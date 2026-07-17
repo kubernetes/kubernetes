@@ -91,7 +91,7 @@ func Validate_T1(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T1) (errs field.ErrorList) {
 
-	{ // field T1.S
+	{ // field T1.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -115,7 +115,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("s"), &obj.S, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.T2
+	{ // field T1.T2 (k8s.io/code-generator/cmd/validation-gen/output_tests/all_types_match/with_field_validations.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T2,
@@ -141,7 +141,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("t2"), &obj.T2, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.T3
+	{ // field T1.T3 (k8s.io/code-generator/cmd/validation-gen/output_tests/all_types_match/with_field_validations.T3)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T3,
@@ -174,7 +174,7 @@ func Validate_T2(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T2) (errs field.ErrorList) {
 
-	{ // field T2.S
+	{ // field T2.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -207,7 +207,7 @@ func Validate_T4(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T4) (errs field.ErrorList) {
 
-	{ // field T4.S
+	{ // field T4.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,

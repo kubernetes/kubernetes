@@ -109,7 +109,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.Enum0Field
+	{ // field Struct.Enum0Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/enum.Enum0)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Enum0,
@@ -131,7 +131,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("enum0Field"), &obj.Enum0Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Enum0PtrField
+	{ // field Struct.Enum0PtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/enum.Enum0)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Enum0,
@@ -153,7 +153,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("enum0PtrField"), obj.Enum0PtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Enum1Field
+	{ // field Struct.Enum1Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/enum.Enum1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Enum1,
@@ -175,7 +175,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("enum1Field"), &obj.Enum1Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Enum1PtrField
+	{ // field Struct.Enum1PtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/enum.Enum1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Enum1,
@@ -197,7 +197,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("enum1PtrField"), obj.Enum1PtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Enum2Field
+	{ // field Struct.Enum2Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/enum.Enum2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Enum2,
@@ -219,7 +219,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("enum2Field"), &obj.Enum2Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Enum2PtrField
+	{ // field Struct.Enum2PtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/enum.Enum2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Enum2,

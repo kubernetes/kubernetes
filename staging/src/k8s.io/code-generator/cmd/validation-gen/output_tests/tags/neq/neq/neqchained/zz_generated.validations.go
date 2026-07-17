@@ -64,7 +64,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.StructField
+	{ // field Struct.StructField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/neq/neq/neqchained.InnerStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *InnerStruct,
@@ -94,7 +94,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("structField"), &obj.StructField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StructPtrField
+	{ // field Struct.StructPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/neq/neq/neqchained.InnerStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *InnerStruct,
@@ -131,7 +131,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("structPtrField"), obj.StructPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StringSliceField
+	{ // field Struct.StringSliceField ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -158,7 +158,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringSliceField"), obj.StringSliceField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StringMapField
+	{ // field Struct.StringMapField (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -185,7 +185,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringMapField"), obj.StringMapField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StringMapKeyField
+	{ // field Struct.StringMapKeyField (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -212,7 +212,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringMapKeyField"), obj.StringMapKeyField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ValidatedSliceField
+	{ // field Struct.ValidatedSliceField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/neq/neq/neqchained.ValidatedStringSlice)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj ValidatedStringSlice,
@@ -234,7 +234,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("validatedSliceField"), obj.ValidatedSliceField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ValidatedStructField
+	{ // field Struct.ValidatedStructField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/neq/neq/neqchained.ValidatedInnerStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *ValidatedInnerStruct,

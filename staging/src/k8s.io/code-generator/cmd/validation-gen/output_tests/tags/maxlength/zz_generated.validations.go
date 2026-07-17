@@ -89,7 +89,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.Max0Field
+	{ // field Struct.Max0Field (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -113,7 +113,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("max0Field"), &obj.Max0Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Max0PtrField
+	{ // field Struct.Max0PtrField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -137,7 +137,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("max0PtrField"), obj.Max0PtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Max10Field
+	{ // field Struct.Max10Field (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -161,7 +161,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("max10Field"), &obj.Max10Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Max10PtrField
+	{ // field Struct.Max10PtrField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -185,7 +185,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("max10PtrField"), obj.Max10PtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Max0UnvalidatedTypedefField
+	{ // field Struct.Max0UnvalidatedTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/maxlength.UnvalidatedStringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *UnvalidatedStringType,
@@ -209,7 +209,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("max0UnvalidatedTypedefField"), &obj.Max0UnvalidatedTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Max0UnvalidatedTypedefPtrField
+	{ // field Struct.Max0UnvalidatedTypedefPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/maxlength.UnvalidatedStringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *UnvalidatedStringType,
@@ -233,7 +233,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("max0UnvalidatedTypedefPtrField"), obj.Max0UnvalidatedTypedefPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Max10UnvalidatedTypedefField
+	{ // field Struct.Max10UnvalidatedTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/maxlength.UnvalidatedStringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *UnvalidatedStringType,
@@ -257,7 +257,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("max10UnvalidatedTypedefField"), &obj.Max10UnvalidatedTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Max10UnvalidatedTypedefPtrField
+	{ // field Struct.Max10UnvalidatedTypedefPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/maxlength.UnvalidatedStringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *UnvalidatedStringType,
@@ -281,7 +281,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("max10UnvalidatedTypedefPtrField"), obj.Max10UnvalidatedTypedefPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Max0ValidatedTypedefField
+	{ // field Struct.Max0ValidatedTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/maxlength.Max0Type)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Max0Type,
@@ -303,7 +303,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("max0ValidatedTypedefField"), &obj.Max0ValidatedTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Max0ValidatedTypedefPtrField
+	{ // field Struct.Max0ValidatedTypedefPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/maxlength.Max0Type)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Max0Type,
@@ -325,7 +325,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("max0ValidatedTypedefPtrField"), obj.Max0ValidatedTypedefPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Max10ValidatedTypedefField
+	{ // field Struct.Max10ValidatedTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/maxlength.Max10Type)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Max10Type,
@@ -347,7 +347,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("max10ValidatedTypedefField"), &obj.Max10ValidatedTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Max10ValidatedTypedefPtrField
+	{ // field Struct.Max10ValidatedTypedefPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/maxlength.Max10Type)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Max10Type,

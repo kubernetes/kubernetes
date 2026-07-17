@@ -210,7 +210,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.DiscriminatorField
+	{ // field Struct.DiscriminatorField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/options/discriminators.Discriminator)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Discriminator,
@@ -232,7 +232,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("discriminatorField"), &obj.DiscriminatorField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.DiscriminatorFieldDisabled
+	{ // field Struct.DiscriminatorFieldDisabled (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/options/discriminators.DiscriminatorDisabled)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DiscriminatorDisabled,

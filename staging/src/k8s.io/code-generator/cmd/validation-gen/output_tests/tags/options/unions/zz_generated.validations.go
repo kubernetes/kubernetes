@@ -67,7 +67,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.UnionField
+	{ // field Struct.UnionField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/options/unions.Union)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Union,
@@ -89,7 +89,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("unionField"), &obj.UnionField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.UnionFieldDisabled
+	{ // field Struct.UnionFieldDisabled (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/options/unions.UnionDisabled)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *UnionDisabled,
@@ -111,7 +111,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("unionFieldDisabled"), &obj.UnionFieldDisabled, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ZeroOrOneOfField
+	{ // field Struct.ZeroOrOneOfField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/options/unions.ZeroOrOneOf)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *ZeroOrOneOf,
@@ -133,7 +133,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("zeroOrOneOfField"), &obj.ZeroOrOneOfField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ZeroOrOneOfFieldDisabled
+	{ // field Struct.ZeroOrOneOfFieldDisabled (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/options/unions.ZeroOrOneOfDisabled)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *ZeroOrOneOfDisabled,
@@ -155,7 +155,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("zeroOrOneOfFieldDisabled"), &obj.ZeroOrOneOfFieldDisabled, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ZeroOrOneOfItem
+	{ // field Struct.ZeroOrOneOfItem ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/options/unions.Task)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Task,
@@ -203,7 +203,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("zeroOrOneOfItem"), obj.ZeroOrOneOfItem, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ZeroOrOneOfItemDisabled
+	{ // field Struct.ZeroOrOneOfItemDisabled ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/options/unions.Task)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Task,

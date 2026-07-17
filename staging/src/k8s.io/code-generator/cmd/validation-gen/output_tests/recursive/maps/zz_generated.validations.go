@@ -137,7 +137,7 @@ func Validate_T1(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T1) (errs field.ErrorList) {
 
-	{ // field T1.T2
+	{ // field T1.T2 (k8s.io/code-generator/cmd/validation-gen/output_tests/recursive/maps.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T2,
@@ -159,7 +159,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("t2"), &obj.T2, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.T3
+	{ // field T1.T3 (k8s.io/code-generator/cmd/validation-gen/output_tests/recursive/maps.T3)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T3,
@@ -181,7 +181,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("t3"), &obj.T3, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.T5
+	{ // field T1.T5 (map[string]k8s.io/code-generator/cmd/validation-gen/output_tests/recursive/maps.T5)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]T5,
@@ -205,7 +205,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("t5"), obj.T5, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.T6
+	{ // field T1.T6 (map[string]k8s.io/code-generator/cmd/validation-gen/output_tests/recursive/maps.T6)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]T6,
@@ -238,7 +238,7 @@ func Validate_T2(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T2) (errs field.ErrorList) {
 
-	{ // field T2.MT1
+	{ // field T2.MT1 (map[string]k8s.io/code-generator/cmd/validation-gen/output_tests/recursive/maps.T1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]T1,
@@ -275,7 +275,7 @@ func Validate_T3(
 		errs = append(errs, e...)
 	}
 
-	{ // field T3.T4
+	{ // field T3.T4 (k8s.io/code-generator/cmd/validation-gen/output_tests/recursive/maps.T4)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T4,
@@ -306,7 +306,7 @@ func Validate_T4(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T4) (errs field.ErrorList) {
 
-	{ // field T4.MT3
+	{ // field T4.MT3 (map[string]k8s.io/code-generator/cmd/validation-gen/output_tests/recursive/maps.T3)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]T3,
@@ -339,7 +339,7 @@ func Validate_T5(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T5) (errs field.ErrorList) {
 
-	{ // field T5.T5
+	{ // field T5.T5 (map[string]k8s.io/code-generator/cmd/validation-gen/output_tests/recursive/maps.T5)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]T5,
@@ -376,7 +376,7 @@ func Validate_T6(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T6) (errs field.ErrorList) {
 
-	{ // field T6.S
+	{ // field T6.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -400,7 +400,7 @@ func Validate_T6(
 		errs = append(errs, fn(fldPath.Child("s"), &obj.S, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T6.T6
+	{ // field T6.T6 (map[string]k8s.io/code-generator/cmd/validation-gen/output_tests/recursive/maps.T6)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]T6,

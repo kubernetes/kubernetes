@@ -64,7 +64,7 @@ func Validate_UpdateTestStruct(
 
 	// field UpdateTestStruct.TypeMeta has no validation
 
-	{ // field UpdateTestStruct.StringNoSet
+	{ // field UpdateTestStruct.StringNoSet (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -93,7 +93,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("stringNoSet"), &obj.StringNoSet, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.StringNoUnset
+	{ // field UpdateTestStruct.StringNoUnset (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -122,7 +122,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("stringNoUnset"), &obj.StringNoUnset, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.StringNoModify
+	{ // field UpdateTestStruct.StringNoModify (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -151,7 +151,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("stringNoModify"), &obj.StringNoModify, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.StringFullyRestricted
+	{ // field UpdateTestStruct.StringFullyRestricted (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -180,7 +180,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("stringFullyRestricted"), &obj.StringFullyRestricted, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.StringSetOnce
+	{ // field UpdateTestStruct.StringSetOnce (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -209,7 +209,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("stringSetOnce"), &obj.StringSetOnce, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.IntNoModify
+	{ // field UpdateTestStruct.IntNoModify (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -238,7 +238,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("intNoModify"), &obj.IntNoModify, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.Int32NoModify
+	{ // field UpdateTestStruct.Int32NoModify (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -267,7 +267,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("int32NoModify"), &obj.Int32NoModify, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.Int64NoModify
+	{ // field UpdateTestStruct.Int64NoModify (int64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int64,
@@ -296,7 +296,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("int64NoModify"), &obj.Int64NoModify, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.UintNoModify
+	{ // field UpdateTestStruct.UintNoModify (uint)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *uint,
@@ -325,7 +325,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("uintNoModify"), &obj.UintNoModify, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.BoolNoModify
+	{ // field UpdateTestStruct.BoolNoModify (bool)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *bool,
@@ -354,7 +354,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("boolNoModify"), &obj.BoolNoModify, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.Float32NoModify
+	{ // field UpdateTestStruct.Float32NoModify (float32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *float32,
@@ -383,7 +383,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("float32NoModify"), &obj.Float32NoModify, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.Float64NoModify
+	{ // field UpdateTestStruct.Float64NoModify (float64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *float64,
@@ -412,7 +412,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("float64NoModify"), &obj.Float64NoModify, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.ByteNoModify
+	{ // field UpdateTestStruct.ByteNoModify (byte)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *byte,
@@ -441,7 +441,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("byteNoModify"), &obj.ByteNoModify, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.StructNoModify
+	{ // field UpdateTestStruct.StructNoModify (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/update/primitives.TestStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *TestStruct,
@@ -470,7 +470,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("structNoModify"), &obj.StructNoModify, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.NonComparableStructNoModify
+	{ // field UpdateTestStruct.NonComparableStructNoModify (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/update/primitives.NonComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *NonComparableStruct,
@@ -499,7 +499,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("nonComparableStructNoModify"), &obj.NonComparableStructNoModify, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.PointerNoSet
+	{ // field UpdateTestStruct.PointerNoSet (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -528,7 +528,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("pointerNoSet"), obj.PointerNoSet, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.PointerNoUnset
+	{ // field UpdateTestStruct.PointerNoUnset (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -557,7 +557,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("pointerNoUnset"), obj.PointerNoUnset, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.PointerNoModify
+	{ // field UpdateTestStruct.PointerNoModify (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -586,7 +586,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("pointerNoModify"), obj.PointerNoModify, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.PointerFullyRestricted
+	{ // field UpdateTestStruct.PointerFullyRestricted (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -615,7 +615,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("pointerFullyRestricted"), obj.PointerFullyRestricted, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.IntPointerNoModify
+	{ // field UpdateTestStruct.IntPointerNoModify (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -644,7 +644,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("intPointerNoModify"), obj.IntPointerNoModify, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.BoolPointerNoModify
+	{ // field UpdateTestStruct.BoolPointerNoModify (bool)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *bool,
@@ -673,7 +673,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("boolPointerNoModify"), obj.BoolPointerNoModify, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.StructPointerNoModify
+	{ // field UpdateTestStruct.StructPointerNoModify (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/update/primitives.TestStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *TestStruct,
@@ -702,7 +702,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("structPointerNoModify"), obj.StructPointerNoModify, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.CustomTypeNoModify
+	{ // field UpdateTestStruct.CustomTypeNoModify (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/update/primitives.CustomString)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *CustomString,
@@ -731,7 +731,7 @@ func Validate_UpdateTestStruct(
 		errs = append(errs, fn(fldPath.Child("customTypeNoModify"), &obj.CustomTypeNoModify, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateTestStruct.CustomTypeNoSet
+	{ // field UpdateTestStruct.CustomTypeNoSet (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/update/primitives.CustomInt)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *CustomInt,

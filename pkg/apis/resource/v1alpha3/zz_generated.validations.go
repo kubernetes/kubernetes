@@ -81,10 +81,10 @@ func Validate_DeviceTaint(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *resourcev1alpha3.DeviceTaint) (errs field.ErrorList) {
 
-	// field resourcev1alpha3.DeviceTaint.Key has no validation
-	// field resourcev1alpha3.DeviceTaint.Value has no validation
+	// field DeviceTaint.Key has no validation
+	// field DeviceTaint.Value has no validation
 
-	{ // field resourcev1alpha3.DeviceTaint.Effect
+	{ // field DeviceTaint.Effect (k8s.io/api/resource/v1alpha3.DeviceTaintEffect)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *resourcev1alpha3.DeviceTaintEffect,
@@ -115,7 +115,7 @@ func Validate_DeviceTaint(
 		errs = append(errs, fn(fldPath.Child("effect"), &obj.Effect, oldVal, oldObj != nil)...)
 	}
 
-	// field resourcev1alpha3.DeviceTaint.TimeAdded has no validation
+	// field DeviceTaint.TimeAdded has no validation
 	return errs
 }
 
@@ -140,9 +140,9 @@ func Validate_DeviceTaintRule(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *resourcev1alpha3.DeviceTaintRule) (errs field.ErrorList) {
 
-	// field resourcev1alpha3.DeviceTaintRule.TypeMeta has no validation
+	// field DeviceTaintRule.TypeMeta has no validation
 
-	{ // field resourcev1alpha3.DeviceTaintRule.ObjectMeta
+	{ // field DeviceTaintRule.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -164,7 +164,7 @@ func Validate_DeviceTaintRule(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.DeviceTaintRule.Spec
+	{ // field DeviceTaintRule.Spec (k8s.io/api/resource/v1alpha3.DeviceTaintRuleSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *resourcev1alpha3.DeviceTaintRuleSpec,
@@ -186,7 +186,7 @@ func Validate_DeviceTaintRule(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.DeviceTaintRule.Status
+	{ // field DeviceTaintRule.Status (k8s.io/api/resource/v1alpha3.DeviceTaintRuleStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *resourcev1alpha3.DeviceTaintRuleStatus,
@@ -217,9 +217,9 @@ func Validate_DeviceTaintRuleSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *resourcev1alpha3.DeviceTaintRuleSpec) (errs field.ErrorList) {
 
-	// field resourcev1alpha3.DeviceTaintRuleSpec.DeviceSelector has no validation
+	// field DeviceTaintRuleSpec.DeviceSelector has no validation
 
-	{ // field resourcev1alpha3.DeviceTaintRuleSpec.Taint
+	{ // field DeviceTaintRuleSpec.Taint (k8s.io/api/resource/v1alpha3.DeviceTaint)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *resourcev1alpha3.DeviceTaint,
@@ -250,7 +250,7 @@ func Validate_DeviceTaintRuleStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *resourcev1alpha3.DeviceTaintRuleStatus) (errs field.ErrorList) {
 
-	{ // field resourcev1alpha3.DeviceTaintRuleStatus.Conditions
+	{ // field DeviceTaintRuleStatus.Conditions ([]k8s.io/apimachinery/pkg/apis/meta/v1.Condition)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []v1.Condition,
@@ -297,7 +297,7 @@ func Validate_PoolStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *resourcev1alpha3.PoolStatus) (errs field.ErrorList) {
 
-	{ // field resourcev1alpha3.PoolStatus.Driver
+	{ // field PoolStatus.Driver (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -329,7 +329,7 @@ func Validate_PoolStatus(
 		errs = append(errs, fn(fldPath.Child("driver"), &obj.Driver, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.PoolStatus.PoolName
+	{ // field PoolStatus.PoolName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -361,7 +361,7 @@ func Validate_PoolStatus(
 		errs = append(errs, fn(fldPath.Child("poolName"), &obj.PoolName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.PoolStatus.Generation
+	{ // field PoolStatus.Generation (int64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int64,
@@ -393,7 +393,7 @@ func Validate_PoolStatus(
 		errs = append(errs, fn(fldPath.Child("generation"), &obj.Generation, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.PoolStatus.ResourceSliceCount
+	{ // field PoolStatus.ResourceSliceCount (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -424,7 +424,7 @@ func Validate_PoolStatus(
 		errs = append(errs, fn(fldPath.Child("resourceSliceCount"), obj.ResourceSliceCount, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.PoolStatus.TotalDevices
+	{ // field PoolStatus.TotalDevices (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -455,7 +455,7 @@ func Validate_PoolStatus(
 		errs = append(errs, fn(fldPath.Child("totalDevices"), obj.TotalDevices, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.PoolStatus.AllocatedDevices
+	{ // field PoolStatus.AllocatedDevices (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -486,7 +486,7 @@ func Validate_PoolStatus(
 		errs = append(errs, fn(fldPath.Child("allocatedDevices"), obj.AllocatedDevices, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.PoolStatus.AvailableDevices
+	{ // field PoolStatus.AvailableDevices (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -517,7 +517,7 @@ func Validate_PoolStatus(
 		errs = append(errs, fn(fldPath.Child("availableDevices"), obj.AvailableDevices, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.PoolStatus.UnavailableDevices
+	{ // field PoolStatus.UnavailableDevices (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -548,7 +548,7 @@ func Validate_PoolStatus(
 		errs = append(errs, fn(fldPath.Child("unavailableDevices"), obj.UnavailableDevices, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.PoolStatus.NodeName
+	{ // field PoolStatus.NodeName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -579,7 +579,7 @@ func Validate_PoolStatus(
 		errs = append(errs, fn(fldPath.Child("nodeName"), obj.NodeName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.PoolStatus.ValidationError
+	{ // field PoolStatus.ValidationError (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -619,9 +619,9 @@ func Validate_ResourcePoolStatusRequest(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *resourcev1alpha3.ResourcePoolStatusRequest) (errs field.ErrorList) {
 
-	// field resourcev1alpha3.ResourcePoolStatusRequest.TypeMeta has no validation
+	// field ResourcePoolStatusRequest.TypeMeta has no validation
 
-	{ // field resourcev1alpha3.ResourcePoolStatusRequest.ObjectMeta
+	{ // field ResourcePoolStatusRequest.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -643,7 +643,7 @@ func Validate_ResourcePoolStatusRequest(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.ResourcePoolStatusRequest.Spec
+	{ // field ResourcePoolStatusRequest.Spec (k8s.io/api/resource/v1alpha3.ResourcePoolStatusRequestSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *resourcev1alpha3.ResourcePoolStatusRequestSpec,
@@ -674,7 +674,7 @@ func Validate_ResourcePoolStatusRequest(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.ResourcePoolStatusRequest.Status
+	{ // field ResourcePoolStatusRequest.Status (k8s.io/api/resource/v1alpha3.ResourcePoolStatusRequestStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *resourcev1alpha3.ResourcePoolStatusRequestStatus,
@@ -713,7 +713,7 @@ func Validate_ResourcePoolStatusRequestSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *resourcev1alpha3.ResourcePoolStatusRequestSpec) (errs field.ErrorList) {
 
-	{ // field resourcev1alpha3.ResourcePoolStatusRequestSpec.Driver
+	{ // field ResourcePoolStatusRequestSpec.Driver (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -745,7 +745,7 @@ func Validate_ResourcePoolStatusRequestSpec(
 		errs = append(errs, fn(fldPath.Child("driver"), &obj.Driver, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.ResourcePoolStatusRequestSpec.PoolName
+	{ // field ResourcePoolStatusRequestSpec.PoolName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -776,7 +776,7 @@ func Validate_ResourcePoolStatusRequestSpec(
 		errs = append(errs, fn(fldPath.Child("poolName"), obj.PoolName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.ResourcePoolStatusRequestSpec.Limit
+	{ // field ResourcePoolStatusRequestSpec.Limit (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -821,7 +821,7 @@ func Validate_ResourcePoolStatusRequestStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *resourcev1alpha3.ResourcePoolStatusRequestStatus) (errs field.ErrorList) {
 
-	{ // field resourcev1alpha3.ResourcePoolStatusRequestStatus.PoolCount
+	{ // field ResourcePoolStatusRequestStatus.PoolCount (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -853,7 +853,7 @@ func Validate_ResourcePoolStatusRequestStatus(
 		errs = append(errs, fn(fldPath.Child("poolCount"), obj.PoolCount, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.ResourcePoolStatusRequestStatus.Pools
+	{ // field ResourcePoolStatusRequestStatus.Pools ([]k8s.io/api/resource/v1alpha3.PoolStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []resourcev1alpha3.PoolStatus,
@@ -889,7 +889,7 @@ func Validate_ResourcePoolStatusRequestStatus(
 		errs = append(errs, fn(fldPath.Child("pools"), obj.Pools, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.ResourcePoolStatusRequestStatus.Conditions
+	{ // field ResourcePoolStatusRequestStatus.Conditions ([]k8s.io/apimachinery/pkg/apis/meta/v1.Condition)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []v1.Condition,

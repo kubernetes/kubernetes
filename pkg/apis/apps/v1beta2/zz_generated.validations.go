@@ -142,9 +142,9 @@ func Validate_ControllerRevision(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *appsv1beta2.ControllerRevision) (errs field.ErrorList) {
 
-	// field appsv1beta2.ControllerRevision.TypeMeta has no validation
+	// field ControllerRevision.TypeMeta has no validation
 
-	{ // field appsv1beta2.ControllerRevision.ObjectMeta
+	{ // field ControllerRevision.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -166,8 +166,8 @@ func Validate_ControllerRevision(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field appsv1beta2.ControllerRevision.Data has no validation
-	// field appsv1beta2.ControllerRevision.Revision has no validation
+	// field ControllerRevision.Data has no validation
+	// field ControllerRevision.Revision has no validation
 	return errs
 }
 
@@ -177,9 +177,9 @@ func Validate_DaemonSet(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *appsv1beta2.DaemonSet) (errs field.ErrorList) {
 
-	// field appsv1beta2.DaemonSet.TypeMeta has no validation
+	// field DaemonSet.TypeMeta has no validation
 
-	{ // field appsv1beta2.DaemonSet.ObjectMeta
+	{ // field DaemonSet.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -201,7 +201,7 @@ func Validate_DaemonSet(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field appsv1beta2.DaemonSet.Spec
+	{ // field DaemonSet.Spec (k8s.io/api/apps/v1beta2.DaemonSetSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *appsv1beta2.DaemonSetSpec,
@@ -223,7 +223,7 @@ func Validate_DaemonSet(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field appsv1beta2.DaemonSet.Status has no validation
+	// field DaemonSet.Status has no validation
 	return errs
 }
 
@@ -233,9 +233,9 @@ func Validate_DaemonSetSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *appsv1beta2.DaemonSetSpec) (errs field.ErrorList) {
 
-	// field appsv1beta2.DaemonSetSpec.Selector has no validation
+	// field DaemonSetSpec.Selector has no validation
 
-	{ // field appsv1beta2.DaemonSetSpec.Template
+	{ // field DaemonSetSpec.Template (k8s.io/api/core/v1.PodTemplateSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *apicorev1.PodTemplateSpec,
@@ -257,9 +257,9 @@ func Validate_DaemonSetSpec(
 		errs = append(errs, fn(fldPath.Child("template"), &obj.Template, oldVal, oldObj != nil)...)
 	}
 
-	// field appsv1beta2.DaemonSetSpec.UpdateStrategy has no validation
-	// field appsv1beta2.DaemonSetSpec.MinReadySeconds has no validation
-	// field appsv1beta2.DaemonSetSpec.RevisionHistoryLimit has no validation
+	// field DaemonSetSpec.UpdateStrategy has no validation
+	// field DaemonSetSpec.MinReadySeconds has no validation
+	// field DaemonSetSpec.RevisionHistoryLimit has no validation
 	return errs
 }
 
@@ -269,9 +269,9 @@ func Validate_Deployment(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *appsv1beta2.Deployment) (errs field.ErrorList) {
 
-	// field appsv1beta2.Deployment.TypeMeta has no validation
+	// field Deployment.TypeMeta has no validation
 
-	{ // field appsv1beta2.Deployment.ObjectMeta
+	{ // field Deployment.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -293,7 +293,7 @@ func Validate_Deployment(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field appsv1beta2.Deployment.Spec
+	{ // field Deployment.Spec (k8s.io/api/apps/v1beta2.DeploymentSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *appsv1beta2.DeploymentSpec,
@@ -315,7 +315,7 @@ func Validate_Deployment(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field appsv1beta2.Deployment.Status has no validation
+	// field Deployment.Status has no validation
 	return errs
 }
 
@@ -325,10 +325,10 @@ func Validate_DeploymentSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *appsv1beta2.DeploymentSpec) (errs field.ErrorList) {
 
-	// field appsv1beta2.DeploymentSpec.Replicas has no validation
-	// field appsv1beta2.DeploymentSpec.Selector has no validation
+	// field DeploymentSpec.Replicas has no validation
+	// field DeploymentSpec.Selector has no validation
 
-	{ // field appsv1beta2.DeploymentSpec.Template
+	{ // field DeploymentSpec.Template (k8s.io/api/core/v1.PodTemplateSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *apicorev1.PodTemplateSpec,
@@ -350,11 +350,11 @@ func Validate_DeploymentSpec(
 		errs = append(errs, fn(fldPath.Child("template"), &obj.Template, oldVal, oldObj != nil)...)
 	}
 
-	// field appsv1beta2.DeploymentSpec.Strategy has no validation
-	// field appsv1beta2.DeploymentSpec.MinReadySeconds has no validation
-	// field appsv1beta2.DeploymentSpec.RevisionHistoryLimit has no validation
-	// field appsv1beta2.DeploymentSpec.Paused has no validation
-	// field appsv1beta2.DeploymentSpec.ProgressDeadlineSeconds has no validation
+	// field DeploymentSpec.Strategy has no validation
+	// field DeploymentSpec.MinReadySeconds has no validation
+	// field DeploymentSpec.RevisionHistoryLimit has no validation
+	// field DeploymentSpec.Paused has no validation
+	// field DeploymentSpec.ProgressDeadlineSeconds has no validation
 	return errs
 }
 
@@ -364,9 +364,9 @@ func Validate_ReplicaSet(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *appsv1beta2.ReplicaSet) (errs field.ErrorList) {
 
-	// field appsv1beta2.ReplicaSet.TypeMeta has no validation
+	// field ReplicaSet.TypeMeta has no validation
 
-	{ // field appsv1beta2.ReplicaSet.ObjectMeta
+	{ // field ReplicaSet.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -388,7 +388,7 @@ func Validate_ReplicaSet(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field appsv1beta2.ReplicaSet.Spec
+	{ // field ReplicaSet.Spec (k8s.io/api/apps/v1beta2.ReplicaSetSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *appsv1beta2.ReplicaSetSpec,
@@ -410,7 +410,7 @@ func Validate_ReplicaSet(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field appsv1beta2.ReplicaSet.Status has no validation
+	// field ReplicaSet.Status has no validation
 	return errs
 }
 
@@ -420,11 +420,11 @@ func Validate_ReplicaSetSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *appsv1beta2.ReplicaSetSpec) (errs field.ErrorList) {
 
-	// field appsv1beta2.ReplicaSetSpec.Replicas has no validation
-	// field appsv1beta2.ReplicaSetSpec.MinReadySeconds has no validation
-	// field appsv1beta2.ReplicaSetSpec.Selector has no validation
+	// field ReplicaSetSpec.Replicas has no validation
+	// field ReplicaSetSpec.MinReadySeconds has no validation
+	// field ReplicaSetSpec.Selector has no validation
 
-	{ // field appsv1beta2.ReplicaSetSpec.Template
+	{ // field ReplicaSetSpec.Template (k8s.io/api/core/v1.PodTemplateSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *apicorev1.PodTemplateSpec,
@@ -455,10 +455,10 @@ func Validate_Scale(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *appsv1beta2.Scale) (errs field.ErrorList) {
 
-	// field appsv1beta2.Scale.TypeMeta has no validation
-	// field appsv1beta2.Scale.ObjectMeta has no validation
+	// field Scale.TypeMeta has no validation
+	// field Scale.ObjectMeta has no validation
 
-	{ // field appsv1beta2.Scale.Spec
+	{ // field Scale.Spec (k8s.io/api/apps/v1beta2.ScaleSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *appsv1beta2.ScaleSpec,
@@ -480,7 +480,7 @@ func Validate_Scale(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field appsv1beta2.Scale.Status has no validation
+	// field Scale.Status has no validation
 	return errs
 }
 
@@ -490,7 +490,7 @@ func Validate_ScaleSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *appsv1beta2.ScaleSpec) (errs field.ErrorList) {
 
-	{ // field appsv1beta2.ScaleSpec.Replicas
+	{ // field ScaleSpec.Replicas (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -524,9 +524,9 @@ func Validate_StatefulSet(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *appsv1beta2.StatefulSet) (errs field.ErrorList) {
 
-	// field appsv1beta2.StatefulSet.TypeMeta has no validation
+	// field StatefulSet.TypeMeta has no validation
 
-	{ // field appsv1beta2.StatefulSet.ObjectMeta
+	{ // field StatefulSet.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -548,7 +548,7 @@ func Validate_StatefulSet(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field appsv1beta2.StatefulSet.Spec
+	{ // field StatefulSet.Spec (k8s.io/api/apps/v1beta2.StatefulSetSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *appsv1beta2.StatefulSetSpec,
@@ -570,7 +570,7 @@ func Validate_StatefulSet(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field appsv1beta2.StatefulSet.Status has no validation
+	// field StatefulSet.Status has no validation
 	return errs
 }
 
@@ -580,9 +580,9 @@ func Validate_StatefulSetSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *appsv1beta2.StatefulSetSpec) (errs field.ErrorList) {
 
-	// field appsv1beta2.StatefulSetSpec.Replicas has no validation
+	// field StatefulSetSpec.Replicas has no validation
 
-	{ // field appsv1beta2.StatefulSetSpec.Selector
+	{ // field StatefulSetSpec.Selector (k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.LabelSelector,
@@ -615,7 +615,7 @@ func Validate_StatefulSetSpec(
 		errs = append(errs, fn(fldPath.Child("selector"), obj.Selector, oldVal, oldObj != nil)...)
 	}
 
-	{ // field appsv1beta2.StatefulSetSpec.Template
+	{ // field StatefulSetSpec.Template (k8s.io/api/core/v1.PodTemplateSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *apicorev1.PodTemplateSpec,
@@ -637,7 +637,7 @@ func Validate_StatefulSetSpec(
 		errs = append(errs, fn(fldPath.Child("template"), &obj.Template, oldVal, oldObj != nil)...)
 	}
 
-	{ // field appsv1beta2.StatefulSetSpec.VolumeClaimTemplates
+	{ // field StatefulSetSpec.VolumeClaimTemplates ([]k8s.io/api/core/v1.PersistentVolumeClaim)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []apicorev1.PersistentVolumeClaim,
@@ -669,7 +669,7 @@ func Validate_StatefulSetSpec(
 		errs = append(errs, fn(fldPath.Child("volumeClaimTemplates"), obj.VolumeClaimTemplates, oldVal, oldObj != nil)...)
 	}
 
-	{ // field appsv1beta2.StatefulSetSpec.ServiceName
+	{ // field StatefulSetSpec.ServiceName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -701,7 +701,7 @@ func Validate_StatefulSetSpec(
 		errs = append(errs, fn(fldPath.Child("serviceName"), &obj.ServiceName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field appsv1beta2.StatefulSetSpec.PodManagementPolicy
+	{ // field StatefulSetSpec.PodManagementPolicy (k8s.io/api/apps/v1beta2.PodManagementPolicyType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *appsv1beta2.PodManagementPolicyType,
@@ -733,10 +733,10 @@ func Validate_StatefulSetSpec(
 		errs = append(errs, fn(fldPath.Child("podManagementPolicy"), &obj.PodManagementPolicy, oldVal, oldObj != nil)...)
 	}
 
-	// field appsv1beta2.StatefulSetSpec.UpdateStrategy has no validation
-	// field appsv1beta2.StatefulSetSpec.RevisionHistoryLimit has no validation
-	// field appsv1beta2.StatefulSetSpec.MinReadySeconds has no validation
-	// field appsv1beta2.StatefulSetSpec.PersistentVolumeClaimRetentionPolicy has no validation
-	// field appsv1beta2.StatefulSetSpec.Ordinals has no validation
+	// field StatefulSetSpec.UpdateStrategy has no validation
+	// field StatefulSetSpec.RevisionHistoryLimit has no validation
+	// field StatefulSetSpec.MinReadySeconds has no validation
+	// field StatefulSetSpec.PersistentVolumeClaimRetentionPolicy has no validation
+	// field StatefulSetSpec.Ordinals has no validation
 	return errs
 }
