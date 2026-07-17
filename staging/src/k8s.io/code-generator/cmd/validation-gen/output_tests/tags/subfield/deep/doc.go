@@ -35,6 +35,7 @@ type Struct struct {
 	// +k8s:subfield(mapField)=+k8s:eachVal=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructField.MapField"
 	StructField OtherStruct `json:"structField"`
 
+	// +k8s:optional
 	// +k8s:subfield(structField)=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructPtrField.StructField 1"
 	// +k8s:subfield(structField)=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructPtrField.StructField 2"
 	// +k8s:subfield(sliceField)=+k8s:eachVal=+k8s:subfield(stringField)=+k8s:validateFalse="Struct.StructPtrField.SliceField"
