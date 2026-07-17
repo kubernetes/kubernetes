@@ -149,13 +149,52 @@ func TestAdmissionNamespaceDoesNotExist(t *testing.T) {
 		t.Errorf("Expected error rejecting creates in a namespace when it is missing")
 	}
 
-	// verify update operations in the namespace cause an error
+	// verify update operations in the namespace can proceed
 	err = handler.Admit(context.TODO(), admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
-	if err == nil {
-		t.Errorf("Expected error rejecting updates in a namespace when it is missing")
+	if err != nil {
+		t.Errorf("Unexpected error rejecting updates in a namespace when it is missing: %v", err)
 	}
 
 	// verify delete operations in the namespace can proceed
+	err = handler.Admit(context.TODO(), admission.NewAttributesRecord(nil, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Delete, &metav1.DeleteOptions{}, false, nil), nil)
+	if err != nil {
+		t.Errorf("Unexpected error returned from admission handler: %v", err)
+	}
+}
+
+// TestAdmissionNamespaceFullyDeleted verifies that when a namespace has been
+// fully deleted from storage (not just Terminating), Creates are rejected but
+// Updates are allowed. Objects may outlive their namespace in storage, and
+// controllers that list across all namespaces may need to update them. The
+// storage layer validates object existence. Create-on-update is safe because
+// the storage layer re-runs the admission chain with a Create operation.
+func TestAdmissionNamespaceFullyDeleted(t *testing.T) {
+	namespace := "test"
+	mockClient := newMockClientForTest(map[string]v1.NamespacePhase{})
+	mockClient.AddReactor("get", "namespaces", func(action core.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.NewNotFound(v1.Resource("namespaces"), namespace)
+	})
+	handler, informerFactory, err := newHandlerForTest(mockClient)
+	if err != nil {
+		t.Errorf("unexpected error initializing handler: %v", err)
+	}
+	informerFactory.Start(wait.NeverStop)
+
+	pod := newPod(namespace)
+
+	// verify create is rejected
+	err = handler.Admit(context.TODO(), admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	if err == nil {
+		t.Errorf("Expected error rejecting creates in a fully deleted namespace")
+	}
+
+	// verify update is allowed
+	err = handler.Admit(context.TODO(), admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
+	if err != nil {
+		t.Errorf("Unexpected error rejecting updates in a fully deleted namespace: %v", err)
+	}
+
+	// verify delete is allowed
 	err = handler.Admit(context.TODO(), admission.NewAttributesRecord(nil, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Delete, &metav1.DeleteOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler: %v", err)
