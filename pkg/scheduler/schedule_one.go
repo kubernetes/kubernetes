@@ -1299,9 +1299,9 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 		utilruntime.HandleErrorWithContext(ctx, err, "Error updating pod", "pod", klog.KObj(pod))
 	} else {
 		// Optimistically apply the update to the local pod info.
-		// We only do this if the API call succeeded, ensuring our queued pod 
+		// We only do this if the API call succeeded, ensuring our queued pod
 		// matches the true API Server state.
-		podutil.UpdatePodCondition(&podInfo.Pod.Status, podCondition)
+		podutil.UpdatePodCondition(&podInfo.Pod.Status, podCondition.DeepCopy())
 		if nominatingInfo != nil && nominatingInfo.Mode() == fwk.ModeOverride {
 			podInfo.Pod.Status.NominatedNodeName = nominatingInfo.NominatedNodeName
 		}
