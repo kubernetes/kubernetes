@@ -28,7 +28,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	mathrand "math/rand/v2"
+	"math/big"
 	"sync"
 	"time"
 
@@ -695,7 +695,13 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 // prevent multiple PodCertificateProjections from synchronizing their PCR
 // creations.
 func jitterDuration() time.Duration {
-	return time.Duration(mathrand.Int64N(5 * 60 * 1_000_000_000))
+	max := big.NewInt(5 * 60 * 1_000_000_000)
+	n, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		// Fall back to zero jitter if crypto/rand is unavailable.
+		return 0
+	}
+	return time.Duration(n.Int64())
 }
 
 // runRefreshPass adds every non-mirror pod on the node back to the volume
