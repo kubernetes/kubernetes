@@ -234,9 +234,6 @@ func verifyContainerCPUWeight(ctx context.Context, f *framework.Framework, pod *
 func VerifyContainerCPULimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	cpuLimCgPath := getCgroupCPULimitPath(cgroupFsPath, podOnCgroupv2)
 	cpuLim := expectedResources.Limits.Cpu()
-	if cpuLim.IsZero() && pod.Spec.Resources != nil {
-		cpuLim = pod.Spec.Resources.Limits.Cpu()
-	}
 	expectedCPULimits := getCPULimitCgroupExpectations(cpuLim, podOnCgroupv2)
 	if err := VerifyCgroupValue(ctx, f, pod, containerName, cpuLimCgPath, expectedCPULimits...); err != nil {
 		return fmt.Errorf("failed to verify cpu limit cgroup value: %w", err)
