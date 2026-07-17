@@ -249,6 +249,9 @@ type ObjectMeta struct {
 	// and services.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:eachKey=+k8s:format=k8s-label-key
+	// +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:format=k8s-label-value
 	Labels map[string]string `json:"labels,omitempty" protobuf:"bytes,11,rep,name=labels"`
 
 	// Annotations is an unstructured key value map stored with a resource that may be

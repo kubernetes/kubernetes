@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -386,6 +387,10 @@ func WithAllDeclarativeEnforcedForTest(ctx context.Context) context.Context {
 // For testing purposes, WithAllDeclarativeEnforcedForTest enforces all declarative validations regardless
 // of lifecycle and filters all covered handwritten validations.
 func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, errs field.ErrorList, opType operation.Type, config DeclarativeValidationConfig) field.ErrorList {
+	config.NormalizationRules = append(config.NormalizationRules, field.NormalizationRule{
+		Regexp:      regexp.MustCompile(`metadata\.labels\[.*\]`),
+		Replacement: "metadata.labels",
+	})
 	// These errors must be errors returned by the handwritten validation.
 	errs = errs.MarkFromImperative()
 	validationIdentifier, err := metricIdentifier(ctx, scheme, obj, opType)

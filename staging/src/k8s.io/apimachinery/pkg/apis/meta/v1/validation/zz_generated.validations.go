@@ -407,7 +407,40 @@ func Validate_ObjectMeta(
 		errs = append(errs, fn(fldPath.Child("deletionGracePeriodSeconds"), obj.DeletionGracePeriodSeconds, oldVal, oldObj != nil)...)
 	}
 
-	// field v1.ObjectMeta.Labels has no validation
+	{ // field v1.ObjectMeta.Labels
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.EachMapKey(ctx, op, fldPath, obj, oldObj, validate.LabelKey).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.LabelValue).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *v1.ObjectMeta) map[string]string {
+				return oldObj.Labels
+			})
+		errs = append(errs, fn(fldPath.Child("labels"), obj.Labels, oldVal, oldObj != nil)...)
+	}
+
 	// field v1.ObjectMeta.Annotations has no validation
 
 	{ // field v1.ObjectMeta.OwnerReferences

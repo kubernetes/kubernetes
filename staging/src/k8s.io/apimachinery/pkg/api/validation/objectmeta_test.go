@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -734,9 +735,46 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 				field.TooLong(fldPath.Child("annotations"), "", TotalAnnotationSizeLimitB).MarkFromImperative(),
 			},
 		},
+		{
+			name:              "invalid label key",
+			obj:               mkMeta(tweakLabels(map[string]string{"a/b/c": "val"})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("labels"), "a/b/c", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		{
+			name:              "label key too long",
+			obj:               mkMeta(tweakLabels(map[string]string{strings.Repeat("a", 64): "val"})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("labels"), strings.Repeat("a", 64), "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		{
+			name:              "invalid label value",
+			obj:               mkMeta(tweakLabels(map[string]string{"key": "a!"})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("labels"), "a!", "").WithOrigin("format=k8s-label-value").MarkAlpha(),
+			},
+		},
+		{
+			name:              "label value too long",
+			obj:               mkMeta(tweakLabels(map[string]string{"key": strings.Repeat("a", 64)})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("labels"), strings.Repeat("a", 64), "").WithOrigin("format=k8s-label-value").MarkAlpha(),
+			},
+		},
 	}
 
-	matcher := field.ErrorMatcher{}.ByField().ByType().BySource().ByOrigin()
+	matcher := field.ErrorMatcher{}.ByFieldNormalized([]field.NormalizationRule{
+		{
+			Regexp:      regexp.MustCompile(regexp.QuoteMeta(fldPath.Child("labels").String()) + `\[.*\]`),
+			Replacement: fldPath.Child("labels").String(),
+		},
+	}).ByType().BySource().ByOrigin()
 
 	toExpectedErrs := func(allDeclarativeEnforced bool, betaEnabled bool, errs field.ErrorList) field.ErrorList {
 		expected := make(field.ErrorList, 0, len(errs))
@@ -896,6 +934,42 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 				field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), &gracePeriod40, "").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
+		{
+			name:              "invalid label key on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakLabels(map[string]string{"a/b/c": "val"})),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("labels"), "a/b/c", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		{
+			name:              "label key too long on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakLabels(map[string]string{strings.Repeat("a", 64): "val"})),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("labels"), strings.Repeat("a", 64), "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		{
+			name:              "invalid label value on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakLabels(map[string]string{"key": "a!"})),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("labels"), "a!", "").WithOrigin("format=k8s-label-value").MarkAlpha(),
+			},
+		},
+		{
+			name:              "label value too long on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakLabels(map[string]string{"key": strings.Repeat("a", 64)})),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("labels"), strings.Repeat("a", 64), "").WithOrigin("format=k8s-label-value").MarkAlpha(),
+			},
+		},
 	}
 
 	for _, tc := range updateCases {
@@ -997,3 +1071,8 @@ func mkOwnerRef(tweaks ...func(*metav1.OwnerReference)) metav1.OwnerReference {
 	}
 	return *r
 }
+
+func tweakLabels(labels map[string]string) func(*metav1.ObjectMeta) {
+	return func(o *metav1.ObjectMeta) { o.Labels = labels }
+}
+

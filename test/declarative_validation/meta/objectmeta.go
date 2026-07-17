@@ -18,6 +18,7 @@ package meta
 
 import (
 	"context"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -59,6 +60,12 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 		opt(o)
 	}
 	fldPath := field.NewPath("metadata")
+	o.validationConfigs = append(o.validationConfigs, apitesting.WithNormalizationRules(
+		field.NormalizationRule{
+			Regexp:      regexp.MustCompile(regexp.QuoteMeta(fldPath.Child("labels").String()) + `\[.*\]`),
+			Replacement: fldPath.Child("labels").String(),
+		},
+	))
 	trueVar := true
 
 	// TODO: Remove MarkFromImperative from expected errors after adding corresponding declarative validation tags on ObjectMeta.
@@ -331,7 +338,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-key").MarkFromImperative(),
+				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
 		{
@@ -342,7 +349,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-key").MarkFromImperative(),
+				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
 		{
@@ -353,7 +360,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-value").MarkFromImperative(),
+				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-value").MarkAlpha(),
 			},
 		},
 		{
@@ -364,7 +371,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-value").MarkFromImperative(),
+				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-value").MarkAlpha(),
 			},
 		},
 		{
@@ -448,6 +455,12 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 		opt(o)
 	}
 	fldPath := field.NewPath("metadata")
+	o.validationConfigs = append(o.validationConfigs, apitesting.WithNormalizationRules(
+		field.NormalizationRule{
+			Regexp:      regexp.MustCompile(regexp.QuoteMeta(fldPath.Child("labels").String()) + `\[.*\]`),
+			Replacement: fldPath.Child("labels").String(),
+		},
+	))
 	t1 := metav1.NewTime(time.Unix(1000, 0).UTC())
 	t2 := metav1.NewTime(time.Unix(2000, 0).UTC())
 
@@ -622,7 +635,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-key").MarkFromImperative(),
+				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
 		{
@@ -633,7 +646,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-key").MarkFromImperative(),
+				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
 		{
@@ -644,7 +657,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-value").MarkFromImperative(),
+				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-value").MarkAlpha(),
 			},
 		},
 		{
@@ -655,7 +668,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-value").MarkFromImperative(),
+				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-value").MarkAlpha(),
 			},
 		},
 	}
