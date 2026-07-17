@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -391,6 +392,9 @@ func parsePorts(portString string) (int32, intstr.IntOrString, error) {
 	if err != nil {
 		return 0, intstr.FromInt32(0), err
 	}
+	if port < 0 || port > math.MaxInt32 {
+		return 0, intstr.FromInt32(0), fmt.Errorf("port value %d is out of int32 range", port)
+	}
 
 	if len(portStringSlice) == 1 {
 		port32 := int32(port)
@@ -406,6 +410,9 @@ func parsePorts(portString string) (int32, intstr.IntOrString, error) {
 	} else {
 		if errs := validation.IsValidPortNum(portNum); len(errs) != 0 {
 			return 0, intstr.FromInt32(0), errors.New(strings.Join(errs, ","))
+		}
+		if portNum < 0 || portNum > math.MaxInt32 {
+			return 0, intstr.FromInt32(0), fmt.Errorf("target port value %d is out of int32 range", portNum)
 		}
 		targetPort = intstr.FromInt32(int32(portNum))
 	}
