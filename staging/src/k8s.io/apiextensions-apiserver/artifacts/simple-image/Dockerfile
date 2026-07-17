@@ -14,4 +14,5 @@
 
 FROM gcr.io/distroless/base-debian10:latest
 ADD apiextensions-apiserver /
+USER 65532:65532
 ENTRYPOINT ["/apiextensions-apiserver"]
