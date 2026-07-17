@@ -804,7 +804,9 @@ func (evc ExternalEtcdVersionCheck) configRootCAs(config *tls.Config) (*tls.Conf
 	}
 	if CACertPool != nil {
 		if config == nil {
-			config = &tls.Config{}
+			config = &tls.Config{
+				MinVersion: tls.VersionTLS13,
+			}
 		}
 		config.RootCAs = CACertPool
 	}
@@ -821,7 +823,9 @@ func (evc ExternalEtcdVersionCheck) configCertAndKey(config *tls.Config) (*tls.C
 			return nil, errors.Wrapf(err, "couldn't load external etcd's certificate and key pair %s, %s", evc.Etcd.External.CertFile, evc.Etcd.External.KeyFile)
 		}
 		if config == nil {
-			config = &tls.Config{}
+			config = &tls.Config{
+				MinVersion: tls.VersionTLS13,
+			}
 		}
 		config.Certificates = []tls.Certificate{cert}
 	}
