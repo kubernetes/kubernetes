@@ -96,7 +96,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.ListField
+	{ // field Struct.ListField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/eachval/typedef_to_slice.ListType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj ListType,
@@ -125,7 +125,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listField"), obj.ListField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ListTypedefField
+	{ // field Struct.ListTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/eachval/typedef_to_slice.ListTypedefType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj ListTypedefType,

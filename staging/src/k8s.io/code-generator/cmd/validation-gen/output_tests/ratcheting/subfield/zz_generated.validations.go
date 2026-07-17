@@ -79,7 +79,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.SubStructField
+	{ // field Struct.SubStructField (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/subfield.SubStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *SubStruct,

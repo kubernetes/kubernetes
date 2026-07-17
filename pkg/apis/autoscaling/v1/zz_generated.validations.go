@@ -80,7 +80,7 @@ func Validate_CrossVersionObjectReference(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *autoscalingv1.CrossVersionObjectReference) (errs field.ErrorList) {
 
-	{ // field autoscalingv1.CrossVersionObjectReference.Kind
+	{ // field CrossVersionObjectReference.Kind (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -109,7 +109,7 @@ func Validate_CrossVersionObjectReference(
 		errs = append(errs, fn(fldPath.Child("kind"), &obj.Kind, oldVal, oldObj != nil)...)
 	}
 
-	{ // field autoscalingv1.CrossVersionObjectReference.Name
+	{ // field CrossVersionObjectReference.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -138,7 +138,7 @@ func Validate_CrossVersionObjectReference(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	// field autoscalingv1.CrossVersionObjectReference.APIVersion has no validation
+	// field CrossVersionObjectReference.APIVersion has no validation
 	return errs
 }
 
@@ -148,9 +148,9 @@ func Validate_HorizontalPodAutoscaler(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *autoscalingv1.HorizontalPodAutoscaler) (errs field.ErrorList) {
 
-	// field autoscalingv1.HorizontalPodAutoscaler.TypeMeta has no validation
+	// field HorizontalPodAutoscaler.TypeMeta has no validation
 
-	{ // field autoscalingv1.HorizontalPodAutoscaler.ObjectMeta
+	{ // field HorizontalPodAutoscaler.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -172,7 +172,7 @@ func Validate_HorizontalPodAutoscaler(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field autoscalingv1.HorizontalPodAutoscaler.Spec
+	{ // field HorizontalPodAutoscaler.Spec (k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *autoscalingv1.HorizontalPodAutoscalerSpec,
@@ -194,7 +194,7 @@ func Validate_HorizontalPodAutoscaler(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field autoscalingv1.HorizontalPodAutoscaler.Status has no validation
+	// field HorizontalPodAutoscaler.Status has no validation
 	return errs
 }
 
@@ -204,7 +204,7 @@ func Validate_HorizontalPodAutoscalerSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) (errs field.ErrorList) {
 
-	{ // field autoscalingv1.HorizontalPodAutoscalerSpec.ScaleTargetRef
+	{ // field HorizontalPodAutoscalerSpec.ScaleTargetRef (k8s.io/api/autoscaling/v1.CrossVersionObjectReference)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *autoscalingv1.CrossVersionObjectReference,
@@ -226,7 +226,7 @@ func Validate_HorizontalPodAutoscalerSpec(
 		errs = append(errs, fn(fldPath.Child("scaleTargetRef"), &obj.ScaleTargetRef, oldVal, oldObj != nil)...)
 	}
 
-	{ // field autoscalingv1.HorizontalPodAutoscalerSpec.MinReplicas
+	{ // field HorizontalPodAutoscalerSpec.MinReplicas (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -266,7 +266,7 @@ func Validate_HorizontalPodAutoscalerSpec(
 		errs = append(errs, fn(fldPath.Child("minReplicas"), obj.MinReplicas, oldVal, oldObj != nil)...)
 	}
 
-	{ // field autoscalingv1.HorizontalPodAutoscalerSpec.MaxReplicas
+	{ // field HorizontalPodAutoscalerSpec.MaxReplicas (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -298,7 +298,7 @@ func Validate_HorizontalPodAutoscalerSpec(
 		errs = append(errs, fn(fldPath.Child("maxReplicas"), &obj.MaxReplicas, oldVal, oldObj != nil)...)
 	}
 
-	// field autoscalingv1.HorizontalPodAutoscalerSpec.TargetCPUUtilizationPercentage has no validation
+	// field HorizontalPodAutoscalerSpec.TargetCPUUtilizationPercentage has no validation
 	return errs
 }
 
@@ -308,10 +308,10 @@ func Validate_Scale(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *autoscalingv1.Scale) (errs field.ErrorList) {
 
-	// field autoscalingv1.Scale.TypeMeta has no validation
-	// field autoscalingv1.Scale.ObjectMeta has no validation
+	// field Scale.TypeMeta has no validation
+	// field Scale.ObjectMeta has no validation
 
-	{ // field autoscalingv1.Scale.Spec
+	{ // field Scale.Spec (k8s.io/api/autoscaling/v1.ScaleSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *autoscalingv1.ScaleSpec,
@@ -333,7 +333,7 @@ func Validate_Scale(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field autoscalingv1.Scale.Status has no validation
+	// field Scale.Status has no validation
 	return errs
 }
 
@@ -343,7 +343,7 @@ func Validate_ScaleSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *autoscalingv1.ScaleSpec) (errs field.ErrorList) {
 
-	{ // field autoscalingv1.ScaleSpec.Replicas
+	{ // field ScaleSpec.Replicas (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,

@@ -79,7 +79,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.Items
+	{ // field Struct.Items ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/single_key.Item)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Item,
@@ -121,7 +121,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("items"), obj.Items, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.IntKeyItems
+	{ // field Struct.IntKeyItems ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/single_key.IntKeyItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []IntKeyItem,
@@ -163,7 +163,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("intKeyItems"), obj.IntKeyItems, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.BoolKeyItems
+	{ // field Struct.BoolKeyItems ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/single_key.BoolKeyItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []BoolKeyItem,
@@ -205,7 +205,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("boolKeyItems"), obj.BoolKeyItems, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.TypedefItems
+	{ // field Struct.TypedefItems (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/single_key.TypedefItemList)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj TypedefItemList,
@@ -247,7 +247,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("typedefItems"), obj.TypedefItems, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.AtomicUniqueMapItems
+	{ // field Struct.AtomicUniqueMapItems ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/single_key.Item)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Item,
@@ -282,7 +282,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("atomicUniqueMapItems"), obj.AtomicUniqueMapItems, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.PtrKeyItems
+	{ // field Struct.PtrKeyItems ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/single_key.PtrKeyItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []PtrKeyItem,
@@ -319,7 +319,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("ptrKeyItems"), obj.PtrKeyItems, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.PointerItems
+	{ // field Struct.PointerItems ([]*k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/single_key.Item)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []*Item,
@@ -373,7 +373,7 @@ func Validate_StructWithNestedTypedef(
 
 	// field StructWithNestedTypedef.TypeMeta has no validation
 
-	{ // field StructWithNestedTypedef.NestedItems
+	{ // field StructWithNestedTypedef.NestedItems ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/single_key.NestedTypedefItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []NestedTypedefItem,

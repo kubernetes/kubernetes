@@ -76,7 +76,7 @@ func Validate_T1(
 
 	// field T1.TypeMeta has no validation
 
-	{ // field T1.S
+	{ // field T1.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -109,7 +109,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("s"), &obj.S, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.T2
+	{ // field T1.T2 (k8s.io/code-generator/cmd/validation-gen/output_tests/multiple_tags.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T2,
@@ -163,7 +163,7 @@ func Validate_T2(
 		errs = append(errs, e...)
 	}
 
-	{ // field T2.S
+	{ // field T2.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,

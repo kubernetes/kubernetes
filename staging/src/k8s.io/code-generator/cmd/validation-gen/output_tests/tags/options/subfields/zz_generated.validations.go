@@ -63,7 +63,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.ObjectMeta
+	{ // field Struct.ObjectMeta (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/options/subfields.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *ObjectMeta,
@@ -94,7 +94,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ObjectMetaDisabled
+	{ // field Struct.ObjectMetaDisabled (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/options/subfields.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *ObjectMeta,

@@ -81,7 +81,7 @@ func Validate_Endpoint(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *discoveryv1.Endpoint) (errs field.ErrorList) {
 
-	{ // field discoveryv1.Endpoint.Addresses
+	{ // field Endpoint.Addresses ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -114,13 +114,13 @@ func Validate_Endpoint(
 		errs = append(errs, fn(fldPath.Child("addresses"), obj.Addresses, oldVal, oldObj != nil)...)
 	}
 
-	// field discoveryv1.Endpoint.Conditions has no validation
-	// field discoveryv1.Endpoint.Hostname has no validation
-	// field discoveryv1.Endpoint.TargetRef has no validation
-	// field discoveryv1.Endpoint.DeprecatedTopology has no validation
-	// field discoveryv1.Endpoint.NodeName has no validation
-	// field discoveryv1.Endpoint.Zone has no validation
-	// field discoveryv1.Endpoint.Hints has no validation
+	// field Endpoint.Conditions has no validation
+	// field Endpoint.Hostname has no validation
+	// field Endpoint.TargetRef has no validation
+	// field Endpoint.DeprecatedTopology has no validation
+	// field Endpoint.NodeName has no validation
+	// field Endpoint.Zone has no validation
+	// field Endpoint.Hints has no validation
 	return errs
 }
 
@@ -130,9 +130,9 @@ func Validate_EndpointSlice(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *discoveryv1.EndpointSlice) (errs field.ErrorList) {
 
-	// field discoveryv1.EndpointSlice.TypeMeta has no validation
+	// field EndpointSlice.TypeMeta has no validation
 
-	{ // field discoveryv1.EndpointSlice.ObjectMeta
+	{ // field EndpointSlice.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -154,7 +154,7 @@ func Validate_EndpointSlice(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field discoveryv1.EndpointSlice.AddressType
+	{ // field EndpointSlice.AddressType (k8s.io/api/discovery/v1.AddressType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *discoveryv1.AddressType,
@@ -189,7 +189,7 @@ func Validate_EndpointSlice(
 		errs = append(errs, fn(fldPath.Child("addressType"), &obj.AddressType, oldVal, oldObj != nil)...)
 	}
 
-	{ // field discoveryv1.EndpointSlice.Endpoints
+	{ // field EndpointSlice.Endpoints ([]k8s.io/api/discovery/v1.Endpoint)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []discoveryv1.Endpoint,
@@ -221,6 +221,6 @@ func Validate_EndpointSlice(
 		errs = append(errs, fn(fldPath.Child("endpoints"), obj.Endpoints, oldVal, oldObj != nil)...)
 	}
 
-	// field discoveryv1.EndpointSlice.Ports has no validation
+	// field EndpointSlice.Ports has no validation
 	return errs
 }

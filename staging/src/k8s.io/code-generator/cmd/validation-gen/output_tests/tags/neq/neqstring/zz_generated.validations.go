@@ -63,7 +63,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.StringField
+	{ // field Struct.StringField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -87,7 +87,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringField"), &obj.StringField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StringPtrField
+	{ // field Struct.StringPtrField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -111,7 +111,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringPtrField"), obj.StringPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StringTypedefField
+	{ // field Struct.StringTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/neq/neqstring.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *StringType,
@@ -135,7 +135,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringTypedefField"), &obj.StringTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StringTypedefPtrField
+	{ // field Struct.StringTypedefPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/neq/neqstring.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *StringType,
@@ -159,7 +159,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringTypedefPtrField"), obj.StringTypedefPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ValidatedTypedefField
+	{ // field Struct.ValidatedTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/neq/neqstring.ValidatedStringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *ValidatedStringType,
@@ -181,7 +181,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("validatedTypedefField"), &obj.ValidatedTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ValidatedTypedefPtrField
+	{ // field Struct.ValidatedTypedefPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/neq/neqstring.ValidatedStringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *ValidatedStringType,

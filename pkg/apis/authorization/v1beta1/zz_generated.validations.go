@@ -93,10 +93,10 @@ func Validate_LocalSubjectAccessReview(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *authorizationv1beta1.LocalSubjectAccessReview) (errs field.ErrorList) {
 
-	// field authorizationv1beta1.LocalSubjectAccessReview.TypeMeta has no validation
-	// field authorizationv1beta1.LocalSubjectAccessReview.ObjectMeta has no validation
+	// field LocalSubjectAccessReview.TypeMeta has no validation
+	// field LocalSubjectAccessReview.ObjectMeta has no validation
 
-	{ // field authorizationv1beta1.LocalSubjectAccessReview.Spec
+	{ // field LocalSubjectAccessReview.Spec (k8s.io/api/authorization/v1beta1.SubjectAccessReviewSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *authorizationv1beta1.SubjectAccessReviewSpec,
@@ -118,7 +118,7 @@ func Validate_LocalSubjectAccessReview(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field authorizationv1beta1.LocalSubjectAccessReview.Status has no validation
+	// field LocalSubjectAccessReview.Status has no validation
 	return errs
 }
 
@@ -128,10 +128,10 @@ func Validate_SelfSubjectAccessReview(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *authorizationv1beta1.SelfSubjectAccessReview) (errs field.ErrorList) {
 
-	// field authorizationv1beta1.SelfSubjectAccessReview.TypeMeta has no validation
-	// field authorizationv1beta1.SelfSubjectAccessReview.ObjectMeta has no validation
+	// field SelfSubjectAccessReview.TypeMeta has no validation
+	// field SelfSubjectAccessReview.ObjectMeta has no validation
 
-	{ // field authorizationv1beta1.SelfSubjectAccessReview.Spec
+	{ // field SelfSubjectAccessReview.Spec (k8s.io/api/authorization/v1beta1.SelfSubjectAccessReviewSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *authorizationv1beta1.SelfSubjectAccessReviewSpec,
@@ -153,7 +153,7 @@ func Validate_SelfSubjectAccessReview(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field authorizationv1beta1.SelfSubjectAccessReview.Status has no validation
+	// field SelfSubjectAccessReview.Status has no validation
 	return errs
 }
 
@@ -181,7 +181,7 @@ func Validate_SelfSubjectAccessReviewSpec(
 		errs = append(errs, e...)
 	}
 
-	{ // field authorizationv1beta1.SelfSubjectAccessReviewSpec.ResourceAttributes
+	{ // field SelfSubjectAccessReviewSpec.ResourceAttributes (k8s.io/api/authorization/v1beta1.ResourceAttributes)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *authorizationv1beta1.ResourceAttributes,
@@ -209,7 +209,7 @@ func Validate_SelfSubjectAccessReviewSpec(
 		errs = append(errs, fn(fldPath.Child("resourceAttributes"), obj.ResourceAttributes, oldVal, oldObj != nil)...)
 	}
 
-	{ // field authorizationv1beta1.SelfSubjectAccessReviewSpec.NonResourceAttributes
+	{ // field SelfSubjectAccessReviewSpec.NonResourceAttributes (k8s.io/api/authorization/v1beta1.NonResourceAttributes)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *authorizationv1beta1.NonResourceAttributes,
@@ -246,10 +246,10 @@ func Validate_SubjectAccessReview(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *authorizationv1beta1.SubjectAccessReview) (errs field.ErrorList) {
 
-	// field authorizationv1beta1.SubjectAccessReview.TypeMeta has no validation
-	// field authorizationv1beta1.SubjectAccessReview.ObjectMeta has no validation
+	// field SubjectAccessReview.TypeMeta has no validation
+	// field SubjectAccessReview.ObjectMeta has no validation
 
-	{ // field authorizationv1beta1.SubjectAccessReview.Spec
+	{ // field SubjectAccessReview.Spec (k8s.io/api/authorization/v1beta1.SubjectAccessReviewSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *authorizationv1beta1.SubjectAccessReviewSpec,
@@ -271,7 +271,7 @@ func Validate_SubjectAccessReview(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field authorizationv1beta1.SubjectAccessReview.Status has no validation
+	// field SubjectAccessReview.Status has no validation
 	return errs
 }
 
@@ -299,7 +299,7 @@ func Validate_SubjectAccessReviewSpec(
 		errs = append(errs, e...)
 	}
 
-	{ // field authorizationv1beta1.SubjectAccessReviewSpec.ResourceAttributes
+	{ // field SubjectAccessReviewSpec.ResourceAttributes (k8s.io/api/authorization/v1beta1.ResourceAttributes)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *authorizationv1beta1.ResourceAttributes,
@@ -327,7 +327,7 @@ func Validate_SubjectAccessReviewSpec(
 		errs = append(errs, fn(fldPath.Child("resourceAttributes"), obj.ResourceAttributes, oldVal, oldObj != nil)...)
 	}
 
-	{ // field authorizationv1beta1.SubjectAccessReviewSpec.NonResourceAttributes
+	{ // field SubjectAccessReviewSpec.NonResourceAttributes (k8s.io/api/authorization/v1beta1.NonResourceAttributes)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *authorizationv1beta1.NonResourceAttributes,
@@ -355,9 +355,9 @@ func Validate_SubjectAccessReviewSpec(
 		errs = append(errs, fn(fldPath.Child("nonResourceAttributes"), obj.NonResourceAttributes, oldVal, oldObj != nil)...)
 	}
 
-	// field authorizationv1beta1.SubjectAccessReviewSpec.User has no validation
-	// field authorizationv1beta1.SubjectAccessReviewSpec.Groups has no validation
-	// field authorizationv1beta1.SubjectAccessReviewSpec.Extra has no validation
-	// field authorizationv1beta1.SubjectAccessReviewSpec.UID has no validation
+	// field SubjectAccessReviewSpec.User has no validation
+	// field SubjectAccessReviewSpec.Groups has no validation
+	// field SubjectAccessReviewSpec.Extra has no validation
+	// field SubjectAccessReviewSpec.UID has no validation
 	return errs
 }

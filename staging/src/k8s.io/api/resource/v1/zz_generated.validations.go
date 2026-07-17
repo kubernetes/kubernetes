@@ -47,7 +47,7 @@ func Validate_AllocatedDeviceStatus(
 	// field AllocatedDeviceStatus.Pool has no validation
 	// field AllocatedDeviceStatus.Device has no validation
 
-	{ // field AllocatedDeviceStatus.ShareID
+	{ // field AllocatedDeviceStatus.ShareID (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -78,7 +78,7 @@ func Validate_AllocatedDeviceStatus(
 		errs = append(errs, fn(fldPath.Child("shareID"), obj.ShareID, oldVal, oldObj != nil)...)
 	}
 
-	{ // field AllocatedDeviceStatus.Conditions
+	{ // field AllocatedDeviceStatus.Conditions ([]k8s.io/apimachinery/pkg/apis/meta/v1.Condition)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []metav1.Condition,
@@ -118,7 +118,7 @@ func Validate_AllocatedDeviceStatus(
 
 	// field AllocatedDeviceStatus.Data has no validation
 
-	{ // field AllocatedDeviceStatus.NetworkData
+	{ // field AllocatedDeviceStatus.NetworkData (k8s.io/api/resource/v1.NetworkDeviceData)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *NetworkDeviceData,
@@ -172,7 +172,7 @@ func Validate_AllocationResult(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *AllocationResult) (errs field.ErrorList) {
 
-	{ // field AllocationResult.Devices
+	{ // field AllocationResult.Devices (k8s.io/api/resource/v1.DeviceAllocationResult)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DeviceAllocationResult,
@@ -205,7 +205,7 @@ func Validate_CounterSet(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *CounterSet) (errs field.ErrorList) {
 
-	{ // field CounterSet.Name
+	{ // field CounterSet.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -237,7 +237,7 @@ func Validate_CounterSet(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field CounterSet.Counters
+	{ // field CounterSet.Counters (map[string]k8s.io/api/resource/v1.Counter)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]Counter,
@@ -280,7 +280,7 @@ func Validate_Device(
 
 	// field Device.Name has no validation
 
-	{ // field Device.Attributes
+	{ // field Device.Attributes (map[k8s.io/api/resource/v1.QualifiedName]k8s.io/api/resource/v1.DeviceAttribute)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[QualifiedName]DeviceAttribute,
@@ -314,7 +314,7 @@ func Validate_Device(
 
 	// field Device.Capacity has no validation
 
-	{ // field Device.ConsumesCounters
+	{ // field Device.ConsumesCounters ([]k8s.io/api/resource/v1.DeviceCounterConsumption)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceCounterConsumption,
@@ -364,7 +364,7 @@ func Validate_Device(
 	// field Device.NodeSelector has no validation
 	// field Device.AllNodes has no validation
 
-	{ // field Device.Taints
+	{ // field Device.Taints ([]k8s.io/api/resource/v1.DeviceTaint)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceTaint,
@@ -398,7 +398,7 @@ func Validate_Device(
 
 	// field Device.BindsToNode has no validation
 
-	{ // field Device.BindingConditions
+	{ // field Device.BindingConditions ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -430,7 +430,7 @@ func Validate_Device(
 		errs = append(errs, fn(fldPath.Child("bindingConditions"), obj.BindingConditions, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Device.BindingFailureConditions
+	{ // field Device.BindingFailureConditions ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -464,7 +464,7 @@ func Validate_Device(
 
 	// field Device.AllowMultipleAllocations has no validation
 
-	{ // field Device.NodeAllocatableResources
+	{ // field Device.NodeAllocatableResources (map[k8s.io/api/core/v1.ResourceName]k8s.io/api/resource/v1.NodeAllocatableResource)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[corev1.ResourceName]NodeAllocatableResource,
@@ -505,7 +505,7 @@ func Validate_DeviceAllocationConfiguration(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *DeviceAllocationConfiguration) (errs field.ErrorList) {
 
-	{ // field DeviceAllocationConfiguration.Source
+	{ // field DeviceAllocationConfiguration.Source (k8s.io/api/resource/v1.AllocationConfigSource)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *AllocationConfigSource,
@@ -536,7 +536,7 @@ func Validate_DeviceAllocationConfiguration(
 		errs = append(errs, fn(fldPath.Child("source"), &obj.Source, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceAllocationConfiguration.Requests
+	{ // field DeviceAllocationConfiguration.Requests ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -572,7 +572,7 @@ func Validate_DeviceAllocationConfiguration(
 		errs = append(errs, fn(fldPath.Child("requests"), obj.Requests, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceAllocationConfiguration.DeviceConfiguration
+	{ // field DeviceAllocationConfiguration.DeviceConfiguration (k8s.io/api/resource/v1.DeviceConfiguration)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DeviceConfiguration,
@@ -618,7 +618,7 @@ func Validate_DeviceAllocationResult(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *DeviceAllocationResult) (errs field.ErrorList) {
 
-	{ // field DeviceAllocationResult.Results
+	{ // field DeviceAllocationResult.Results ([]k8s.io/api/resource/v1.DeviceRequestAllocationResult)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceRequestAllocationResult,
@@ -654,7 +654,7 @@ func Validate_DeviceAllocationResult(
 		errs = append(errs, fn(fldPath.Child("results"), obj.Results, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceAllocationResult.Config
+	{ // field DeviceAllocationResult.Config ([]k8s.io/api/resource/v1.DeviceAllocationConfiguration)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceAllocationConfiguration,
@@ -753,7 +753,7 @@ func Validate_DeviceAttribute(
 		errs = append(errs, e...)
 	}
 
-	{ // field DeviceAttribute.IntValue
+	{ // field DeviceAttribute.IntValue (int64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int64,
@@ -781,7 +781,7 @@ func Validate_DeviceAttribute(
 		errs = append(errs, fn(fldPath.Child("int"), obj.IntValue, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceAttribute.BoolValue
+	{ // field DeviceAttribute.BoolValue (bool)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *bool,
@@ -809,7 +809,7 @@ func Validate_DeviceAttribute(
 		errs = append(errs, fn(fldPath.Child("bool"), obj.BoolValue, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceAttribute.StringValue
+	{ // field DeviceAttribute.StringValue (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -837,7 +837,7 @@ func Validate_DeviceAttribute(
 		errs = append(errs, fn(fldPath.Child("string"), obj.StringValue, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceAttribute.VersionValue
+	{ // field DeviceAttribute.VersionValue (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -865,7 +865,7 @@ func Validate_DeviceAttribute(
 		errs = append(errs, fn(fldPath.Child("version"), obj.VersionValue, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceAttribute.IntValues
+	{ // field DeviceAttribute.IntValues ([]int64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []int64,
@@ -893,7 +893,7 @@ func Validate_DeviceAttribute(
 		errs = append(errs, fn(fldPath.Child("ints"), obj.IntValues, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceAttribute.BoolValues
+	{ // field DeviceAttribute.BoolValues ([]bool)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []bool,
@@ -921,7 +921,7 @@ func Validate_DeviceAttribute(
 		errs = append(errs, fn(fldPath.Child("bools"), obj.BoolValues, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceAttribute.StringValues
+	{ // field DeviceAttribute.StringValues ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -955,7 +955,7 @@ func Validate_DeviceAttribute(
 		errs = append(errs, fn(fldPath.Child("strings"), obj.StringValues, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceAttribute.VersionValues
+	{ // field DeviceAttribute.VersionValues ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -992,7 +992,7 @@ func Validate_DeviceClaim(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *DeviceClaim) (errs field.ErrorList) {
 
-	{ // field DeviceClaim.Requests
+	{ // field DeviceClaim.Requests ([]k8s.io/api/resource/v1.DeviceRequest)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceRequest,
@@ -1034,7 +1034,7 @@ func Validate_DeviceClaim(
 		errs = append(errs, fn(fldPath.Child("requests"), obj.Requests, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceClaim.Constraints
+	{ // field DeviceClaim.Constraints ([]k8s.io/api/resource/v1.DeviceConstraint)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceConstraint,
@@ -1070,7 +1070,7 @@ func Validate_DeviceClaim(
 		errs = append(errs, fn(fldPath.Child("constraints"), obj.Constraints, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceClaim.Config
+	{ // field DeviceClaim.Config ([]k8s.io/api/resource/v1.DeviceClaimConfiguration)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceClaimConfiguration,
@@ -1115,7 +1115,7 @@ func Validate_DeviceClaimConfiguration(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *DeviceClaimConfiguration) (errs field.ErrorList) {
 
-	{ // field DeviceClaimConfiguration.Requests
+	{ // field DeviceClaimConfiguration.Requests ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -1151,7 +1151,7 @@ func Validate_DeviceClaimConfiguration(
 		errs = append(errs, fn(fldPath.Child("requests"), obj.Requests, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceClaimConfiguration.DeviceConfiguration
+	{ // field DeviceClaimConfiguration.DeviceConfiguration (k8s.io/api/resource/v1.DeviceConfiguration)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DeviceConfiguration,
@@ -1182,7 +1182,7 @@ func Validate_DeviceClassConfiguration(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *DeviceClassConfiguration) (errs field.ErrorList) {
 
-	{ // field DeviceClassConfiguration.DeviceConfiguration
+	{ // field DeviceClassConfiguration.DeviceConfiguration (k8s.io/api/resource/v1.DeviceConfiguration)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DeviceConfiguration,
@@ -1213,7 +1213,7 @@ func Validate_DeviceClassSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *DeviceClassSpec) (errs field.ErrorList) {
 
-	{ // field DeviceClassSpec.Selectors
+	{ // field DeviceClassSpec.Selectors ([]k8s.io/api/resource/v1.DeviceSelector)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceSelector,
@@ -1245,7 +1245,7 @@ func Validate_DeviceClassSpec(
 		errs = append(errs, fn(fldPath.Child("selectors"), obj.Selectors, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceClassSpec.Config
+	{ // field DeviceClassSpec.Config ([]k8s.io/api/resource/v1.DeviceClassConfiguration)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceClassConfiguration,
@@ -1281,7 +1281,7 @@ func Validate_DeviceClassSpec(
 		errs = append(errs, fn(fldPath.Child("config"), obj.Config, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceClassSpec.ExtendedResourceName
+	{ // field DeviceClassSpec.ExtendedResourceName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1321,7 +1321,7 @@ func Validate_DeviceConfiguration(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *DeviceConfiguration) (errs field.ErrorList) {
 
-	{ // field DeviceConfiguration.Opaque
+	{ // field DeviceConfiguration.Opaque (k8s.io/api/resource/v1.OpaqueDeviceConfiguration)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *OpaqueDeviceConfiguration,
@@ -1360,7 +1360,7 @@ func Validate_DeviceConstraint(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *DeviceConstraint) (errs field.ErrorList) {
 
-	{ // field DeviceConstraint.Requests
+	{ // field DeviceConstraint.Requests ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -1396,7 +1396,7 @@ func Validate_DeviceConstraint(
 		errs = append(errs, fn(fldPath.Child("requests"), obj.Requests, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceConstraint.MatchAttribute
+	{ // field DeviceConstraint.MatchAttribute (k8s.io/api/resource/v1.FullyQualifiedName)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *FullyQualifiedName,
@@ -1427,7 +1427,7 @@ func Validate_DeviceConstraint(
 		errs = append(errs, fn(fldPath.Child("matchAttribute"), obj.MatchAttribute, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceConstraint.DistinctAttribute
+	{ // field DeviceConstraint.DistinctAttribute (k8s.io/api/resource/v1.FullyQualifiedName)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *FullyQualifiedName,
@@ -1467,7 +1467,7 @@ func Validate_DeviceCounterConsumption(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *DeviceCounterConsumption) (errs field.ErrorList) {
 
-	{ // field DeviceCounterConsumption.CounterSet
+	{ // field DeviceCounterConsumption.CounterSet (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1499,7 +1499,7 @@ func Validate_DeviceCounterConsumption(
 		errs = append(errs, fn(fldPath.Child("counterSet"), &obj.CounterSet, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceCounterConsumption.Counters
+	{ // field DeviceCounterConsumption.Counters (map[string]k8s.io/api/resource/v1.Counter)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]Counter,
@@ -1531,7 +1531,7 @@ func Validate_DeviceCounterConsumption(
 		errs = append(errs, fn(fldPath.Child("counters"), obj.Counters, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceCounterConsumption.CompatibilityGroups
+	{ // field DeviceCounterConsumption.CompatibilityGroups ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -1579,7 +1579,7 @@ func Validate_DeviceDerivedAttribute(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *DeviceDerivedAttribute) (errs field.ErrorList) {
 
-	{ // field DeviceDerivedAttribute.Name
+	{ // field DeviceDerivedAttribute.Name (k8s.io/api/resource/v1.FullyQualifiedName)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *FullyQualifiedName,
@@ -1611,7 +1611,7 @@ func Validate_DeviceDerivedAttribute(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceDerivedAttribute.Expression
+	{ // field DeviceDerivedAttribute.Expression (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1651,7 +1651,7 @@ func Validate_DeviceRequest(
 
 	// field DeviceRequest.Name has no validation
 
-	{ // field DeviceRequest.Exactly
+	{ // field DeviceRequest.Exactly (k8s.io/api/resource/v1.ExactDeviceRequest)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *ExactDeviceRequest,
@@ -1681,7 +1681,7 @@ func Validate_DeviceRequest(
 		errs = append(errs, fn(fldPath.Child("exactly"), obj.Exactly, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceRequest.FirstAvailable
+	{ // field DeviceRequest.FirstAvailable ([]k8s.io/api/resource/v1.DeviceSubRequest)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceSubRequest,
@@ -1734,7 +1734,7 @@ func Validate_DeviceRequestAllocationResult(
 
 	// field DeviceRequestAllocationResult.Request has no validation
 
-	{ // field DeviceRequestAllocationResult.Driver
+	{ // field DeviceRequestAllocationResult.Driver (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1769,7 +1769,7 @@ func Validate_DeviceRequestAllocationResult(
 		errs = append(errs, fn(fldPath.Child("driver"), &obj.Driver, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceRequestAllocationResult.Pool
+	{ // field DeviceRequestAllocationResult.Pool (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1804,7 +1804,7 @@ func Validate_DeviceRequestAllocationResult(
 	// field DeviceRequestAllocationResult.Device has no validation
 	// field DeviceRequestAllocationResult.AdminAccess has no validation
 
-	{ // field DeviceRequestAllocationResult.Tolerations
+	{ // field DeviceRequestAllocationResult.Tolerations ([]k8s.io/api/resource/v1.DeviceToleration)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceToleration,
@@ -1836,7 +1836,7 @@ func Validate_DeviceRequestAllocationResult(
 		errs = append(errs, fn(fldPath.Child("tolerations"), obj.Tolerations, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceRequestAllocationResult.BindingConditions
+	{ // field DeviceRequestAllocationResult.BindingConditions ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -1868,7 +1868,7 @@ func Validate_DeviceRequestAllocationResult(
 		errs = append(errs, fn(fldPath.Child("bindingConditions"), obj.BindingConditions, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceRequestAllocationResult.BindingFailureConditions
+	{ // field DeviceRequestAllocationResult.BindingFailureConditions ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -1900,7 +1900,7 @@ func Validate_DeviceRequestAllocationResult(
 		errs = append(errs, fn(fldPath.Child("bindingFailureConditions"), obj.BindingFailureConditions, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceRequestAllocationResult.ShareID
+	{ // field DeviceRequestAllocationResult.ShareID (k8s.io/apimachinery/pkg/types.UID)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *types.UID,
@@ -1933,7 +1933,7 @@ func Validate_DeviceRequestAllocationResult(
 
 	// field DeviceRequestAllocationResult.ConsumedCapacity has no validation
 
-	{ // field DeviceRequestAllocationResult.SkipNodeOperations
+	{ // field DeviceRequestAllocationResult.SkipNodeOperations ([]k8s.io/api/resource/v1.SkipNodeOperation)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []SkipNodeOperation,
@@ -1980,7 +1980,7 @@ func Validate_DeviceSubRequest(
 
 	// field DeviceSubRequest.Name has no validation
 
-	{ // field DeviceSubRequest.DeviceClassName
+	{ // field DeviceSubRequest.DeviceClassName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2012,7 +2012,7 @@ func Validate_DeviceSubRequest(
 		errs = append(errs, fn(fldPath.Child("deviceClassName"), &obj.DeviceClassName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceSubRequest.Selectors
+	{ // field DeviceSubRequest.Selectors ([]k8s.io/api/resource/v1.DeviceSelector)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceSelector,
@@ -2044,7 +2044,7 @@ func Validate_DeviceSubRequest(
 		errs = append(errs, fn(fldPath.Child("selectors"), obj.Selectors, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceSubRequest.AllocationMode
+	{ // field DeviceSubRequest.AllocationMode (k8s.io/api/resource/v1.DeviceAllocationMode)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DeviceAllocationMode,
@@ -2076,7 +2076,7 @@ func Validate_DeviceSubRequest(
 
 	// field DeviceSubRequest.Count has no validation
 
-	{ // field DeviceSubRequest.Tolerations
+	{ // field DeviceSubRequest.Tolerations ([]k8s.io/api/resource/v1.DeviceToleration)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceToleration,
@@ -2110,7 +2110,7 @@ func Validate_DeviceSubRequest(
 
 	// field DeviceSubRequest.Capacity has no validation
 
-	{ // field DeviceSubRequest.DerivedAttributes
+	{ // field DeviceSubRequest.DerivedAttributes ([]k8s.io/api/resource/v1.DeviceDerivedAttribute)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceDerivedAttribute,
@@ -2158,7 +2158,7 @@ func Validate_DeviceTaint(
 	// field DeviceTaint.Key has no validation
 	// field DeviceTaint.Value has no validation
 
-	{ // field DeviceTaint.Effect
+	{ // field DeviceTaint.Effect (k8s.io/api/resource/v1.DeviceTaintEffect)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DeviceTaintEffect,
@@ -2216,7 +2216,7 @@ func Validate_DeviceTaintRuleSpec(
 
 	// field DeviceTaintRuleSpec.DeviceSelector has no validation
 
-	{ // field DeviceTaintRuleSpec.Taint
+	{ // field DeviceTaintRuleSpec.Taint (k8s.io/api/resource/v1.DeviceTaint)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DeviceTaint,
@@ -2247,7 +2247,7 @@ func Validate_DeviceTaintRuleStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *DeviceTaintRuleStatus) (errs field.ErrorList) {
 
-	{ // field DeviceTaintRuleStatus.Conditions
+	{ // field DeviceTaintRuleStatus.Conditions ([]k8s.io/apimachinery/pkg/apis/meta/v1.Condition)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []metav1.Condition,
@@ -2294,7 +2294,7 @@ func Validate_DeviceToleration(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *DeviceToleration) (errs field.ErrorList) {
 
-	{ // field DeviceToleration.Key
+	{ // field DeviceToleration.Key (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2325,7 +2325,7 @@ func Validate_DeviceToleration(
 		errs = append(errs, fn(fldPath.Child("key"), &obj.Key, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceToleration.Operator
+	{ // field DeviceToleration.Operator (k8s.io/api/resource/v1.DeviceTolerationOperator)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DeviceTolerationOperator,
@@ -2359,7 +2359,7 @@ func Validate_DeviceToleration(
 
 	// field DeviceToleration.Value has no validation
 
-	{ // field DeviceToleration.Effect
+	{ // field DeviceToleration.Effect (k8s.io/api/resource/v1.DeviceTaintEffect)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DeviceTaintEffect,
@@ -2416,7 +2416,7 @@ func Validate_ExactDeviceRequest(
 
 	// field ExactDeviceRequest.DeviceClassName has no validation
 
-	{ // field ExactDeviceRequest.Selectors
+	{ // field ExactDeviceRequest.Selectors ([]k8s.io/api/resource/v1.DeviceSelector)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceSelector,
@@ -2448,7 +2448,7 @@ func Validate_ExactDeviceRequest(
 		errs = append(errs, fn(fldPath.Child("selectors"), obj.Selectors, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ExactDeviceRequest.AllocationMode
+	{ // field ExactDeviceRequest.AllocationMode (k8s.io/api/resource/v1.DeviceAllocationMode)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DeviceAllocationMode,
@@ -2481,7 +2481,7 @@ func Validate_ExactDeviceRequest(
 	// field ExactDeviceRequest.Count has no validation
 	// field ExactDeviceRequest.AdminAccess has no validation
 
-	{ // field ExactDeviceRequest.Tolerations
+	{ // field ExactDeviceRequest.Tolerations ([]k8s.io/api/resource/v1.DeviceToleration)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceToleration,
@@ -2515,7 +2515,7 @@ func Validate_ExactDeviceRequest(
 
 	// field ExactDeviceRequest.Capacity has no validation
 
-	{ // field ExactDeviceRequest.DerivedAttributes
+	{ // field ExactDeviceRequest.DerivedAttributes ([]k8s.io/api/resource/v1.DeviceDerivedAttribute)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceDerivedAttribute,
@@ -2560,7 +2560,7 @@ func Validate_NetworkDeviceData(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *NetworkDeviceData) (errs field.ErrorList) {
 
-	{ // field NetworkDeviceData.InterfaceName
+	{ // field NetworkDeviceData.InterfaceName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2591,7 +2591,7 @@ func Validate_NetworkDeviceData(
 		errs = append(errs, fn(fldPath.Child("interfaceName"), &obj.InterfaceName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field NetworkDeviceData.IPs
+	{ // field NetworkDeviceData.IPs ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -2627,7 +2627,7 @@ func Validate_NetworkDeviceData(
 		errs = append(errs, fn(fldPath.Child("ips"), obj.IPs, oldVal, oldObj != nil)...)
 	}
 
-	{ // field NetworkDeviceData.HardwareAddress
+	{ // field NetworkDeviceData.HardwareAddress (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2715,7 +2715,7 @@ func Validate_NodeAllocatableMapping(
 		errs = append(errs, e...)
 	}
 
-	{ // field NodeAllocatableMapping.CapacityKey
+	{ // field NodeAllocatableMapping.CapacityKey (k8s.io/api/resource/v1.QualifiedName)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *QualifiedName,
@@ -2743,7 +2743,7 @@ func Validate_NodeAllocatableMapping(
 		errs = append(errs, fn(fldPath.Child("capacityKey"), obj.CapacityKey, oldVal, oldObj != nil)...)
 	}
 
-	{ // field NodeAllocatableMapping.CapacityMultiplier
+	{ // field NodeAllocatableMapping.CapacityMultiplier (k8s.io/apimachinery/pkg/api/resource.Quantity)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *resource.Quantity,
@@ -2771,7 +2771,7 @@ func Validate_NodeAllocatableMapping(
 		errs = append(errs, fn(fldPath.Child("capacityMultiplier"), obj.CapacityMultiplier, oldVal, oldObj != nil)...)
 	}
 
-	{ // field NodeAllocatableMapping.DeviceMultiplier
+	{ // field NodeAllocatableMapping.DeviceMultiplier (k8s.io/apimachinery/pkg/api/resource.Quantity)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *resource.Quantity,
@@ -2808,7 +2808,7 @@ func Validate_NodeAllocatableOverhead(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *NodeAllocatableOverhead) (errs field.ErrorList) {
 
-	{ // field NodeAllocatableOverhead.PerPod
+	{ // field NodeAllocatableOverhead.PerPod (k8s.io/apimachinery/pkg/api/resource.Quantity)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *resource.Quantity,
@@ -2836,7 +2836,7 @@ func Validate_NodeAllocatableOverhead(
 		errs = append(errs, fn(fldPath.Child("perPod"), obj.PerPod, oldVal, oldObj != nil)...)
 	}
 
-	{ // field NodeAllocatableOverhead.PerContainer
+	{ // field NodeAllocatableOverhead.PerContainer (k8s.io/apimachinery/pkg/api/resource.Quantity)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *resource.Quantity,
@@ -2873,7 +2873,7 @@ func Validate_NodeAllocatableResource(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *NodeAllocatableResource) (errs field.ErrorList) {
 
-	{ // field NodeAllocatableResource.Mapping
+	{ // field NodeAllocatableResource.Mapping (k8s.io/api/resource/v1.NodeAllocatableMapping)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *NodeAllocatableMapping,
@@ -2903,7 +2903,7 @@ func Validate_NodeAllocatableResource(
 		errs = append(errs, fn(fldPath.Child("mapping"), obj.Mapping, oldVal, oldObj != nil)...)
 	}
 
-	{ // field NodeAllocatableResource.Overhead
+	{ // field NodeAllocatableResource.Overhead (k8s.io/api/resource/v1.NodeAllocatableOverhead)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *NodeAllocatableOverhead,
@@ -2942,7 +2942,7 @@ func Validate_OpaqueDeviceConfiguration(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *OpaqueDeviceConfiguration) (errs field.ErrorList) {
 
-	{ // field OpaqueDeviceConfiguration.Driver
+	{ // field OpaqueDeviceConfiguration.Driver (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2987,7 +2987,7 @@ func Validate_ResourceClaimSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *ResourceClaimSpec) (errs field.ErrorList) {
 
-	{ // field ResourceClaimSpec.Devices
+	{ // field ResourceClaimSpec.Devices (k8s.io/api/resource/v1.DeviceClaim)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *DeviceClaim,
@@ -3018,7 +3018,7 @@ func Validate_ResourceClaimStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *ResourceClaimStatus) (errs field.ErrorList) {
 
-	{ // field ResourceClaimStatus.Allocation
+	{ // field ResourceClaimStatus.Allocation (k8s.io/api/resource/v1.AllocationResult)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *AllocationResult,
@@ -3052,7 +3052,7 @@ func Validate_ResourceClaimStatus(
 		errs = append(errs, fn(fldPath.Child("allocation"), obj.Allocation, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ResourceClaimStatus.ReservedFor
+	{ // field ResourceClaimStatus.ReservedFor ([]k8s.io/api/resource/v1.ResourceClaimConsumerReference)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ResourceClaimConsumerReference,
@@ -3089,7 +3089,7 @@ func Validate_ResourceClaimStatus(
 		errs = append(errs, fn(fldPath.Child("reservedFor"), obj.ReservedFor, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ResourceClaimStatus.Devices
+	{ // field ResourceClaimStatus.Devices ([]k8s.io/api/resource/v1.AllocatedDeviceStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []AllocatedDeviceStatus,
@@ -3142,7 +3142,7 @@ func Validate_ResourceClaimTemplateSpec(
 
 	// field ResourceClaimTemplateSpec.ObjectMeta has no validation
 
-	{ // field ResourceClaimTemplateSpec.Spec
+	{ // field ResourceClaimTemplateSpec.Spec (k8s.io/api/resource/v1.ResourceClaimSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *ResourceClaimSpec,
@@ -3179,7 +3179,7 @@ func Validate_ResourceSliceSpec(
 	// field ResourceSliceSpec.NodeSelector has no validation
 	// field ResourceSliceSpec.AllNodes has no validation
 
-	{ // field ResourceSliceSpec.Devices
+	{ // field ResourceSliceSpec.Devices ([]k8s.io/api/resource/v1.Device)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Device,
@@ -3213,7 +3213,7 @@ func Validate_ResourceSliceSpec(
 
 	// field ResourceSliceSpec.PerDeviceNodeSelection has no validation
 
-	{ // field ResourceSliceSpec.SharedCounters
+	{ // field ResourceSliceSpec.SharedCounters ([]k8s.io/api/resource/v1.CounterSet)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []CounterSet,
@@ -3255,7 +3255,7 @@ func Validate_ResourceSliceSpec(
 		errs = append(errs, fn(fldPath.Child("sharedCounters"), obj.SharedCounters, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ResourceSliceSpec.PartitionTypeAttribute
+	{ // field ResourceSliceSpec.PartitionTypeAttribute (k8s.io/api/resource/v1.FullyQualifiedName)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *FullyQualifiedName,
@@ -3293,7 +3293,7 @@ func Validate_ResourceSliceSpec(
 		errs = append(errs, fn(fldPath.Child("partitionTypeAttribute"), obj.PartitionTypeAttribute, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ResourceSliceSpec.SkipNodeOperations
+	{ // field ResourceSliceSpec.SkipNodeOperations ([]k8s.io/api/resource/v1.SkipNodeOperation)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []SkipNodeOperation,

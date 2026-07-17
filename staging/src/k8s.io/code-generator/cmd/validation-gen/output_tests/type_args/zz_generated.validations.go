@@ -77,7 +77,7 @@ func Validate_T1(
 
 	// field T1.TypeMeta has no validation
 
-	{ // field T1.S1
+	{ // field T1.S1 (k8s.io/code-generator/cmd/validation-gen/output_tests/primitives.T1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *primitives.T1,
@@ -103,7 +103,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("s1"), obj.S1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PS1
+	{ // field T1.PS1 (k8s.io/code-generator/cmd/validation-gen/output_tests/primitives.T1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *primitives.T1,
@@ -129,7 +129,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("ps1"), obj.PS1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.E1
+	{ // field T1.E1 (k8s.io/code-generator/cmd/validation-gen/output_tests/type_args.E1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *E1,
@@ -155,7 +155,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("e1"), &obj.E1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PE1
+	{ // field T1.PE1 (k8s.io/code-generator/cmd/validation-gen/output_tests/type_args.E1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *E1,
@@ -181,7 +181,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("pe1"), obj.PE1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.I1
+	{ // field T1.I1 (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -205,7 +205,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("i1"), &obj.I1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PI1
+	{ // field T1.PI1 (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
