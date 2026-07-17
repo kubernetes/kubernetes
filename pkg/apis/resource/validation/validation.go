@@ -290,9 +290,8 @@ func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, oldCapacity 
 }
 
 func validateCapacityRequirements(capacity, oldCapacity *resource.CapacityRequirements, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
 	if capacity == nil {
-		return allErrs
+		return nil
 	}
 	if oldCapacity != nil && apiequality.Semantic.DeepEqual(capacity, oldCapacity) {
 		return nil
