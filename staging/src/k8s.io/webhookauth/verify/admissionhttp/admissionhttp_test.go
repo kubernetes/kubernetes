@@ -111,6 +111,14 @@ func startOIDCServer() (*oidcTestServer, error) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(jwks)
 	})
+	// The apiserver's local JWKS endpoint. The in-cluster verifier
+	// (oidc.NewLocalKeySetVerifier) fetches keys here rather than via the
+	// discovery jwks_uri, so the in-cluster end-to-end test needs it served
+	// alongside /keys. Both serve the same signing key.
+	mux.HandleFunc("/openid/v1/jwks", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(jwks)
+	})
 	ts.server = httptest.NewTLSServer(mux)
 	ts.issuer = ts.server.URL
 	return ts, nil

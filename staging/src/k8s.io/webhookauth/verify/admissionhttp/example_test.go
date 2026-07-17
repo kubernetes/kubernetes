@@ -45,6 +45,7 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/webhookauth/verify"
 	"k8s.io/webhookauth/verify/admissionhttp"
 	"k8s.io/webhookauth/verify/oidc"
 )
@@ -259,5 +260,116 @@ func TestExampleEndToEnd_MinimalWebhook(t *testing.T) {
 				t.Errorf("downstream reached = %v, want %v", reached, tc.wantNextReached)
 			}
 		})
+	}
+}
+
+// TestExampleEndToEnd_InClusterDeferredWebhook is the in-cluster counterpart to
+// TestExampleEndToEnd_MinimalWebhook. It proves the zero-config in-cluster path
+// end-to-end: a DEFERRED verifier — built from the apiserver's local discovery
+// and JWKS, with the audience UNKNOWN at startup — is wired behind the HTTP
+// handler together with InClusterAudienceResolver. The handler derives and binds
+// the expected audience from the FIRST request, then verifies the token; this is
+// the deferred-construction path that carries the in-cluster messiness. Readiness
+// flips from not-ready to ready across that first request, and a later
+// unauthenticated request is denied fail-closed.
+//
+// This mirrors incluster.InCluster, which only adds rest.InClusterConfig on top
+// of oidc.NewLocalKeySetVerifier; here the apiserver is a throwaway TLS double so
+// the test runs offline with no real cluster and verifies REAL signatures.
+func TestExampleEndToEnd_InClusterDeferredWebhook(t *testing.T) {
+	ts := newOIDCTestServer(t)
+
+	// The in-cluster verifier: the issuer is read from the apiserver's local
+	// discovery document, keys come from its local /openid/v1/jwks endpoint, and
+	// the audience is NOT known yet — it is bound from the first request below.
+	v, err := oidc.NewLocalKeySetVerifier(context.Background(), ts.issuer, oidc.WithHTTPClient(ts.client()))
+	if err != nil {
+		t.Fatalf("NewLocalKeySetVerifier: %v", err)
+	}
+
+	// The Service backing this webhook. InClusterAudienceResolver derives the
+	// audience as https://<name>.<namespace>.svc:<port><path>, reading the port
+	// from the kubelet-injected <NAME>_SERVICE_PORT env var (also a trust anchor:
+	// only a real Service in this pod's namespace has one).
+	const svcName, svcNamespace = "webhook", "default"
+	const svcPort int32 = 443
+	t.Setenv("WEBHOOK_SERVICE_PORT", "443")
+	serviceHost := svcName + "." + svcNamespace + ".svc" // the DNS name the apiserver dials
+	expectedAudience := verify.AudienceForService(svcName, svcNamespace, svcPort, "/")
+
+	// The apiserver mints this token for the webhook's ServiceAccount; its audience
+	// is the derived Service audience, and it attests the exampleAPIGroup.
+	claims := ts.baseClaims()
+	claims["aud"] = []string{expectedAudience}
+	token := ts.sign(t, claims)
+
+	var reached bool
+	admit := func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
+		reached = true
+		return &admissionv1.AdmissionResponse{UID: req.UID, Allowed: true}
+	}
+
+	// The whole in-cluster wiring: the deferred verifier plus the resolver. The
+	// only production difference is incluster.InCluster supplying the verifier
+	// from rest.InClusterConfig instead of a test double.
+	h := admissionhttp.WithTokenVerification(v, admit,
+		admissionhttp.WithAudienceResolver(admissionhttp.InClusterAudienceResolver()))
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	// Before any request the audience is unbound, so the handler is not ready —
+	// the seam a controller-runtime readiness check wires into.
+	if err := h.HealthCheck(); err == nil {
+		t.Fatal("expected not-ready before the first request binds the audience")
+	}
+
+	do := func(bearer string) *http.Response {
+		body, err := json.Marshal(exampleReview(exampleAPIGroup))
+		if err != nil {
+			t.Fatalf("marshal review: %v", err)
+		}
+		// POST to "/" so the resolver derives the same path the token audience uses.
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, srv.URL+"/", bytes.NewReader(body))
+		if err != nil {
+			t.Fatalf("new request: %v", err)
+		}
+		req.Host = serviceHost // the apiserver dials the Service DNS name
+		req.Header.Set("Content-Type", "application/json")
+		if bearer != "" {
+			req.Header.Set("Authorization", "Bearer "+bearer)
+		}
+		resp, err := srv.Client().Do(req)
+		if err != nil {
+			t.Fatalf("do request: %v", err)
+		}
+		return resp
+	}
+
+	// First request with a valid token: the audience is derived and bound, the
+	// token is verified, the downstream is reached, and the status is 200.
+	reached = false
+	resp := do(token)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("valid in-cluster request status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	if !reached {
+		t.Error("downstream not reached for a valid in-cluster request")
+	}
+	// The first request bound the audience, so the handler is now ready.
+	if err := h.HealthCheck(); err != nil {
+		t.Errorf("expected ready after the first request bound the audience, got %v", err)
+	}
+
+	// A subsequent unauthenticated request is denied fail-closed with 401 and
+	// never reaches the downstream handler.
+	reached = false
+	respNoToken := do("")
+	defer respNoToken.Body.Close()
+	if respNoToken.StatusCode != http.StatusUnauthorized {
+		t.Errorf("no-token request status = %d, want %d", respNoToken.StatusCode, http.StatusUnauthorized)
+	}
+	if reached {
+		t.Error("downstream reached for an unauthenticated request")
 	}
 }
