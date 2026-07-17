@@ -58,8 +58,9 @@ import (
 // TestPodGroupPreemption tests preemption scenarios involving pod groups.
 func TestPodGroupPreemption(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload:   true,
-		features.PodLevelResources: true,
+		features.GenericWorkload:                 true,
+		features.PodLevelResources:               true,
+		features.TopologyAwareWorkloadScheduling: true,
 	})
 	tests := []struct {
 		name          string
@@ -906,13 +907,121 @@ func TestPodGroupPreemption(t *testing.T) {
 			// preemption will be called in the subsequent cycle to make room for the second pod.
 			expectedEventOrder: []string{"Bind:high-1", "PodGroupPostFilter:pg1", "Bind:high-2"},
 		},
+		{
+			name: "Topology-Aware Preemption: single topology domain",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label("topology-key", "zone1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Label("topology-key", "zone1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).TopologyKey("topology-key").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("low-1").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("low-2").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"high-1", "high-2"},
+			expectedPreempted:          []string{"low-1", "low-2"},
+			expectedToHaveNNNInfo:      []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP: 2,
+			tempRemovePG:               true,
+		},
+		{
+			name: "Topology-Aware Preemption: two topologies, only one eligible",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label("topology-key", "zone1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Label("topology-key", "zone1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node3").Label("topology-key", "zone2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node4").Label("topology-key", "zone2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).TopologyKey("topology-key").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("low-1").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("low-2").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("high-priority-initial-1").Node("node3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(200).Obj(),
+				st.MakePod().Name("high-priority-initial-2").Node("node4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(200).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"high-1", "high-2", "high-priority-initial-1", "high-priority-initial-2"},
+			expectedPreempted:          []string{"low-1", "low-2"},
+			expectedToHaveNNNInfo:      []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP: 2,
+			tempRemovePG:               true,
+		},
+		{
+			name: "Topology-Aware Preemption: two topologies, both eligible, selects higher scored topology",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label("topology-key", "zone1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Label("topology-key", "zone1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node3").Label("topology-key", "zone2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node4").Label("topology-key", "zone2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).TopologyKey("topology-key").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("low-1").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("low-2").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("low-3").Node("node3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("low-4").Node("node4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"high-1", "high-2", "low-1", "low-2"},
+			expectedPreempted:          []string{"low-3", "low-4"},
+			expectedToHaveNNNInfo:      []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP: 2,
+			tempRemovePG:               true,
+			customPluginName:           "mockScorePlugin",
+			customPluginFunc:           newPresetScorePlugin(map[string]int64{"node1": 0, "node2": 0, "node3": 100, "node4": 100}),
+		},
+		{
+			// Even after removing low prio pods in each topology, none of them becomes available.
+			name: "Topology-Aware Preemption: insufficient capacity across all topologies, no preemption performed",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Label("topology-key", "zone1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Label("topology-key", "zone1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node3").Label("topology-key", "zone2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node4").Label("topology-key", "zone2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).TopologyKey("topology-key").Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("low-1").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("high-priority-initial-1").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(200).Obj(),
+				st.MakePod().Name("low-2").Node("node3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("high-priority-initial-2").Node("node4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(200).Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:          []string{"low-1", "low-2", "high-priority-initial-1", "high-priority-initial-2"},
+			expectedPreempted:          nil,
+			expectedToHaveNNNInfo:      nil,
+			expectedPodsPreemptedByWAP: 0,
+			tempRemovePG:               true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:          true,
-				features.PodGroupPreemptionPolicy: tt.enablePodGroupPreemptionPolicy,
+				features.GenericWorkload:                 true,
+				features.PodGroupPreemptionPolicy:        tt.enablePodGroupPreemptionPolicy,
+				features.TopologyAwareWorkloadScheduling: true,
 			})
 			recorder := eventRecorder{}
 			registry := make(frameworkruntime.Registry)
@@ -2486,6 +2595,7 @@ func (p *mockReservePlugin) Filter(ctx context.Context, state fwk.CycleState, po
 var _ fwk.ReservePlugin = &mockReservePlugin{}
 var _ fwk.FilterPlugin = &mockReservePlugin{}
 var _ fwk.ScorePlugin = &mockScorePlugin{}
+var _ fwk.PlacementScorePlugin = &mockScorePlugin{}
 
 type mockScorePlugin struct {
 	scores map[string]int64
@@ -2504,6 +2614,23 @@ func (p *mockScorePlugin) Score(ctx context.Context, state fwk.CycleState, pod *
 
 func (p *mockScorePlugin) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
+}
+
+func (p *mockScorePlugin) PlacementScoreExtensions() fwk.PlacementScoreExtensions {
+	return nil
+}
+
+func (p *mockScorePlugin) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+	if len(placement.ProposedAssignments) == 0 {
+		return 0, nil
+	}
+	var total int64
+	for _, pa := range placement.ProposedAssignments {
+		if score, ok := p.scores[pa.GetNodeName()]; ok {
+			total += score
+		}
+	}
+	return total / int64(len(placement.ProposedAssignments)), nil
 }
 
 func newPresetScorePlugin(scores map[string]int64) frameworkruntime.PluginFactory {
