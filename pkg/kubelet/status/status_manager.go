@@ -984,6 +984,13 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 		status.StartTime = &now
 	}
 
+	// Preserve volume health across pod status updates. VolumeHealth is set
+	// independently by the volume health manager and is not part of the
+	// status generated from the container runtime.
+	if len(oldStatus.VolumeHealth) > 0 && len(status.VolumeHealth) == 0 {
+		status.VolumeHealth = oldStatus.VolumeHealth
+	}
+
 	// prevent sending unnecessary patches
 	if oldStatus.ObservedGeneration > status.ObservedGeneration {
 		status.ObservedGeneration = oldStatus.ObservedGeneration

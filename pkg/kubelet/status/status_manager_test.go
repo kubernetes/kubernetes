@@ -1700,6 +1700,48 @@ func TestSetPodVolumeHealth(t *testing.T) {
 	}
 }
 
+func TestVolumeHealthSurvivesPodStatusUpdate(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
+
+	pod := getTestPod()
+	m := newTestManager(&fake.Clientset{})
+	m.podManager.(mutablePodManager).AddPod(pod)
+
+	m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning})
+	verifyUpdates(t, m, 1)
+
+	unhealthy := []v1.VolumeHealthCondition{{
+		Status:  v1.VolumeHealthInaccessible,
+		Reason:  "TargetPathNotFound",
+		Message: "volume path missing",
+	}}
+	if !m.SetPodVolumeHealth(logger, pod.UID, "vol1", unhealthy) {
+		t.Fatal("expected update when setting volume health")
+	}
+	verifyUpdates(t, m, 1)
+
+	status := expectPodStatus(t, m, pod)
+	if len(status.VolumeHealth) != 1 {
+		t.Fatalf("expected 1 VolumeHealth entry, got %d", len(status.VolumeHealth))
+	}
+
+	// Simulate what happens on the next pod sync: SetPodStatus is called
+	// with a freshly generated status that has no VolumeHealth.
+	m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning})
+
+	status = expectPodStatus(t, m, pod)
+	if len(status.VolumeHealth) != 1 {
+		t.Fatalf("VolumeHealth should survive SetPodStatus, got %d entries", len(status.VolumeHealth))
+	}
+	if status.VolumeHealth[0].Name != "vol1" {
+		t.Errorf("unexpected volume name: %q", status.VolumeHealth[0].Name)
+	}
+	if !reflect.DeepEqual(status.VolumeHealth[0].HealthConditions, unhealthy) {
+		t.Errorf("unexpected conditions after SetPodStatus: %+v", status.VolumeHealth[0].HealthConditions)
+	}
+}
+
 func TestSetContainerStartup(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	cID1 := kubecontainer.ContainerID{Type: "test", ID: "1"}
