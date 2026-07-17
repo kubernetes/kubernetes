@@ -1300,7 +1300,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 			utilruntime.HandleErrorWithContext(ctx, updateErr, "Error updating pod", "pod", klog.KObj(pod))
 		}
 	} else {
-		// Sync path: update the pod synchronously to get the fully updated Pod 
+		// Sync path: update the pod synchronously to get the fully updated Pod
 		// back from the API Server. Then update podInfo and add it to the queue.
 		updatedPod, updateErr := updatePodSync(ctx, sched.client, pod, podCondition, nominatingInfo)
 		if updateErr != nil {

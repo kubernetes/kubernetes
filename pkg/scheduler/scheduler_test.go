@@ -337,6 +337,7 @@ func TestFailureHandler(t *testing.T) {
 					if err := podInformer.Informer().GetStore().Update(testPodUpdated); err != nil {
 						t.Fatal(err)
 					}
+					client.CoreV1().Pods(testPodUpdated.Namespace).Update(ctx, testPodUpdated, metav1.UpdateOptions{})
 					queue.Update(ctx, testPod, testPodUpdated)
 				}
 				if tt.podDeletedDuringScheduling {
@@ -364,8 +365,27 @@ func TestFailureHandler(t *testing.T) {
 				} else {
 					got = getPodFromPriorityQueue(queue, testPod)
 				}
+				var expect *v1.Pod
+				if tt.expect != nil {
+					expect = tt.expect.DeepCopy()
+					if !asyncAPICallsEnabled {
+						expect.Status.Conditions = []v1.PodCondition{
+							{
+								Type:   v1.PodScheduled,
+								Status: v1.ConditionFalse,
+								Reason: v1.PodReasonUnschedulable,
+							},
+						}
+					}
+				}
+				if got != nil {
+					got.ManagedFields = nil
+					for i := range got.Status.Conditions {
+						got.Status.Conditions[i].LastTransitionTime = metav1.Time{}
+					}
+				}
 
-				if diff := cmp.Diff(tt.expect, got); diff != "" {
+				if diff := cmp.Diff(expect, got); diff != "" {
 					t.Errorf("Unexpected pod (-want, +got): %s", diff)
 				}
 			})
