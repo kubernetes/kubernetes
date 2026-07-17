@@ -280,6 +280,9 @@ const jwksMinRefreshInterval = time.Second
 // the underlying key set (which forces a fresh fetch from jwksURL) and retries
 // once, rate limited by jwksMinRefreshInterval to bound the cost of repeated
 // bad tokens against the identity provider's JWKS endpoint.
+//
+// It is only used when the issuer opts in via Issuer.JWKSRefreshOnUnknownKeyID;
+// otherwise a bare oidc.RemoteKeySet is used, preserving the default behavior.
 type verifyingKeySet struct {
 	ctx     context.Context
 	client  *http.Client
@@ -539,12 +542,20 @@ func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHeal
 					jwksClient = &clientWithJWKSMetrics
 				}
 
-				// Use verifyingKeySet instead of the provider's own key set (or a
-				// bare oidc.NewRemoteKeySet) so that a token signed with a key ID
-				// the local JWKS cache doesn't yet recognize (e.g. right after the
-				// provider rotates its signing keys) triggers a fresh JWKS fetch
-				// before authentication fails, instead of failing immediately.
-				keySet := newVerifyingKeySet(lifecycleCtx, jwksClient, providerJSON.JWKSURL)
+				// Only use verifyingKeySet instead of a bare oidc.NewRemoteKeySet
+				// when opted in via Issuer.JWKSRefreshOnUnknownKeyID, so that a
+				// token signed with a key ID the local JWKS cache doesn't yet
+				// recognize (e.g. right after the provider rotates its signing
+				// keys) triggers a fresh JWKS fetch before authentication fails,
+				// instead of failing immediately. Unset/false preserves the
+				// default behavior: refresh only when the whole cache is near
+				// expiry.
+				var keySet oidc.KeySet
+				if opts.JWTAuthenticator.Issuer.JWKSRefreshOnUnknownKeyID {
+					keySet = newVerifyingKeySet(lifecycleCtx, jwksClient, providerJSON.JWKSURL)
+				} else {
+					keySet = oidc.NewRemoteKeySet(oidc.ClientContext(lifecycleCtx, jwksClient), providerJSON.JWKSURL)
+				}
 				authn.setVerifier(&idTokenVerifier{oidc.NewVerifier(issuerURL, keySet, verifierConfig), audiences})
 				return true, nil
 			})

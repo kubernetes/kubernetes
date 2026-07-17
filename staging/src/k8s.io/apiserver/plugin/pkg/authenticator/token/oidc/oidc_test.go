@@ -5067,3 +5067,189 @@ func testContext(t *testing.T) context.Context {
 	t.Cleanup(cancel)
 	return ctx
 }
+
+type refreshTestServer struct {
+	*httptest.Server
+
+	mu   sync.RWMutex
+	keys jose.JSONWebKeySet
+}
+
+func (s *refreshTestServer) setKeys(keys jose.JSONWebKeySet) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.keys = keys
+}
+
+func (s *refreshTestServer) getKeys() jose.JSONWebKeySet {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.keys
+}
+
+func newRefreshTestServer(t *testing.T, initialKeys jose.JSONWebKeySet) *refreshTestServer {
+	s := &refreshTestServer{keys: initialKeys}
+	s.Server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/.well-known/openid-configuration":
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"issuer": %q, "jwks_uri": %q}`, s.Server.URL, s.Server.URL+"/keys")
+		case "/keys":
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Cache-Control", "max-age=3600")
+			keyBytes, err := json.Marshal(s.getKeys())
+			if err != nil {
+				t.Fatalf("marshal keys: %v", err)
+			}
+			w.Write(keyBytes)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	return s
+}
+
+// TestJWKSRefreshOnUnknownKeyID verifies that a token signed with a key the
+// issuer has rotated to, but which the authenticator's local JWKS cache
+// hasn't observed yet (the cache is still within its Cache-Control lifetime),
+// is only accepted after a forced refresh when Issuer.JWKSRefreshOnUnknownKeyID
+// is set. Left unset, the pre-existing behavior is preserved: the token is
+// rejected until the cache naturally expires.
+func TestJWKSRefreshOnUnknownKeyID(t *testing.T) {
+	testCases := []struct {
+		name                      string
+		jwksRefreshOnUnknownKeyID bool
+		wantErr                   bool
+	}{
+		{
+			name:    "disabled by default: token signed with a not-yet-cached key is rejected",
+			wantErr: true,
+		},
+		{
+			name:                      "enabled: token signed with a not-yet-cached key succeeds after refresh",
+			jwksRefreshOnUnknownKeyID: true,
+			wantErr:                   false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			signingKey := loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256)
+			pubKeys := []*jose.JSONWebKey{loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256)}
+			signer, err := jose.NewSigner(jose.SigningKey{
+				Algorithm: jose.SignatureAlgorithm(signingKey.Algorithm),
+				Key:       signingKey,
+			}, nil)
+			if err != nil {
+				t.Fatalf("initialize signer: %v", err)
+			}
+
+			ts := newRefreshTestServer(t, toKeySet(pubKeys))
+			defer ts.Close()
+
+			opts := Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                       ts.URL,
+						Audiences:                 []string{"my-client"},
+						JWKSRefreshOnUnknownKeyID: tc.jwksRefreshOnUnknownKeyID,
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: ptr.To(""),
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			}
+
+			caBundle := pem.EncodeToMemory(&pem.Block{
+				Type:  "CERTIFICATE",
+				Bytes: ts.Certificate().Raw,
+			})
+			caContent, err := dynamiccertificates.NewStaticCAContent("oidc-authenticator", caBundle)
+			if err != nil {
+				t.Fatalf("initialize ca: %v", err)
+			}
+			opts.CAContentProvider = caContent
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			a, err := New(ctx, opts)
+			if err != nil {
+				t.Fatalf("initialize authenticator: %v", err)
+			}
+
+			ia, ok := a.(*instrumentedAuthenticator)
+			if !ok {
+				t.Fatalf("expected authenticator to be instrumented")
+			}
+			authn, ok := ia.delegate.(*jwtAuthenticator)
+			if !ok {
+				t.Fatalf("expected delegate to be jwtAuthenticator")
+			}
+			if err := wait.PollUntilContextCancel(ctx, time.Millisecond, true, func(context.Context) (bool, error) {
+				v, _ := authn.idTokenVerifier()
+				return v != nil, nil
+			}); err != nil {
+				t.Fatalf("failed to initialize the authenticator: %v", err)
+			}
+
+			claims := fmt.Sprintf(`{"iss": %q, "aud": "my-client", "username": "jane", "exp": %d}`, ts.URL, valid.Unix())
+
+			jws, err := signer.Sign([]byte(claims))
+			if err != nil {
+				t.Fatalf("sign claims: %v", err)
+			}
+			token, err := jws.CompactSerialize()
+			if err != nil {
+				t.Fatalf("serialize token: %v", err)
+			}
+			// Prime the cache with the original key.
+			if _, _, err := a.AuthenticateToken(ctx, token); err != nil {
+				t.Fatalf("authenticate token with initial key: %v", err)
+			}
+
+			// Rotate the provider's signing key. The JWKS response's
+			// Cache-Control header keeps the cache "fresh" for an hour, so
+			// this simulates a key rotation the authenticator hasn't
+			// observed yet.
+			signingKey = loadRSAPrivKey(t, "testdata/rsa_2.pem", jose.RS256)
+			pubKeys = []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+				loadRSAKey(t, "testdata/rsa_2.pem", jose.RS256),
+			}
+			signer, err = jose.NewSigner(jose.SigningKey{
+				Algorithm: jose.SignatureAlgorithm(signingKey.Algorithm),
+				Key:       signingKey,
+			}, nil)
+			if err != nil {
+				t.Fatalf("initialize signer: %v", err)
+			}
+			ts.setKeys(toKeySet(pubKeys))
+
+			jws, err = signer.Sign([]byte(claims))
+			if err != nil {
+				t.Fatalf("sign claims: %v", err)
+			}
+			token, err = jws.CompactSerialize()
+			if err != nil {
+				t.Fatalf("serialize token: %v", err)
+			}
+
+			// verifyingKeySet rate limits forced refreshes; wait it out so the
+			// "enabled" case's refresh attempt isn't skipped.
+			time.Sleep(jwksMinRefreshInterval + 100*time.Millisecond)
+
+			_, _, err = a.AuthenticateToken(ctx, token)
+			if tc.wantErr && err == nil {
+				t.Fatalf("expected authentication to fail for a token signed with a not-yet-cached key, but it succeeded")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("expected authentication to succeed after JWKS refresh, got error: %v", err)
+			}
+		})
+	}
+}
