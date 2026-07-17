@@ -319,6 +319,19 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		// The device declares the attribute both bare (a valid string) and
+		// explicitly (a non-string). The explicit form is authoritative, so the
+		// result is deterministic rather than dependent on map iteration order.
+		"partition-type-attribute-explicit-form-wins": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key(driverName+"/string"), resourceapi.DeviceAttribute{IntValue: ptr.To(int64(1))}, "must be a string value because `partitionTypeAttribute` names this attribute")},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(1)
+				slice.Spec.Devices[0].Attributes[resourceapi.QualifiedName(driverName+"/string")] = resourceapi.DeviceAttribute{IntValue: ptr.To(int64(1))}
+				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName(driverName + "/string"))
+				return slice
+			}(),
+		},
 		"missing-name": {
 			wantFailures: field.ErrorList{field.Required(field.NewPath("metadata", "name"), "name or generateName is required")},
 			slice:        testResourceSlice("", goodName, driverName, 1),

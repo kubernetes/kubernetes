@@ -422,6 +422,11 @@ func (m *PartitionTypeStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	i -= len(m.Attribute)
+	copy(dAtA[i:], m.Attribute)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Attribute)))
+	i--
+	dAtA[i] = 0x22
 	if m.Allocatable != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.Allocatable))
 		i--
@@ -1002,6 +1007,8 @@ func (m *PartitionTypeStatus) Size() (n int) {
 	if m.Allocatable != nil {
 		n += 1 + sovGenerated(uint64(*m.Allocatable))
 	}
+	l = len(m.Attribute)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -1270,6 +1277,7 @@ func (this *PartitionTypeStatus) String() string {
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Total:` + valueToStringGenerated(this.Total) + `,`,
 		`Allocatable:` + valueToStringGenerated(this.Allocatable) + `,`,
+		`Attribute:` + fmt.Sprintf("%v", this.Attribute) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2470,6 +2478,38 @@ func (m *PartitionTypeStatus) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Allocatable = &v
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Attribute", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Attribute = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

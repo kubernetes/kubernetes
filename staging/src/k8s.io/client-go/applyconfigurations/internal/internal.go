@@ -13331,6 +13331,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: allocatable
       type:
         scalar: numeric
+    - name: attribute
+      type:
+        scalar: string
     - name: total
       type:
         scalar: numeric

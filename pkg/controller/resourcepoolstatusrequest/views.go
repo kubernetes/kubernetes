@@ -47,24 +47,34 @@ const (
 // deviceRecord is the per-device data the advanced views are computed from.
 type deviceRecord struct {
 	name string
-	// partitionType is the value of the pool's PartitionTypeAttribute on this
-	// device; hasPartitionType is false when the device lacks the attribute.
+	// partitionAttr is the grouping attribute resolved for this device: the
+	// PartitionTypeAttribute its own slice declared, or the request default
+	// when the slice declares none. Empty when neither names one.
+	partitionAttr string
+	// partitionType is the value of partitionAttr on this device;
+	// hasPartitionType is false when the device lacks it as a string.
 	partitionType    string
 	hasPartitionType bool
 	consumesCounters []resourcev1.DeviceCounterConsumption
 	allowMultiple    bool
 	capacity         map[resourcev1.QualifiedName]resourcev1.DeviceCapacity
-	// attributes lets the partition type be resolved once the pool attribute is known.
+	// attributes lets the partition type be resolved once partitionAttr is known.
 	attributes map[resourcev1.QualifiedName]resourcev1.DeviceAttribute
 }
 
-// sliceDeviceRecords builds the per-device records for one slice.
+// sliceDeviceRecords builds the per-device records for one slice, seeding each
+// with the slice's own PartitionTypeAttribute (empty when the slice declares none).
 func sliceDeviceRecords(slice *resourcev1.ResourceSlice) []deviceRecord {
+	var sliceAttr string
+	if slice.Spec.PartitionTypeAttribute != nil {
+		sliceAttr = string(*slice.Spec.PartitionTypeAttribute)
+	}
 	recs := make([]deviceRecord, 0, len(slice.Spec.Devices))
 	for i := range slice.Spec.Devices {
 		d := &slice.Spec.Devices[i]
 		recs = append(recs, deviceRecord{
 			name:             d.Name,
+			partitionAttr:    sliceAttr,
 			consumesCounters: d.ConsumesCounters,
 			allowMultiple:    d.AllowMultipleAllocations != nil && *d.AllowMultipleAllocations,
 			capacity:         d.Capacity,
@@ -75,28 +85,21 @@ func sliceDeviceRecords(slice *resourcev1.ResourceSlice) []deviceRecord {
 }
 
 // resolvePartitionType returns the string value of attribute fqn on a device.
-// An attribute key's domain defaults to the driver name (as CEL selectors do); a
-// non-string or absent attribute yields ("", false).
+// An attribute key's domain defaults to the driver name (as CEL selectors do),
+// so an attribute in the driver's domain may be declared explicitly or bare;
+// the explicit form wins, keeping the result deterministic when both are present.
+// A non-string or absent attribute yields ("", false).
 func resolvePartitionType(driver string, attrs map[resourcev1.QualifiedName]resourcev1.DeviceAttribute, fqn string) (string, bool) {
-	for key, attr := range attrs {
-		if qualifyAttributeName(driver, string(key)) != fqn {
-			continue
+	attr, ok := attrs[resourcev1.QualifiedName(fqn)]
+	if !ok {
+		if bare, cut := strings.CutPrefix(fqn, driver+"/"); cut {
+			attr, ok = attrs[resourcev1.QualifiedName(bare)]
 		}
-		if attr.StringValue != nil {
-			return *attr.StringValue, true
-		}
+	}
+	if !ok || attr.StringValue == nil {
 		return "", false
 	}
-	return "", false
-}
-
-// qualifyAttributeName returns the fully-qualified form of an attribute key,
-// prepending the driver domain when the key carries none.
-func qualifyAttributeName(driver, name string) string {
-	if strings.Contains(name, "/") {
-		return name
-	}
-	return driver + "/" + name
+	return *attr.StringValue, true
 }
 
 // poolViewInput carries everything needed to compute the advanced views for one
@@ -107,46 +110,35 @@ type poolViewInput struct {
 	devices  []deviceRecord
 	// sharedCounters merged from all slices in the pool (names are unique per pool).
 	sharedCounters []resourcev1.CounterSet
-	// partitionAttr is the resolved grouping attribute (from the request or the
-	// pool's slices); hasPartitionAttr is false when neither names one.
-	// partitionAttrConflict is true when slices declare differing values.
-	partitionAttr         string
-	hasPartitionAttr      bool
-	partitionAttrConflict bool
 	// inUse holds device names with at least one non-AdminAccess claim.
 	inUse map[string]struct{}
 	// consumedCapacity is per-key consumption summed over non-AdminAccess claims.
 	consumedCapacity map[resourcev1.QualifiedName]resource.Quantity
 }
 
-// resolvePartitionAttribute settles the pool's grouping attribute and, when
-// consistent, resolves each device's partition type. The driver's slice
-// declaration takes precedence; slices declaring differing values are a
-// conflict. Slices declaring none stay silent: the attribute is only permitted
-// on slices carrying devices that consume counters, so a pool's counter and
-// plain-device slices legitimately omit it. The request's attribute is only a
-// fallback for drivers that have not been updated to declare one.
-func resolvePartitionAttribute(requestAttr *string, values map[string]struct{}, in *poolViewInput) {
-	switch {
-	case len(values) == 1:
-		for v := range values {
-			in.partitionAttr = v
+// resolveDevicePartitions resolves each device's partition type against its
+// grouping attribute. A device's own slice declaration takes precedence, and
+// slices may declare differing attributes: a pool that mixes partitions is
+// grouped per device, not per pool. The request's attribute is a pool-wide
+// fallback used only when no slice in the pool declares one, for drivers that
+// have not been updated to declare it themselves.
+func resolveDevicePartitions(requestAttr *string, in *poolViewInput) {
+	poolDeclares := false
+	for i := range in.devices {
+		if in.devices[i].partitionAttr != "" {
+			poolDeclares = true
+			break
 		}
-		in.hasPartitionAttr = true
-	case len(values) > 1:
-		in.hasPartitionAttr = true
-		in.partitionAttrConflict = true
-		return
-	case requestAttr != nil:
-		in.partitionAttr = *requestAttr
-		in.hasPartitionAttr = true
-	default:
-		return // neither the driver nor the request named one: no partition view
 	}
 	for i := range in.devices {
-		value, ok := resolvePartitionType(in.driver, in.devices[i].attributes, in.partitionAttr)
-		in.devices[i].partitionType = value
-		in.devices[i].hasPartitionType = ok
+		d := &in.devices[i]
+		if d.partitionAttr == "" {
+			if poolDeclares || requestAttr == nil {
+				continue // no grouping attribute for this device
+			}
+			d.partitionAttr = *requestAttr
+		}
+		d.partitionType, d.hasPartitionType = resolvePartitionType(in.driver, d.attributes, d.partitionAttr)
 	}
 }
 
@@ -158,14 +150,19 @@ func resolvePartitionAttribute(requestAttr *string, values map[string]struct{}, 
 func computePoolViews(in poolViewInput) (partitionSummary []resourcev1alpha3.PartitionTypeStatus, shareable *resourcev1alpha3.ShareableSummaryStatus, validationError string) {
 	hasCounters := len(in.sharedCounters) > 0
 
+	grouped := false
+	for i := range in.devices {
+		if in.devices[i].partitionAttr != "" {
+			grouped = true
+			break
+		}
+	}
+
 	switch {
-	case in.hasPartitionAttr && in.partitionAttrConflict:
-		validationError = fmt.Sprintf("%s pool %s/%s has slices that declare different partitionTypeAttribute values",
-			prefixPartitionTypeMissing, in.driver, in.poolName)
-	case in.hasPartitionAttr && !hasCounters:
+	case grouped && !hasCounters:
 		validationError = fmt.Sprintf("%s pool %s/%s declares partitionTypeAttribute but publishes no sharedCounters",
 			prefixPartitionTypeMissing, in.driver, in.poolName)
-	case in.hasPartitionAttr:
+	case grouped:
 		partitionSummary, validationError = computePartitionSummary(in)
 	}
 
@@ -184,26 +181,33 @@ func computePoolViews(in poolViewInput) (partitionSummary []resourcev1alpha3.Par
 	return partitionSummary, shareable, validationError
 }
 
-// computePartitionSummary groups devices by partition type and reports, per
-// type, the total device count and how many additional devices still fit given
-// current shared-counter consumption.
+// computePartitionSummary groups partitionable (counter-consuming) devices by
+// (grouping attribute, partition type) and reports, per group, the total device
+// count and how many additional devices still fit given current shared-counter
+// consumption. Devices that consume no counters are not partitions and are
+// skipped; so are devices for which no grouping attribute was resolved.
 func computePartitionSummary(in poolViewInput) ([]resourcev1alpha3.PartitionTypeStatus, string) {
+	type groupKey struct{ attr, typ string }
 	type group struct {
 		total   int32
 		fresh   []deviceRecord
 		costKey string
 	}
-	groups := map[string]*group{}
+	groups := map[groupKey]*group{}
 	for i := range in.devices {
 		d := in.devices[i]
+		if len(d.consumesCounters) == 0 || d.partitionAttr == "" {
+			continue
+		}
 		if !d.hasPartitionType {
 			return nil, fmt.Sprintf("%s device %q in pool %s/%s does not carry partition type attribute %q",
-				prefixPartitionTypeMissing, d.name, in.driver, in.poolName, in.partitionAttr)
+				prefixPartitionTypeMissing, d.name, in.driver, in.poolName, d.partitionAttr)
 		}
-		g := groups[d.partitionType]
+		k := groupKey{d.partitionAttr, d.partitionType}
+		g := groups[k]
 		if g == nil {
 			g = &group{}
-			groups[d.partitionType] = g
+			groups[k] = g
 		}
 		key := consumesCountersKey(d.consumesCounters)
 		if g.total == 0 {
@@ -218,12 +222,12 @@ func computePartitionSummary(in poolViewInput) ([]resourcev1alpha3.PartitionType
 		}
 	}
 
-	// Headroom after in-use consumption. Each type is measured independently
-	// against this baseline: allocatable[T] = min(fresh[T], floor(avail/cost[T])).
+	// Headroom after in-use consumption. Each group is measured independently
+	// against this baseline: allocatable[G] = min(fresh[G], floor(avail/cost[G])).
 	baseline := availableCounters(in.sharedCounters, in.devices, in.inUse)
 
 	result := make([]resourcev1alpha3.PartitionTypeStatus, 0, len(groups))
-	for typeValue, g := range groups {
+	for k, g := range groups {
 		avail := cloneCounters(baseline)
 		allocatable := int32(0)
 		for _, d := range g.fresh {
@@ -233,12 +237,18 @@ func computePartitionSummary(in poolViewInput) ([]resourcev1alpha3.PartitionType
 			}
 		}
 		result = append(result, resourcev1alpha3.PartitionTypeStatus{
-			Type:        typeValue,
+			Attribute:   k.attr,
+			Type:        k.typ,
 			Total:       ptr.To(g.total),
 			Allocatable: ptr.To(allocatable),
 		})
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].Type < result[j].Type })
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Attribute != result[j].Attribute {
+			return result[i].Attribute < result[j].Attribute
+		}
+		return result[i].Type < result[j].Type
+	})
 
 	if len(result) > maxStatusListItems {
 		return nil, fmt.Sprintf("%s pool %s/%s has %d partition types, exceeding the maximum of %d",

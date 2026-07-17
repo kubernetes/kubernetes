@@ -297,6 +297,35 @@ func Validate_PartitionTypeStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *resourcev1alpha3.PartitionTypeStatus) (errs field.ErrorList) {
 
+	{ // field resourcev1alpha3.PartitionTypeStatus.Attribute
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1alpha3.PartitionTypeStatus) *string {
+				return &oldObj.Attribute
+			})
+		errs = append(errs, fn(fldPath.Child("attribute"), &obj.Attribute, oldVal, oldObj != nil)...)
+	}
+
 	{ // field resourcev1alpha3.PartitionTypeStatus.Type
 		fn := func(
 			fldPath *field.Path,
@@ -735,8 +764,18 @@ func Validate_PoolStatus(
 			if earlyReturn {
 				return // do not proceed
 			}
+			// lists with map semantics require unique keys
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *resourcev1alpha3.PartitionTypeStatus, b *resourcev1alpha3.PartitionTypeStatus) bool {
+					return a.Attribute == b.Attribute && a.Type == b.Type
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PartitionTypeStatus); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *resourcev1alpha3.PartitionTypeStatus, b *resourcev1alpha3.PartitionTypeStatus) bool {
+					return a.Attribute == b.Attribute && a.Type == b.Type
+				}, validate.SemanticDeepEqual, Validate_PartitionTypeStatus); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

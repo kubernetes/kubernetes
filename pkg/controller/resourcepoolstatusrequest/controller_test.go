@@ -1251,20 +1251,44 @@ func partitionSliceDevice(name, profile, cost string) resourcev1.Device {
 	}
 }
 
+// makePartitionClassSlice is a second device slice for the same pool that groups
+// its partitions by a different attribute (driver/class), drawing from the same
+// sibling counter set. It models a pool that mixes multiple partition attributes.
+func makePartitionClassSlice(name, driver, pool, node string, sliceCount int64) *resourcev1.ResourceSlice {
+	s := makeSliceWithGenerationAndCount(name, driver, pool, node, 0, 1, sliceCount)
+	s.Spec.PartitionTypeAttribute = ptr.To(resourcev1.FullyQualifiedName(driver + "/class"))
+	s.Spec.Devices = []resourcev1.Device{{
+		Name: "a-0",
+		Attributes: map[resourcev1.QualifiedName]resourcev1.DeviceAttribute{
+			"class": {StringValue: ptr.To("A")},
+		},
+		ConsumesCounters: []resourcev1.DeviceCounterConsumption{consumes("gpu-0", map[string]string{"memory": "40Gi"})},
+	}}
+	return s
+}
+
 // End-to-end partition attribute resolution over a two-slice partitionable pool,
 // exercising slice collection and the pool-beats-request precedence.
 func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
 	driver := "gpu.example.com"
 
+	profileAttr := driver + "/profile"
+	classAttr := driver + "/class"
+	// key names a summary entry by its attribute and type, so the assertion
+	// covers the reported Attribute as well as the counts.
+	key := func(attr, typ string) string { return attr + "\t" + typ }
+
 	testCases := map[string]struct {
 		// declarePoolAttr keeps the driver's own attribute on the slices.
 		declarePoolAttr bool
 		requestAttr     *string
-		want            map[string][2]int32
+		// mixedClass adds a second device slice grouped by a different attribute.
+		mixedClass bool
+		want       map[string][2]int32
 	}{
 		"pool declares the attribute": {
 			declarePoolAttr: true,
-			want:            map[string][2]int32{"Full": {1, 1}, "Half": {2, 2}},
+			want:            map[string][2]int32{key(profileAttr, "Full"): {1, 1}, key(profileAttr, "Half"): {2, 2}},
 		},
 		// The slices declare driver/profile. The request names a different
 		// attribute that no device carries: if it won, every device would look
@@ -1272,18 +1296,37 @@ func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
 		"pool declaration beats the request default": {
 			declarePoolAttr: true,
 			requestAttr:     ptr.To(driver + "/other"),
-			want:            map[string][2]int32{"Full": {1, 1}, "Half": {2, 2}},
+			want:            map[string][2]int32{key(profileAttr, "Full"): {1, 1}, key(profileAttr, "Half"): {2, 2}},
 		},
 		"request default applies when the pool declares none": {
-			requestAttr: ptr.To(driver + "/profile"),
-			want:        map[string][2]int32{"Full": {1, 1}, "Half": {2, 2}},
+			requestAttr: ptr.To(profileAttr),
+			want:        map[string][2]int32{key(profileAttr, "Full"): {1, 1}, key(profileAttr, "Half"): {2, 2}},
+		},
+		// Slices declaring different attributes are not a conflict: each group
+		// is reported independently under its own attribute.
+		"pool mixes two grouping attributes": {
+			declarePoolAttr: true,
+			mixedClass:      true,
+			want: map[string][2]int32{
+				key(profileAttr, "Full"): {1, 1},
+				key(profileAttr, "Half"): {2, 2},
+				key(classAttr, "A"):      {1, 1},
+			},
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			counters := makePartitionCounterSlice("counters", driver, "pool-0", "node-0", 2)
-			devices := makePartitionDeviceSlice("devices", driver, "pool-0", "node-0", 2)
+			sliceCount := int64(2)
+			if tc.mixedClass {
+				sliceCount = 3
+			}
+			counters := makePartitionCounterSlice("counters", driver, "pool-0", "node-0", sliceCount)
+			devices := makePartitionDeviceSlice("devices", driver, "pool-0", "node-0", sliceCount)
+			all := []*resourcev1.ResourceSlice{counters, devices}
+			if tc.mixedClass {
+				all = append(all, makePartitionClassSlice("class-devices", driver, "pool-0", "node-0", sliceCount))
+			}
 			if !tc.declarePoolAttr {
 				counters.Spec.PartitionTypeAttribute = nil
 				devices.Spec.PartitionTypeAttribute = nil
@@ -1291,13 +1334,13 @@ func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
 			request := makeRequest(driver)
 			request.Spec.PartitionTypeAttribute = tc.requestAttr
 
-			pool := requireSinglePool(t, runCalculatePoolStatus(t, request, []*resourcev1.ResourceSlice{counters, devices}, nil))
+			pool := requireSinglePool(t, runCalculatePoolStatus(t, request, all, nil))
 			if pool.ValidationError != nil {
 				t.Fatalf("unexpected validationError: %s", *pool.ValidationError)
 			}
 			got := map[string][2]int32{}
 			for _, p := range pool.PartitionSummary {
-				got[p.Type] = [2]int32{ptr.Deref(p.Total, 0), ptr.Deref(p.Allocatable, 0)}
+				got[key(p.Attribute, p.Type)] = [2]int32{ptr.Deref(p.Total, 0), ptr.Deref(p.Allocatable, 0)}
 			}
 			if !maps.Equal(got, tc.want) {
 				t.Errorf("partitionSummary {total,allocatable} = %v, want %v", got, tc.want)

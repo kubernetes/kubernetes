@@ -49580,9 +49580,16 @@ func schema_k8sio_api_resource_v1alpha3_PartitionTypeStatus(ref common.Reference
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PartitionTypeStatus reports allocatability for a single partition type, identified by the value of the pool's PartitionTypeAttribute.",
+				Description: "PartitionTypeStatus reports allocatability for a single partition type, identified by the value of a grouping attribute.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
+					"attribute": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Attribute is the fully qualified name of the device attribute whose value groups this entry. It is the PartitionTypeAttribute declared by the devices' own slice, or the default named in the request when their slice declares none.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"type": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Type is the partition type value (e.g. \"Full\" or \"Half\").",
@@ -49605,7 +49612,7 @@ func schema_k8sio_api_resource_v1alpha3_PartitionTypeStatus(ref common.Reference
 						},
 					},
 				},
-				Required: []string{"type", "total", "allocatable"},
+				Required: []string{"attribute", "type", "total", "allocatable"},
 			},
 		},
 	}
@@ -49696,7 +49703,7 @@ func schema_k8sio_api_resource_v1alpha3_PoolStatus(ref common.ReferenceCallback)
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "PartitionSummary reports allocatability per partition type for a partitionable pool that publishes SharedCounters. It is populated only when a grouping attribute is resolved: the PartitionTypeAttribute declared on the pool's slices, or for a pool that declares none, the default named in the request. When neither names an attribute, the pool reports no partition summary.",
+							Description: "PartitionSummary reports allocatability per (attribute, partition type) for a partitionable pool that publishes SharedCounters. Each entry names the grouping attribute it was resolved from: the PartitionTypeAttribute declared by a device's own slice, or for devices whose slice declares none, the default named in the request. A pool that mixes partitions declared under different attributes reports each independently. When no slice declares an attribute and the request names no default, the pool reports no partition summary.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -49854,7 +49861,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestSpec(ref common
 					},
 					"partitionTypeAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PartitionTypeAttribute optionally names a device attribute (by its fully qualified name, e.g. \"gpu.example.com/profile\") to use as the default grouping attribute for pools which have not declared one themselves.\n\nA pool's own PartitionTypeAttribute always takes precedence. This default applies only to pools whose slices do not declare one, so that a request can still get an accurate partitionSummary from a driver that has not been updated to declare it. When neither the pool nor this default names an attribute, a partitionable pool reports no partitionSummary.\n\nMust include the domain qualifier.",
+							Description: "PartitionTypeAttribute optionally names a device attribute (by its fully qualified name, e.g. \"gpu.example.com/profile\") to use as the default grouping attribute for pools which have not declared one themselves.\n\nA slice's own PartitionTypeAttribute always takes precedence. This default applies only to pools whose slices do not declare one, so that a request can still get an accurate partitionSummary from a driver that has not been updated to declare it. When neither the pool nor this default names an attribute, a partitionable pool reports no partitionSummary.\n\nMust include the domain qualifier.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

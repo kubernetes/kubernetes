@@ -22,8 +22,13 @@ package v1alpha3
 // with apply.
 //
 // PartitionTypeStatus reports allocatability for a single partition type,
-// identified by the value of the pool's PartitionTypeAttribute.
+// identified by the value of a grouping attribute.
 type PartitionTypeStatusApplyConfiguration struct {
+	// Attribute is the fully qualified name of the device attribute whose value
+	// groups this entry. It is the PartitionTypeAttribute declared by the
+	// devices' own slice, or the default named in the request when their slice
+	// declares none.
+	Attribute *string `json:"attribute,omitempty"`
 	// Type is the partition type value (e.g. "Full" or "Half").
 	Type *string `json:"type,omitempty"`
 	// Total is the number of devices of this partition type in the pool.
@@ -37,6 +42,14 @@ type PartitionTypeStatusApplyConfiguration struct {
 // apply.
 func PartitionTypeStatus() *PartitionTypeStatusApplyConfiguration {
 	return &PartitionTypeStatusApplyConfiguration{}
+}
+
+// WithAttribute sets the Attribute field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Attribute field is set to the value of the last call.
+func (b *PartitionTypeStatusApplyConfiguration) WithAttribute(value string) *PartitionTypeStatusApplyConfiguration {
+	b.Attribute = &value
+	return b
 }
 
 // WithType sets the Type field in the declarative configuration to the given value

@@ -2276,10 +2276,10 @@ type PoolStatus struct {
 	// +optional
 	ValidationError *string
 
-	// PartitionSummary reports allocatability per partition type for a
-	// partitionable pool. It is populated only when a grouping attribute is
-	// resolved: the one declared on the pool's slices, or for a pool that
-	// declares none, the default named in the request.
+	// PartitionSummary reports allocatability per (attribute, partition type)
+	// for a partitionable pool. Each entry names the grouping attribute it was
+	// resolved from: the one declared by a device's own slice, or for devices
+	// whose slice declares none, the default named in the request.
 	// +optional
 	PartitionSummary []PartitionTypeStatus
 
@@ -2290,8 +2290,15 @@ type PoolStatus struct {
 }
 
 // PartitionTypeStatus reports allocatability for a single partition type,
-// identified by the value of the pool's PartitionTypeAttribute.
+// identified by the value of a grouping attribute.
 type PartitionTypeStatus struct {
+	// Attribute is the fully qualified name of the device attribute whose value
+	// groups this entry. It is the PartitionTypeAttribute declared by the
+	// devices' own slice, or the default named in the request when their slice
+	// declares none.
+	// +required
+	Attribute string
+
 	// Type is the partition type value (e.g. "Full" or "Half").
 	Type string
 

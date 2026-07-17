@@ -587,16 +587,22 @@ type PoolStatus struct {
 	// +k8s:maxBytes=256
 	ValidationError *string `json:"validationError,omitempty" protobuf:"bytes,10,opt,name=validationError"`
 
-	// PartitionSummary reports allocatability per partition type for a
-	// partitionable pool that publishes SharedCounters. It is populated only
-	// when a grouping attribute is resolved: the PartitionTypeAttribute
-	// declared on the pool's slices, or for a pool that declares none, the
-	// default named in the request. When neither names an attribute, the pool
+	// PartitionSummary reports allocatability per (attribute, partition type)
+	// for a partitionable pool that publishes SharedCounters. Each entry names
+	// the grouping attribute it was resolved from: the PartitionTypeAttribute
+	// declared by a device's own slice, or for devices whose slice declares
+	// none, the default named in the request. A pool that mixes partitions
+	// declared under different attributes reports each independently. When no
+	// slice declares an attribute and the request names no default, the pool
 	// reports no partition summary.
 	//
 	// +optional
 	// +k8s:optional
 	// +listType=atomic
+	// +k8s:listType=atomic
+	// +k8s:unique=map
+	// +k8s:listMapKey=attribute
+	// +k8s:listMapKey=type
 	// +k8s:maxItems=32
 	PartitionSummary []PartitionTypeStatus `json:"partitionSummary,omitempty" protobuf:"bytes,11,rep,name=partitionSummary"`
 
@@ -610,8 +616,17 @@ type PoolStatus struct {
 }
 
 // PartitionTypeStatus reports allocatability for a single partition type,
-// identified by the value of the pool's PartitionTypeAttribute.
+// identified by the value of a grouping attribute.
 type PartitionTypeStatus struct {
+	// Attribute is the fully qualified name of the device attribute whose value
+	// groups this entry. It is the PartitionTypeAttribute declared by the
+	// devices' own slice, or the default named in the request when their slice
+	// declares none.
+	//
+	// +required
+	// +k8s:required
+	Attribute string `json:"attribute,omitempty" protobuf:"bytes,4,name=attribute"`
+
 	// Type is the partition type value (e.g. "Full" or "Half").
 	//
 	// +required

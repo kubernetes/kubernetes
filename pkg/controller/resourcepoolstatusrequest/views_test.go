@@ -51,11 +51,13 @@ func inUseSet(names ...string) map[string]struct{} {
 	return s
 }
 
-// partitionDevice builds a device carrying the partition-type attribute already
-// resolved (as the controller does before calling the view functions).
+// partitionDevice builds a counter-consuming device with its grouping attribute
+// and partition type already resolved (as the controller does before calling
+// the view functions).
 func partitionDevice(name, partitionType string, cost ...resourcev1.DeviceCounterConsumption) deviceRecord {
 	return deviceRecord{
 		name:             name,
+		partitionAttr:    "gpu.example.com/profile",
 		partitionType:    partitionType,
 		hasPartitionType: true,
 		consumesCounters: cost,
@@ -106,10 +108,18 @@ func TestComputePartitionSummary(t *testing.T) {
 			want:  map[string]int32{"Full": 3},
 			total: map[string]int32{"Full": 3},
 		},
+		// A counter-consuming device whose slice resolved a grouping attribute
+		// but that lacks the attribute value is flagged; a non-partition device
+		// missing it would instead be skipped.
 		"missing-attribute": {
 			devices: []deviceRecord{
 				partitionDevice("full-0", "Full", consumes("gpu-0", map[string]string{"memory": "80Gi"})),
-				{name: "mystery", hasPartitionType: false},
+				{
+					name:             "mystery",
+					partitionAttr:    "gpu.example.com/profile",
+					consumesCounters: []resourcev1.DeviceCounterConsumption{consumes("gpu-0", map[string]string{"memory": "40Gi"})},
+					hasPartitionType: false,
+				},
 			},
 			inUse:   inUseSet(),
 			wantErr: prefixPartitionTypeMissing,
@@ -197,10 +207,10 @@ func TestComputePartitionSummary_MultiCounterSet(t *testing.T) {
 func TestComputePoolViews_Hybrid(t *testing.T) {
 	in := poolViewInput{
 		driver: "gpu.example.com", poolName: "p",
-		sharedCounters:   []resourcev1.CounterSet{counterSet("gpu-0", map[string]string{"memory": "80Gi"})},
-		hasPartitionAttr: true, partitionAttr: "gpu.example.com/profile",
+		sharedCounters: []resourcev1.CounterSet{counterSet("gpu-0", map[string]string{"memory": "80Gi"})},
 		devices: []deviceRecord{{
 			name:             "full-0",
+			partitionAttr:    "gpu.example.com/profile",
 			partitionType:    "Full",
 			hasPartitionType: true,
 			consumesCounters: []resourcev1.DeviceCounterConsumption{consumes("gpu-0", map[string]string{"memory": "80Gi"})},
@@ -334,7 +344,7 @@ func TestComputePoolViews_PartitionAttributeGatesView(t *testing.T) {
 
 	// With a grouping attribute -> partitionSummary.
 	typed := poolViewInput{
-		driver: "gpu.example.com", poolName: "p", sharedCounters: sc, hasPartitionAttr: true, partitionAttr: "gpu.example.com/profile",
+		driver: "gpu.example.com", poolName: "p", sharedCounters: sc,
 		devices: []deviceRecord{partitionDevice("d0", "Full", consumes("gpu-0", map[string]string{"memory": "80Gi"}))},
 		inUse:   inUseSet(),
 	}
@@ -361,72 +371,72 @@ func TestComputePoolViews_PartitionAttributeGatesView(t *testing.T) {
 	}
 }
 
-func TestComputePoolViews_AttributeConflict(t *testing.T) {
-	in := poolViewInput{
-		driver: "gpu.example.com", poolName: "p",
-		sharedCounters:        []resourcev1.CounterSet{counterSet("gpu-0", map[string]string{"memory": "80Gi"})},
-		hasPartitionAttr:      true,
-		partitionAttrConflict: true,
-	}
-	_, _, err := computePoolViews(in)
-	if !strings.HasPrefix(err, prefixPartitionTypeMissing) {
-		t.Errorf("want %q prefix, got %q", prefixPartitionTypeMissing, err)
-	}
-}
-
-func TestResolvePartitionAttribute(t *testing.T) {
-	const attr = "gpu.example.com/profile"
-	values := func(vs ...string) map[string]struct{} {
-		m := make(map[string]struct{}, len(vs))
-		for _, v := range vs {
-			m[v] = struct{}{}
-		}
-		return m
+func TestResolveDevicePartitions(t *testing.T) {
+	const driver = "gpu.example.com"
+	// A device carrying profile=Full and shape=Small, so either attribute resolves.
+	deviceAttrs := map[resourcev1.QualifiedName]resourcev1.DeviceAttribute{
+		"gpu.example.com/profile": {StringValue: ptr.To("Full")},
+		"gpu.example.com/shape":   {StringValue: ptr.To("Small")},
 	}
 	testCases := map[string]struct {
-		requestAttr  *string
-		values       map[string]struct{}
-		wantAttr     string
-		wantHas      bool
-		wantConflict bool
+		requestAttr *string
+		devices     []deviceRecord
+		wantAttr    []string // resolved partitionAttr per device
+		wantType    []string // resolved partitionType per device ("" when unresolved)
 	}{
-		// The attribute is only permitted on slices whose devices consume
-		// counters, so a pool's counter and plain-device slices declare
-		// nothing and must not read as a conflict.
-		"declared by only some slices": {
-			values:   values(attr),
-			wantAttr: attr,
-			wantHas:  true,
+		"slice declaration wins over request default": {
+			requestAttr: ptr.To("gpu.example.com/shape"),
+			devices:     []deviceRecord{{name: "d0", partitionAttr: "gpu.example.com/profile", attributes: deviceAttrs}},
+			wantAttr:    []string{"gpu.example.com/profile"},
+			wantType:    []string{"Full"},
 		},
-		"declared with differing values": {
-			values:       values(attr, "gpu.example.com/other"),
-			wantHas:      true,
-			wantConflict: true,
+		"request default fills devices when no slice declares": {
+			requestAttr: ptr.To("gpu.example.com/shape"),
+			devices:     []deviceRecord{{name: "d0", attributes: deviceAttrs}},
+			wantAttr:    []string{"gpu.example.com/shape"},
+			wantType:    []string{"Small"},
 		},
-		"undeclared falls back to the request": {
-			requestAttr: ptr.To(attr),
-			values:      values(),
-			wantAttr:    attr,
-			wantHas:     true,
+		"request default ignored when any slice declares": {
+			requestAttr: ptr.To("gpu.example.com/shape"),
+			devices: []deviceRecord{
+				{name: "d0", partitionAttr: "gpu.example.com/profile", attributes: deviceAttrs},
+				{name: "d1", attributes: deviceAttrs},
+			},
+			wantAttr: []string{"gpu.example.com/profile", ""},
+			wantType: []string{"Full", ""},
 		},
-		"pool declaration beats the request default": {
-			requestAttr: ptr.To("gpu.example.com/other"),
-			values:      values(attr),
-			wantAttr:    attr,
-			wantHas:     true,
+		// liggitt's case: slices declaring differing attributes are legitimate,
+		// so each device keeps its own rather than being flagged a conflict.
+		"differing slice attributes are each kept": {
+			devices: []deviceRecord{
+				{name: "d0", partitionAttr: "gpu.example.com/profile", attributes: deviceAttrs},
+				{name: "d1", partitionAttr: "gpu.example.com/shape", attributes: deviceAttrs},
+			},
+			wantAttr: []string{"gpu.example.com/profile", "gpu.example.com/shape"},
+			wantType: []string{"Full", "Small"},
 		},
-		"neither names one": {
-			values: values(),
+		"neither slice nor request names one": {
+			devices:  []deviceRecord{{name: "d0", attributes: deviceAttrs}},
+			wantAttr: []string{""},
+			wantType: []string{""},
 		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			in := poolViewInput{driver: "gpu.example.com", poolName: "p"}
-			resolvePartitionAttribute(tc.requestAttr, tc.values, &in)
-			if in.partitionAttr != tc.wantAttr || in.hasPartitionAttr != tc.wantHas || in.partitionAttrConflict != tc.wantConflict {
-				t.Errorf("got attr=%q has=%v conflict=%v, want attr=%q has=%v conflict=%v",
-					in.partitionAttr, in.hasPartitionAttr, in.partitionAttrConflict,
-					tc.wantAttr, tc.wantHas, tc.wantConflict)
+			in := poolViewInput{driver: driver, devices: tc.devices}
+			resolveDevicePartitions(tc.requestAttr, &in)
+			for i := range in.devices {
+				d := in.devices[i]
+				if d.partitionAttr != tc.wantAttr[i] {
+					t.Errorf("device %d: partitionAttr = %q, want %q", i, d.partitionAttr, tc.wantAttr[i])
+				}
+				gotType := ""
+				if d.hasPartitionType {
+					gotType = d.partitionType
+				}
+				if gotType != tc.wantType[i] {
+					t.Errorf("device %d: type = %q (has=%v), want %q", i, d.partitionType, d.hasPartitionType, tc.wantType[i])
+				}
 			}
 		})
 	}
@@ -449,5 +459,20 @@ func TestResolvePartitionType(t *testing.T) {
 	// Unknown attribute.
 	if _, ok := resolvePartitionType("gpu.example.com", attrs, "gpu.example.com/missing"); ok {
 		t.Error("missing attribute should resolve as absent")
+	}
+	// A foreign-domain name only matches an explicit key, never a bare one.
+	if v, ok := resolvePartitionType("gpu.example.com", attrs, "other.com/x"); !ok || v != "ignore" {
+		t.Errorf("foreign-domain resolution: got (%q,%v), want (ignore,true)", v, ok)
+	}
+	// When both the explicit and bare form of the same attribute are present,
+	// the explicit key wins so the result does not depend on map iteration order.
+	both := map[resourcev1.QualifiedName]resourcev1.DeviceAttribute{
+		"profile":                 {StringValue: ptr.To("Bare")},
+		"gpu.example.com/profile": {StringValue: ptr.To("Explicit")},
+	}
+	for range 20 {
+		if v, ok := resolvePartitionType("gpu.example.com", both, "gpu.example.com/profile"); !ok || v != "Explicit" {
+			t.Fatalf("colliding keys: got (%q,%v), want (Explicit,true)", v, ok)
+		}
 	}
 }

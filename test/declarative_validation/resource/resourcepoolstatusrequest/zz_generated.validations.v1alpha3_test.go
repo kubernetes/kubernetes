@@ -127,8 +127,14 @@ func init() {
 			"status.pools[*].partitionSummary": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
+			"status.pools[*].partitionSummary[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
 			"status.pools[*].partitionSummary[*].allocatable": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.pools[*].partitionSummary[*].attribute": {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"status.pools[*].partitionSummary[*].total": {

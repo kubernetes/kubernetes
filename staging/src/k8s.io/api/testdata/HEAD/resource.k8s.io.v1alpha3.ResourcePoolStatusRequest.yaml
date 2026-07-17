@@ -54,6 +54,7 @@ status:
     nodeName: nodeNameValue
     partitionSummary:
     - allocatable: 3
+      attribute: attributeValue
       total: 2
       type: typeValue
     poolName: poolNameValue

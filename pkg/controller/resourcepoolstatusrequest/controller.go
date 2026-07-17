@@ -364,9 +364,8 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 		expectedSliceCount int64
 		generation         int64
 		// Data for the partition/counter/shareable views (Alpha 1.37).
-		devices         []deviceRecord
-		sharedCounters  []resourcev1.CounterSet
-		partitionValues map[string]struct{} // distinct PartitionTypeAttribute values across slices
+		devices        []deviceRecord
+		sharedCounters []resourcev1.CounterSet
 	}
 
 	slices, err := c.sliceLister.List(labels.Everything())
@@ -442,7 +441,6 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 				sliceCount:         1,
 				expectedSliceCount: slice.Spec.Pool.ResourceSliceCount,
 				generation:         maxGeneration[key],
-				partitionValues:    make(map[string]struct{}),
 			}
 			poolData[key] = info
 		} else {
@@ -459,12 +457,10 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 			}
 		}
 
-		// Per-device data and pool-level counters/attribute for the advanced views.
+		// Per-device data and pool counters for the advanced views. Each device
+		// record carries its own slice's PartitionTypeAttribute.
 		info.devices = append(info.devices, sliceDeviceRecords(slice)...)
 		info.sharedCounters = append(info.sharedCounters, slice.Spec.SharedCounters...)
-		if slice.Spec.PartitionTypeAttribute != nil {
-			info.partitionValues[string(*slice.Spec.PartitionTypeAttribute)] = struct{}{}
-		}
 	}
 
 	// Step 2: Count allocated devices from ResourceClaims.
@@ -559,7 +555,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 				inUse:            inUse,
 				consumedCapacity: consumedCapacity[key],
 			}
-			resolvePartitionAttribute(request.Spec.PartitionTypeAttribute, info.partitionValues, &viewInput)
+			resolveDevicePartitions(request.Spec.PartitionTypeAttribute, &viewInput)
 
 			partitionSummary, shareable, viewErr := computePoolViews(viewInput)
 			pool.PartitionSummary = partitionSummary

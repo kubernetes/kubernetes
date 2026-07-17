@@ -63,11 +63,13 @@ type PoolStatusApplyConfiguration struct {
 	// validated (e.g., incomplete slice publication). When set, device
 	// count fields and ResourceSliceCount may be unset.
 	ValidationError *string `json:"validationError,omitempty"`
-	// PartitionSummary reports allocatability per partition type for a
-	// partitionable pool that publishes SharedCounters. It is populated only
-	// when a grouping attribute is resolved: the PartitionTypeAttribute
-	// declared on the pool's slices, or for a pool that declares none, the
-	// default named in the request. When neither names an attribute, the pool
+	// PartitionSummary reports allocatability per (attribute, partition type)
+	// for a partitionable pool that publishes SharedCounters. Each entry names
+	// the grouping attribute it was resolved from: the PartitionTypeAttribute
+	// declared by a device's own slice, or for devices whose slice declares
+	// none, the default named in the request. A pool that mixes partitions
+	// declared under different attributes reports each independently. When no
+	// slice declares an attribute and the request names no default, the pool
 	// reports no partition summary.
 	PartitionSummary []PartitionTypeStatusApplyConfiguration `json:"partitionSummary,omitempty"`
 	// ShareableSummary reports aggregate capacity for a pool that contains

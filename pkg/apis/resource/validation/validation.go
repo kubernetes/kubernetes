@@ -788,14 +788,16 @@ func validatePartitionTypeAttribute(spec *resource.ResourceSliceSpec, fldPath *f
 }
 
 // lookupQualifiedAttribute finds a device attribute by its fully qualified
-// name. Keys which carry no domain are qualified with the driver's own domain.
+// name. A key that carries no domain defaults to the driver's own domain, so an
+// attribute in the driver's domain may be declared either explicitly or bare.
+// The explicit form wins, keeping the result deterministic when a device
+// declares both; a bare key is consulted only for a name in the driver's domain.
 func lookupQualifiedAttribute(attributes map[resource.QualifiedName]resource.DeviceAttribute, driver, name string) (resource.DeviceAttribute, bool) {
-	for key, attribute := range attributes {
-		qualified := string(key)
-		if !strings.Contains(qualified, "/") {
-			qualified = driver + "/" + qualified
-		}
-		if qualified == name {
+	if attribute, ok := attributes[resource.QualifiedName(name)]; ok {
+		return attribute, true
+	}
+	if bare, ok := strings.CutPrefix(name, driver+"/"); ok {
+		if attribute, ok := attributes[resource.QualifiedName(bare)]; ok {
 			return attribute, true
 		}
 	}

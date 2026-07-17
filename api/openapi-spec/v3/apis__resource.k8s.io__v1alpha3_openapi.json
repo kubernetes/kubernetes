@@ -188,12 +188,16 @@
         "type": "object"
       },
       "io.k8s.api.resource.v1alpha3.PartitionTypeStatus": {
-        "description": "PartitionTypeStatus reports allocatability for a single partition type, identified by the value of the pool's PartitionTypeAttribute.",
+        "description": "PartitionTypeStatus reports allocatability for a single partition type, identified by the value of a grouping attribute.",
         "properties": {
           "allocatable": {
             "description": "Allocatable is the number of additional devices of this partition type that could still be allocated given current shared-counter consumption.",
             "format": "int32",
             "type": "integer"
+          },
+          "attribute": {
+            "description": "Attribute is the fully qualified name of the device attribute whose value groups this entry. It is the PartitionTypeAttribute declared by the devices' own slice, or the default named in the request when their slice declares none.",
+            "type": "string"
           },
           "total": {
             "description": "Total is the number of devices of this partition type in the pool.",
@@ -206,6 +210,7 @@
           }
         },
         "required": [
+          "attribute",
           "type",
           "total",
           "allocatable"
@@ -240,7 +245,7 @@
             "type": "string"
           },
           "partitionSummary": {
-            "description": "PartitionSummary reports allocatability per partition type for a partitionable pool that publishes SharedCounters. It is populated only when a grouping attribute is resolved: the PartitionTypeAttribute declared on the pool's slices, or for a pool that declares none, the default named in the request. When neither names an attribute, the pool reports no partition summary.",
+            "description": "PartitionSummary reports allocatability per (attribute, partition type) for a partitionable pool that publishes SharedCounters. Each entry names the grouping attribute it was resolved from: the PartitionTypeAttribute declared by a device's own slice, or for devices whose slice declares none, the default named in the request. A pool that mixes partitions declared under different attributes reports each independently. When no slice declares an attribute and the request names no default, the pool reports no partition summary.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha3.PartitionTypeStatus"
             },
@@ -392,7 +397,7 @@
             "type": "integer"
           },
           "partitionTypeAttribute": {
-            "description": "PartitionTypeAttribute optionally names a device attribute (by its fully qualified name, e.g. \"gpu.example.com/profile\") to use as the default grouping attribute for pools which have not declared one themselves.\n\nA pool's own PartitionTypeAttribute always takes precedence. This default applies only to pools whose slices do not declare one, so that a request can still get an accurate partitionSummary from a driver that has not been updated to declare it. When neither the pool nor this default names an attribute, a partitionable pool reports no partitionSummary.\n\nMust include the domain qualifier.",
+            "description": "PartitionTypeAttribute optionally names a device attribute (by its fully qualified name, e.g. \"gpu.example.com/profile\") to use as the default grouping attribute for pools which have not declared one themselves.\n\nA slice's own PartitionTypeAttribute always takes precedence. This default applies only to pools whose slices do not declare one, so that a request can still get an accurate partitionSummary from a driver that has not been updated to declare it. When neither the pool nor this default names an attribute, a partitionable pool reports no partitionSummary.\n\nMust include the domain qualifier.",
             "type": "string"
           },
           "poolName": {

@@ -65,6 +65,7 @@
         "validationError": "validationErrorValue",
         "partitionSummary": [
           {
+            "attribute": "attributeValue",
             "type": "typeValue",
             "total": 2,
             "allocatable": 3
