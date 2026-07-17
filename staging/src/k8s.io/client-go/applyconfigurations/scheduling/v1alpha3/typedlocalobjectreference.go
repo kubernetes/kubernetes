@@ -23,15 +23,15 @@ package v1alpha3
 //
 // TypedLocalObjectReference allows to reference typed object inside the same namespace.
 type TypedLocalObjectReferenceApplyConfiguration struct {
-	// APIGroup is the group for the resource being referenced.
+	// apiGroup is the group for the resource being referenced.
 	// If APIGroup is empty, the specified Kind must be in the core API group.
 	// For any other third-party types, setting APIGroup is required.
 	// It must be a DNS subdomain.
 	APIGroup *string `json:"apiGroup,omitempty"`
-	// Kind is the type of resource being referenced.
+	// kind is the type of resource being referenced.
 	// It must be a path segment name.
 	Kind *string `json:"kind,omitempty"`
-	// Name is the name of resource being referenced.
+	// name is the name of resource being referenced.
 	// It must be a path segment name.
 	Name *string `json:"name,omitempty"`
 }

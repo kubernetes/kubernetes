@@ -36,12 +36,12 @@ import (
 // PodGroup API enablement is toggled by the GenericWorkload feature gate.
 type PodGroupApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Spec defines the desired state of the PodGroup.
+	// spec defines the desired state of the PodGroup.
 	Spec *PodGroupSpecApplyConfiguration `json:"spec,omitempty"`
-	// Status represents the current observed state of the PodGroup.
+	// status represents the current observed state of the PodGroup.
 	Status *PodGroupStatusApplyConfiguration `json:"status,omitempty"`
 }
 

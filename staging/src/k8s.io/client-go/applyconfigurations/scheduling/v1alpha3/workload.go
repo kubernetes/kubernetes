@@ -36,10 +36,10 @@ import (
 // Workload API enablement is toggled by the GenericWorkload feature gate.
 type WorkloadApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Spec defines the desired behavior of a Workload.
+	// spec defines the desired behavior of a Workload.
 	Spec *WorkloadSpecApplyConfiguration `json:"spec,omitempty"`
 }
 

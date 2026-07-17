@@ -27,7 +27,7 @@ import (
 //
 // CompositePodGroupStatus represents information about the status of a composite pod group.
 type CompositePodGroupStatusApplyConfiguration struct {
-	// Conditions represent the latest observations of the CompositePodGroup's state.
+	// conditions represent the latest observations of the CompositePodGroup's state.
 	//
 	// Known condition types:
 	// - "CompositePodGroupInitiallyScheduled": Indicates whether the overall scheduling requirement

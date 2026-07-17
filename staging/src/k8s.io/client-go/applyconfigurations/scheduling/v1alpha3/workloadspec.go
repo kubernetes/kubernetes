@@ -23,17 +23,17 @@ package v1alpha3
 //
 // WorkloadSpec defines the desired state of a Workload.
 type WorkloadSpecApplyConfiguration struct {
-	// ControllerRef is an optional reference to the controlling object, such as a
+	// controllerRef is an optional reference to the controlling object, such as a
 	// Deployment or Job. This field is intended for use by tools like CLIs
 	// to provide a link back to the original workload definition.
 	// This field is immutable.
 	ControllerRef *TypedLocalObjectReferenceApplyConfiguration `json:"controllerRef,omitempty"`
-	// PodGroupTemplates is the list of templates that make up the Workload.
+	// podGroupTemplates is the list of templates that make up the Workload.
 	// The maximum number of templates is 8. Templates cannot be added or removed after the workload is created.
 	// Existing templates may still be updated where their individual fields allow it.
 	// Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.
 	PodGroupTemplates []PodGroupTemplateApplyConfiguration `json:"podGroupTemplates,omitempty"`
-	// CompositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload.
+	// compositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload.
 	// The maximum number of templates is 8. This field is immutable.
 	// Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.
 	//

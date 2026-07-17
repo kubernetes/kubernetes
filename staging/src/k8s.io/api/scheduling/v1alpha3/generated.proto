@@ -45,7 +45,7 @@ message CompositeBasicSchedulingPolicy {
 // CompositeGangSchedulingPolicy indicates that the groups belonging to the composite group
 // should be scheduled using all-or-nothing semantics.
 message CompositeGangSchedulingPolicy {
-  // MinGroupCount is the minimum number of child groups that must be schedulable
+  // minGroupCount is the minimum number of child groups that must be schedulable
   // or scheduled at the same time for the scheduler to admit the entire group.
   // It must be a positive integer.
   //
@@ -60,18 +60,18 @@ message CompositeGangSchedulingPolicy {
 // Workload.compositePodGroupTemplates.
 // CompositePodGroup API enablement is toggled by the CompositePodGroup feature gate.
 message CompositePodGroup {
-  // Standard object's metadata.
+  // metadata is the standard object metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   //
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec defines the desired state of the CompositePodGroup.
+  // spec defines the desired state of the CompositePodGroup.
   //
   // +required
   optional CompositePodGroupSpec spec = 2;
 
-  // Status represents the current observed state of the CompositePodGroup.
+  // status represents the current observed state of the CompositePodGroup.
   //
   // +optional
   optional CompositePodGroupStatus status = 3;
@@ -93,7 +93,7 @@ message CompositePodGroupList {
 //
 // +union
 message CompositePodGroupSchedulingPolicy {
-  // Basic specifies that the groups of this composite group should be scheduled independently.
+  // basic specifies that the groups of this composite group should be scheduled independently.
   // This field is immutable.
   //
   // +optional
@@ -102,7 +102,7 @@ message CompositePodGroupSchedulingPolicy {
   // +k8s:unionMember
   optional CompositeBasicSchedulingPolicy basic = 1;
 
-  // Gang specifies that the groups of this composite group should be scheduled using
+  // gang specifies that the groups of this composite group should be scheduled using
   // all-or-nothing semantics.
   //
   // +optional
@@ -115,7 +115,7 @@ message CompositePodGroupSchedulingPolicy {
 
 // CompositePodGroupSpec defines the desired state of CompositePodGroup.
 message CompositePodGroupSpec {
-  // ParentCompositePodGroupName contains the name of the parent composite pod group
+  // parentCompositePodGroupName contains the name of the parent composite pod group
   // within the same namespace as this composite pod group. It must be a DNS name.
   // If it's nil, then this composite pod group is a root of a workload's hierarchy.
   // This field is immutable.
@@ -126,7 +126,7 @@ message CompositePodGroupSpec {
   // +k8s:format=k8s-long-name
   optional string parentCompositePodGroupName = 1;
 
-  // WorkloadRef references an optional CompositePodGroup template within the
+  // workloadRef references an optional CompositePodGroup template within the
   // Workload object that was used to create the CompositePodGroup.
   // This field is required.
   // This field is immutable.
@@ -136,7 +136,7 @@ message CompositePodGroupSpec {
   // +k8s:immutable
   optional WorkloadReference workloadRef = 2;
 
-  // SchedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup.
+  // schedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup.
   // Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
   // This field is immutable.
   //
@@ -144,7 +144,7 @@ message CompositePodGroupSpec {
   // +k8s:immutable
   optional CompositePodGroupSchedulingPolicy schedulingPolicy = 3;
 
-  // PriorityClassName defines the priority that should be considered when scheduling this CompositePodGroup.
+  // priorityClassName defines the priority that should be considered when scheduling this CompositePodGroup.
   // Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
   // If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods
   // (i.e. if no priority class is specified, admission control can set this to the global default
@@ -157,7 +157,7 @@ message CompositePodGroupSpec {
   // +k8s:immutable
   optional string priorityClassName = 4;
 
-  // Priority is the value of priority of this composite pod group. Various system components
+  // priority is the value of priority of this composite pod group. Various system components
   // use this field to find the priority of the composite pod group. When Priority Admission
   // Controller is enabled, it prevents users from setting this field. The admission
   // controller populates this field from PriorityClassName.
@@ -173,7 +173,7 @@ message CompositePodGroupSpec {
 
 // CompositePodGroupStatus represents information about the status of a composite pod group.
 message CompositePodGroupStatus {
-  // Conditions represent the latest observations of the CompositePodGroup's state.
+  // conditions represent the latest observations of the CompositePodGroup's state.
   //
   // Known condition types:
   // - "CompositePodGroupInitiallyScheduled": Indicates whether the overall scheduling requirement
@@ -209,7 +209,7 @@ message CompositePodGroupStatus {
 
 // CompositePodGroupTemplate represents a template for a CompositePodGroup with a scheduling policy.
 message CompositePodGroupTemplate {
-  // Name is a unique identifier for the CompositePodGroupTemplate within the Workload.
+  // name is a unique identifier for the CompositePodGroupTemplate within the Workload.
   // It must be a DNS label. This field is required.
   //
   // +required
@@ -217,12 +217,12 @@ message CompositePodGroupTemplate {
   // +k8s:format=k8s-short-name
   optional string name = 1;
 
-  // SchedulingPolicy defines the scheduling policy for this template.
+  // schedulingPolicy defines the scheduling policy for this template.
   //
   // +required
   optional CompositePodGroupSchedulingPolicy schedulingPolicy = 2;
 
-  // PriorityClassName indicates the priority that should be considered when scheduling
+  // priorityClassName indicates the priority that should be considered when scheduling
   // a composite pod group created from this template. If no priority class is specified,
   // admission control can set this to the global default priority class if it exists.
   // Otherwise, composite pod groups created from this template will have the priority set
@@ -235,7 +235,7 @@ message CompositePodGroupTemplate {
   // +k8s:immutable
   optional string priorityClassName = 3;
 
-  // Priority is the value of priority of composite pod groups created from this template.
+  // priority is the value of priority of composite pod groups created from this template.
   // Various system components use this field to find the priority of the composite pod group.
   // When Priority Admission Controller is enabled, it prevents users from setting this field.
   // The admission controller populates this field from PriorityClassName.
@@ -248,7 +248,7 @@ message CompositePodGroupTemplate {
   // +k8s:immutable
   optional int32 priority = 4;
 
-  // PodGroupTemplates is the list of templates for children PodGroups.
+  // podGroupTemplates is the list of templates for children PodGroups.
   // The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates
   // or PodGroupTemplates must be set.
   //
@@ -263,7 +263,7 @@ message CompositePodGroupTemplate {
   // +k8s:update=NoRemoveItem
   repeated PodGroupTemplate podGroupTemplates = 5;
 
-  // CompositePodGroupTemplates is the list of templates for children CompositePodGroups.
+  // compositePodGroupTemplates is the list of templates for children CompositePodGroups.
   // The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates
   // or PodGroupTemplates must be set.
   //
@@ -284,14 +284,14 @@ message CompositePodGroupTemplate {
 //
 // +union
 message DisruptionMode {
-  // Single specifies that children can be disrupted independently from each other.
+  // single specifies that children can be disrupted independently from each other.
   //
   // +optional
   // +k8s:optional
   // +k8s:unionMember
   optional SingleDisruptionMode single = 1;
 
-  // All specifies that all children can only be disrupted together.
+  // all specifies that all children can only be disrupted together.
   //
   // +optional
   // +k8s:optional
@@ -301,7 +301,7 @@ message DisruptionMode {
 
 // GangSchedulingPolicy defines the parameters for gang scheduling.
 message GangSchedulingPolicy {
-  // MinCount is the minimum number of pods that must be schedulable or scheduled
+  // minCount is the minimum number of pods that must be schedulable or scheduled
   // at the same time for the scheduler to admit the entire group.
   // It must be a positive integer. This field is mutable to support workload scaling.
   //
@@ -324,18 +324,18 @@ message GangSchedulingPolicy {
 // Workload.podGroupTemplates.
 // PodGroup API enablement is toggled by the GenericWorkload feature gate.
 message PodGroup {
-  // Standard object's metadata.
+  // metadata is the standard object metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   //
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec defines the desired state of the PodGroup.
+  // spec defines the desired state of the PodGroup.
   //
   // +required
   optional PodGroupSpec spec = 2;
 
-  // Status represents the current observed state of the PodGroup.
+  // status represents the current observed state of the PodGroup.
   //
   // +optional
   optional PodGroupStatus status = 3;
@@ -361,7 +361,7 @@ message PodGroupList {
 // own Spec.ResourceClaims. The Pod's claim must match all fields of the
 // PodGroup's claim exactly.
 message PodGroupResourceClaim {
-  // Name uniquely identifies this resource claim inside the PodGroup.
+  // name uniquely identifies this resource claim inside the PodGroup.
   // This must be a DNS_LABEL.
   //
   // +required
@@ -369,7 +369,7 @@ message PodGroupResourceClaim {
   // +k8s:format=k8s-short-name
   optional string name = 1;
 
-  // ResourceClaimName is the name of a ResourceClaim object in the same
+  // resourceClaimName is the name of a ResourceClaim object in the same
   // namespace as this PodGroup. The ResourceClaim will be reserved for the
   // PodGroup instead of its individual pods.
   //
@@ -382,7 +382,7 @@ message PodGroupResourceClaim {
   // +k8s:format=k8s-long-name
   optional string resourceClaimName = 2;
 
-  // ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+  // resourceClaimTemplateName is the name of a ResourceClaimTemplate
   // object in the same namespace as this PodGroup.
   //
   // The template will be used to create a new ResourceClaim, which will
@@ -409,14 +409,14 @@ message PodGroupResourceClaim {
 // PodGroupResourceClaim which references a ResourceClaimTemplate. It stores the
 // generated name for the corresponding ResourceClaim.
 message PodGroupResourceClaimStatus {
-  // Name uniquely identifies this resource claim inside the PodGroup. This
+  // name uniquely identifies this resource claim inside the PodGroup. This
   // must match the name of an entry in podgroup.spec.resourceClaims, which
   // implies that the string must be a DNS_LABEL.
   //
   // +required
   optional string name = 1;
 
-  // ResourceClaimName is the name of the ResourceClaim that was generated for
+  // resourceClaimName is the name of the ResourceClaim that was generated for
   // the PodGroup in the namespace of the PodGroup. If this is unset, then
   // generating a ResourceClaim was not necessary. The
   // podgroup.spec.resourceClaims entry can be ignored in this case.
@@ -429,7 +429,7 @@ message PodGroupResourceClaimStatus {
 
 // PodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a PodGroup.
 message PodGroupSchedulingConstraints {
-  // Topology defines the topology constraints for the pod group.
+  // topology defines the topology constraints for the pod group.
   // Currently only a single topology constraint can be specified. This may change in the future.
   //
   // +optional
@@ -447,7 +447,7 @@ message PodGroupSchedulingConstraints {
 //
 // +union
 message PodGroupSchedulingPolicy {
-  // Basic specifies that the pods in this group should be scheduled using
+  // basic specifies that the pods in this group should be scheduled using
   // standard Kubernetes scheduling behavior. Setting this field at group creation time
   // opts this group to basic scheduling; this field cannot be changed afterward.
   //
@@ -457,7 +457,7 @@ message PodGroupSchedulingPolicy {
   // +k8s:immutable
   optional BasicSchedulingPolicy basic = 1;
 
-  // Gang specifies that the pods in this group should be scheduled using
+  // gang specifies that the pods in this group should be scheduled using
   // all-or-nothing semantics. Setting this field at group creation time
   // opts this group to gang scheduling; this field cannot be set or unset afterward.
   // The minCount field within Gang scheduling policy remains mutable after group creation.
@@ -472,7 +472,7 @@ message PodGroupSchedulingPolicy {
 
 // PodGroupSpec defines the desired state of a PodGroup.
 message PodGroupSpec {
-  // ParentCompositePodGroupName contains the name of the parent composite pod group
+  // parentCompositePodGroupName contains the name of the parent composite pod group
   // within the same namespace as this pod group.
   // If it's nil, then this pod group is a root of a workload's hierarchy.
   // This field is used only when the CompositePodGroup feature gate is enabled.
@@ -487,7 +487,7 @@ message PodGroupSpec {
   // +k8s:dependentRequired("workloadRef")
   optional string parentCompositePodGroupName = 1;
 
-  // WorkloadRef references an optional PodGroup template within the Workload
+  // workloadRef references an optional PodGroup template within the Workload
   // object that was used to create the PodGroup.
   // This field is immutable.
   //
@@ -496,13 +496,13 @@ message PodGroupSpec {
   // +k8s:immutable
   optional WorkloadReference workloadRef = 2;
 
-  // SchedulingPolicy defines the scheduling policy for this instance of the PodGroup.
+  // schedulingPolicy defines the scheduling policy for this instance of the PodGroup.
   // Controllers are expected to fill this field by copying it from a PodGroupTemplate.
   //
   // +required
   optional PodGroupSchedulingPolicy schedulingPolicy = 3;
 
-  // SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup.
+  // schedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup.
   // Controllers are expected to fill this field by copying it from a PodGroupTemplate.
   // This field is immutable.
   // This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
@@ -514,7 +514,7 @@ message PodGroupSpec {
   // +k8s:ifEnabled(TopologyAwareWorkloadScheduling)=+k8s:immutable
   optional PodGroupSchedulingConstraints schedulingConstraints = 4;
 
-  // ResourceClaims defines which ResourceClaims may be shared among Pods in
+  // resourceClaims defines which ResourceClaims may be shared among Pods in
   // the group. Pods consume the devices allocated to a PodGroup's claim by
   // defining a claim in its own Spec.ResourceClaims that matches the
   // PodGroup's claim exactly. The claim must have the same name and refer to
@@ -538,7 +538,7 @@ message PodGroupSpec {
   // +featureGate=DRAWorkloadResourceClaims
   repeated PodGroupResourceClaim resourceClaims = 5;
 
-  // DisruptionMode defines the mode in which a given PodGroup can be disrupted.
+  // disruptionMode defines the mode in which a given PodGroup can be disrupted.
   // Controllers are expected to fill this field by copying it from a PodGroupTemplate.
   // One of Single, All. Defaults to Single if unset.
   // This field is immutable.
@@ -549,7 +549,7 @@ message PodGroupSpec {
   // +k8s:immutable
   optional DisruptionMode disruptionMode = 6;
 
-  // PriorityClassName defines the priority that should be considered when scheduling this pod group.
+  // priorityClassName defines the priority that should be considered when scheduling this pod group.
   // Controllers are expected to fill this field by copying it from a PodGroupTemplate.
   // Otherwise, it is validated and resolved similarly to the PriorityClassName on PodGroupTemplate
   // (i.e. if no priority class is specified, admission control can set this to the global default
@@ -562,7 +562,7 @@ message PodGroupSpec {
   // +k8s:format=k8s-long-name
   optional string priorityClassName = 7;
 
-  // Priority is the value of priority of this pod group. Various system components
+  // priority is the value of priority of this pod group. Various system components
   // use this field to find the priority of the pod group. When Priority Admission
   // Controller is enabled, it prevents users from setting this field. The admission
   // controller populates this field from PriorityClassName.
@@ -575,7 +575,7 @@ message PodGroupSpec {
   // +k8s:maximum=1000000000 # HighestUserDefinablePriority
   optional int32 priority = 8;
 
-  // PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+  // preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
   // One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset.
   // When Priority Admission Controller is enabled, it populates this field from PriorityClassName,
   // and defaults to PreemptLowerPriority if value is unset in PriorityClass.
@@ -592,7 +592,7 @@ message PodGroupSpec {
 
 // PodGroupStatus represents information about the status of a pod group.
 message PodGroupStatus {
-  // Conditions represent the latest observations of the PodGroup's state.
+  // conditions represent the latest observations of the PodGroup's state.
   //
   // Known condition types:
   // - "PodGroupInitiallyScheduled": Indicates whether the scheduling requirement has been satisfied.
@@ -621,7 +621,7 @@ message PodGroupStatus {
   // +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 
-  // Status of resource claims.
+  // resourceClaimStatuses is status of resource claims.
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge,retainKeys
@@ -637,7 +637,7 @@ message PodGroupStatus {
 
 // PodGroupTemplate represents a template for a set of pods with a scheduling policy.
 message PodGroupTemplate {
-  // Name is a unique identifier for the PodGroupTemplate within the Workload.
+  // name is a unique identifier for the PodGroupTemplate within the Workload.
   // It must be a DNS label. This field is immutable.
   //
   // +required
@@ -645,12 +645,12 @@ message PodGroupTemplate {
   // +k8s:format=k8s-short-name
   optional string name = 1;
 
-  // SchedulingPolicy defines the scheduling policy for this PodGroupTemplate.
+  // schedulingPolicy defines the scheduling policy for this PodGroupTemplate.
   //
   // +required
   optional PodGroupSchedulingPolicy schedulingPolicy = 2;
 
-  // SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate.
+  // schedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate.
   // This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
   // This field is immutable.
   //
@@ -661,7 +661,7 @@ message PodGroupTemplate {
   // +k8s:immutable
   optional PodGroupSchedulingConstraints schedulingConstraints = 3;
 
-  // ResourceClaims defines which ResourceClaims may be shared among Pods in
+  // resourceClaims defines which ResourceClaims may be shared among Pods in
   // the group. Pods consume the devices allocated to a PodGroup's claim by
   // defining a claim in its own Spec.ResourceClaims that matches the
   // PodGroup's claim exactly. The claim must have the same name and refer to
@@ -685,7 +685,7 @@ message PodGroupTemplate {
   // +k8s:immutable
   repeated PodGroupResourceClaim resourceClaims = 4;
 
-  // DisruptionMode defines the mode in which a given PodGroup can be disrupted.
+  // disruptionMode defines the mode in which a given PodGroup can be disrupted.
   // One of Single, All.
   // This field is immutable.
   //
@@ -694,7 +694,7 @@ message PodGroupTemplate {
   // +k8s:immutable
   optional DisruptionMode disruptionMode = 5;
 
-  // PriorityClassName indicates the priority that should be considered when scheduling
+  // priorityClassName indicates the priority that should be considered when scheduling
   // a pod group created from this template.
   // This field is immutable.
   //
@@ -704,7 +704,7 @@ message PodGroupTemplate {
   // +k8s:immutable
   optional string priorityClassName = 6;
 
-  // Priority is the value of priority of pod groups created from this template. Various
+  // priority is the value of priority of pod groups created from this template. Various
   // system components use this field to find the priority of the pod group.
   // The higher the value, the higher the priority.
   // This field is immutable.
@@ -715,7 +715,7 @@ message PodGroupTemplate {
   // +k8s:immutable
   optional int32 priority = 7;
 
-  // PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+  // preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
   // One of Never, PreemptLowerPriority.
   // This field is immutable.
   // This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
@@ -734,7 +734,7 @@ message SingleDisruptionMode {
 
 // TopologyConstraint defines a topology constraint for a PodGroup.
 message TopologyConstraint {
-  // Key specifies the key of the node label representing the topology domain.
+  // key specifies the key of the node label representing the topology domain.
   // All pods within the PodGroup must be colocated within the same domain instance.
   // Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate.
   // Examples: "topology.kubernetes.io/rack"
@@ -747,7 +747,7 @@ message TopologyConstraint {
 
 // TypedLocalObjectReference allows to reference typed object inside the same namespace.
 message TypedLocalObjectReference {
-  // APIGroup is the group for the resource being referenced.
+  // apiGroup is the group for the resource being referenced.
   // If APIGroup is empty, the specified Kind must be in the core API group.
   // For any other third-party types, setting APIGroup is required.
   // It must be a DNS subdomain.
@@ -757,7 +757,7 @@ message TypedLocalObjectReference {
   // +k8s:format=k8s-long-name
   optional string apiGroup = 1;
 
-  // Kind is the type of resource being referenced.
+  // kind is the type of resource being referenced.
   // It must be a path segment name.
   //
   // +required
@@ -765,7 +765,7 @@ message TypedLocalObjectReference {
   // +k8s:format=k8s-path-segment-name
   optional string kind = 2;
 
-  // Name is the name of resource being referenced.
+  // name is the name of resource being referenced.
   // It must be a path segment name.
   //
   // +required
@@ -779,13 +779,13 @@ message TypedLocalObjectReference {
 // including scheduling, preemption, eviction and other phases.
 // Workload API enablement is toggled by the GenericWorkload feature gate.
 message Workload {
-  // Standard object's metadata.
+  // metadata is the standard object metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   //
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec defines the desired behavior of a Workload.
+  // spec defines the desired behavior of a Workload.
   //
   // +required
   optional WorkloadSpec spec = 2;
@@ -805,7 +805,7 @@ message WorkloadList {
 // WorkloadReference references the Workload object together with the template
 // that was used to create a particular PodGroup.
 message WorkloadReference {
-  // WorkloadName is the name of the Workload object that contains a template
+  // workloadName is the name of the Workload object that contains a template
   // that was used when creating a pod group. It must
   // be a DNS name.
   // This field is required.
@@ -815,7 +815,7 @@ message WorkloadReference {
   // +k8s:format=k8s-long-name
   optional string workloadName = 1;
 
-  // TemplateName is the name of a template within the Workload object that
+  // templateName is the name of a template within the Workload object that
   // was used to create a pod group. It must be a DNS label.
   // This field is required.
   //
@@ -827,7 +827,7 @@ message WorkloadReference {
 
 // WorkloadSpec defines the desired state of a Workload.
 message WorkloadSpec {
-  // ControllerRef is an optional reference to the controlling object, such as a
+  // controllerRef is an optional reference to the controlling object, such as a
   // Deployment or Job. This field is intended for use by tools like CLIs
   // to provide a link back to the original workload definition.
   // This field is immutable.
@@ -837,7 +837,7 @@ message WorkloadSpec {
   // +k8s:immutable
   optional TypedLocalObjectReference controllerRef = 1;
 
-  // PodGroupTemplates is the list of templates that make up the Workload.
+  // podGroupTemplates is the list of templates that make up the Workload.
   // The maximum number of templates is 8. Templates cannot be added or removed after the workload is created.
   // Existing templates may still be updated where their individual fields allow it.
   // Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.
@@ -854,7 +854,7 @@ message WorkloadSpec {
   // +k8s:update=NoRemoveItem
   repeated PodGroupTemplate podGroupTemplates = 2;
 
-  // CompositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload.
+  // compositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload.
   // The maximum number of templates is 8. This field is immutable.
   // Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.
   //

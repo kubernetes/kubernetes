@@ -54203,7 +54203,7 @@ func schema_k8sio_api_scheduling_v1_PriorityClass(ref common.ReferenceCallback) 
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
@@ -54338,7 +54338,7 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositeGangSchedulingPolicy(ref comm
 				Properties: map[string]spec.Schema{
 					"minGroupCount": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MinGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
+							Description: "minGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -54374,21 +54374,21 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroup(ref common.Reference
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec defines the desired state of the CompositePodGroup.",
+							Description: "spec defines the desired state of the CompositePodGroup.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(schedulingv1alpha3.CompositePodGroupSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status represents the current observed state of the CompositePodGroup.",
+							Description: "status represents the current observed state of the CompositePodGroup.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(schedulingv1alpha3.CompositePodGroupStatus{}.OpenAPIModelName()),
 						},
@@ -54461,13 +54461,13 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSchedulingPolicy(ref 
 				Properties: map[string]spec.Schema{
 					"basic": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Basic specifies that the groups of this composite group should be scheduled independently. This field is immutable.",
+							Description: "basic specifies that the groups of this composite group should be scheduled independently. This field is immutable.",
 							Ref:         ref(schedulingv1alpha3.CompositeBasicSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
 					"gang": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics.",
+							Description: "gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics.",
 							Ref:         ref(schedulingv1alpha3.CompositeGangSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
@@ -54500,34 +54500,34 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSpec(ref common.Refer
 				Properties: map[string]spec.Schema{
 					"parentCompositePodGroupName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ParentCompositePodGroupName contains the name of the parent composite pod group within the same namespace as this composite pod group. It must be a DNS name. If it's nil, then this composite pod group is a root of a workload's hierarchy. This field is immutable.",
+							Description: "parentCompositePodGroupName contains the name of the parent composite pod group within the same namespace as this composite pod group. It must be a DNS name. If it's nil, then this composite pod group is a root of a workload's hierarchy. This field is immutable.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"workloadRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "WorkloadRef references an optional CompositePodGroup template within the Workload object that was used to create the CompositePodGroup. This field is required. This field is immutable.",
+							Description: "workloadRef references an optional CompositePodGroup template within the Workload object that was used to create the CompositePodGroup. This field is required. This field is immutable.",
 							Ref:         ref(schedulingv1alpha3.WorkloadReference{}.OpenAPIModelName()),
 						},
 					},
 					"schedulingPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "SchedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable.",
+							Description: "schedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
 					"priorityClassName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PriorityClassName defines the priority that should be considered when scheduling this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the composite pod group's priority will be zero). This field is immutable.",
+							Description: "priorityClassName defines the priority that should be considered when scheduling this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the composite pod group's priority will be zero). This field is immutable.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"priority": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Priority is the value of priority of this composite pod group. Various system components use this field to find the priority of the composite pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
+							Description: "priority is the value of priority of this composite pod group. Various system components use this field to find the priority of the composite pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -54560,7 +54560,7 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupStatus(ref common.Ref
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Conditions represent the latest observations of the CompositePodGroup's state.\n\nKnown condition types: - \"CompositePodGroupInitiallyScheduled\": Indicates whether the overall scheduling requirement\n  for the subtree under this CompositePodGroup has been satisfied. Once this condition\n  transitions to True, it serves as a terminal state and will never revert to False,\n  even if pods are subsequently deleted and group constraints are no longer met.\n- \"DisruptionTarget\": Indicates whether the CompositePodGroup is about to be terminated\n  due to disruption such as preemption.\n\nKnown reasons for the CompositePodGroupInitiallyScheduled condition: - \"Unschedulable\": The CompositePodGroup's subtree could not be placed due to resource constraints,\n  affinity/anti-affinity, or topological constraints.\n- \"SchedulerError\": The CompositePodGroup cannot be scheduled due to some internal error\n  that occurred during scheduling.\n- \"Invalid\": Set to True when kube-scheduler detects an invalid group layout during\n  runtime validation. The `message` field details the specific layout violation (such as\n  a detected cycle, exceeding the maximum depth of 4, or referencing multiple distinct Workloads).\n\nKnown reasons for the DisruptionTarget condition: - \"PreemptionByScheduler\": The CompositePodGroup was targeted by the scheduler's preemption loop\n  to free up capacity for higher-priority preemptors.",
+							Description: "conditions represent the latest observations of the CompositePodGroup's state.\n\nKnown condition types: - \"CompositePodGroupInitiallyScheduled\": Indicates whether the overall scheduling requirement\n  for the subtree under this CompositePodGroup has been satisfied. Once this condition\n  transitions to True, it serves as a terminal state and will never revert to False,\n  even if pods are subsequently deleted and group constraints are no longer met.\n- \"DisruptionTarget\": Indicates whether the CompositePodGroup is about to be terminated\n  due to disruption such as preemption.\n\nKnown reasons for the CompositePodGroupInitiallyScheduled condition: - \"Unschedulable\": The CompositePodGroup's subtree could not be placed due to resource constraints,\n  affinity/anti-affinity, or topological constraints.\n- \"SchedulerError\": The CompositePodGroup cannot be scheduled due to some internal error\n  that occurred during scheduling.\n- \"Invalid\": Set to True when kube-scheduler detects an invalid group layout during\n  runtime validation. The `message` field details the specific layout violation (such as\n  a detected cycle, exceeding the maximum depth of 4, or referencing multiple distinct Workloads).\n\nKnown reasons for the DisruptionTarget condition: - \"PreemptionByScheduler\": The CompositePodGroup was targeted by the scheduler's preemption loop\n  to free up capacity for higher-priority preemptors.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -54588,7 +54588,7 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupTemplate(ref common.R
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name is a unique identifier for the CompositePodGroupTemplate within the Workload. It must be a DNS label. This field is required.",
+							Description: "name is a unique identifier for the CompositePodGroupTemplate within the Workload. It must be a DNS label. This field is required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -54596,21 +54596,21 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupTemplate(ref common.R
 					},
 					"schedulingPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "SchedulingPolicy defines the scheduling policy for this template.",
+							Description: "schedulingPolicy defines the scheduling policy for this template.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
 					"priorityClassName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PriorityClassName indicates the priority that should be considered when scheduling a composite pod group created from this template. If no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, composite pod groups created from this template will have the priority set to zero. This field is immutable.",
+							Description: "priorityClassName indicates the priority that should be considered when scheduling a composite pod group created from this template. If no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, composite pod groups created from this template will have the priority set to zero. This field is immutable.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"priority": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Priority is the value of priority of composite pod groups created from this template. Various system components use this field to find the priority of the composite pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
+							Description: "priority is the value of priority of composite pod groups created from this template. Various system components use this field to find the priority of the composite pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -54625,7 +54625,7 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupTemplate(ref common.R
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "PodGroupTemplates is the list of templates for children PodGroups. The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates or PodGroupTemplates must be set.",
+							Description: "podGroupTemplates is the list of templates for children PodGroups. The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates or PodGroupTemplates must be set.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -54646,7 +54646,7 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupTemplate(ref common.R
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "CompositePodGroupTemplates is the list of templates for children CompositePodGroups. The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates or PodGroupTemplates must be set.",
+							Description: "compositePodGroupTemplates is the list of templates for children CompositePodGroups. The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates or PodGroupTemplates must be set.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -54675,13 +54675,13 @@ func schema_k8sio_api_scheduling_v1alpha3_DisruptionMode(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"single": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Single specifies that children can be disrupted independently from each other.",
+							Description: "single specifies that children can be disrupted independently from each other.",
 							Ref:         ref(schedulingv1alpha3.SingleDisruptionMode{}.OpenAPIModelName()),
 						},
 					},
 					"all": {
 						SchemaProps: spec.SchemaProps{
-							Description: "All specifies that all children can only be disrupted together.",
+							Description: "all specifies that all children can only be disrupted together.",
 							Ref:         ref(schedulingv1alpha3.AllDisruptionMode{}.OpenAPIModelName()),
 						},
 					},
@@ -54714,7 +54714,7 @@ func schema_k8sio_api_scheduling_v1alpha3_GangSchedulingPolicy(ref common.Refere
 				Properties: map[string]spec.Schema{
 					"minCount": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MinCount is the minimum number of pods that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer. This field is mutable to support workload scaling.\n\nNote that the scheduler operates on an eventually consistent model. Updates to minCount may not be immediately reflected in scheduling decisions due to propagation delays. If minCount is updated while a scheduling cycle is in progress for that group, the new value may not take effect until the next cycle. Moreover, minCount is only enforced during scheduling, meaning that modifications to this field do not affect already-scheduled pods, applying only to those evaluated in future cycles.",
+							Description: "minCount is the minimum number of pods that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer. This field is mutable to support workload scaling.\n\nNote that the scheduler operates on an eventually consistent model. Updates to minCount may not be immediately reflected in scheduling decisions due to propagation delays. If minCount is updated while a scheduling cycle is in progress for that group, the new value may not take effect until the next cycle. Moreover, minCount is only enforced during scheduling, meaning that modifications to this field do not affect already-scheduled pods, applying only to those evaluated in future cycles.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -54750,21 +54750,21 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroup(ref common.ReferenceCallback)
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec defines the desired state of the PodGroup.",
+							Description: "spec defines the desired state of the PodGroup.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(schedulingv1alpha3.PodGroupSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status represents the current observed state of the PodGroup.",
+							Description: "status represents the current observed state of the PodGroup.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(schedulingv1alpha3.PodGroupStatus{}.OpenAPIModelName()),
 						},
@@ -54837,7 +54837,7 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupResourceClaim(ref common.Refer
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name uniquely identifies this resource claim inside the PodGroup. This must be a DNS_LABEL.",
+							Description: "name uniquely identifies this resource claim inside the PodGroup. This must be a DNS_LABEL.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -54845,14 +54845,14 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupResourceClaim(ref common.Refer
 					},
 					"resourceClaimName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceClaimName is the name of a ResourceClaim object in the same namespace as this PodGroup. The ResourceClaim will be reserved for the PodGroup instead of its individual pods.\n\nExactly one of ResourceClaimName and ResourceClaimTemplateName must be set.",
+							Description: "resourceClaimName is the name of a ResourceClaim object in the same namespace as this PodGroup. The ResourceClaim will be reserved for the PodGroup instead of its individual pods.\n\nExactly one of ResourceClaimName and ResourceClaimTemplateName must be set.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"resourceClaimTemplateName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace as this PodGroup.\n\nThe template will be used to create a new ResourceClaim, which will be bound to this PodGroup. When this PodGroup is deleted, the ResourceClaim will also be deleted. The PodGroup name and resource name, along with a generated component, will be used to form a unique name for the ResourceClaim, which will be recorded in podgroup.status.resourceClaimStatuses.\n\nThis field is immutable and no changes will be made to the corresponding ResourceClaim by the control plane after creating the ResourceClaim.\n\nExactly one of ResourceClaimName and ResourceClaimTemplateName must be set.",
+							Description: "resourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace as this PodGroup.\n\nThe template will be used to create a new ResourceClaim, which will be bound to this PodGroup. When this PodGroup is deleted, the ResourceClaim will also be deleted. The PodGroup name and resource name, along with a generated component, will be used to form a unique name for the ResourceClaim, which will be recorded in podgroup.status.resourceClaimStatuses.\n\nThis field is immutable and no changes will be made to the corresponding ResourceClaim by the control plane after creating the ResourceClaim.\n\nExactly one of ResourceClaimName and ResourceClaimTemplateName must be set.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -54873,7 +54873,7 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupResourceClaimStatus(ref common
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name uniquely identifies this resource claim inside the PodGroup. This must match the name of an entry in podgroup.spec.resourceClaims, which implies that the string must be a DNS_LABEL.",
+							Description: "name uniquely identifies this resource claim inside the PodGroup. This must match the name of an entry in podgroup.spec.resourceClaims, which implies that the string must be a DNS_LABEL.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -54881,7 +54881,7 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupResourceClaimStatus(ref common
 					},
 					"resourceClaimName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceClaimName is the name of the ResourceClaim that was generated for the PodGroup in the namespace of the PodGroup. If this is unset, then generating a ResourceClaim was not necessary. The podgroup.spec.resourceClaims entry can be ignored in this case.",
+							Description: "resourceClaimName is the name of the ResourceClaim that was generated for the PodGroup in the namespace of the PodGroup. If this is unset, then generating a ResourceClaim was not necessary. The podgroup.spec.resourceClaims entry can be ignored in this case.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -54907,7 +54907,7 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupSchedulingConstraints(ref comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Topology defines the topology constraints for the pod group. Currently only a single topology constraint can be specified. This may change in the future.",
+							Description: "topology defines the topology constraints for the pod group. Currently only a single topology constraint can be specified. This may change in the future.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -54935,13 +54935,13 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupSchedulingPolicy(ref common.Re
 				Properties: map[string]spec.Schema{
 					"basic": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Basic specifies that the pods in this group should be scheduled using standard Kubernetes scheduling behavior. Setting this field at group creation time opts this group to basic scheduling; this field cannot be changed afterward.",
+							Description: "basic specifies that the pods in this group should be scheduled using standard Kubernetes scheduling behavior. Setting this field at group creation time opts this group to basic scheduling; this field cannot be changed afterward.",
 							Ref:         ref(schedulingv1alpha3.BasicSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
 					"gang": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Gang specifies that the pods in this group should be scheduled using all-or-nothing semantics. Setting this field at group creation time opts this group to gang scheduling; this field cannot be set or unset afterward. The minCount field within Gang scheduling policy remains mutable after group creation.",
+							Description: "gang specifies that the pods in this group should be scheduled using all-or-nothing semantics. Setting this field at group creation time opts this group to gang scheduling; this field cannot be set or unset afterward. The minCount field within Gang scheduling policy remains mutable after group creation.",
 							Ref:         ref(schedulingv1alpha3.GangSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
@@ -54974,27 +54974,27 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupSpec(ref common.ReferenceCallb
 				Properties: map[string]spec.Schema{
 					"parentCompositePodGroupName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ParentCompositePodGroupName contains the name of the parent composite pod group within the same namespace as this pod group. If it's nil, then this pod group is a root of a workload's hierarchy. This field is used only when the CompositePodGroup feature gate is enabled. This field is immutable.",
+							Description: "parentCompositePodGroupName contains the name of the parent composite pod group within the same namespace as this pod group. If it's nil, then this pod group is a root of a workload's hierarchy. This field is used only when the CompositePodGroup feature gate is enabled. This field is immutable.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"workloadRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "WorkloadRef references an optional PodGroup template within the Workload object that was used to create the PodGroup. This field is immutable.",
+							Description: "workloadRef references an optional PodGroup template within the Workload object that was used to create the PodGroup. This field is immutable.",
 							Ref:         ref(schedulingv1alpha3.WorkloadReference{}.OpenAPIModelName()),
 						},
 					},
 					"schedulingPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "SchedulingPolicy defines the scheduling policy for this instance of the PodGroup. Controllers are expected to fill this field by copying it from a PodGroupTemplate.",
+							Description: "schedulingPolicy defines the scheduling policy for this instance of the PodGroup. Controllers are expected to fill this field by copying it from a PodGroupTemplate.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(schedulingv1alpha3.PodGroupSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
 					"schedulingConstraints": {
 						SchemaProps: spec.SchemaProps{
-							Description: "SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup. Controllers are expected to fill this field by copying it from a PodGroupTemplate. This field is immutable. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.",
+							Description: "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup. Controllers are expected to fill this field by copying it from a PodGroupTemplate. This field is immutable. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.",
 							Ref:         ref(schedulingv1alpha3.PodGroupSchedulingConstraints{}.OpenAPIModelName()),
 						},
 					},
@@ -55010,7 +55010,7 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupSpec(ref common.ReferenceCallb
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceClaims defines which ResourceClaims may be shared among Pods in the group. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate.\n\nThis is an alpha-level field and requires that the DRAWorkloadResourceClaims feature gate is enabled.\n\nThis field is immutable.",
+							Description: "resourceClaims defines which ResourceClaims may be shared among Pods in the group. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate.\n\nThis is an alpha-level field and requires that the DRAWorkloadResourceClaims feature gate is enabled.\n\nThis field is immutable.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -55023,28 +55023,28 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupSpec(ref common.ReferenceCallb
 					},
 					"disruptionMode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DisruptionMode defines the mode in which a given PodGroup can be disrupted. Controllers are expected to fill this field by copying it from a PodGroupTemplate. One of Single, All. Defaults to Single if unset. This field is immutable.",
+							Description: "disruptionMode defines the mode in which a given PodGroup can be disrupted. Controllers are expected to fill this field by copying it from a PodGroupTemplate. One of Single, All. Defaults to Single if unset. This field is immutable.",
 							Default:     map[string]interface{}{"single": map[string]interface{}{}},
 							Ref:         ref(schedulingv1alpha3.DisruptionMode{}.OpenAPIModelName()),
 						},
 					},
 					"priorityClassName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PriorityClassName defines the priority that should be considered when scheduling this pod group. Controllers are expected to fill this field by copying it from a PodGroupTemplate. Otherwise, it is validated and resolved similarly to the PriorityClassName on PodGroupTemplate (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the pod group's priority will be zero). This field is immutable.",
+							Description: "priorityClassName defines the priority that should be considered when scheduling this pod group. Controllers are expected to fill this field by copying it from a PodGroupTemplate. Otherwise, it is validated and resolved similarly to the PriorityClassName on PodGroupTemplate (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the pod group's priority will be zero). This field is immutable.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"priority": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Priority is the value of priority of this pod group. Various system components use this field to find the priority of the pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
+							Description: "priority is the value of priority of this pod group. Various system components use this field to find the priority of the pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"preemptionPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset. When Priority Admission Controller is enabled, it populates this field from PriorityClassName, and defaults to PreemptLowerPriority if value is unset in PriorityClass. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.\n\n\nPossible enum values:\n - `\"Never\"` means that pod never preempts other pods with lower priority.\n - `\"PreemptLowerPriority\"` means that pod can preempt other pods with lower priority.",
+							Description: "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset. When Priority Admission Controller is enabled, it populates this field from PriorityClassName, and defaults to PreemptLowerPriority if value is unset in PriorityClass. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.\n\n\nPossible enum values:\n - `\"Never\"` means that pod never preempts other pods with lower priority.\n - `\"PreemptLowerPriority\"` means that pod can preempt other pods with lower priority.",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"Never", "PreemptLowerPriority"},
@@ -55078,7 +55078,7 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupStatus(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Conditions represent the latest observations of the PodGroup's state.\n\nKnown condition types: - \"PodGroupInitiallyScheduled\": Indicates whether the scheduling requirement has been satisfied. Once this condition transitions to True, it serves as a terminal state and will never revert to False, even if pods are subsequently evicted and group constraints are no longer met. - \"DisruptionTarget\": Indicates whether the PodGroup is about to be terminated\n  due to disruption such as preemption.\n\nKnown reasons for the PodGroupInitiallyScheduled condition: - \"Unschedulable\": The PodGroup cannot be scheduled due to resource constraints,\n  affinity/anti-affinity rules, or insufficient capacity for the gang.\n- \"SchedulerError\": The PodGroup cannot be scheduled due to some internal error\n  that happened during scheduling, for example due to nodeAffinity parsing errors.\n\nKnown reasons for the DisruptionTarget condition: - \"PreemptionByScheduler\": The PodGroup was preempted by the scheduler to make room for\n  higher-priority PodGroups or Pods.",
+							Description: "conditions represent the latest observations of the PodGroup's state.\n\nKnown condition types: - \"PodGroupInitiallyScheduled\": Indicates whether the scheduling requirement has been satisfied. Once this condition transitions to True, it serves as a terminal state and will never revert to False, even if pods are subsequently evicted and group constraints are no longer met. - \"DisruptionTarget\": Indicates whether the PodGroup is about to be terminated\n  due to disruption such as preemption.\n\nKnown reasons for the PodGroupInitiallyScheduled condition: - \"Unschedulable\": The PodGroup cannot be scheduled due to resource constraints,\n  affinity/anti-affinity rules, or insufficient capacity for the gang.\n- \"SchedulerError\": The PodGroup cannot be scheduled due to some internal error\n  that happened during scheduling, for example due to nodeAffinity parsing errors.\n\nKnown reasons for the DisruptionTarget condition: - \"PreemptionByScheduler\": The PodGroup was preempted by the scheduler to make room for\n  higher-priority PodGroups or Pods.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -55101,7 +55101,7 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupStatus(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Status of resource claims.",
+							Description: "resourceClaimStatuses is status of resource claims.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -55129,7 +55129,7 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupTemplate(ref common.ReferenceC
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name is a unique identifier for the PodGroupTemplate within the Workload. It must be a DNS label. This field is immutable.",
+							Description: "name is a unique identifier for the PodGroupTemplate within the Workload. It must be a DNS label. This field is immutable.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -55137,14 +55137,14 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupTemplate(ref common.ReferenceC
 					},
 					"schedulingPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "SchedulingPolicy defines the scheduling policy for this PodGroupTemplate.",
+							Description: "schedulingPolicy defines the scheduling policy for this PodGroupTemplate.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(schedulingv1alpha3.PodGroupSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
 					"schedulingConstraints": {
 						SchemaProps: spec.SchemaProps{
-							Description: "SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled. This field is immutable.",
+							Description: "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled. This field is immutable.",
 							Ref:         ref(schedulingv1alpha3.PodGroupSchedulingConstraints{}.OpenAPIModelName()),
 						},
 					},
@@ -55160,7 +55160,7 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupTemplate(ref common.ReferenceC
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceClaims defines which ResourceClaims may be shared among Pods in the group. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate.\n\nThis is an alpha-level field and requires that the DRAWorkloadResourceClaims feature gate is enabled.\n\nThis field is immutable.",
+							Description: "resourceClaims defines which ResourceClaims may be shared among Pods in the group. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate.\n\nThis is an alpha-level field and requires that the DRAWorkloadResourceClaims feature gate is enabled.\n\nThis field is immutable.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -55173,27 +55173,27 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupTemplate(ref common.ReferenceC
 					},
 					"disruptionMode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DisruptionMode defines the mode in which a given PodGroup can be disrupted. One of Single, All. This field is immutable.",
+							Description: "disruptionMode defines the mode in which a given PodGroup can be disrupted. One of Single, All. This field is immutable.",
 							Ref:         ref(schedulingv1alpha3.DisruptionMode{}.OpenAPIModelName()),
 						},
 					},
 					"priorityClassName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PriorityClassName indicates the priority that should be considered when scheduling a pod group created from this template. This field is immutable.",
+							Description: "priorityClassName indicates the priority that should be considered when scheduling a pod group created from this template. This field is immutable.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"priority": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Priority is the value of priority of pod groups created from this template. Various system components use this field to find the priority of the pod group. The higher the value, the higher the priority. This field is immutable.",
+							Description: "priority is the value of priority of pod groups created from this template. Various system components use this field to find the priority of the pod group. The higher the value, the higher the priority. This field is immutable.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"preemptionPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.\n\n\nPossible enum values:\n - `\"Never\"` means that pod never preempts other pods with lower priority.\n - `\"PreemptLowerPriority\"` means that pod can preempt other pods with lower priority.",
+							Description: "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.\n\n\nPossible enum values:\n - `\"Never\"` means that pod never preempts other pods with lower priority.\n - `\"PreemptLowerPriority\"` means that pod can preempt other pods with lower priority.",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"Never", "PreemptLowerPriority"},
@@ -55228,7 +55228,7 @@ func schema_k8sio_api_scheduling_v1alpha3_TopologyConstraint(ref common.Referenc
 				Properties: map[string]spec.Schema{
 					"key": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Key specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Examples: \"topology.kubernetes.io/rack\"",
+							Description: "key specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Examples: \"topology.kubernetes.io/rack\"",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -55250,14 +55250,14 @@ func schema_k8sio_api_scheduling_v1alpha3_TypedLocalObjectReference(ref common.R
 				Properties: map[string]spec.Schema{
 					"apiGroup": {
 						SchemaProps: spec.SchemaProps{
-							Description: "APIGroup is the group for the resource being referenced. If APIGroup is empty, the specified Kind must be in the core API group. For any other third-party types, setting APIGroup is required. It must be a DNS subdomain.",
+							Description: "apiGroup is the group for the resource being referenced. If APIGroup is empty, the specified Kind must be in the core API group. For any other third-party types, setting APIGroup is required. It must be a DNS subdomain.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"kind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Kind is the type of resource being referenced. It must be a path segment name.",
+							Description: "kind is the type of resource being referenced. It must be a path segment name.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -55265,7 +55265,7 @@ func schema_k8sio_api_scheduling_v1alpha3_TypedLocalObjectReference(ref common.R
 					},
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name is the name of resource being referenced. It must be a path segment name.",
+							Description: "name is the name of resource being referenced. It must be a path segment name.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -55301,14 +55301,14 @@ func schema_k8sio_api_scheduling_v1alpha3_Workload(ref common.ReferenceCallback)
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec defines the desired behavior of a Workload.",
+							Description: "spec defines the desired behavior of a Workload.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(schedulingv1alpha3.WorkloadSpec{}.OpenAPIModelName()),
 						},
@@ -55381,7 +55381,7 @@ func schema_k8sio_api_scheduling_v1alpha3_WorkloadReference(ref common.Reference
 				Properties: map[string]spec.Schema{
 					"workloadName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "WorkloadName is the name of the Workload object that contains a template that was used when creating a pod group. It must be a DNS name. This field is required.",
+							Description: "workloadName is the name of the Workload object that contains a template that was used when creating a pod group. It must be a DNS name. This field is required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -55389,7 +55389,7 @@ func schema_k8sio_api_scheduling_v1alpha3_WorkloadReference(ref common.Reference
 					},
 					"templateName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TemplateName is the name of a template within the Workload object that was used to create a pod group. It must be a DNS label. This field is required.",
+							Description: "templateName is the name of a template within the Workload object that was used to create a pod group. It must be a DNS label. This field is required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -55411,7 +55411,7 @@ func schema_k8sio_api_scheduling_v1alpha3_WorkloadSpec(ref common.ReferenceCallb
 				Properties: map[string]spec.Schema{
 					"controllerRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ControllerRef is an optional reference to the controlling object, such as a Deployment or Job. This field is intended for use by tools like CLIs to provide a link back to the original workload definition. This field is immutable.",
+							Description: "controllerRef is an optional reference to the controlling object, such as a Deployment or Job. This field is intended for use by tools like CLIs to provide a link back to the original workload definition. This field is immutable.",
 							Ref:         ref(schedulingv1alpha3.TypedLocalObjectReference{}.OpenAPIModelName()),
 						},
 					},
@@ -55425,7 +55425,7 @@ func schema_k8sio_api_scheduling_v1alpha3_WorkloadSpec(ref common.ReferenceCallb
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "PodGroupTemplates is the list of templates that make up the Workload. The maximum number of templates is 8. Templates cannot be added or removed after the workload is created. Existing templates may still be updated where their individual fields allow it. Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.",
+							Description: "podGroupTemplates is the list of templates that make up the Workload. The maximum number of templates is 8. Templates cannot be added or removed after the workload is created. Existing templates may still be updated where their individual fields allow it. Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -55446,7 +55446,7 @@ func schema_k8sio_api_scheduling_v1alpha3_WorkloadSpec(ref common.ReferenceCallb
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "CompositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload. The maximum number of templates is 8. This field is immutable. Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.\n\nThis field is used only when the CompositePodGroup feature gate is enabled.",
+							Description: "compositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload. The maximum number of templates is 8. This field is immutable. Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.\n\nThis field is used only when the CompositePodGroup feature gate is enabled.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -55488,7 +55488,7 @@ func schema_k8sio_api_scheduling_v1beta1_PriorityClass(ref common.ReferenceCallb
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
