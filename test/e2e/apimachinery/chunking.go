@@ -18,6 +18,7 @@ package apimachinery
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"time"
@@ -165,7 +166,12 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		ginkgo.By("retrieving the second page until the token expires")
 		opts.Continue = firstToken
 		var inconsistentToken string
-		err = wait.Poll(20*time.Second, 2*storagebackend.DefaultCompactInterval, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(
+			ctx,
+			20*time.Second,
+			2*storagebackend.DefaultCompactInterval,
+			true,
+			func(ctx context.Context) (bool, error) {
 			_, err := client.List(ctx, opts)
 
 			if err == nil {
@@ -192,7 +198,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			framework.Logf("Retrieved inconsistent continue %s", inconsistentToken)
 			return true, nil
 		})
-		if err == wait.ErrWaitTimeout {
+		if errors.Is(err, context.DeadlineExceeded) {
 			framework.Failf(
 				"continue token never expired; compaction appears to be disabled",
 			)
