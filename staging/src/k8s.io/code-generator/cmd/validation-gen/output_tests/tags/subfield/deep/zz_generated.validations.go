@@ -132,6 +132,19 @@ func Validate_Struct(
 					errs = append(errs, e...)
 				}
 			}()
+			func() { // cohort = "ptrField"
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ptrField",
+					func(o *OtherStruct) *SmallStruct { return o.PtrField }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
+						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
+							func(o *SmallStruct) *string { return &o.StringField }, validate.DirectEqual,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+								return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "Struct.StructField.PtrField")
+							})
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
+			}()
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -211,6 +224,19 @@ func Validate_Struct(
 									func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 										return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "Struct.StructPtrField.MapField")
 									})
+							})
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
+			}()
+			func() { // cohort = "ptrField"
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ptrField",
+					func(o *OtherStruct) *SmallStruct { return o.PtrField }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
+						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
+							func(o *SmallStruct) *string { return &o.StringField }, validate.DirectEqual,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+								return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "Struct.StructPtrField.PtrField")
 							})
 					}); len(e) != 0 {
 					errs = append(errs, e...)
