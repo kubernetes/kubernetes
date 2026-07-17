@@ -119,6 +119,14 @@ func (e *EventedPLEG) RequestRelist(logger klog.Logger, podUID types.UID) {
 	e.genericPleg.RequestRelist(logger, podUID)
 }
 
+func (e *EventedPLEG) SuspendPodRelist(podUID types.UID) {
+	e.genericPleg.SuspendPodRelist(podUID)
+}
+
+func (e *EventedPLEG) ResumePodRelist(logger klog.Logger, podUID types.UID, alwaysRelist bool) {
+	e.genericPleg.ResumePodRelist(logger, podUID, alwaysRelist)
+}
+
 // Start starts the Evented PLEG
 func (e *EventedPLEG) Start(ctx context.Context) {
 	e.runningMu.Lock()

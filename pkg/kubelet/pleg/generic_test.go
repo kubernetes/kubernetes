@@ -980,3 +980,171 @@ func requireUnblocked[T any](t *testing.T, ch <-chan T) (received T) {
 		return
 	}
 }
+
+func TestSuspendResumeRelist(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PLEGOnDemandRelist, true)
+	synctest.Test(t, func(t *testing.T) {
+		tCtx := ktesting.Init(t)
+		runtimeMock := containertest.NewMockRuntime(t)
+		cache := kubecontainer.NewCache()
+		pleg := NewGenericPLEG(
+			runtimeMock,
+			make(chan *PodLifecycleEvent, 100),
+			&RelistDuration{RelistPeriod: 2 * time.Second},
+			cache,
+			clock.RealClock{},
+		).(*GenericPLEG)
+
+		pod1 := &kubecontainer.Pod{ID: "pod1", Name: "pod1", Containers: []*kubecontainer.Container{{ID: kubecontainer.ContainerID{Type: "test", ID: "c1"}, State: kubecontainer.ContainerStateRunning}}}
+		pleg.globalRelistTimer = pleg.clock.NewTimer(2 * time.Second)
+
+		t.Log("1a. Suspend pod1 relist, and request relist. It should be queued in state but not channel.")
+		pleg.SuspendPodRelist(pod1.ID)
+		pleg.RequestRelist(tCtx.Logger(), pod1.ID)
+
+		// Verify it is queued in state
+		state := pleg.getPodRelistState(pod1.ID)
+		state.mu.Lock()
+		assert.True(t, state.suspended)
+		assert.True(t, state.relistNeeded)
+		state.mu.Unlock()
+
+		t.Log("1b. Resume pod1 relist (queues it) and suspend again. Worker should dequeue and return early.")
+		pleg.ResumePodRelist(tCtx.Logger(), pod1.ID, false)
+		pleg.SuspendPodRelist(pod1.ID)
+
+		// workerLoopIteration should dequeue and call relistPod, which should return early because suspended.
+		// We do NOT expect GetPod to be called.
+		pleg.workerLoopIteration(tCtx)
+
+		// Verify it is queued in state again
+		state.mu.Lock()
+		assert.True(t, state.suspended)
+		assert.True(t, state.relistNeeded)
+		state.mu.Unlock()
+
+		t.Log("2. Resume pod1 relist. It should queue the request to the channel.")
+		call := runtimeMock.EXPECT().GetPod(mock.Anything, pod1.ID).RunAndReturn(func(ctx context.Context, uid types.UID) (*kubecontainer.Pod, error) {
+			assert.Equal(t, pod1.ID, uid)
+			pod1.Timestamp = time.Now()
+			return pod1, nil
+		}).Once()
+		runtimeMock.EXPECT().GetPodStatus(mock.Anything, pod1).RunAndReturn(func(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
+			assert.Equal(t, pod1, pod)
+			return &kubecontainer.PodStatus{ID: pod1.ID, TimeStamp: time.Now()}, nil
+		}).NotBefore(call).Once()
+
+		pleg.ResumePodRelist(tCtx.Logger(), pod1.ID, false)
+
+		// Now run worker loop to process the queued request
+		pleg.workerLoopIteration(tCtx)
+
+		t.Log("3. Suspend pod1 relist, and run global relist. It should skip reconciliation for pod1.")
+		pleg.SuspendPodRelist(pod1.ID)
+
+		pod1_changed := &kubecontainer.Pod{ID: "pod1", Name: "pod1", Containers: []*kubecontainer.Container{
+			{ID: kubecontainer.ContainerID{Type: "test", ID: "c1"}, State: kubecontainer.ContainerStateExited},
+		}}
+
+		runtimeMock.EXPECT().GetPods(mock.Anything, true).RunAndReturn(func(_ context.Context, _ bool) ([]*kubecontainer.Pod, error) {
+			pod1_changed.Timestamp = time.Now()
+			return []*kubecontainer.Pod{pod1_changed}, nil
+		}).Once()
+
+		pleg.globalRelistTimer.Reset(0)
+		pleg.workerLoopIteration(tCtx)
+
+		// Verify that a relist is queued in state because global relist saw changes but was suspended.
+		state.mu.Lock()
+		assert.True(t, state.relistNeeded)
+		state.mu.Unlock()
+
+		t.Log("4. Resume pod1. It should trigger the queued relist which will update the cache.")
+		call = runtimeMock.EXPECT().GetPod(mock.Anything, pod1.ID).RunAndReturn(func(ctx context.Context, uid types.UID) (*kubecontainer.Pod, error) {
+			assert.Equal(t, pod1.ID, uid)
+			pod1_changed.Timestamp = time.Now()
+			return pod1_changed, nil
+		}).Once()
+		runtimeMock.EXPECT().GetPodStatus(mock.Anything, pod1_changed).RunAndReturn(func(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
+			assert.Equal(t, pod1_changed, pod)
+			return &kubecontainer.PodStatus{ID: pod1_changed.ID, TimeStamp: time.Now()}, nil
+		}).NotBefore(call).Once()
+
+		time.Sleep(10 * time.Millisecond) // Advance fake time to ensure T_now > T_global
+		pleg.ResumePodRelist(tCtx.Logger(), pod1.ID, false)
+		pleg.workerLoopIteration(tCtx)
+
+		t.Log("5. Suspend and flag for reinspect. Global relist should queue relist and preserve reinspect.")
+		runtimeMock.EXPECT().GetPods(mock.Anything, true).RunAndReturn(func(_ context.Context, _ bool) ([]*kubecontainer.Pod, error) {
+			pod1_changed.Timestamp = time.Now()
+			return []*kubecontainer.Pod{pod1_changed}, nil
+		}).Once()
+
+		pleg.RequestReinspect(pod1.ID)
+		pleg.SuspendPodRelist(pod1.ID)
+		pleg.globalRelistTimer.Reset(0)
+		pleg.workerLoopIteration(tCtx)
+
+		// Verify queued
+		state.mu.Lock()
+		assert.True(t, state.relistNeeded)
+		state.mu.Unlock()
+
+		// Verify reinspect still in map
+		_, reinspectExists := pleg.podsToReinspect.Load(pod1.ID)
+		assert.True(t, reinspectExists)
+
+		t.Log("6. Resume pod1 after reinspect suspend. It should trigger relist and clean reinspect.")
+		call = runtimeMock.EXPECT().GetPod(mock.Anything, pod1.ID).RunAndReturn(func(ctx context.Context, uid types.UID) (*kubecontainer.Pod, error) {
+			assert.Equal(t, pod1.ID, uid)
+			pod1_changed.Timestamp = time.Now()
+			return pod1_changed, nil
+		}).Once()
+		runtimeMock.EXPECT().GetPodStatus(mock.Anything, pod1_changed).RunAndReturn(func(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
+			assert.Equal(t, pod1_changed, pod)
+			return &kubecontainer.PodStatus{ID: pod1_changed.ID, TimeStamp: time.Now()}, nil
+		}).NotBefore(call).Once()
+
+		time.Sleep(10 * time.Millisecond) // Advance fake time to ensure T_now > T_global_2
+		pleg.ResumePodRelist(tCtx.Logger(), pod1.ID, false)
+		pleg.workerLoopIteration(tCtx)
+
+		// Verify reinspect is now gone
+		_, reinspectExists = pleg.podsToReinspect.Load(pod1.ID)
+		assert.False(t, reinspectExists)
+
+		t.Log("8. Suspend and resume with alwaysRelist=true when not needed. It should trigger relist.")
+		pleg.SuspendPodRelist(pod1.ID)
+		// relistNeeded is false.
+		// We expect GetPod and GetPodStatus because we return a changed pod.
+		pod1_changed_2 := &kubecontainer.Pod{ID: "pod1", Name: "pod1", Containers: []*kubecontainer.Container{
+			{ID: kubecontainer.ContainerID{Type: "test", ID: "c1"}, State: kubecontainer.ContainerStateRunning},
+		}}
+		call = runtimeMock.EXPECT().GetPod(mock.Anything, pod1.ID).RunAndReturn(func(ctx context.Context, uid types.UID) (*kubecontainer.Pod, error) {
+			assert.Equal(t, pod1.ID, uid)
+			pod1_changed_2.Timestamp = time.Now()
+			return pod1_changed_2, nil
+		}).Once()
+		runtimeMock.EXPECT().GetPodStatus(mock.Anything, pod1_changed_2).RunAndReturn(func(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
+			assert.Equal(t, pod1_changed_2, pod)
+			return &kubecontainer.PodStatus{ID: pod1_changed_2.ID, TimeStamp: time.Now()}, nil
+		}).NotBefore(call).Once()
+
+		time.Sleep(10 * time.Millisecond) // Advance fake time
+		pleg.ResumePodRelist(tCtx.Logger(), pod1.ID, true) // alwaysRelist = true
+		pleg.workerLoopIteration(tCtx)
+
+		t.Log("7. Verify cleanup on deletion.")
+		runtimeMock.EXPECT().GetPods(mock.Anything, true).RunAndReturn(func(_ context.Context, _ bool) ([]*kubecontainer.Pod, error) {
+			return nil, nil
+		}).Once()
+
+		pleg.globalRelistTimer.Reset(0)
+		pleg.workerLoopIteration(tCtx)
+
+		// The pod should be removed from podRelistStates.
+		_, exists := pleg.podRelistStates.Load(pod1.ID)
+		assert.False(t, exists)
+	})
+}
+

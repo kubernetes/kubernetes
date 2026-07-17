@@ -80,6 +80,14 @@ type GenericPLEG struct {
 	relistRequests chan relistRequest
 	// globalRelistTimer controls the periodic global relist.
 	globalRelistTimer clock.Timer
+	// podRelistStates maps podUID to its relist suspension state.
+	podRelistStates sync.Map
+}
+
+type podRelistState struct {
+	mu           sync.Mutex
+	suspended    bool
+	relistNeeded bool
 }
 
 // Empty placeholder value for podsToReinspect (shared pointer reduces allocations).
@@ -342,12 +350,24 @@ func (g *GenericPLEG) reconcilePodRecord(ctx context.Context, pid types.UID) {
 		events = append(events, containerEvents...)
 	}
 
-	_, reinspect := g.podsToReinspect.LoadAndDelete(pid)
+	_, reinspect := g.podsToReinspect.Load(pid)
 
 	if len(events) == 0 && !reinspect {
 		// Nothing else needed for this pod.
 		return
 	}
+
+	state := g.getPodRelistState(pid)
+	state.mu.Lock()
+	if state.suspended {
+		logger.V(4).Info("GenericPLEG: Pod is suspended during global relist reconciliation, queueing relist request", "podUID", pid)
+		state.relistNeeded = true
+		state.mu.Unlock()
+		return
+	}
+	state.mu.Unlock()
+
+	g.podsToReinspect.Delete(pid)
 
 	// updateCache() will inspect the pod and update the cache. If an
 	// error occurs during the inspection, we want PLEG to retry again
@@ -380,6 +400,10 @@ func (g *GenericPLEG) reconcilePodRecord(ctx context.Context, pid types.UID) {
 
 	// Update the internal storage and send out the events.
 	g.podRecords.update(pid)
+	if _, exists := g.podRecords[pid]; !exists {
+		logger.V(4).Info("GenericPLEG: Pod is deleted, cleaning up relist state", "podUID", pid)
+		g.podRelistStates.Delete(pid)
+	}
 
 	// Map from containerId to exit code; used as a temporary cache for lookup
 	containerExitCode := make(map[string]int)
@@ -415,9 +439,19 @@ func (g *GenericPLEG) reconcilePodRecord(ctx context.Context, pid types.UID) {
 }
 
 func (g *GenericPLEG) relistPod(ctx context.Context, podUID types.UID) {
+	logger := klog.FromContext(ctx)
+	state := g.getPodRelistState(podUID)
+	state.mu.Lock()
+	if state.suspended {
+		logger.V(4).Info("GenericPLEG: Relists are suspended, queueing relist request", "podUID", podUID)
+		state.relistNeeded = true
+		state.mu.Unlock()
+		return
+	}
+	state.mu.Unlock()
+
 	g.relistLock.Lock()
 	defer g.relistLock.Unlock()
-	logger := klog.FromContext(ctx)
 
 	logger.V(5).Info("GenericPLEG: Relisting Pod", "podUID", podUID)
 
@@ -567,13 +601,53 @@ func (g *GenericPLEG) RequestReinspect(podUID types.UID) {
 	g.podsToReinspect.Store(podUID, empty)
 }
 
+func (g *GenericPLEG) getPodRelistState(uid types.UID) *podRelistState {
+	val, _ := g.podRelistStates.LoadOrStore(uid, &podRelistState{})
+	return val.(*podRelistState)
+}
+
+func (g *GenericPLEG) SuspendPodRelist(podUID types.UID) {
+	state := g.getPodRelistState(podUID)
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	state.suspended = true
+}
+
+func (g *GenericPLEG) ResumePodRelist(logger klog.Logger, podUID types.UID, alwaysRelist bool) {
+	state := g.getPodRelistState(podUID)
+	state.mu.Lock()
+	state.suspended = false
+	needed := state.relistNeeded || alwaysRelist
+	state.relistNeeded = false
+	state.mu.Unlock()
+
+	if needed {
+		logger.V(4).Info("GenericPLEG: Resuming relists, triggering queued relist request", "podUID", podUID, "alwaysRelist", alwaysRelist)
+		select {
+		case g.relistRequests <- relistRequest{podUID, g.clock.Now()}:
+		default:
+			logger.Error(nil, "Relist request channel full; dropping queued relist request", "podUID", podUID)
+		}
+	}
+}
+
 func (g *GenericPLEG) RequestRelist(logger klog.Logger, podUID types.UID) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PLEGOnDemandRelist) {
 		return
 	}
 
+	state := g.getPodRelistState(podUID)
+	state.mu.Lock()
+	if state.suspended {
+		logger.V(4).Info("GenericPLEG: Relists are suspended, queueing request", "podUID", podUID)
+		state.relistNeeded = true
+		state.mu.Unlock()
+		return
+	}
+	state.mu.Unlock()
+
 	select {
-	case g.relistRequests <- relistRequest{podUID, time.Now()}:
+	case g.relistRequests <- relistRequest{podUID, g.clock.Now()}:
 	default:
 		logger.Error(nil, "Relist request channel full; dropping relist request", "podUID", podUID)
 	}
