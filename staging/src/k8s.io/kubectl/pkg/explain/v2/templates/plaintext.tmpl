@@ -112,7 +112,7 @@ Takes dictionary as argument with keys:
         {{- $subschema := index $resolved.properties (first $.FieldPath) -}}
         {{- if eq 1 (len $.FieldPath) -}}
             {{- /* TODO: The original explain would say RESOURCE instead of FIELD here under some circumstances */ -}}
-            FIELD: {{first $.FieldPath}} <{{ template "typeGuess" (dict "schema" $subschema "Document" $.Document) }}>{{"\n"}}
+            FIELD: {{first $.FieldPath}} {{print "<" (include "typeGuess" (dict "schema" $subschema "Document" $.Document)) ">"}}{{"\n"}}
             {{- template "extractEnum" (dict "schema" $subschema "Document" $.Document "isLongView" true "limit" -1) -}}{{"\n"}}
             {{- "\n" -}}
         {{- end -}}
@@ -208,7 +208,7 @@ Takes dictionary as argument with keys:
     {{- $level := or $.level 0 -}}
     {{- $indentAmount := mul $level 2 -}}
     {{- $fieldSchema := index $.schema.properties $.name -}}
-    {{- $.name | indent $indentAmount -}}{{"\t"}}<{{ template "typeGuess" (dict "schema" $fieldSchema "Document" $.Document) }}>
+    {{- $.name | indent $indentAmount -}}{{"\t"}}{{print "<" (include "typeGuess" (dict "schema" $fieldSchema "Document" $.Document)) ">"}}
     {{- if contains $.schema.required $.name}} -required-{{- end -}}
     {{- template "extractEnum" (dict "schema" $fieldSchema "Document" $.Document "isLongView" false "limit" 4 "indentAmount" $indentAmount) -}}
     {{- "\n" -}}
