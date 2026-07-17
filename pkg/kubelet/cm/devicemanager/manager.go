@@ -292,42 +292,44 @@ func (m *ManagerImpl) PluginListAndWatchReceiver(logger klog.Logger, resourceNam
 
 func (m *ManagerImpl) genericDeviceUpdateCallback(logger klog.Logger, resourceName string, devices []*pluginapi.Device) {
 	healthyCount := 0
-	m.mutex.Lock()
-	m.healthyDevices[resourceName] = sets.New[string]()
-	m.unhealthyDevices[resourceName] = sets.New[string]()
-	oldDevices := m.allDevices[resourceName]
 	podsToUpdate := sets.New[string]()
-	m.allDevices[resourceName] = make(map[string]*pluginapi.Device)
-	for _, dev := range devices {
+	func() {
+		m.mutex.Lock()
+		defer m.mutex.Unlock()
+		m.healthyDevices[resourceName] = sets.New[string]()
+		m.unhealthyDevices[resourceName] = sets.New[string]()
+		oldDevices := m.allDevices[resourceName]
+		m.allDevices[resourceName] = make(map[string]*pluginapi.Device)
+		for _, dev := range devices {
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
-			// compare with old device's health and send update to the channel if needed
-			updatePodUIDFn := func(deviceID string) {
-				podUID, _ := m.podDevices.getPodAndContainerForDevice(resourceName, deviceID)
-				if podUID != "" {
-					podsToUpdate.Insert(podUID)
+			if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
+				// compare with old device's health and send update to the channel if needed
+				updatePodUIDFn := func(deviceID string) {
+					podUID, _ := m.podDevices.getPodAndContainerForDevice(resourceName, deviceID)
+					if podUID != "" {
+						podsToUpdate.Insert(podUID)
+					}
 				}
-			}
-			if oldDev, ok := oldDevices[dev.ID]; ok {
-				if oldDev.Health != dev.Health {
+				if oldDev, ok := oldDevices[dev.ID]; ok {
+					if oldDev.Health != dev.Health {
+						updatePodUIDFn(dev.ID)
+					}
+				} else {
+					// if this is a new device, it might have existed before and disappeared for a while
+					// but still be assigned to a Pod. In this case, we need to send an update to the channel
 					updatePodUIDFn(dev.ID)
 				}
+			}
+
+			m.allDevices[resourceName][dev.ID] = dev
+			if dev.Health == pluginapi.Healthy {
+				m.healthyDevices[resourceName].Insert(dev.ID)
+				healthyCount++
 			} else {
-				// if this is a new device, it might have existed before and disappeared for a while
-				// but still be assigned to a Pod. In this case, we need to send an update to the channel
-				updatePodUIDFn(dev.ID)
+				m.unhealthyDevices[resourceName].Insert(dev.ID)
 			}
 		}
-
-		m.allDevices[resourceName][dev.ID] = dev
-		if dev.Health == pluginapi.Healthy {
-			m.healthyDevices[resourceName].Insert(dev.ID)
-			healthyCount++
-		} else {
-			m.unhealthyDevices[resourceName].Insert(dev.ID)
-		}
-	}
-	m.mutex.Unlock()
+	}()
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
 		if len(podsToUpdate) > 0 {
