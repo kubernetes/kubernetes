@@ -563,7 +563,7 @@ func (o *CopyOptions) untarAll(ns, pod string, prefix string, src remotePath, de
 			return err
 		}
 		defer outFile.Close()
-		if _, err := io.Copy(outFile, tarReader); err != nil {
+		if _, err := io.CopyN(outFile, tarReader, header.Size); err != nil && err != io.EOF {
 			return err
 		}
 		if err := outFile.Close(); err != nil {
