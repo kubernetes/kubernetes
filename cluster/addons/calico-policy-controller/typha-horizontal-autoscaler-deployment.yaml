@@ -35,4 +35,6 @@ spec:
             cpu: 10m
           limits:
             cpu: 10m
+        securityContext:
+          allowPrivilegeEscalation: false
       serviceAccountName: typha-cpha
