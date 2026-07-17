@@ -5163,6 +5163,12 @@ func TestAllocatorSelection(t *testing.T) {
 			features:             "AllAlpha=false,AllBeta=false,DRAAdminAccess=true",
 			expectImplementation: "stable",
 		},
+		"CompatibilityGroups": {
+			// DRAPartitionableDevices must be enabled together with the
+			// compatibility groups gate (feature dependency).
+			features:             "AllAlpha=false,AllBeta=false,DRADeviceCompatibilityGroups=true,DRAPartitionableDevices=true",
+			expectImplementation: "experimental",
+		},
 		"ConsumableCapacity": {
 			features:             "AllAlpha=false,AllBeta=false,DRAConsumableCapacity=true",
 			expectImplementation: "incubating",

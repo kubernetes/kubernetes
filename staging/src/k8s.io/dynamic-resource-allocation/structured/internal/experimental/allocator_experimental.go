@@ -86,6 +86,7 @@ var SupportedFeatures = internal.Features{
 	ListTypeAttributes:      true,
 	OptionalNodeOperations:  true,
 	DerivedAttributes:       true,
+	CompatibilityGroups:     true,
 }
 
 type Allocator struct {
@@ -106,7 +107,20 @@ type Allocator struct {
 	// The allocator might be accessed by different goroutines, so
 	// access to this map must be synchronized.
 	availableCounters map[PoolID]counterSets
-	mutex             sync.RWMutex
+	// groupedCounterSets lists, per pool, the counter sets on which an
+	// already-allocated device declares groups (read from the ResourceSlices).
+	// Used only by the version-skew skip, so it is only populated while the
+	// feature is disabled; enforcement (feature on) uses the richer
+	// compatibilityGroupsBaseline below.
+	groupedCounterSets map[PoolID]sets.Set[string]
+	// compatibilityGroupsBaseline caches, per resource pool, the
+	// compatibility-group intersection contributed by already-allocated devices
+	// (their groups read live from the source ResourceSlice). Like
+	// availableCounters it is computed lazily, never changes once set, and is
+	// guarded by mutex. The keys in the map are resource pool IDs (driver name
+	// and pool name), and the inner map keys are counter set names.
+	compatibilityGroupsBaseline map[PoolID]map[string]compatibilityGroupIntersection
+	mutex                       sync.RWMutex
 	// numAllocateOneInvocations counts the number of times the allocateOne
 	// function is called for the allocator. This is a measurement of the
 	// amount of work the allocator had to do to allocate devices
@@ -137,7 +151,7 @@ func NewAllocator(ctx context.Context,
 			slicesOnNode[nodeName] = append(slicesOnNode[nodeName], slice)
 		}
 	}
-	return &Allocator{
+	a := &Allocator{
 		features:          features,
 		allocatedState:    allocatedState,
 		classLister:       classLister,
@@ -146,7 +160,13 @@ func NewAllocator(ctx context.Context,
 		allSlices:         slices,
 		celCache:          celCache,
 		availableCounters: make(map[PoolID]counterSets),
-	}, nil
+
+		compatibilityGroupsBaseline: make(map[PoolID]map[string]compatibilityGroupIntersection),
+	}
+	if !features.CompatibilityGroups {
+		a.groupedCounterSets = groupedCounterSetsFromSlices(slices, allocatedState)
+	}
+	return a, nil
 }
 
 func (a *Allocator) Channel() internal.AllocatorChannel {
@@ -164,9 +184,12 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		derivedAttributesCache: make(map[deviceExprKey]*resourceapi.DeviceAttribute),
 		constraints:            make([][]constraint, len(claims)),
 		consumedCounters:       make(map[PoolID]counterSets),
-		requestData:            make(map[requestIndices]requestData),
-		result:                 make([]internalAllocationResult, len(claims)),
-		allocatingCapacity:     NewConsumedCapacityCollection(),
+
+		consumedCompatibilityGroups: make(map[PoolID]map[string]compatibilityGroupIntersection),
+
+		requestData:        make(map[requestIndices]requestData),
+		result:             make([]internalAllocationResult, len(claims)),
+		allocatingCapacity: NewConsumedCapacityCollection(),
 	}
 	slicesForNode := slices.Concat(alloc.slicesOnNode[node.Name], alloc.slicesShared)
 	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate), "numSlicesForNode", len(slicesForNode))
@@ -677,7 +700,13 @@ type allocator struct {
 	// that are in the process of being allocated.
 	// The keys in the map are resource pool IDs (driver name and pool name).
 	consumedCounters map[PoolID]counterSets
-	requestData      map[requestIndices]requestData // one entry per request with no subrequests and one entry per subrequest
+	// consumedCompatibilityGroups tracks the rolling compatibility-group
+	// intersection per counter set for each pool across the devices being
+	// allocated in the current attempt. It is seeded from the already-allocated
+	// peers (compatibilityGroupsBaseline) the first time a counter set is touched.
+	// pool ID -> counter set name -> running intersection.
+	consumedCompatibilityGroups map[PoolID]map[string]compatibilityGroupIntersection
+	requestData                 map[requestIndices]requestData // one entry per request with no subrequests and one entry per subrequest
 	// allocatingDevices tracks which devices will be newly allocated for a
 	// particular attempt to find a solution. The map is indexed by device
 	// and its values represent for which of a pod's claims the device will
@@ -1595,39 +1624,65 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	// accounted for, so a further share must not charge them again.
 	skipCounterCheck := allowMultipleAllocations && alloc.deviceCapacityInUse(device.id)
 
-	// The API validation logic has checked the ConsumesCounters referred should exist inside SharedCounters.
-	// countersReserved records whether checkAvailableCounters actually reserved
-	// this device's counters. It is not the same as len(device.ConsumesCounters) > 0,
-	// because skipCounterCheck can bypass the reservation.
-	countersReserved := false
-	if !skipCounterCheck && len(device.ConsumesCounters) > 0 {
-		// If a device consumes counters from a counter set, verify that
-		// there is sufficient counters available.
-		ok, err := alloc.checkAvailableCounters(device)
-		if err != nil {
-			return false, nil, err
-		}
-		if !ok {
-			alloc.logger.V(7).Info("Insufficient counters", "device", device.id)
-			return false, nil, nil
-		}
-		countersReserved = true
-	}
-
 	var parentRequestName string
 	if requestData.parentRequest != nil {
 		parentRequestName = requestData.parentRequest.name()
 	}
 
 	// state records the mutations this call makes so rollbackDevice can undo
-	// them. Every rejection path after a successful counter reservation calls
-	// rollbackDevice synchronously, and the success path returns a closure that
-	// calls the same helper during backtracking, so both undo routes stay
-	// identical. Passing the state by value to rollbackDevice keeps it (and the flags) on the
+	// them. Every rejection path after the first mutation calls rollbackDevice
+	// synchronously, and the success path returns a closure that calls the same
+	// helper during backtracking, so both undo routes stay identical. Passing
+	// the state by value to rollbackDevice keeps it (and the flags) on the
 	// stack for the rejection paths; only the success closure escapes.
 	state := deviceRollbackState{
-		countersReserved:   countersReserved,
 		previousNumResults: len(alloc.result[r.claimIndex].devices),
+	}
+
+	// Enforce the DRADeviceCompatibilityGroups constraint: a device may only be
+	// co-allocated with the other devices already drawing from a counter set when
+	// their declared compatibility groups intersect. This is gated identically to
+	// the counter check below so that additional shares of an already-allocated
+	// device (skipCounterCheck) are not re-evaluated, and runs before it so that
+	// a rejection or skip returns before any counters have been reserved.
+	if !skipCounterCheck && len(device.ConsumesCounters) > 0 {
+		if alloc.features.CompatibilityGroups {
+			ok, restore := alloc.checkAndConsumeCompatibilityGroups(device)
+			if !ok {
+				alloc.logger.V(7).Info("Incompatible compatibility groups", "device", device.id)
+				return false, nil, nil
+			}
+			state.restoreCompatibilityGroups = restore
+		} else if alloc.skipForDisabledCompatibilityGroups(device) {
+			// The feature is disabled but compatibility groups are present in the
+			// cluster (version skew with the apiserver). Skip rather than risk an
+			// allocation that cannot be validated, so the feature can be enabled
+			// later without deleting pods.
+			alloc.logger.V(7).Info("Skipping device with compatibility groups because the feature is disabled", "device", device.id)
+			return false, nil, nil
+		}
+	}
+
+	// The API validation logic has checked the ConsumesCounters referred should exist inside SharedCounters.
+	// state.countersReserved records whether checkAvailableCounters actually
+	// reserved this device's counters. It is not the same as
+	// len(device.ConsumesCounters) > 0, because skipCounterCheck can bypass the
+	// reservation.
+	if !skipCounterCheck && len(device.ConsumesCounters) > 0 {
+		// If a device consumes counters from a counter set, verify that
+		// there is sufficient counters available.
+		ok, err := alloc.checkAvailableCounters(device)
+		if err != nil || !ok {
+			// Unwind the compatibility-group intersection consumed above now
+			// that the device is rejected; nothing else has been mutated yet.
+			alloc.rollbackDevice(r, device, &requestData, state)
+			if err != nil {
+				return false, nil, err
+			}
+			alloc.logger.V(7).Info("Insufficient counters", "device", device.id)
+			return false, nil, nil
+		}
+		state.countersReserved = true
 	}
 
 	// Might be tainted, in which case the taint has to be tolerated.
@@ -1735,14 +1790,18 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 // candidate so rollbackDevice can undo them, both when the candidate is rejected
 // and when the backtracking search abandons a previously successful candidate.
 type deviceRollbackState struct {
-	countersReserved     bool
-	constraintsAdded     int
-	deviceMarked         bool
-	capacityInserted     bool
-	capacityEntryExisted bool
-	resultAdded          bool
-	previousNumResults   int
-	consumedCapacity     map[resourceapi.QualifiedName]resource.Quantity
+	// restoreCompatibilityGroups, when non-nil, reverts the rolling
+	// compatibility-group intersection consumed for this device by
+	// checkAndConsumeCompatibilityGroups.
+	restoreCompatibilityGroups func()
+	countersReserved           bool
+	constraintsAdded           int
+	deviceMarked               bool
+	capacityInserted           bool
+	capacityEntryExisted       bool
+	resultAdded                bool
+	previousNumResults         int
+	consumedCapacity           map[resourceapi.QualifiedName]resource.Quantity
 }
 
 // rollbackDevice reverses the mutations recorded in state, in the opposite order
@@ -1768,6 +1827,9 @@ func (alloc *allocator) rollbackDevice(r deviceIndices, device deviceWithID, req
 	}
 	for i := state.constraintsAdded - 1; i >= 0; i-- {
 		alloc.constraints[r.claimIndex][i].remove(requestData, device.Device, device.id)
+	}
+	if state.restoreCompatibilityGroups != nil {
+		state.restoreCompatibilityGroups()
 	}
 	if state.countersReserved {
 		alloc.deallocateCountersForDevice(device)
@@ -1965,6 +2027,135 @@ func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
 			consumedCounterSet[name] = consumedCounter
 		}
 	}
+}
+
+// compatibilityGroupsBaselineForPool returns, per counter set in the pool, the
+// compatibility-group intersection contributed by the devices that are already
+// allocated (i.e. recorded in allocatedState). Both counter set membership and
+// the declared group values are read live from the source ResourceSlice,
+// exactly like checkAvailableCounters does for counters: an allocated device's
+// consumption is assumed stable in the slice. A device that is allocated but no
+// longer present in the slice contributes nothing, just as its counters do not.
+//
+// The result is computed once per pool and cached, mirroring availableCounters.
+func (alloc *allocator) compatibilityGroupsBaselineForPool(pool *Pool) map[string]compatibilityGroupIntersection {
+	poolID := pool.PoolID
+
+	alloc.mutex.RLock()
+	baseline, found := alloc.compatibilityGroupsBaseline[poolID]
+	alloc.mutex.RUnlock()
+	if found {
+		return baseline
+	}
+
+	baseline = make(map[string]compatibilityGroupIntersection)
+	for _, resourceSlices := range [][]*draapi.ResourceSlice{pool.DeviceSlicesTargetingNode, pool.DeviceSlicesNotTargetingNode} {
+		for _, slice := range resourceSlices {
+			for _, device := range slice.Spec.Devices {
+				deviceID := DeviceID{
+					Driver: slice.Spec.Driver,
+					Pool:   slice.Spec.Pool.Name,
+					Device: device.Name,
+				}
+				if !internal.IsDeviceAllocated(deviceID, &alloc.allocatedState) {
+					continue
+				}
+				for _, deviceCounterConsumption := range device.ConsumesCounters {
+					counterSetName := deviceCounterConsumption.CounterSet.String()
+					cur := baseline[counterSetName]
+					baseline[counterSetName] = cur.add(compatibilityGroupSet(deviceCounterConsumption.CompatibilityGroups))
+				}
+			}
+		}
+	}
+
+	alloc.mutex.Lock()
+	alloc.compatibilityGroupsBaseline[poolID] = baseline
+	alloc.mutex.Unlock()
+	return baseline
+}
+
+// checkAndConsumeCompatibilityGroups verifies that the candidate device can be
+// co-allocated, for every counter set it consumes, with the devices already
+// placed on that counter set (allocated peers plus in-flight allocations of the
+// current attempt). If so it folds the candidate's groups into the rolling
+// intersection and returns a rollback function that restores the previous state
+// when the allocator backtracks. If not, it leaves the running state unchanged
+// and returns false.
+func (alloc *allocator) checkAndConsumeCompatibilityGroups(device deviceWithID) (bool, func()) {
+	poolID := device.pool.PoolID
+	running, found := alloc.consumedCompatibilityGroups[poolID]
+	if !found {
+		running = make(map[string]compatibilityGroupIntersection)
+		alloc.consumedCompatibilityGroups[poolID] = running
+	}
+	baseline := alloc.compatibilityGroupsBaselineForPool(device.pool)
+
+	type savedEntry struct {
+		counterSet string
+		prev       compatibilityGroupIntersection
+		existed    bool
+	}
+	var saved []savedEntry
+	rollback := func() {
+		// Restore in reverse order so repeated entries for the same counter set
+		// (a device cannot have them, but be defensive) unwind correctly.
+		for idx := len(saved) - 1; idx >= 0; idx-- {
+			s := saved[idx]
+			if s.existed {
+				running[s.counterSet] = s.prev
+			} else {
+				delete(running, s.counterSet)
+			}
+		}
+	}
+
+	for _, deviceCounterConsumption := range device.ConsumesCounters {
+		counterSetName := deviceCounterConsumption.CounterSet.String()
+		cur, existed := running[counterSetName]
+		if !existed {
+			// Seed from the already-allocated peers for this counter set.
+			cur = baseline[counterSetName]
+		}
+		groups := compatibilityGroupSet(deviceCounterConsumption.CompatibilityGroups)
+		if !cur.admits(groups) {
+			rollback()
+			return false, nil
+		}
+		saved = append(saved, savedEntry{counterSet: counterSetName, prev: cur, existed: existed})
+		running[counterSetName] = cur.add(groups)
+	}
+
+	return true, rollback
+}
+
+// skipForDisabledCompatibilityGroups reports whether a device must be skipped
+// while the DRADeviceCompatibilityGroups feature is disabled in this scheduler
+// but compatibility groups are still present in the cluster (served by the
+// apiserver during a version skew). To avoid allocations it cannot validate, the
+// scheduler ignores any device that declares compatibility groups, and any
+// device drawing from a counter set on which an already-allocated device has
+// declared groups. This lets the feature be enabled later without having to
+// delete pods.
+//
+// This is the same version-skew skip used by the stable and incubating
+// allocators; enforcement (feature on) uses checkAndConsumeCompatibilityGroups
+// and the richer per-pool baseline instead.
+func (alloc *allocator) skipForDisabledCompatibilityGroups(device deviceWithID) bool {
+	grouped := alloc.groupedCounterSets[device.pool.PoolID]
+	for _, deviceCounterConsumption := range device.ConsumesCounters {
+		if len(deviceCounterConsumption.CompatibilityGroups) > 0 {
+			alloc.logger.V(7).Info("Skipping device: it declares compatibility groups, which this allocator does not enforce",
+				"device", device.id, "counterSet", deviceCounterConsumption.CounterSet.String())
+			return true
+		}
+		if grouped.Has(deviceCounterConsumption.CounterSet.String()) {
+			alloc.logger.V(7).Info("Skipping device: its counter set already carries a grouped allocation this allocator cannot validate",
+				"device", device.id, "counterSet", deviceCounterConsumption.CounterSet.String())
+			return true
+		}
+	}
+	return false
 }
 
 // createNodeSelector constructs a node selector for the allocation, if needed,
