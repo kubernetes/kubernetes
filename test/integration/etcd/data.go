@@ -65,6 +65,10 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 	return GetEtcdStorageDataForNamespaceServedAt(namespace, utilversion.DefaultKubeBinaryVersion, false)
 }
 
+// logExpectedVersionChange is used by GetEtcdStorageDataForNamespaceServedAt to surface when the expected version changed.
+// defaults to no-op, can be set to log for specific tests.
+var logExpectedVersionChange = func(format string, args ...any) {}
+
 // GetEtcdStorageDataForNamespaceServedAt returns etcd data for all persisted objects at a particular release version.
 // It is exported so that it can be reused across multiple tests.
 // It returns a new map on every invocation to prevent different tests from mutating shared state.
@@ -886,7 +890,10 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			if storageVersion == "" {
 				continue
 			}
-			data.ExpectedGVK.Version = storageVersion
+			if storageVersion != data.ExpectedGVK.Version {
+				logExpectedVersionChange("expected version for %v changed from %v to %v", key, data.ExpectedGVK.Version, storageVersion)
+				data.ExpectedGVK.Version = storageVersion
+			}
 		}
 	}
 	validateStorageData(etcdStorageData)
