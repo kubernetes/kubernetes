@@ -104,6 +104,7 @@ type testParameters struct {
 	enableSnapshot               bool
 	enableVolumeMountGroup       bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
 	enableNodeVolumeCondition    bool
+	enableNodeStorageHealth      bool
 	hooks                        *drivers.Hooks
 	tokenRequests                []storagev1.TokenRequest
 	serviceAccountTokenInSecrets *bool // if true, the service account token should be passed only via secrets
@@ -178,6 +179,7 @@ func (m *mockDriverSetup) init(ctx context.Context, tp testParameters) {
 		EnableResizing:               tp.enableResizing,
 		EnableNodeExpansion:          tp.enableNodeExpansion,
 		EnableNodeVolumeCondition:    tp.enableNodeVolumeCondition,
+		EnableNodeStorageHealth:      tp.enableNodeStorageHealth,
 		DisableControllerExpansion:   tp.disableControllerExpansion,
 		EnableSnapshot:               tp.enableSnapshot,
 		EnableVolumeMountGroup:       tp.enableVolumeMountGroup,

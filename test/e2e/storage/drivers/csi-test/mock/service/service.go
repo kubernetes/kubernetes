@@ -56,6 +56,7 @@ type Config struct {
 	AttachLimit                 int64
 	NodeExpansionRequired       bool
 	NodeVolumeConditionRequired bool
+	NodeStorageHealthRequired   bool
 	VolumeMountGroupRequired    bool
 	DisableControllerExpansion  bool
 	DisableOnlineExpansion      bool

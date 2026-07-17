@@ -379,6 +379,16 @@ func (s *service) NodeGetCapabilities(
 		})
 	}
 
+	if s.config.NodeStorageHealthRequired {
+		capabilities = append(capabilities, &csi.NodeServiceCapability{
+			Type: &csi.NodeServiceCapability_Rpc{
+				Rpc: &csi.NodeServiceCapability_RPC{
+					Type: csi.NodeServiceCapability_RPC_GET_STORAGE_HEALTH,
+				},
+			},
+		})
+	}
+
 	if s.config.VolumeMountGroupRequired {
 		capabilities = append(capabilities, &csi.NodeServiceCapability{
 			Type: &csi.NodeServiceCapability_Rpc{
@@ -485,4 +495,10 @@ func (s *service) NodeGetVolumeHealth(ctx context.Context,
 	}
 
 	return resp, nil
+}
+
+func (s *service) NodeGetStorageHealth(ctx context.Context,
+	req *csi.NodeGetStorageHealthRequest) (*csi.NodeGetStorageHealthResponse, error) {
+
+	return &csi.NodeGetStorageHealthResponse{}, nil
 }
