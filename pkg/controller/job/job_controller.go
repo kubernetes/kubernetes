@@ -94,7 +94,6 @@ type Controller struct {
 
 	// To allow injection of the following for testing.
 	updateStatusHandler func(ctx context.Context, job *batch.Job) (*batch.Job, error)
-	patchJobHandler     func(ctx context.Context, job *batch.Job, patch []byte) error
 	syncHandler         func(ctx context.Context, jobKey string) error
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
@@ -309,7 +308,6 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 	jm.podIndexer = podInformer.Informer().GetIndexer()
 
 	jm.updateStatusHandler = jm.updateJobStatus
-	jm.patchJobHandler = jm.patchJob
 	jm.syncHandler = jm.syncJob
 
 	if feature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) {
@@ -2015,21 +2013,6 @@ func (jm *Controller) updateJobStatus(ctx context.Context, job *batch.Job) (*bat
 		job.ResourceVersion,
 	)
 	return job, err
-}
-
-func (jm *Controller) patchJob(ctx context.Context, job *batch.Job, data []byte) error {
-	job, err := jm.kubeClient.BatchV1().Jobs(job.Namespace).Patch(
-		ctx, job.Name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
-	if err != nil {
-		return err
-	}
-	jm.consistencyStore.WroteAt(
-		types.NamespacedName{Name: job.Name, Namespace: job.Namespace},
-		job.UID,
-		jobGroupResource,
-		job.ResourceVersion,
-	)
-	return err
 }
 
 // getValidPodsWithFilter returns the valid pods that pass the filter.
