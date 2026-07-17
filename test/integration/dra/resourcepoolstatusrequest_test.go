@@ -269,8 +269,9 @@ func testProcessResourcePoolStatusRequest(tCtx ktesting.TContext) {
 }
 
 // testPartitionSummary verifies a two-slice partitionable pool (a counter slice
-// and a device slice, both declaring the pool's PartitionTypeAttribute) yields a
-// typed partitionSummary and no counterSets.
+// and a device slice, only the device slice declaring the PartitionTypeAttribute
+// since the counter slice carries no counter-consuming devices) yields a typed
+// partitionSummary and no counterSets.
 func testPartitionSummary(tCtx ktesting.TContext) {
 	startResourcePoolStatusRequestController(tCtx)
 
@@ -300,7 +301,6 @@ func testPartitionSummary(tCtx ktesting.TContext) {
 				Name:     "gpu-0",
 				Counters: map[string]resourceapi.Counter{"memory": {Value: resource.MustParse("80Gi")}},
 			}},
-			PartitionTypeAttribute: &fqn,
 		},
 	}
 	deviceSlice := &resourceapi.ResourceSlice{
