@@ -64,7 +64,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.StructField
+	{ // field Struct.StructField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shallow.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *OtherStruct,
@@ -137,7 +137,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("structField"), &obj.StructField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StructPtrField
+	{ // field Struct.StructPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shallow.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *OtherStruct,

@@ -64,7 +64,7 @@ func Validate_MapValidationStruct(
 
 	// field MapValidationStruct.TypeMeta has no validation
 
-	{ // field MapValidationStruct.StandardEachVal
+	{ // field MapValidationStruct.StandardEachVal (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -91,7 +91,7 @@ func Validate_MapValidationStruct(
 		errs = append(errs, fn(fldPath.Child("standardEachVal"), obj.StandardEachVal, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MapValidationStruct.AlphaEachVal
+	{ // field MapValidationStruct.AlphaEachVal (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -118,7 +118,7 @@ func Validate_MapValidationStruct(
 		errs = append(errs, fn(fldPath.Child("AlphaEachVal"), obj.AlphaEachVal, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MapValidationStruct.BetaEachVal
+	{ // field MapValidationStruct.BetaEachVal (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -145,7 +145,7 @@ func Validate_MapValidationStruct(
 		errs = append(errs, fn(fldPath.Child("BetaEachVal"), obj.BetaEachVal, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MapValidationStruct.StandardEachKey
+	{ // field MapValidationStruct.StandardEachKey (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -172,7 +172,7 @@ func Validate_MapValidationStruct(
 		errs = append(errs, fn(fldPath.Child("standardEachKey"), obj.StandardEachKey, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MapValidationStruct.AlphaEachKey
+	{ // field MapValidationStruct.AlphaEachKey (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -199,7 +199,7 @@ func Validate_MapValidationStruct(
 		errs = append(errs, fn(fldPath.Child("AlphaEachKey"), obj.AlphaEachKey, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MapValidationStruct.BetaEachKey
+	{ // field MapValidationStruct.BetaEachKey (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -226,7 +226,7 @@ func Validate_MapValidationStruct(
 		errs = append(errs, fn(fldPath.Child("BetaEachKey"), obj.BetaEachKey, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MapValidationStruct.AlphaValidation
+	{ // field MapValidationStruct.AlphaValidation (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -253,7 +253,7 @@ func Validate_MapValidationStruct(
 		errs = append(errs, fn(fldPath.Child("AlphaValidation"), obj.AlphaValidation, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MapValidationStruct.BetaValidation
+	{ // field MapValidationStruct.BetaValidation (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,

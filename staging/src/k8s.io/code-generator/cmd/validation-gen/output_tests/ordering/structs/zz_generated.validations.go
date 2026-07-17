@@ -125,7 +125,7 @@ func Validate_T00(
 	// field T00.S has no validation
 	// field T00.PS has no validation
 
-	{ // field T00.T
+	{ // field T00.T (k8s.io/code-generator/cmd/validation-gen/output_tests/ordering/structs.Tother)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Tother,
@@ -147,7 +147,7 @@ func Validate_T00(
 		errs = append(errs, fn(fldPath.Child("t"), &obj.T, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T00.PT
+	{ // field T00.PT (k8s.io/code-generator/cmd/validation-gen/output_tests/ordering/structs.Tother)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Tother,
@@ -184,7 +184,7 @@ func Validate_T01(
 
 	// field T01.TypeMeta has no validation
 
-	{ // field T01.S
+	{ // field T01.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -208,7 +208,7 @@ func Validate_T01(
 		errs = append(errs, fn(fldPath.Child("s"), &obj.S, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T01.PS
+	{ // field T01.PS (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -232,7 +232,7 @@ func Validate_T01(
 		errs = append(errs, fn(fldPath.Child("ps"), obj.PS, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T01.T
+	{ // field T01.T (k8s.io/code-generator/cmd/validation-gen/output_tests/ordering/structs.Tother)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Tother,
@@ -258,7 +258,7 @@ func Validate_T01(
 		errs = append(errs, fn(fldPath.Child("t"), &obj.T, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T01.PT
+	{ // field T01.PT (k8s.io/code-generator/cmd/validation-gen/output_tests/ordering/structs.Tother)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Tother,
@@ -304,7 +304,7 @@ func Validate_T02(
 
 	// field T02.TypeMeta has no validation
 
-	{ // field T02.S
+	{ // field T02.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -333,7 +333,7 @@ func Validate_T02(
 		errs = append(errs, fn(fldPath.Child("s"), &obj.S, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T02.PS
+	{ // field T02.PS (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -362,7 +362,7 @@ func Validate_T02(
 		errs = append(errs, fn(fldPath.Child("ps"), obj.PS, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T02.T
+	{ // field T02.T (k8s.io/code-generator/cmd/validation-gen/output_tests/ordering/structs.Tother)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Tother,
@@ -393,7 +393,7 @@ func Validate_T02(
 		errs = append(errs, fn(fldPath.Child("t"), &obj.T, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T02.PT
+	{ // field T02.PT (k8s.io/code-generator/cmd/validation-gen/output_tests/ordering/structs.Tother)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Tother,
@@ -447,7 +447,7 @@ func Validate_T03(
 
 	// field T03.TypeMeta has no validation
 
-	{ // field T03.S
+	{ // field T03.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -479,7 +479,7 @@ func Validate_T03(
 		errs = append(errs, fn(fldPath.Child("s"), &obj.S, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T03.PS
+	{ // field T03.PS (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -511,7 +511,7 @@ func Validate_T03(
 		errs = append(errs, fn(fldPath.Child("ps"), obj.PS, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T03.T
+	{ // field T03.T (k8s.io/code-generator/cmd/validation-gen/output_tests/ordering/structs.Tother)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Tother,
@@ -545,7 +545,7 @@ func Validate_T03(
 		errs = append(errs, fn(fldPath.Child("t"), &obj.T, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T03.PT
+	{ // field T03.PT (k8s.io/code-generator/cmd/validation-gen/output_tests/ordering/structs.Tother)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Tother,
@@ -612,7 +612,7 @@ func Validate_TMultiple(
 
 	// field TMultiple.TypeMeta has no validation
 
-	{ // field TMultiple.S
+	{ // field TMultiple.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -654,7 +654,7 @@ func Validate_TMultiple(
 		errs = append(errs, fn(fldPath.Child("s"), &obj.S, oldVal, oldObj != nil)...)
 	}
 
-	{ // field TMultiple.PS
+	{ // field TMultiple.PS (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -696,7 +696,7 @@ func Validate_TMultiple(
 		errs = append(errs, fn(fldPath.Child("ps"), obj.PS, oldVal, oldObj != nil)...)
 	}
 
-	{ // field TMultiple.T
+	{ // field TMultiple.T (k8s.io/code-generator/cmd/validation-gen/output_tests/ordering/structs.Tother)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Tother,
@@ -740,7 +740,7 @@ func Validate_TMultiple(
 		errs = append(errs, fn(fldPath.Child("t"), &obj.T, oldVal, oldObj != nil)...)
 	}
 
-	{ // field TMultiple.PT
+	{ // field TMultiple.PT (k8s.io/code-generator/cmd/validation-gen/output_tests/ordering/structs.Tother)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Tother,
@@ -793,7 +793,7 @@ func Validate_Tother(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *Tother) (errs field.ErrorList) {
 
-	{ // field Tother.OS
+	{ // field Tother.OS (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,

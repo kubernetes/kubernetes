@@ -67,9 +67,9 @@ func Validate_RuntimeClass(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *nodev1beta1.RuntimeClass) (errs field.ErrorList) {
 
-	// field nodev1beta1.RuntimeClass.TypeMeta has no validation
+	// field RuntimeClass.TypeMeta has no validation
 
-	{ // field nodev1beta1.RuntimeClass.ObjectMeta
+	{ // field RuntimeClass.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -91,7 +91,7 @@ func Validate_RuntimeClass(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field nodev1beta1.RuntimeClass.Handler
+	{ // field RuntimeClass.Handler (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -127,9 +127,9 @@ func Validate_RuntimeClass(
 		errs = append(errs, fn(fldPath.Child("handler"), &obj.Handler, oldVal, oldObj != nil)...)
 	}
 
-	// field nodev1beta1.RuntimeClass.Overhead has no validation
+	// field RuntimeClass.Overhead has no validation
 
-	{ // field nodev1beta1.RuntimeClass.Scheduling
+	{ // field RuntimeClass.Scheduling (k8s.io/api/node/v1beta1.Scheduling)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *nodev1beta1.Scheduling,
@@ -168,9 +168,9 @@ func Validate_Scheduling(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *nodev1beta1.Scheduling) (errs field.ErrorList) {
 
-	// field nodev1beta1.Scheduling.NodeSelector has no validation
+	// field Scheduling.NodeSelector has no validation
 
-	{ // field nodev1beta1.Scheduling.Tolerations
+	{ // field Scheduling.Tolerations ([]k8s.io/api/core/v1.Toleration)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []apicorev1.Toleration,

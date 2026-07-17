@@ -64,7 +64,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.Items
+	{ // field Struct.Items ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/subfield.Item)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Item,
@@ -103,7 +103,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("items"), obj.Items, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.RatchetItems
+	{ // field Struct.RatchetItems ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/subfield.RatchetItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []RatchetItem,

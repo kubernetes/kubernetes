@@ -63,7 +63,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.ImmutableEnabled
+	{ // field Struct.ImmutableEnabled (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -92,7 +92,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("immutableEnabled"), &obj.ImmutableEnabled, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ImmutableDisabled
+	{ // field Struct.ImmutableDisabled (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -121,7 +121,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("immutableDisabled"), &obj.ImmutableDisabled, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.UpdateNoModifyEnabled
+	{ // field Struct.UpdateNoModifyEnabled (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -153,7 +153,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("updateNoModifyEnabled"), &obj.UpdateNoModifyEnabled, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.UpdateNoModifyDisabled
+	{ // field Struct.UpdateNoModifyDisabled (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,

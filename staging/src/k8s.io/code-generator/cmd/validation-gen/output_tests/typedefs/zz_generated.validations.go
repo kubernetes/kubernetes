@@ -104,7 +104,7 @@ func Validate_E4(
 		errs = append(errs, e...)
 	}
 
-	{ // field E4.S
+	{ // field E4.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -143,7 +143,7 @@ func Validate_T1(
 
 	// field T1.TypeMeta has no validation
 
-	{ // field T1.E1
+	{ // field T1.E1 (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.E1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *E1,
@@ -169,7 +169,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("e1"), &obj.E1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PE1
+	{ // field T1.PE1 (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.E1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *E1,
@@ -195,7 +195,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("pe1"), obj.PE1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.E2
+	{ // field T1.E2 (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.E2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *E2,
@@ -221,7 +221,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("e2"), &obj.E2, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PE2
+	{ // field T1.PE2 (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.E2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *E2,
@@ -247,7 +247,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("pe2"), obj.PE2, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.E3
+	{ // field T1.E3 (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.E3)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *E3,
@@ -273,7 +273,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("e3"), &obj.E3, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PE3
+	{ // field T1.PE3 (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.E3)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *E3,
@@ -299,7 +299,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("pe3"), obj.PE3, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.E4
+	{ // field T1.E4 (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.E4)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *E4,
@@ -325,7 +325,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("e4"), &obj.E4, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PE4
+	{ // field T1.PE4 (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.E4)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *E4,
@@ -351,7 +351,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("pe4"), obj.PE4, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.T2
+	{ // field T1.T2 (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T2,
@@ -377,7 +377,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("t2"), &obj.T2, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.PT2
+	{ // field T1.PT2 (k8s.io/code-generator/cmd/validation-gen/output_tests/typedefs.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T2,
@@ -416,7 +416,7 @@ func Validate_T2(
 		errs = append(errs, e...)
 	}
 
-	{ // field T2.S
+	{ // field T2.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,

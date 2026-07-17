@@ -64,7 +64,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.Min0Field
+	{ // field Struct.Min0Field (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -88,7 +88,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("min0Field"), obj.Min0Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Min10Field
+	{ // field Struct.Min10Field (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -112,7 +112,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("min10Field"), obj.Min10Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Min0TypedefField
+	{ // field Struct.Min0TypedefField (map[string]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/minproperties.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]StringType,
@@ -136,7 +136,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("min0TypedefField"), obj.Min0TypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Min10TypedefField
+	{ // field Struct.Min10TypedefField (map[string]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/minproperties.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]StringType,

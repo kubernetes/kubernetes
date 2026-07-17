@@ -64,7 +64,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.ListMap
+	{ // field Struct.ListMap ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/options/lists.ListItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ListItem,
@@ -92,7 +92,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listMap"), obj.ListMap, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ListMapDisabled
+	{ // field Struct.ListMapDisabled ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/options/lists.ListItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ListItem,
@@ -120,7 +120,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listMapDisabled"), obj.ListMapDisabled, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ListEachVal
+	{ // field Struct.ListEachVal ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/options/lists.ListItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ListItem,
@@ -150,7 +150,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listEachVal"), obj.ListEachVal, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ListEachValDisabled
+	{ // field Struct.ListEachValDisabled ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/options/lists.ListItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ListItem,

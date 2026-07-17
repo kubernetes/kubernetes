@@ -94,7 +94,7 @@ func Validate_SpecialValidationStruct(
 
 	// field SpecialValidationStruct.TypeMeta has no validation
 
-	{ // field SpecialValidationStruct.NEQField
+	{ // field SpecialValidationStruct.NEQField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -118,7 +118,7 @@ func Validate_SpecialValidationStruct(
 		errs = append(errs, fn(fldPath.Child("neqField"), &obj.NEQField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field SpecialValidationStruct.NEQFieldBeta
+	{ // field SpecialValidationStruct.NEQFieldBeta (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -142,7 +142,7 @@ func Validate_SpecialValidationStruct(
 		errs = append(errs, fn(fldPath.Child("neqFieldBeta"), &obj.NEQFieldBeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field SpecialValidationStruct.ForbiddenField
+	{ // field SpecialValidationStruct.ForbiddenField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -174,7 +174,7 @@ func Validate_SpecialValidationStruct(
 		errs = append(errs, fn(fldPath.Child("forbiddenField"), obj.ForbiddenField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field SpecialValidationStruct.ForbiddenFieldBeta
+	{ // field SpecialValidationStruct.ForbiddenFieldBeta (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -206,7 +206,7 @@ func Validate_SpecialValidationStruct(
 		errs = append(errs, fn(fldPath.Child("forbiddenFieldBeta"), obj.ForbiddenFieldBeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field SpecialValidationStruct.UpdateField
+	{ // field SpecialValidationStruct.UpdateField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -235,7 +235,7 @@ func Validate_SpecialValidationStruct(
 		errs = append(errs, fn(fldPath.Child("updateField"), &obj.UpdateField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field SpecialValidationStruct.UpdateFieldBeta
+	{ // field SpecialValidationStruct.UpdateFieldBeta (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -275,7 +275,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.IntField
+	{ // field Struct.IntField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -299,7 +299,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("intField"), &obj.IntField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.IntFieldBeta
+	{ // field Struct.IntFieldBeta (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -323,7 +323,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("intFieldBeta"), &obj.IntFieldBeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StringField
+	{ // field Struct.StringField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -347,7 +347,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringField"), &obj.StringField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StringFieldBeta
+	{ // field Struct.StringFieldBeta (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -371,7 +371,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringFieldBeta"), &obj.StringFieldBeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.SliceField
+	{ // field Struct.SliceField ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -400,7 +400,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("sliceField"), obj.SliceField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.SliceFieldBeta
+	{ // field Struct.SliceFieldBeta ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -429,7 +429,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("sliceFieldBeta"), obj.SliceFieldBeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.UUIDField
+	{ // field Struct.UUIDField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -453,7 +453,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("uuidField"), &obj.UUIDField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.UUIDFieldBeta
+	{ // field Struct.UUIDFieldBeta (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -477,7 +477,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("uuidFieldBeta"), &obj.UUIDFieldBeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ImmutableField
+	{ // field Struct.ImmutableField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -506,7 +506,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("immutableField"), &obj.ImmutableField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ImmutableFieldBeta
+	{ // field Struct.ImmutableFieldBeta (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -546,7 +546,7 @@ func Validate_StructWithValidateFalse(
 
 	// field StructWithValidateFalse.TypeMeta has no validation
 
-	{ // field StructWithValidateFalse.ValidateFalse
+	{ // field StructWithValidateFalse.ValidateFalse (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -570,7 +570,7 @@ func Validate_StructWithValidateFalse(
 		errs = append(errs, fn(fldPath.Child("validateFalse"), obj.ValidateFalse, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructWithValidateFalse.ValidateFalseBeta
+	{ // field StructWithValidateFalse.ValidateFalseBeta (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,

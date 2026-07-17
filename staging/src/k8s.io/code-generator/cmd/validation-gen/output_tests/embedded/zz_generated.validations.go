@@ -63,7 +63,7 @@ func Validate_T1(
 
 	// field T1.TypeMeta has no validation
 
-	{ // field T1.T2
+	{ // field T1.T2 (k8s.io/code-generator/cmd/validation-gen/output_tests/embedded.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T2,
@@ -85,7 +85,7 @@ func Validate_T1(
 		errs = append(errs, fn(safe.Value(fldPath, func() *field.Path { return fldPath.Child("T2") }), &obj.T2, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.T3
+	{ // field T1.T3 (k8s.io/code-generator/cmd/validation-gen/output_tests/embedded.T3)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T3,
@@ -116,7 +116,7 @@ func Validate_T2(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T2) (errs field.ErrorList) {
 
-	{ // field T2.IntField
+	{ // field T2.IntField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -149,7 +149,7 @@ func Validate_T3(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T3) (errs field.ErrorList) {
 
-	{ // field T3.StringField
+	{ // field T3.StringField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -173,7 +173,7 @@ func Validate_T3(
 		errs = append(errs, fn(fldPath.Child("stringField"), &obj.StringField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T3.IntField
+	{ // field T3.IntField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,

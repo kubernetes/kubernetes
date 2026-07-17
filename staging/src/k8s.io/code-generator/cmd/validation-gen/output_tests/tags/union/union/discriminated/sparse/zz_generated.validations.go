@@ -82,7 +82,7 @@ func Validate_Struct(
 	// field Struct.TypeMeta has no validation
 	// field Struct.D has no validation
 
-	{ // field Struct.M1
+	{ // field Struct.M1 (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/union/union/discriminated/sparse.M1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *M1,

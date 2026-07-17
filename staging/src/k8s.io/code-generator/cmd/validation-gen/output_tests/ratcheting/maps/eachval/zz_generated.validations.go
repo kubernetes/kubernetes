@@ -64,7 +64,7 @@ func Validate_StructWithMaps(
 
 	// field StructWithMaps.TypeMeta has no validation
 
-	{ // field StructWithMaps.MapPrimitiveField
+	{ // field StructWithMaps.MapPrimitiveField (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -91,7 +91,7 @@ func Validate_StructWithMaps(
 		errs = append(errs, fn(fldPath.Child("mapPrimitiveField"), obj.MapPrimitiveField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructWithMaps.MapTypedefField
+	{ // field StructWithMaps.MapTypedefField (map[string]k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/maps/eachval.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]StringType,
@@ -118,7 +118,7 @@ func Validate_StructWithMaps(
 		errs = append(errs, fn(fldPath.Child("mapTypedefField"), obj.MapTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructWithMaps.MapComparableStructField
+	{ // field StructWithMaps.MapComparableStructField (map[string]k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/maps/eachval.ComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]ComparableStruct,
@@ -145,7 +145,7 @@ func Validate_StructWithMaps(
 		errs = append(errs, fn(fldPath.Child("mapComparableStructField"), obj.MapComparableStructField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructWithMaps.MapNonComparableStructField
+	{ // field StructWithMaps.MapNonComparableStructField (map[string]k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/maps/eachval.NonComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]NonComparableStruct,

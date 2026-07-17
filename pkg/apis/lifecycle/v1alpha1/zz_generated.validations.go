@@ -82,9 +82,9 @@ func Validate_Eviction(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *lifecyclev1alpha1.Eviction) (errs field.ErrorList) {
 
-	// field lifecyclev1alpha1.Eviction.TypeMeta has no validation
+	// field Eviction.TypeMeta has no validation
 
-	{ // field lifecyclev1alpha1.Eviction.ObjectMeta
+	{ // field Eviction.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -113,7 +113,7 @@ func Validate_Eviction(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.Eviction.Spec
+	{ // field Eviction.Spec (k8s.io/api/lifecycle/v1alpha1.EvictionSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *lifecyclev1alpha1.EvictionSpec,
@@ -135,7 +135,7 @@ func Validate_Eviction(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.Eviction.Status
+	{ // field Eviction.Status (k8s.io/api/lifecycle/v1alpha1.EvictionStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *lifecyclev1alpha1.EvictionStatus,
@@ -166,7 +166,7 @@ func Validate_EvictionPodReference(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *lifecyclev1alpha1.EvictionPodReference) (errs field.ErrorList) {
 
-	{ // field lifecyclev1alpha1.EvictionPodReference.Name
+	{ // field EvictionPodReference.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -198,7 +198,7 @@ func Validate_EvictionPodReference(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.EvictionPodReference.UID
+	{ // field EvictionPodReference.UID (k8s.io/apimachinery/pkg/types.UID)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *types.UID,
@@ -239,9 +239,9 @@ func Validate_EvictionRequest(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *lifecyclev1alpha1.EvictionRequest) (errs field.ErrorList) {
 
-	// field lifecyclev1alpha1.EvictionRequest.TypeMeta has no validation
+	// field EvictionRequest.TypeMeta has no validation
 
-	{ // field lifecyclev1alpha1.EvictionRequest.ObjectMeta
+	{ // field EvictionRequest.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -270,7 +270,7 @@ func Validate_EvictionRequest(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.EvictionRequest.Spec
+	{ // field EvictionRequest.Spec (k8s.io/api/lifecycle/v1alpha1.EvictionRequestSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *lifecyclev1alpha1.EvictionRequestSpec,
@@ -292,7 +292,7 @@ func Validate_EvictionRequest(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.EvictionRequest.Status
+	{ // field EvictionRequest.Status (k8s.io/api/lifecycle/v1alpha1.EvictionRequestStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *lifecyclev1alpha1.EvictionRequestStatus,
@@ -338,7 +338,7 @@ func Validate_EvictionRequestPodReference(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *lifecyclev1alpha1.EvictionRequestPodReference) (errs field.ErrorList) {
 
-	{ // field lifecyclev1alpha1.EvictionRequestPodReference.Name
+	{ // field EvictionRequestPodReference.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -370,7 +370,7 @@ func Validate_EvictionRequestPodReference(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.EvictionRequestPodReference.UID
+	{ // field EvictionRequestPodReference.UID (k8s.io/apimachinery/pkg/types.UID)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *types.UID,
@@ -411,7 +411,7 @@ func Validate_EvictionRequestSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *lifecyclev1alpha1.EvictionRequestSpec) (errs field.ErrorList) {
 
-	{ // field lifecyclev1alpha1.EvictionRequestSpec.Target
+	{ // field EvictionRequestSpec.Target (k8s.io/api/lifecycle/v1alpha1.EvictionRequestTarget)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *lifecyclev1alpha1.EvictionRequestTarget,
@@ -442,7 +442,7 @@ func Validate_EvictionRequestSpec(
 		errs = append(errs, fn(fldPath.Child("target"), &obj.Target, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.EvictionRequestSpec.Requester
+	{ // field EvictionRequestSpec.Requester (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -482,7 +482,7 @@ func Validate_EvictionRequestSpec(
 		errs = append(errs, fn(fldPath.Child("requester"), &obj.Requester, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.EvictionRequestSpec.Intent
+	{ // field EvictionRequestSpec.Intent (k8s.io/api/lifecycle/v1alpha1.EvictionRequestIntent)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *lifecyclev1alpha1.EvictionRequestIntent,
@@ -522,7 +522,7 @@ func Validate_EvictionRequestStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *lifecyclev1alpha1.EvictionRequestStatus) (errs field.ErrorList) {
 
-	{ // field lifecyclev1alpha1.EvictionRequestStatus.Conditions
+	{ // field EvictionRequestStatus.Conditions ([]k8s.io/apimachinery/pkg/apis/meta/v1.Condition)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []v1.Condition,
@@ -564,7 +564,7 @@ func Validate_EvictionRequestStatus(
 		errs = append(errs, fn(fldPath.Child("conditions"), obj.Conditions, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.EvictionRequestStatus.ObservedGeneration
+	{ // field EvictionRequestStatus.ObservedGeneration (int64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int64,
@@ -623,7 +623,7 @@ func Validate_EvictionRequestTarget(
 		errs = append(errs, e...)
 	}
 
-	{ // field lifecyclev1alpha1.EvictionRequestTarget.Pod
+	{ // field EvictionRequestTarget.Pod (k8s.io/api/lifecycle/v1alpha1.EvictionRequestPodReference)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *lifecyclev1alpha1.EvictionRequestPodReference,
@@ -662,7 +662,7 @@ func Validate_EvictionSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *lifecyclev1alpha1.EvictionSpec) (errs field.ErrorList) {
 
-	{ // field lifecyclev1alpha1.EvictionSpec.Target
+	{ // field EvictionSpec.Target (k8s.io/api/lifecycle/v1alpha1.EvictionTarget)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *lifecyclev1alpha1.EvictionTarget,
@@ -702,7 +702,7 @@ func Validate_EvictionStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *lifecyclev1alpha1.EvictionStatus) (errs field.ErrorList) {
 
-	{ // field lifecyclev1alpha1.EvictionStatus.Conditions
+	{ // field EvictionStatus.Conditions ([]k8s.io/apimachinery/pkg/apis/meta/v1.Condition)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []v1.Condition,
@@ -744,7 +744,7 @@ func Validate_EvictionStatus(
 		errs = append(errs, fn(fldPath.Child("conditions"), obj.Conditions, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.EvictionStatus.ObservedGeneration
+	{ // field EvictionStatus.ObservedGeneration (int64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int64,
@@ -782,7 +782,7 @@ func Validate_EvictionStatus(
 		errs = append(errs, fn(fldPath.Child("observedGeneration"), obj.ObservedGeneration, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.EvictionStatus.Requesters
+	{ // field EvictionStatus.Requesters ([]k8s.io/api/lifecycle/v1alpha1.Requester)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []lifecyclev1alpha1.Requester,
@@ -824,7 +824,7 @@ func Validate_EvictionStatus(
 		errs = append(errs, fn(fldPath.Child("requesters"), obj.Requesters, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.EvictionStatus.TargetResponders
+	{ // field EvictionStatus.TargetResponders ([]k8s.io/api/lifecycle/v1alpha1.TargetResponder)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []lifecyclev1alpha1.TargetResponder,
@@ -870,7 +870,7 @@ func Validate_EvictionStatus(
 		errs = append(errs, fn(fldPath.Child("targetResponders"), obj.TargetResponders, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.EvictionStatus.Responders
+	{ // field EvictionStatus.Responders ([]k8s.io/api/lifecycle/v1alpha1.ResponderStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []lifecyclev1alpha1.ResponderStatus,
@@ -937,7 +937,7 @@ func Validate_EvictionTarget(
 		errs = append(errs, e...)
 	}
 
-	{ // field lifecyclev1alpha1.EvictionTarget.Pod
+	{ // field EvictionTarget.Pod (k8s.io/api/lifecycle/v1alpha1.EvictionPodReference)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *lifecyclev1alpha1.EvictionPodReference,
@@ -976,7 +976,7 @@ func Validate_Requester(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *lifecyclev1alpha1.Requester) (errs field.ErrorList) {
 
-	{ // field lifecyclev1alpha1.Requester.Name
+	{ // field Requester.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1008,7 +1008,7 @@ func Validate_Requester(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.Requester.Intent
+	{ // field Requester.Intent (k8s.io/api/lifecycle/v1alpha1.RequesterIntent)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *lifecyclev1alpha1.RequesterIntent,
@@ -1078,7 +1078,7 @@ func Validate_ResponderStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *lifecyclev1alpha1.ResponderStatus) (errs field.ErrorList) {
 
-	{ // field lifecyclev1alpha1.ResponderStatus.Name
+	{ // field ResponderStatus.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1110,7 +1110,7 @@ func Validate_ResponderStatus(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.ResponderStatus.StartTime
+	{ // field ResponderStatus.StartTime (k8s.io/apimachinery/pkg/apis/meta/v1.Time)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.Time,
@@ -1142,7 +1142,7 @@ func Validate_ResponderStatus(
 		errs = append(errs, fn(fldPath.Child("startTime"), obj.StartTime, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.ResponderStatus.HeartbeatTime
+	{ // field ResponderStatus.HeartbeatTime (k8s.io/apimachinery/pkg/apis/meta/v1.Time)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.Time,
@@ -1170,7 +1170,7 @@ func Validate_ResponderStatus(
 		errs = append(errs, fn(fldPath.Child("heartbeatTime"), obj.HeartbeatTime, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.ResponderStatus.ExpectedCompletionTime
+	{ // field ResponderStatus.ExpectedCompletionTime (k8s.io/apimachinery/pkg/apis/meta/v1.Time)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.Time,
@@ -1198,7 +1198,7 @@ func Validate_ResponderStatus(
 		errs = append(errs, fn(fldPath.Child("expectedCompletionTime"), obj.ExpectedCompletionTime, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.ResponderStatus.CompletionTime
+	{ // field ResponderStatus.CompletionTime (k8s.io/apimachinery/pkg/apis/meta/v1.Time)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.Time,
@@ -1230,7 +1230,7 @@ func Validate_ResponderStatus(
 		errs = append(errs, fn(fldPath.Child("completionTime"), obj.CompletionTime, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.ResponderStatus.Message
+	{ // field ResponderStatus.Message (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1270,7 +1270,7 @@ func Validate_TargetResponder(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *lifecyclev1alpha1.TargetResponder) (errs field.ErrorList) {
 
-	{ // field lifecyclev1alpha1.TargetResponder.Name
+	{ // field TargetResponder.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1302,7 +1302,7 @@ func Validate_TargetResponder(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.TargetResponder.Priority
+	{ // field TargetResponder.Priority (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -1341,7 +1341,7 @@ func Validate_TargetResponder(
 		errs = append(errs, fn(fldPath.Child("priority"), obj.Priority, oldVal, oldObj != nil)...)
 	}
 
-	{ // field lifecyclev1alpha1.TargetResponder.State
+	{ // field TargetResponder.State (k8s.io/api/lifecycle/v1alpha1.ResponderStateType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *lifecyclev1alpha1.ResponderStateType,

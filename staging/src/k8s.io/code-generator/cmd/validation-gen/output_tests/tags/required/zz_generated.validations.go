@@ -129,7 +129,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.StringField
+	{ // field Struct.StringField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -161,7 +161,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringField"), &obj.StringField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StringPtrField
+	{ // field Struct.StringPtrField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -193,7 +193,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringPtrField"), obj.StringPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StringTypedefField
+	{ // field Struct.StringTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/required.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *StringType,
@@ -227,7 +227,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringTypedefField"), &obj.StringTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StringTypedefPtrField
+	{ // field Struct.StringTypedefPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/required.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *StringType,
@@ -261,7 +261,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringTypedefPtrField"), obj.StringTypedefPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.IntField
+	{ // field Struct.IntField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -293,7 +293,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("intField"), &obj.IntField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.IntPtrField
+	{ // field Struct.IntPtrField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -325,7 +325,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("intPtrField"), obj.IntPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.IntTypedefField
+	{ // field Struct.IntTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/required.IntType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *IntType,
@@ -359,7 +359,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("intTypedefField"), &obj.IntTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.IntTypedefPtrField
+	{ // field Struct.IntTypedefPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/required.IntType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *IntType,
@@ -393,7 +393,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("intTypedefPtrField"), obj.IntTypedefPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.BoolField
+	{ // field Struct.BoolField (bool)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *bool,
@@ -425,7 +425,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("boolField"), &obj.BoolField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.FloatField
+	{ // field Struct.FloatField (float64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *float64,
@@ -457,7 +457,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("floatField"), &obj.FloatField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ByteField
+	{ // field Struct.ByteField (byte)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *byte,
@@ -489,7 +489,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("byteField"), &obj.ByteField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.OtherStructPtrField
+	{ // field Struct.OtherStructPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/required.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *OtherStruct,
@@ -523,7 +523,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("otherStructPtrField"), obj.OtherStructPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.SliceField
+	{ // field Struct.SliceField ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -555,7 +555,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("sliceField"), obj.SliceField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.SliceTypedefField
+	{ // field Struct.SliceTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/required.SliceType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj SliceType,
@@ -589,7 +589,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("sliceTypedefField"), obj.SliceTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ByteArrayField
+	{ // field Struct.ByteArrayField ([]byte)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []byte,
@@ -621,7 +621,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("byteArrayField"), obj.ByteArrayField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.MapField
+	{ // field Struct.MapField (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -653,7 +653,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("mapField"), obj.MapField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.MapTypedefField
+	{ // field Struct.MapTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/required.MapType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj MapType,

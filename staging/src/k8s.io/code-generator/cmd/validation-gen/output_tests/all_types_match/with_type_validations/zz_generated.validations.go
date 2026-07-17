@@ -93,7 +93,7 @@ func Validate_T1(
 		errs = append(errs, e...)
 	}
 
-	{ // field T1.S
+	{ // field T1.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,

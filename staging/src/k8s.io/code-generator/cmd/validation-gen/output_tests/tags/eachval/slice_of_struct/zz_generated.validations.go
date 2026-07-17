@@ -64,7 +64,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.ListField
+	{ // field Struct.ListField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/eachval/slice_of_struct.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []OtherStruct,
@@ -91,7 +91,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listField"), obj.ListField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ListTypedefField
+	{ // field Struct.ListTypedefField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/eachval/slice_of_struct.OtherTypedefStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []OtherTypedefStruct,
@@ -118,7 +118,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listTypedefField"), obj.ListTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ListNonComparableField
+	{ // field Struct.ListNonComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/eachval/slice_of_struct.NonComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []NonComparableStruct,

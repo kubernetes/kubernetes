@@ -64,7 +64,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.PrimitiveListUniqueSet
+	{ // field Struct.PrimitiveListUniqueSet ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -89,7 +89,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("primitiveListUniqueSet"), obj.PrimitiveListUniqueSet, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.SliceMapFieldWithMultipleKeys
+	{ // field Struct.SliceMapFieldWithMultipleKeys ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/unique.ItemWithMultipleKeys)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ItemWithMultipleKeys,
@@ -117,7 +117,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("sliceMapFieldWithMultipleKeys"), obj.SliceMapFieldWithMultipleKeys, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.AtomicListUniqueSet
+	{ // field Struct.AtomicListUniqueSet ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/unique.Item)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Item,
@@ -142,7 +142,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("atomicListUniqueSet"), obj.AtomicListUniqueSet, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.AtomicListUniqueMap
+	{ // field Struct.AtomicListUniqueMap ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/unique.Item)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Item,
@@ -168,7 +168,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("atomicListUniqueMap"), obj.AtomicListUniqueMap, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.CustomUniqueListWithTypeSet
+	{ // field Struct.CustomUniqueListWithTypeSet ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -183,7 +183,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("customUniqueListWithTypeSet"), obj.CustomUniqueListWithTypeSet, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.CustomUniqueListWithTypeMap
+	{ // field Struct.CustomUniqueListWithTypeMap ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/unique.Item)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Item,
@@ -198,7 +198,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("customUniqueListWithTypeMap"), obj.CustomUniqueListWithTypeMap, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.SliceMapFieldWithPtrKey
+	{ // field Struct.SliceMapFieldWithPtrKey ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/unique.PtrKeyStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []PtrKeyStruct,
@@ -226,7 +226,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("sliceMapFieldWithPtrKey"), obj.SliceMapFieldWithPtrKey, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.SliceMapFieldWithMixedKeys
+	{ // field Struct.SliceMapFieldWithMixedKeys ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/unique.ItemWithMixedKeys)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ItemWithMixedKeys,
@@ -254,7 +254,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("sliceMapFieldWithMixedKeys"), obj.SliceMapFieldWithMixedKeys, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.SliceMapFieldWithMultiplePtrKeys
+	{ // field Struct.SliceMapFieldWithMultiplePtrKeys ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/unique.ItemWithMultiplePtrKeys)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ItemWithMultiplePtrKeys,
@@ -282,7 +282,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("sliceMapFieldWithMultiplePtrKeys"), obj.SliceMapFieldWithMultiplePtrKeys, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.PrimitivePointerListUniqueSet
+	{ // field Struct.PrimitivePointerListUniqueSet ([]*string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []*string,
@@ -315,7 +315,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("primitivePointerListUniqueSet"), obj.PrimitivePointerListUniqueSet, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.PointerListUniqueMap
+	{ // field Struct.PointerListUniqueMap ([]*k8s.io/code-generator/cmd/validation-gen/output_tests/tags/unique.Item)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []*Item,

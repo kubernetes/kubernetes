@@ -171,7 +171,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.TypedefItems
+	{ // field Struct.TypedefItems (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/typedef.ItemList)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj ItemList,
@@ -193,7 +193,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("typedefItems"), obj.TypedefItems, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.NestedTypedefItems
+	{ // field Struct.NestedTypedefItems (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/typedef.ItemListAlias)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj ItemListAlias,
@@ -215,7 +215,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("nestedTypedefItems"), obj.NestedTypedefItems, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.DualItems
+	{ // field Struct.DualItems (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/typedef.DualItemList)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj DualItemList,
@@ -247,7 +247,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("dualItems"), obj.DualItems, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ConflictingItems
+	{ // field Struct.ConflictingItems (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/typedef.ConflictingItemList)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj ConflictingItemList,

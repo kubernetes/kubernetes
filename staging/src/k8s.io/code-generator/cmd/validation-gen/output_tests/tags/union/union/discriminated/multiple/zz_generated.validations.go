@@ -110,7 +110,7 @@ func Validate_Struct(
 	// field Struct.TypeMeta has no validation
 	// field Struct.D1 has no validation
 
-	{ // field Struct.U1M1
+	{ // field Struct.U1M1 (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/union/union/discriminated/multiple.M1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *M1,
@@ -138,7 +138,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("u1m1"), obj.U1M1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.U1M2
+	{ // field Struct.U1M2 (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/union/union/discriminated/multiple.M2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *M2,
@@ -168,7 +168,7 @@ func Validate_Struct(
 
 	// field Struct.D2 has no validation
 
-	{ // field Struct.U2M1
+	{ // field Struct.U2M1 (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/union/union/discriminated/multiple.M1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *M1,
@@ -196,7 +196,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("u2m1"), obj.U2M1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.U2M2
+	{ // field Struct.U2M2 (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/union/union/discriminated/multiple.M2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *M2,

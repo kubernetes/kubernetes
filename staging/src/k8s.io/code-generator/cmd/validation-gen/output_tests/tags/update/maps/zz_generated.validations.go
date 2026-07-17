@@ -64,7 +64,7 @@ func Validate_UpdateMapStruct(
 
 	// field UpdateMapStruct.TypeMeta has no validation
 
-	{ // field UpdateMapStruct.MapNoSet
+	{ // field UpdateMapStruct.MapNoSet (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -93,7 +93,7 @@ func Validate_UpdateMapStruct(
 		errs = append(errs, fn(fldPath.Child("mapNoSet"), obj.MapNoSet, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateMapStruct.MapNoUnset
+	{ // field UpdateMapStruct.MapNoUnset (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -122,7 +122,7 @@ func Validate_UpdateMapStruct(
 		errs = append(errs, fn(fldPath.Child("mapNoUnset"), obj.MapNoUnset, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateMapStruct.MapNoAdd
+	{ // field UpdateMapStruct.MapNoAdd (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -151,7 +151,7 @@ func Validate_UpdateMapStruct(
 		errs = append(errs, fn(fldPath.Child("mapNoAdd"), obj.MapNoAdd, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateMapStruct.MapNoRemove
+	{ // field UpdateMapStruct.MapNoRemove (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -180,7 +180,7 @@ func Validate_UpdateMapStruct(
 		errs = append(errs, fn(fldPath.Child("mapNoRemove"), obj.MapNoRemove, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateMapStruct.MapFrozenShape
+	{ // field UpdateMapStruct.MapFrozenShape (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -209,7 +209,7 @@ func Validate_UpdateMapStruct(
 		errs = append(errs, fn(fldPath.Child("mapFrozenShape"), obj.MapFrozenShape, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateMapStruct.MapSetThenFreeze
+	{ // field UpdateMapStruct.MapSetThenFreeze (map[string]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/update/maps.MapItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]MapItem,
@@ -238,7 +238,7 @@ func Validate_UpdateMapStruct(
 		errs = append(errs, fn(fldPath.Child("mapSetThenFreeze"), obj.MapSetThenFreeze, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateMapStruct.EachValNoModifyMap
+	{ // field UpdateMapStruct.EachValNoModifyMap (map[string]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/update/maps.MapItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]MapItem,
