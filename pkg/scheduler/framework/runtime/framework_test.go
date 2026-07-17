@@ -228,7 +228,7 @@ func (pl *TestPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1
 	return pl.inj.PreFilterResult, fwk.NewStatus(fwk.Code(pl.inj.PreFilterStatus), injectReason)
 }
 
-func (pl *TestPlugin) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, args framework.PlacementFeasibleArgs) *fwk.Status {
+func (pl *TestPlugin) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, args framework.PlacementProgress) *fwk.Status {
 	return fwk.NewStatus(fwk.Code(pl.inj.PlacementFeasibleStatus), injectReason)
 }
 
@@ -780,7 +780,7 @@ type mockGangSchedulingWithPlacementFeasible struct {
 	mockGangScheduling
 }
 
-func (p *mockGangSchedulingWithPlacementFeasible) PlacementFeasible(_ context.Context, _ fwk.PlacementCycleState, _ fwk.PodGroupInfo, _ framework.PlacementFeasibleArgs) *fwk.Status {
+func (p *mockGangSchedulingWithPlacementFeasible) PlacementFeasible(_ context.Context, _ fwk.PlacementCycleState, _ fwk.PodGroupInfo, _ framework.PlacementProgress) *fwk.Status {
 	return nil
 }
 
@@ -1154,7 +1154,7 @@ type mockPlacementFeasiblePlugin struct {
 
 func (p *mockPlacementFeasiblePlugin) Name() string { return p.name }
 
-func (p *mockPlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, args framework.PlacementFeasibleArgs) *fwk.Status {
+func (p *mockPlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, args framework.PlacementProgress) *fwk.Status {
 	p.called = true
 	return p.status
 }
@@ -1241,7 +1241,7 @@ func TestRunPlacementFeasiblePlugins(t *testing.T) {
 				f.placementFeasiblePlugins[i] = p
 			}
 
-			status := f.RunPlacementFeasiblePlugins(ctx, framework.NewCycleState(), nil, framework.PlacementFeasibleArgs{})
+			status := f.RunPlacementFeasiblePlugins(ctx, framework.NewCycleState(), nil, framework.PlacementProgress{})
 
 			if diff := cmp.Diff(tc.expectedStatus, status, statusCmpOpts...); diff != "" {
 				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
@@ -4041,7 +4041,7 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "PlacementFeasible - Success",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunPlacementFeasiblePlugins(ctx, state, nil, framework.PlacementFeasibleArgs{})
+				f.RunPlacementFeasiblePlugins(ctx, state, nil, framework.PlacementProgress{})
 			},
 			wantExtensionPoint: "PlacementFeasible",
 			wantStatus:         fwk.Success,
@@ -4138,7 +4138,7 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "PlacementFeasible - Error",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunPlacementFeasiblePlugins(ctx, state, nil, framework.PlacementFeasibleArgs{})
+				f.RunPlacementFeasiblePlugins(ctx, state, nil, framework.PlacementProgress{})
 			},
 			inject:             injectedResult{PlacementFeasibleStatus: int(fwk.Error)},
 			wantExtensionPoint: "PlacementFeasible",
