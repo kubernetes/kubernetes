@@ -229,16 +229,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(ctx, rawNodeIPs, config.BindAddress)
 	s.podCIDRs = s.NodeManager.PodCIDRs()
 
-	if len(config.NodePortAddresses) == 1 && config.NodePortAddresses[0] == kubeproxyconfig.NodePortAddressesPrimary {
-		var nodePortAddresses []string
-		if nodeIP := s.NodeIPs[v1.IPv4Protocol]; nodeIP != nil && !nodeIP.IsLoopback() {
-			nodePortAddresses = append(nodePortAddresses, fmt.Sprintf("%s/32", nodeIP.String()))
-		}
-		if nodeIP := s.NodeIPs[v1.IPv6Protocol]; nodeIP != nil && !nodeIP.IsLoopback() {
-			nodePortAddresses = append(nodePortAddresses, fmt.Sprintf("%s/128", nodeIP.String()))
-		}
-		config.NodePortAddresses = nodePortAddresses
-	}
+	config.NodePortAddresses = expandNodePortAddressKeywords(config.NodePortAddresses, s.NodeIPs)
 
 	s.Broadcaster = events.NewBroadcaster(&events.EventSinkImpl{Interface: s.Client.EventsV1()})
 	s.Recorder = s.Broadcaster.NewRecorder(proxyconfigscheme.Scheme, kubeProxy)
@@ -646,6 +637,33 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 
 func (s *ProxyServer) birthCry() {
 	s.Recorder.Eventf(s.NodeRef, nil, api.EventTypeNormal, "Starting", "StartKubeProxy", "")
+}
+
+func expandNodePortAddressKeywords(nodePortAddresses []string, nodeIPs map[v1.IPFamily]net.IP) []string {
+	var expanded []string
+	for _, addr := range nodePortAddresses {
+		switch addr {
+		case kubeproxyconfig.NodePortAddressesPrimary:
+			// "primary" pins NodePorts to the node's actual IP(s). A family whose node
+			// IP is loopback has no routable address to pin to (see detectNodeIPs), so
+			// it is skipped.
+			if ip := nodeIPs[v1.IPv4Protocol]; ip != nil && !ip.IsLoopback() {
+				expanded = append(expanded, fmt.Sprintf("%s/32", ip.String()))
+			}
+			if ip := nodeIPs[v1.IPv6Protocol]; ip != nil && !ip.IsLoopback() {
+				expanded = append(expanded, fmt.Sprintf("%s/128", ip.String()))
+			}
+		case kubeproxyconfig.NodePortAddressesLocalhost:
+			// Loopback exists for every family regardless of the node's routable IPs,
+			// so both are always emitted.
+			expanded = append(expanded, "127.0.0.0/8", "::1/128")
+		case kubeproxyconfig.NodePortAddressesAll:
+			expanded = append(expanded, proxyutil.IPv4ZeroCIDR, proxyutil.IPv6ZeroCIDR)
+		default:
+			expanded = append(expanded, addr)
+		}
+	}
+	return expanded
 }
 
 // detectNodeIPs returns the proxier's "node IP" or IPs, and the IP family to use if the
