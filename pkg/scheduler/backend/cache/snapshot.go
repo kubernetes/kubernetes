@@ -939,6 +939,9 @@ func (s *Snapshot) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, e
 		if visited.Has(currentKey) {
 			return fwk.EntityKey{}, false, fmt.Errorf("cycle detected in the hierarchy: %v", visited.UnsortedList())
 		}
+		if len(visited) >= schedulingv1alpha3.WorkloadMaxTreeDepth {
+			return fwk.EntityKey{}, false, fmt.Errorf("workload tree depth exceeds max depth %d", schedulingv1alpha3.WorkloadMaxTreeDepth)
+		}
 		visited.Insert(currentKey)
 
 		switch currentKey.Type {

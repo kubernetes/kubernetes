@@ -1988,7 +1988,15 @@ func TestSnapshot_GetRootKeyForGroup(t *testing.T) {
 		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_cycle_1")] = &compositePodGroupStateSnapshot{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_cycle_1").Namespace("ns1").ParentCompositePodGroup("cpg_cycle_2").Obj()}}
 		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_cycle_2")] = &compositePodGroupStateSnapshot{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_cycle_2").Namespace("ns1").ParentCompositePodGroup("cpg_cycle_1").Obj()}}
 
+		s.podGroupStates[fwk.PodGroupKey("ns1", "pg_deep")] = &podGroupStateSnapshot{podGroupStateData: podGroupStateData{podGroup: st.MakePodGroup().Name("pg_deep").Namespace("ns1").ParentCompositePodGroup("cpg_deep_4").Obj()}}
+		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_deep_4")] = &compositePodGroupStateSnapshot{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_deep_4").Namespace("ns1").ParentCompositePodGroup("cpg_deep_3").Obj()}}
+		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_deep_3")] = &compositePodGroupStateSnapshot{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_deep_3").Namespace("ns1").ParentCompositePodGroup("cpg_deep_2").Obj()}}
+		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_deep_2")] = &compositePodGroupStateSnapshot{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_deep_2").Namespace("ns1").ParentCompositePodGroup("cpg_deep_1").Obj()}}
+		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_deep_1")] = &compositePodGroupStateSnapshot{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_deep_1").Namespace("ns1").Obj()}}
+
 		s.podGroupStates[fwk.PodGroupKey("ns1", "pg_missing_parent")] = &podGroupStateSnapshot{podGroupStateData: podGroupStateData{podGroup: st.MakePodGroup().Name("pg_missing_parent").Namespace("ns1").ParentCompositePodGroup("non-existent").Obj()}}
+		s.podGroupStates[fwk.PodGroupKey("ns1", "pg_nil")] = &podGroupStateSnapshot{}
+		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_nil")] = &compositePodGroupStateSnapshot{}
 
 		return s
 	}
@@ -2058,11 +2066,39 @@ func TestSnapshot_GetRootKeyForGroup(t *testing.T) {
 			wantErr:                  true,
 		},
 		{
+			name:                     "max tree depth exceeded",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			key:                      fwk.PodGroupKey("ns1", "pg_deep"),
+			wantErr:                  true,
+		},
+		{
 			name:                     "pod key type is not supported",
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
 			key:                      fwk.PodKey("ns1", "pod1"),
 			wantErr:                  true,
+		},
+		{
+			name:                     "pg state exists but pg object is nil",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			key:                      fwk.PodGroupKey("ns1", "pg_nil"),
+			wantOk:                   false,
+		},
+		{
+			name:                     "cpg state exists but cpg object is nil",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			key:                      fwk.CompositePodGroupKey("ns1", "cpg_nil"),
+			wantOk:                   false,
+		},
+		{
+			name:                     "pg state does not exist",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			key:                      fwk.PodGroupKey("ns1", "pg_not_exists"),
+			wantOk:                   false,
 		},
 	}
 

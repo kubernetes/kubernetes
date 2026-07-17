@@ -172,7 +172,7 @@ func (wf *workloadForest) getLeafPodGroups(logger klog.Logger, rootLookupInfo *f
 
 		if visited.Has(currKey) {
 			utilruntime.HandleErrorWithLogger(logger, nil, "Cycle detected in composite pod group hierarchy when getting leaf PodGroups", "compositePodGroup", klog.KObj(rootLookupInfo))
-			return pgs
+			return nil
 		}
 		visited.Insert(currKey)
 
@@ -218,9 +218,11 @@ func (wf *workloadForest) buildPodGroupInfo(logger klog.Logger, gpg *fwk.Generic
 	}
 	for childKey := range childrenSet {
 		if childGPG, ok := wf.podGroups[childKey]; ok {
-			if childInfo := wf.buildPodGroupInfo(logger, childGPG, visited); childInfo != nil {
-				pgi.Children = append(pgi.Children, childInfo)
+			childInfo := wf.buildPodGroupInfo(logger, childGPG, visited)
+			if childInfo == nil {
+				return nil
 			}
+			pgi.Children = append(pgi.Children, childInfo)
 		}
 	}
 	return pgi
@@ -234,7 +236,11 @@ func (wf *workloadForest) buildQueuedPodGroupInfo(logger klog.Logger, rootLookup
 	if !ok {
 		return nil
 	}
+	pgi := wf.buildPodGroupInfo(logger, gpg, sets.New[fwk.EntityKey]())
+	if pgi == nil {
+		return nil
+	}
 	return &framework.QueuedPodGroupInfo{
-		PodGroupInfo: wf.buildPodGroupInfo(logger, gpg, sets.New[fwk.EntityKey]()),
+		PodGroupInfo: pgi,
 	}
 }
