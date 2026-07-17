@@ -258,6 +258,11 @@ linters:
       - text: "dependenttags: field WorkloadSpec\\.CompositePodGroupTemplates with marker \\+k8s:unionMember is missing required marker.*"
         path: "staging/src/k8s.io/api/scheduling/v1alpha3/types\\.go"
       
+      # The (SubjectAccessReview|SelfSubjectAccessReview|LocalSubjectAccessReview).Spec fields hold a union type, but nonpointerstructs does not understand unions today.
+      # Validation requires exactly one of spec.resourceAttributes or spec.nonResourceAttributes, so an empty spec is always rejected and the field is required in practice.
+      - text: "nonpointerstructs: field (SubjectAccessReview|SelfSubjectAccessReview|LocalSubjectAccessReview)\\.Spec is a non-pointer struct with no required fields\\..*"
+        path: "staging/src/k8s.io/api/authorization/(v1|v1beta1)/types\\.go"
+      
       # NoReferences - Existing fields that use Reference/References suffixes instead of Ref/Refs.
       # These fields use the Reference suffix, but renaming them would be a breaking change, so they are allowlisted.
       - text: 'noreferences: naming convention "reference-to-ref": field (SerializedReference|ImageVolumeSource)\.Reference:'
