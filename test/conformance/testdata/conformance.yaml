@@ -2994,6 +2994,12 @@
     for resource.k8s.io/v1 DeviceClass.
   release: v1.35
   file: test/e2e/dra/dra.go
+- testname: CRUD operations for devicetaintrules
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 DeviceTaintRule [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 DeviceTaintRule.
+  release: v1.37
+  file: test/e2e/dra/dra.go
 - testname: CRUD operations for resourceclaims
   codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 ResourceClaim [Conformance]'
   description: kube-apiserver must support create/update/list/patch/delete operations
