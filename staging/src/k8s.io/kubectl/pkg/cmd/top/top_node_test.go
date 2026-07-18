@@ -32,8 +32,7 @@ import (
 	core "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
-	metricsv1api "k8s.io/metrics/pkg/apis/metrics/v1"
-	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 )
 
@@ -42,461 +41,167 @@ const (
 	apiVersion = "v1"
 )
 
-func TestTopNodeAllMetricsFrom(t *testing.T) {
-	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
+func TestTopNode(t *testing.T) {
+	listNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
-	t.Run("v1beta1", func(t *testing.T) {
-		metrics, nodes := testNodeV1beta1MetricsData()
-		fakeMetrics := &metricsfake.Clientset{}
-		fakeMetrics.AddReactor("list", "nodes", func(action core.Action) (bool, runtime.Object, error) {
-			return true, metrics, nil
-		})
-		result := runTopNodeTest(t, runTopNodeOpts{
-			apisBody:     apisV1beta1BodyWithMetrics,
-			expectedPath: expectedNodePath,
-			nodeBody:     nodes,
-			fakeMetrics:  fakeMetrics,
-		})
-		for _, m := range metrics.Items {
-			if !strings.Contains(result, m.Name) {
-				t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-			}
-		}
-	})
-
-	t.Run("v1", func(t *testing.T) {
-		metrics, nodes := testNodeV1MetricsData()
-		fakeMetrics := &metricsfake.Clientset{}
-		fakeMetrics.AddReactor("list", "nodes", func(action core.Action) (bool, runtime.Object, error) {
-			return true, metrics, nil
-		})
-		result := runTopNodeTest(t, runTopNodeOpts{
-			apisBody:     apisV1BodyWithMetrics,
-			expectedPath: expectedNodePath,
-			nodeBody:     nodes,
-			fakeMetrics:  fakeMetrics,
-		})
-		for _, m := range metrics.Items {
-			if !strings.Contains(result, m.Name) {
-				t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-			}
-		}
-	})
-}
-
-func TestTopNodeWithNameMetricsFrom(t *testing.T) {
-	t.Run("v1beta1", func(t *testing.T) {
-		metrics, nodes := testNodeV1beta1MetricsData()
-		expectedMetrics := metrics.Items[0]
-		expectedNode := nodes.Items[0]
-		nonExpectedMetrics := metrics.Items[1:]
-		expectedNodePath := fmt.Sprintf("/%s/%s/nodes/%s", apiPrefix, apiVersion, expectedMetrics.Name)
-
-		fakeMetrics := &metricsfake.Clientset{}
-		fakeMetrics.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
-			return true, &expectedMetrics, nil
-		})
-		result := runTopNodeTest(t, runTopNodeOpts{
-			apisBody:     apisV1beta1BodyWithMetrics,
-			expectedPath: expectedNodePath,
-			nodeBody:     &expectedNode,
-			fakeMetrics:  fakeMetrics,
-			cmdArgs:      []string{expectedMetrics.Name},
-		})
-		if !strings.Contains(result, expectedMetrics.Name) {
-			t.Errorf("missing metrics for %s: \n%s", expectedMetrics.Name, result)
-		}
-		for _, m := range nonExpectedMetrics {
-			if strings.Contains(result, m.Name) {
-				t.Errorf("unexpected metrics for %s: \n%s", m.Name, result)
-			}
-		}
-	})
-
-	t.Run("v1", func(t *testing.T) {
-		metrics, nodes := testNodeV1MetricsData()
-		expectedMetrics := metrics.Items[0]
-		expectedNode := nodes.Items[0]
-		nonExpectedMetrics := metrics.Items[1:]
-		expectedNodePath := fmt.Sprintf("/%s/%s/nodes/%s", apiPrefix, apiVersion, expectedMetrics.Name)
-
-		fakeMetrics := &metricsfake.Clientset{}
-		fakeMetrics.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
-			return true, &expectedMetrics, nil
-		})
-		result := runTopNodeTest(t, runTopNodeOpts{
-			apisBody:     apisV1BodyWithMetrics,
-			expectedPath: expectedNodePath,
-			nodeBody:     &expectedNode,
-			fakeMetrics:  fakeMetrics,
-			cmdArgs:      []string{expectedMetrics.Name},
-		})
-		if !strings.Contains(result, expectedMetrics.Name) {
-			t.Errorf("missing metrics for %s: \n%s", expectedMetrics.Name, result)
-		}
-		for _, m := range nonExpectedMetrics {
-			if strings.Contains(result, m.Name) {
-				t.Errorf("unexpected metrics for %s: \n%s", m.Name, result)
-			}
-		}
-	})
-}
-
-func TestTopNodeWithLabelSelectorMetricsFrom(t *testing.T) {
-	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
-	label := "key=value"
-
-	t.Run("v1beta1", func(t *testing.T) {
-		metrics, nodes := testNodeV1beta1MetricsData()
-		expectedMetrics := &metricsv1beta1api.NodeMetricsList{
-			ListMeta: metrics.ListMeta,
-			Items:    metrics.Items[0:1],
-		}
-		expectedNodes := v1.NodeList{
-			ListMeta: nodes.ListMeta,
-			Items:    nodes.Items[0:1],
-		}
-		nonExpectedMetrics := &metricsv1beta1api.NodeMetricsList{
-			ListMeta: metrics.ListMeta,
-			Items:    metrics.Items[1:],
-		}
-		fakeMetrics := &metricsfake.Clientset{}
-		fakeMetrics.AddReactor("list", "nodes", func(action core.Action) (bool, runtime.Object, error) {
-			return true, expectedMetrics, nil
-		})
-		result := runTopNodeTest(t, runTopNodeOpts{
-			apisBody:     apisV1beta1BodyWithMetrics,
-			expectedPath: expectedNodePath,
-			nodeBody:     &expectedNodes,
-			fakeMetrics:  fakeMetrics,
-			selector:     label,
-		})
-		for _, m := range expectedMetrics.Items {
-			if !strings.Contains(result, m.Name) {
-				t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-			}
-		}
-		for _, m := range nonExpectedMetrics.Items {
-			if strings.Contains(result, m.Name) {
-				t.Errorf("unexpected metrics for %s: \n%s", m.Name, result)
-			}
-		}
-	})
-
-	t.Run("v1", func(t *testing.T) {
-		metrics, nodes := testNodeV1MetricsData()
-		expectedMetrics := &metricsv1api.NodeMetricsList{
-			ListMeta: metrics.ListMeta,
-			Items:    metrics.Items[0:1],
-		}
-		expectedNodes := v1.NodeList{
-			ListMeta: nodes.ListMeta,
-			Items:    nodes.Items[0:1],
-		}
-		nonExpectedMetrics := &metricsv1api.NodeMetricsList{
-			ListMeta: metrics.ListMeta,
-			Items:    metrics.Items[1:],
-		}
-		fakeMetrics := &metricsfake.Clientset{}
-		fakeMetrics.AddReactor("list", "nodes", func(action core.Action) (bool, runtime.Object, error) {
-			return true, expectedMetrics, nil
-		})
-		result := runTopNodeTest(t, runTopNodeOpts{
-			apisBody:     apisV1BodyWithMetrics,
-			expectedPath: expectedNodePath,
-			nodeBody:     &expectedNodes,
-			fakeMetrics:  fakeMetrics,
-			selector:     label,
-		})
-		for _, m := range expectedMetrics.Items {
-			if !strings.Contains(result, m.Name) {
-				t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-			}
-		}
-		for _, m := range nonExpectedMetrics.Items {
-			if strings.Contains(result, m.Name) {
-				t.Errorf("unexpected metrics for %s: \n%s", m.Name, result)
-			}
-		}
-	})
-}
-
-func TestTopNodeWithSortByCpuMetricsFrom(t *testing.T) {
-	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
-
-	t.Run("v1beta1", func(t *testing.T) {
-		metrics, nodes := testNodeV1beta1MetricsData()
-		expectedMetrics := &metricsv1beta1api.NodeMetricsList{
-			ListMeta: metrics.ListMeta,
-			Items:    metrics.Items,
-		}
-		expectedNodes := v1.NodeList{
-			ListMeta: nodes.ListMeta,
-			Items:    nodes.Items,
-		}
-		expectedNodesNames := []string{"node2", "node3", "node1"}
-		fakemetrics := &metricsfake.Clientset{}
-		fakemetrics.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			return true, expectedMetrics, nil
-		})
-
-		// Check the presence of node names in the output.
-		result := runTopNodeTest(t, runTopNodeOpts{
-			apisBody:     apisV1beta1BodyWithMetrics,
-			expectedPath: expectedNodePath,
-			nodeBody:     &expectedNodes,
-			fakeMetrics:  fakemetrics,
-			sortBy:       "cpu",
-		})
-
-		for _, m := range expectedMetrics.Items {
-			if !strings.Contains(result, m.Name) {
-				t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-			}
-		}
-
-		resultNodes := extractNodeNamesFromTopOutput(result)
-
-		if !reflect.DeepEqual(resultNodes, expectedNodesNames) {
-			t.Errorf("kinds not matching:\n\texpectedKinds: %v\n\tgotKinds: %v\n", expectedNodesNames, resultNodes)
-		}
-	})
-
-	t.Run("v1", func(t *testing.T) {
-		metrics, nodes := testNodeV1MetricsData()
-		expectedMetrics := &metricsv1api.NodeMetricsList{
-			ListMeta: metrics.ListMeta,
-			Items:    metrics.Items,
-		}
-		expectedNodes := v1.NodeList{
-			ListMeta: nodes.ListMeta,
-			Items:    nodes.Items,
-		}
-		expectedNodesNames := []string{"node2", "node3", "node1"}
-		fakemetrics := &metricsfake.Clientset{}
-		fakemetrics.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			return true, expectedMetrics, nil
-		})
-
-		// Check the presence of node names in the output.
-		result := runTopNodeTest(t, runTopNodeOpts{
-			apisBody:     apisV1BodyWithMetrics,
-			expectedPath: expectedNodePath,
-			nodeBody:     &expectedNodes,
-			fakeMetrics:  fakemetrics,
-			sortBy:       "cpu",
-		})
-
-		for _, m := range expectedMetrics.Items {
-			if !strings.Contains(result, m.Name) {
-				t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-			}
-		}
-
-		resultNodes := extractNodeNamesFromTopOutput(result)
-
-		if !reflect.DeepEqual(resultNodes, expectedNodesNames) {
-			t.Errorf("kinds not matching:\n\texpectedKinds: %v\n\tgotKinds: %v\n", expectedNodesNames, resultNodes)
-		}
-	})
-}
-
-func TestTopNodeWithSortByMemoryMetricsFrom(t *testing.T) {
-	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
-
-	t.Run("v1beta1", func(t *testing.T) {
-		metrics, nodes := testNodeV1beta1MetricsData()
-		expectedMetrics := &metricsv1beta1api.NodeMetricsList{
-			ListMeta: metrics.ListMeta,
-			Items:    metrics.Items,
-		}
-		expectedNodes := v1.NodeList{
-			ListMeta: nodes.ListMeta,
-			Items:    nodes.Items,
-		}
-		expectedNodesNames := []string{"node2", "node3", "node1"}
-		fakemetrics := &metricsfake.Clientset{}
-		fakemetrics.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			return true, expectedMetrics, nil
-		})
-
-		// Check the presence of node names in the output.
-		result := runTopNodeTest(t, runTopNodeOpts{
-			apisBody:     apisV1beta1BodyWithMetrics,
-			expectedPath: expectedNodePath,
-			nodeBody:     &expectedNodes,
-			fakeMetrics:  fakemetrics,
-			sortBy:       "memory",
-		})
-
-		for _, m := range expectedMetrics.Items {
-			if !strings.Contains(result, m.Name) {
-				t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-			}
-		}
-
-		resultNodes := extractNodeNamesFromTopOutput(result)
-
-		if !reflect.DeepEqual(resultNodes, expectedNodesNames) {
-			t.Errorf("kinds not matching:\n\texpectedKinds: %v\n\tgotKinds: %v\n", expectedNodesNames, resultNodes)
-		}
-	})
-
-	t.Run("v1", func(t *testing.T) {
-		metrics, nodes := testNodeV1MetricsData()
-		expectedMetrics := &metricsv1api.NodeMetricsList{
-			ListMeta: metrics.ListMeta,
-			Items:    metrics.Items,
-		}
-		expectedNodes := v1.NodeList{
-			ListMeta: nodes.ListMeta,
-			Items:    nodes.Items,
-		}
-		expectedNodesNames := []string{"node2", "node3", "node1"}
-		fakemetrics := &metricsfake.Clientset{}
-		fakemetrics.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			return true, expectedMetrics, nil
-		})
-
-		// Check the presence of node names in the output.
-		result := runTopNodeTest(t, runTopNodeOpts{
-			apisBody:     apisV1BodyWithMetrics,
-			expectedPath: expectedNodePath,
-			nodeBody:     &expectedNodes,
-			fakeMetrics:  fakemetrics,
-			sortBy:       "memory",
-		})
-
-		for _, m := range expectedMetrics.Items {
-			if !strings.Contains(result, m.Name) {
-				t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-			}
-		}
-
-		resultNodes := extractNodeNamesFromTopOutput(result)
-
-		if !reflect.DeepEqual(resultNodes, expectedNodesNames) {
-			t.Errorf("kinds not matching:\n\texpectedKinds: %v\n\tgotKinds: %v\n", expectedNodesNames, resultNodes)
-		}
-	})
-}
-
-func TestTopNodeWithSwap(t *testing.T) {
-	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
-
-	swapCases := []struct {
-		name                  string
-		isSwapDisabledOnNodes bool
+	testCases := []struct {
+		name                string
+		args                []string
+		selector            string
+		sortBy              string
+		showSwap            bool
+		noSwapOnNodes       bool
+		nodeIndices         []int // fixture items served by the fakes; nil means all
+		expectedNodes       []string
+		nonExpectedNodes    []string
+		expectedSortedNodes []string
 	}{
 		{
-			name:                  "nodes with swap",
-			isSwapDisabledOnNodes: false,
+			name:          "all nodes",
+			expectedNodes: []string{"node1", "node2", "node3"},
 		},
 		{
-			name:                  "nodes without swap",
-			isSwapDisabledOnNodes: true,
+			name:             "node with name",
+			args:             []string{"node1"},
+			nodeIndices:      []int{0},
+			expectedNodes:    []string{"node1"},
+			nonExpectedNodes: []string{"node2", "node3"},
+		},
+		{
+			name:             "node with label selector",
+			selector:         "key=value",
+			nodeIndices:      []int{0},
+			expectedNodes:    []string{"node1"},
+			nonExpectedNodes: []string{"node2", "node3"},
+		},
+		{
+			name:                "node sort by cpu",
+			sortBy:              "cpu",
+			expectedNodes:       []string{"node1", "node2", "node3"},
+			expectedSortedNodes: []string{"node2", "node3", "node1"},
+		},
+		{
+			name:                "node sort by memory",
+			sortBy:              "memory",
+			expectedNodes:       []string{"node1", "node2", "node3"},
+			expectedSortedNodes: []string{"node2", "node3", "node1"},
+		},
+		{
+			name:          "nodes with swap",
+			showSwap:      true,
+			expectedNodes: []string{"node1", "node2", "node3"},
+		},
+		{
+			name:          "nodes without swap",
+			showSwap:      true,
+			noSwapOnNodes: true,
+			expectedNodes: []string{"node1", "node2", "node3"},
 		},
 	}
 
-	t.Run("v1beta1", func(t *testing.T) {
-		for _, tc := range swapCases {
-			t.Run(tc.name, func(t *testing.T) {
-				expectedMetrics, nodes := testNodeV1beta1MetricsData()
-				if tc.isSwapDisabledOnNodes {
-					for i := range expectedMetrics.Items {
-						delete(expectedMetrics.Items[i].Usage, "swap")
+	for _, version := range metricsAPIVersions {
+		t.Run(version.name, func(t *testing.T) {
+			for _, testCase := range testCases {
+				t.Run(testCase.name, func(t *testing.T) {
+					metrics, nodes := testNodeMetricsData()
+					if testCase.nodeIndices != nil {
+						var metricsItems []metricsapi.NodeMetrics
+						var nodeItems []v1.Node
+						for _, i := range testCase.nodeIndices {
+							metricsItems = append(metricsItems, metrics.Items[i])
+							nodeItems = append(nodeItems, nodes.Items[i])
+						}
+						metrics.Items = metricsItems
+						nodes.Items = nodeItems
 					}
-					for i := range nodes.Items {
-						nodes.Items[i].Status.NodeInfo.Swap = nil
+					if testCase.noSwapOnNodes {
+						for i := range metrics.Items {
+							delete(metrics.Items[i].Usage, "swap")
+						}
+						for i := range nodes.Items {
+							nodes.Items[i].Status.NodeInfo.Swap = nil
+						}
 					}
-				}
-				fakeMetrics := &metricsfake.Clientset{}
-				fakeMetrics.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-					return true, expectedMetrics, nil
+
+					metricsList, firstMetrics := versionedNodeMetricsList(t, version.name, metrics)
+					fakeMetrics := &metricsfake.Clientset{}
+					fakeMetrics.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+						return true, firstMetrics, nil
+					})
+					fakeMetrics.AddReactor("list", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+						return true, metricsList, nil
+					})
+
+					expectedPath := listNodePath
+					var nodeBody runtime.Object = nodes
+					if len(testCase.args) > 0 {
+						expectedPath = fmt.Sprintf("%s/%s", listNodePath, testCase.args[0])
+						nodeBody = &nodes.Items[0]
+					}
+
+					result := runTopNodeTest(t, runTopNodeOpts{
+						apisBody:     version.apisBody,
+						expectedPath: expectedPath,
+						nodeBody:     nodeBody,
+						fakeMetrics:  fakeMetrics,
+						cmdArgs:      testCase.args,
+						selector:     testCase.selector,
+						sortBy:       testCase.sortBy,
+						showSwap:     testCase.showSwap,
+					})
+
+					assertTopNodeOutput(t, topNodeAssertion{
+						result:              result,
+						expectedNodes:       testCase.expectedNodes,
+						nonExpectedNodes:    testCase.nonExpectedNodes,
+						expectedSortedNodes: testCase.expectedSortedNodes,
+						showSwap:            testCase.showSwap,
+						expectUnknownSwap:   testCase.noSwapOnNodes,
+					})
 				})
+			}
+		})
+	}
+}
 
-				result := runTopNodeTest(t, runTopNodeOpts{
-					apisBody:     apisV1beta1BodyWithMetrics,
-					expectedPath: expectedNodePath,
-					nodeBody:     nodes,
-					fakeMetrics:  fakeMetrics,
-					showSwap:     true,
-				})
+type topNodeAssertion struct {
+	result              string
+	expectedNodes       []string // names that should appear in the output
+	nonExpectedNodes    []string // names that should not appear in the output
+	expectedSortedNodes []string // sort assertion (column 0)
+	showSwap            bool
+	expectUnknownSwap   bool
+}
 
-				if !strings.Contains(result, "SWAP(bytes)") {
-					t.Errorf("missing SWAP(bytes) header: \n%s", result)
-				}
-				if !strings.Contains(result, "SWAP(%)") {
-					t.Errorf("missing SWAP(%%) header: \n%s", result)
-				}
-
-				if tc.isSwapDisabledOnNodes {
-					if !strings.Contains(result, "<unknown>") {
-						t.Errorf("expected swap to be <unknown>: \n%s", result)
-					}
-				}
-
-				for _, m := range expectedMetrics.Items {
-					if !strings.Contains(result, m.Name) {
-						t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-					}
-					if _, foundSwapMetric := m.Usage["swap"]; foundSwapMetric != !tc.isSwapDisabledOnNodes {
-						t.Errorf("missing swap metric for %s: \n%s", m.Name, result)
-					}
-				}
-			})
+func assertTopNodeOutput(t *testing.T, a topNodeAssertion) {
+	t.Helper()
+	for _, name := range a.expectedNodes {
+		if !strings.Contains(a.result, name) {
+			t.Errorf("missing metrics for %s: \n%s", name, a.result)
 		}
-	})
-
-	t.Run("v1", func(t *testing.T) {
-		for _, tc := range swapCases {
-			t.Run(tc.name, func(t *testing.T) {
-				expectedMetrics, nodes := testNodeV1MetricsData()
-				if tc.isSwapDisabledOnNodes {
-					for i := range expectedMetrics.Items {
-						delete(expectedMetrics.Items[i].Usage, "swap")
-					}
-					for i := range nodes.Items {
-						nodes.Items[i].Status.NodeInfo.Swap = nil
-					}
-				}
-				fakeMetrics := &metricsfake.Clientset{}
-				fakeMetrics.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-					return true, expectedMetrics, nil
-				})
-
-				result := runTopNodeTest(t, runTopNodeOpts{
-					apisBody:     apisV1BodyWithMetrics,
-					expectedPath: expectedNodePath,
-					nodeBody:     nodes,
-					fakeMetrics:  fakeMetrics,
-					showSwap:     true,
-				})
-
-				if !strings.Contains(result, "SWAP(bytes)") {
-					t.Errorf("missing SWAP(bytes) header: \n%s", result)
-				}
-				if !strings.Contains(result, "SWAP(%)") {
-					t.Errorf("missing SWAP(%%) header: \n%s", result)
-				}
-
-				if tc.isSwapDisabledOnNodes {
-					if !strings.Contains(result, "<unknown>") {
-						t.Errorf("expected swap to be <unknown>: \n%s", result)
-					}
-				}
-
-				for _, m := range expectedMetrics.Items {
-					if !strings.Contains(result, m.Name) {
-						t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-					}
-					if _, foundSwapMetric := m.Usage["swap"]; foundSwapMetric != !tc.isSwapDisabledOnNodes {
-						t.Errorf("missing swap metric for %s: \n%s", m.Name, result)
-					}
-				}
-			})
+	}
+	for _, name := range a.nonExpectedNodes {
+		if strings.Contains(a.result, name) {
+			t.Errorf("unexpected metrics for %s: \n%s", name, a.result)
 		}
-	})
+	}
+	if a.expectedSortedNodes != nil {
+		resultNodes := extractNodeNamesFromTopOutput(a.result)
+		if !reflect.DeepEqual(a.expectedSortedNodes, resultNodes) {
+			t.Errorf("nodes not matching:\n\texpectedNodes: %v\n\tresultNodes: %v\n", a.expectedSortedNodes, resultNodes)
+		}
+	}
+	if a.showSwap {
+		if !strings.Contains(a.result, "SWAP(bytes)") {
+			t.Errorf("missing SWAP(bytes) header: \n%s", a.result)
+		}
+		if !strings.Contains(a.result, "SWAP(%)") {
+			t.Errorf("missing SWAP(%%) header: \n%s", a.result)
+		}
+	}
+	if a.expectUnknownSwap && !strings.Contains(a.result, "<unknown>") {
+		t.Errorf("expected swap to be <unknown>: \n%s", a.result)
+	}
 }
 
 func extractNodeNamesFromTopOutput(result string) []string {
