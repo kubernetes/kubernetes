@@ -17,6 +17,7 @@ limitations under the License.
 package field
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -158,21 +159,16 @@ func (m ErrorMatcher) Render(e *Error) string {
 			fmt.Fprintf(&buf, "Field=%q", e.Field)
 		}
 	}
+	renderVal := func(v any) string {
+		jb, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Sprintf("%v", v)
+		}
+		return string(jb)
+	}
 	if m.matchValue {
 		comma()
-		if s, ok := e.BadValue.(string); ok {
-			fmt.Fprintf(&buf, "Value=%q", s)
-		} else {
-			rv := reflect.ValueOf(e.BadValue)
-			if rv.Kind() == reflect.Pointer && !rv.IsNil() {
-				rv = rv.Elem()
-			}
-			if rv.IsValid() && rv.CanInterface() {
-				fmt.Fprintf(&buf, "Value=%v", rv.Interface())
-			} else {
-				fmt.Fprintf(&buf, "Value=%v", e.BadValue)
-			}
-		}
+		fmt.Fprintf(&buf, "Value=%s", renderVal(e.BadValue))
 	}
 	if m.matchOrigin || m.requireOriginWhenInvalid && e.Type == ErrorTypeInvalid {
 		comma()

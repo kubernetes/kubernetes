@@ -131,3 +131,56 @@ func OptionalMap[K comparable, T any](_ context.Context, _ operation.Operation, 
 	}
 	return field.ErrorList{field.Required(fldPath, "optional value was not specified")}
 }
+
+// OptionalValueChained validates the value using the provided validator if and only if
+// the value is not the zero-value for its type.
+func OptionalValueChained[T comparable](
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	value, oldValue *T,
+	validator ValidateFunc[*T],
+) field.ErrorList {
+	var zero T
+	if value == nil || *value == zero {
+		return nil
+	}
+	return validator(ctx, op, fldPath, value, oldValue)
+}
+
+// OptionalPointerChained validates the pointer value using the provided validator if and only if
+// the pointer is not nil.
+func OptionalPointerChained[T any](
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	value, oldValue *T,
+	validator ValidateFunc[*T],
+) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	return validator(ctx, op, fldPath, value, oldValue)
+}
+
+// OptionalSliceChained validates the slice using the provided validator if and only if
+// the slice is not empty.
+func OptionalSliceChained[T any](
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	value, oldValue []T,
+	validator ValidateFunc[[]T],
+) field.ErrorList {
+	if len(value) == 0 {
+		return nil
+	}
+	return validator(ctx, op, fldPath, value, oldValue)
+}
+
+// OptionalMapChained validates the map using the provided validator if and only if
+// the map is not empty.
+func OptionalMapChained[K comparable, T any](
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	value, oldValue map[K]T,
+	validator ValidateFunc[map[K]T],
+) field.ErrorList {
+	if len(value) == 0 {
+		return nil
+	}
+	return validator(ctx, op, fldPath, value, oldValue)
+}
