@@ -172,32 +172,32 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			2*storagebackend.DefaultCompactInterval,
 			true,
 			func(ctx context.Context) (bool, error) {
-			_, err := client.List(ctx, opts)
+				_, err := client.List(ctx, opts)
 
-			if err == nil {
-				framework.Logf("Token %s has not expired yet", firstToken)
-				return false, nil
-			}
+				if err == nil {
+					framework.Logf("Token %s has not expired yet", firstToken)
+					return false, nil
+				}
 
-			if !apierrors.IsResourceExpired(err) {
-				return false, err
-			}
+				if !apierrors.IsResourceExpired(err) {
+					return false, err
+				}
 
-			framework.Logf("got error %s", err)
+				framework.Logf("got error %s", err)
 
-			status, ok := err.(apierrors.APIStatus)
-			if !ok {
-				return false, fmt.Errorf("expect error to implement APIStatus, got %v", reflect.TypeOf(err))
-			}
+				status, ok := err.(apierrors.APIStatus)
+				if !ok {
+					return false, fmt.Errorf("expect error to implement APIStatus, got %v", reflect.TypeOf(err))
+				}
 
-			inconsistentToken = status.Status().ListMeta.Continue
-			if inconsistentToken == "" {
-				return false, fmt.Errorf("expect non empty continue token")
-			}
+				inconsistentToken = status.Status().ListMeta.Continue
+				if inconsistentToken == "" {
+					return false, fmt.Errorf("expect non empty continue token")
+				}
 
-			framework.Logf("Retrieved inconsistent continue %s", inconsistentToken)
-			return true, nil
-		})
+				framework.Logf("Retrieved inconsistent continue %s", inconsistentToken)
+				return true, nil
+			})
 		if errors.Is(err, context.DeadlineExceeded) {
 			framework.Failf(
 				"continue token never expired; compaction appears to be disabled",
