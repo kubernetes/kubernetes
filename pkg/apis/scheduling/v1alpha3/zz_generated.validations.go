@@ -2585,6 +2585,46 @@ func Validate_Workload(
 	return errs
 }
 
+// Validate_WorkloadCompositePodGroupGangSchedulingPolicy validates an instance of WorkloadCompositePodGroupGangSchedulingPolicy according
+// to declarative validation rules in the API schema.
+func Validate_WorkloadCompositePodGroupGangSchedulingPolicy(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy) (errs field.ErrorList) {
+
+	{ // field schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy.MinGroupCount
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 1); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy) *int32 {
+				return oldObj.MinGroupCount
+			})
+		errs = append(errs, fn(fldPath.Child("minGroupCount"), obj.MinGroupCount, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
 var unionMembershipFor_k8s_io_api_scheduling_v1alpha3_WorkloadPodGroupDisruptionMode_ = validate.NewUnionMembership(validate.NewUnionMember("single"), validate.NewUnionMember("all"))
 
 // Validate_WorkloadPodGroupDisruptionMode validates an instance of WorkloadPodGroupDisruptionMode according
