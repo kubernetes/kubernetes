@@ -163,9 +163,9 @@ func TestValidateDeviceCapacity(t *testing.T) {
 			capacity: testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&two, nil, testValidRange(ptr.To(overCapacity), ptr.To(one), nil))),
 			wantFailures: field.ErrorList{
 				field.Invalid(validRangeField.Child("min"), "20Gi", "min is larger than capacity value: 10Gi"),
-				field.Invalid(validRangeField.Child("min"), "2Gi", "default is less than min: 20Gi"),
+				field.Invalid(validRangeField.Child("default"), "2Gi", "default is less than min: 20Gi"),
 				field.Invalid(validRangeField.Child("max"), "20Gi", "min is larger than max: 1Gi"),
-				field.Invalid(validRangeField.Child("max"), "2Gi", "default is more than max: 1Gi"),
+				field.Invalid(validRangeField.Child("default"), "2Gi", "default is more than max: 1Gi"),
 			},
 		},
 		"invalid-range-large-max": {

@@ -1131,7 +1131,11 @@ func validateValidRequestValues(maxCapacity apiresource.Quantity, policy *resour
 		if policy.Default == nil {
 			allErrs = append(allErrs, field.Required(fldPath.Child("default"), "required when validValues is defined"))
 		} else {
-			allErrs = append(allErrs, validateRequestPolicyValidValues(*policy.Default, maxCapacity, policy.ValidValues, fldPath.Child("validValues"))...)
+			var oldValidValues *[]apiresource.Quantity
+			if oldPolicy != nil {
+				oldValidValues = &oldPolicy.ValidValues // +k8s:verify-mutation:reason=clone
+			}
+			allErrs = append(allErrs, validateRequestPolicyValidValues(*policy.Default, maxCapacity, policy.ValidValues, oldValidValues, fldPath.Child("validValues"))...)
 		}
 	case policy.ValidRange != nil:
 		if policy.Default == nil {
@@ -1147,9 +1151,13 @@ func validateValidRequestValues(maxCapacity apiresource.Quantity, policy *resour
 	return allErrs
 }
 
-func validateRequestPolicyValidValues(defaultValue apiresource.Quantity, maxCapacity apiresource.Quantity, validValues []apiresource.Quantity, fldPath *field.Path) field.ErrorList {
+func validateRequestPolicyValidValues(defaultValue apiresource.Quantity, maxCapacity apiresource.Quantity, validValues []apiresource.Quantity, oldValidValues *[]apiresource.Quantity, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	foundDefault := false
+
+	if oldValidValues != nil && apiequality.Semantic.DeepEqual(*oldValidValues, validValues) {
+		return nil
+	}
 
 	// Check if validValues is sorted in ascending order
 	for i := range len(validValues) - 1 {
@@ -1202,7 +1210,7 @@ func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity a
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("min"), valueRange.Min.String(), fmt.Sprintf("min is larger than capacity value: %s", maxCapacity.String())))
 	}
 	if defaultValue.Cmp(*valueRange.Min) < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("min"), defaultValue.String(), fmt.Sprintf("default is less than min: %s", valueRange.Min.String())))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), defaultValue.String(), fmt.Sprintf("default is less than min: %s", valueRange.Min.String())))
 	}
 	if valueRange.Max != nil {
 		if valueRange.Min.Cmp(*valueRange.Max) > 0 {
@@ -1212,7 +1220,7 @@ func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity a
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("max"), valueRange.Max.String(), fmt.Sprintf("max is larger than capacity value: %s", maxCapacity.String())))
 		}
 		if defaultValue.Cmp(*valueRange.Max) > 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("max"), defaultValue.String(), fmt.Sprintf("default is more than max: %s", valueRange.Max.String())))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), defaultValue.String(), fmt.Sprintf("default is more than max: %s", valueRange.Max.String())))
 		}
 	}
 	useMilli := false
