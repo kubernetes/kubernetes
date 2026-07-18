@@ -13406,6 +13406,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1alpha3.ResourcePoolStatusRequestSpec
   map:
     fields:
+    - name: defaultPartitionTypeAttribute
+      type:
+        scalar: string
     - name: driver
       type:
         scalar: string
@@ -13414,9 +13417,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 100
-    - name: partitionTypeAttribute
-      type:
-        scalar: string
     - name: poolName
       type:
         scalar: string

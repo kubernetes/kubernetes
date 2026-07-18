@@ -47,7 +47,7 @@
     "driver": "driverValue",
     "poolName": "poolNameValue",
     "limit": 3,
-    "partitionTypeAttribute": "partitionTypeAttributeValue"
+    "defaultPartitionTypeAttribute": "defaultPartitionTypeAttributeValue"
   },
   "status": {
     "poolCount": 6,

@@ -64,6 +64,10 @@ func init() {
 			"spec": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.defaultPartitionTypeAttribute": {
+				{ErrorType: "FieldValueForbidden"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-fully-qualified-name"},
+			},
 			"spec.driver": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name-caseless"},
 				{ErrorType: "FieldValueRequired"},
@@ -72,10 +76,6 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
-			},
-			"spec.partitionTypeAttribute": {
-				{ErrorType: "FieldValueForbidden"},
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-fully-qualified-name"},
 			},
 			"spec.poolName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-pool-name"},

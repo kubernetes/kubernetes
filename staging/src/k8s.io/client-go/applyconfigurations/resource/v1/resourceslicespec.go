@@ -88,15 +88,8 @@ type ResourceSliceSpecApplyConfiguration struct {
 	// each device with its partition type, such as "Full" or "Half" for a
 	// MIG-style GPU.
 	//
-	// When set, every device in the pool must carry the attribute and
-	// devices sharing a value must share the same ConsumesCounters cost.
-	// It opts the pool into the typed partitionSummary view of
-	// ResourcePoolStatusRequest and takes precedence over the default attribute
-	// named in the ResourcePoolStatusRequest. When neither names an attribute,
-	// the pool reports no partitionSummary.
-	// It does not disable SharedCounters: when a pool publishes them, counter
-	// accounting still governs allocation and the summary reports the
-	// allocatable device count per partition type.
+	// When set, every partitionable device in the slice must carry the attribute
+	// and devices sharing a value must share the same ConsumesCounters cost.
 	PartitionTypeAttribute *resourcev1.FullyQualifiedName `json:"partitionTypeAttribute,omitempty"`
 }
 

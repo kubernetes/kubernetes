@@ -40,18 +40,19 @@ type ResourcePoolStatusRequestSpecApplyConfiguration struct {
 	// Minimum: 1
 	// Maximum: 1000
 	Limit *int32 `json:"limit,omitempty"`
-	// PartitionTypeAttribute optionally names a device attribute (by its fully
-	// qualified name, e.g. "gpu.example.com/profile") to use as the default
-	// grouping attribute for pools which have not declared one themselves.
+	// DefaultPartitionTypeAttribute optionally names a device attribute (by its
+	// fully qualified name, e.g. "gpu.example.com/profile") to use as the default
+	// grouping attribute for partitionable devices whose slice has not declared
+	// one themselves.
 	//
 	// A slice's own PartitionTypeAttribute always takes precedence. This default
-	// applies only to pools whose slices do not declare one, so that a request
+	// applies only to devices whose slice does not declare one, so that a request
 	// can still get an accurate partitionSummary from a driver that has not
-	// been updated to declare it. When neither the pool nor this default names
+	// been updated to declare it. When neither the slice nor this default names
 	// an attribute, a partitionable pool reports no partitionSummary.
 	//
 	// Must include the domain qualifier.
-	PartitionTypeAttribute *string `json:"partitionTypeAttribute,omitempty"`
+	DefaultPartitionTypeAttribute *string `json:"defaultPartitionTypeAttribute,omitempty"`
 }
 
 // ResourcePoolStatusRequestSpecApplyConfiguration constructs a declarative configuration of the ResourcePoolStatusRequestSpec type for use with
@@ -84,10 +85,10 @@ func (b *ResourcePoolStatusRequestSpecApplyConfiguration) WithLimit(value int32)
 	return b
 }
 
-// WithPartitionTypeAttribute sets the PartitionTypeAttribute field in the declarative configuration to the given value
+// WithDefaultPartitionTypeAttribute sets the DefaultPartitionTypeAttribute field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the PartitionTypeAttribute field is set to the value of the last call.
-func (b *ResourcePoolStatusRequestSpecApplyConfiguration) WithPartitionTypeAttribute(value string) *ResourcePoolStatusRequestSpecApplyConfiguration {
-	b.PartitionTypeAttribute = &value
+// If called multiple times, the DefaultPartitionTypeAttribute field is set to the value of the last call.
+func (b *ResourcePoolStatusRequestSpecApplyConfiguration) WithDefaultPartitionTypeAttribute(value string) *ResourcePoolStatusRequestSpecApplyConfiguration {
+	b.DefaultPartitionTypeAttribute = &value
 	return b
 }

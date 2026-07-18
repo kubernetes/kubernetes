@@ -276,7 +276,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				"valid: partitionTypeAttribute": {
 					input: mkResourceSliceWithDevices(
 						tweakDeviceCounter(counters("valid-key")),
-						tweakDeviceAttribute("gpu.example.com/profile", resource.DeviceAttribute{StringValue: ptr.To("Full")}),
+						tweakDeviceAttribute("gpu.example.com/profile", resource.DeviceAttribute{StringValue: new("Full")}),
 						tweakPartitionTypeAttribute("gpu.example.com/profile"),
 					),
 					enablePartitionTypeAttr: true,
@@ -306,7 +306,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				"invalid: partitionTypeAttribute with feature disabled": {
 					input: mkResourceSliceWithDevices(
 						tweakDeviceCounter(counters("valid-key")),
-						tweakDeviceAttribute("gpu.example.com/profile", resource.DeviceAttribute{StringValue: ptr.To("Full")}),
+						tweakDeviceAttribute("gpu.example.com/profile", resource.DeviceAttribute{StringValue: new("Full")}),
 						tweakPartitionTypeAttribute("gpu.example.com/profile"),
 					),
 					expectedErrs: field.ErrorList{

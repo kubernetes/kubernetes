@@ -768,8 +768,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					"PoolName":        gomega.Equal("partitioned"),
 					"ValidationError": gomega.BeNil(),
 					"PartitionSummary": gomega.ConsistOf(
-						gomega.Equal(resourcealphaapi.PartitionTypeStatus{Type: "Full", Total: ptr.To[int32](1), Allocatable: ptr.To[int32](1)}),
-						gomega.Equal(resourcealphaapi.PartitionTypeStatus{Type: "Half", Total: ptr.To[int32](2), Allocatable: ptr.To[int32](2)}),
+						gomega.Equal(resourcealphaapi.PartitionTypeStatus{Attribute: string(drautils.PartitionProfileAttribute), Type: "Full", Total: ptr.To[int32](1), Allocatable: ptr.To[int32](1)}),
+						gomega.Equal(resourcealphaapi.PartitionTypeStatus{Attribute: string(drautils.PartitionProfileAttribute), Type: "Half", Total: ptr.To[int32](2), Allocatable: ptr.To[int32](2)}),
 					),
 				}))
 			})

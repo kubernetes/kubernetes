@@ -1019,7 +1019,7 @@ func Validate_ResourcePoolStatusRequestSpec(
 		errs = append(errs, fn(fldPath.Child("limit"), obj.Limit, oldVal, oldObj != nil)...)
 	}
 
-	{ // field resourcev1alpha3.ResourcePoolStatusRequestSpec.PartitionTypeAttribute
+	{ // field resourcev1alpha3.ResourcePoolStatusRequestSpec.DefaultPartitionTypeAttribute
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1052,9 +1052,9 @@ func Validate_ResourcePoolStatusRequestSpec(
 		}
 		oldVal := safe.Field(oldObj,
 			func(oldObj *resourcev1alpha3.ResourcePoolStatusRequestSpec) *string {
-				return oldObj.PartitionTypeAttribute
+				return oldObj.DefaultPartitionTypeAttribute
 			})
-		errs = append(errs, fn(fldPath.Child("partitionTypeAttribute"), obj.PartitionTypeAttribute, oldVal, oldObj != nil)...)
+		errs = append(errs, fn(fldPath.Child("defaultPartitionTypeAttribute"), obj.DefaultPartitionTypeAttribute, oldVal, oldObj != nil)...)
 	}
 
 	return errs

@@ -34,8 +34,8 @@ func testRequest(attr *string) *resource.ResourcePoolStatusRequest {
 	return &resource.ResourcePoolStatusRequest{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-request"},
 		Spec: resource.ResourcePoolStatusRequestSpec{
-			Driver:                 "gpu.example.com",
-			PartitionTypeAttribute: attr,
+			Driver:                        "gpu.example.com",
+			DefaultPartitionTypeAttribute: attr,
 		},
 	}
 }
@@ -68,15 +68,15 @@ func TestPrepareForCreatePartitionTypeAttribute(t *testing.T) {
 			request := testRequest(new(testPartitionAttr))
 			Strategy.PrepareForCreate(genericapirequest.NewDefaultContext(), request)
 
-			got := request.Spec.PartitionTypeAttribute
+			got := request.Spec.DefaultPartitionTypeAttribute
 			if tc.wantDropped {
 				if got != nil {
-					t.Errorf("PartitionTypeAttribute = %q, want nil (gate disabled)", *got)
+					t.Errorf("DefaultPartitionTypeAttribute = %q, want nil (gate disabled)", *got)
 				}
 				return
 			}
 			if got == nil || *got != testPartitionAttr {
-				t.Errorf("PartitionTypeAttribute = %v, want %q", got, testPartitionAttr)
+				t.Errorf("DefaultPartitionTypeAttribute = %v, want %q", got, testPartitionAttr)
 			}
 		})
 	}
@@ -92,7 +92,7 @@ func TestPrepareForUpdateKeepsExistingPartitionTypeAttribute(t *testing.T) {
 	newRequest := testRequest(new(testPartitionAttr))
 	Strategy.PrepareForUpdate(genericapirequest.NewDefaultContext(), newRequest, oldRequest)
 
-	if newRequest.Spec.PartitionTypeAttribute == nil {
-		t.Error("PartitionTypeAttribute was dropped, want preserved (already in use)")
+	if newRequest.Spec.DefaultPartitionTypeAttribute == nil {
+		t.Error("DefaultPartitionTypeAttribute was dropped, want preserved (already in use)")
 	}
 }

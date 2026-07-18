@@ -192,15 +192,8 @@ type ResourceSliceSpec struct {
 	// each device with its partition type, such as "Full" or "Half" for a
 	// MIG-style GPU.
 	//
-	// When set, every device in the pool must carry the attribute and
-	// devices sharing a value must share the same ConsumesCounters cost.
-	// It opts the pool into the typed partitionSummary view of
-	// ResourcePoolStatusRequest and takes precedence over the default attribute
-	// named in the ResourcePoolStatusRequest. When neither names an attribute,
-	// the pool reports no partitionSummary.
-	// It does not disable SharedCounters: when a pool publishes them, counter
-	// accounting still governs allocation and the summary reports the
-	// allocatable device count per partition type.
+	// When set, every partitionable device in the slice must carry the attribute
+	// and devices sharing a value must share the same ConsumesCounters cost.
 	//
 	// +optional
 	// +featureGate=DRAPartitionableDevicesType
@@ -2198,13 +2191,14 @@ type ResourcePoolStatusRequestSpec struct {
 	// +optional
 	Limit *int32
 
-	// PartitionTypeAttribute optionally names a device attribute (by its fully
-	// qualified name) to use as the default grouping attribute for pools which
-	// have not declared one themselves. A pool's own PartitionTypeAttribute
-	// always takes precedence. When neither the pool nor this default names an
-	// attribute, a partitionable pool reports no partitionSummary.
+	// DefaultPartitionTypeAttribute optionally names a device attribute (by its
+	// fully qualified name) to use as the default grouping attribute for
+	// partitionable devices whose slice has not declared one themselves. A
+	// slice's own PartitionTypeAttribute always takes precedence. When neither
+	// the slice nor this default names an attribute, a partitionable pool
+	// reports no partitionSummary.
 	// +optional
-	PartitionTypeAttribute *string
+	DefaultPartitionTypeAttribute *string
 }
 
 // ResourcePoolStatusRequestLimitDefault is the default value for spec.limit.
@@ -2300,6 +2294,7 @@ type PartitionTypeStatus struct {
 	Attribute string
 
 	// Type is the partition type value (e.g. "Full" or "Half").
+	// +required
 	Type string
 
 	// Total is the number of devices of this partition type in the pool.
@@ -2335,15 +2330,19 @@ type ShareableSummaryStatus struct {
 // capacity key.
 type ShareableCapacityStatus struct {
 	// Name is the capacity name.
+	// +required
 	Name string
 
 	// Total is the sum of this capacity across shareable devices in the pool.
+	// +required
 	Total resource.Quantity
 
 	// Consumed is the amount drawn by current allocations.
+	// +required
 	Consumed resource.Quantity
 
 	// Available is Total minus Consumed, never negative.
+	// +required
 	Available resource.Quantity
 }
 

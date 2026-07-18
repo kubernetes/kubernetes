@@ -33,9 +33,9 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
+  defaultPartitionTypeAttribute: defaultPartitionTypeAttributeValue
   driver: driverValue
   limit: 3
-  partitionTypeAttribute: partitionTypeAttributeValue
   poolName: poolNameValue
 status:
   conditions:

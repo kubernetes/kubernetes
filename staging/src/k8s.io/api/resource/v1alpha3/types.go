@@ -426,14 +426,15 @@ type ResourcePoolStatusRequestSpec struct {
 	// +k8s:maximum=1000
 	Limit *int32 `json:"limit,omitempty" protobuf:"varint,3,opt,name=limit"`
 
-	// PartitionTypeAttribute optionally names a device attribute (by its fully
-	// qualified name, e.g. "gpu.example.com/profile") to use as the default
-	// grouping attribute for pools which have not declared one themselves.
+	// DefaultPartitionTypeAttribute optionally names a device attribute (by its
+	// fully qualified name, e.g. "gpu.example.com/profile") to use as the default
+	// grouping attribute for partitionable devices whose slice has not declared
+	// one themselves.
 	//
 	// A slice's own PartitionTypeAttribute always takes precedence. This default
-	// applies only to pools whose slices do not declare one, so that a request
+	// applies only to devices whose slice does not declare one, so that a request
 	// can still get an accurate partitionSummary from a driver that has not
-	// been updated to declare it. When neither the pool nor this default names
+	// been updated to declare it. When neither the slice nor this default names
 	// an attribute, a partitionable pool reports no partitionSummary.
 	//
 	// Must include the domain qualifier.
@@ -443,7 +444,7 @@ type ResourcePoolStatusRequestSpec struct {
 	// +k8s:ifDisabled(DRAPartitionableDevicesType)=+k8s:forbidden
 	// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:optional
 	// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:format=k8s-resource-fully-qualified-name
-	PartitionTypeAttribute *string `json:"partitionTypeAttribute,omitempty" protobuf:"bytes,4,opt,name=partitionTypeAttribute"`
+	DefaultPartitionTypeAttribute *string `json:"defaultPartitionTypeAttribute,omitempty" protobuf:"bytes,4,opt,name=defaultPartitionTypeAttribute"`
 }
 
 // ResourcePoolStatusRequestLimitDefault is the default value for spec.limit.

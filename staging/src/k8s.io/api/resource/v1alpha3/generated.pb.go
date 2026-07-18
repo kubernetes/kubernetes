@@ -668,10 +668,10 @@ func (m *ResourcePoolStatusRequestSpec) MarshalToSizedBuffer(dAtA []byte) (int, 
 	_ = i
 	var l int
 	_ = l
-	if m.PartitionTypeAttribute != nil {
-		i -= len(*m.PartitionTypeAttribute)
-		copy(dAtA[i:], *m.PartitionTypeAttribute)
-		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.PartitionTypeAttribute)))
+	if m.DefaultPartitionTypeAttribute != nil {
+		i -= len(*m.DefaultPartitionTypeAttribute)
+		copy(dAtA[i:], *m.DefaultPartitionTypeAttribute)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.DefaultPartitionTypeAttribute)))
 		i--
 		dAtA[i] = 0x22
 	}
@@ -1108,8 +1108,8 @@ func (m *ResourcePoolStatusRequestSpec) Size() (n int) {
 	if m.Limit != nil {
 		n += 1 + sovGenerated(uint64(*m.Limit))
 	}
-	if m.PartitionTypeAttribute != nil {
-		l = len(*m.PartitionTypeAttribute)
+	if m.DefaultPartitionTypeAttribute != nil {
+		l = len(*m.DefaultPartitionTypeAttribute)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
@@ -1344,7 +1344,7 @@ func (this *ResourcePoolStatusRequestSpec) String() string {
 		`Driver:` + fmt.Sprintf("%v", this.Driver) + `,`,
 		`PoolName:` + valueToStringGenerated(this.PoolName) + `,`,
 		`Limit:` + valueToStringGenerated(this.Limit) + `,`,
-		`PartitionTypeAttribute:` + valueToStringGenerated(this.PartitionTypeAttribute) + `,`,
+		`DefaultPartitionTypeAttribute:` + valueToStringGenerated(this.DefaultPartitionTypeAttribute) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3285,7 +3285,7 @@ func (m *ResourcePoolStatusRequestSpec) Unmarshal(dAtA []byte) error {
 			m.Limit = &v
 		case 4:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PartitionTypeAttribute", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field DefaultPartitionTypeAttribute", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -3314,7 +3314,7 @@ func (m *ResourcePoolStatusRequestSpec) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			s := string(dAtA[iNdEx:postIndex])
-			m.PartitionTypeAttribute = &s
+			m.DefaultPartitionTypeAttribute = &s
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

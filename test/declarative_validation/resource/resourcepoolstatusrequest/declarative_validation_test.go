@@ -76,33 +76,33 @@ func TestDeclarativeValidate(t *testing.T) {
 		"valid partitionTypeAttribute": {
 			// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:optional
 			input: mkValidRPSR(func(r *resource.ResourcePoolStatusRequest) {
-				r.Spec.PartitionTypeAttribute = new("gpu.example.com/profile")
+				r.Spec.DefaultPartitionTypeAttribute = new("gpu.example.com/profile")
 			}),
 			enablePartitionTypeAttr: true,
 		},
 		"invalid partitionTypeAttribute format": {
 			// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:format=k8s-resource-fully-qualified-name
 			input: mkValidRPSR(func(r *resource.ResourcePoolStatusRequest) {
-				r.Spec.PartitionTypeAttribute = new("invalid attr!")
+				r.Spec.DefaultPartitionTypeAttribute = new("invalid attr!")
 			}),
 			enablePartitionTypeAttr: true,
-			expectedErrs:            field.ErrorList{field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name")},
+			expectedErrs:            field.ErrorList{field.Invalid(field.NewPath("spec", "defaultPartitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name")},
 		},
 		"partitionTypeAttribute without domain": {
 			// A bare name is a valid attribute key but not a valid reference:
 			// the domain is required so the attribute is unambiguous.
 			input: mkValidRPSR(func(r *resource.ResourcePoolStatusRequest) {
-				r.Spec.PartitionTypeAttribute = new("profile")
+				r.Spec.DefaultPartitionTypeAttribute = new("profile")
 			}),
 			enablePartitionTypeAttr: true,
-			expectedErrs:            field.ErrorList{field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name")},
+			expectedErrs:            field.ErrorList{field.Invalid(field.NewPath("spec", "defaultPartitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name")},
 		},
 		"partitionTypeAttribute with feature disabled": {
 			// +k8s:ifDisabled(DRAPartitionableDevicesType)=+k8s:forbidden
 			input: mkValidRPSR(func(r *resource.ResourcePoolStatusRequest) {
-				r.Spec.PartitionTypeAttribute = new("gpu.example.com/profile")
+				r.Spec.DefaultPartitionTypeAttribute = new("gpu.example.com/profile")
 			}),
-			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "partitionTypeAttribute"), "")},
+			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "defaultPartitionTypeAttribute"), "")},
 		},
 		"limit zero": {
 			// +k8s:minimum=1 (standard DV)
@@ -416,7 +416,7 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 				pool := mkValidPoolStatus()
 				summary := make([]resource.PartitionTypeStatus, 33)
 				for i := range summary {
-					summary[i] = resource.PartitionTypeStatus{Type: "Full", Total: ptr.To[int32](0), Allocatable: ptr.To[int32](0)}
+					summary[i] = resource.PartitionTypeStatus{Attribute: "gpu.example.com/profile", Type: "Full" + strings.Repeat("x", i), Total: ptr.To[int32](0), Allocatable: ptr.To[int32](0)}
 				}
 				pool.PartitionSummary = summary
 				s.Pools = []resource.PoolStatus{pool}
@@ -428,7 +428,7 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 			oldObj: mkValidRPSRForUpdate(),
 			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
 				pool := mkValidPoolStatus()
-				pool.PartitionSummary = []resource.PartitionTypeStatus{{Type: "", Total: ptr.To[int32](0), Allocatable: ptr.To[int32](0)}}
+				pool.PartitionSummary = []resource.PartitionTypeStatus{{Attribute: "gpu.example.com/profile", Type: "", Total: ptr.To[int32](0), Allocatable: ptr.To[int32](0)}}
 				s.Pools = []resource.PoolStatus{pool}
 			})),
 			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(0).Child("type"), "")},
@@ -438,7 +438,7 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 			oldObj: mkValidRPSRForUpdate(),
 			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
 				pool := mkValidPoolStatus()
-				pool.PartitionSummary = []resource.PartitionTypeStatus{{Type: "Full", Total: ptr.To[int32](-1), Allocatable: ptr.To[int32](0)}}
+				pool.PartitionSummary = []resource.PartitionTypeStatus{{Attribute: "gpu.example.com/profile", Type: "Full", Total: ptr.To[int32](-1), Allocatable: ptr.To[int32](0)}}
 				s.Pools = []resource.PoolStatus{pool}
 			})),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(0).Child("total"), nil, "").WithOrigin("minimum")},
@@ -448,7 +448,7 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 			oldObj: mkValidRPSRForUpdate(),
 			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
 				pool := mkValidPoolStatus()
-				pool.PartitionSummary = []resource.PartitionTypeStatus{{Type: "Full", Total: ptr.To[int32](0), Allocatable: ptr.To[int32](-1)}}
+				pool.PartitionSummary = []resource.PartitionTypeStatus{{Attribute: "gpu.example.com/profile", Type: "Full", Total: ptr.To[int32](0), Allocatable: ptr.To[int32](-1)}}
 				s.Pools = []resource.PoolStatus{pool}
 			})),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(0).Child("allocatable"), nil, "").WithOrigin("minimum")},
@@ -458,7 +458,7 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 			oldObj: mkValidRPSRForUpdate(),
 			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
 				pool := mkValidPoolStatus()
-				pool.PartitionSummary = []resource.PartitionTypeStatus{{Type: "Full", Allocatable: ptr.To[int32](0)}}
+				pool.PartitionSummary = []resource.PartitionTypeStatus{{Attribute: "gpu.example.com/profile", Type: "Full", Allocatable: ptr.To[int32](0)}}
 				s.Pools = []resource.PoolStatus{pool}
 			})),
 			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(0).Child("total"), "")},
@@ -468,10 +468,31 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 			oldObj: mkValidRPSRForUpdate(),
 			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
 				pool := mkValidPoolStatus()
-				pool.PartitionSummary = []resource.PartitionTypeStatus{{Type: "Full", Total: ptr.To[int32](0)}}
+				pool.PartitionSummary = []resource.PartitionTypeStatus{{Attribute: "gpu.example.com/profile", Type: "Full", Total: ptr.To[int32](0)}}
 				s.Pools = []resource.PoolStatus{pool}
 			})),
 			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(0).Child("allocatable"), "")},
+		},
+		"partitionSummary empty attribute": {
+			// +k8s:required (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.PartitionSummary = []resource.PartitionTypeStatus{{Type: "Full", Total: ptr.To[int32](0), Allocatable: ptr.To[int32](0)}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(0).Child("attribute"), "")},
+		},
+		"partitionSummary duplicate attribute and type": {
+			// +k8s:unique=map on (attribute, type)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				entry := resource.PartitionTypeStatus{Attribute: "gpu.example.com/profile", Type: "Full", Total: ptr.To[int32](0), Allocatable: ptr.To[int32](0)}
+				pool.PartitionSummary = []resource.PartitionTypeStatus{entry, entry}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Duplicate(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(1), map[string]interface{}{"attribute": "gpu.example.com/profile", "type": "Full"})},
 		},
 		"shareableSummary capacity maxItems exceeded": {
 			// +k8s:maxItems=32

@@ -1503,8 +1503,8 @@ func (in *ResourcePoolStatusRequestSpec) DeepCopyInto(out *ResourcePoolStatusReq
 		*out = new(int32)
 		**out = **in
 	}
-	if in.PartitionTypeAttribute != nil {
-		in, out := &in.PartitionTypeAttribute, &out.PartitionTypeAttribute
+	if in.DefaultPartitionTypeAttribute != nil {
+		in, out := &in.DefaultPartitionTypeAttribute, &out.DefaultPartitionTypeAttribute
 		*out = new(string)
 		**out = **in
 	}

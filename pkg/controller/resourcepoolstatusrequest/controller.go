@@ -555,7 +555,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 				inUse:            inUse,
 				consumedCapacity: consumedCapacity[key],
 			}
-			resolveDevicePartitions(request.Spec.PartitionTypeAttribute, &viewInput)
+			resolveDevicePartitions(request.Spec.DefaultPartitionTypeAttribute, &viewInput)
 
 			partitionSummary, shareable, viewErr := computePoolViews(viewInput)
 			pool.PartitionSummary = partitionSummary

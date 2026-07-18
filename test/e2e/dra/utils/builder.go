@@ -777,9 +777,11 @@ const PartitionProfileAttribute = resourceapi.FullyQualifiedName("dra.e2e.exampl
 // PartitionableResources publishes one pool "partitioned" split into a
 // shared-counter slice and a device slice whose devices consume those counters.
 // Each device carries the PartitionProfileAttribute ("Full"/"Half"). When
-// withPartitionType is true both slices declare PartitionTypeAttribute, which
-// opts the pool into the typed partitionSummary view; otherwise the pool falls
-// back to the counterSets view. Node-selected for control-plane use.
+// withPartitionType is true the device slice declares PartitionTypeAttribute,
+// which opts the pool into the typed partitionSummary view; otherwise the pool
+// falls back to the counterSets view. The attribute goes only on the device
+// slice: it may not be set on a slice without counter-consuming devices.
+// Node-selected for control-plane use.
 func PartitionableResources(withPartitionType bool) driverResourcesGenFunc {
 	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
 		full := "Full"
@@ -798,7 +800,6 @@ func PartitionableResources(withPartitionType bool) driverResourcesGenFunc {
 		deviceSlice := resourceslice.Slice{Devices: devices}
 		if withPartitionType {
 			attr := PartitionProfileAttribute
-			counterSlice.PartitionTypeAttribute = &attr
 			deviceSlice.PartitionTypeAttribute = &attr
 		}
 		return map[string]resourceslice.DriverResources{

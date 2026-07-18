@@ -49271,7 +49271,7 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 					},
 					"partitionTypeAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every device in the pool must carry the attribute and devices sharing a value must share the same ConsumesCounters cost. It opts the pool into the typed partitionSummary view of ResourcePoolStatusRequest and takes precedence over the default attribute named in the ResourcePoolStatusRequest. When neither names an attribute, the pool reports no partitionSummary. It does not disable SharedCounters: when a pool publishes them, counter accounting still governs allocation and the summary reports the allocatable device count per partition type.",
+							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every partitionable device in the slice must carry the attribute and devices sharing a value must share the same ConsumesCounters cost.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -49859,9 +49859,9 @@ func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestSpec(ref common
 							Format:      "int32",
 						},
 					},
-					"partitionTypeAttribute": {
+					"defaultPartitionTypeAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PartitionTypeAttribute optionally names a device attribute (by its fully qualified name, e.g. \"gpu.example.com/profile\") to use as the default grouping attribute for pools which have not declared one themselves.\n\nA slice's own PartitionTypeAttribute always takes precedence. This default applies only to pools whose slices do not declare one, so that a request can still get an accurate partitionSummary from a driver that has not been updated to declare it. When neither the pool nor this default names an attribute, a partitionable pool reports no partitionSummary.\n\nMust include the domain qualifier.",
+							Description: "DefaultPartitionTypeAttribute optionally names a device attribute (by its fully qualified name, e.g. \"gpu.example.com/profile\") to use as the default grouping attribute for partitionable devices whose slice has not declared one themselves.\n\nA slice's own PartitionTypeAttribute always takes precedence. This default applies only to devices whose slice does not declare one, so that a request can still get an accurate partitionSummary from a driver that has not been updated to declare it. When neither the slice nor this default names an attribute, a partitionable pool reports no partitionSummary.\n\nMust include the domain qualifier.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -52290,7 +52290,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 					},
 					"partitionTypeAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every device in the pool must carry the attribute and devices sharing a value must share the same ConsumesCounters cost. It opts the pool into the typed partitionSummary view of ResourcePoolStatusRequest and takes precedence over the default attribute named in the ResourcePoolStatusRequest. When neither names an attribute, the pool reports no partitionSummary. It does not disable SharedCounters: when a pool publishes them, counter accounting still governs allocation and the summary reports the allocatable device count per partition type.",
+							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every partitionable device in the slice must carry the attribute and devices sharing a value must share the same ConsumesCounters cost.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -54771,7 +54771,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 					},
 					"partitionTypeAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every device in the pool must carry the attribute and devices sharing a value must share the same ConsumesCounters cost. It opts the pool into the typed partitionSummary view of ResourcePoolStatusRequest and takes precedence over the default attribute named in the ResourcePoolStatusRequest. When neither names an attribute, the pool reports no partitionSummary. It does not disable SharedCounters: when a pool publishes them, counter accounting still governs allocation and the summary reports the allocatable device count per partition type.",
+							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every partitionable device in the slice must carry the attribute and devices sharing a value must share the same ConsumesCounters cost.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

@@ -1332,7 +1332,7 @@ func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
 				devices.Spec.PartitionTypeAttribute = nil
 			}
 			request := makeRequest(driver)
-			request.Spec.PartitionTypeAttribute = tc.requestAttr
+			request.Spec.DefaultPartitionTypeAttribute = tc.requestAttr
 
 			pool := requireSinglePool(t, runCalculatePoolStatus(t, request, all, nil))
 			if pool.ValidationError != nil {

@@ -71,11 +71,11 @@ func (*resourcePoolStatusRequestStrategy) PrepareForCreate(ctx context.Context, 
 // default when the feature is disabled, unless the old request already set it.
 func dropDisabledDRAPartitionableDevicesTypeFields(request, oldRequest *resource.ResourcePoolStatusRequest) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevicesType) ||
-		(oldRequest != nil && oldRequest.Spec.PartitionTypeAttribute != nil) {
+		(oldRequest != nil && oldRequest.Spec.DefaultPartitionTypeAttribute != nil) {
 		return
 	}
 
-	request.Spec.PartitionTypeAttribute = nil
+	request.Spec.DefaultPartitionTypeAttribute = nil
 }
 
 func (*resourcePoolStatusRequestStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
