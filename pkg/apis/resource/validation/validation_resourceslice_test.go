@@ -142,13 +142,14 @@ func testResourceSliceWithNodeAllocatableResources(name, nodeName, driverName st
 			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 				v1.ResourceCPU: {
 					Mapping: &resourceapi.NodeAllocatableMapping{
-						CapacityMultiplier: ptr.To(resource.MustParse("1")),
-						CapacityKey:        ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+						CapacityMultiplier: new(resource.MustParse("1")),
+						CapacityKey:        new[resourceapi.QualifiedName]("dra.example.com/cpu"),
 					},
 				},
 				"memory": {
 					Mapping: &resourceapi.NodeAllocatableMapping{
-						CapacityKey: ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+						CapacityKey:        new[resourceapi.QualifiedName]("dra.example.com/cpu"),
+						CapacityMultiplier: new(resource.MustParse("1")),
 					},
 				},
 			},
@@ -1665,41 +1666,7 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 		},
-		"bad-node-allocatable-resources-capacity-multiplier-without-key": {
-			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityMultiplier"), "1", "must not be set when capacityKey is not set"),
-			},
-			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
-					v1.ResourceCPU: {
-						Mapping: &resourceapi.NodeAllocatableMapping{
-							CapacityMultiplier: ptr.To(resource.MustParse("1")),
-						},
-					},
-				}
-				return slice
-			}(),
-			enableDRANodeAllocatableResourcesFeatureGate: true,
-		},
-		"bad-node-allocatable-resources-device-multiplier-with-key": {
-			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("deviceMultiplier"), "1", "must not be set when capacityKey is set"),
-			},
-			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
-					v1.ResourceCPU: {
-						Mapping: &resourceapi.NodeAllocatableMapping{
-							CapacityKey:      ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
-							DeviceMultiplier: ptr.To(resource.MustParse("1")),
-						},
-					},
-				}
-				return slice
-			}(),
-			enableDRANodeAllocatableResourcesFeatureGate: true,
-		},
+
 		"bad-node-allocatable-resources-capacityKey-empty": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityKey"), "", "capacityKey must not be an empty string"),
@@ -1709,7 +1676,8 @@ func TestValidateResourceSlice(t *testing.T) {
 				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 					v1.ResourceCPU: {
 						Mapping: &resourceapi.NodeAllocatableMapping{
-							CapacityKey: ptr.To[resourceapi.QualifiedName](""),
+							CapacityKey:        ptr.To[resourceapi.QualifiedName](""),
+							CapacityMultiplier: ptr.To(resource.MustParse("1")),
 						},
 					},
 				}
@@ -1726,7 +1694,8 @@ func TestValidateResourceSlice(t *testing.T) {
 				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 					v1.ResourceCPU: {
 						Mapping: &resourceapi.NodeAllocatableMapping{
-							CapacityKey: ptr.To[resourceapi.QualifiedName]("nonexistent"),
+							CapacityKey:        ptr.To[resourceapi.QualifiedName]("nonexistent"),
+							CapacityMultiplier: ptr.To(resource.MustParse("1")),
 						},
 					},
 				}
@@ -1839,6 +1808,136 @@ func TestValidateResourceSlice(t *testing.T) {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("dra.example.com/gpu"), v1.ResourceName("dra.example.com/gpu"), "must be a node allocatable resource name"),
 			},
+		},
+
+		"bad-node-allocatable-resources-overhead-neither-perpod-nor-percontainer-set": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceMemory)).Child("overhead"), "", "at least one of perPod or perContainer must be set"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceMemory: {
+						Overhead: &resourceapi.NodeAllocatableOverhead{},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-overhead-negative-perpod": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceMemory)).Child("overhead").Child("perPod"), "-1Gi", "must be non-negative"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceMemory: {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod: ptr.To(resource.MustParse("-1Gi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-overhead-negative-percontainer": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceMemory)).Child("overhead").Child("perContainer"), "-500Mi", "must be non-negative"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceMemory: {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerContainer: ptr.To(resource.MustParse("-500Mi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"good-node-allocatable-resources-overhead": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceMemory: {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod:       ptr.To(resource.MustParse("1Gi")),
+							PerContainer: ptr.To(resource.MustParse("500Mi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"good-node-allocatable-resources-both-mapping-and-overhead-set": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:        new[resourceapi.QualifiedName]("dra.example.com/cpu"),
+							CapacityMultiplier: new(resource.MustParse("1")),
+						},
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod: new(resource.MustParse("1Gi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-neither-mapping-nor-overhead-set": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)), "at least one of mapping or overhead must be set"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-capacity-key-set-without-multiplier": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityMultiplier"), "capacityMultiplier is required when capacityKey is set").MarkCoveredByDeclarative(),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey: new[resourceapi.QualifiedName]("dra.example.com/cpu"),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-multiplier-set-without-capacity-key": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityKey"), "capacityKey is required when capacityMultiplier is set").MarkCoveredByDeclarative(),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityMultiplier: new(resource.MustParse("1")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
 		},
 	}
 

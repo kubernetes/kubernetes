@@ -987,38 +987,67 @@ func validateNodeAllocatableResources(mappings map[corev1.ResourceName]resource.
 		}
 
 		if mapping.Mapping == nil && mapping.Overhead == nil {
-			allErrs = append(allErrs, field.Required(keyPath, "exactly one of mapping or overhead must be set"))
-		} else if mapping.Mapping != nil && mapping.Overhead != nil {
-			allErrs = append(allErrs, field.Invalid(keyPath, "", "mapping and overhead are mutually exclusive"))
-		} else if mapping.Mapping != nil {
-			mappingPath := keyPath.Child("mapping")
-			if mapping.Mapping.CapacityKey != nil {
-				if *mapping.Mapping.CapacityKey == "" {
-					allErrs = append(allErrs, field.Invalid(mappingPath.Child("capacityKey"), "", "capacityKey must not be an empty string"))
-				} else if capacities == nil {
-					allErrs = append(allErrs, field.NotFound(mappingPath.Child("capacityKey"), *mapping.Mapping.CapacityKey))
-				} else if _, exists := capacities[*mapping.Mapping.CapacityKey]; !exists {
-					allErrs = append(allErrs, field.NotFound(mappingPath.Child("capacityKey"), *mapping.Mapping.CapacityKey))
-				}
-				if mapping.Mapping.DeviceMultiplier != nil {
-					allErrs = append(allErrs, field.Invalid(mappingPath.Child("deviceMultiplier"), mapping.Mapping.DeviceMultiplier.String(), "must not be set when capacityKey is set"))
-				}
-				if mapping.Mapping.CapacityMultiplier != nil {
-					if mapping.Mapping.CapacityMultiplier.Sign() <= 0 {
-						allErrs = append(allErrs, field.Invalid(mappingPath.Child("capacityMultiplier"), mapping.Mapping.CapacityMultiplier.String(), "must be positive"))
-					}
-				}
-			} else {
-				if mapping.Mapping.CapacityMultiplier != nil {
-					allErrs = append(allErrs, field.Invalid(mappingPath.Child("capacityMultiplier"), mapping.Mapping.CapacityMultiplier.String(), "must not be set when capacityKey is not set"))
-				}
-				if mapping.Mapping.DeviceMultiplier != nil {
-					if mapping.Mapping.DeviceMultiplier.Sign() <= 0 {
-						allErrs = append(allErrs, field.Invalid(mappingPath.Child("deviceMultiplier"), mapping.Mapping.DeviceMultiplier.String(), "must be positive"))
-					}
-				}
+			allErrs = append(allErrs, field.Required(keyPath, "at least one of mapping or overhead must be set"))
+		}
+		if mapping.Mapping != nil {
+			allErrs = append(allErrs, validateNodeAllocatableMapping(mapping.Mapping, capacities, keyPath.Child("mapping"))...)
+		}
+		if mapping.Overhead != nil {
+			allErrs = append(allErrs, validateNodeAllocatableOverheadMapping(mapping.Overhead, keyPath.Child("overhead"))...)
+		}
+	}
+	return allErrs
+}
+
+// validateNodeAllocatableMapping validates a mapped node allocatable resource configuration
+func validateNodeAllocatableMapping(mapping *resource.NodeAllocatableMapping, capacities map[resource.QualifiedName]resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if mapping.CapacityKey != nil {
+		if *mapping.CapacityKey == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("capacityKey"), "", "capacityKey must not be an empty string"))
+		} else {
+			var exists bool
+			if capacities != nil {
+				_, exists = capacities[*mapping.CapacityKey]
+			}
+			if !exists {
+				allErrs = append(allErrs, field.NotFound(fldPath.Child("capacityKey"), *mapping.CapacityKey))
 			}
 		}
+		if mapping.CapacityMultiplier == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("capacityMultiplier"), "capacityMultiplier is required when capacityKey is set").WithOrigin("dependentRequired").MarkCoveredByDeclarative())
+		} else if mapping.CapacityMultiplier.Sign() <= 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("capacityMultiplier"), mapping.CapacityMultiplier.String(), "must be positive"))
+		}
+	}
+
+	if mapping.DeviceMultiplier != nil {
+		if mapping.DeviceMultiplier.Sign() <= 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("deviceMultiplier"), mapping.DeviceMultiplier.String(), "must be positive"))
+		}
+	}
+
+	if mapping.CapacityMultiplier != nil && mapping.CapacityKey == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("capacityKey"), "capacityKey is required when capacityMultiplier is set").WithOrigin("dependentRequired").MarkCoveredByDeclarative())
+	}
+
+	return allErrs
+}
+
+// validateNodeAllocatableOverheadMapping validates an overhead node allocatable resource configuration
+func validateNodeAllocatableOverheadMapping(overhead *resource.NodeAllocatableOverhead, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if overhead.PerPod == nil && overhead.PerContainer == nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "at least one of perPod or perContainer must be set"))
+		return allErrs
+	}
+
+	if overhead.PerPod != nil && overhead.PerPod.Sign() < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("perPod"), overhead.PerPod.String(), "must be non-negative"))
+	}
+
+	if overhead.PerContainer != nil && overhead.PerContainer.Sign() < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("perContainer"), overhead.PerContainer.String(), "must be non-negative"))
 	}
 	return allErrs
 }

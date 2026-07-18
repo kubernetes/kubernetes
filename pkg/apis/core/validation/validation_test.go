@@ -17213,7 +17213,7 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			errorMsg:    "must be non-negative",
 		},
 		{
-			name: "Empty containers list",
+			name: "Valid NodeAllocatableResourceClaimStatus with empty containers",
 			spec: validPodSpec1,
 			podStatus: core.PodStatus{
 				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
@@ -17225,45 +17225,9 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 					},
 				},
 			},
-			expectError: true,
-			errorType:   field.ErrorTypeRequired,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].containers",
-			errorMsg:    "must not be empty",
+			expectError: false,
 		},
-		{
-			name: "Missing ResourceClaimName",
-			spec: validPodSpec1,
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						Containers: []string{"c1"},
-						Mapping: []core.NodeAllocatableMappedResources{
-							{Name: core.ResourceCPU, Quantity: resource.MustParse("1")},
-						},
-					},
-				},
-			},
-			expectError: true,
-			errorType:   field.ErrorTypeRequired,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resourceClaimName",
-			errorMsg:    "must not be empty",
-		},
-		{
-			name: "Empty Resources",
-			spec: validPodSpec1,
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
-					},
-				},
-			},
-			expectError: true,
-			errorType:   field.ErrorTypeRequired,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].mapping",
-			errorMsg:    "must not be empty",
-		},
+
 		{
 			name: "Valid ResourceClaimName from PodSpec",
 			spec: core.PodSpec{
@@ -17347,6 +17311,118 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resourceClaimName",
 			errorMsg:    "not found in PodSpec.ResourceClaims or PodStatus.ResourceClaimStatuses",
+		},
+
+		{
+			name: "Invalid NodeAllocatableResourceClaimStatus overhead neither perPod nor perContainer set",
+			spec: core.PodSpec{
+				Containers:     []core.Container{{Name: "c1", Image: "image"}},
+				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
+			},
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Overhead: []core.NodeAllocatableOverheadResources{
+							{Name: core.ResourceMemory},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0]",
+			errorMsg:    "at least one of perPod or perContainer must be set",
+		},
+		{
+			name: "Invalid NodeAllocatableResourceClaimStatus overhead negative perPod",
+			spec: core.PodSpec{
+				Containers:     []core.Container{{Name: "c1", Image: "image"}},
+				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
+			},
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Overhead: []core.NodeAllocatableOverheadResources{
+							{Name: core.ResourceMemory, PerPod: new(resource.MustParse("-1Gi"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0].perPod",
+			errorMsg:    "must be non-negative",
+		},
+		{
+			name: "Invalid NodeAllocatableResourceClaimStatus overhead negative perContainer",
+			spec: core.PodSpec{
+				Containers:     []core.Container{{Name: "c1", Image: "image"}},
+				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
+			},
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Overhead: []core.NodeAllocatableOverheadResources{
+							{Name: core.ResourceMemory, PerContainer: new(resource.MustParse("-500Mi"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0].perContainer",
+			errorMsg:    "must be non-negative",
+		},
+		{
+			name: "Valid NodeAllocatableResourceClaimStatus overhead both set",
+			spec: core.PodSpec{
+				Containers:     []core.Container{{Name: "c1", Image: "image"}},
+				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
+			},
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Overhead: []core.NodeAllocatableOverheadResources{
+							{
+								Name:         core.ResourceMemory,
+								PerPod:       new(resource.MustParse("1Gi")),
+								PerContainer: new(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Invalid Resource Name in Overhead",
+			spec: core.PodSpec{
+				Containers:     []core.Container{{Name: "c1", Image: "image"}},
+				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
+			},
+			podStatus: core.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "my-claim1",
+						Containers:        []string{"c1"},
+						Overhead: []core.NodeAllocatableOverheadResources{
+							{Name: "example.com/foo", PerPod: new(resource.MustParse("1Gi"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0].name",
+			errorMsg:    "must be a node allocatable resource name",
 		},
 	}
 

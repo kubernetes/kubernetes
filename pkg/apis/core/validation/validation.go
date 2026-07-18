@@ -65,7 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
@@ -6284,7 +6284,7 @@ func validateNodeAllocatableResourceClaimStatus(podStatus core.PodStatus, podSpe
 	for i, nodeAllocatableStatus := range podStatus.NodeAllocatableResourceClaimStatuses {
 		statusFldPath := fldPath.Index(i)
 		if nodeAllocatableStatus.ResourceClaimName == "" {
-			allErrs = append(allErrs, field.Required(statusFldPath.Child("resourceClaimName"), "must not be empty"))
+			continue
 		}
 
 		// First check the podSpec to see if the ResourceClaim is directly referenced.
@@ -6309,28 +6309,51 @@ func validateNodeAllocatableResourceClaimStatus(podStatus core.PodStatus, podSpe
 			allErrs = append(allErrs, field.Invalid(statusFldPath.Child("resourceClaimName"), nodeAllocatableStatus.ResourceClaimName, "no mapping found in pod reference"))
 		}
 
-		// TODO(KEP-5517): Evaluate if its ok to have no containers referencing a node allocatable resource claim.
-		// This is pending on defining kubelet cgroup enforcement.
-		if len(nodeAllocatableStatus.Containers) == 0 {
-			allErrs = append(allErrs, field.Required(statusFldPath.Child("containers"), "must not be empty"))
+		if len(nodeAllocatableStatus.Mapping) > 0 {
+			allErrs = append(allErrs, validateNodeAllocatableMappedResources(nodeAllocatableStatus.Mapping, statusFldPath.Child("mapping"))...)
 		}
-
-		mappingFldPath := statusFldPath.Child("mapping")
-		if len(nodeAllocatableStatus.Mapping) == 0 {
-			allErrs = append(allErrs, field.Required(mappingFldPath, "must not be empty"))
-		}
-
-		for i, mapping := range nodeAllocatableStatus.Mapping {
-			itemPath := mappingFldPath.Index(i)
-			if !v1helper.IsNativeResource(v1.ResourceName(mapping.Name)) {
-				allErrs = append(allErrs, field.Invalid(itemPath.Child("name"), mapping.Name, "must be a node allocatable resource name"))
-			}
-			if mapping.Quantity.Cmp(resource.Quantity{}) < 0 {
-				allErrs = append(allErrs, field.Invalid(itemPath.Child("quantity"), mapping.Quantity.String(), "must be non-negative"))
-			}
+		if len(nodeAllocatableStatus.Overhead) > 0 {
+			allErrs = append(allErrs, validateNodeAllocatableOverheadResources(nodeAllocatableStatus.Overhead, statusFldPath.Child("overhead"))...)
 		}
 	}
 
+	return allErrs
+}
+
+// validateNodeAllocatableMappedResources validates a list of mapped node allocatable resources
+func validateNodeAllocatableMappedResources(mapping []core.NodeAllocatableMappedResources, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, item := range mapping {
+		itemPath := fldPath.Index(i)
+		if !helper.IsNativeResource(item.Name) {
+			allErrs = append(allErrs, field.Invalid(itemPath.Child("name"), item.Name, "must be a node allocatable resource name"))
+		}
+		if item.Quantity != nil && item.Quantity.Cmp(resource.Quantity{}) < 0 {
+			allErrs = append(allErrs, field.Invalid(itemPath.Child("quantity"), item.Quantity.String(), "must be non-negative"))
+		}
+	}
+	return allErrs
+}
+
+// validateNodeAllocatableOverheadResources validates a list of overhead node allocatable resources
+func validateNodeAllocatableOverheadResources(overhead []core.NodeAllocatableOverheadResources, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, item := range overhead {
+		itemPath := fldPath.Index(i)
+		if !helper.IsNativeResource(item.Name) {
+			allErrs = append(allErrs, field.Invalid(itemPath.Child("name"), item.Name, "must be a node allocatable resource name"))
+		}
+		if item.PerPod == nil && item.PerContainer == nil {
+			allErrs = append(allErrs, field.Invalid(itemPath, "", "at least one of perPod or perContainer must be set"))
+		} else {
+			if item.PerPod != nil && item.PerPod.Cmp(resource.Quantity{}) < 0 {
+				allErrs = append(allErrs, field.Invalid(itemPath.Child("perPod"), item.PerPod.String(), "must be non-negative"))
+			}
+			if item.PerContainer != nil && item.PerContainer.Cmp(resource.Quantity{}) < 0 {
+				allErrs = append(allErrs, field.Invalid(itemPath.Child("perContainer"), item.PerContainer.String(), "must be non-negative"))
+			}
+		}
+	}
 	return allErrs
 }
 

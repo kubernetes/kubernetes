@@ -197,7 +197,9 @@ var sliceWithNodeAllocatableResources = func() *resource.ResourceSlice {
 	instanceQuantity := k8sresource.MustParse("1")
 	obj.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resource.NodeAllocatableResource{
 		v1.ResourceCPU: {
-			DeviceMultiplier: &instanceQuantity,
+			Mapping: &resource.NodeAllocatableMapping{
+				DeviceMultiplier: &instanceQuantity,
+			},
 		},
 	}
 	return obj
@@ -887,6 +889,49 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAListTypeAttributes: false},
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithListTypeAttributes.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"keep-existing-fields-node-allocatable-dra-claims": {
+			oldObj: sliceWithNodeAllocatableResources,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithNodeAllocatableResources.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithNodeAllocatableResources.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"drop-fields-node-allocatable-dra-claims-disabled-feature": {
+			oldObj: slice,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithNodeAllocatableResources.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-existing-fields-node-allocatable-dra-claims-disabled-feature": {
+			oldObj: sliceWithNodeAllocatableResources,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithNodeAllocatableResources.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithNodeAllocatableResources.DeepCopy()
 				obj.ResourceVersion = "4"
 				return obj
 			}(),
