@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -731,7 +732,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 					t.Errorf("Unexpected policy name. Have: %q wants %q", rawMgr.policy.Name(), testCase.expectedPolicy)
 				}
 				if rawMgr.topology == nil {
-					t.Errorf("Expected topology to be non-nil for policy '%v'. Have: %q", rawMgr.policy.Name(), rawMgr.topology)
+					t.Errorf("Expected topology to be non-nil for policy '%v'. Have: %v", rawMgr.policy.Name(), rawMgr.topology)
 				}
 			}
 		})
