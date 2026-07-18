@@ -453,17 +453,27 @@ func podLevelResourcesTests(f *framework.Framework) {
 func verifyContainersCgroupLimits(ctx context.Context, f *framework.Framework, pod *v1.Pod) error {
 	var errs []error
 	for _, container := range pod.Spec.Containers {
-		if pod.Spec.Resources != nil && pod.Spec.Resources.Limits.Memory() != nil &&
-			container.Resources.Limits.Memory() == nil {
-			err := cgroups.VerifyContainerMemoryLimit(ctx, f, pod, container.Name, &container.Resources, true)
+		if pod.Spec.Resources != nil && !pod.Spec.Resources.Limits.Memory().IsZero() {
+			expectedResources := &v1.ResourceRequirements{Limits: make(v1.ResourceList)}
+			if container.Resources.Limits.Memory().IsZero() {
+				expectedResources.Limits[v1.ResourceMemory] = pod.Spec.Resources.Limits.Memory().DeepCopy()
+			} else {
+				expectedResources.Limits[v1.ResourceMemory] = container.Resources.Limits.Memory().DeepCopy()
+			}
+			err := cgroups.VerifyContainerMemoryLimit(ctx, f, pod, container.Name, expectedResources, true)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to verify memory limit cgroup value: %w", err))
 			}
 		}
 
-		if pod.Spec.Resources != nil && pod.Spec.Resources.Limits.Cpu() != nil &&
-			container.Resources.Limits.Cpu() == nil {
-			err := cgroups.VerifyContainerCPULimit(ctx, f, pod, container.Name, &container.Resources, true)
+		if pod.Spec.Resources != nil && !pod.Spec.Resources.Limits.Cpu().IsZero() {
+			expectedResources := &v1.ResourceRequirements{Limits: make(v1.ResourceList)}
+			if container.Resources.Limits.Cpu().IsZero() {
+				expectedResources.Limits[v1.ResourceCPU] = pod.Spec.Resources.Limits.Cpu().DeepCopy()
+			} else {
+				expectedResources.Limits[v1.ResourceCPU] = container.Resources.Limits.Cpu().DeepCopy()
+			}
+			err := cgroups.VerifyContainerCPULimit(ctx, f, pod, container.Name, expectedResources, true)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to verify cpu limit cgroup value: %w", err))
 			}
