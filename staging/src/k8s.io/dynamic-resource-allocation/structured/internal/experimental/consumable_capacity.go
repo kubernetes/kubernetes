@@ -48,7 +48,7 @@ func CmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, deviceRequ
 		if _, allocatedFound := clone[name]; allocatedFound {
 			clone[name].Add(consumedCapacity)
 		} else {
-			clone[name] = ptr.To(consumedCapacity)
+			clone[name] = ptr.To(consumedCapacity.DeepCopy())
 		}
 		// If allocatingCapacity contains an entry for this capacity, add its value to clone as well.
 		if allocatingVal, allocatingFound := allocatingCapacity[name]; allocatingFound {
