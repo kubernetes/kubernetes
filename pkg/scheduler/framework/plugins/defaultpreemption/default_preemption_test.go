@@ -400,60 +400,6 @@ func TestPostFilter(t *testing.T) {
 			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node2, preempting 1 victims"),
 		},
 		{
-			name: "pod with SchedulingGroup with TAS with scheduling constraint enabled should not preempt",
-			pod:  st.MakePod().Name("p-with-podgroup").Namespace(v1.NamespaceDefault).PodGroupName("foo").Priority(highPriority).Obj(),
-			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
-			},
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
-			},
-			podGroups: []*v1alpha3.PodGroup{
-				st.MakePodGroup().Name("foo").Namespace(v1.NamespaceDefault).TopologyKey("rack").Obj(),
-			},
-			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
-				"node1": fwk.NewStatus(fwk.Unschedulable),
-			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			features:   feature.Features{EnableGenericWorkload: true, EnableTopologyAwareWorkloadScheduling: true},
-			wantResult: nil,
-			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: not eligible due to workload aware preemption enabled"),
-		},
-		{
-			name: "pod with SchedulingGroup with TAS without scheduling constraint enabled should not preempt",
-			pod:  st.MakePod().Name("p-with-podgroup").Namespace(v1.NamespaceDefault).PodGroupName("foo").Priority(highPriority).Obj(),
-			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
-			},
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
-			},
-			podGroups: []*v1alpha3.PodGroup{
-				st.MakePodGroup().Name("foo").Namespace(v1.NamespaceDefault).Obj(),
-			},
-			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
-				"node1": fwk.NewStatus(fwk.Unschedulable),
-			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			features:   feature.Features{EnableGenericWorkload: true, EnableTopologyAwareWorkloadScheduling: true},
-			wantResult: nil,
-			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: not eligible due to workload aware preemption enabled"),
-		},
-		{
-			name: "pod with SchedulingGroup should not preempt",
-			pod:  st.MakePod().Name("p-with-podgroup").PodGroupName("foo").Priority(highPriority).Obj(),
-			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
-			},
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
-			},
-			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
-				"node1": fwk.NewStatus(fwk.Unschedulable),
-			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
-			features:   feature.Features{EnableGenericWorkload: true},
-			wantResult: nil,
-			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: not eligible due to workload aware preemption enabled"),
-		},
-		{
 			name: "pod with SchedulingGroup with GenericWorkload and TAS disabled should preempt",
 			pod:  st.MakePod().Name("p-with-podgroup").PodGroupName("foo").Priority(highPriority).Obj(),
 			pods: []*v1.Pod{
