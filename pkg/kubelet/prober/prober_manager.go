@@ -77,6 +77,13 @@ type Manager interface {
 	// pod created.
 	AddPod(ctx context.Context, pod *v1.Pod)
 
+	// StartContainerProbes starts probe workers for a started container. It is idempotent
+	// and safe to call multiple times for the same container.
+	StartContainerProbes(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID, podIP string, containerStartTime time.Time)
+
+	// StopContainerProbes handles stopping probe workers for a terminated container.
+	StopContainerProbes(podUID types.UID, containerName string)
+
 	// StopLivenessAndStartup handles stopping liveness and startup probes during termination.
 	StopLivenessAndStartup(pod *v1.Pod)
 
@@ -200,7 +207,10 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 			}
 			w := newWorker(m, startup, pod, c)
 			m.workers[key] = w
-			go w.run(ctx)
+			if !utilfeature.DefaultFeatureGate.Enabled(features.ContainerLifecycleProber) {
+				w.running.Store(true)
+				go w.run(ctx)
+			}
 		}
 
 		if c.ReadinessProbe != nil {
@@ -212,7 +222,10 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 			}
 			w := newWorker(m, readiness, pod, c)
 			m.workers[key] = w
-			go w.run(ctx)
+			if !utilfeature.DefaultFeatureGate.Enabled(features.ContainerLifecycleProber) {
+				w.running.Store(true)
+				go w.run(ctx)
+			}
 		}
 
 		if c.LivenessProbe != nil {
@@ -224,14 +237,146 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 			}
 			w := newWorker(m, liveness, pod, c)
 			m.workers[key] = w
-			go w.run(ctx)
+			if !utilfeature.DefaultFeatureGate.Enabled(features.ContainerLifecycleProber) {
+				w.running.Store(true)
+				go w.run(ctx)
+			}
+		}
+	}
+}
+
+// StartContainerProbes starts probe workers for a started container. It is idempotent for a
+// given container instance and safe to call multiple times (e.g. on every SyncPod). If the
+// containerID differs from the one currently being probed (a container restart that did not
+// go through StopContainerProbes, such as a crash-restart), the stale workers are torn down
+// and recreated for the new instance.
+func (m *manager) StartContainerProbes(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID, podIP string, containerStartTime time.Time) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ContainerLifecycleProber) {
+		return
+	}
+	m.workerLock.Lock()
+	defer m.workerLock.Unlock()
+
+	m.resetStaleWorkersLocked(pod, container, containerID)
+	m.ensureWorkersLocked(pod, *container)
+
+	if container.StartupProbe != nil {
+		// Only the startup probe runs initially; readiness and liveness are activated once
+		// the startup probe succeeds (see worker.startDependents).
+		m.startWorkerLocked(ctx, pod, container, startup, containerID, podIP, containerStartTime)
+	} else {
+		m.startLivenessAndReadinessLocked(ctx, pod, container, containerID, podIP, containerStartTime)
+	}
+}
+
+// resetStaleWorkersLocked stops any workers for the container that are bound to a
+// previous container instance and removes them from m.workers. This handles container restarts
+// that do not go through killContainer/StopContainerProbes. Caller must hold workerLock.
+func (m *manager) resetStaleWorkersLocked(pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID) {
+	key := probeKey{podUID: pod.UID, containerName: container.Name}
+	for _, probeType := range [...]probeType{readiness, liveness, startup} {
+		key.probeType = probeType
+		if w, ok := m.workers[key]; ok && !w.containerID.IsEmpty() && w.containerID != containerID {
+			w.stop()
+			delete(m.workers, key)
+		}
+	}
+}
+
+// startWorkerLocked activates the probe worker of the given type for a container instance,
+// launching its probe loop. It is a no-op if no probe of that type is configured or the worker
+// is already probing the given container instance.
+//
+// 1-to-1 Worker-to-Goroutine Lifecycle:
+// To avoid race conditions between exiting probe goroutines and newly launched container instances,
+// worker structs are not reused across container runs. Each startWorkerLocked call creates a fresh
+// *worker instance for the specific containerID. When a previous worker's goroutine exits, its cleanup
+// defer (removeWorkerIfCurrent) only removes m.workers entries that still point to that specific worker,
+// preventing stale goroutines from deleting active workers.
+// Caller must hold workerLock.
+func (m *manager) startWorkerLocked(ctx context.Context, pod *v1.Pod, container *v1.Container, probeType probeType, containerID kubecontainer.ContainerID, podIP string, containerStartTime time.Time) {
+	key := probeKey{podUID: pod.UID, containerName: container.Name, probeType: probeType}
+	w, ok := m.workers[key]
+	if !ok {
+		// No probe of this type is configured for the container.
+		return
+	}
+	if w.running.Load() && w.containerID == containerID {
+		// Already probing this container instance.
+		return
+	}
+	if w.running.Load() {
+		// Probing a different container instance; signal it to stop.
+		w.stop()
+	}
+
+	w = newWorker(m, probeType, pod, *container)
+	w.containerID = containerID
+	w.podIP = podIP
+	w.containerStartTime = containerStartTime
+	w.running.Store(true)
+	m.workers[key] = w
+	go w.run(ctx)
+}
+
+// startLivenessAndReadinessLocked activates readiness and liveness probe workers for a container.
+// Caller must hold workerLock.
+func (m *manager) startLivenessAndReadinessLocked(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID, podIP string, containerStartTime time.Time) {
+	m.startWorkerLocked(ctx, pod, container, readiness, containerID, podIP, containerStartTime)
+	m.startWorkerLocked(ctx, pod, container, liveness, containerID, podIP, containerStartTime)
+}
+
+// startLivenessAndReadiness is called upon startup probe success to immediately transition to
+// running readiness and liveness probes without sync loop delay.
+func (m *manager) startLivenessAndReadiness(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID, podIP string, containerStartTime time.Time) {
+	m.workerLock.Lock()
+	defer m.workerLock.Unlock()
+	m.startLivenessAndReadinessLocked(ctx, pod, container, containerID, podIP, containerStartTime)
+}
+
+func (m *manager) StopContainerProbes(podUID types.UID, containerName string) {
+	m.workerLock.Lock()
+	defer m.workerLock.Unlock()
+
+	key := probeKey{podUID: podUID, containerName: containerName}
+	for _, probeType := range [...]probeType{readiness, liveness, startup} {
+		key.probeType = probeType
+		if worker, ok := m.workers[key]; ok {
+			worker.stop()
+			if !worker.running.Load() {
+				delete(m.workers, key)
+			}
+		}
+	}
+}
+
+// ensureWorkersLocked guarantees that probe worker entries are allocated in
+// m.workers for any configured probes. Caller must hold workerLock.
+func (m *manager) ensureWorkersLocked(pod *v1.Pod, c v1.Container) {
+	key := probeKey{podUID: pod.UID, containerName: c.Name}
+	if c.StartupProbe != nil {
+		key.probeType = startup
+		if _, ok := m.workers[key]; !ok {
+			m.workers[key] = newWorker(m, startup, pod, c)
+		}
+	}
+	if c.ReadinessProbe != nil {
+		key.probeType = readiness
+		if _, ok := m.workers[key]; !ok {
+			m.workers[key] = newWorker(m, readiness, pod, c)
+		}
+	}
+	if c.LivenessProbe != nil {
+		key.probeType = liveness
+		if _, ok := m.workers[key]; !ok {
+			m.workers[key] = newWorker(m, liveness, pod, c)
 		}
 	}
 }
 
 func (m *manager) StopLivenessAndStartup(pod *v1.Pod) {
-	m.workerLock.RLock()
-	defer m.workerLock.RUnlock()
+	m.workerLock.Lock()
+	defer m.workerLock.Unlock()
 
 	key := probeKey{podUID: pod.UID}
 	for _, c := range pod.Spec.Containers {
@@ -240,14 +385,17 @@ func (m *manager) StopLivenessAndStartup(pod *v1.Pod) {
 			key.probeType = probeType
 			if worker, ok := m.workers[key]; ok {
 				worker.stop()
+				if !worker.running.Load() {
+					delete(m.workers, key)
+				}
 			}
 		}
 	}
 }
 
 func (m *manager) RemovePod(pod *v1.Pod) {
-	m.workerLock.RLock()
-	defer m.workerLock.RUnlock()
+	m.workerLock.Lock()
+	defer m.workerLock.Unlock()
 
 	key := probeKey{podUID: pod.UID}
 	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {
@@ -256,18 +404,24 @@ func (m *manager) RemovePod(pod *v1.Pod) {
 			key.probeType = probeType
 			if worker, ok := m.workers[key]; ok {
 				worker.stop()
+				if !worker.running.Load() {
+					delete(m.workers, key)
+				}
 			}
 		}
 	}
 }
 
 func (m *manager) CleanupPods(desiredPods map[types.UID]sets.Empty) {
-	m.workerLock.RLock()
-	defer m.workerLock.RUnlock()
+	m.workerLock.Lock()
+	defer m.workerLock.Unlock()
 
 	for key, worker := range m.workers {
 		if _, ok := desiredPods[key.podUID]; !ok {
 			worker.stop()
+			if !worker.running.Load() {
+				delete(m.workers, key)
+			}
 		}
 	}
 }
@@ -348,7 +502,7 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 			// The check whether there is a probe which hasn't run yet.
 			w, exists := m.getWorker(pod.UID, c.Name, readiness)
 			ready = !exists // no readinessProbe -> always ready
-			if exists {
+			if exists && !utilfeature.DefaultFeatureGate.Enabled(features.ContainerLifecycleProber) {
 				// Trigger an immediate run of the readinessProbe to update ready state
 				select {
 				case w.manualTriggerCh <- struct{}{}:
@@ -403,7 +557,7 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 			// The check whether there is a probe which hasn't run yet.
 			w, exists := m.getWorker(pod.UID, c.Name, readiness)
 			ready = !exists // no readinessProbe -> always ready
-			if exists {
+			if exists && !utilfeature.DefaultFeatureGate.Enabled(features.ContainerLifecycleProber) {
 				// Trigger an immediate run of the readinessProbe to update ready state
 				select {
 				case w.manualTriggerCh <- struct{}{}:
@@ -426,11 +580,16 @@ func (m *manager) getWorker(podUID types.UID, containerName string, probeType pr
 	return worker, ok
 }
 
-// Called by the worker after exiting.
-func (m *manager) removeWorker(podUID types.UID, containerName string, probeType probeType) {
+// removeWorkerIfCurrent is called by a worker after exiting. It deletes the worker from the
+// map only if it is still the registered worker for its key, so that a replacement worker
+// installed for a new container instance is not removed by the exiting goroutine of a prior one.
+func (m *manager) removeWorkerIfCurrent(w *worker) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
-	delete(m.workers, probeKey{podUID, containerName, probeType})
+	key := probeKey{w.pod.UID, w.container.Name, w.probeType}
+	if m.workers[key] == w {
+		delete(m.workers, key)
+	}
 }
 
 // workerCount returns the total number of probe workers. For testing.

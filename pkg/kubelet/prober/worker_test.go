@@ -614,6 +614,7 @@ func testCleanUp(tCtx ktesting.TContext) {
 		key := probeKey{testPodUID, testContainerName, probeType}
 		w := newTestWorker(m, probeType, v1.Probe{})
 		m.statusManager.SetPodStatus(tCtx.Logger(), w.pod, getTestRunningStatusWithStarted(probeType != startup))
+		w.running.Store(true)
 		go w.run(tCtx)
 		m.workers[key] = w
 
@@ -1109,5 +1110,145 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 				t.Errorf("Expected result %v, but got: %v", tc.expectedResult, result)
 			}
 		})
+	}
+}
+
+// TestSequentialProbeTransition exercises the startup -> readiness/liveness cascade, which
+// only exists when the feature is enabled. It is not run with the feature off: the cascade is
+// a no-op there, and AddPod would launch the worker goroutine itself, racing with the manual
+// doProbe call below.
+func TestSequentialProbeTransition(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerLifecycleProber: true,
+	})
+	ktesting.Init(t).SyncTest("", testSequentialProbeTransition)
+}
+
+func testSequentialProbeTransition(tCtx ktesting.TContext) {
+	t := tCtx.TB()
+	ctx := tCtx.Context
+
+	probeSpec := &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			Exec: &v1.ExecAction{Command: []string{"test"}},
+		},
+		PeriodSeconds:    1,
+		TimeoutSeconds:   1,
+		SuccessThreshold: 1,
+		FailureThreshold: 1,
+	}
+
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "sequential_pod"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:           "test_container",
+					StartupProbe:   probeSpec,
+					ReadinessProbe: probeSpec,
+					LivenessProbe:  probeSpec,
+				},
+			},
+		},
+	}
+
+	m := newTestManager()
+	defer cleanup(t, m)
+
+	m.AddPod(ctx, &pod)
+
+	cID := kubecontainer.ContainerID{Type: "docker", ID: "cid-seq"}
+	now := time.Now()
+
+	podStatus := getTestRunningStatusWithStarted(false)
+	podStatus.ContainerStatuses[0].Name = "test_container"
+	podStatus.ContainerStatuses[0].ContainerID = cID.String()
+	m.statusManager.SetPodStatus(tCtx.Logger(), &pod, podStatus)
+
+	startupWorker, ok := m.getWorker("sequential_pod", "test_container", startup)
+	if !ok {
+		t.Fatalf("startup worker not found")
+	}
+
+	startupWorker.containerID = cID
+	startupWorker.podIP = "10.0.0.1"
+	startupWorker.containerStartTime = now
+
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+
+	// Executing doProbe for startup probe with fakeExecProber (Success).
+	startupWorker.doProbe(ctx)
+	if !startupWorker.onHold {
+		t.Errorf("expected startup worker to be on hold upon success")
+	}
+
+	// Verify startupManager cached result is Success.
+	res, ok := m.startupManager.Get(cID)
+	if !ok || res != results.Success {
+		t.Errorf("expected startupManager result to be Success, got %v (ok=%v)", res, ok)
+	}
+
+	// Verify readiness and liveness workers were started.
+	readinessWorker, ok := m.getWorker("sequential_pod", "test_container", readiness)
+	if !ok || !readinessWorker.running.Load() {
+		t.Errorf("expected readiness worker to be started after startup success")
+	}
+	livenessWorker, ok := m.getWorker("sequential_pod", "test_container", liveness)
+	if !ok || !livenessWorker.running.Load() {
+		t.Errorf("expected liveness worker to be started after startup success")
+	}
+}
+
+// TestInitialDelayWithContainerStartTime verifies the initial delay is measured from the
+// runtime-reported container start time, which only applies when the feature is enabled.
+// It is not run with the feature off: that override is gated off, and AddPod would launch the
+// worker goroutine itself, racing with the manual doProbe call below.
+func TestInitialDelayWithContainerStartTime(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerLifecycleProber: true,
+	})
+	ktesting.Init(t).SyncTest("", testInitialDelayWithContainerStartTime)
+}
+
+func testInitialDelayWithContainerStartTime(tCtx ktesting.TContext) {
+	t := tCtx.TB()
+	ctx := tCtx.Context
+
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "delay_pod"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "delayed_container",
+					ReadinessProbe: &v1.Probe{
+						ProbeHandler:        v1.ProbeHandler{Exec: &v1.ExecAction{}},
+						InitialDelaySeconds: 30,
+						PeriodSeconds:       1,
+					},
+				},
+			},
+		},
+	}
+
+	m := newTestManager()
+	defer cleanup(t, m)
+
+	m.AddPod(ctx, &pod)
+
+	cID := kubecontainer.ContainerID{Type: "docker", ID: "cid-delay"}
+	now := time.Now()
+
+	m.StartContainerProbes(ctx, &pod, &pod.Spec.Containers[0], cID, "10.0.0.1", now)
+
+	worker, ok := m.getWorker("delay_pod", "delayed_container", readiness)
+	if !ok {
+		t.Fatalf("readiness worker not found")
+	}
+
+	// Immediate probe should be skipped due to 30s InitialDelaySeconds.
+	worker.doProbe(ctx)
+
+	if _, ok := m.readinessManager.Get(cID); ok {
+		t.Errorf("expected probe result not to be recorded yet during initial delay")
 	}
 }
