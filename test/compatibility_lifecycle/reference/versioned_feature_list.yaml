@@ -215,6 +215,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
+- name: ContainerLifecycleProber
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: ContainerRestartRules
   versionedSpecs:
   - default: false

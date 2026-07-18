@@ -158,6 +158,11 @@ const (
 	// Enables container Checkpoint support in the kubelet
 	ContainerCheckpoint featuregate.Feature = "ContainerCheckpoint"
 
+	// owner: @troychiu
+	//
+	// Enables container-lifecycle-driven probe management in kubelet.
+	ContainerLifecycleProber featuregate.Feature = "ContainerLifecycleProber"
+
 	// onwer: @yuanwang04
 	// kep: https://kep.k8s.io/5307
 	//
@@ -1284,6 +1289,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	ContainerLifecycleProber: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	ContainerRestartRules: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2314,6 +2323,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	CompositePodGroup: {GenericWorkload, TopologyAwareWorkloadScheduling},
 
 	ContainerCheckpoint: {},
+
+	ContainerLifecycleProber: {},
 
 	ContainerRestartRules: {},
 
