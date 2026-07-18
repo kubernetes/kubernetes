@@ -43,7 +43,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/coreos/go-oidc"
+	"github.com/coreos/go-oidc/v3/oidc"
 	celgo "github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
@@ -68,11 +68,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var (
-	// synchronizeTokenIDVerifierForTest should be set to true to force a
-	// wait until the token ID verifiers are ready.
-	synchronizeTokenIDVerifierForTest = false
-)
+// synchronizeTokenIDVerifierForTest should be set to true to force a
+// wait until the token ID verifiers are ready.
+var synchronizeTokenIDVerifierForTest = false
 
 const (
 	wellKnownEndpointPath = "/.well-known/openid-configuration"
