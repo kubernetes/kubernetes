@@ -44,6 +44,8 @@ func (s *sortedNodeScores) Len() int {
 }
 
 // UnorderedList returns all nodes in heap-internal order (not sorted by score).
+// Only the outer slice is copied. Each NodePluginScores.Scores slice is still
+// shared with the heap. Callers must not mutate the returned elements.
 func (s *sortedNodeScores) UnorderedList() []fwk.NodePluginScores {
 	result := make([]fwk.NodePluginScores, len(s.nodes))
 	copy(result, s.nodes)
