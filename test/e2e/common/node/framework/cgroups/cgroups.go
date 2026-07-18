@@ -244,9 +244,6 @@ func VerifyContainerCPULimit(ctx context.Context, f *framework.Framework, pod *v
 func VerifyContainerMemoryLimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	memLimCgPath := getCgroupMemLimitPath(cgroupFsPath, podOnCgroupv2)
 	memLim := expectedResources.Limits.Memory()
-	if memLim.IsZero() && pod.Spec.Resources != nil {
-		memLim = pod.Spec.Resources.Limits.Memory()
-	}
 	expectedMemLim := getExpectedMemLimitString(memLim, podOnCgroupv2)
 	if expectedMemLim == "0" {
 		return nil
