@@ -546,5 +546,79 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("mapTypedefField"), obj.MapTypedefField, oldVal, oldObj != nil)...)
 	}
 
+	{ // field Struct.ChainedOptionalField (string)
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			if e := validate.OptionalPointerChained(ctx, op, fldPath, obj, oldObj,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ChainedOptionalField")
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return oldObj.ChainedOptionalField
+			})
+		errs = append(errs, fn(fldPath.Child("chainedOptionalField"), obj.ChainedOptionalField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.ChainedOptionalSubfield (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/optional.NestedStruct)
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *NestedStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			func() { // cohort = "structPtrField"
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "structPtrField",
+					func(o *NestedStruct) *AnotherStruct {
+						if o == nil {
+							return nil
+						}
+						return o.StructPtrField
+					}, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *AnotherStruct) field.ErrorList {
+						return validate.OptionalPointerChained(ctx, op, fldPath, obj, oldObj,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *AnotherStruct) field.ErrorList {
+								return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
+									func(o *AnotherStruct) *string {
+										if o == nil {
+											return nil
+										}
+										return &o.StringField
+									}, validate.DirectEqual,
+									func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+										return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ChainedOptionalSubfield.StructPtrField.StringField")
+									})
+							})
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
+			}()
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *NestedStruct {
+				return &oldObj.ChainedOptionalSubfield
+			})
+		errs = append(errs, fn(fldPath.Child("chainedOptionalSubfield"), &obj.ChainedOptionalSubfield, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }

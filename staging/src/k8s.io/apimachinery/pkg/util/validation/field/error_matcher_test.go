@@ -645,7 +645,7 @@ func TestErrorMatcher_Render(t *testing.T) {
 			name:     "single field - value with nil",
 			matcher:  ErrorMatcher{}.ByValue(),
 			err:      Invalid(NewPath("field"), nil, "detail"),
-			expected: `{Value=<nil>}`,
+			expected: `{Value=null}`,
 		},
 		{
 			name:     "multiple fields",

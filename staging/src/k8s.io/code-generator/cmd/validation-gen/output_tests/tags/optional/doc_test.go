@@ -19,7 +19,7 @@ package optional
 import (
 	"testing"
 
-	"k8s.io/utils/ptr"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func Test(t *testing.T) {
@@ -31,31 +31,44 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		StringField:           "abc",
-		StringPtrField:        ptr.To("xyz"),
+		StringPtrField:        new("xyz"),
 		StringTypedefField:    StringType("abc"),
-		StringTypedefPtrField: ptr.To(StringType("xyz")),
+		StringTypedefPtrField: new(StringType("xyz")),
 		IntField:              123,
-		IntPtrField:           ptr.To(456),
+		IntPtrField:           new(456),
 		IntTypedefField:       IntType(123),
-		IntTypedefPtrField:    ptr.To(IntType(456)),
+		IntTypedefPtrField:    new(IntType(456)),
 		OtherStructPtrField:   &OtherStruct{},
 		SliceField:            []string{"a", "b"},
 		SliceTypedefField:     SliceType([]string{"a", "b"}),
 		MapField:              map[string]string{"a": "b", "c": "d"},
 		MapTypedefField:       MapType(map[string]string{"a": "b", "c": "d"}),
-	}).ExpectValidateFalseByPath(map[string][]string{
-		"stringField":           {"field Struct.StringField"},
-		"stringPtrField":        {"field Struct.StringPtrField"},
-		"stringTypedefField":    {"field Struct.StringTypedefField", "type StringType"},
-		"stringTypedefPtrField": {"field Struct.StringTypedefPtrField", "type StringType"},
-		"intField":              {"field Struct.IntField"},
-		"intPtrField":           {"field Struct.IntPtrField"},
-		"intTypedefField":       {"field Struct.IntTypedefField", "type IntType"},
-		"intTypedefPtrField":    {"field Struct.IntTypedefPtrField", "type IntType"},
-		"otherStructPtrField":   {"type OtherStruct", "field Struct.OtherStructPtrField"},
-		"sliceField":            {"field Struct.SliceField"},
-		"sliceTypedefField":     {"field Struct.SliceTypedefField", "type SliceType"},
-		"mapField":              {"field Struct.MapField"},
-		"mapTypedefField":       {"field Struct.MapTypedefField", "type MapType"},
+		ChainedOptionalField:  new("short"),
+		ChainedOptionalSubfield: NestedStruct{
+			StructPtrField: &AnotherStruct{StringField: "s"},
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring(), field.ErrorList{
+		field.Invalid(field.NewPath("stringField"), nil, "field Struct.StringField"),
+		field.Invalid(field.NewPath("stringPtrField"), nil, "field Struct.StringPtrField"),
+		field.Invalid(field.NewPath("stringTypedefField"), nil, "field Struct.StringTypedefField"),
+		field.Invalid(field.NewPath("stringTypedefField"), nil, "type StringType"),
+		field.Invalid(field.NewPath("stringTypedefPtrField"), nil, "field Struct.StringTypedefPtrField"),
+		field.Invalid(field.NewPath("stringTypedefPtrField"), nil, "type StringType"),
+		field.Invalid(field.NewPath("intField"), nil, "field Struct.IntField"),
+		field.Invalid(field.NewPath("intPtrField"), nil, "field Struct.IntPtrField"),
+		field.Invalid(field.NewPath("intTypedefField"), nil, "field Struct.IntTypedefField"),
+		field.Invalid(field.NewPath("intTypedefField"), nil, "type IntType"),
+		field.Invalid(field.NewPath("intTypedefPtrField"), nil, "field Struct.IntTypedefPtrField"),
+		field.Invalid(field.NewPath("intTypedefPtrField"), nil, "type IntType"),
+		field.Invalid(field.NewPath("otherStructPtrField"), nil, "type OtherStruct"),
+		field.Invalid(field.NewPath("otherStructPtrField"), nil, "field Struct.OtherStructPtrField"),
+		field.Invalid(field.NewPath("sliceField"), nil, "field Struct.SliceField"),
+		field.Invalid(field.NewPath("sliceTypedefField"), nil, "field Struct.SliceTypedefField"),
+		field.Invalid(field.NewPath("sliceTypedefField"), nil, "type SliceType"),
+		field.Invalid(field.NewPath("mapField"), nil, "field Struct.MapField"),
+		field.Invalid(field.NewPath("mapTypedefField"), nil, "field Struct.MapTypedefField"),
+		field.Invalid(field.NewPath("mapTypedefField"), nil, "type MapType"),
+		field.Invalid(field.NewPath("chainedOptionalField"), nil, "field Struct.ChainedOptionalField"),
+		field.Invalid(field.NewPath("chainedOptionalSubfield.structPtrField.stringField"), nil, "field Struct.ChainedOptionalSubfield.StructPtrField.StringField"),
 	})
 }

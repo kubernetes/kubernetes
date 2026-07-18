@@ -37,14 +37,15 @@ const (
 )
 
 func init() {
-	RegisterTagValidator(requirednessTagValidator{requirednessRequired})
-	RegisterTagValidator(requirednessTagValidator{requirednessOptional})
-	RegisterTagValidator(requirednessTagValidator{requirednessForbidden})
+	RegisterTagValidator(&requirednessTagValidator{mode: requirednessRequired})
+	RegisterTagValidator(&requirednessTagValidator{mode: requirednessOptional})
+	RegisterTagValidator(&requirednessTagValidator{mode: requirednessForbidden})
 }
 
 // requirednessTagValidator implements multiple modes of requiredness.
 type requirednessTagValidator struct {
-	mode requirednessMode
+	mode      requirednessMode
+	validator TagValidationExtractor
 }
 
 type requirednessMode string
@@ -55,7 +56,9 @@ const (
 	requirednessForbidden requirednessMode = forbiddenTagName
 )
 
-func (requirednessTagValidator) Init(_ Config) {}
+func (rtv *requirednessTagValidator) Init(cfg Config) {
+	rtv.validator = cfg.TagValidator
+}
 
 func (rtv requirednessTagValidator) TagName() string {
 	return string(rtv.mode)
@@ -67,12 +70,12 @@ func (requirednessTagValidator) ValidScopes() sets.Set[Scope] {
 	return requirednessTagValidScopes
 }
 
-func (rtv requirednessTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
+func (rtv requirednessTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	switch rtv.mode {
 	case requirednessRequired:
 		return rtv.doRequired(context)
 	case requirednessOptional:
-		return rtv.doOptional(context)
+		return rtv.doOptional(context, tag)
 	case requirednessForbidden:
 		return rtv.doForbidden(context)
 	}
@@ -113,13 +116,17 @@ func (rtv requirednessTagValidator) doRequired(context Context) (Validations, er
 }
 
 var (
-	optionalValueValidator   = types.Name{Package: libValidationPkg, Name: "OptionalValue"}
-	optionalPointerValidator = types.Name{Package: libValidationPkg, Name: "OptionalPointer"}
-	optionalSliceValidator   = types.Name{Package: libValidationPkg, Name: "OptionalSlice"}
-	optionalMapValidator     = types.Name{Package: libValidationPkg, Name: "OptionalMap"}
+	optionalValueValidator          = types.Name{Package: libValidationPkg, Name: "OptionalValue"}
+	optionalPointerValidator        = types.Name{Package: libValidationPkg, Name: "OptionalPointer"}
+	optionalSliceValidator          = types.Name{Package: libValidationPkg, Name: "OptionalSlice"}
+	optionalMapValidator            = types.Name{Package: libValidationPkg, Name: "OptionalMap"}
+	optionalValueChainedValidator   = types.Name{Package: libValidationPkg, Name: "OptionalValueChained"}
+	optionalPointerChainedValidator = types.Name{Package: libValidationPkg, Name: "OptionalPointerChained"}
+	optionalSliceChainedValidator   = types.Name{Package: libValidationPkg, Name: "OptionalSliceChained"}
+	optionalMapChainedValidator     = types.Name{Package: libValidationPkg, Name: "OptionalMapChained"}
 )
 
-func (rtv requirednessTagValidator) doOptional(context Context) (Validations, error) {
+func (rtv requirednessTagValidator) doOptional(context Context, tag codetags.Tag) (Validations, error) {
 	// All of our tags are expressed from the perspective of a client of the
 	// API, but the code we generate is for the server. Optional is tricky.
 	//
@@ -158,6 +165,13 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 		for i, fn := range validations.Functions {
 			validations.Functions[i] = fn.WithComment("optional fields with default values are effectively required")
 		}
+		if tag.ValueTag != nil {
+			nestedValidations, err := rtv.validator.ExtractTagValidations(context, *tag.ValueTag)
+			if err != nil {
+				return Validations{}, err
+			}
+			validations.Add(nestedValidations)
+		}
 		return validations, nil
 	}
 
@@ -165,22 +179,122 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 	// originally defined as a value-type or a pointer-type in the API.  This
 	// one does.  Since Go doesn't do partial specialization of templates, we
 	// do manual dispatch here.
+	if tag.ValueTag == nil {
+		switch util.NativeType(context.Type).Kind {
+		case types.Slice:
+			return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalSliceValidator)}}, nil
+		case types.Map:
+			return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalMapValidator)}}, nil
+		case types.Pointer:
+			return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalPointerValidator)}}, nil
+		case types.Struct:
+			// The +k8s:optional tag on a non-pointer struct is not supported.
+			// If you encounter this error and believe you have a valid use case
+			// for forbiddening a non-pointer struct, please let us know! We need
+			// to understand your scenario to determine if we need to adjust
+			// this behavior or provide alternative validation mechanisms.
+			return Validations{}, fmt.Errorf("non-pointer structs cannot use the %q tag", optionalTagName)
+		}
+		return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalValueValidator)}}, nil
+	}
+
+	nestedValidations, err := rtv.validator.ExtractTagValidations(context, *tag.ValueTag)
+	if err != nil {
+		return Validations{}, err
+	}
+
+	var validatorName types.Name
 	switch util.NativeType(context.Type).Kind {
 	case types.Slice:
-		return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalSliceValidator)}}, nil
+		validatorName = optionalSliceChainedValidator
 	case types.Map:
-		return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalMapValidator)}}, nil
+		validatorName = optionalMapChainedValidator
 	case types.Pointer:
-		return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalPointerValidator)}}, nil
+		validatorName = optionalPointerChainedValidator
 	case types.Struct:
-		// The +k8s:optional tag on a non-pointer struct is not supported.
-		// If you encounter this error and believe you have a valid use case
-		// for forbiddening a non-pointer struct, please let us know! We need
-		// to understand your scenario to determine if we need to adjust
-		// this behavior or provide alternative validation mechanisms.
 		return Validations{}, fmt.Errorf("non-pointer structs cannot use the %q tag", optionalTagName)
+	default:
+		validatorName = optionalValueChainedValidator
 	}
-	return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalValueValidator)}}, nil
+
+	return deferWrap(nil, nestedValidations, context.Type, validatorName, optionalTagName)
+}
+
+func sortFunctions(fns []FunctionGen) []FunctionGen {
+	sooner := make([]FunctionGen, 0, len(fns))
+	later := make([]FunctionGen, 0, len(fns))
+	for _, fg := range fns {
+		if fg.Flags.IsSet(ShortCircuit) {
+			sooner = append(sooner, fg)
+		} else {
+			later = append(later, fg)
+		}
+	}
+	return append(sooner, later...)
+}
+
+func wrapValidations(v Validations, objType *types.Type) (any, error) {
+	if len(v.Functions) == 0 {
+		return nil, fmt.Errorf("no functions to wrap")
+	}
+	sortedFns := sortFunctions(v.Functions)
+	if len(sortedFns) == 1 {
+		return WrapperFunction{Function: sortedFns[0], ObjType: objType}, nil
+	}
+	return MultiWrapperFunction{Functions: sortedFns, ObjType: objType}, nil
+}
+
+func deferWrap(accumulatedFunctions []FunctionGen, nested Validations, objType *types.Type, validatorName types.Name, optionalTagName string) (Validations, error) {
+	// Add currently resolved functions to accumulated.
+	accumulatedFunctions = append(accumulatedFunctions, nested.Functions...)
+
+	if len(nested.Deferred) == 0 {
+		if len(accumulatedFunctions) == 0 {
+			// If no functions resolved, fallback to non-chained.
+			var fallbackName types.Name
+			switch validatorName {
+			case optionalSliceChainedValidator:
+				fallbackName = optionalSliceValidator
+			case optionalMapChainedValidator:
+				fallbackName = optionalMapValidator
+			case optionalPointerChainedValidator:
+				fallbackName = optionalPointerValidator
+			case optionalValueChainedValidator:
+				fallbackName = optionalValueValidator
+			default:
+				return Validations{}, fmt.Errorf("unknown chained validator: %v", validatorName)
+			}
+			return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, fallbackName)}}, nil
+		}
+		tempVal := Validations{Functions: accumulatedFunctions}
+		wrapped, err := wrapValidations(tempVal, objType)
+		if err != nil {
+			return Validations{}, err
+		}
+		var validations Validations
+		validations.Variables = nested.Variables
+		validations.AddFunction(Function(optionalTagName, DefaultFlags, validatorName, wrapped))
+		return validations, nil
+	}
+
+	// We have deferred validations. We must wrap them.
+	var validations Validations
+	validations.Variables = nested.Variables
+	for _, d := range nested.Deferred {
+		dCopy := d
+		accumulatedCopy := make([]FunctionGen, len(accumulatedFunctions))
+		copy(accumulatedCopy, accumulatedFunctions)
+
+		validations.AddDeferred(Deferred(dCopy.Scope, func() (Validations, error) {
+			inner, err := dCopy.Callback()
+			if err != nil {
+				return Validations{}, err
+			}
+			return deferWrap(accumulatedCopy, inner, objType, validatorName, optionalTagName)
+		}))
+	}
+
+	return validations, nil
 }
 
 // hasZeroDefault returns whether the field has a default value and whether
@@ -326,6 +440,18 @@ func (rtv requirednessTagValidator) Docs() TagDoc {
 	case requirednessOptional:
 		doc.StabilityLevel = TagStabilityLevelStable
 		doc.Description = "Indicates that a field is optional to clients."
+		doc.PayloadsType = codetags.ValueTypeTag
+		doc.PayloadsRequired = false
+		doc.Payloads = []TagPayloadDoc{
+			{
+				Description: "<none>",
+				Docs:        "The field is optional and no further validations are chained.",
+			},
+			{
+				Description: "<validation-tag>",
+				Docs:        "This validation tag will be evaluated only if the field is present.",
+			},
+		}
 	case requirednessForbidden:
 		doc.StabilityLevel = TagStabilityLevelBeta
 		doc.Description = "Indicates that a field may not be specified."

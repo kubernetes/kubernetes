@@ -81,6 +81,12 @@ type Struct struct {
 	// +k8s:optional
 	// +k8s:validateFalse="field Struct.MapTypedefField"
 	MapTypedefField MapType `json:"mapTypedefField"`
+
+	// +k8s:optional=+k8s:validateFalse="field Struct.ChainedOptionalField"
+	ChainedOptionalField *string `json:"chainedOptionalField"`
+
+	// +k8s:subfield(structPtrField)=+k8s:optional=+k8s:subfield(stringField)=+k8s:validateFalse="field Struct.ChainedOptionalSubfield.StructPtrField.StringField"
+	ChainedOptionalSubfield NestedStruct `json:"chainedOptionalSubfield"`
 }
 
 // +k8s:validateFalse="type StringType"
@@ -97,3 +103,11 @@ type SliceType []string
 
 // +k8s:validateFalse="type MapType"
 type MapType map[string]string
+
+type NestedStruct struct {
+	StructPtrField *AnotherStruct `json:"structPtrField"`
+}
+
+type AnotherStruct struct {
+	StringField string `json:"stringField"`
+}
