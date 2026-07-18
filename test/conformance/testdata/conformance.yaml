@@ -1510,21 +1510,31 @@
   file: test/e2e/auth/subjectreviews.go
 - testname: CRUD operations for clustertrustbundles
   codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
-    CRUD Tests certificates.k8s.io/v1 ClusterTrustBundles [Conformance]'
+    CRUD Tests certificates.k8s.io/v1 ClusterTrustBundles [MinimumKubeletVersion:1.37]
+    [Conformance]'
   description: kube-apiserver must support create/update/list/patch/delete operations
     for certificates.k8s.io/v1 ClusterTrustBundles
   release: v1.37
   file: test/e2e/auth/projected_clustertrustbundle.go
+- testname: Mounting big number (>100) of ClusterTrustBundle volumes
+  codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
+    should be able to mount a big number (>100) of CTBs [MinimumKubeletVersion:1.37]
+    [Conformance]'
+  description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+    MUST be able to mount a big number of volumes of ClusterTrustBundle type.
+  release: v1.37
+  file: test/e2e/auth/projected_clustertrustbundle.go
 - testname: Mounting a single ClusterTrustBundle
   codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
-    should be able to mount a single ClusterTrustBundle by name [Conformance]'
+    should be able to mount a single ClusterTrustBundle by name [MinimumKubeletVersion:1.37]
+    [Conformance]'
   description: The API server MUST serve the ClusterTrustBundle API and the kubelet
     MUST be able to mount contents of these API objects inside of pods.
   release: v1.37
   file: test/e2e/auth/projected_clustertrustbundle.go
 - testname: Mounting multiple ClusterTrustBundle volumes
   codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
-    should be able to specify multiple CTB volumes [Conformance]'
+    should be able to specify multiple CTB volumes [MinimumKubeletVersion:1.37] [Conformance]'
   description: The API server MUST serve the ClusterTrustBundle API and the kubelet
     MUST be able to mount multiple volumes of ClusterTrustBundle type.
   release: v1.37
@@ -1532,7 +1542,7 @@
 - testname: Mounting multiple ClusterTrustBundles
   codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
     should be capable to mount multiple trust bundles by signer+labels can combine
-    all signer CTBs with an empty label selector [Conformance]'
+    all signer CTBs with an empty label selector [MinimumKubeletVersion:1.37] [Conformance]'
   description: The API server MUST serve the ClusterTrustBundle API and the kubelet
     MUST be able to mount contents of these API objects inside of pods using different
     kinds of selectors.
@@ -1541,16 +1551,7 @@
 - testname: Mounting multiple ClusterTrustBundles
   codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
     should be capable to mount multiple trust bundles by signer+labels can combine
-    multiple CTBs with signer name and label selector [Conformance]'
-  description: The API server MUST serve the ClusterTrustBundle API and the kubelet
-    MUST be able to mount contents of these API objects inside of pods using different
-    kinds of selectors.
-  release: v1.37
-  file: test/e2e/auth/projected_clustertrustbundle.go
-- testname: Mounting multiple ClusterTrustBundles
-  codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
-    should be capable to mount multiple trust bundles by signer+labels should start
-    if only signer name and explicit label selector matches nothing + optional=true
+    multiple CTBs with signer name and label selector [MinimumKubeletVersion:1.37]
     [Conformance]'
   description: The API server MUST serve the ClusterTrustBundle API and the kubelet
     MUST be able to mount contents of these API objects inside of pods using different
@@ -1560,7 +1561,18 @@
 - testname: Mounting multiple ClusterTrustBundles
   codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
     should be capable to mount multiple trust bundles by signer+labels should start
-    if only signer name and nil label selector + optional=true [Conformance]'
+    if only signer name and explicit label selector matches nothing + optional=true
+    [MinimumKubeletVersion:1.37] [Conformance]'
+  description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+    MUST be able to mount contents of these API objects inside of pods using different
+    kinds of selectors.
+  release: v1.37
+  file: test/e2e/auth/projected_clustertrustbundle.go
+- testname: Mounting multiple ClusterTrustBundles
+  codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
+    should be capable to mount multiple trust bundles by signer+labels should start
+    if only signer name and nil label selector + optional=true [MinimumKubeletVersion:1.37]
+    [Conformance]'
   description: The API server MUST serve the ClusterTrustBundle API and the kubelet
     MUST be able to mount contents of these API objects inside of pods using different
     kinds of selectors.
@@ -1569,7 +1581,7 @@
 - testname: Failing to mount improperly defined ClusterTrustBundles
   codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
     should prevent a pod from starting if: sets optional=false and no trust bundle
-    matches query [Conformance]'
+    matches query [MinimumKubeletVersion:1.37] [Conformance]'
   description: The API server MUST serve the ClusterTrustBundle API and the kubelet
     MUST fail to mount these objects if none match the provided selector.
   release: v1.37
@@ -1577,7 +1589,7 @@
 - testname: Failing to mount improperly defined ClusterTrustBundles
   codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
     should prevent a pod from starting if: sets optional=false and the configured
-    CTB does not exist [Conformance]'
+    CTB does not exist [MinimumKubeletVersion:1.37] [Conformance]'
   description: The API server MUST serve the ClusterTrustBundle API and the kubelet
     MUST fail to mount these objects if none match the provided selector.
   release: v1.37
