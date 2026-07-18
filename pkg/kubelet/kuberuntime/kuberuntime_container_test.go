@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -720,6 +721,63 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 			t.Errorf("CMD PostStart hook was not invoked")
 		}
 	})
+
+	t.Run("PostStart-ProbesStartedBeforePostStart", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerLifecycleProber, true)
+		tCtx := ktesting.Init(t)
+		spyPM := &spyProbeManager{}
+		m.InitializeProbeManager(spyPM)
+
+		probesStartedDuringPostStart := false
+		orderRunner := &testOrderCommandRunner{
+			runFunc: func() {
+				if _, ok := spyPM.started[testContainer.Name]; ok {
+					probesStartedDuringPostStart = true
+				}
+			},
+		}
+		m.runner = lifecycle.NewHandlerRunner(
+			fakeHTTP,
+			orderRunner,
+			fakePodStatusProvider,
+			nil)
+
+		fakeSandBox, _ := makeAndSetFakePod(tCtx, m, fakeRuntime, testPod)
+		fakeSandBoxConfig, _ := m.generatePodSandboxConfig(tCtx, testPod, 0)
+		testContainer.Lifecycle = cmdPostStart
+		fakePodStatus := &kubecontainer.PodStatus{
+			ContainerStatuses: []*kubecontainer.Status{
+				{
+					ID: kubecontainer.ContainerID{
+						Type: "docker",
+						ID:   testContainer.Name,
+					},
+					Name:      testContainer.Name,
+					State:     kubecontainer.ContainerStateCreated,
+					CreatedAt: time.Unix(0, time.Now().Unix()),
+				},
+			},
+		}
+
+		_, err := m.startContainer(tCtx, fakeSandBox.Id, fakeSandBoxConfig, containerStartSpec(testContainer), testPod, fakePodStatus, nil, "", []string{}, nil)
+		if err != nil {
+			t.Errorf("startContainer error =%v", err)
+		}
+		if !probesStartedDuringPostStart {
+			t.Errorf("expected container probes to be started before post-start hook execution")
+		}
+	})
+}
+
+type testOrderCommandRunner struct {
+	runFunc func()
+}
+
+func (r *testOrderCommandRunner) RunInContainer(_ context.Context, _ kubecontainer.ContainerID, _ []string, _ time.Duration) ([]byte, error) {
+	if r.runFunc != nil {
+		r.runFunc()
+	}
+	return nil, nil
 }
 
 func TestLifeCycleHook(t *testing.T) {

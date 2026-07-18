@@ -65,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/prober"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
@@ -132,6 +133,9 @@ type kubeGenericRuntimeManager struct {
 	livenessManager  proberesults.Manager
 	readinessManager proberesults.Manager
 	startupManager   proberesults.Manager
+
+	// Prober manager for container lifecycle probes.
+	probeManager prober.Manager
 
 	// If false, pass "memory.oom.group" to container cgroups when using cgroups v2 to cause processes
 	// in those cgroups to be killed as a unit by the OOM killer.
@@ -208,6 +212,11 @@ type KubeGenericRuntime interface {
 	kubecontainer.Runtime
 	kubecontainer.StreamingRuntime
 	kubecontainer.CommandRunner
+
+	// InitializeProbeManager wires the probe manager used to drive container
+	// lifecycle probes. It must be called once during kubelet initialization,
+	// before the sync loop starts; see the InitializeProbeManager implementation.
+	InitializeProbeManager(prober.Manager)
 }
 
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
@@ -1826,7 +1835,59 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		start(ctx, "container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx]))
 	}
 
+	// Step 10: reconcile probe workers for existing running containers (e.g. after a Kubelet restart).
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerLifecycleProber) && m.probeManager != nil {
+		m.reconcileRunningContainerProbes(ctx, pod, podStatus)
+	}
+
 	return result
+}
+
+// InitializeProbeManager sets the probe manager reference used by the runtime manager
+// to trigger container probe lifecycle events.
+//
+// It must be called exactly once during kubelet initialization, before the sync loop
+// starts issuing SyncPod/startContainer/killContainer calls. The field is therefore
+// written before any concurrent reader exists and needs no additional synchronization.
+func (m *kubeGenericRuntimeManager) InitializeProbeManager(probeManager prober.Manager) {
+	m.probeManager = probeManager
+}
+
+// reconcileRunningContainerProbes reconciles probe workers for existing running containers across
+// Kubelet restarts, adopting running containers into the probe manager, and stops probes for
+// containers that have terminated.
+func (m *kubeGenericRuntimeManager) reconcileRunningContainerProbes(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
+	podIP := ""
+	if len(podStatus.IPs) > 0 {
+		podIP = podStatus.IPs[0]
+	}
+	for _, cStatus := range podStatus.ContainerStatuses {
+		cSpec := kubecontainer.GetContainerSpec(pod, cStatus.Name)
+		if cSpec == nil {
+			continue
+		}
+		if isInitContainer(pod, cSpec) && !podutil.IsRestartableInitContainer(cSpec) {
+			continue
+		}
+		if cStatus.State == kubecontainer.ContainerStateRunning && !cStatus.ID.IsEmpty() {
+			startTime := cStatus.CreatedAt
+			if !cStatus.StartedAt.IsZero() {
+				startTime = cStatus.StartedAt
+			}
+			m.probeManager.StartContainerProbes(ctx, pod, cSpec, cStatus.ID, podIP, startTime)
+		} else {
+			m.probeManager.StopContainerProbes(pod.UID, cStatus.Name)
+		}
+	}
+}
+
+func isInitContainer(pod *v1.Pod, container *v1.Container) bool {
+	for i := range pod.Spec.InitContainers {
+		if pod.Spec.InitContainers[i].Name == container.Name {
+			return true
+		}
+	}
+	return false
 }
 
 // incrementImageVolumeMetrics increments the image volume mount metrics
