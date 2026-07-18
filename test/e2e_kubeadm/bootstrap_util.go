@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package bootstrap
+package kubeadm
 
 import (
 	"context"
@@ -31,6 +31,18 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
+
+const (
+	// TokenIDBytes is the length of the byte array to generate tokenID.
+	TokenIDBytes = 3
+
+	// TokenSecretBytes is the length of the byte array to generate tokenSecret.
+	TokenSecretBytes = 8
+)
+
+// secretNeedClean holds the name of a bootstrap token secret that a spec created
+// and expects the AfterEach cleanup to delete.
+var secretNeedClean string
 
 func newTokenSecret(tokenID, tokenSecret string) *v1.Secret {
 	return &v1.Secret{

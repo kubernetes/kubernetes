@@ -14,25 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package bootstrap
+package kubeadm
 
 import (
 	"context"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/lifecycle"
 	admissionapi "k8s.io/pod-security-admission/api"
+
+	"github.com/onsi/ginkgo/v2"
 )
 
-var secretNeedClean string
-var _ = lifecycle.SIGDescribe(feature.BootstrapTokens, func() {
+var _ = Describe("bootstrap token cleaner", func() {
 
 	var c clientset.Interface
 
@@ -51,7 +48,7 @@ var _ = lifecycle.SIGDescribe(feature.BootstrapTokens, func() {
 			framework.ExpectNoError(err)
 		}
 	})
-	ginkgo.It("should delete the token secret when the secret expired", func(ctx context.Context) {
+	f.It("should delete the token secret when the secret expired", func(ctx context.Context) {
 		ginkgo.By("create a new expired bootstrap token secret")
 		tokenID, err := GenerateTokenID()
 		framework.ExpectNoError(err)
@@ -69,7 +66,7 @@ var _ = lifecycle.SIGDescribe(feature.BootstrapTokens, func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should not delete the token secret when the secret is not expired", func(ctx context.Context) {
+	f.It("should not delete the token secret when the secret is not expired", func(ctx context.Context) {
 		ginkgo.By("create a new expired bootstrap token secret")
 		tokenID, err := GenerateTokenID()
 		framework.ExpectNoError(err)

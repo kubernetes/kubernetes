@@ -29,12 +29,6 @@ var (
 	// TODO: document the feature (when to use this feature for a test)
 	APIServerIdentity = framework.WithFeature(framework.ValidFeatures.Add("APIServerIdentity"))
 
-	// Owner: sig-lifecycle
-	// This label is used for tests which need the following controllers to be enabled:
-	// - bootstrap-signer-controller
-	// - token-cleaner-controller
-	BootstrapTokens = framework.WithFeature(framework.ValidFeatures.Add("BootstrapTokens"))
-
 	// Owner: sig-auth
 	// TODO: document the feature (when to use this feature for a test)
 	BoundServiceAccountTokenVolume = framework.WithFeature(framework.ValidFeatures.Add("BoundServiceAccountTokenVolume"))
