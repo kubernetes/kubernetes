@@ -21,6 +21,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -282,6 +283,30 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					ExpectedErrs: field.ErrorList{
 						// handwritten validation requires "True"
 						field.NotSupported(field.NewPath("status", "conditions").Child("[0]", "status"), "False", []string{"True"}).MarkFromImperative(),
+					},
+				},
+				{
+					Name: "invalid missing reason",
+					Conditions: []metav1.Condition{
+						meta.MkCondition(
+							meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)),
+							meta.TweakReason(""),
+						),
+					},
+					ExpectedErrs: field.ErrorList{
+						field.Required(field.NewPath("status", "conditions").Index(0).Child("reason"), "").MarkAlpha(),
+					},
+				},
+				{
+					Name: "invalid too long reason",
+					Conditions: []metav1.Condition{
+						meta.MkCondition(
+							meta.TweakType(string(certificates.PodCertificateRequestConditionTypeDenied)),
+							meta.TweakReason(strings.Repeat("A", 1025)),
+						),
+					},
+					ExpectedErrs: field.ErrorList{
+						field.TooLong(field.NewPath("status", "conditions").Index(0).Child("reason"), "", 1024).WithOrigin("maxLength").MarkAlpha(),
 					},
 				},
 			}
