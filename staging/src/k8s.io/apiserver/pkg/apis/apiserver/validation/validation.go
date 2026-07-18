@@ -41,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/cert"
+	"k8s.io/klog/v2"
 )
 
 // ValidateAuthenticationConfiguration validates a given AuthenticationConfiguration.
@@ -635,6 +636,15 @@ func ValidateAuthorizationConfiguration(compiler authorizationcel.Compiler, fldP
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), a.Name, fmt.Sprintf("authorizer name is invalid: %s", strings.Join(errs, ", "))))
 		}
 		seenAuthorizerNames.Insert(a.Name)
+
+		// Warn for Kubernetes-reserved authorizer names, but don't fail, as someone could technically have configured their Kube API server with such a name already,
+		// and they are forced to change the name first when they would actually like to use Kubernetes' own authorizer.
+		if strings.HasSuffix(a.Name, "kubernetes.io") {
+			klog.Warningf("Authorizer name %q is a subdomain of kubernetes.io, this is not recommended for user-provided authorizers, as Kubernetes might add an authorizer with this name in future versions", a.Name)
+		}
+		if strings.HasSuffix(a.Name, "k8s.io") {
+			klog.Warningf("Authorizer name %q is a subdomain of k8s.io, this is not recommended for user-provided authorizers, as Kubernetes might add an authorizer with this name in future versions", a.Name)
+		}
 
 		switch a.Type {
 		case api.TypeWebhook:
