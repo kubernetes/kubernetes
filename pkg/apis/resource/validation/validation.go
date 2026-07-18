@@ -710,6 +710,7 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 		allErrs = append(allErrs, validateUID(string(*result.ShareID), fldPath.Child("shareID")).MarkCoveredByDeclarative()...)
 	}
 	allErrs = append(allErrs, validateSkipNodeOperations(result.SkipNodeOperations, fldPath.Child("skipNodeOperations"))...)
+	// TODO: what is the right maximum size for ConsumedCapacity? See PR discussion / @sunya-ch.
 	allErrs = append(allErrs, validateMap(result.ConsumedCapacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateNonNegativeQuantity, fldPath.Child("consumedCapacity"))...)
 	return allErrs
 }
