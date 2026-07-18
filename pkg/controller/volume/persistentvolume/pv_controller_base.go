@@ -318,6 +318,8 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	wg.Go(func() {
 		wait.Until(func() { ctrl.resync(ctx) }, ctrl.resyncPeriod, ctx.Done())
 	})
+	// Only the volume worker fans out; the claim worker stays single (serial
+	// match-and-reserve).
 	wg.Go(func() {
 		wait.UntilWithContext(ctx, ctrl.volumeWorker, time.Second)
 	})
