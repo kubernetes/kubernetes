@@ -155,18 +155,11 @@ func (d ConditionsAwareDecision) IsUnconditional() bool {
 	return d.IsAllow() || d.IsDeny() || d.IsNoOpinion()
 }
 
-// unconditionalParts turns a ConditionsAwareDecision into the
+// UnconditionalParts splits a ConditionsAwareDecision into the
 // triple that Authorize expects. If the decision is
-// conditional, the returned condition is Deny if there were at least
-// some Deny condition, otherwise NoOpinion.
+// conditional, FailureDecision() is returned.
 // This function is meant to be called when IsUnconditional() == true.
-//
-// If the authorizer is conditions-aware, it can choose to only implement
-// real business logic in the ConditionsAwareAuthorize method, and implement
-// Authorize() as "return self.ConditionsAwareAuthorize(ctx, attrs).unconditionalParts()"
-//
-// Private for now, to not encourage callers to perform conditions-aware logic where not needed.
-func (d ConditionsAwareDecision) unconditionalParts() (Decision, string, error) {
+func (d ConditionsAwareDecision) UnconditionalParts() (Decision, string, error) {
 	switch {
 	case d.IsAllow():
 		return DecisionAllow, d.Reason(), d.Error()
