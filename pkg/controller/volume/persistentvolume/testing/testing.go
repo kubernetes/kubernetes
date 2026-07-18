@@ -176,6 +176,12 @@ func (r *VolumeReactor) React(ctx context.Context, action core.Action) (handled 
 		for _, w := range r.getWatches(action.GetResource(), action.GetNamespace()) {
 			w.Modify(volume)
 		}
+		// Echo the update back on the informer watch too, like a real apiserver.
+		// The controller's own reserve/bind writes must reach the informer so
+		// its assume-cache entry expires and syncVolume re-runs to complete.
+		if r.fakeVolumeWatch != nil {
+			r.fakeVolumeWatch.Modify(volume.DeepCopy())
+		}
 		r.volumes[volume.Name] = volume
 		r.changedObjects = append(r.changedObjects, volume)
 		r.changedSinceLastSync++
@@ -208,6 +214,10 @@ func (r *VolumeReactor) React(ctx context.Context, action core.Action) (handled 
 		// Store the updated object to appropriate places.
 		for _, w := range r.getWatches(action.GetResource(), action.GetNamespace()) {
 			w.Modify(claim)
+		}
+		// Echo the update back on the informer watch too, like a real apiserver.
+		if r.fakeClaimWatch != nil {
+			r.fakeClaimWatch.Modify(claim.DeepCopy())
 		}
 		r.claims[claim.Name] = claim
 		r.changedObjects = append(r.changedObjects, claim)
