@@ -73,7 +73,6 @@ func TestValidateDeviceCapacity(t *testing.T) {
 
 	scenarios := map[string]struct {
 		capacity                    resource.DeviceCapacity
-		oldPolicy                   *resource.CapacityRequestPolicy
 		fractionalCapacityRangeGate bool
 		wantFailures                field.ErrorList
 	}{
@@ -255,25 +254,6 @@ func TestValidateDeviceCapacity(t *testing.T) {
 			),
 			// fractionalCapacityRangeGate: false (default) — no errors expected
 		},
-		"identical-range-update-skips-validation": {
-			// when oldRange == newRange the function returns nil immediately,
-			// even if the range would otherwise fail (e.g. 10P > MaxMilliValue with gate on)
-			capacity: testDeviceCapacity(
-				apiresource.MustParse("100P"),
-				testCapacityRequestPolicy(
-					ptr.To(apiresource.MustParse("10P")),
-					nil,
-					testValidRange(ptr.To(apiresource.MustParse("10P")), nil, ptr.To(apiresource.MustParse("100m"))),
-				),
-			),
-			oldPolicy: testCapacityRequestPolicy(
-				ptr.To(apiresource.MustParse("10P")),
-				nil,
-				testValidRange(ptr.To(apiresource.MustParse("10P")), nil, ptr.To(apiresource.MustParse("100m"))),
-			),
-			fractionalCapacityRangeGate: true,
-			// no wantFailures: identical range short-circuits all checks
-		},
 		"fractional-range-overflow-min": {
 			// min exceeds MaxMilliValue — rejected when gate is on and range is fractional
 			capacity: testDeviceCapacity(
@@ -305,30 +285,11 @@ func TestValidateDeviceCapacity(t *testing.T) {
 				field.Invalid(validRangeField.Child("min"), "10u", "value cannot be represented as a milli value"),
 			},
 		},
-		"fractional-range-stored-object-exemption": {
-			// min=10P exceeds MaxMilliValue and would normally trigger the overflow guard,
-			// but the old stored range already had the same fractional step — so the overflow
-			// check is skipped to avoid breaking updates of objects that pre-date the gate.
-			capacity: testDeviceCapacity(
-				apiresource.MustParse("100P"),
-				testCapacityRequestPolicy(
-					ptr.To(apiresource.MustParse("10P")),
-					nil,
-					testValidRange(ptr.To(apiresource.MustParse("10P")), nil, ptr.To(apiresource.MustParse("100m"))),
-				),
-			),
-			oldPolicy: testCapacityRequestPolicy(
-				ptr.To(apiresource.MustParse("10P")),
-				nil,
-				testValidRange(ptr.To(apiresource.MustParse("10P")), nil, ptr.To(apiresource.MustParse("100m"))),
-			),
-			fractionalCapacityRangeGate: true,
-		},
 	}
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAFractionalCapacityRange, scenario.fractionalCapacityRangeGate)
-			errs := validateMultiAllocatableDeviceCapacity(scenario.capacity, scenario.oldPolicy, capacityField)
+			errs := validateMultiAllocatableDeviceCapacity(scenario.capacity, capacityField)
 			assertFailures(t, scenario.wantFailures, errs)
 		})
 	}

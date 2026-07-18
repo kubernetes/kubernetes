@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"testing"
@@ -153,6 +154,54 @@ func testResourceSliceWithNodeAllocatableResources(name, nodeName, driverName st
 	return slice
 }
 
+func testResourceSliceWithConsumableCapacity(name, nodeName, driverName string, numDevices int) *resourceapi.ResourceSlice {
+	slice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: &nodeName,
+			Driver:   driverName,
+			Pool: resourceapi.ResourcePool{
+				Name:               nodeName,
+				ResourceSliceCount: 1,
+			},
+		},
+	}
+	for d := range numDevices {
+		device := resourceapi.Device{
+			Name:                     fmt.Sprintf("device-%d", d),
+			AllowMultipleAllocations: new(true),
+			Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				"a": {
+					Value: resource.MustParse("100"),
+					RequestPolicy: &resourceapi.CapacityRequestPolicy{
+						Default: new(resource.MustParse("10")),
+						ValidValues: []resource.Quantity{
+							resource.MustParse("5"),
+							resource.MustParse("10"),
+							resource.MustParse("100"),
+						},
+					},
+				},
+			},
+		}
+		slice.Spec.Devices = append(slice.Spec.Devices, device)
+	}
+	return slice
+}
+
+func updateConsumableCapacity(slice *resourceapi.ResourceSlice, deviceNum int, update func(cap *resourceapi.DeviceCapacity)) {
+	cap := slice.Spec.Devices[deviceNum].Capacity["a"]
+	cap = *cap.DeepCopy()
+	update(&cap)
+	slice.Spec.Devices[deviceNum].Capacity["a"] = cap
+}
+
+func consumeableCapacityPath(deviceNum int) *field.Path {
+	return field.NewPath("spec", "devices").Index(deviceNum).Child("capacity").Key("a")
+}
+
 func TestValidateResourceSlice(t *testing.T) {
 	goodName := "foo"
 	badName := "!@#$%^"
@@ -186,6 +235,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		slice                                        *resourceapi.ResourceSlice
 		wantFailures                                 field.ErrorList
 		consumableCapacityFeatureGate                bool
+		fractionalCapacityRangeFeatureGate           bool
 		enableDRANodeAllocatableResourcesFeatureGate bool
 	}{
 		"good": {
@@ -884,6 +934,175 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 			consumableCapacityFeatureGate: true,
 		},
+		"consumable-capacity-integer": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: false,
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithConsumableCapacity(goodName, goodName, driverName, 12)
+				updateConsumableCapacity(slice, 1, func(cap *resourceapi.DeviceCapacity) { cap.Value = resource.MustParse("-1") })
+				updateConsumableCapacity(slice, 2, func(cap *resourceapi.DeviceCapacity) { cap.RequestPolicy.Default = new(resource.MustParse("-1")) })
+				updateConsumableCapacity(slice, 3, func(cap *resourceapi.DeviceCapacity) { cap.RequestPolicy.ValidValues = nil }) // Valid (no constraints on consumption).
+				updateConsumableCapacity(slice, 4, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid, ValidValues also set.
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("10"))}
+				})
+				updateConsumableCapacity(slice, 5, func(cap *resourceapi.DeviceCapacity) {
+					// Valid, only ValidRange.
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("1"))}
+					cap.RequestPolicy.ValidValues = nil
+				})
+				updateConsumableCapacity(slice, 6, func(cap *resourceapi.DeviceCapacity) {
+					// Rounds down in integer mode, still valid.
+					fraction := resource.MustParse("0.1")
+					cap.RequestPolicy.Default.Add(fraction)
+					cap.RequestPolicy.ValidValues[0].Add(fraction)
+					cap.RequestPolicy.ValidValues[1].Add(fraction)
+				})
+				updateConsumableCapacity(slice, 7, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid, default too small.
+					cap.RequestPolicy.Default = new(resource.MustParse("1.05"))
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("1.1"))}
+					cap.RequestPolicy.ValidValues = nil
+				})
+				updateConsumableCapacity(slice, 8, func(cap *resourceapi.DeviceCapacity) {
+					fraction := resource.MustParse("0.1")
+					min := cap.RequestPolicy.ValidValues[1]
+					minFrac := min.DeepCopy()
+					minFrac.Sub(fraction)
+					cap.RequestPolicy.ValidValues[0] = minFrac // Smaller, but gets rounded up to min == Value[1] -> invalid duplicate.
+
+				})
+				updateConsumableCapacity(slice, 9, func(cap *resourceapi.DeviceCapacity) {
+					// Valid big integers.
+					cap.Value.Set(math.MaxInt64)
+					cap.RequestPolicy.Default.Set(math.MaxInt64)
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewQuantity(0, resource.DecimalSI),
+						Step: resource.NewQuantity(1, resource.DecimalSI),
+						Max:  &cap.Value,
+					}
+				})
+				updateConsumableCapacity(slice, 10, func(cap *resourceapi.DeviceCapacity) {
+					// Valid fractions.
+					maxMilli := *resource.NewMilliQuantity(math.MaxInt64, resource.DecimalSI)
+					cap.Value = maxMilli
+					cap.RequestPolicy.Default = &maxMilli
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewMilliQuantity(0, resource.DecimalSI),
+						Step: resource.NewMilliQuantity(1, resource.DecimalSI),
+						Max:  &cap.Value,
+					}
+				})
+				updateConsumableCapacity(slice, 11, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid fractions, range too large - okay when rounding to integer.
+					cap.Value.Set(math.MaxInt64)
+					cap.RequestPolicy.Default.Set(math.MaxInt64)
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewMilliQuantity(0, resource.DecimalSI),
+						Step: resource.NewMilliQuantity(1, resource.DecimalSI),
+						Max:  &cap.Value,
+					}
+				})
+				return slice
+			}(),
+			wantFailures: field.ErrorList{
+				field.Invalid(consumeableCapacityPath(1).Child("requestPolicy", "validValues").Index(0), "5", "option is larger than capacity value: -1"),
+				field.Invalid(consumeableCapacityPath(1).Child("requestPolicy", "validValues").Index(1), "10", "option is larger than capacity value: -1"),
+				field.Invalid(consumeableCapacityPath(1).Child("requestPolicy", "validValues").Index(2), "100", "option is larger than capacity value: -1"),
+				field.Invalid(consumeableCapacityPath(2).Child("requestPolicy", "validValues"), "-1", "default value is not valid according to the requestPolicy"),
+				field.Forbidden(consumeableCapacityPath(4).Child("requestPolicy"), `exactly one policy can be specified, cannot specify "validValues" and "validRange" at the same time`),
+				field.Invalid(consumeableCapacityPath(7).Child("requestPolicy", "validRange", "default"), "1050m", "default is less than min: 1100m"),
+				field.Duplicate(consumeableCapacityPath(8).Child("requestPolicy", "validValues").Index(1), "10"),
+			},
+		},
+		"consumable-capacity-fractional": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: true,
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithConsumableCapacity(goodName, goodName, driverName, 12)
+				updateConsumableCapacity(slice, 1, func(cap *resourceapi.DeviceCapacity) { cap.Value = resource.MustParse("-1") })
+				updateConsumableCapacity(slice, 2, func(cap *resourceapi.DeviceCapacity) { cap.RequestPolicy.Default = new(resource.MustParse("-1")) })
+				updateConsumableCapacity(slice, 3, func(cap *resourceapi.DeviceCapacity) { cap.RequestPolicy.ValidValues = nil }) // Valid (no constraints on consumption).
+				updateConsumableCapacity(slice, 4, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid, ValidValues also set.
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("10"))}
+				})
+				updateConsumableCapacity(slice, 5, func(cap *resourceapi.DeviceCapacity) {
+					// Valid, only ValidRange.
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("1"))}
+					cap.RequestPolicy.ValidValues = nil
+				})
+				updateConsumableCapacity(slice, 6, func(cap *resourceapi.DeviceCapacity) {
+					// Rounds down in integer mode, still valid.
+					fraction := resource.MustParse("0.1")
+					cap.RequestPolicy.Default.Add(fraction)
+					cap.RequestPolicy.ValidValues[0].Add(fraction)
+					cap.RequestPolicy.ValidValues[1].Add(fraction)
+				})
+				updateConsumableCapacity(slice, 7, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid, default too small.
+					cap.RequestPolicy.Default = new(resource.MustParse("1.05"))
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("1.1"))}
+					cap.RequestPolicy.ValidValues = nil
+				})
+				updateConsumableCapacity(slice, 8, func(cap *resourceapi.DeviceCapacity) {
+					fraction := resource.MustParse("0.1")
+					min := cap.RequestPolicy.ValidValues[1]
+					minFrac := min.DeepCopy()
+					minFrac.Sub(fraction)
+					cap.RequestPolicy.ValidValues[0] = minFrac // Not a duplicate when using milli-values.
+
+				})
+				updateConsumableCapacity(slice, 9, func(cap *resourceapi.DeviceCapacity) {
+					// Valid big integers.
+					cap.Value.Set(math.MaxInt64)
+					cap.RequestPolicy.Default.Set(math.MaxInt64)
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewQuantity(0, resource.DecimalSI),
+						Step: resource.NewQuantity(1, resource.DecimalSI),
+						Max:  resource.NewQuantity(math.MaxInt, resource.DecimalSI),
+					}
+				})
+				updateConsumableCapacity(slice, 10, func(cap *resourceapi.DeviceCapacity) {
+					// Valid fractions.
+					maxMilli := *resource.NewMilliQuantity(math.MaxInt64, resource.DecimalSI)
+					cap.Value = maxMilli
+					cap.RequestPolicy.Default = &maxMilli
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewMilliQuantity(0, resource.DecimalSI),
+						Step: resource.NewMilliQuantity(1, resource.DecimalSI),
+						Max:  &maxMilli,
+					}
+				})
+				updateConsumableCapacity(slice, 11, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid fractions, range too large.
+					cap.Value.Set(math.MaxInt64)
+					cap.RequestPolicy.Default.Set(math.MaxInt64)
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewMilliQuantity(0, resource.DecimalSI),
+						Step: resource.NewMilliQuantity(1, resource.DecimalSI),
+						Max:  &cap.Value,
+					}
+				})
+				return slice
+			}(),
+			wantFailures: field.ErrorList{
+				field.Invalid(consumeableCapacityPath(1).Child("requestPolicy", "validValues").Index(0), "5", "option is larger than capacity value: -1"),
+				field.Invalid(consumeableCapacityPath(1).Child("requestPolicy", "validValues").Index(1), "10", "option is larger than capacity value: -1"),
+				field.Invalid(consumeableCapacityPath(1).Child("requestPolicy", "validValues").Index(2), "100", "option is larger than capacity value: -1"),
+				field.Invalid(consumeableCapacityPath(2).Child("requestPolicy", "validValues"), "-1", "default value is not valid according to the requestPolicy"),
+				field.Forbidden(consumeableCapacityPath(4).Child("requestPolicy"), `exactly one policy can be specified, cannot specify "validValues" and "validRange" at the same time`),
+				field.Invalid(consumeableCapacityPath(7).Child("requestPolicy", "validRange", "default"), "1050m", "default is less than min: 1100m"),
+				field.Invalid(consumeableCapacityPath(11).Child("requestPolicy", "validRange", "default"), fmt.Sprintf("%d", math.MaxInt), "value cannot be represented as a milli value"),
+				field.Invalid(consumeableCapacityPath(11).Child("requestPolicy", "validRange", "max"), fmt.Sprintf("%d", math.MaxInt), "value cannot be represented as a milli value"),
+			},
+		},
 		"invalid-node-selecor-label-value": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "nodeSelector", "nodeSelectorTerms").Index(0).Child("matchExpressions").Index(0).Child("values").Index(0), "-1", "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')")},
 			slice: func() *resourceapi.ResourceSlice {
@@ -1477,10 +1696,10 @@ func TestValidateResourceSlice(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, scenario.consumableCapacityFeatureGate)
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DRANodeAllocatableResources: scenario.enableDRANodeAllocatableResourcesFeatureGate,
 				features.DRAConsumableCapacity:       scenario.consumableCapacityFeatureGate,
+				features.DRAFractionalCapacityRange:  scenario.fractionalCapacityRangeFeatureGate,
 			})
 			errs := ValidateResourceSlice(scenario.slice)
 			assertFailures(t, scenario.wantFailures, errs)
@@ -1504,9 +1723,11 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 	}
 
 	scenarios := map[string]struct {
-		oldResourceSlice *resourceapi.ResourceSlice
-		update           func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice
-		wantFailures     field.ErrorList
+		consumableCapacityFeatureGate      bool
+		fractionalCapacityRangeFeatureGate bool
+		oldResourceSlice                   *resourceapi.ResourceSlice
+		update                             func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice
+		wantFailures                       field.ErrorList
 	}{
 		"valid-no-op-update": {
 			oldResourceSlice: validResourceSlice,
@@ -1598,10 +1819,129 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 				return slice
 			},
 		},
+		"consumable-capacity-valid-values-integer": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: false,
+			wantFailures:                       field.ErrorList{field.Duplicate(consumeableCapacityPath(0).Child("requestPolicy", "validValues").Index(1), "10")},
+			oldResourceSlice:                   testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					fraction := resource.MustParse("0.1")
+					min := cap.RequestPolicy.ValidValues[1]
+					minFrac := min.DeepCopy()
+					minFrac.Sub(fraction)
+					cap.RequestPolicy.ValidValues[0] = minFrac // A duplicate when using integers.
+
+				})
+				return slice
+			},
+		},
+		"consumable-capacity-valid-values-integer-okay-if-stored": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: false,
+			wantFailures:                       nil,
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithConsumableCapacity(name, name, name, 1)
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					fraction := resource.MustParse("0.1")
+					min := cap.RequestPolicy.ValidValues[1]
+					minFrac := min.DeepCopy()
+					minFrac.Sub(fraction)
+					cap.RequestPolicy.ValidValues[0] = minFrac // A duplicate when using integers.
+				})
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
+		},
+		"consumable-capacity-valid-values-milli-values": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: true,
+			wantFailures:                       nil,
+			oldResourceSlice:                   testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					fraction := resource.MustParse("0.1")
+					min := cap.RequestPolicy.ValidValues[1]
+					minFrac := min.DeepCopy()
+					minFrac.Sub(fraction)
+					cap.RequestPolicy.ValidValues[0] = minFrac // Okay when using milli-values.
+
+				})
+				return slice
+			},
+		},
+		"consumable-capacity-valid-range-integer": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: false,
+			wantFailures:                       nil,
+			oldResourceSlice:                   testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid fractions, range too large - okay when rounding to integer.
+					cap.Value.Set(math.MaxInt64)
+					cap.RequestPolicy.Default.Set(math.MaxInt64)
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewMilliQuantity(0, resource.DecimalSI),
+						Step: resource.NewMilliQuantity(1, resource.DecimalSI),
+						Max:  &cap.Value,
+					}
+				})
+				return slice
+			},
+		},
+		"consumable-capacity-valid-range-integer-okay-if-stored": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: true,
+			wantFailures:                       nil,
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithConsumableCapacity(name, name, name, 1)
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid fractions, range too large.
+					cap.Value.Set(math.MaxInt64)
+					cap.RequestPolicy.Default.Set(math.MaxInt64)
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewMilliQuantity(0, resource.DecimalSI),
+						Step: resource.NewMilliQuantity(1, resource.DecimalSI),
+						Max:  &cap.Value,
+					}
+				})
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
+		},
+		"consumable-capacity-valid-range-milli-values": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(consumeableCapacityPath(0).Child("requestPolicy", "validRange", "default"), fmt.Sprintf("%d", math.MaxInt), "value cannot be represented as a milli value"),
+				field.Invalid(consumeableCapacityPath(0).Child("requestPolicy", "validRange", "max"), fmt.Sprintf("%d", math.MaxInt), "value cannot be represented as a milli value"),
+			},
+			oldResourceSlice: testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid fractions, range too large.
+					cap.Value.Set(math.MaxInt64)
+					cap.RequestPolicy.Default.Set(math.MaxInt64)
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewMilliQuantity(0, resource.DecimalSI),
+						Step: resource.NewMilliQuantity(1, resource.DecimalSI),
+						Max:  &cap.Value,
+					}
+				})
+				return slice
+			},
+		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAConsumableCapacity:      scenario.consumableCapacityFeatureGate,
+				features.DRAFractionalCapacityRange: scenario.fractionalCapacityRangeFeatureGate,
+			})
 			scenario.oldResourceSlice.ResourceVersion = "1"
 			errs := ValidateResourceSliceUpdate(scenario.update(scenario.oldResourceSlice.DeepCopy()), scenario.oldResourceSlice)
 			assertFailures(t, scenario.wantFailures, errs)
