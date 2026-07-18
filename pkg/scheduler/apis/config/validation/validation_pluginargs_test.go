@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -189,6 +190,124 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 					},
 				},
 				DefaultingType: config.ListDefaulting,
+			},
+		},
+		"valid config with minDomains and node inclusion policies": {
+			args: &config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						MaxSkew:            1,
+						TopologyKey:        "node",
+						WhenUnsatisfiable:  v1.DoNotSchedule,
+						MinDomains:         ptr.To[int32](1),
+						NodeAffinityPolicy: ptr.To(v1.NodeInclusionPolicyHonor),
+						NodeTaintsPolicy:   ptr.To(v1.NodeInclusionPolicyIgnore),
+					},
+					{
+						MaxSkew:            2,
+						TopologyKey:        "zone",
+						WhenUnsatisfiable:  v1.DoNotSchedule,
+						MinDomains:         ptr.To[int32](2),
+						NodeAffinityPolicy: ptr.To(v1.NodeInclusionPolicyIgnore),
+						NodeTaintsPolicy:   ptr.To(v1.NodeInclusionPolicyHonor),
+					},
+				},
+				DefaultingType: config.ListDefaulting,
+			},
+		},
+		"minDomains less than zero": {
+			args: &config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						MaxSkew:           1,
+						TopologyKey:       "node",
+						WhenUnsatisfiable: v1.DoNotSchedule,
+						MinDomains:        ptr.To[int32](-1),
+					},
+				},
+				DefaultingType: config.ListDefaulting,
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "defaultConstraints[0].minDomains",
+				},
+			},
+		},
+		"minDomains equal to zero": {
+			args: &config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						MaxSkew:           1,
+						TopologyKey:       "node",
+						WhenUnsatisfiable: v1.DoNotSchedule,
+						MinDomains:        ptr.To[int32](0),
+					},
+				},
+				DefaultingType: config.ListDefaulting,
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "defaultConstraints[0].minDomains",
+				},
+			},
+		},
+		"minDomains with schedule anyway": {
+			args: &config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						MaxSkew:           1,
+						TopologyKey:       "node",
+						WhenUnsatisfiable: v1.ScheduleAnyway,
+						MinDomains:        ptr.To[int32](1),
+					},
+				},
+				DefaultingType: config.ListDefaulting,
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "defaultConstraints[0].minDomains",
+				},
+			},
+		},
+		"unsupported nodeAffinityPolicy": {
+			args: &config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						MaxSkew:            1,
+						TopologyKey:        "node",
+						WhenUnsatisfiable:  v1.DoNotSchedule,
+						NodeAffinityPolicy: ptr.To[v1.NodeInclusionPolicy]("unknown policy"),
+					},
+				},
+				DefaultingType: config.ListDefaulting,
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeNotSupported,
+					Field: "defaultConstraints[0].nodeAffinityPolicy",
+				},
+			},
+		},
+		"unsupported nodeTaintsPolicy": {
+			args: &config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						MaxSkew:           1,
+						TopologyKey:       "node",
+						WhenUnsatisfiable: v1.DoNotSchedule,
+						NodeTaintsPolicy:  ptr.To[v1.NodeInclusionPolicy]("unknown policy"),
+					},
+				},
+				DefaultingType: config.ListDefaulting,
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeNotSupported,
+					Field: "defaultConstraints[0].nodeTaintsPolicy",
+				},
 			},
 		},
 		"maxSkew less than zero": {
