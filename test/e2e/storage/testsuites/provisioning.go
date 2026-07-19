@@ -1508,7 +1508,7 @@ func MultiplePVMountSingleNodeCheck(ctx context.Context, client clientset.Interf
 
 	pvc2Config := e2epv.PersistentVolumeClaimConfig{
 		NamePrefix:       fmt.Sprintf("%s-", "pvc"),
-		StorageClassName: &claim.Namespace,
+		StorageClassName: claim.Spec.StorageClassName,
 		AccessModes:      e2evolume.Spec.AccessModes,
 		VolumeMode:       e2evolume.Spec.VolumeMode,
 	}
