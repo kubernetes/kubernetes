@@ -2166,6 +2166,30 @@ func TestPolicyWithAlignBySocketAndDistributeCPUsAcrossNUMAEnabled(t *testing.T)
 	}
 }
 
+func TestPolicyWithDistributeCPUsAcrossNUMAAndFullPCPUsOnly(t *testing.T) {
+	testCases := []staticPolicyTest{
+		{
+			description: "DistributeCPUsAcrossNUMA and FullPCPUsOnly with fragmented per-NUMA availability",
+			topo:        topoDualSocketMultiNumaPerSocketHT,
+			options: map[string]string{
+				DistributeCPUsAcrossNUMAOption: "true",
+				FullPCPUsOnlyOption:            "true",
+			},
+			numReservedCPUs: 0,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: mustParseCPUSet(t, "0-4,10-14,20-24,30-34"),
+			pod:             makePod("fakePod", "fakeContainer", "14000m", "14000m"),
+			topologyHint:    &topologymanager.TopologyHint{},
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         mustParseCPUSet(t, "0-3,10-13,20-23,30-31"),
+		},
+	}
+	for _, testCase := range testCases {
+		runStaticPolicyTestCaseWithFeatureGate(t, testCase)
+	}
+}
+
 type staticPolicyAllocatePodTest struct {
 	description                     string
 	topo                            *topology.CPUTopology

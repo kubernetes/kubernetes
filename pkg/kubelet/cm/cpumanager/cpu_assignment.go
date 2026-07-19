@@ -1030,8 +1030,14 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 					availableAfterAllocation := availableAfterAllocation.Clone()
 
 					// If this subset is not capable of allocating all
-					// remainder CPUs, continue to the next one.
-					if sum(availableAfterAllocation.Values(subset...)) < remainder {
+					// remainder CPUs in whole groups of 'cpuGroupSize',
+					// continue to the next one. Leftover CPUs smaller than a
+					// group cannot be handed out, so a raw CPU sum overcounts.
+					availableGroups := 0
+					for _, numa := range subset {
+						availableGroups += availableAfterAllocation[numa] / cpuGroupSize
+					}
+					if availableGroups*cpuGroupSize < remainder {
 						return Continue
 					}
 
