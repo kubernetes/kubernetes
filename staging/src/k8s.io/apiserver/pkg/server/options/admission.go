@@ -18,6 +18,7 @@ package options
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
+	"k8s.io/apiserver/pkg/admission/plugin/authorizer/conditionsenforcer"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
 	mutatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/mutating"
 	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
@@ -92,7 +94,7 @@ func NewAdmissionOptions() *AdmissionOptions {
 		// admission plugins. The apiserver always runs the validating ones
 		// after all the mutating ones, so their relative order in this list
 		// doesn't matter.
-		RecommendedPluginOrder: []string{lifecycle.PluginName, mutatingadmissionpolicy.PluginName, mutatingwebhook.PluginName, validatingadmissionpolicy.PluginName, validatingwebhook.PluginName},
+		RecommendedPluginOrder: []string{lifecycle.PluginName, mutatingadmissionpolicy.PluginName, mutatingwebhook.PluginName, conditionsenforcer.PluginName, validatingadmissionpolicy.PluginName, validatingwebhook.PluginName},
 		DefaultOffPlugins:      sets.Set[string]{},
 	}
 	server.RegisterAllAdmissionPlugins(options.Plugins)
@@ -177,6 +179,8 @@ func (a *AdmissionOptions) ApplyTo(
 	}
 
 	c.AdmissionControl = admissionmetrics.WithStepMetrics(admissionChain)
+	// Propagate to BuildHandlerChain whether the authorization-critical admission plugin is enabled, and thus whether it is safe to enable conditional authorization.
+	c.Authorization.ConditionsEnforcerPluginEnabled = slices.Contains(pluginNames, conditionsenforcer.PluginName)
 	return nil
 }
 
