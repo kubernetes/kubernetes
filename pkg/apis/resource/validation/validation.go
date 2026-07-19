@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"gopkg.in/inf.v0"
 
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -846,10 +847,14 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 	}
 
 	allErrs = append(allErrs, validateMap(device.Attributes, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
-	if allowMultipleAllocations {
-		allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateMultiAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
-	} else {
-		allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateSingleAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
+	// If the entire capacity is the same as before then validation can be skipped.
+	// We could also do the DeepEqual on the entire spec, but here it is a bit cheaper.
+	if oldDevice == nil || !apiequality.Semantic.DeepEqual(oldDevice.Capacity, device.Capacity) {
+		if allowMultipleAllocations {
+			allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateMultiAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
+		} else {
+			allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateSingleAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
+		}
 	}
 	// If the entire set is the same as before then validation can be skipped.
 	// We could also do the DeepEqual on the entire spec, but here it is a bit cheaper.
@@ -1070,6 +1075,7 @@ func validateDeviceAttributeVersionValue(value *string, fldPath *field.Path) fie
 }
 
 // validateMultiAllocatableDeviceCapacity must check requestPolicy in consumable capacity.
+// It only gets called for new or modified capacity.
 func validateMultiAllocatableDeviceCapacity(capacity resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if capacity.RequestPolicy != nil {
@@ -1091,6 +1097,7 @@ func validateSingleAllocatableDeviceCapacity(capacity resource.DeviceCapacity, f
 
 // validateRequestPolicy validates at most one of ValidRequestValues can be defined.
 // If any ValidRequestValues are defined, Default must also be defined and valid.
+// Only gets called for new or modified policy.
 func validateRequestPolicy(maxCapacity apiresource.Quantity, policy *resource.CapacityRequestPolicy, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(policy.ValidValues) > 0 && policy.ValidRange != nil {
@@ -1134,6 +1141,14 @@ func validateRequestPolicyValidValues(defaultValue apiresource.Quantity, maxCapa
 		}
 	}
 
+	// Choose the key function based on whether fractional capacity values are
+	// supported. When DRAFractionalCapacityRange is enabled, use decimal precision;
+	// otherwise, use integer-based keys.
+	quantityKeyFunc := quantityKeyInt
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAFractionalCapacityRange) {
+		quantityKeyFunc = quantityKeyAsDec
+	}
+
 	allErrs = append(allErrs, validateSet(validValues, resource.CapacityRequestPolicyDiscreteMaxOptions,
 		func(option apiresource.Quantity, fldPath *field.Path) field.ErrorList {
 			var allErrs field.ErrorList
@@ -1144,13 +1159,15 @@ func validateRequestPolicyValidValues(defaultValue apiresource.Quantity, maxCapa
 				foundDefault = true
 			}
 			return allErrs
-		}, quantityKey, fldPath)...)
+		}, quantityKeyFunc, fldPath)...)
 	if !foundDefault {
 		allErrs = append(allErrs, field.Invalid(fldPath, defaultValue.String(), "default value is not valid according to the requestPolicy"))
 	}
 	return allErrs
 }
 
+// validateRequestPolicyRange validates a CapacityRequestPolicyRange.
+// Only gets called for a new or modified range.
 func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity apiresource.Quantity, valueRange resource.CapacityRequestPolicyRange, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if valueRange.Min == nil {
@@ -1161,7 +1178,7 @@ func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity a
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("min"), valueRange.Min.String(), fmt.Sprintf("min is larger than capacity value: %s", maxCapacity.String())))
 	}
 	if defaultValue.Cmp(*valueRange.Min) < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("min"), defaultValue.String(), fmt.Sprintf("default is less than min: %s", valueRange.Min.String())))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), defaultValue.String(), fmt.Sprintf("default is less than min: %s", valueRange.Min.String())))
 	}
 	if valueRange.Max != nil {
 		if valueRange.Min.Cmp(*valueRange.Max) > 0 {
@@ -1171,7 +1188,38 @@ func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity a
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("max"), valueRange.Max.String(), fmt.Sprintf("max is larger than capacity value: %s", maxCapacity.String())))
 		}
 		if defaultValue.Cmp(*valueRange.Max) > 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("max"), defaultValue.String(), fmt.Sprintf("default is more than max: %s", valueRange.Max.String())))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), defaultValue.String(), fmt.Sprintf("default is more than max: %s", valueRange.Max.String())))
+		}
+	}
+	useMilli := false
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAFractionalCapacityRange) {
+		useMilli = rangeHasFractional(valueRange)
+		// Overflow guards apply when DRAFractionalCapacityRange is enabled and the incoming
+		// range has fractional values.
+		if useMilli {
+			hasUnsafeValue := false
+			for _, pair := range []struct {
+				q    *apiresource.Quantity
+				name string
+			}{
+				{&defaultValue, "default"},
+				{valueRange.Min, "min"},
+				{valueRange.Max, "max"},
+				{valueRange.Step, "step"},
+			} {
+				if pair.q != nil {
+					milliQuantity := apiresource.NewMilliQuantity(pair.q.MilliValue(), pair.q.Format)
+					if pair.q.Cmp(*milliQuantity) != 0 {
+						allErrs = append(allErrs, field.Invalid(fldPath.Child(pair.name), pair.q.String(),
+							"value cannot be represented as a milli value"))
+						hasUnsafeValue = true
+					}
+				}
+			}
+			if hasUnsafeValue {
+				// fast return to avoid unsafe calculation
+				return allErrs
+			}
 		}
 	}
 	if valueRange.Step != nil {
@@ -1183,25 +1231,56 @@ func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity a
 			if added.Cmp(maxCapacity) > 0 {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("step"), valueRange.Step.String(), fmt.Sprintf("one step %s is larger than capacity value: %s", added.String(), maxCapacity.String())))
 			}
-			allErrs = append(allErrs, validateRequestPolicyRangeStep(defaultValue, *valueRange.Min, *valueRange.Step, fldPath.Child("step"))...)
+			// Use milli-value arithmetic whenever any field is fractional to preserve.
+			// useMilli is set only when the DRAFractionalCapacityRange feature gate is enabled.
+			allErrs = append(allErrs, validateRequestPolicyRangeStep(defaultValue, *valueRange.Min, *valueRange.Step, useMilli, fldPath.Child("step"))...)
 			if valueRange.Max != nil {
-				allErrs = append(allErrs, validateRequestPolicyRangeStep(*valueRange.Max, *valueRange.Min, *valueRange.Step, fldPath.Child("step"))...)
+				allErrs = append(allErrs, validateRequestPolicyRangeStep(*valueRange.Max, *valueRange.Min, *valueRange.Step, useMilli, fldPath.Child("step"))...)
 			}
 		}
 	}
 	return allErrs
 }
 
-func validateRequestPolicyRangeStep(value, min, step apiresource.Quantity, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	stepVal := step.Value()
-	minVal := min.Value()
-	val := value.Value()
-	added := (val - minVal)
-	if added%stepVal != 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, value.String(), fmt.Sprintf("value is not a multiple of a given step (%s) from (%s)", step.String(), min.String())))
+// validateRequestPolicyRangeStep checks if the value is a valid step increment
+// starting from the minimum value (i.e., value - min is a multiple of step).
+//
+// Pre-requisite: value, min, and step must be pre-validated to ensure they
+// don't underflow or overflow the supported value range (int64 or milli-value)
+// and that step is not zero.
+func validateRequestPolicyRangeStep(value, min, step apiresource.Quantity, useMilli bool, fldPath *field.Path) field.ErrorList {
+	var stepVal, minVal, val int64
+	if useMilli {
+		stepVal = step.MilliValue()
+		minVal = min.MilliValue()
+		val = value.MilliValue()
+	} else {
+		stepVal = step.Value()
+		minVal = min.Value()
+		val = value.Value()
 	}
-	return allErrs
+	if (val-minVal)%stepVal != 0 {
+		return field.ErrorList{field.Invalid(fldPath, value.String(), fmt.Sprintf("value is not a multiple of a given step (%s) from (%s)", step.String(), min.String()))}
+	}
+	return nil
+}
+
+// rangeHasFractional reports whether any non-nil field of r has sub-integer precision.
+func rangeHasFractional(r resource.CapacityRequestPolicyRange) bool {
+	for _, q := range []*apiresource.Quantity{r.Min, r.Max, r.Step} {
+		if q != nil && isFractionalQuantity(*q) {
+			return true
+		}
+	}
+	return false
+}
+
+// isFractionalQuantity reports whether q has sub-integer precision.
+func isFractionalQuantity(q apiresource.Quantity) bool {
+	dec := q.AsDec()
+	infDec := inf.Dec{}
+	rounded := infDec.Round(dec, 0, inf.RoundDown)
+	return dec.Cmp(rounded) != 0
 }
 
 func validateDeviceCounter(counter resource.Counter, fldPath *field.Path) field.ErrorList {
@@ -1350,8 +1429,15 @@ func stringKey(item string) string {
 	return item
 }
 
-// quantityKey uses the item itself as a key for validateSet.
-func quantityKey(item apiresource.Quantity) string {
+// quantityKeyAsDec uses a scaled inf.Dec of the item as itself
+// as a key for validateSet.
+func quantityKeyAsDec(item apiresource.Quantity) string {
+	return item.AsDec().String()
+}
+
+// quantityKeyInt uses base-10 integer of the item itself
+// as a key for validateSet.
+func quantityKeyInt(item apiresource.Quantity) string {
 	return strconv.FormatInt(item.Value(), 10)
 }
 
