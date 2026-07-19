@@ -562,16 +562,19 @@ message ShareableCapacityStatus {
   // Total is the sum of this capacity across shareable devices in the pool.
   //
   // +required
+  // +k8s:required
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity total = 2;
 
   // Consumed is the amount drawn by current allocations.
   //
   // +required
+  // +k8s:required
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity consumed = 3;
 
   // Available is Total minus Consumed, never negative.
   //
   // +required
+  // +k8s:required
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity available = 4;
 }
 

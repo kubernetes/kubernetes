@@ -691,17 +691,20 @@ type ShareableCapacityStatus struct {
 	// Total is the sum of this capacity across shareable devices in the pool.
 	//
 	// +required
-	Total resource.Quantity `json:"total" protobuf:"bytes,2,name=total"`
+	// +k8s:required
+	Total *resource.Quantity `json:"total,omitempty" protobuf:"bytes,2,opt,name=total"`
 
 	// Consumed is the amount drawn by current allocations.
 	//
 	// +required
-	Consumed resource.Quantity `json:"consumed" protobuf:"bytes,3,name=consumed"`
+	// +k8s:required
+	Consumed *resource.Quantity `json:"consumed,omitempty" protobuf:"bytes,3,opt,name=consumed"`
 
 	// Available is Total minus Consumed, never negative.
 	//
 	// +required
-	Available resource.Quantity `json:"available" protobuf:"bytes,4,name=available"`
+	// +k8s:required
+	Available *resource.Quantity `json:"available,omitempty" protobuf:"bytes,4,opt,name=available"`
 }
 
 // ResourcePoolStatusRequestConditionComplete is the condition type for completed requests.

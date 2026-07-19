@@ -767,12 +767,16 @@ func validatePartitionTypeAttribute(spec *resource.ResourceSliceSpec, fldPath *f
 		return allErrs
 	}
 
+	// A name in the driver's own domain may also be declared bare. Strip the
+	// prefix once here rather than allocating driver+"/" per device below.
+	bareName, _ := strings.CutPrefix(name, spec.Driver+"/")
+
 	for i, device := range spec.Devices {
 		if len(device.ConsumesCounters) == 0 {
 			continue
 		}
 		attrPath := fldPath.Child("devices").Index(i).Child("attributes").Key(name)
-		attribute, ok := lookupQualifiedAttribute(device.Attributes, spec.Driver, name)
+		attribute, ok := lookupQualifiedAttribute(device.Attributes, name, bareName)
 		if !ok {
 			allErrs = append(allErrs, field.Required(attrPath,
 				"device consumes counters and `partitionTypeAttribute` names this attribute, so it must be set"))
@@ -791,13 +795,14 @@ func validatePartitionTypeAttribute(spec *resource.ResourceSliceSpec, fldPath *f
 // name. A key that carries no domain defaults to the driver's own domain, so an
 // attribute in the driver's domain may be declared either explicitly or bare.
 // The explicit form wins, keeping the result deterministic when a device
-// declares both; a bare key is consulted only for a name in the driver's domain.
-func lookupQualifiedAttribute(attributes map[resource.QualifiedName]resource.DeviceAttribute, driver, name string) (resource.DeviceAttribute, bool) {
+// declares both; bareName (the name with the driver's domain stripped, empty
+// when the name is in another domain) is consulted only when non-empty.
+func lookupQualifiedAttribute(attributes map[resource.QualifiedName]resource.DeviceAttribute, name, bareName string) (resource.DeviceAttribute, bool) {
 	if attribute, ok := attributes[resource.QualifiedName(name)]; ok {
 		return attribute, true
 	}
-	if bare, ok := strings.CutPrefix(name, driver+"/"); ok {
-		if attribute, ok := attributes[resource.QualifiedName(bare)]; ok {
+	if bareName != "" {
+		if attribute, ok := attributes[resource.QualifiedName(bareName)]; ok {
 			return attribute, true
 		}
 	}

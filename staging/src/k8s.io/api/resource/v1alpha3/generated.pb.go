@@ -24,6 +24,7 @@ import (
 
 	io "io"
 
+	resource "k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	math_bits "math/bits"
@@ -771,36 +772,42 @@ func (m *ShareableCapacityStatus) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	_ = i
 	var l int
 	_ = l
-	{
-		size, err := m.Available.MarshalToSizedBuffer(dAtA[:i])
-		if err != nil {
-			return 0, err
+	if m.Available != nil {
+		{
+			size, err := m.Available.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
 		}
-		i -= size
-		i = encodeVarintGenerated(dAtA, i, uint64(size))
+		i--
+		dAtA[i] = 0x22
 	}
-	i--
-	dAtA[i] = 0x22
-	{
-		size, err := m.Consumed.MarshalToSizedBuffer(dAtA[:i])
-		if err != nil {
-			return 0, err
+	if m.Consumed != nil {
+		{
+			size, err := m.Consumed.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
 		}
-		i -= size
-		i = encodeVarintGenerated(dAtA, i, uint64(size))
+		i--
+		dAtA[i] = 0x1a
 	}
-	i--
-	dAtA[i] = 0x1a
-	{
-		size, err := m.Total.MarshalToSizedBuffer(dAtA[:i])
-		if err != nil {
-			return 0, err
+	if m.Total != nil {
+		{
+			size, err := m.Total.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
 		}
-		i -= size
-		i = encodeVarintGenerated(dAtA, i, uint64(size))
+		i--
+		dAtA[i] = 0x12
 	}
-	i--
-	dAtA[i] = 0x12
 	i -= len(m.Name)
 	copy(dAtA[i:], m.Name)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
@@ -1147,12 +1154,18 @@ func (m *ShareableCapacityStatus) Size() (n int) {
 	_ = l
 	l = len(m.Name)
 	n += 1 + l + sovGenerated(uint64(l))
-	l = m.Total.Size()
-	n += 1 + l + sovGenerated(uint64(l))
-	l = m.Consumed.Size()
-	n += 1 + l + sovGenerated(uint64(l))
-	l = m.Available.Size()
-	n += 1 + l + sovGenerated(uint64(l))
+	if m.Total != nil {
+		l = m.Total.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.Consumed != nil {
+		l = m.Consumed.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.Available != nil {
+		l = m.Available.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -1377,9 +1390,9 @@ func (this *ShareableCapacityStatus) String() string {
 	}
 	s := strings.Join([]string{`&ShareableCapacityStatus{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
-		`Total:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Total), "Quantity", "resource.Quantity", 1), `&`, ``, 1) + `,`,
-		`Consumed:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Consumed), "Quantity", "resource.Quantity", 1), `&`, ``, 1) + `,`,
-		`Available:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Available), "Quantity", "resource.Quantity", 1), `&`, ``, 1) + `,`,
+		`Total:` + strings.Replace(fmt.Sprintf("%v", this.Total), "Quantity", "resource.Quantity", 1) + `,`,
+		`Consumed:` + strings.Replace(fmt.Sprintf("%v", this.Consumed), "Quantity", "resource.Quantity", 1) + `,`,
+		`Available:` + strings.Replace(fmt.Sprintf("%v", this.Available), "Quantity", "resource.Quantity", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3565,6 +3578,9 @@ func (m *ShareableCapacityStatus) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
+			if m.Total == nil {
+				m.Total = &resource.Quantity{}
+			}
 			if err := m.Total.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -3598,6 +3614,9 @@ func (m *ShareableCapacityStatus) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
+			if m.Consumed == nil {
+				m.Consumed = &resource.Quantity{}
+			}
 			if err := m.Consumed.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -3630,6 +3649,9 @@ func (m *ShareableCapacityStatus) Unmarshal(dAtA []byte) error {
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
+			}
+			if m.Available == nil {
+				m.Available = &resource.Quantity{}
 			}
 			if err := m.Available.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err

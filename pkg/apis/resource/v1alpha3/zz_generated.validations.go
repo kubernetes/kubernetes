@@ -28,6 +28,7 @@ import (
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
+	resource "k8s.io/apimachinery/pkg/api/resource"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1214,9 +1215,93 @@ func Validate_ShareableCapacityStatus(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	// field resourcev1alpha3.ShareableCapacityStatus.Total has no validation
-	// field resourcev1alpha3.ShareableCapacityStatus.Consumed has no validation
-	// field resourcev1alpha3.ShareableCapacityStatus.Available has no validation
+	{ // field resourcev1alpha3.ShareableCapacityStatus.Total
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resource.Quantity,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1alpha3.ShareableCapacityStatus) *resource.Quantity {
+				return oldObj.Total
+			})
+		errs = append(errs, fn(fldPath.Child("total"), obj.Total, oldVal, oldObj != nil)...)
+	}
+
+	{ // field resourcev1alpha3.ShareableCapacityStatus.Consumed
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resource.Quantity,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1alpha3.ShareableCapacityStatus) *resource.Quantity {
+				return oldObj.Consumed
+			})
+		errs = append(errs, fn(fldPath.Child("consumed"), obj.Consumed, oldVal, oldObj != nil)...)
+	}
+
+	{ // field resourcev1alpha3.ShareableCapacityStatus.Available
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resource.Quantity,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1alpha3.ShareableCapacityStatus) *resource.Quantity {
+				return oldObj.Available
+			})
+		errs = append(errs, fn(fldPath.Child("available"), obj.Available, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 

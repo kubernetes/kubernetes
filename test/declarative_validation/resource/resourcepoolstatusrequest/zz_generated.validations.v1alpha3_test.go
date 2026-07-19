@@ -154,7 +154,16 @@ func init() {
 			"status.pools[*].shareableSummary.capacity": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
+			"status.pools[*].shareableSummary.capacity[*].available": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.pools[*].shareableSummary.capacity[*].consumed": {
+				{ErrorType: "FieldValueRequired"},
+			},
 			"status.pools[*].shareableSummary.capacity[*].name": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.pools[*].shareableSummary.capacity[*].total": {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"status.pools[*].shareableSummary.fullyAvailableDevices": {

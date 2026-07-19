@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -501,7 +502,7 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 				pool := mkValidPoolStatus()
 				caps := make([]resource.ShareableCapacityStatus, 33)
 				for i := range caps {
-					caps[i] = resource.ShareableCapacityStatus{Name: "mem"}
+					caps[i] = validShareableCapacity("mem")
 				}
 				pool.ShareableSummary = &resource.ShareableSummaryStatus{FullyAvailableDevices: ptr.To[int32](0), PartiallyAvailableDevices: ptr.To[int32](0), Capacity: caps}
 				s.Pools = []resource.PoolStatus{pool}
@@ -513,10 +514,47 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 			oldObj: mkValidRPSRForUpdate(),
 			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
 				pool := mkValidPoolStatus()
-				pool.ShareableSummary = &resource.ShareableSummaryStatus{FullyAvailableDevices: ptr.To[int32](0), PartiallyAvailableDevices: ptr.To[int32](0), Capacity: []resource.ShareableCapacityStatus{{Name: ""}}}
+				cap := validShareableCapacity("")
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{FullyAvailableDevices: ptr.To[int32](0), PartiallyAvailableDevices: ptr.To[int32](0), Capacity: []resource.ShareableCapacityStatus{cap}}
 				s.Pools = []resource.PoolStatus{pool}
 			})),
 			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("capacity").Index(0).Child("name"), "")},
+		},
+		"shareableSummary capacity total required": {
+			// +k8s:required
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				cap := validShareableCapacity("mem")
+				cap.Total = nil
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{FullyAvailableDevices: ptr.To[int32](0), PartiallyAvailableDevices: ptr.To[int32](0), Capacity: []resource.ShareableCapacityStatus{cap}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("capacity").Index(0).Child("total"), "")},
+		},
+		"shareableSummary capacity consumed required": {
+			// +k8s:required
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				cap := validShareableCapacity("mem")
+				cap.Consumed = nil
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{FullyAvailableDevices: ptr.To[int32](0), PartiallyAvailableDevices: ptr.To[int32](0), Capacity: []resource.ShareableCapacityStatus{cap}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("capacity").Index(0).Child("consumed"), "")},
+		},
+		"shareableSummary capacity available required": {
+			// +k8s:required
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				cap := validShareableCapacity("mem")
+				cap.Available = nil
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{FullyAvailableDevices: ptr.To[int32](0), PartiallyAvailableDevices: ptr.To[int32](0), Capacity: []resource.ShareableCapacityStatus{cap}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("capacity").Index(0).Child("available"), "")},
 		},
 		"shareableSummary negative fullyAvailableDevices": {
 			// +k8s:minimum=0 (standard DV)
@@ -597,6 +635,15 @@ func mkValidRPSRForUpdate(tweaks ...func(*resource.ResourcePoolStatusRequest)) r
 	obj := mkValidRPSR(tweaks...)
 	obj.ResourceVersion = "1"
 	return obj
+}
+
+func qty(s string) *apiresource.Quantity {
+	q := apiresource.MustParse(s)
+	return &q
+}
+
+func validShareableCapacity(name string) resource.ShareableCapacityStatus {
+	return resource.ShareableCapacityStatus{Name: name, Total: qty("1"), Consumed: qty("0"), Available: qty("1")}
 }
 
 func mkValidPoolStatus() resource.PoolStatus {

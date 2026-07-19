@@ -298,11 +298,12 @@ func computeShareableSummary(in poolViewInput) (*resourcev1alpha3.ShareableSumma
 		if q, ok := in.consumedCapacity[key]; ok {
 			cons = q.DeepCopy()
 		}
+		avail := nonNegativeDiff(t, cons)
 		capacities = append(capacities, resourcev1alpha3.ShareableCapacityStatus{
 			Name:      string(key),
-			Total:     t,
-			Consumed:  cons,
-			Available: nonNegativeDiff(t, cons),
+			Total:     &t,
+			Consumed:  &cons,
+			Available: &avail,
 		})
 	}
 	if len(capacities) > maxStatusListItems {

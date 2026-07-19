@@ -2335,15 +2335,15 @@ type ShareableCapacityStatus struct {
 
 	// Total is the sum of this capacity across shareable devices in the pool.
 	// +required
-	Total resource.Quantity
+	Total *resource.Quantity
 
 	// Consumed is the amount drawn by current allocations.
 	// +required
-	Consumed resource.Quantity
+	Consumed *resource.Quantity
 
 	// Available is Total minus Consumed, never negative.
 	// +required
-	Available resource.Quantity
+	Available *resource.Quantity
 }
 
 // ResourcePoolStatusRequestConditionComplete is the condition type for completed requests.
