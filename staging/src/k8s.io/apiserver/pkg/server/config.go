@@ -395,6 +395,9 @@ type AuthorizationInfo struct {
 	// Authorizer determines whether the subject is allowed to make the request based only
 	// on the RequestURI
 	Authorizer authorizer.Authorizer
+
+	// ConditionsEnforcerPluginEnabled is set to true by AdmissionOptions when the admission plugin is enabled
+	ConditionsEnforcerPluginEnabled bool
 }
 
 func init() {
