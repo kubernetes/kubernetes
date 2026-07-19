@@ -77,7 +77,7 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ClusterTrustBundle), fram
 			  Description: kube-apiserver must support create/update/list/patch/delete operations
 						   for certificates.k8s.io/v1 ClusterTrustBundles
 		*/
-		framework.ConformanceIt("certificates.k8s.io/v1 ClusterTrustBundles", func(ctx context.Context) {
+		framework.ConformanceIt("certificates.k8s.io/v1 ClusterTrustBundles [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 			initialPEMBundle := mustMakeCAPEM("crud-root-initial")
 			updatedPEMBundle := mustMakeCAPEM("crud-root-updated")
 
@@ -111,7 +111,7 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ClusterTrustBundle), fram
 		  Description: The API server MUST serve the ClusterTrustBundle API and the kubelet
 					   MUST be able to mount contents of these API objects inside of pods.
 	*/
-	framework.ConformanceIt("should be able to mount a single ClusterTrustBundle by name", func(ctx context.Context) {
+	framework.ConformanceIt("should be able to mount a single ClusterTrustBundle by name [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 
 		for _, tt := range []struct {
 			name           string
@@ -194,7 +194,7 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ClusterTrustBundle), fram
 							   MUST be able to mount contents of these API objects inside of pods
 							   using different kinds of selectors.
 			*/
-			framework.ConformanceIt(tt.name, func(ctx context.Context) {
+			framework.ConformanceIt(tt.name+" [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 				signerName := tt.signerName + f.UniqueName
 				pod := podForCTBProjection(v1.VolumeProjection{
 					ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
@@ -247,7 +247,7 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ClusterTrustBundle), fram
 				  Description: The API server MUST serve the ClusterTrustBundle API and the kubelet
 							   MUST fail to mount these objects if none match the provided selector.
 			*/
-			framework.ConformanceIt(tt.name, func(ctx context.Context) {
+			framework.ConformanceIt(tt.name+" [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 				pod := podForCTBProjection(v1.VolumeProjection{ClusterTrustBundle: tt.ctb})
 
 				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
@@ -299,7 +299,7 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ClusterTrustBundle), fram
 		  Description: The API server MUST serve the ClusterTrustBundle API and the kubelet
 					   MUST be able to mount multiple volumes of ClusterTrustBundle type.
 	*/
-	framework.ConformanceIt("should be able to specify multiple CTB volumes", func(ctx context.Context) {
+	framework.ConformanceIt("should be able to specify multiple CTB volumes [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 		pod := podForCTBProjection(
 			v1.VolumeProjection{
 				ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
@@ -327,7 +327,13 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ClusterTrustBundle), fram
 		e2epodoutput.TestContainerOutputsRegexp(ctx, f, "multiple CTB volumes", pod, expectedOutputs)
 	})
 
-	framework.It("should be able to mount a big number (>100) of CTBs", func(ctx context.Context) {
+	/*
+		  Release: v1.37
+		  Testname: Mounting big number (>100) of ClusterTrustBundle volumes
+		  Description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+					   MUST be able to mount a big number of volumes of ClusterTrustBundle type.
+	*/
+	framework.ConformanceIt("should be able to mount a big number (>100) of CTBs [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 		const numCTBs = 150
 
 		var initCTBs []*certificatesv1.ClusterTrustBundle
