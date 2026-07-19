@@ -326,4 +326,3 @@ func writeCollectionHead(w io.Writer, base byte, n int64) error {
 		return err
 	}
 }
-

@@ -1215,3 +1215,102 @@ func TestStreamEncodeCollectionsNondeterministic(t *testing.T) {
 	}
 }
 
+// TestCollectionHeadMatchesLibrary verifies that writeArrayHead and writeMapHead
+// produce byte-identical output to the fxamacker/cbor library's own head encoding
+// at every length-encoding width boundary (and its neighbors) reachable by
+// allocating a real collection. The library encodes an n-element array/map with a
+// leading definite-length head, so our streamed head must equal that prefix.
+//
+// The reachable sizes exercise the 1-, 2-, 3-, and 5-byte argument forms (the last
+// at n=65536). The 8-byte form (n > 2^32) cannot be produced by allocation and is
+// covered against explicit RFC 8949 bytes by TestWriteCollectionHeadBoundaries.
+func TestCollectionHeadMatchesLibrary(t *testing.T) {
+	// Width-class boundaries and neighbors:
+	//   n <= 23           -> 1-byte head
+	//   24    <= n <= 255 -> 2-byte head
+	//   256   <= n <= 65535 -> 3-byte head
+	//   65536 <= n        -> 5-byte head
+	sizes := []int{0, 1, 23, 24, 25, 255, 256, 257, 65535, 65536, 65537}
+
+	assertPrefix := func(t *testing.T, kind string, n int, head, lib []byte) {
+		t.Helper()
+		end := min(len(head), len(lib))
+		if !bytes.Equal(head, lib[:end]) {
+			t.Errorf("%s head mismatch for n=%d:\n  ours:    % x\n  library: % x", kind, n, head, lib[:min(len(lib), len(head)+4)])
+		}
+	}
+
+	for _, n := range sizes {
+		t.Run(fmt.Sprintf("array/%d", n), func(t *testing.T) {
+			var head bytes.Buffer
+			if err := writeArrayHead(&head, n); err != nil {
+				t.Fatalf("writeArrayHead(%d): %v", n, err)
+			}
+			lib, err := modes.Encode.Marshal(make([]bool, n))
+			if err != nil {
+				t.Fatalf("library marshal []bool len %d: %v", n, err)
+			}
+			assertPrefix(t, "array", n, head.Bytes(), lib)
+		})
+		t.Run(fmt.Sprintf("map/%d", n), func(t *testing.T) {
+			var head bytes.Buffer
+			if err := writeMapHead(&head, n); err != nil {
+				t.Fatalf("writeMapHead(%d): %v", n, err)
+			}
+			m := make(map[int64]bool, n)
+			for i := range n {
+				m[int64(i)] = false
+			}
+			lib, err := modes.Encode.Marshal(m)
+			if err != nil {
+				t.Fatalf("library marshal map len %d: %v", n, err)
+			}
+			assertPrefix(t, "map", n, head.Bytes(), lib)
+		})
+	}
+}
+
+// TestWriteCollectionHeadBoundaries checks writeCollectionHead against explicit
+// RFC 8949 Section 3 expected bytes at every additional-information width boundary
+// and its neighbors, for both the array (0x80) and map (0xa0) major types. Unlike
+// TestCollectionHeadMatchesLibrary, this calls writeCollectionHead directly, so it
+// can cover the 8-byte argument form (n > 2^32) that no allocatable collection can
+// reach.
+func TestWriteCollectionHeadBoundaries(t *testing.T) {
+	for _, tc := range []struct {
+		n     int64
+		array []byte
+		mp    []byte
+	}{
+		{n: 0, array: []byte{0x80}, mp: []byte{0xa0}},
+		{n: 1, array: []byte{0x81}, mp: []byte{0xa1}},
+		{n: 23, array: []byte{0x97}, mp: []byte{0xb7}},                                                                                                            // max 1-byte
+		{n: 24, array: []byte{0x98, 0x18}, mp: []byte{0xb8, 0x18}},                                                                                                // min 2-byte
+		{n: 255, array: []byte{0x98, 0xff}, mp: []byte{0xb8, 0xff}},                                                                                               // max 2-byte
+		{n: 256, array: []byte{0x99, 0x01, 0x00}, mp: []byte{0xb9, 0x01, 0x00}},                                                                                   // min 3-byte
+		{n: 65535, array: []byte{0x99, 0xff, 0xff}, mp: []byte{0xb9, 0xff, 0xff}},                                                                                 // max 3-byte
+		{n: 65536, array: []byte{0x9a, 0x00, 0x01, 0x00, 0x00}, mp: []byte{0xba, 0x00, 0x01, 0x00, 0x00}},                                                         // min 5-byte
+		{n: 4294967295, array: []byte{0x9a, 0xff, 0xff, 0xff, 0xff}, mp: []byte{0xba, 0xff, 0xff, 0xff, 0xff}},                                                    // max 5-byte (2^32-1)
+		{n: 4294967296, array: []byte{0x9b, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00}, mp: []byte{0xbb, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00}},    // min 9-byte (2^32)
+		{n: 1099511627775, array: []byte{0x9b, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff}, mp: []byte{0xbb, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff}}, // 0xFFFFFFFFFF
+	} {
+		t.Run(fmt.Sprintf("array/%d", tc.n), func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := writeCollectionHead(&buf, cborTypeArray, tc.n); err != nil {
+				t.Fatalf("writeCollectionHead: %v", err)
+			}
+			if !bytes.Equal(buf.Bytes(), tc.array) {
+				t.Errorf("n=%d: got % x, want % x", tc.n, buf.Bytes(), tc.array)
+			}
+		})
+		t.Run(fmt.Sprintf("map/%d", tc.n), func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := writeCollectionHead(&buf, cborTypeMap, tc.n); err != nil {
+				t.Fatalf("writeCollectionHead: %v", err)
+			}
+			if !bytes.Equal(buf.Bytes(), tc.mp) {
+				t.Errorf("n=%d: got % x, want % x", tc.n, buf.Bytes(), tc.mp)
+			}
+		})
+	}
+}
