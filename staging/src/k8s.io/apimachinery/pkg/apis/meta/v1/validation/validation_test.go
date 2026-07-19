@@ -343,6 +343,55 @@ func TestValidateFieldManagerInvalid(t *testing.T) {
 	}
 }
 
+// TestValidateFieldManagerTooLongErrorShape verifies that the too-long error
+// carries the "maxBytes" origin and is marked as covered by declarative
+// validation, so the DV migration framework can suppress it once enforced.
+func TestValidateFieldManagerTooLongErrorShape(t *testing.T) {
+	// 129 characters — one over the 128-byte limit
+	tooLong := strings.Repeat("a", FieldManagerMaxLength+1)
+	errs := ValidateFieldManager(tooLong, field.NewPath("fieldManager"))
+	if len(errs) == 0 {
+		t.Fatal("expected a TooLong error, got none")
+	}
+	err := errs[0]
+	if err.Type != field.ErrorTypeTooLong {
+		t.Errorf("expected ErrorTypeTooLong, got %v", err.Type)
+	}
+	if err.Origin != "maxBytes" {
+		t.Errorf("expected origin \"maxBytes\", got %q", err.Origin)
+	}
+	if !err.CoveredByDeclarative {
+		t.Errorf("expected CoveredByDeclarative=true")
+	}
+}
+
+// TestValidateManagedFieldsSubresourceTooLongErrorShape verifies that the
+// subresource too-long error carries the "maxBytes" origin and is marked as
+// covered by declarative validation.
+func TestValidateManagedFieldsSubresourceTooLongErrorShape(t *testing.T) {
+	// 257 characters — one over the 256-byte limit
+	entry := metav1.ManagedFieldsEntry{
+		Operation:   metav1.ManagedFieldsOperationUpdate,
+		FieldsType:  "FieldsV1",
+		APIVersion:  "v1",
+		Subresource: strings.Repeat("a", MaxSubresourceNameLength+1),
+	}
+	errs := ValidateManagedFields([]metav1.ManagedFieldsEntry{entry}, field.NewPath("managedFields"))
+	if len(errs) == 0 {
+		t.Fatal("expected a TooLong error, got none")
+	}
+	err := errs[0]
+	if err.Type != field.ErrorTypeTooLong {
+		t.Errorf("expected ErrorTypeTooLong, got %v", err.Type)
+	}
+	if err.Origin != "maxBytes" {
+		t.Errorf("expected origin \"maxBytes\", got %q", err.Origin)
+	}
+	if !err.CoveredByDeclarative {
+		t.Errorf("expected CoveredByDeclarative=true")
+	}
+}
+
 func TestValidateManagedFieldsInvalid(t *testing.T) {
 	tests := []metav1.ManagedFieldsEntry{{
 		Operation:  metav1.ManagedFieldsOperationUpdate,

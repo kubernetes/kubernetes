@@ -706,6 +706,8 @@ message ListOptions {
 // that the fieldset applies to.
 message ManagedFieldsEntry {
   // Manager is an identifier of the workflow managing these fields.
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:maxBytes=128
   optional string manager = 1;
 
   // Operation is the type of operation which lead to this ManagedFieldsEntry being created.
@@ -742,6 +744,8 @@ message ManagedFieldsEntry {
   // regular update using the same manager name.
   // Note that the APIVersion field is not related to the Subresource field and
   // it always corresponds to the version of the main resource.
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:maxBytes=256
   optional string subresource = 8;
 }
 

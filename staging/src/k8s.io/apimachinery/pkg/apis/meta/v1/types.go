@@ -1406,6 +1406,8 @@ const (
 // that the fieldset applies to.
 type ManagedFieldsEntry struct {
 	// Manager is an identifier of the workflow managing these fields.
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:maxBytes=128
 	Manager string `json:"manager,omitempty" protobuf:"bytes,1,opt,name=manager"`
 	// Operation is the type of operation which lead to this ManagedFieldsEntry being created.
 	// The only valid values for this field are 'Apply' and 'Update'.
@@ -1441,6 +1443,8 @@ type ManagedFieldsEntry struct {
 	// regular update using the same manager name.
 	// Note that the APIVersion field is not related to the Subresource field and
 	// it always corresponds to the version of the main resource.
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:maxBytes=256
 	Subresource string `json:"subresource,omitempty" protobuf:"bytes,8,opt,name=subresource"`
 }
 
