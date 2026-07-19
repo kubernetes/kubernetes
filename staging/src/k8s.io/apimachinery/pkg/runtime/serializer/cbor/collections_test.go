@@ -449,6 +449,23 @@ func TestStreamingCollectionsEncoding(t *testing.T) {
 			cannotStream: true,
 		},
 		{
+			// A cbor struct tag takes precedence over json in the CBOR encoder, so
+			// the streaming encoder (which follows the json tags) must not claim
+			// this type; it falls back to the general encoder, which renames the
+			// items key to "elements".
+			name: "List with cbor tag cannot be streamed",
+			in: &ListWithCBORTagList{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "List",
+					APIVersion: "v1",
+				},
+				Items: []testapigroupv1.Carp{
+					{ObjectMeta: metav1.ObjectMeta{Name: "pod"}},
+				},
+			},
+			cannotStream: true,
+		},
+		{
 			name: "Not a collection cannot be streamed",
 			in: &testapigroupv1.Carp{
 				TypeMeta: metav1.TypeMeta{
@@ -782,6 +799,19 @@ type ListWithAdditionalFields struct {
 }
 
 func (s *ListWithAdditionalFields) DeepCopyObject() runtime.Object {
+	return nil
+}
+
+// ListWithCBORTagList has a valid json-tagged shape but a cbor struct tag on
+// Items that renames its key. Because the CBOR encoder prefers the cbor tag over
+// json, getListMeta must refuse to stream this type.
+type ListWithCBORTagList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items           []testapigroupv1.Carp `json:"items" cbor:"elements" protobuf:"bytes,2,rep,name=items"`
+}
+
+func (s *ListWithCBORTagList) DeepCopyObject() runtime.Object {
 	return nil
 }
 

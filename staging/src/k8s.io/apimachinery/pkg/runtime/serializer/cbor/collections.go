@@ -64,6 +64,18 @@ func getListMeta(list runtime.Object) (metav1.TypeMeta, metav1.ListMeta, []inter
 	if listType.NumField() != 3 {
 		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf("expected ListType to have 3 fields")
 	}
+	// The streaming encoder reproduces the field names and layout implied by the
+	// json struct tags (kind, apiVersion, metadata, items). The CBOR encoder,
+	// however, gives a "cbor" struct tag precedence over "json", so a cbor tag on
+	// any of these fields could rename a key, change its options (e.g. keyasint),
+	// or un-inline the embedded TypeMeta -- diverging from the streamed output.
+	// Refuse to stream such a type and fall back to the general encoder, which
+	// honors the cbor tag correctly.
+	for i := 0; i < listType.NumField(); i++ {
+		if _, ok := listType.Field(i).Tag.Lookup("cbor"); ok {
+			return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf("expected list field %d to have no cbor tag", i)
+		}
+	}
 	// TypeMeta
 	typeMeta, ok := listValue.Field(0).Interface().(metav1.TypeMeta)
 	if !ok {
@@ -251,23 +263,28 @@ func encodeKeyValuePair(w io.Writer, key string, value interface{}, mode modes.E
 	return nil
 }
 
+// CBOR major type prefix bytes (the type in the high 3 bits, additional info
+// zeroed), following RFC 8949 Section 3.1.
+const (
+	cborTypeArray byte = 0x80 // major type 4
+	cborTypeMap   byte = 0xa0 // major type 5
+)
+
 // writeMapHead writes a CBOR map header for a map with n entries.
-// Uses major type 5 (0xa0 base), following RFC 8949 Section 3.1.
 func writeMapHead(w io.Writer, n int) error {
-	return writeCollectionHead(w, 0xa0, int64(n))
+	return writeCollectionHead(w, cborTypeMap, int64(n))
 }
 
 // writeArrayHead writes a CBOR array header for an array with n elements.
-// Uses major type 4 (0x80 base), following RFC 8949 Section 3.1.
 func writeArrayHead(w io.Writer, n int) error {
-	return writeCollectionHead(w, 0x80, int64(n))
+	return writeCollectionHead(w, cborTypeArray, int64(n))
 }
 
 // writeCollectionHead writes a CBOR collection (array or map) header encoding
 // the number of elements n, following RFC 8949 Section 3 additional info rules:
 //
 //   - base: the prefix byte for the collection type.
-//     For maps: 0xa0 (major type 5), for arrays: 0x80 (major type 4).
+//     For maps: cborTypeMap (0xa0), for arrays: cborTypeArray (0x80).
 //
 // The extended form prefixes are derived from base using bitwise OR:
 //   - base|24: 1-byte length follows (additional info 24)
