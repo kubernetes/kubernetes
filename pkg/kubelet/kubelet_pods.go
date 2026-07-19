@@ -2214,10 +2214,22 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	cpuRequest := cm.CPURequestsFromConfig(cpuConfig)
 	cpuLimit := cm.CPULimitsFromConfig(cpuConfig)
 
-	preserveOldResourcesValue := func(rName v1.ResourceName, oldStatusResource, resource v1.ResourceList) {
+	// preserveOldResourcesValue preserves old pod status resources if already present.
+	// When falling back to spec resources (e.g. cgroup config read fails), pod overhead is added.
+	preserveOldResourcesValue := func(rName v1.ResourceName, oldStatusResource, resource v1.ResourceList, isLimit bool) {
 		if allocatedPod.Status.Phase == v1.PodRunning && oldPodStatus.Phase == v1.PodRunning && oldPodStatus.Resources != nil {
 			if r, exists := oldStatusResource[rName]; exists {
 				resource[rName] = r.DeepCopy()
+				return
+			}
+		}
+		if val, found := resource[rName]; found && allocatedPod.Spec.Overhead != nil {
+			if overhead, ok := allocatedPod.Spec.Overhead[rName]; ok {
+				// Add overhead for requests, but for limits only add if a non-zero limit is set.
+				if !isLimit || !val.IsZero() {
+					val.Add(overhead)
+					resource[rName] = val
+				}
 			}
 		}
 	}
@@ -2248,10 +2260,14 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 			resources.Requests[v1.ResourceCPU] = cpuRequest.DeepCopy()
 		}
 	} else {
-		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Requests, resources.Requests)
+		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Requests, resources.Requests, false)
 	}
 
-	if _, found := resources.Requests[v1.ResourceMemory]; !found {
+	// Memory requests are not read from cgroups because cgroups do not track or enforce memory requests.
+	// Preserve existing status memory requests or fall back to aggregating requests from pod spec.
+	if _, found := resources.Requests[v1.ResourceMemory]; found {
+		preserveOldResourcesValue(v1.ResourceMemory, oldPodStatus.Resources.Requests, resources.Requests, false)
+	} else {
 		opts := resourcehelper.PodResourcesOptions{
 			SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 		}
@@ -2269,14 +2285,13 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 			resources.Limits[v1.ResourceCPU] = cpuLimit.DeepCopy()
 		}
 	} else {
-		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Limits, resources.Limits)
-
+		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Limits, resources.Limits, true)
 	}
 
 	if memoryLimit != nil {
 		resources.Limits[v1.ResourceMemory] = memoryLimit.DeepCopy()
 	} else {
-		preserveOldResourcesValue(v1.ResourceMemory, oldPodStatus.Resources.Limits, resources.Limits)
+		preserveOldResourcesValue(v1.ResourceMemory, oldPodStatus.Resources.Limits, resources.Limits, true)
 	}
 
 	return resources
