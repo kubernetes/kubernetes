@@ -60,7 +60,9 @@ type backoffQueuer interface {
 	// add adds the entity to backoffQueue.
 	// The event should show which event triggered this addition and is used for the metric recording.
 	// It also ensures that entity is not in both queues.
-	add(logger klog.Logger, entity framework.QueuedEntityInfo, event string)
+	// 'strategy' is the previous queuing strategy, helps determine if the entity moved into a different
+	// queue or newly added to correctly maintain incoming entities metrics.
+	add(logger klog.Logger, entity framework.QueuedEntityInfo, event string, strategy *queueingStrategy)
 	// update updates the pod in backoffQueue if oldEntity is already in the queue and the pod is present there.
 	// It returns new pod info if updated, nil otherwise.
 	update(newPod *v1.Pod, oldEntity framework.QueuedEntityInfo) *framework.QueuedPodInfo
@@ -119,8 +121,8 @@ func newBackoffQueue(clock clock.WithTicker, podInitialBackoffDuration time.Dura
 	if popFromBackoffQEnabled {
 		entityBackoffQLessFn = bq.lessBackoffCompletedWithPriority
 	}
-	bq.entityBackoffQ = heap.NewWithRecorder(queuedEntityKeyFunc, entityBackoffQLessFn, metrics.NewBackoffPodsRecorder())
-	bq.entityErrorBackoffQ = heap.NewWithRecorder(queuedEntityKeyFunc, bq.lessBackoffCompleted, metrics.NewBackoffPodsRecorder())
+	bq.entityBackoffQ = heap.NewWithRecorder(queuedEntityKeyFunc, entityBackoffQLessFn, metrics.NewBackoffEntitiesRecorder())
+	bq.entityErrorBackoffQ = heap.NewWithRecorder(queuedEntityKeyFunc, bq.lessBackoffCompleted, metrics.NewBackoffEntitiesRecorder())
 
 	return bq
 }
@@ -295,7 +297,7 @@ func (bq *backoffQueue) popAllBackoffCompleted(logger klog.Logger) []framework.Q
 // add adds the entity to backoffQueue.
 // The event should show which event triggered this addition and is used for the metric recording.
 // It also ensures that entity is not in both queues.
-func (bq *backoffQueue) add(logger klog.Logger, entity framework.QueuedEntityInfo, event string) {
+func (bq *backoffQueue) add(logger klog.Logger, entity framework.QueuedEntityInfo, event string, strategy *queueingStrategy) {
 	bq.lock.Lock()
 	defer bq.lock.Unlock()
 
@@ -308,7 +310,7 @@ func (bq *backoffQueue) add(logger klog.Logger, entity framework.QueuedEntityInf
 			logger.Error(nil, "BackoffQueue add() was called with an entity that was already in the entityBackoffQ", "type", entity.Type(), "entity", klog.KObj(entity))
 			return
 		}
-		metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Add(float64(entity.Size()))
+		recordIncomingEntitiesMetrics("backoff", entity, event, strategy)
 		logger.V(5).Info("Entity moved to an internal scheduling queue", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", backoffQ)
 		return
 	}
@@ -318,7 +320,7 @@ func (bq *backoffQueue) add(logger klog.Logger, entity framework.QueuedEntityInf
 		logger.Error(nil, "BackoffQueue add() was called with an entity that was already in the entityErrorBackoffQ", "type", entity.Type(), "entity", klog.KObj(entity))
 		return
 	}
-	metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Add(float64(entity.Size()))
+	recordIncomingEntitiesMetrics("backoff", entity, event, strategy)
 	logger.V(5).Info("Entity moved to an internal scheduling queue", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", backoffQ)
 }
 

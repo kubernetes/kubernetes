@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -69,7 +70,7 @@ func TestPodGroupMemberPods_Add(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ppm := newPodGroupMemberPods()
+			ppm := newPodGroupMemberPods(metrics.IncompletePodGroupPods())
 			for _, pInfo := range tt.podsToAdd {
 				ppm.add(pInfo)
 			}
@@ -124,7 +125,7 @@ func TestPodGroupMemberPods_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ppm := newPodGroupMemberPods()
+			ppm := newPodGroupMemberPods(metrics.IncompletePodGroupPods())
 			for _, pInfo := range tt.podsToAdd {
 				ppm.add(pInfo)
 			}
@@ -172,7 +173,7 @@ func TestPodGroupMemberPods_Has(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ppm := newPodGroupMemberPods()
+			ppm := newPodGroupMemberPods(metrics.IncompletePodGroupPods())
 			for _, pInfo := range tt.podsToAdd {
 				ppm.add(pInfo)
 			}
@@ -215,7 +216,7 @@ func TestPodGroupMemberPods_Update(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ppm := newPodGroupMemberPods()
+			ppm := newPodGroupMemberPods(metrics.IncompletePodGroupPods())
 			for _, pInfo := range tt.podsToAdd {
 				ppm.add(pInfo.DeepCopy())
 			}
@@ -279,7 +280,7 @@ func TestPodGroupMemberPods_Delete(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ppm := newPodGroupMemberPods()
+			ppm := newPodGroupMemberPods(metrics.IncompletePodGroupPods())
 			for _, pInfo := range tt.podsToAdd {
 				ppm.add(pInfo.DeepCopy())
 			}
@@ -342,7 +343,7 @@ func TestPodGroupMemberPods_Clear(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ppm := newPodGroupMemberPods()
+			ppm := newPodGroupMemberPods(metrics.IncompletePodGroupPods())
 			for _, pInfo := range tt.podsToAdd {
 				ppm.add(pInfo)
 			}
@@ -385,7 +386,7 @@ func TestPodGroupMemberPods_Len(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ppm := newPodGroupMemberPods()
+			ppm := newPodGroupMemberPods(metrics.IncompletePodGroupPods())
 			for _, pInfo := range tt.podsToAdd {
 				ppm.add(pInfo)
 			}

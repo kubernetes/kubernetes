@@ -445,9 +445,9 @@ func NewPriorityQueue(
 		stop:                              make(chan struct{}),
 		podMaxInUnschedulablePodsDuration: options.podMaxInUnschedulablePodsDuration,
 		backoffQ:                          backoffQ,
-		unschedulableEntities:             newUnschedulableEntities(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder()),
-		pendingPodGroupPods:               newPodGroupMemberPods(),
-		incompletePodGroupPods:            newPodGroupMemberPods(),
+		unschedulableEntities:             newUnschedulableEntities(metrics.NewUnschedulableEntitiesRecorder(), metrics.NewGatedEntitiesRecorder()),
+		pendingPodGroupPods:               newPodGroupMemberPods(metrics.PendingPodGroupPods()),
+		incompletePodGroupPods:            newPodGroupMemberPods(metrics.IncompletePodGroupPods()),
 		workloadForest:                    newWorkloadForest(isCompositePodGroupEnabled),
 		preEnqueuePluginMap:               options.preEnqueuePluginMap,
 		queueingHintMap:                   options.queueingHintMap,
@@ -465,7 +465,7 @@ func NewPriorityQueue(
 	if isPopFromBackoffQEnabled {
 		backoffQPopper = backoffQ
 	}
-	pq.activeQ = newActiveQueue(heap.NewWithRecorder(queuedEntityKeyFunc, heap.LessFunc[framework.QueuedEntityInfo](lessConverted), metrics.NewActivePodsRecorder()), options.metricsRecorder, backoffQPopper)
+	pq.activeQ = newActiveQueue(heap.NewWithRecorder(queuedEntityKeyFunc, heap.LessFunc[framework.QueuedEntityInfo](lessConverted), metrics.NewActiveEntitiesRecorder()), options.metricsRecorder, backoffQPopper)
 	pq.nsLister = informerFactory.Core().V1().Namespaces().Lister()
 	pq.nominator = newPodNominator(options.podLister)
 
@@ -772,11 +772,14 @@ func (p *PriorityQueue) AddNominatedPod(logger klog.Logger, pi fwk.PodInfo, nomi
 // moveToActiveQ tries to add the entity to the active queue.
 // If the entity doesn't pass PreEnqueue plugins, it gets added to unschedulableEntities instead.
 // movesFromBackoffQ should be set to true, if the entity directly moves from the backoffQ, so the PreEnqueue call can be skipped.
+// strategy is the previous queuing strategy of the entity. Having a nil strategy indicates that the entity is newly added to
+// scheduler queue, and causes incoming entity metrics to be incremented unconditionally.
+// Otherwise the strategy allows metric recording to check if the entity actually moved between queues or not, to avoid double-counting in metrics.
 // It returns a boolean flag to indicate whether the entity is added successfully.
 // Entity should be removed from the backoffQ before calling moveToActiveQ.
 // Note: it does not signal the Pop() method to wake up,
 // so the caller is responsible for calling activeQ.broadcast() after executing this method.
-func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, entity framework.QueuedEntityInfo, event string, movesFromBackoffQ bool) bool {
+func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, entity framework.QueuedEntityInfo, event string, movesFromBackoffQ bool, strategy *queueingStrategy) bool {
 	gatedBefore := entity.Gated()
 	// If SchedulerPopFromBackoffQ feature gate is enabled,
 	// PreEnqueue plugins were called when the entity was added to the backoffQ.
@@ -793,7 +796,7 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, entity framework.Queue
 		// Clearing WasFlushedFromUnschedulable is typically done on scheduling failure, but in case the flushed pod was gated, it never attempts scheduling.
 		// We clear it here to ensure it's not set the next time the pod is woken up by a non-flush event.
 		entity.SetWasFlushedFromUnschedulable(false)
-		p.unschedulableEntities.addOrUpdate(entity, gatedBefore, event)
+		p.unschedulableEntities.addOrUpdate(entity, gatedBefore, event, strategy)
 		// Entity not moved to activeQ.
 		return false
 	}
@@ -801,15 +804,18 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, entity framework.Queue
 	entity.SetInitialAttemptTimestamp(now)
 	p.unschedulableEntities.delete(entity, gatedBefore)
 
-	p.activeQ.add(logger, entity, event)
+	p.activeQ.add(logger, entity, event, strategy)
 	// Pod successfully moved to activeQ.
 	return true
 }
 
 // moveToBackoffQ tries to add the entity to the backoff queue.
 // If SchedulerPopFromBackoffQ feature gate is enabled and the entity doesn't pass PreEnqueue plugins, it gets added to unschedulableEntities instead.
+// strategy is the previous queuing strategy of the entity. Having a nil strategy indicates that the entity is newly added to
+// scheduler queue, and causes incoming entity metrics to be incremented unconditionally.
+// Otherwise the strategy allows metric recording to check if the entity actually moved between queues or not, to avoid double-counting in metrics.
 // It returns a boolean flag to indicate whether the entity is added successfully.
-func (p *PriorityQueue) moveToBackoffQ(logger klog.Logger, entity framework.QueuedEntityInfo, event string) bool {
+func (p *PriorityQueue) moveToBackoffQ(logger klog.Logger, entity framework.QueuedEntityInfo, event string, strategy *queueingStrategy) bool {
 	gatedBefore := entity.Gated()
 	// If SchedulerPopFromBackoffQ feature gate is enabled,
 	// PreEnqueue plugins are called on inserting entities to the backoffQ,
@@ -823,13 +829,13 @@ func (p *PriorityQueue) moveToBackoffQ(logger klog.Logger, entity framework.Queu
 			// Clearing WasFlushedFromUnschedulable is typically done on scheduling failure, but in case the flushed pod was gated, it never attempts scheduling.
 			// We clear it here to ensure it's not set the next time the pod is woken up by a non-flush event.
 			entity.SetWasFlushedFromUnschedulable(false)
-			p.unschedulableEntities.addOrUpdate(entity, gatedBefore, event)
+			p.unschedulableEntities.addOrUpdate(entity, gatedBefore, event, strategy)
 			return false
 		}
 	}
 	p.unschedulableEntities.delete(entity, gatedBefore)
 
-	p.backoffQ.add(logger, entity, event)
+	p.backoffQ.add(logger, entity, event, strategy)
 	return true
 }
 
@@ -856,7 +862,7 @@ func (p *PriorityQueue) addPod(ctx context.Context, pod *v1.Pod) {
 		p.addPodGroupMember(logger, pInfo)
 		return
 	}
-	if added := p.moveToActiveQ(logger, pInfo, framework.EventUnscheduledPodAdd.Label(), false); added {
+	if added := p.moveToActiveQ(logger, pInfo, framework.EventUnscheduledPodAdd.Label(), false, nil); added {
 		p.activeQ.broadcast()
 	}
 }
@@ -886,7 +892,7 @@ func (p *PriorityQueue) addPodGroupMember(logger klog.Logger, pInfo *framework.Q
 
 	// Create a new group as it's the first member pod in the queue.
 	rootInfo := p.newQueuedPodGroupInfoFromRootLookup(logger, pInfo, rootInfoLookup)
-	if added := p.moveToActiveQ(logger, rootInfo, framework.EventUnscheduledPodAdd.Label(), false); added {
+	if added := p.moveToActiveQ(logger, rootInfo, framework.EventUnscheduledPodAdd.Label(), false, nil); added {
 		p.activeQ.broadcast()
 	}
 	logger.V(5).Info("Pod was added to root group as the first member pod", "rootType", rootInfo.Type(), "root", klog.KObj(rootInfo), "pod", klog.KObj(pInfo))
@@ -984,7 +990,7 @@ func (p *PriorityQueue) activate(logger klog.Logger, entityLookup framework.Queu
 		return false
 	}
 
-	return p.moveToActiveQ(logger, entity, framework.ForceActivate, movesFromBackoffQ)
+	return p.moveToActiveQ(logger, entity, framework.ForceActivate, movesFromBackoffQ, nil)
 }
 
 // SchedulingCycle returns current scheduling cycle.
@@ -1216,11 +1222,11 @@ func (p *PriorityQueue) AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo 
 	// If the PreEnqueue fails for this pod group, it will be moved to the unschedulableEntities.
 	queue := unschedulableQ
 	if !requeueWithoutBackoff && p.backoffQ.isEntityBackingoff(pgInfo) {
-		if added := p.moveToBackoffQ(logger, pgInfo, framework.ScheduleAttemptFailure); added {
+		if added := p.moveToBackoffQ(logger, pgInfo, framework.ScheduleAttemptFailure, nil); added {
 			queue = backoffQ
 		}
 	} else {
-		if added := p.moveToActiveQ(logger, pgInfo, framework.ScheduleAttemptFailure, false); added {
+		if added := p.moveToActiveQ(logger, pgInfo, framework.ScheduleAttemptFailure, false, nil); added {
 			queue = activeQ
 		}
 	}
@@ -1257,7 +1263,7 @@ func (p *PriorityQueue) flushBackoffQCompleted(logger klog.Logger) {
 	activated := false
 	podsCompletedBackoff := p.backoffQ.popAllBackoffCompleted(logger)
 	for _, pInfo := range podsCompletedBackoff {
-		if added := p.moveToActiveQ(logger, pInfo, framework.BackoffComplete, true); added {
+		if added := p.moveToActiveQ(logger, pInfo, framework.BackoffComplete, true, nil); added {
 			activated = true
 		}
 	}
@@ -1807,21 +1813,21 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 func (p *PriorityQueue) requeueEntityWithQueueingStrategy(logger klog.Logger, entity framework.QueuedEntityInfo, strategy queueingStrategy, event string) string {
 	if strategy == queueSkip {
 		// Current Gate status is required for already exisiting entities. For new entities, this parameter is ignored/unused by addPod/addPodGroup.
-		p.unschedulableEntities.addOrUpdate(entity, entity.Gated(), event)
+		p.unschedulableEntities.addOrUpdate(entity, entity.Gated(), event, &strategy)
 		return unschedulableQ
 	}
 
 	// Entity might have completed its backoff time while being in unschedulableEntities,
 	// so we should check isEntityBackingoff before moving the entity to backoffQ.
 	if strategy == queueAfterBackoff && p.backoffQ.isEntityBackingoff(entity) {
-		if added := p.moveToBackoffQ(logger, entity, event); added {
+		if added := p.moveToBackoffQ(logger, entity, event, &strategy); added {
 			return backoffQ
 		}
 		return unschedulableQ
 	}
 
 	// Reach here if schedulingHint is QueueImmediately, or schedulingHint is Queue but the entity is not backing off.
-	if added := p.moveToActiveQ(logger, entity, event, false); added {
+	if added := p.moveToActiveQ(logger, entity, event, false, &strategy); added {
 		return activeQ
 	}
 	// Entity is gated. We don't have to push it back to unschedulable queue, because moveToActiveQ should already have done that.
@@ -2127,6 +2133,34 @@ func (p *PriorityQueue) newQueuedPodInfo(ctx context.Context, pod *v1.Pod, plugi
 			UnschedulablePlugins:    sets.New(plugins...),
 		},
 		PodSignature: p.signPod(ctx, pod),
+	}
+}
+
+// recordIncomingEntitiesMetrics records incoming queue metrics for pod-level and entity-level (individual pod or podgroup).
+// 'strategy' is the previous queuing strategy, helps determine if the entity moved into a different
+// queue or newly added to correctly maintain incoming entities metrics.
+// If strategy is 'nil' it means that entity is newly added.
+// If queue label defined by previous strategy is different from next queue label, it means that entity moved into a different queue.
+// In both cases, we increment the incoming entities metric for the new queue.
+func recordIncomingEntitiesMetrics(targetQueueLabel string, entity framework.QueuedEntityInfo, event string, strategy *queueingStrategy) {
+	metrics.SchedulerQueueIncomingPods.WithLabelValues(targetQueueLabel, event).Add(float64(entity.Size()))
+
+	if strategy == nil || targetQueueLabel != strategyToQueueLabel(*strategy) {
+		if entityLabel, ok := metrics.EntityToLabel(entity); ok {
+			metrics.SchedulerQueueIncomingEntities.WithLabelValues(targetQueueLabel, event, entityLabel).Inc()
+		}
+	}
+}
+
+// strategyToQueueLabel maps previous queueingStrategy to the queue label (used for metrics) where an entity was present.
+func strategyToQueueLabel(strategy queueingStrategy) string {
+	switch strategy {
+	case queueImmediately:
+		return "active"
+	case queueAfterBackoff:
+		return "backoff"
+	default:
+		return "unschedulable"
 	}
 }
 
