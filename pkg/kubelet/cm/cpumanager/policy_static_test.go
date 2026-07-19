@@ -2207,6 +2207,71 @@ func TestPolicyWithAlignBySocketAndDistributeCPUsAcrossNUMAEnabled(t *testing.T)
 	}
 }
 
+func TestPolicyWithDistributeCPUsAcrossNUMAAndFullPCPUsOnly(t *testing.T) {
+	testCases := []staticPolicyTest{
+		{
+			description: "DistributeCPUsAcrossNUMA and FullPCPUsOnly with fragmented per-NUMA availability",
+			topo:        topoDualSocketMultiNumaPerSocketHT,
+			options: map[string]string{
+				DistributeCPUsAcrossNUMAOption: "true",
+				FullPCPUsOnlyOption:            "true",
+			},
+			numReservedCPUs: 0,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: mustParseCPUSet(t, "0-4,10-14,20-24,30-34"),
+			pod:             makePod("fakePod", "fakeContainer", "14000m", "14000m"),
+			topologyHint:    &topologymanager.TopologyHint{},
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         mustParseCPUSet(t, "0-3,10-13,20-23,30-31"),
+		},
+		{
+			// --reserved-cpus takes one thread of a core on each NUMA node,
+			// leaving 19 CPUs free per node.
+			description: "GuPodManyCores, DualSocketMultiNumaPerSocketHT, PartialCoreReserved, ExpectAllocDistributed",
+			topo:        topoDualSocketMultiNumaPerSocketHT,
+			options: map[string]string{
+				DistributeCPUsAcrossNUMAOption: "true",
+				FullPCPUsOnlyOption:            "true",
+			},
+			numReservedCPUs: 4,
+			reservedCPUs:    newCPUSetPtr(0, 10, 20, 30),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: mustParseCPUSet(t, "1-9,11-19,21-29,31-39,40-79"),
+			pod:             makePod("fakePod", "fakeContainer", "70000m", "70000m"),
+			topologyHint:    &topologymanager.TopologyHint{},
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         mustParseCPUSet(t, "1-9,11-19,21-29,31-38,41-49,51-59,61-69,71-78"),
+		},
+		{
+			// Shared pool fragmented before FullPCPUsOnly was enabled: a
+			// container holding half cores leaves 17 CPUs free per NUMA node.
+			description: "GuPodManyCores, DualSocketMultiNumaPerSocketHT, PreexistingPartialCores, ExpectAllocDistributed",
+			topo:        topoDualSocketMultiNumaPerSocketHT,
+			options: map[string]string{
+				DistributeCPUsAcrossNUMAOption: "true",
+				FullPCPUsOnlyOption:            "true",
+			},
+			numReservedCPUs: 0,
+			stAssignments: state.ContainerCPUAssignments{
+				"legacyPod": map[string]cpuset.CPUSet{
+					"legacyContainer": mustParseCPUSet(t, "0-2,10-12,20-22,30-32"),
+				},
+			},
+			stDefaultCPUSet: mustParseCPUSet(t, "3-9,13-19,23-29,33-39,40-79"),
+			pod:             makePod("fakePod", "fakeContainer", "62000m", "62000m"),
+			topologyHint:    &topologymanager.TopologyHint{},
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         mustParseCPUSet(t, "3-9,13-19,23-29,33-41,43-51,53-61,63-69,73-79"),
+		},
+	}
+	for _, testCase := range testCases {
+		runStaticPolicyTestCaseWithFeatureGate(t, testCase)
+	}
+}
+
 type staticPolicyAllocatePodTest struct {
 	description                     string
 	topo                            *topology.CPUTopology
