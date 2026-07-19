@@ -69,6 +69,10 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c randfill.Continue) 
 	obj.Patches = nil
 	obj.DryRun = false
 	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
+
+	// Required because MergeMethod is not present in v1beta4.
+	// TODO: remove this once v1beta4 is removed.
+	obj.NodeRegistration.KubeletExtraArgs = nil
 }
 
 func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c randfill.Continue) {
@@ -77,6 +81,10 @@ func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c randfill.Conti
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.IgnorePreflightErrors = nil
 	obj.ImagePullSerial = ptr.To(true)
+
+	// Required because MergeMethod is not present in v1beta4.
+	// TODO: remove this once v1beta4 is removed.
+	obj.KubeletExtraArgs = nil
 }
 
 func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c randfill.Continue) {
@@ -97,6 +105,13 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c randfill.Cont
 	obj.Proxy.Disabled = false
 	obj.CertificateValidityPeriod = &metav1.Duration{Duration: constants.CertificateValidityPeriod}
 	obj.CACertificateValidityPeriod = &metav1.Duration{Duration: constants.CACertificateValidityPeriod}
+
+	// Required because MergeMethod is not present in v1beta4.
+	// TODO: remove this once v1beta4 is removed.
+	obj.APIServer.ExtraArgs = nil
+	obj.ControllerManager.ExtraArgs = nil
+	obj.Scheduler.ExtraArgs = nil
+	obj.Etcd.Local.ExtraArgs = nil
 }
 
 func fuzzDNS(obj *kubeadm.DNS, c randfill.Continue) {
@@ -146,6 +161,10 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c randfill.Continue) 
 	obj.Patches = nil
 	obj.DryRun = false
 	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
+
+	// Required because MergeMethod is not present in v1beta4.
+	// TODO: remove this once v1beta4 is removed.
+	obj.NodeRegistration.KubeletExtraArgs = nil
 }
 
 func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c randfill.Continue) {

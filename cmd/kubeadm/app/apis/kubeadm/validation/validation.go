@@ -739,6 +739,11 @@ func ValidateExtraArgs(args []kubeadm.Arg, fldPath *field.Path) field.ErrorList 
 		if len(arg.Name) == 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("index %d", idx), "argument has no name"))
 		}
+		if arg.MergeMethod != "" {
+			if arg.MergeMethod != kubeadm.ArgMergeMethodAppend && arg.MergeMethod != kubeadm.ArgMergeMethodPrepend {
+				allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("index %d", idx), "argument has an invalid merge method"))
+			}
+		}
 	}
 
 	return allErrs
