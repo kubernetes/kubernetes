@@ -1922,6 +1922,27 @@ func (proxier *Proxier) writeServiceToEndpointDNATs(tx *knftables.Transaction, s
 		ipX = "ip6"
 	}
 
+	// Special case for single endpoint services
+	// Inserting maps into nftables is a O(n) (or worse) operation, so we want to avoid it for single endpoint services.
+	if len(endpoints) == 1 {
+		ep := endpoints[0]
+		epInfo, ok := ep.(*endpointInfo)
+		if !ok {
+			return
+		}
+
+		tx.Add(&knftables.Rule{
+			Chain: svcChain,
+			Rule: knftables.Concat(
+				"meta l4proto", strings.ToLower(string(svcInfo.Protocol())),
+				"dnat", ipX, "addr . port to",
+				epInfo.IP(), ".", strconv.Itoa(epInfo.Port()),
+			),
+		})
+
+		return
+	}
+
 	var elements []string
 	for i, ep := range endpoints {
 		epInfo, ok := ep.(*endpointInfo)
