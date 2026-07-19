@@ -22,12 +22,11 @@ import (
 	"io"
 	"maps"
 	"math/rand"
+	"reflect"
 	"slices"
 	"sort"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -52,12 +51,11 @@ func streamEncodeCollections(obj runtime.Object, w io.Writer, mode modes.EncMode
 	if err == nil {
 		return true, streamingEncodeList(w, typeMeta, listMeta, items, mode)
 	}
-	klog.ErrorS(err, "getListMeta err", "obj", obj)
 	return false, nil
 }
 
 // getListMeta implements list extraction logic for cbor stream serialization.
-func getListMeta(list runtime.Object) (metav1.TypeMeta, metav1.ListMeta, []runtime.Object, error) {
+func getListMeta(list runtime.Object) (metav1.TypeMeta, metav1.ListMeta, []interface{}, error) {
 	listValue, err := conversion.EnforcePtr(list)
 	if err != nil {
 		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, err
@@ -88,14 +86,38 @@ func getListMeta(list runtime.Object) (metav1.TypeMeta, metav1.ListMeta, []runti
 		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf(`expected ListMeta json field tag to be "metadata,omitempty"`)
 	}
 	// Items
-	items, err := meta.ExtractList(list)
-	if err != nil {
-		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, err
-	}
 	if listType.Field(2).Tag.Get("json") != "items" {
 		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf(`expected Items json field tag to be "items"`)
 	}
+	items, err := getListItems(listValue.Field(2))
+	if err != nil {
+		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, err
+	}
 	return typeMeta, listMeta, items, nil
+}
+
+// getListItems returns the elements of a list's Items field as addressable
+// values. Marshaling each element directly (rather than routing through
+// meta.ExtractList) preserves the element's own type and custom marshaler, so
+// that e.g. a metav1.List whose Items are runtime.RawExtension holding CBOR
+// bytes are encoded verbatim by runtime.RawExtension.MarshalCBOR instead of
+// being flattened into a runtime.Unknown (which has no MarshalCBOR and would be
+// misencoded as a struct or fail JSON transcoding).
+//
+// A nil Items slice returns a nil result, distinct from an empty non-nil slice,
+// so the encoder can emit CBOR null rather than an empty array.
+func getListItems(itemsValue reflect.Value) ([]interface{}, error) {
+	if itemsValue.Kind() != reflect.Slice {
+		return nil, fmt.Errorf("expected Items field to be a slice, got %s", itemsValue.Kind())
+	}
+	if itemsValue.IsNil() {
+		return nil, nil
+	}
+	items := make([]interface{}, itemsValue.Len())
+	for i := range items {
+		items[i] = itemsValue.Index(i).Addr().Interface()
+	}
+	return items, nil
 }
 
 type cborMapEntry struct {
@@ -103,7 +125,7 @@ type cborMapEntry struct {
 	write func() error
 }
 
-func streamingEncodeList(w io.Writer, typeMeta metav1.TypeMeta, listMeta metav1.ListMeta, items []runtime.Object, mode modes.EncMode) error {
+func streamingEncodeList(w io.Writer, typeMeta metav1.TypeMeta, listMeta metav1.ListMeta, items []interface{}, mode modes.EncMode) error {
 	var entries []cborMapEntry
 
 	if typeMeta.Kind != "" {
@@ -150,8 +172,11 @@ func streamingEncodeList(w io.Writer, typeMeta metav1.TypeMeta, listMeta metav1.
 		})
 	}
 
-	// For nondeterministic modes (SortFastShuffle), randomize the initial offset
-	// of the encoding for-loop.
+	// entries is built in a fixed order (kind, items, metadata, apiVersion).
+	// Unlike streamingEncodeUnstructuredList, whose keys come in Go's randomized
+	// map-iteration order, there is no inherent randomness here, so for
+	// nondeterministic modes (SortFastShuffle) we rotate the encoding for-loop
+	// by a random initial offset.
 	start := 0
 	if !mode.IsDeterministic() && len(entries) > 0 {
 		start = rand.Intn(len(entries))
@@ -175,11 +200,12 @@ func streamingEncodeUnstructuredList(w io.Writer, list *unstructured.Unstructure
 	if _, exists := list.Object["items"]; !exists {
 		keys = append(keys, "items")
 	}
-	// Sort keys only for deterministic modes (SortBytewiseLexical):
-	// shorter lengths come first, then lexicographic by content.
-	// For nondeterministic modes (SortFastShuffle), randomize the initial offset
-	// of the encoding for-loop (essentially what SortFastShuffle does for structs).
-	start := 0
+	// keys starts in Go's randomized map-iteration order. For deterministic
+	// modes (SortBytewiseLexical) we sort it: shorter lengths come first, then
+	// lexicographic by content. For nondeterministic modes (SortFastShuffle) we
+	// leave the map-iteration order as-is, which already varies from call to
+	// call (analogous to what SortFastShuffle does for structs), so no explicit
+	// shuffling is needed.
 	if mode.IsDeterministic() {
 		sort.Slice(keys, func(i, j int) bool {
 			if len(keys[i]) != len(keys[j]) {
@@ -193,8 +219,7 @@ func streamingEncodeUnstructuredList(w io.Writer, list *unstructured.Unstructure
 		return err
 	}
 
-	for i := 0; i < len(keys); i++ {
-		key := keys[(start+i)%len(keys)]
+	for _, key := range keys {
 		if err := mode.MarshalTo(key, w); err != nil {
 			return err
 		}
@@ -284,3 +309,4 @@ func writeCollectionHead(w io.Writer, base byte, n int64) error {
 		return err
 	}
 }
+

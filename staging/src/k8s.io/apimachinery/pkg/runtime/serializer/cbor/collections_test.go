@@ -894,6 +894,117 @@ func TestFuzzCollectionsEncoding(t *testing.T) {
 	}
 }
 
+// mustCBORSelfDescribed encodes v to CBOR and prepends the self-described CBOR
+// tag (0xd9d9f7), matching how runtime.RawExtension stores CBOR-content bytes.
+func mustCBORSelfDescribed(t *testing.T, v interface{}) []byte {
+	t.Helper()
+	data, err := modes.Encode.Marshal(v)
+	if err != nil {
+		t.Fatalf("failed to marshal %#v to CBOR: %v", v, err)
+	}
+	return append([]byte{0xd9, 0xd9, 0xf7}, data...)
+}
+
+// TestStreamEncodeListRawExtension is a regression test for streaming encoding of
+// a metav1.List whose Items are runtime.RawExtension. Streaming encoding must be
+// byte-identical to non-streaming encoding, and must round-trip.
+//
+// Previously the streaming path routed items through meta.ExtractList, which
+// flattens a RawExtension holding raw bytes into a runtime.Unknown (dropping its
+// content type). runtime.Unknown implements MarshalJSON but not MarshalCBOR, so
+// CBOR-content bytes were either misencoded as a struct or, worse, failed while
+// the encoder attempted to transcode them from JSON. The streaming path now
+// marshals each RawExtension directly, honoring runtime.RawExtension.MarshalCBOR.
+func TestStreamEncodeListRawExtension(t *testing.T) {
+	streamingSerializer := NewSerializer(nil, nil)
+	normalSerializer := NewSerializer(nil, nil, StreamingCollectionsEncoding(false))
+
+	for _, tc := range []struct {
+		name string
+		// nonEmpty indicates Items encodes as a non-empty array (should stream).
+		nonEmpty bool
+		// roundTrips indicates decoding the output reproduces the input exactly.
+		// Only holds for CBOR-content RawExtension: decoding normalizes JSON bytes
+		// and populated Objects into CBOR Raw bytes.
+		roundTrips bool
+		items      []runtime.RawExtension
+	}{
+		{
+			name:       "RawExtension with CBOR bytes",
+			nonEmpty:   true,
+			roundTrips: true,
+			items: []runtime.RawExtension{
+				{Raw: mustCBORSelfDescribed(t, map[string]interface{}{"foo": "bar"})},
+				{Raw: mustCBORSelfDescribed(t, map[string]interface{}{"baz": int64(1)})},
+			},
+		},
+		{
+			name:     "RawExtension with JSON bytes",
+			nonEmpty: true,
+			items: []runtime.RawExtension{
+				{Raw: []byte(`{"foo":"bar"}`)},
+			},
+		},
+		{
+			name:     "RawExtension with Object",
+			nonEmpty: true,
+			items: []runtime.RawExtension{
+				{Object: &testapigroupv1.Carp{ObjectMeta: metav1.ObjectMeta{Name: "carp"}}},
+			},
+		},
+		{
+			name:  "RawExtension items empty",
+			items: []runtime.RawExtension{},
+		},
+		{
+			name:  "RawExtension items nil",
+			items: nil,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in := &metav1.List{
+				TypeMeta: metav1.TypeMeta{Kind: "List", APIVersion: "v1"},
+				ListMeta: metav1.ListMeta{ResourceVersion: "42"},
+				Items:    tc.items,
+			}
+
+			var streamingBuf writeCountingBuffer
+			if err := streamingSerializer.Encode(in, &streamingBuf); err != nil {
+				t.Fatalf("streaming encode error: %v", err)
+			}
+
+			var normalBuf bytes.Buffer
+			if err := normalSerializer.Encode(in, &normalBuf); err != nil {
+				t.Fatalf("normal encode error: %v", err)
+			}
+
+			if diff := cmp.Diff(normalBuf.Bytes(), streamingBuf.Bytes()); diff != "" {
+				t.Logf("normal:    %x", normalBuf.Bytes())
+				t.Logf("streaming: %x", streamingBuf.Bytes())
+				t.Errorf("streaming output differs from normal encoding:\n%s", diff)
+			}
+
+			// Non-empty lists should exercise the streaming path (more than the
+			// map-head + items-key writes).
+			if tc.nonEmpty && streamingBuf.writeCount <= 2 {
+				t.Errorf("expected streaming encoding to use more than 2 writes, got %d", streamingBuf.writeCount)
+			}
+
+			// Round-trip: decoding the streamed bytes must reproduce the input
+			// for CBOR-content items (see roundTrips doc above).
+			if tc.roundTrips {
+				out := &metav1.List{}
+				if err := modes.Decode.Unmarshal(streamingBuf.Bytes(), out); err != nil {
+					t.Fatalf("decode error: %v", err)
+				}
+				if !apiequality.Semantic.DeepEqual(in, out) {
+					t.Errorf("round-trip mismatch:\n%s", cmp.Diff(in, out))
+				}
+			}
+		})
+	}
+}
+
 // TestStreamEncodeCollectionsDeterministic verifies that the streaming serializer
 // produces output identical to the normal non-streaming serializer.
 func TestStreamEncodeCollectionsDeterministic(t *testing.T) {
@@ -1073,3 +1184,4 @@ func TestStreamEncodeCollectionsNondeterministic(t *testing.T) {
 		})
 	}
 }
+
