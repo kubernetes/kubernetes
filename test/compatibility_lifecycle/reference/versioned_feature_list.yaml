@@ -207,6 +207,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
+- name: ConditionalAuthorization
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: ConsistentListFromCacheSkipTimeoutFallback
   versionedSpecs:
   - default: false
