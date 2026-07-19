@@ -41,6 +41,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
@@ -2197,8 +2198,10 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 			tCtx := ktesting.Init(t)
 
 			if test.disableIPPRInitCtrFG {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingInitContainers, false)
 			}
+
 			pod, status := makeBasePodAndStatusWithInitContainers()
 
 			// Sync the actuated state with the base values before any resize
@@ -4007,7 +4010,6 @@ func TestComputePodResizeActionForOOMKilledInitContainer(t *testing.T) {
 	}
 	logger, tCtx := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingInitContainers, true)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	require.NoError(t, err)
