@@ -2296,6 +2296,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	genericfeatures.ConditionalAuthorization: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	genericfeatures.ConsistentListFromCacheSkipTimeoutFallback: {
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2860,6 +2864,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	genericfeatures.CBORServingAndStorage: {},
 
 	genericfeatures.ConcurrentWatchObjectDecode: {},
+
+	genericfeatures.ConditionalAuthorization: {},
 
 	genericfeatures.ConsistentListFromCacheSkipTimeoutFallback: {},
 
