@@ -165,6 +165,9 @@ func filterOutDisabledSpecs(specs et.ExtensionTestSpecs) et.ExtensionTestSpecs {
 
 			// https://issues.redhat.com/browse/OCPBUGS-63132
 			"[sig-node] [Serial] Pod InPlace Resize Container (deferred-resizes) [FeatureGate:InPlacePodVerticalScaling] pod-resize-retry-deferred-test-3",
+
+			// https://issues.redhat.com/browse/OCPBUGS-99058
+			"[sig-node] [DRA] [FeatureGate:DRAExtendedResource] [Beta] [Feature:DynamicResourceAllocation] must run pods with extended resource on dra nodes and device plugin nodes [Serial] [KubeletMinVersion:1.35]",
 		},
 		// tests that need to be temporarily disabled while the rebase is in progress.
 		"RebaseInProgress": {
