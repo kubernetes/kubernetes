@@ -156,8 +156,10 @@ func NewPodsToActivate() *PodsToActivate {
 
 // SortedScoredNodes is a list of scored nodes, returned from scheduling.
 type SortedScoredNodes interface {
-	Pop() string
+	Pop() fwk.NodePluginScores
 	Len() int
+	// UnorderedList returns all nodes in heap-internal order (not sorted by score).
+	UnorderedList() []fwk.NodePluginScores
 }
 
 // PlacementFeasiblePlugin is an interface for plugins that are called after each pod in a pod group is evaluated.
