@@ -21,15 +21,18 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	certutil "k8s.io/client-go/util/cert"
 )
@@ -46,11 +49,15 @@ const (
 )
 
 type expectedHeadersHolder struct {
-	usernameHeaders      []string
-	uidHeaders           []string
-	groupHeaders         []string
-	extraHeaderPrefixes  []string
-	allowedClientNames   []string
+	usernameHeaders     []string
+	uidHeaders          []string
+	groupHeaders        []string
+	extraHeaderPrefixes []string
+	// allowedClientNames may be nil or empty to allow all common names when
+	// rejectAllClientNames is false.
+	allowedClientNames []string
+	// rejectAllClientNames represents deleted or unavailable ConfigMap state and
+	// rejects all common names, even when allowedClientNames is nil or empty.
 	rejectAllClientNames bool
 }
 
@@ -269,6 +276,39 @@ func TestRequestHeaderAuthRequestControllerRunOnceClearsStateOnConfigMapDeletion
 	})
 }
 
+func TestRequestHeaderAuthRequestControllerRunOncePreservesStateOnNonNotFoundError(t *testing.T) {
+	target := newDefaultTarget()
+	expectedHeaders := expectedHeadersHolder{
+		usernameHeaders:     []string{"user-val"},
+		uidHeaders:          []string{"uid-val"},
+		groupHeaders:        []string{"group-val"},
+		extraHeaderPrefixes: []string{"extra-val"},
+		allowedClientNames:  []string{"names-val"},
+	}
+	if err := target.syncConfigMap(defaultConfigMap(
+		t,
+		expectedHeaders.usernameHeaders,
+		expectedHeaders.uidHeaders,
+		expectedHeaders.groupHeaders,
+		expectedHeaders.extraHeaderPrefixes,
+		expectedHeaders.allowedClientNames,
+	)); err != nil {
+		t.Fatal(err)
+	}
+
+	client := fake.NewSimpleClientset()
+	client.PrependReactor("get", "configmaps", func(clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("temporary API error")
+	})
+	target.client = client
+
+	if err := target.RunOnce(context.Background()); err == nil {
+		t.Fatal("expected RunOnce to return the API error")
+	}
+
+	validateExpectedHeaders(t, target, expectedHeaders)
+}
+
 func TestRequestHeaderAuthRequestControllerDeletedBundleRejectsRequestDuringConfigMapRecreation(t *testing.T) {
 	target := newDefaultTarget()
 
@@ -319,7 +359,7 @@ func TestRequestHeaderAuthRequestControllerDeletedBundleRejectsRequestDuringConf
 			Roots:     roots,
 			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		}),
-		target.AllowedClientNamesProvider(),
+		target.AllowedClientNamesFunc(),
 		StringSliceProviderFunc(func() []string {
 			usernameHeadersRead = true
 			if err := target.sync(); err != nil {
@@ -404,7 +444,8 @@ func validateExpectedHeaders(t *testing.T, target *RequestHeaderAuthRequestContr
 	if !equality.Semantic.DeepEqual(target.AllowedClientNames(), expected.allowedClientNames) {
 		t.Fatalf("incorrect expectedAllowedClientNames, got %v, wanted %v", target.AllowedClientNames(), expected.allowedClientNames)
 	}
-	if target.AllowedClientNamesProvider().CommonNameRestriction().RejectAll != expected.rejectAllClientNames {
-		t.Fatalf("incorrect rejectAllClientNames, got %v, wanted %v", target.AllowedClientNamesProvider().CommonNameRestriction().RejectAll, expected.rejectAllClientNames)
+	_, rejectAllClientNames := target.AllowedClientNamesFunc()()
+	if rejectAllClientNames != expected.rejectAllClientNames {
+		t.Fatalf("incorrect rejectAllClientNames, got %t, wanted %t", rejectAllClientNames, expected.rejectAllClientNames)
 	}
 }

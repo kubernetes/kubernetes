@@ -453,7 +453,7 @@ func (s *DelegatingAuthenticationOptions) createRequestHeaderConfig(client kuber
 		UIDHeaders:          headerrequest.StringSliceProvider(headerrequest.StringSliceProviderFunc(dynamicRequestHeaderProvider.UIDHeaders)),
 		GroupHeaders:        headerrequest.StringSliceProvider(headerrequest.StringSliceProviderFunc(dynamicRequestHeaderProvider.GroupHeaders)),
 		ExtraHeaderPrefixes: headerrequest.StringSliceProvider(headerrequest.StringSliceProviderFunc(dynamicRequestHeaderProvider.ExtraHeaderPrefixes)),
-		AllowedClientNames:  dynamicRequestHeaderProvider.AllowedClientNamesProvider(),
+		AllowedClientNames:  dynamicRequestHeaderProvider.AllowedClientNamesFunc(),
 	}, nil
 }
 

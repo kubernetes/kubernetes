@@ -89,7 +89,7 @@ func TestToAuthenticationRequestHeaderConfig(t *testing.T) {
 	}
 }
 
-func TestCreateRequestHeaderConfigPreservesCommonNameRestrictionProvider(t *testing.T) {
+func TestCreateRequestHeaderConfigUsesCommonNameRestrictionFunc(t *testing.T) {
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      authenticationConfigMapName,
@@ -105,16 +105,16 @@ func TestCreateRequestHeaderConfigPreservesCommonNameRestrictionProvider(t *test
 		t.Fatal(err)
 	}
 
-	provider, ok := config.AllowedClientNames.(x509request.CommonNameRestrictionProvider)
+	restriction, ok := config.AllowedClientNames.(x509request.CommonNameRestrictionFunc)
 	if !ok {
-		t.Fatalf("expected CommonNameRestrictionProvider, got %T", config.AllowedClientNames)
+		t.Fatalf("expected CommonNameRestrictionFunc, got %T", config.AllowedClientNames)
 	}
-	restriction := provider.CommonNameRestriction()
-	if restriction.RejectAll {
+	names, rejectAll := restriction()
+	if rejectAll {
 		t.Fatal("expected configured client names to allow authentication")
 	}
-	if !reflect.DeepEqual(restriction.AllowedCommonNames, []string{"front-proxy-client"}) {
-		t.Fatalf("incorrect allowed common names, got %v", restriction.AllowedCommonNames)
+	if !reflect.DeepEqual(names, []string{"front-proxy-client"}) {
+		t.Fatalf("incorrect allowed common names, got %v", names)
 	}
 }
 

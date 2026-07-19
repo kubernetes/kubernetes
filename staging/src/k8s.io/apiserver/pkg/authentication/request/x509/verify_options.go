@@ -54,21 +54,18 @@ type StringSliceProvider interface {
 	Value() []string
 }
 
-// CommonNameRestriction describes the common names a verified client certificate may use.
-// RejectAll rejects every verified client certificate regardless of AllowedCommonNames.
-// If RejectAll is false and AllowedCommonNames is empty, all verified client certificates are allowed.
-type CommonNameRestriction struct {
-	AllowedCommonNames []string
-	RejectAll          bool
-}
+// CommonNameRestrictionFunc returns the common names allowed for a verified
+// client certificate and whether all verified client certificates must be
+// rejected. Both values must come from the same immutable snapshot.
+type CommonNameRestrictionFunc func() (allowedCommonNames []string, rejectAll bool)
 
-// CommonNameRestrictionProvider provides the current common name restriction.
-type CommonNameRestrictionProvider interface {
-	StringSliceProvider
+var _ StringSliceProvider = CommonNameRestrictionFunc(nil)
 
-	// CommonNameRestriction returns the current restriction from one immutable snapshot.
-	// The provider and callers must not mutate the returned AllowedCommonNames slice.
-	CommonNameRestriction() CommonNameRestriction
+// Value implements StringSliceProvider for compatibility with callers that do
+// not support rejecting all common names. It intentionally discards rejectAll.
+func (f CommonNameRestrictionFunc) Value() []string {
+	allowedCommonNames, _ := f()
+	return allowedCommonNames
 }
 
 // StringSliceProviderFunc is a function that matches the StringSliceProvider interface

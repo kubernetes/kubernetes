@@ -55,19 +55,17 @@ type RequestHeaderAuthRequestProvider interface {
 var _ RequestHeaderAuthRequestProvider = &RequestHeaderAuthRequestController{}
 
 type requestHeaderBundle struct {
-	UsernameHeaders      []string
-	UIDHeaders           []string
-	GroupHeaders         []string
-	ExtraHeaderPrefixes  []string
-	AllowedClientNames   []string
+	UsernameHeaders     []string
+	UIDHeaders          []string
+	GroupHeaders        []string
+	ExtraHeaderPrefixes []string
+	// AllowedClientNames may be nil or empty to allow all common names when
+	// RejectAllClientNames is false.
+	AllowedClientNames []string
+	// RejectAllClientNames represents deleted or unavailable ConfigMap state and
+	// rejects all common names, even when AllowedClientNames is nil or empty.
 	RejectAllClientNames bool
 }
-
-type allowedClientNamesProvider struct {
-	controller *RequestHeaderAuthRequestController
-}
-
-var _ x509request.CommonNameRestrictionProvider = &allowedClientNamesProvider{}
 
 // RequestHeaderAuthRequestController a controller that exposes a set of methods for dynamically filling parts of RequestHeaderConfig struct.
 // The methods are sourced from the config map which is being monitored by this controller.
@@ -179,30 +177,22 @@ func (c *RequestHeaderAuthRequestController) ExtraHeaderPrefixes() []string {
 }
 
 func (c *RequestHeaderAuthRequestController) AllowedClientNames() []string {
-	return c.loadRequestHeaderFor(c.allowedClientNamesKey)
+	return c.AllowedClientNamesFunc().Value()
 }
 
-// AllowedClientNamesProvider returns the current allowed client names and their restriction state.
-func (c *RequestHeaderAuthRequestController) AllowedClientNamesProvider() x509request.CommonNameRestrictionProvider {
-	return &allowedClientNamesProvider{controller: c}
-}
-
-func (p *allowedClientNamesProvider) Value() []string {
-	return p.controller.AllowedClientNames()
-}
-
-func (p *allowedClientNamesProvider) CommonNameRestriction() x509request.CommonNameRestriction {
-	rawHeaderBundle := p.controller.exportedRequestHeaderBundle.Load()
-	if rawHeaderBundle == nil {
-		return x509request.CommonNameRestriction{RejectAll: true}
-	}
-	headerBundle, ok := rawHeaderBundle.(*requestHeaderBundle)
-	if !ok {
-		return x509request.CommonNameRestriction{RejectAll: true}
-	}
-	return x509request.CommonNameRestriction{
-		AllowedCommonNames: headerBundle.AllowedClientNames,
-		RejectAll:          headerBundle.RejectAllClientNames,
+// AllowedClientNamesFunc returns the current common name restriction from a
+// single request header bundle snapshot.
+func (c *RequestHeaderAuthRequestController) AllowedClientNamesFunc() x509request.CommonNameRestrictionFunc {
+	return func() ([]string, bool) {
+		rawHeaderBundle := c.exportedRequestHeaderBundle.Load()
+		if rawHeaderBundle == nil {
+			return nil, true
+		}
+		headerBundle, ok := rawHeaderBundle.(*requestHeaderBundle)
+		if !ok || headerBundle == nil {
+			return nil, true
+		}
+		return headerBundle.AllowedClientNames, headerBundle.RejectAllClientNames
 	}
 }
 
