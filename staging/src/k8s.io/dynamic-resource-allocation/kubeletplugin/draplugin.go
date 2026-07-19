@@ -38,6 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
+	metadatav1alpha1 "k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
+	metadatav1beta1 "k8s.io/dynamic-resource-allocation/api/metadata/v1beta1"
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -595,21 +597,28 @@ func ReconcilePoolWithName(name string) Option {
 // and uses the first object whose apiVersion it understands, similar to how
 // clients negotiate API versions with the API server.
 //
-// Use [MetadataVersions] to control which API versions are serialized.
-func EnableDeviceMetadata(enabled bool) Option {
+// When enabled, the version(s) used for encoding the metadata must be
+// specified explicitly:
+//   - At least the latest version must be used.
+//   - Older versions may be used. This can be useful to support
+//     consumers that haven't been updated yet to support the latest
+//     version.
+//   - Versions are written in the order listed here.
+//
+// At the moment, []schema.GroupVersion{metadatav1beta1.SchemeGroupVersion}
+// is the latest version, from k8s.io/dynamic-resource-allocation/api/metadata/v1beta1.
+// When the feature graduates to GA, DRA drivers have to be updated to include
+// the v1 version in their EnableDeviceMetadata call or they will encounter a runtime
+// error when the versions are validated during startup.
+//
+// The latest version is intentionally not exported as a variable in this
+// package because then a DRA driver using only it would become incompatible to
+// older consumers when that variable gets bumped to the next version and the
+// DRA driver updates the package. This would only show up when explicitly
+// testing with an older consumer.
+func EnableDeviceMetadata(enabled bool, versions []schema.GroupVersion) Option {
 	return func(o *options) error {
 		o.enableDeviceMetadata = enabled
-		return nil
-	}
-}
-
-// MetadataVersions sets the API versions to serialize when the device
-// metadata feature is enabled. If not specified, the current version
-// (v1alpha1) is used.
-//
-// This has no effect unless [EnableDeviceMetadata] is also set to true.
-func MetadataVersions(versions ...schema.GroupVersion) Option {
-	return func(o *options) error {
 		o.metadataVersions = versions
 		return nil
 	}
@@ -729,13 +738,6 @@ func MetadataFileOps(ops MetadataFileOperations) Option {
 		o.metadataFileOps = ops
 		return nil
 	}
-}
-
-// TODO(KEP #5304): Decide on a version negotiation strategy before exiting alpha
-// so that adding new versions does not break existing consumers, until then
-// defaulting is empty.
-func defaultMetadataVersions() []schema.GroupVersion {
-	return []schema.GroupVersion{}
 }
 
 type options struct {
@@ -878,7 +880,22 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		}
 		versions := o.metadataVersions
 		if len(versions) == 0 {
-			versions = defaultMetadataVersions()
+			return nil, errors.New("metadata versions must be explicitly selected in EnableDeviceMetadata, none chosen")
+		}
+		haveLatest := false
+		for _, version := range versions {
+			switch version {
+			case metadatav1beta1.SchemeGroupVersion:
+				haveLatest = true
+			case metadatav1alpha1.SchemeGroupVersion:
+			// TODO: when removing this version, enable this error:
+			// return nil, fmt.Errorf(`metadata version "metadata.resource.k8s.io/v1alpha1" is no longer supported`)
+			default:
+				return nil, fmt.Errorf("metadata version %q is not supported", version)
+			}
+		}
+		if !haveLatest {
+			return nil, fmt.Errorf("the latest metadata version is %s (= metadatav1beta1.SchemeGroupVersion) and must be enabled explicitly", metadatav1beta1.SchemeGroupVersion)
 		}
 		mw, err := newMetadataWriter(o.driverName, o.pluginDataDirectoryPath, cdiDir, versions, defaultMetadataFileOperations(o.metadataFileOps))
 		if err != nil {

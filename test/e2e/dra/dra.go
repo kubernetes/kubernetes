@@ -44,10 +44,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	metadata "k8s.io/dynamic-resource-allocation/api/metadata"
+	metadatav1alpha1 "k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
+	metadatav1beta1 "k8s.io/dynamic-resource-allocation/api/metadata/v1beta1"
 	"k8s.io/dynamic-resource-allocation/devicemetadata"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -732,6 +735,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		requestName    string
 		driverName     string
 		generation     int64
+		version        schema.GroupVersion
 	}
 
 	expectStringMetadataAttribute := func(tCtx ktesting.TContext, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, name resourceapi.QualifiedName, expected, filePath string) {
@@ -761,10 +765,14 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		tCtx.Expect(stderr).To(gomega.BeEmpty(), "metadata file stderr for container %s", containerName)
 
 		var md metadata.DeviceMetadata
+		var gvk schema.GroupVersionKind
 		tCtx.ExpectNoError(devicemetadata.DecodeMetadataFromStream(
 			json.NewDecoder(strings.NewReader(stdout)), &md,
+			devicemetadata.DecodeMetadataStoreGVK(&gvk),
+			// Validation is on by default.
 		), "decode metadata file %s", filePath)
 
+		tCtx.Expect(gvk).To(gomega.HaveField("GroupVersion()", gomega.Equal(expected.version)))
 		if expected.claimName != "" {
 			tCtx.Expect(md.Name).To(gomega.Equal(expected.claimName), "claim name in %s", filePath)
 		}
@@ -793,10 +801,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		}
 	}
 
-	f.Context("kubelet", feature.DynamicResourceAllocation, func() {
+	testMetadata := func(expectVersion schema.GroupVersion, enableVersions ...schema.GroupVersion) {
 		nodes := drautils.NewNodes(f, 1, 1)
 		driver := drautils.NewDriver(f, nodes, drautils.DriverResources(2))
 		driver.EnableDeviceMetadata = true
+		driver.DeviceMetadataVersions = enableVersions
 		b := drautils.NewBuilder(f, driver)
 
 		ginkgo.It("must mount device metadata for resource claims", func(ctx context.Context) {
@@ -817,6 +826,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				requestName:    "my-request",
 				driverName:     driver.Name,
 				generation:     1,
+				version:        expectVersion,
 			})
 		})
 
@@ -849,6 +859,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					requestName:    requestName,
 					driverName:     driver.Name,
 					generation:     1,
+					version:        expectVersion,
 				})
 			}
 			expectMetadata("all-requests", "req0")
@@ -883,20 +894,32 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				requestName:    "my-request",
 				driverName:     driver.Name,
 				generation:     1,
+				version:        expectVersion,
 			})
+		})
+	}
+	f.Context("metadata", feature.DynamicResourceAllocation, func() {
+		// v1alpha1 alone not supported!
+		f.Context("v1beta1", func() {
+			testMetadata(metadatav1beta1.SchemeGroupVersion /* <- expected, enabled: */, metadatav1beta1.SchemeGroupVersion)
+		})
+		f.Context("v1alpha1+v1beta1", func() {
+			testMetadata(metadatav1beta1.SchemeGroupVersion /* <- expected, enabled: */, metadatav1beta1.SchemeGroupVersion, metadatav1alpha1.SchemeGroupVersion)
 		})
 	})
 
-	f.Context("kubelet", feature.DynamicResourceAllocation, func() {
+	f.Context("metadata", feature.DynamicResourceAllocation, func() {
 		nodes := drautils.NewNodes(f, 1, 1)
 
 		driverA := drautils.NewDriver(f, nodes, drautils.DriverResources(1))
 		driverA.NameSuffix = "-a"
 		driverA.EnableDeviceMetadata = true
+		driverA.DeviceMetadataVersions = []schema.GroupVersion{metadatav1beta1.SchemeGroupVersion}
 
 		driverB := drautils.NewDriver(f, nodes, drautils.DriverResources(1))
 		driverB.NameSuffix = "-b"
 		driverB.EnableDeviceMetadata = true
+		driverB.DeviceMetadataVersions = []schema.GroupVersion{metadatav1beta1.SchemeGroupVersion}
 
 		bA := drautils.NewBuilder(f, driverA)
 
@@ -949,6 +972,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					requestName:    "my-request",
 					driverName:     driverName,
 					generation:     1,
+					version:        metadatav1beta1.SchemeGroupVersion,
 				})
 			}
 		})

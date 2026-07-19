@@ -35,6 +35,7 @@ import (
 	"k8s.io/component-base/metrics"
 
 	resourceapi "k8s.io/api/resource/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -45,7 +46,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/term"
-	metadatav1alpha1 "k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
+	metadataapi "k8s.io/dynamic-resource-allocation/api/metadata/v1beta1" // always use the latest here
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
@@ -229,10 +230,7 @@ func NewCommand() *cobra.Command {
 			Options{EnableHealthService: true},
 			kubeletplugin.PluginDataDirectoryPath(datadir),
 			kubeletplugin.RegistrarDirectoryPath(*kubeletRegistryDir),
-			kubeletplugin.EnableDeviceMetadata(*enableDeviceMetadata),
-		}
-		if *enableDeviceMetadata {
-			pluginOpts = append(pluginOpts, kubeletplugin.MetadataVersions(metadatav1alpha1.SchemeGroupVersion))
+			kubeletplugin.EnableDeviceMetadata(*enableDeviceMetadata, []schema.GroupVersion{metadataapi.SchemeGroupVersion /* always use the latest */}),
 		}
 		plugin, err := StartPlugin(cmd.Context(), *cdiDir, *driverName, clientset, *nodeName, FileOperations{DriverResources: &driverResources},
 			pluginOpts...,
