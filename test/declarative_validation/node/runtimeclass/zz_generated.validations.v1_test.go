@@ -47,9 +47,15 @@ func init() {
 			"metadata.generation": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"metadata.managedFields[*].manager": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
 			"metadata.managedFields[*].operation": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.managedFields[*].subresource": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 			},
 			"metadata.ownerReferences[*].apiVersion": {
 				{ErrorType: "FieldValueRequired"},
