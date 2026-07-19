@@ -1,0 +1,86 @@
+{
+  "kind": "DeviceMetadata",
+  "apiVersion": "metadata.resource.k8s.io/v1alpha1",
+  "metadata": {
+    "name": "claim",
+    "generateName": "generateNameValue",
+    "namespace": "default",
+    "selfLink": "selfLinkValue",
+    "uid": "claim-uid",
+    "resourceVersion": "resourceVersionValue",
+    "generation": 7,
+    "creationTimestamp": "2008-01-01T01:01:01Z",
+    "deletionTimestamp": "2009-01-01T01:01:01Z",
+    "deletionGracePeriodSeconds": 10,
+    "labels": {
+      "labelsKey": "labelsValue"
+    },
+    "annotations": {
+      "annotationsKey": "annotationsValue"
+    },
+    "ownerReferences": [
+      {
+        "apiVersion": "apiVersionValue",
+        "kind": "kindValue",
+        "name": "nameValue",
+        "uid": "uidValue",
+        "controller": true,
+        "blockOwnerDeletion": true
+      }
+    ],
+    "finalizers": [
+      "finalizersValue"
+    ],
+    "managedFields": [
+      {
+        "manager": "managerValue",
+        "operation": "operationValue",
+        "apiVersion": "apiVersionValue",
+        "time": "2004-01-01T01:01:01Z",
+        "fieldsType": "fieldsTypeValue",
+        "fieldsV1": {},
+        "subresource": "subresourceValue"
+      }
+    ]
+  },
+  "podClaimName": "\u003cno json tag\u003e PodClaimNameValue",
+  "requests": [
+    {
+      "name": "request",
+      "devices": [
+        {
+          "driver": "gpu.example.com",
+          "pool": "worker-0",
+          "name": "gpu-0",
+          "attributes": {
+            "model": {
+              "int": 2,
+              "bool": true,
+              "string": "LATEST-GPU-MODEL",
+              "version": "versionValue",
+              "ints": [
+                6
+              ],
+              "bools": [
+                true
+              ],
+              "strings": [
+                "stringsValue"
+              ],
+              "versions": [
+                "versionsValue"
+              ]
+            }
+          },
+          "networkData": {
+            "interfaceName": "interfaceNameValue",
+            "ips": [
+              "ipsValue"
+            ],
+            "hardwareAddress": "hardwareAddressValue"
+          }
+        }
+      ]
+    }
+  ]
+}
