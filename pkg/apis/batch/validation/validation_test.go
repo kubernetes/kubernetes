@@ -27,6 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -82,7 +83,7 @@ func getValidPodTemplateSpecForGenerated(selector *metav1.LabelSelector) api.Pod
 	}
 }
 
-func TestValidateJob(t *testing.T) {
+func TestValidateJobCreate(t *testing.T) {
 	validJobObjectMeta := metav1.ObjectMeta{
 		Name:      "myjob",
 		Namespace: metav1.NamespaceDefault,
@@ -424,7 +425,7 @@ func TestValidateJob(t *testing.T) {
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
-			if errs := ValidateJob(&v.job, v.opts); len(errs) != 0 {
+			if errs := ValidateJobCreate(&v.job, v.opts); len(errs) != 0 {
 				t.Errorf("Got unexpected validation errors: %v", errs)
 			}
 		})
@@ -1447,7 +1448,7 @@ func TestValidateJob(t *testing.T) {
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			errs := ValidateJob(&v.job, v.opts)
+			errs := ValidateJobCreate(&v.job, v.opts)
 			if len(errs) == 0 {
 				t.Errorf("expected failure for %s", k)
 			} else {
@@ -2562,6 +2563,67 @@ func TestValidateJobUpdate(t *testing.T) {
 				Field: "spec.template.spec",
 			},
 		},
+		// spec.scheduling structural immutability is handled by DV. The hand-written
+		// update path enforces the basic<->gang policy variant immutability that DV
+		// cannot express, plus gang.minCount<=parallelism.
+		"unchanged scheduling is valid": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:   validGeneratedSelector,
+					Template:   validPodTemplateSpecForGenerated,
+					Scheduling: &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}}},
+				},
+			},
+			update: func(job *batch.Job) {},
+		},
+		"gang minCount change within parallelism is allowed": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:    validGeneratedSelector,
+					Template:    validPodTemplateSpecForGenerated,
+					Parallelism: ptr.To[int32](8),
+					Scheduling:  &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)}}},
+				},
+			},
+			update: func(job *batch.Job) { job.Spec.Scheduling.SchedulingPolicy.Gang.MinCount = ptr.To[int32](8) },
+		},
+		"switching policy from basic to gang is immutable": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:   validGeneratedSelector,
+					Template:   validPodTemplateSpecForGenerated,
+					Scheduling: &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}}},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Scheduling.SchedulingPolicy = &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](1)}}
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.scheduling.schedulingPolicy",
+			},
+		},
+		"switching policy from gang to basic is immutable": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector:    validGeneratedSelector,
+					Template:    validPodTemplateSpecForGenerated,
+					Parallelism: ptr.To[int32](4),
+					Scheduling:  &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)}}},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Scheduling.SchedulingPolicy = &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}}
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.scheduling.schedulingPolicy",
+			},
+		},
 	}
 	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 	for k, tc := range cases {
@@ -3310,6 +3372,392 @@ func TestValidateCronJob(t *testing.T) {
 				if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
 					t.Errorf("unexpected error: %v, expected: %s", err, k)
 				}
+			}
+		})
+	}
+}
+
+func TestValidateCronJobSchedulingUpdate(t *testing.T) {
+	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
+	validPodTemplateSpec.Labels = map[string]string{}
+	mkCronJob := func(sched *batch.JobSchedulingConfiguration) batch.CronJob {
+		cj := batch.CronJob{
+			ObjectMeta: metav1.ObjectMeta{Name: "mycronjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c")},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				// Parallelism large enough that the gang minCount values used below do not
+				// trip the minCount<=parallelism check; these cases only exercise immutability.
+				JobTemplate: batch.JobTemplateSpec{Spec: batch.JobSpec{Parallelism: ptr.To[int32](8), Template: validPodTemplateSpec}},
+			},
+		}
+		cj.Spec.JobTemplate.Spec.Scheduling = sched
+		return cj
+	}
+	basic := func() *batch.JobSchedulingConfiguration {
+		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}}}
+	}
+	gang := func(minCount int32) *batch.JobSchedulingConfiguration {
+		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}}
+	}
+
+	// The CronJob update path does not enforce scheduling immutability
+	// (each Job from a CronJob gets its own Workload/PodGroup, so the handwritten
+	// validation leaves the template alone). Policy immutability on the jobTemplate
+	// is instead enforced declaratively via the shared scheduling policy type; that
+	// is covered in the declarative_validation tests. The only scheduling rule this
+	// imperative path enforces is the structural gang minCount<=parallelism check.
+	cases := map[string]struct {
+		old    *batch.JobSchedulingConfiguration
+		update *batch.JobSchedulingConfiguration
+		err    *field.Error
+	}{
+		"unchanged is valid": {
+			old:    basic(),
+			update: basic(),
+		},
+		"gang minCount change is allowed": {
+			old:    gang(4),
+			update: gang(8),
+		},
+		"adding scheduling after creation is allowed": {
+			old:    nil,
+			update: basic(),
+		},
+		"removing scheduling is allowed": {
+			old:    basic(),
+			update: nil,
+		},
+		"switching basic to gang is allowed": {
+			old:    basic(),
+			update: gang(4),
+		},
+		"switching gang to basic is allowed": {
+			old:    gang(4),
+			update: basic(),
+		},
+		"gang minCount above parallelism is rejected": {
+			old:    gang(4),
+			update: gang(16),
+			err:    field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "scheduling", "schedulingPolicy", "gang", "minCount"), nil, ""),
+		},
+	}
+	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
+	for k, tc := range cases {
+		t.Run(k, func(t *testing.T) {
+			old := mkCronJob(tc.old)
+			old.ResourceVersion = "1"
+			update := mkCronJob(tc.update)
+			update.ResourceVersion = "2"
+			errs := ValidateCronJobUpdate(&update, &old, corevalidation.PodValidationOptions{})
+			var wantErrs field.ErrorList
+			if tc.err != nil {
+				wantErrs = append(wantErrs, tc.err)
+			}
+			if diff := cmp.Diff(wantErrs, errs, ignoreValueAndDetail); diff != "" {
+				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidateJobSchedulingUpdate(t *testing.T) {
+	validSelector := getValidGeneratedSelector()
+	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(validSelector)
+	basic := func() *batch.JobSchedulingConfiguration {
+		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}}}
+	}
+	gang := func(minCount int32) *batch.JobSchedulingConfiguration {
+		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}}
+	}
+	mkJob := func(sched *batch.JobSchedulingConfiguration) batch.Job {
+		return batch.Job{
+			ObjectMeta: metav1.ObjectMeta{Name: "myjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c")},
+			Spec: batch.JobSpec{
+				Selector: validSelector,
+				// Parallelism large enough that the gang minCount values used below do
+				// not trip the minCount<=parallelism check; these cases only exercise
+				// the basic/gang variant immutability.
+				Parallelism: ptr.To[int32](8),
+				Template:    validPodTemplateSpec,
+				Scheduling:  sched,
+			},
+		}
+	}
+	// Only an in-place basic<->gang variant switch is rejected; adding or removing
+	// spec.scheduling is left to declarative validation, and gang minCount is mutable.
+	policyPath := field.NewPath("spec", "scheduling", "schedulingPolicy")
+	cases := map[string]struct {
+		old    *batch.JobSchedulingConfiguration
+		update *batch.JobSchedulingConfiguration
+		err    *field.Error
+	}{
+		"unchanged basic is valid": {
+			old:    basic(),
+			update: basic(),
+		},
+		"unchanged gang is valid": {
+			old:    gang(4),
+			update: gang(4),
+		},
+		"gang minCount change is allowed": {
+			old:    gang(4),
+			update: gang(6),
+		},
+		"adding scheduling after creation is allowed": {
+			old:    nil,
+			update: basic(),
+		},
+		"removing scheduling is allowed": {
+			old:    basic(),
+			update: nil,
+		},
+		"switching basic to gang is rejected": {
+			old:    basic(),
+			update: gang(4),
+			err:    field.Invalid(policyPath, nil, ""),
+		},
+		"switching gang to basic is rejected": {
+			old:    gang(4),
+			update: basic(),
+			err:    field.Invalid(policyPath, nil, ""),
+		},
+	}
+	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
+	for k, tc := range cases {
+		t.Run(k, func(t *testing.T) {
+			old := mkJob(tc.old)
+			old.ResourceVersion = "1"
+			update := mkJob(tc.update)
+			update.ResourceVersion = "2"
+			errs := ValidateJobUpdate(&update, &old, JobValidationOptions{})
+			var wantErrs field.ErrorList
+			if tc.err != nil {
+				wantErrs = append(wantErrs, tc.err)
+			}
+			if diff := cmp.Diff(wantErrs, errs, ignoreValueAndDetail); diff != "" {
+				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidateJobSchedulingGangMinCount(t *testing.T) {
+	validSelector := getValidGeneratedSelector()
+	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(validSelector)
+	gang := func(minCount int32) *batch.JobSchedulingConfiguration {
+		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}}
+	}
+	basic := &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}}}
+	basicSingle := &batch.JobSchedulingConfiguration{
+		SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}},
+		DisruptionMode:   &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{Single: &schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{}},
+	}
+	basicAll := &batch.JobSchedulingConfiguration{
+		SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}},
+		DisruptionMode:   &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}},
+	}
+	gangAll := func(minCount int32) *batch.JobSchedulingConfiguration {
+		return &batch.JobSchedulingConfiguration{
+			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}},
+			DisruptionMode:   &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}},
+		}
+	}
+	disruptionModePath := field.NewPath("spec", "scheduling", "disruptionMode")
+	mkJob := func(parallelism *int32, sched *batch.JobSchedulingConfiguration) *batch.Job {
+		return &batch.Job{
+			ObjectMeta: metav1.ObjectMeta{Name: "myjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c")},
+			Spec: batch.JobSpec{
+				Selector:    validSelector,
+				Parallelism: parallelism,
+				Template:    validPodTemplateSpec,
+				Scheduling:  sched,
+			},
+		}
+	}
+	minCountPath := field.NewPath("spec", "scheduling", "schedulingPolicy", "gang", "minCount")
+
+	cases := map[string]struct {
+		parallelism *int32
+		sched       *batch.JobSchedulingConfiguration
+		opts        JobValidationOptions
+		err         *field.Error
+	}{
+		"no scheduling": {
+			parallelism: ptr.To[int32](4),
+		},
+		"basic policy is not subject to the minCount rule": {
+			parallelism: ptr.To[int32](1),
+			sched:       basic,
+		},
+		"gang minCount below parallelism": {
+			parallelism: ptr.To[int32](4),
+			sched:       gang(2),
+		},
+		"gang minCount equal to parallelism": {
+			parallelism: ptr.To[int32](4),
+			sched:       gang(4),
+		},
+		"gang minCount above parallelism is rejected": {
+			parallelism: ptr.To[int32](2),
+			sched:       gang(4),
+			err:         field.Invalid(minCountPath, nil, ""),
+		},
+		"gang minCount unset (zero) is allowed": {
+			parallelism: ptr.To[int32](2),
+			sched:       gang(0),
+		},
+		"gang minCount unset (nil) defaults to parallelism and is accepted": {
+			parallelism: ptr.To[int32](4),
+			sched:       &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: nil}}},
+		},
+		"nil parallelism defaults to 1, minCount 1 is allowed": {
+			sched: gang(1),
+		},
+		"nil parallelism defaults to 1, minCount 2 is rejected": {
+			sched: gang(2),
+			err:   field.Invalid(minCountPath, nil, ""),
+		},
+		"basic policy with single disruption is allowed": {
+			parallelism: ptr.To[int32](1),
+			sched:       basicSingle,
+		},
+		"gang policy with all disruption is allowed": {
+			parallelism: ptr.To[int32](4),
+			sched:       gangAll(2),
+		},
+		"basic policy with all disruption is rejected": {
+			parallelism: ptr.To[int32](1),
+			sched:       basicAll,
+			err:         field.Invalid(disruptionModePath, nil, ""),
+		},
+	}
+	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			tc.opts.RequirePrefixedLabels = true
+			errs := ValidateJobCreate(mkJob(tc.parallelism, tc.sched), tc.opts)
+			var wantErrs field.ErrorList
+			if tc.err != nil {
+				wantErrs = append(wantErrs, tc.err)
+			}
+			if diff := cmp.Diff(wantErrs, errs, ignoreValueAndDetail); diff != "" {
+				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidateCronJobCreateGangMinCount(t *testing.T) {
+	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
+	validPodTemplateSpec.Labels = map[string]string{}
+	gang := func(minCount int32) *batch.JobSchedulingConfiguration {
+		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}}
+	}
+	mkCronJob := func(parallelism *int32, sched *batch.JobSchedulingConfiguration) *batch.CronJob {
+		return &batch.CronJob{
+			ObjectMeta: metav1.ObjectMeta{Name: "mycronjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c")},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{Spec: batch.JobSpec{
+					Parallelism: parallelism,
+					Template:    validPodTemplateSpec,
+					Scheduling:  sched,
+				}},
+			},
+		}
+	}
+	minCountPath := field.NewPath("spec", "jobTemplate", "spec", "scheduling", "schedulingPolicy", "gang", "minCount")
+
+	cases := map[string]struct {
+		parallelism *int32
+		sched       *batch.JobSchedulingConfiguration
+		err         *field.Error
+	}{
+		"gang minCount below parallelism": {
+			parallelism: ptr.To[int32](4),
+			sched:       gang(2),
+		},
+		"gang minCount above parallelism is rejected": {
+			parallelism: ptr.To[int32](2),
+			sched:       gang(4),
+			err:         field.Invalid(minCountPath, nil, ""),
+		},
+		"nil parallelism defaults to 1, minCount 2 is rejected": {
+			sched: gang(2),
+			err:   field.Invalid(minCountPath, nil, ""),
+		},
+	}
+	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateCronJobCreate(mkCronJob(tc.parallelism, tc.sched), corevalidation.PodValidationOptions{})
+			var wantErrs field.ErrorList
+			if tc.err != nil {
+				wantErrs = append(wantErrs, tc.err)
+			}
+			if diff := cmp.Diff(wantErrs, errs, ignoreValueAndDetail); diff != "" {
+				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidateCronJobUpdateGangMinCount(t *testing.T) {
+	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
+	validPodTemplateSpec.Labels = map[string]string{}
+	mkCronJob := func(parallelism, minCount int32) batch.CronJob {
+		return batch.CronJob{
+			ObjectMeta: metav1.ObjectMeta{Name: "mycronjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c")},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{Spec: batch.JobSpec{
+					Parallelism: new(parallelism),
+					Template:    validPodTemplateSpec,
+					Scheduling:  &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}},
+				}},
+			},
+		}
+	}
+	minCountPath := field.NewPath("spec", "jobTemplate", "spec", "scheduling", "schedulingPolicy", "gang", "minCount")
+
+	cases := map[string]struct {
+		oldParallelism int32
+		oldMinCount    int32
+		newParallelism int32
+		newMinCount    int32
+		err            *field.Error
+	}{
+		"lowering parallelism below minCount is rejected": {
+			oldParallelism: 4, oldMinCount: 4,
+			newParallelism: 2, newMinCount: 4,
+			err: field.Invalid(minCountPath, nil, ""),
+		},
+		"raising parallelism and minCount together is accepted": {
+			oldParallelism: 4, oldMinCount: 4,
+			newParallelism: 8, newMinCount: 8,
+		},
+		"raising minCount within parallelism is accepted": {
+			oldParallelism: 8, oldMinCount: 4,
+			newParallelism: 8, newMinCount: 6,
+		},
+	}
+	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			old := mkCronJob(tc.oldParallelism, tc.oldMinCount)
+			old.ResourceVersion = "1"
+			update := mkCronJob(tc.newParallelism, tc.newMinCount)
+			update.ResourceVersion = "2"
+			errs := ValidateCronJobUpdate(&update, &old, corevalidation.PodValidationOptions{})
+			var wantErrs field.ErrorList
+			if tc.err != nil {
+				wantErrs = append(wantErrs, tc.err)
+			}
+			if diff := cmp.Diff(wantErrs, errs, ignoreValueAndDetail); diff != "" {
+				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
 			}
 		})
 	}

@@ -512,6 +512,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsbatchv1.JobApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("JobCondition"):
 		return &applyconfigurationsbatchv1.JobConditionApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("JobSchedulingConfiguration"):
+		return &applyconfigurationsbatchv1.JobSchedulingConfigurationApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("JobSpec"):
 		return &applyconfigurationsbatchv1.JobSpecApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("JobStatus"):
@@ -1896,6 +1898,16 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1alpha3.TypedLocalObjectReferenceApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("Workload"):
 		return &applyconfigurationsschedulingv1alpha3.WorkloadApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupDisruptionMode"):
+		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupDisruptionModeApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupGangSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicyApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupResourceClaim"):
+		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupResourceClaimApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupSchedulingConstraints"):
+		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupSchedulingConstraintsApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupSchedulingPolicyApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadReference"):
 		return &applyconfigurationsschedulingv1alpha3.WorkloadReferenceApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadSpec"):

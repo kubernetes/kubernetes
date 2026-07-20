@@ -92,17 +92,19 @@ func (jobStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 
 // PrepareForCreate clears the status of a job before creation.
 func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	job := obj.(*batch.Job)
-	generateSelectorIfNeeded(job)
-	job.Status = batch.JobStatus{}
+	newJob := obj.(*batch.Job)
+	generateSelectorIfNeeded(newJob)
+	newJob.Status = batch.JobStatus{}
 
-	job.Generation = 1
+	newJob.Generation = 1
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobManagedBy) {
-		job.Spec.ManagedBy = nil
+		newJob.Spec.ManagedBy = nil
 	}
 
-	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
+	job.DropDisabledFields(&newJob.Spec, nil)
+
+	pod.DropDisabledTemplateFields(&newJob.Spec.Template, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -110,6 +112,8 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
+
+	job.DropDisabledFields(&newJob.Spec, &oldJob.Spec)
 
 	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)
 
@@ -125,7 +129,15 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	job := obj.(*batch.Job)
 	opts := validationOptionsForJob(job, nil)
-	return batchvalidation.ValidateJob(job, opts)
+	return batchvalidation.ValidateJobCreate(job, opts)
+}
+
+// DeclarativeValidationConfig declares the options referenced by this type's tags,
+// mapped to whether each is enabled.
+func (jobStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.WorkloadWithJob): utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithJob),
+	}}
 }
 
 // shouldAllowMutablePodTemplate returns true if the Job's pod template should
@@ -266,9 +278,7 @@ func (jobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	oldJob := old.(*batch.Job)
 
 	opts := validationOptionsForJob(job, oldJob)
-	validationErrorList := batchvalidation.ValidateJob(job, opts)
-	updateErrorList := batchvalidation.ValidateJobUpdate(job, oldJob, opts)
-	return append(validationErrorList, updateErrorList...)
+	return batchvalidation.ValidateJobUpdate(job, oldJob, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
