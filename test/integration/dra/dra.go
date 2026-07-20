@@ -224,6 +224,16 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
 			},
 		},
+		"GA-opt-out-1.36": {
+			version: "1.36",
+			apis:    map[schema.GroupVersion]bool{},
+			features: map[featuregate.Feature]bool{
+				features.DRAResourceClaimDeviceStatus: false,
+			},
+			f: func(tCtx ktesting.TContext) {
+				runSubTest(tCtx, "ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
+			},
+		},
 		"v1beta1": {
 			apis: map[schema.GroupVersion]bool{
 				resourceapi.SchemeGroupVersion:     false,

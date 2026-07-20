@@ -83,7 +83,15 @@ func testResourceClaimDeviceStatus(tCtx ktesting.TContext, enabled bool) {
 		},
 	}}
 	claim.Status.Devices = deviceStatus
-	_, err = tCtx.Client().ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
+	updatedClaim, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
+	if !enabled {
+		tCtx.ExpectNoError(err, "updating the status with an invalid AllocatedDeviceStatus should have worked because the field should have been dropped")
+		require.Empty(tCtx, updatedClaim.Status.Devices, "field should have been dropped")
+		return
+	}
+
+	// Tests for enabled feature follow.
+
 	if err == nil {
 		tCtx.Fatal("updating the status with an invalid AllocatedDeviceStatus should have failed and didn't")
 	}
