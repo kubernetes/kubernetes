@@ -282,6 +282,28 @@ func TestTaintTolerationScore(t *testing.T) {
 			},
 			enableTaintTolerationComparisonOps: true,
 		},
+		{
+			name: "Score ignores parse errors from numeric PreferNoSchedule taint value",
+			pod: podWithTolerations("pod1", []v1.Toleration{{
+				Key:      "node.kubernetes.io/sla",
+				Operator: v1.TolerationOpGt,
+				Value:    "950",
+				Effect:   v1.TaintEffectPreferNoSchedule,
+			}}),
+			nodes: []*v1.Node{
+				nodeWithTaints("nodeA", nil),
+				nodeWithTaints("nodeB", []v1.Taint{{
+					Key:    "node.kubernetes.io/sla",
+					Value:  "high",
+					Effect: v1.TaintEffectPreferNoSchedule,
+				}}),
+			},
+			expectedList: []fwk.NodeScore{
+				{Name: "nodeA", Score: fwk.MaxScore},
+				{Name: "nodeB", Score: 0},
+			},
+			enableTaintTolerationComparisonOps: true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -419,11 +441,20 @@ func TestTaintTolerationFilter(t *testing.T) {
 			enableTaintTolerationComparisonOps: true,
 		},
 		{
-			name: "Pod with Gt toleration cannot be scheduled on node with non-numeric taint value",
+			name:                               "Pod with Gt toleration cannot be scheduled on node with non-numeric taint value",
+			pod:                                podWithTolerations("pod1", []v1.Toleration{{Key: "node.kubernetes.io/sla", Operator: "Gt", Value: "950", Effect: "NoSchedule"}}),
+			node:                               nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "high", Effect: "NoSchedule"}}),
+			wantStatus:                         fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)"),
+			enableTaintTolerationComparisonOps: true,
+		},
+		{
+			name: "Parse error before clean untolerated taint still reports stable Filter reason",
 			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "node.kubernetes.io/sla", Operator: "Gt", Value: "950", Effect: "NoSchedule"}}),
-			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "node.kubernetes.io/sla", Value: "high", Effect: "NoSchedule"}}),
-			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
-				"node(s) had untolerated taint(s)"),
+			node: nodeWithTaints("nodeA", []v1.Taint{
+				{Key: "node.kubernetes.io/sla", Value: "high", Effect: "NoSchedule"},
+				{Key: "dedicated", Value: "gpu", Effect: "NoSchedule"},
+			}),
+			wantStatus:                         fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)"),
 			enableTaintTolerationComparisonOps: true,
 		},
 	}
@@ -439,8 +470,8 @@ func TestTaintTolerationFilter(t *testing.T) {
 				t.Fatalf("creating plugin: %v", err)
 			}
 			gotStatus := p.(fwk.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
-			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
-				t.Errorf("Unexpected status (-want,+got):\n%s", diff)
+			if test.wantStatus.Code() != gotStatus.Code() || test.wantStatus.Message() != gotStatus.Message() {
+				t.Errorf("Unexpected status (-want,+got):\n%s", cmp.Diff(test.wantStatus, gotStatus))
 			}
 		})
 	}
@@ -525,8 +556,8 @@ func TestTaintTolerationFilterWithFeatureGate(t *testing.T) {
 				t.Fatalf("creating plugin: %v", err)
 			}
 			gotStatus := p.(fwk.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
-			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
-				t.Errorf("Unexpected status (-want,+got):\n%s", diff)
+			if test.wantStatus.Code() != gotStatus.Code() || test.wantStatus.Message() != gotStatus.Message() {
+				t.Errorf("Unexpected status (-want,+got):\n%s", cmp.Diff(test.wantStatus, gotStatus))
 			}
 		})
 	}

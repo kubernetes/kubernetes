@@ -50,6 +50,8 @@ const (
 	preScoreStateKey = "PreScore" + Name
 	// ErrReasonNotMatch is the Filter reason status when not matching.
 	ErrReasonNotMatch = "node(s) had taints that the pod didn't tolerate"
+	// taintComparisonFailedLogMessage is logged when numeric taint/toleration comparison fails.
+	taintComparisonFailedLogMessage = "node had a taint that could not be compared with pod tolerations"
 )
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -84,10 +86,16 @@ func (pl *TaintToleration) isSchedulableAfterNodeChange(logger klog.Logger, pod 
 
 	wasUntolerated := true
 	if originalNode != nil {
-		_, wasUntolerated = v1helper.FindMatchingUntoleratedTaint(logger, originalNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), pl.enableTaintTolerationComparisonOperators)
+		_, wasUntolerated, err = v1helper.FindMatchingUntoleratedTaint(logger, originalNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), pl.enableTaintTolerationComparisonOperators)
+		if err != nil {
+			logger.V(4).Info(taintComparisonFailedLogMessage, "node", klog.KObj(originalNode), "pod", klog.KObj(pod), "err", err)
+		}
 	}
 
-	_, isUntolerated := v1helper.FindMatchingUntoleratedTaint(logger, modifiedNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), pl.enableTaintTolerationComparisonOperators)
+	_, isUntolerated, err := v1helper.FindMatchingUntoleratedTaint(logger, modifiedNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), pl.enableTaintTolerationComparisonOperators)
+	if err != nil {
+		logger.V(4).Info(taintComparisonFailedLogMessage, "node", klog.KObj(modifiedNode), "pod", klog.KObj(pod), "err", err)
+	}
 
 	if wasUntolerated && !isUntolerated {
 		logger.V(5).Info("node was created or updated, and this may make the Pod rejected by TaintToleration plugin in the previous scheduling cycle schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
@@ -103,14 +111,17 @@ func (pl *TaintToleration) Filter(ctx context.Context, state fwk.CycleState, pod
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
-	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, pod.Spec.Tolerations,
+	taint, isUntolerated, err := v1helper.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, pod.Spec.Tolerations,
 		helper.DoNotScheduleTaintsFilterFunc(),
 		pl.enableTaintTolerationComparisonOperators)
 	if !isUntolerated {
 		return nil
 	}
-
-	logger.V(4).Info("node had untolerated taints", "node", klog.KObj(node), "pod", klog.KObj(pod), "untoleratedTaint", taint)
+	if err != nil {
+		logger.V(4).Info(taintComparisonFailedLogMessage, "node", klog.KObj(node), "pod", klog.KObj(pod), "untoleratedTaint", taint, "err", err)
+	} else {
+		logger.V(4).Info("node had untolerated taints", "node", klog.KObj(node), "pod", klog.KObj(pod), "untoleratedTaint", taint)
+	}
 	return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node(s) had untolerated taint(s)")
 }
 
@@ -160,14 +171,18 @@ func getPreScoreState(cycleState fwk.CycleState) (*preScoreState, error) {
 }
 
 // CountIntolerableTaintsPreferNoSchedule gives the count of intolerable taints of a pod with effect PreferNoSchedule
-func (pl *TaintToleration) countIntolerableTaintsPreferNoSchedule(logger klog.Logger, taints []v1.Taint, tolerations []v1.Toleration) (intolerableTaints int) {
+func (pl *TaintToleration) countIntolerableTaintsPreferNoSchedule(logger klog.Logger, node *v1.Node, pod *v1.Pod, taints []v1.Taint, tolerations []v1.Toleration) (intolerableTaints int) {
 	for _, taint := range taints {
 		// check only on taints that have effect PreferNoSchedule
 		if taint.Effect != v1.TaintEffectPreferNoSchedule {
 			continue
 		}
 
-		if !v1helper.TolerationsTolerateTaint(logger, tolerations, &taint, pl.enableTaintTolerationComparisonOperators) {
+		tolerated, err := v1helper.TolerationsTolerateTaint(logger, tolerations, &taint, pl.enableTaintTolerationComparisonOperators)
+		if err != nil {
+			logger.V(4).Info(taintComparisonFailedLogMessage, "node", klog.KObj(node), "pod", klog.KObj(pod), "taint", taint, "err", err)
+		}
+		if !tolerated {
 			intolerableTaints++
 		}
 	}
@@ -185,7 +200,7 @@ func (pl *TaintToleration) Score(ctx context.Context, state fwk.CycleState, pod 
 		return 0, fwk.AsStatus(err)
 	}
 
-	score := int64(pl.countIntolerableTaintsPreferNoSchedule(logger, node.Spec.Taints, s.tolerationsPreferNoSchedule))
+	score := int64(pl.countIntolerableTaintsPreferNoSchedule(logger, node, pod, node.Spec.Taints, s.tolerationsPreferNoSchedule))
 	return score, nil
 }
 

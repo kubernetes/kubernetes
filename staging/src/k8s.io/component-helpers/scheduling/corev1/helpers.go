@@ -61,29 +61,49 @@ func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (v1.AvoidPod
 }
 
 // TolerationsTolerateTaint checks if taint is tolerated by any of the tolerations.
-func TolerationsTolerateTaint(logger klog.Logger, tolerations []v1.Toleration, taint *v1.Taint, enableComparisonOperators bool) bool {
+func TolerationsTolerateTaint(logger klog.Logger, tolerations []v1.Toleration, taint *v1.Taint, enableComparisonOperators bool) (bool, error) {
+	var firstErr error
 	for i := range tolerations {
-		if tolerations[i].ToleratesTaint(logger, taint, enableComparisonOperators) {
-			return true
+		tolerated, err := tolerations[i].ToleratesTaint(taint, enableComparisonOperators)
+		if tolerated {
+			return true, nil
+		}
+		if firstErr == nil && err != nil {
+			firstErr = err
 		}
 	}
-	return false
+	return false, firstErr
 }
 
 type taintsFilterFunc func(*v1.Taint) bool
 
-// FindMatchingUntoleratedTaint checks if the given tolerations tolerates
-// all the filtered taints, and returns the first taint without a toleration
-// Returns true if there is an untolerated taint
-// Returns false if all taints are tolerated
-func FindMatchingUntoleratedTaint(logger klog.Logger, taints []v1.Taint, tolerations []v1.Toleration, inclusionFilter taintsFilterFunc, enableComparisonOperators bool) (v1.Taint, bool) {
+// FindMatchingUntoleratedTaint checks if the given tolerations tolerate
+// all the filtered taints, and returns a taint without a matching toleration.
+// Prefer a cleanly untolerated taint over a comparison parse failure so callers
+// get a stable result regardless of taint order.
+// Returns true if there is an untolerated taint (or only comparison errors).
+// Returns false if all taints are tolerated.
+func FindMatchingUntoleratedTaint(logger klog.Logger, taints []v1.Taint, tolerations []v1.Toleration, inclusionFilter taintsFilterFunc, enableComparisonOperators bool) (v1.Taint, bool, error) {
 	filteredTaints := getFilteredTaints(taints, inclusionFilter)
+	var firstErrTaint v1.Taint
+	var firstErr error
 	for _, taint := range filteredTaints {
-		if !TolerationsTolerateTaint(logger, tolerations, &taint, enableComparisonOperators) {
-			return taint, true
+		tolerated, err := TolerationsTolerateTaint(logger, tolerations, &taint, enableComparisonOperators)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+				firstErrTaint = taint
+			}
+			continue
+		}
+		if !tolerated {
+			return taint, true, nil
 		}
 	}
-	return v1.Taint{}, false
+	if firstErr != nil {
+		return firstErrTaint, true, firstErr
+	}
+	return v1.Taint{}, false, nil
 }
 
 // getFilteredTaints returns a list of taints satisfying the filter predicate
