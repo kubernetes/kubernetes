@@ -42,6 +42,8 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	componentmetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -58,6 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
@@ -2187,11 +2190,35 @@ var statusCmpOpt = cmp.Comparer(func(s1 *fwk.Status, s2 *fwk.Status) bool {
 	return s1.Code() == s2.Code() && s1.Plugin() == s2.Plugin() && s1.Message() == s2.Message()
 })
 
+func assertCounterValueFromGatherer(t *testing.T, g componentmetrics.Gatherer, name, labelName, labelValue string, want int) {
+	t.Helper()
+	got := 0
+	if vals, err := testutil.GetCounterValuesFromGatherer(g, name, nil, labelName); err == nil {
+		got = int(vals[labelValue])
+	}
+	if got != want {
+		t.Errorf("unexpected %s{%s=%q}: got %d, want %d", name, labelName, labelValue, got, want)
+	}
+}
+
+func assertHistogramSampleCountFromGatherer(t *testing.T, g componentmetrics.Gatherer, name string, labels map[string]string, want int) {
+	t.Helper()
+	got := 0
+	if vec, err := testutil.GetHistogramVecFromGatherer(g, name, labels); err == nil {
+		got = int(vec.GetAggregatedSampleCount())
+	}
+	if got != want {
+		t.Errorf("unexpected %s%v sample count: got %d, want %d", name, labels, got, want)
+	}
+}
+
 func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.TopologyAwareWorkloadScheduling: true,
 		features.GenericWorkload:                 true,
 	})
+	testRegistry := componentmetrics.NewKubeRegistry()
+	testRegistry.MustRegister(metrics.GeneratedPlacementsTotal, metrics.PlacementEvaluations, metrics.PlacementEvaluationDuration)
 
 	nodes := []*v1.Node{
 		st.MakeNode().Name("node1").Obj(),
@@ -2208,11 +2235,16 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		placementPlugin           fakePlacementPlugin
-		placementFeasibleStatuses [][]fwk.Code
-		expectedResult            podGroupAlgorithmResult
+		placementPlugin               fakePlacementPlugin
+		placementFeasibleStatuses     [][]fwk.Code
+		expectedResult                podGroupAlgorithmResult
+		expectedGeneratedPlacements   int
+		expectedFeasibleEvaluations   int
+		expectedInfeasibleEvaluations int
 	}{
 		"respects higher score of placement1": {
+			expectedGeneratedPlacements: 2,
+			expectedFeasibleEvaluations: 2,
 			placementPlugin: fakePlacementPlugin{
 				generatePlacementsResult: map[string][]string{
 					"placement1": {nodes[0].Name},
@@ -2238,6 +2270,8 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 			},
 		},
 		"respects higher score of placement2": {
+			expectedGeneratedPlacements: 2,
+			expectedFeasibleEvaluations: 2,
 			placementPlugin: fakePlacementPlugin{
 				generatePlacementsResult: map[string][]string{
 					"placement1": {nodes[0].Name},
@@ -2271,6 +2305,8 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 			},
 		},
 		"when all placements are infeasible, returns unschedulable": {
+			expectedGeneratedPlacements:   2,
+			expectedInfeasibleEvaluations: 2,
 			placementPlugin: fakePlacementPlugin{
 				generatePlacementsResult: map[string][]string{
 					"placement1": {nodes[0].Name},
@@ -2304,6 +2340,8 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 			},
 		},
 		"when all placements are infeasible, but pods are feasible, returns unschedulable": {
+			expectedGeneratedPlacements:   2,
+			expectedInfeasibleEvaluations: 2,
 			placementPlugin: fakePlacementPlugin{
 				generatePlacementsResult: map[string][]string{
 					"placement1": {nodes[0].Name},
@@ -2338,6 +2376,9 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 			},
 		},
 		"filters out infeasible placements": {
+			expectedGeneratedPlacements:   2,
+			expectedFeasibleEvaluations:   1,
+			expectedInfeasibleEvaluations: 1,
 			placementPlugin: fakePlacementPlugin{
 				generatePlacementsResult: map[string][]string{
 					"placement1": {nodes[0].Name},
@@ -2365,6 +2406,9 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 			},
 		},
 		"filters out infeasible placements with feasible pods": {
+			expectedGeneratedPlacements:   2,
+			expectedFeasibleEvaluations:   1,
+			expectedInfeasibleEvaluations: 1,
 			placementPlugin: fakePlacementPlugin{
 				generatePlacementsResult: map[string][]string{
 					"placement1": {nodes[0].Name},
@@ -2405,6 +2449,8 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 			},
 		},
 		"when score plugin fails, returns error": {
+			expectedGeneratedPlacements: 2,
+			expectedFeasibleEvaluations: 2,
 			placementPlugin: fakePlacementPlugin{
 				generatePlacementsResult: map[string][]string{
 					"placement1": {nodes[0].Name},
@@ -2419,6 +2465,32 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 			},
 			expectedResult: podGroupAlgorithmResult{
 				status: fwk.NewStatus(fwk.Error, "running PlacementScore plugins: plugin \"FakePlacementPlugin\" failed with: error for test").WithPlugin("FakePlacementPlugin"),
+			},
+		},
+		"when a placement evaluation errors, returns error": {
+			expectedGeneratedPlacements: 1,
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: map[string][]string{
+					"placement1": {nodes[0].Name},
+				},
+				scorePlacementsResult: map[string]int64{
+					"placement1": 1,
+				},
+				filterStatus: map[string]*fwk.Status{
+					nodes[0].Name: fwk.NewStatus(fwk.Error, "error for test"),
+				},
+			},
+			expectedResult: podGroupAlgorithmResult{
+				podResults: []algorithmResult{
+					{
+						podInfo: podGroupPodInfo,
+						scheduleResult: ScheduleResult{
+							nominatingInfo: &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride},
+						},
+						status: fwk.NewStatus(fwk.Error, "running \"FakePlacementPlugin\" filter plugin: error for test"),
+					},
+				},
+				status: fwk.NewStatus(fwk.Error, "failed to schedule other pod from a pod group: running \"FakePlacementPlugin\" filter plugin: error for test"),
 			},
 		},
 	}
@@ -2498,6 +2570,10 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 				},
 			}
 
+			metrics.GeneratedPlacementsTotal.Reset()
+			metrics.PlacementEvaluations.Reset()
+			metrics.PlacementEvaluationDuration.Reset()
+
 			resultsMap := sched.runRootSchedulingAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo)
 			result := resultsMap[pgKey(pgInfo.PodGroupInfo)]
 
@@ -2529,6 +2605,14 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 			if diff := cmp.Diff(tt.expectedResult, *result, opts...); diff != "" {
 				t.Fatalf("Unexpected algorithm result (-want,+got):\n%s", diff)
 			}
+
+			feasibleLabels := map[string]string{"profile": "test-scheduler", "result": metrics.FeasibleResult}
+			infeasibleLabels := map[string]string{"profile": "test-scheduler", "result": metrics.InfeasibleResult}
+			assertCounterValueFromGatherer(t, testRegistry, "scheduler_generated_placements_total", "profile", "test-scheduler", tt.expectedGeneratedPlacements)
+			assertCounterValueFromGatherer(t, testRegistry, "scheduler_placement_evaluations_total", "result", metrics.FeasibleResult, tt.expectedFeasibleEvaluations)
+			assertCounterValueFromGatherer(t, testRegistry, "scheduler_placement_evaluations_total", "result", metrics.InfeasibleResult, tt.expectedInfeasibleEvaluations)
+			assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_placement_evaluation_duration_seconds", feasibleLabels, tt.expectedFeasibleEvaluations)
+			assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_placement_evaluation_duration_seconds", infeasibleLabels, tt.expectedInfeasibleEvaluations)
 		})
 	}
 }

@@ -971,12 +971,14 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 			status:       status,
 		}
 	}
+	metrics.RecordGeneratedPlacements(schedFwk.ProfileName(), len(placements))
 
 	var anyResult *podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]*podGroupAlgorithmResult)
 
 	for _, placement := range placements {
 		logger.V(4).Info("Assuming placement in snapshot", "placement", placement.Name)
+		evaluationStart := time.Now()
 		err := sched.nodeInfoSnapshot.AssumePlacement(placement)
 		if err != nil {
 			return &podGroupAlgorithmResult{
@@ -1002,9 +1004,14 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 			anyResult = result
 		}
 
+		// Errors are excluded by the early return above since they are internal
+		// faults, not feasibility results.
+		evaluationResult := metrics.InfeasibleResult
 		if result.status.IsSuccess() {
+			evaluationResult = metrics.FeasibleResult
 			successfulResults[placement] = result
 		}
+		metrics.ObservePlacementEvaluation(evaluationResult, schedFwk.ProfileName(), metrics.SinceInSeconds(evaluationStart))
 	}
 
 	if len(successfulResults) == 0 {

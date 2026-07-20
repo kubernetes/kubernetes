@@ -185,6 +185,12 @@ var (
 	podGroupScheduleAttempts           *metrics.CounterVec
 	podGroupSchedulingLatency          *metrics.HistogramVec
 	PodGroupSchedulingAlgorithmLatency *metrics.Histogram
+
+	// The below are only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
+	GeneratedPlacementsTotal    *metrics.CounterVec
+	PlacementEvaluations        *metrics.CounterVec
+	PlacementEvaluationDuration *metrics.HistogramVec
+
 	// The below are only available when the DRADeviceBindingConditions feature gate is enabled.
 	DRABindingConditionsAllocationsTotal *metrics.CounterVec
 	DRABindingConditionsPreBindDuration  *metrics.HistogramVec
@@ -234,6 +240,13 @@ func Register() {
 				PreemptionEvaluationDuration,
 				PreemptionExecutionDuration,
 				PreemptionPDBViolations,
+			)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
+			RegisterMetrics(
+				GeneratedPlacementsTotal,
+				PlacementEvaluations,
+				PlacementEvaluationDuration,
 			)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) {
@@ -622,6 +635,30 @@ func InitMetrics() {
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"preemptor"},
 	)
+
+	// The below (GeneratedPlacementsTotal, PlacementEvaluations and PlacementEvaluationDuration) are only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
+	GeneratedPlacementsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "generated_placements_total",
+			Help:           "Number of candidate placements generated when scheduling pod groups.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"profile"})
+	PlacementEvaluations = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "placement_evaluations_total",
+			Help:           "Number of candidate placements evaluated when scheduling pod groups, by result. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"result", "profile"})
+	PlacementEvaluationDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "placement_evaluation_duration_seconds",
+			Help:           "Latency in seconds of evaluating a single candidate placement when scheduling pod groups, by result. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not.",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"result", "profile"})
 
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
