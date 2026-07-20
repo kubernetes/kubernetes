@@ -2228,7 +2228,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 		{
 			name: "status requests - spec is highest (2 CPU, 200Mi mem)",
 			opts: PodResourcesOptions{
-				UseStatusResources:                             true,
+				UseStatusResources: true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
 			podResources: v1.ResourceRequirements{
@@ -2259,7 +2259,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 		{
 			name: "status requests - allocated is highest",
 			opts: PodResourcesOptions{
-				UseStatusResources:                             true,
+				UseStatusResources: true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
 			podResources: v1.ResourceRequirements{
@@ -2290,7 +2290,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 		{
 			name: "status requests - actual status requests is highest",
 			opts: PodResourcesOptions{
-				UseStatusResources:                             true,
+				UseStatusResources: true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
 			podResources: v1.ResourceRequirements{
@@ -2321,7 +2321,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 		{
 			name: "status requests - status resources unset",
 			opts: PodResourcesOptions{
-				UseStatusResources:                             true,
+				UseStatusResources: true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
 			podResources: v1.ResourceRequirements{
@@ -2342,7 +2342,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 		{
 			name: "status requests - status.resources nil, status.allocatedResources set",
 			opts: PodResourcesOptions{
-				UseStatusResources:                             true,
+				UseStatusResources: true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
 			podResources: v1.ResourceRequirements{
@@ -2367,7 +2367,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 		{
 			name: "status requests - infeasible resize",
 			opts: PodResourcesOptions{
-				UseStatusResources:                             true,
+				UseStatusResources: true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
 			podResources: v1.ResourceRequirements{
@@ -2400,6 +2400,43 @@ func TestPodLevelResourceRequests(t *testing.T) {
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("2100m"),
 				v1.ResourceMemory: resource.MustParse("250Mi"),
+			},
+		},
+		{
+			name: "status requests with overhead when pod-level spec is unset",
+			opts: PodResourcesOptions{
+				UseStatusResources: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("10Mi"),
+			},
+			containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+				},
+			},
+			statusRequests: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1100m"),
+					v1.ResourceMemory: resource.MustParse("110Mi"),
+				},
+			},
+			allocated: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2100m"),
+				v1.ResourceMemory: resource.MustParse("210Mi"),
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2100m"),
+				v1.ResourceMemory: resource.MustParse("210Mi"),
 			},
 		},
 	}
@@ -2761,7 +2798,7 @@ func TestPodLevelResourceLimits(t *testing.T) {
 		{
 			name: "status limits include overhead for all pod-level resources",
 			opts: PodResourcesOptions{
-				UseStatusResources:                             true,
+				UseStatusResources: true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
 			podResources: v1.ResourceRequirements{
@@ -2788,7 +2825,7 @@ func TestPodLevelResourceLimits(t *testing.T) {
 		{
 			name: "status limits include overhead for only one pod-level resource",
 			opts: PodResourcesOptions{
-				UseStatusResources:                             true,
+				UseStatusResources: true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
 			podResources: v1.ResourceRequirements{
@@ -2814,7 +2851,7 @@ func TestPodLevelResourceLimits(t *testing.T) {
 		{
 			name: "status limits - spec is highest (2 CPU, 200Mi mem)",
 			opts: PodResourcesOptions{
-				UseStatusResources:                             true,
+				UseStatusResources: true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
 			podResources: v1.ResourceRequirements{
@@ -2841,7 +2878,7 @@ func TestPodLevelResourceLimits(t *testing.T) {
 		{
 			name: "status limits - actual status limits is highest",
 			opts: PodResourcesOptions{
-				UseStatusResources:                             true,
+				UseStatusResources: true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
 			podResources: v1.ResourceRequirements{
@@ -2868,7 +2905,7 @@ func TestPodLevelResourceLimits(t *testing.T) {
 		{
 			name: "status limits - status resources unset",
 			opts: PodResourcesOptions{
-				UseStatusResources:                             true,
+				UseStatusResources: true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
 			podResources: v1.ResourceRequirements{
@@ -2889,7 +2926,7 @@ func TestPodLevelResourceLimits(t *testing.T) {
 		{
 			name: "status limits - allocated is highest (ignored by limits)",
 			opts: PodResourcesOptions{
-				UseStatusResources:                             true,
+				UseStatusResources: true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
 			podResources: v1.ResourceRequirements{
@@ -2920,7 +2957,7 @@ func TestPodLevelResourceLimits(t *testing.T) {
 		{
 			name: "status limits - status.resources nil, status.allocatedResources set",
 			opts: PodResourcesOptions{
-				UseStatusResources:                             true,
+				UseStatusResources: true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
 			podResources: v1.ResourceRequirements{
@@ -2945,7 +2982,7 @@ func TestPodLevelResourceLimits(t *testing.T) {
 		{
 			name: "status limits - infeasible resize",
 			opts: PodResourcesOptions{
-				UseStatusResources:                             true,
+				UseStatusResources: true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
 			podResources: v1.ResourceRequirements{
@@ -2974,6 +3011,39 @@ func TestPodLevelResourceLimits(t *testing.T) {
 			expectedLimits: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("4100m"),
 				v1.ResourceMemory: resource.MustParse("450Mi"),
+			},
+		},
+		{
+			name: "status limits with overhead when pod-level spec is unset",
+			opts: PodResourcesOptions{
+				UseStatusResources: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("10Mi"),
+			},
+			containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+				},
+			},
+			statusResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1100m"),
+					v1.ResourceMemory: resource.MustParse("110Mi"),
+				},
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1100m"),
+				v1.ResourceMemory: resource.MustParse("110Mi"),
 			},
 		},
 	}
