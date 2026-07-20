@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"errors"
 	"fmt"
 	"iter"
 
@@ -103,4 +104,62 @@ func collectConditions(condIter iter.Seq[authorizer.Condition]) []authorizationv
 		})
 	}
 	return conds
+}
+
+// DeserializeEvaluationError extracts the error from an authorizationv1.UnconditionalDecision that could be nil.
+func DeserializeEvaluationError(ud *authorizationv1.UnconditionalDecision) error {
+	if ud == nil || len(ud.EvaluationError) == 0 {
+		return nil
+	}
+	return errors.New(ud.EvaluationError)
+}
+
+// DeserializeReason extracts the reason from an authorizationv1.UnconditionalDecision that could be nil.
+func DeserializeReason(ud *authorizationv1.UnconditionalDecision) string {
+	if ud == nil {
+		return ""
+	}
+	return ud.Reason
+}
+
+// DeserializeConditionsAwareDecision deserializes an authorizationv1.ConditionsAwareDecision into the authorizer types.
+func DeserializeConditionsAwareDecision(serializedDecision authorizationv1.ConditionsAwareDecision, failClosed func(error) authorizer.ConditionsAwareDecision) authorizer.ConditionsAwareDecision {
+	switch serializedDecision.Type {
+	case authorizationv1.ConditionsAwareDecisionTypeAllow:
+		return authorizer.ConditionsAwareDecisionAllow(DeserializeReason(serializedDecision.Allow), DeserializeEvaluationError(serializedDecision.Allow))
+	case authorizationv1.ConditionsAwareDecisionTypeDeny:
+		return authorizer.ConditionsAwareDecisionDeny(DeserializeReason(serializedDecision.Deny), DeserializeEvaluationError(serializedDecision.Deny))
+	case authorizationv1.ConditionsAwareDecisionTypeNoOpinion:
+		return authorizer.ConditionsAwareDecisionNoOpinion(DeserializeReason(serializedDecision.NoOpinion), DeserializeEvaluationError(serializedDecision.NoOpinion))
+	case authorizationv1.ConditionsAwareDecisionTypeConditionsMap:
+		if serializedDecision.ConditionsMap != nil {
+			return authorizer.ConditionsAwareDecisionConditionsMap(
+				deserializeConditions(serializedDecision.ConditionsMap.DenyConditions),
+				deserializeConditions(serializedDecision.ConditionsMap.NoOpinionConditions),
+				deserializeConditions(serializedDecision.ConditionsMap.AllowConditions),
+			)
+		}
+		return authorizer.ConditionsAwareDecisionConditionsMap(nil, nil, nil)
+	case authorizationv1.ConditionsAwareDecisionTypeUnion:
+		chain := authorizer.ConditionsAwareDecisionUnion{}
+		for _, namedDecision := range serializedDecision.Union {
+			chain.Add(namedDecision.AuthorizerName, DeserializeConditionsAwareDecision(namedDecision.Decision, failClosed))
+		}
+		return chain.ToDecision()
+	default:
+		return failClosed(fmt.Errorf("unrecognized ConditionsAwareDecision.type=%q", serializedDecision.Type))
+	}
+}
+
+func deserializeConditions(serializedConditions []authorizationv1.Condition) []authorizer.Condition {
+	deserializedConditions := make([]authorizer.Condition, len(serializedConditions))
+	for i, serialized := range serializedConditions {
+		deserializedConditions[i] = authorizer.GenericCondition{
+			ID:          serialized.ID,
+			Condition:   serialized.Condition,
+			Type:        serialized.Type,
+			Description: serialized.Description,
+		}
+	}
+	return deserializedConditions
 }
