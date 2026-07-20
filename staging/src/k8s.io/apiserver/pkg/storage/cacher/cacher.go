@@ -342,6 +342,7 @@ type Cacher struct {
 	// expiredBookmarkWatchers is a list of watchers that were expired and need to be schedule for a next bookmark event
 	expiredBookmarkWatchers []*cacheWatcher
 	compactor               *compactor
+	watcherMetrics          *metrics.WatcherMetricsObservers
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -414,6 +415,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		clock:            config.Clock,
 		timer:            time.NewTimer(time.Duration(0)),
 		bookmarkWatchers: newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
+		watcherMetrics:   metrics.NewWatcherMetricsObservers(config.GroupResource),
 	}
 
 	// Ensure that timer is stopped.
@@ -596,6 +598,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// given that memory allocation may trigger GC and block the thread.
 	// Also note that emptyFunc is a placeholder, until we will be able
 	// to compute watcher.forget function (which has to happen under lock).
+	auditID, _ := audit.AuditIDFrom(ctx)
 	watcher := newCacheWatcher(
 		chanSize,
 		filterWithAttrsAndPrefixFunction(key, pred, c.groupResource),
@@ -604,7 +607,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		deadline,
 		pred.AllowWatchBookmarks,
 		c.groupResource,
+		c.watcherMetrics,
 		identifier,
+		auditID,
 	)
 
 	// note that c.waitUntilWatchCacheFreshAndForceAllEvents must be called without
@@ -987,6 +992,12 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 	c.startDispatching(event)
 	defer c.finishDispatching()
 	// Watchers stopped after startDispatching will be delayed to finishDispatching,
+
+	dispatchedAt := c.clock.Now()
+	event.WatchCacheDispatchedAt = dispatchedAt.UnixNano()
+	if event.WatchCacheEnqueuedAt > 0 {
+		metrics.WatchCacheQueueDuration.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Observe(dispatchedAt.Sub(time.Unix(0, event.WatchCacheEnqueuedAt)).Seconds())
+	}
 
 	// Since add() can block, we explicitly add when cacher is unlocked.
 	// Dispatching event in nonblocking way first, which make faster watchers
