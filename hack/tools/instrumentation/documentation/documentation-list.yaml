@@ -2966,16 +2966,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: version_info
-  namespace: etcd
-  help: Etcd server's binary version
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - binary_version
-  componentEndpoints:
-  - component: etcd-version-monitor
-    endpoint: /metrics
 - name: field_validation_request_duration_seconds
   help: Response latency distribution in seconds for each field validation value
   type: Histogram
