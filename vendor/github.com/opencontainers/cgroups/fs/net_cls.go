@@ -12,6 +12,12 @@ func (s *NetClsGroup) Name() string {
 	return "net_cls"
 }
 
+// ID returns the controller ID for net_cls subsystem.
+// Returns 0 as net_cls is not a cgroups.Controller.
+func (s *NetClsGroup) ID() cgroups.Controller {
+	return 0
+}
+
 func (s *NetClsGroup) Apply(path string, _ *cgroups.Resources, pid int) error {
 	return apply(path, pid)
 }
