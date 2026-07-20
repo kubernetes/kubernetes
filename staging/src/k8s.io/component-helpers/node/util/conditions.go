@@ -19,12 +19,18 @@ package util
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
+)
+
+const (
+	// NodeShutdownMessage is used by kubelet when reporting that graceful node shutdown is active.
+	NodeShutdownMessage = "node is shutting down"
 )
 
 // GetNodeCondition extracts the provided condition from the given status and returns that.
@@ -39,6 +45,18 @@ func GetNodeCondition(status *v1.NodeStatus, conditionType v1.NodeConditionType)
 		}
 	}
 	return -1, nil
+}
+
+// IsNodeInGracefulShutdown returns true when the NodeReady condition reports graceful node shutdown.
+func IsNodeInGracefulShutdown(node *v1.Node) bool {
+	if node == nil {
+		return false
+	}
+	_, condition := GetNodeCondition(&node.Status, v1.NodeReady)
+	if condition == nil || condition.Status != v1.ConditionFalse {
+		return false
+	}
+	return condition.Reason == NodeShutdownMessage || strings.Contains(condition.Message, NodeShutdownMessage)
 }
 
 // SetNodeCondition updates specific node condition with patch operation.

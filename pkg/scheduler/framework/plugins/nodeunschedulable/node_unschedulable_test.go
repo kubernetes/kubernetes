@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	nodeutil "k8s.io/component-helpers/node/util"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -72,6 +73,23 @@ func TestNodeUnschedulable(t *testing.T) {
 					Unschedulable: true,
 				},
 			},
+		},
+		{
+			name:       "Does not schedule pod to shutting down node",
+			pod:        st.MakePod().Toleration(v1.TaintNodeNotReady).Obj(),
+			node:       st.MakeNode().Name("node").Condition(v1.NodeReady, v1.ConditionFalse, nodeutil.NodeShutdownMessage, "KubeletNotReady").Obj(),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonNodeShutdown),
+		},
+		{
+			name:       "Does not schedule pod to node with shutdown reason",
+			pod:        &v1.Pod{},
+			node:       st.MakeNode().Name("node").Condition(v1.NodeReady, v1.ConditionFalse, "", nodeutil.NodeShutdownMessage).Obj(),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonNodeShutdown),
+		},
+		{
+			name: "Schedule pod to not ready node without shutdown signal",
+			pod:  &v1.Pod{},
+			node: st.MakeNode().Name("node").Condition(v1.NodeReady, v1.ConditionFalse, "runtime error", "KubeletNotReady").Obj(),
 		},
 	}
 
@@ -128,6 +146,17 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 			expectedHint: fwk.QueueSkip,
 		},
 		{
+			name: "skip-queue-on-shutting-down-node-added",
+			pod:  &v1.Pod{},
+			newObj: st.MakeNode().Name("node").Condition(
+				v1.NodeReady,
+				v1.ConditionFalse,
+				nodeutil.NodeShutdownMessage,
+				"KubeletNotReady",
+			).Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
 			name: "queue-on-schedulable-node-added",
 			pod:  &v1.Pod{},
 			newObj: &v1.Node{
@@ -136,6 +165,40 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 				},
 			},
 			expectedHint: fwk.Queue,
+		},
+		{
+			name: "queue-on-shutdown-condition-cleared",
+			pod:  &v1.Pod{},
+			newObj: st.MakeNode().Name("node").Condition(
+				v1.NodeReady,
+				v1.ConditionTrue,
+				"kubelet is posting ready status",
+				"KubeletReady",
+			).Obj(),
+			oldObj: st.MakeNode().Name("node").Condition(
+				v1.NodeReady,
+				v1.ConditionFalse,
+				nodeutil.NodeShutdownMessage,
+				"KubeletNotReady",
+			).Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
+			name: "skip-queue-on-shutdown-condition-set",
+			pod:  &v1.Pod{},
+			newObj: st.MakeNode().Name("node").Condition(
+				v1.NodeReady,
+				v1.ConditionFalse,
+				nodeutil.NodeShutdownMessage,
+				"KubeletNotReady",
+			).Obj(),
+			oldObj: st.MakeNode().Name("node").Condition(
+				v1.NodeReady,
+				v1.ConditionTrue,
+				"kubelet is posting ready status",
+				"KubeletReady",
+			).Obj(),
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "skip-unrelated-change-unschedulable-true",
