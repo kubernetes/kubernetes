@@ -234,6 +234,9 @@ type PodGroupState interface {
 	// AssumedPods returns the UIDs of all pods for this group in the "assumed" state,
 	// i.e., passed the Reserve gate.
 	AssumedPods() sets.Set[types.UID]
+	// AssumedInThisCycleCount returns the number of pods in this group that entered the "assumed" state
+	// in this scheduling cycle.
+	AssumedInThisCycleCount() int
 	// AssignedPods returns the UIDs of all pods already assigned (bound) for this group.
 	AssignedPods() sets.Set[types.UID]
 	// ScheduledPods returns the pods that are either assumed or assigned for this pod group.

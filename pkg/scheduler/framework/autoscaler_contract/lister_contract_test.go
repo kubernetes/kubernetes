@@ -121,6 +121,10 @@ func (c *podGroupStateContract) AssumedPods() sets.Set[types.UID] {
 	return nil
 }
 
+func (c *podGroupStateContract) AssumedInThisCycleCount() int {
+	return 0
+}
+
 func (c *podGroupStateContract) AssignedPods() sets.Set[types.UID] {
 	return nil
 }
