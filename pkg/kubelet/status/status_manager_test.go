@@ -3095,3 +3095,142 @@ func getPodStatus() v1.PodStatus {
 		Message: "Message",
 	}
 }
+
+func TestNeedToReconcilePodReadiness(t *testing.T) {
+	readyContainerStatus := v1.ContainerStatus{
+		Name:  "c1",
+		Ready: true,
+		State: v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+	}
+
+	testCases := []struct {
+		name           string
+		pod            *v1.Pod
+		expectedResult bool
+	}{
+		{
+			name: "no readiness gates",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+				Status: v1.PodStatus{
+					Phase:             v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{readyContainerStatus},
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "readiness gate present but no PodReady condition",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					ReadinessGates: []v1.PodReadinessGate{
+						{ConditionType: v1.PodReady},
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+				Status: v1.PodStatus{
+					Phase:             v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{readyContainerStatus},
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodScheduled,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "readiness gate present and status matches expected",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					ReadinessGates: []v1.PodReadinessGate{
+						{ConditionType: v1.PodReady},
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+				Status: v1.PodStatus{
+					Phase:             v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{readyContainerStatus},
+					Conditions: []v1.PodCondition{
+						{
+							Type:    v1.PodReady,
+							Status:  v1.ConditionTrue,
+							Message: "",
+						},
+						{
+							Type:   v1.PodScheduled,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "readiness gate present and status differs from expected",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					ReadinessGates: []v1.PodReadinessGate{
+						{ConditionType: v1.PodReady},
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+				Status: v1.PodStatus{
+					Phase:             v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{readyContainerStatus},
+					Conditions: []v1.PodCondition{
+						{
+							Type:    v1.PodReady,
+							Status:  v1.ConditionFalse,
+							Reason:  "ReadinessGatesNotReady",
+							Message: "some readiness gate not ready",
+						},
+						{
+							Type:   v1.PodScheduled,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			expectedResult: true,
+		},
+		{
+			name: "readiness gate present and message differs from expected",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					ReadinessGates: []v1.PodReadinessGate{
+						{ConditionType: v1.PodReady},
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+				Status: v1.PodStatus{
+					Phase:             v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{readyContainerStatus},
+					Conditions: []v1.PodCondition{
+						{
+							Type:    v1.PodReady,
+							Status:  v1.ConditionTrue,
+							Message: "wrong message",
+						},
+						{
+							Type:   v1.PodScheduled,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			expectedResult: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := NeedToReconcilePodReadiness(tc.pod)
+			assert.Equal(t, tc.expectedResult, result)
+		})
+	}
+}
