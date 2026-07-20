@@ -49,6 +49,7 @@ import (
 	"k8s.io/client-go/rest"
 	metadata "k8s.io/dynamic-resource-allocation/api/metadata"
 	"k8s.io/dynamic-resource-allocation/devicemetadata"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -1069,6 +1070,63 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			gomega.Eventually(ctx, func(ctx context.Context) (*v1.Pod, error) {
 				return f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 			}).WithTimeout(f.Timeouts.PodStartSlow).Should(gomega.HaveField("Status.ContainerStatuses", gomega.ContainElements(gomega.HaveField("RestartCount", gomega.BeNumerically(">=", 2)))))
+		})
+	})
+
+	f.Context("kubelet", feature.DynamicResourceAllocation, func() {
+		const poolName = "all-nodes-pool"
+
+		nodes := drautils.NewNodes(f, 1, 1)
+		driver := drautils.NewDriver(f, nodes, func(nodes *drautils.Nodes) map[string]resourceslice.DriverResources {
+			return map[string]resourceslice.DriverResources{
+				nodes.NodeNames[0]: {
+					Pools: map[string]resourceslice.Pool{
+						poolName: {
+							AllNodes: true,
+							Slices: []resourceslice.Slice{{
+								Devices: []resourceapi.Device{{Name: "device-00"}},
+							}},
+						},
+					},
+				},
+			}
+		})
+		driver.ReconcilePoolWithName = poolName
+		driver.UsePrivilegedClient = true
+
+		ginkgo.It("reconciles ResourceSlices with ReconcilePoolWithName", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			fieldSelector := fields.Set{
+				resourceapi.ResourceSliceSelectorDriver:   driver.Name,
+				resourceapi.ResourceSliceSelectorPoolName: poolName,
+			}.String()
+			getSlices := framework.ListObjects(f.ClientSet.ResourceV1().ResourceSlices().List, metav1.ListOptions{FieldSelector: fieldSelector})
+			resourceSliceMatcher := gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"Spec": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Driver":   gomega.Equal(driver.Name),
+					"NodeName": gomega.BeNil(),
+					"AllNodes": gomega.Equal(new(true)),
+					"Pool": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"Name":               gomega.Equal(poolName),
+						"ResourceSliceCount": gomega.Equal(int64(1)),
+					}),
+				}),
+			})
+			expectedSlices := gomega.HaveField("Items", gomega.ConsistOf(resourceSliceMatcher))
+			ginkgo.By("waiting for the initial ResourceSlice")
+			tCtx.Eventually(getSlices).Should(expectedSlices)
+
+			slices, err := getSlices(tCtx)
+			tCtx.ExpectNoError(err, "list ResourceSlices for pool %q", poolName)
+			oldSlice := slices.Items[0]
+			err = f.ClientSet.ResourceV1().ResourceSlices().Delete(tCtx, oldSlice.Name, metav1.DeleteOptions{})
+			tCtx.ExpectNoError(err, "delete ResourceSlice %q", oldSlice.Name)
+
+			ginkgo.By("waiting for the recreated ResourceSlice")
+			tCtx.Eventually(getSlices).WithTimeout(50 * time.Second).Should(expectedSlices)
+			slices, err = getSlices(tCtx)
+			tCtx.ExpectNoError(err, "list recreated ResourceSlices for pool %q", poolName)
+			tCtx.Expect(slices.Items[0].UID).ToNot(gomega.Equal(oldSlice.UID), "ResourceSlice must be recreated after deletion")
 		})
 	})
 
