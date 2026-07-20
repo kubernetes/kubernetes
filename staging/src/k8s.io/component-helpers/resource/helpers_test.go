@@ -1692,6 +1692,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 		containers       []v1.Container
 		statusRequests   *v1.ResourceRequirements
 		allocated        v1.ResourceList
+		conditions       []v1.PodCondition
 		expectedRequests v1.ResourceList
 	}{
 		{
@@ -2102,37 +2103,6 @@ func TestPodLevelResourceRequests(t *testing.T) {
 			},
 		},
 		{
-			name: "status resources without overhead still receive overhead",
-			opts: PodResourcesOptions{
-				UseStatusResources: true,
-				InPlacePodLevelResourcesVerticalScalingEnabled: true,
-			},
-			podResources: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceCPU:    resource.MustParse("1"),
-					v1.ResourceMemory: resource.MustParse("100Mi"),
-				},
-			},
-			overhead: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("100m"),
-				v1.ResourceMemory: resource.MustParse("10Mi"),
-			},
-			statusRequests: &v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceCPU:    resource.MustParse("1"),
-					v1.ResourceMemory: resource.MustParse("100Mi"),
-				},
-			},
-			allocated: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("1"),
-				v1.ResourceMemory: resource.MustParse("100Mi"),
-			},
-			expectedRequests: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("1100m"),
-				v1.ResourceMemory: resource.MustParse("110Mi"),
-			},
-		},
-		{
 			name: "allocated resources include overhead when status requests do not",
 			opts: PodResourcesOptions{
 				UseStatusResources: true,
@@ -2194,6 +2164,183 @@ func TestPodLevelResourceRequests(t *testing.T) {
 				v1.ResourceMemory: resource.MustParse("110Mi"),
 			},
 		},
+		{
+			name: "status requests - spec is highest (2 CPU, 200Mi mem)",
+			opts: PodResourcesOptions{
+				UseStatusResources:                             true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("50Mi"),
+			},
+			statusRequests: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1100m"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			allocated: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1100m"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2100m"),
+				v1.ResourceMemory: resource.MustParse("250Mi"),
+			},
+		},
+		{
+			name: "status requests - allocated is highest",
+			opts: PodResourcesOptions{
+				UseStatusResources:                             true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("50Mi"),
+			},
+			statusRequests: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2100m"),
+					v1.ResourceMemory: resource.MustParse("250Mi"),
+				},
+			},
+			allocated: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("3100m"),
+				v1.ResourceMemory: resource.MustParse("350Mi"),
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("3100m"),
+				v1.ResourceMemory: resource.MustParse("350Mi"),
+			},
+		},
+		{
+			name: "status requests - actual status requests is highest",
+			opts: PodResourcesOptions{
+				UseStatusResources:                             true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("50Mi"),
+			},
+			statusRequests: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("4100m"),
+					v1.ResourceMemory: resource.MustParse("450Mi"),
+				},
+			},
+			allocated: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2100m"),
+				v1.ResourceMemory: resource.MustParse("250Mi"),
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("4100m"),
+				v1.ResourceMemory: resource.MustParse("450Mi"),
+			},
+		},
+		{
+			name: "status requests - status resources unset",
+			opts: PodResourcesOptions{
+				UseStatusResources:                             true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("50Mi"),
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2100m"),
+				v1.ResourceMemory: resource.MustParse("250Mi"),
+			},
+		},
+		{
+			name: "status requests - status.resources nil, status.allocatedResources set",
+			opts: PodResourcesOptions{
+				UseStatusResources:                             true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("50Mi"),
+			},
+			allocated: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("3100m"),
+				v1.ResourceMemory: resource.MustParse("350Mi"),
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("3100m"),
+				v1.ResourceMemory: resource.MustParse("350Mi"),
+			},
+		},
+		{
+			name: "status requests - infeasible resize",
+			opts: PodResourcesOptions{
+				UseStatusResources:                             true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("10"),
+					v1.ResourceMemory: resource.MustParse("1000Mi"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("50Mi"),
+			},
+			statusRequests: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2100m"),
+					v1.ResourceMemory: resource.MustParse("250Mi"),
+				},
+			},
+			allocated: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2100m"),
+				v1.ResourceMemory: resource.MustParse("250Mi"),
+			},
+			conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodResizePending,
+					Status: v1.ConditionTrue,
+					Reason: v1.PodReasonInfeasible,
+				},
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2100m"),
+				v1.ResourceMemory: resource.MustParse("250Mi"),
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2204,9 +2351,586 @@ func TestPodLevelResourceRequests(t *testing.T) {
 			if tc.allocated != nil {
 				pod.Status.AllocatedResources = tc.allocated
 			}
+			if len(tc.conditions) > 0 {
+				pod.Status.Conditions = tc.conditions
+			}
 			podReqs := PodRequests(pod, tc.opts)
 			if !equality.Semantic.DeepEqual(podReqs, tc.expectedRequests) {
 				t.Errorf("got=%v, want=%v, diff=%s", podReqs, tc.expectedRequests, diff.Diff(podReqs, tc.expectedRequests))
+			}
+		})
+	}
+}
+
+func TestPodLevelResourceLimits(t *testing.T) {
+	restartAlways := v1.ContainerRestartPolicyAlways
+	testCases := []struct {
+		name            string
+		opts            PodResourcesOptions
+		podResources    v1.ResourceRequirements
+		overhead        v1.ResourceList
+		initContainers  []v1.Container
+		containers      []v1.Container
+		statusResources *v1.ResourceRequirements
+		allocated       v1.ResourceList
+		conditions      []v1.PodCondition
+		expectedLimits  v1.ResourceList
+	}{
+		{
+			name:           "nil",
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			name:           "pod level memory resource limit with SkipPodLevelResources true",
+			podResources:   v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Mi")}},
+			opts:           PodResourcesOptions{SkipPodLevelResources: true},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			name:           "pod level memory resource limit with SkipPodLevelResources false",
+			podResources:   v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Mi")}},
+			opts:           PodResourcesOptions{SkipPodLevelResources: false},
+			expectedLimits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Mi")},
+		},
+		{
+			name:         "pod level memory and container level cpu resource limits with SkipPodLevelResources false",
+			podResources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Mi")}},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2m")}},
+				},
+			},
+			opts:           PodResourcesOptions{SkipPodLevelResources: false},
+			expectedLimits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Mi"), v1.ResourceCPU: resource.MustParse("2m")},
+		},
+		{
+			name:         "pod level unsupported resource limits set at both pod-level and container-level with SkipPodLevelResources false",
+			podResources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceStorage: resource.MustParse("3Mi")}},
+				},
+			},
+			opts:           PodResourcesOptions{SkipPodLevelResources: false},
+			expectedLimits: v1.ResourceList{v1.ResourceStorage: resource.MustParse("3Mi")},
+		},
+		{
+			name:         "pod level unsupported resource limits set at pod-level with SkipPodLevelResources false",
+			podResources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("3Mi")}},
+				},
+			},
+			opts:           PodResourcesOptions{SkipPodLevelResources: false},
+			expectedLimits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("3Mi")},
+		},
+		{
+			name: "only container level resource limits set with SkipPodLevelResources false",
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("3Mi"),
+							v1.ResourceCPU:    resource.MustParse("2m"),
+						},
+					},
+				},
+			},
+			opts:           PodResourcesOptions{SkipPodLevelResources: false},
+			expectedLimits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("3Mi"), v1.ResourceCPU: resource.MustParse("2m")},
+		},
+		{
+			name: "both container-level and pod-level resource limits set with SkipPodLevelResources false",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("6Mi"),
+					v1.ResourceCPU:    resource.MustParse("8m"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("3Mi"),
+							v1.ResourceCPU:    resource.MustParse("2m"),
+						},
+					},
+				},
+			},
+			opts:           PodResourcesOptions{SkipPodLevelResources: false},
+			expectedLimits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("6Mi"), v1.ResourceCPU: resource.MustParse("8m")},
+		},
+		{
+			name: "container-level resource limits and init container set with SkipPodLevelResources false",
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("3Mi"),
+							v1.ResourceCPU:    resource.MustParse("2m"),
+						},
+					},
+				},
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("5Mi"),
+							v1.ResourceCPU:    resource.MustParse("4m"),
+						},
+					},
+				},
+			},
+			opts:           PodResourcesOptions{SkipPodLevelResources: false},
+			expectedLimits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("5Mi"), v1.ResourceCPU: resource.MustParse("4m")},
+		},
+		{
+			name: "container-level resource limits and init container set with SkipPodLevelResources true",
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("3Mi"),
+							v1.ResourceCPU:    resource.MustParse("2m"),
+						},
+					},
+				},
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("5Mi"),
+							v1.ResourceCPU:    resource.MustParse("4m"),
+						},
+					},
+				},
+			},
+			opts:           PodResourcesOptions{SkipPodLevelResources: true},
+			expectedLimits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("5Mi"), v1.ResourceCPU: resource.MustParse("4m")},
+		},
+		{
+			name: "container-level resource limits and sidecar container set with SkipPodLevelResources false",
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("3Mi"),
+							v1.ResourceCPU:    resource.MustParse("2m"),
+						},
+					},
+				},
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("5Mi"),
+							v1.ResourceCPU:    resource.MustParse("4m"),
+						},
+					},
+					RestartPolicy: &restartAlways,
+				},
+			},
+			opts:           PodResourcesOptions{SkipPodLevelResources: false},
+			expectedLimits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("8Mi"), v1.ResourceCPU: resource.MustParse("6m")},
+		},
+		{
+			name: "container-level resource limits, init and sidecar container set with SkipPodLevelResources false",
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("3Mi"),
+							v1.ResourceCPU:    resource.MustParse("2m"),
+						},
+					},
+				},
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("5Mi"),
+							v1.ResourceCPU:    resource.MustParse("4m"),
+						},
+					},
+					RestartPolicy: &restartAlways,
+				},
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("6Mi"),
+							v1.ResourceCPU:    resource.MustParse("8m"),
+						},
+					},
+				},
+			},
+			opts:           PodResourcesOptions{SkipPodLevelResources: false},
+			expectedLimits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("11Mi"), v1.ResourceCPU: resource.MustParse("12m")},
+		},
+		{
+			name: "pod-level resource limits, container-level limits, init and sidecar container set with SkipPodLevelResources false",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("15Mi"),
+					v1.ResourceCPU:    resource.MustParse("18m"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("3Mi"),
+							v1.ResourceCPU:    resource.MustParse("2m"),
+						},
+					},
+				},
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("5Mi"),
+							v1.ResourceCPU:    resource.MustParse("4m"),
+						},
+					},
+					RestartPolicy: &restartAlways,
+				},
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("6Mi"),
+							v1.ResourceCPU:    resource.MustParse("8m"),
+						},
+					},
+				},
+			},
+			opts:           PodResourcesOptions{SkipPodLevelResources: false},
+			expectedLimits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("15Mi"), v1.ResourceCPU: resource.MustParse("18m")},
+		},
+		{
+			name: "pod-level resource limits, hugepage limit single page size",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory:                  resource.MustParse("10Mi"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+				},
+			},
+			opts:           PodResourcesOptions{SkipPodLevelResources: false},
+			expectedLimits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("10Mi"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi")},
+		},
+		{
+			name: "pod-level resource limits, hugepage limit multiple page sizes",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:                     resource.MustParse("1"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+					v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
+				},
+			},
+			opts:           PodResourcesOptions{SkipPodLevelResources: false},
+			expectedLimits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"), v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi")},
+		},
+		{
+			name: "pod-level resource limits, container-level limits, hugepage limit single page size",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:                     resource.MustParse("1"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("6Mi"),
+						},
+					},
+				},
+			},
+			opts:           PodResourcesOptions{SkipPodLevelResources: false},
+			expectedLimits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi")},
+		},
+		{
+			name: "pod-level resource limits, container-level limits, hugepage limit multiple page sizes",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:                     resource.MustParse("1"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+					v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:                     resource.MustParse("1"),
+							v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+			opts:           PodResourcesOptions{SkipPodLevelResources: false},
+			expectedLimits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"), v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi")},
+		},
+		{
+			name: "pod-level resource limits, container-level limits, hugepage limit multiple page sizes between pod-level and container-level",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:                     resource.MustParse("1"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory:                  resource.MustParse("4Mi"),
+							v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			opts:           PodResourcesOptions{SkipPodLevelResources: false},
+			expectedLimits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("4Mi"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"), v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi")},
+		},
+		{
+			name: "status limits include overhead for all pod-level resources",
+			opts: PodResourcesOptions{
+				UseStatusResources:                             true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("10Mi"),
+			},
+			statusResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1100m"),
+					v1.ResourceMemory: resource.MustParse("110Mi"),
+				},
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1100m"),
+				v1.ResourceMemory: resource.MustParse("110Mi"),
+			},
+		},
+		{
+			name: "status limits include overhead for only one pod-level resource",
+			opts: PodResourcesOptions{
+				UseStatusResources:                             true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("10Mi"),
+			},
+			statusResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("1100m"),
+				},
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1100m"),
+				v1.ResourceMemory: resource.MustParse("110Mi"),
+			},
+		},
+		{
+			name: "status limits - spec is highest (2 CPU, 200Mi mem)",
+			opts: PodResourcesOptions{
+				UseStatusResources:                             true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("50Mi"),
+			},
+			statusResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1100m"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2100m"),
+				v1.ResourceMemory: resource.MustParse("250Mi"),
+			},
+		},
+		{
+			name: "status limits - actual status limits is highest",
+			opts: PodResourcesOptions{
+				UseStatusResources:                             true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("50Mi"),
+			},
+			statusResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("3100m"),
+					v1.ResourceMemory: resource.MustParse("350Mi"),
+				},
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("3100m"),
+				v1.ResourceMemory: resource.MustParse("350Mi"),
+			},
+		},
+		{
+			name: "status limits - status resources unset",
+			opts: PodResourcesOptions{
+				UseStatusResources:                             true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("50Mi"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2100m"),
+				v1.ResourceMemory: resource.MustParse("250Mi"),
+			},
+		},
+		{
+			name: "status limits - allocated is highest (ignored by limits)",
+			opts: PodResourcesOptions{
+				UseStatusResources:                             true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("50Mi"),
+			},
+			statusResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2100m"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			allocated: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("5100m"),
+				v1.ResourceMemory: resource.MustParse("500Mi"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2100m"),
+				v1.ResourceMemory: resource.MustParse("200Mi"),
+			},
+		},
+		{
+			name: "status limits - status.resources nil, status.allocatedResources set",
+			opts: PodResourcesOptions{
+				UseStatusResources:                             true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("4"),
+					v1.ResourceMemory: resource.MustParse("400Mi"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("50Mi"),
+			},
+			allocated: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("3100m"),
+				v1.ResourceMemory: resource.MustParse("350Mi"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("4100m"),
+				v1.ResourceMemory: resource.MustParse("450Mi"),
+			},
+		},
+		{
+			name: "status limits - infeasible resize",
+			opts: PodResourcesOptions{
+				UseStatusResources:                             true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("10"),
+					v1.ResourceMemory: resource.MustParse("1000Mi"),
+				},
+			},
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("50Mi"),
+			},
+			statusResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("4100m"),
+					v1.ResourceMemory: resource.MustParse("450Mi"),
+				},
+			},
+			conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodResizePending,
+					Status: v1.ConditionTrue,
+					Reason: v1.PodReasonInfeasible,
+				},
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("4100m"),
+				v1.ResourceMemory: resource.MustParse("450Mi"),
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := getPodLevelResourcesPod(tc.podResources, tc.overhead, tc.containers, tc.initContainers)
+			if tc.statusResources != nil {
+				pod.Status.Resources = tc.statusResources
+			}
+			if tc.allocated != nil {
+				pod.Status.AllocatedResources = tc.allocated
+			}
+			if len(tc.conditions) > 0 {
+				pod.Status.Conditions = tc.conditions
+			}
+			podLimits := PodLimits(pod, tc.opts)
+			if !equality.Semantic.DeepEqual(podLimits, tc.expectedLimits) {
+				t.Errorf("got=%v, want=%v, diff=%s", podLimits, tc.expectedLimits, diff.Diff(podLimits, tc.expectedLimits))
 			}
 		})
 	}

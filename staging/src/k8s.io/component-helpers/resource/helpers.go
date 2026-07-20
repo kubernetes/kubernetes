@@ -158,14 +158,10 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && (pod.Status.Resources != nil || pod.Status.AllocatedResources != nil) {
 			var statusRequests, allocatedRequests v1.ResourceList
 			if pod.Status.Resources != nil {
-				statusRequests = pod.Status.Resources.Requests.DeepCopy()
+				statusRequests = subtractResourceList(pod.Status.Resources.Requests, pod.Spec.Overhead)
 			}
 			if pod.Status.AllocatedResources != nil {
-				allocatedRequests = pod.Status.AllocatedResources.DeepCopy()
-			}
-			if pod.Spec.Overhead != nil {
-				subtractResourceList(statusRequests, pod.Spec.Overhead)
-				subtractResourceList(allocatedRequests, pod.Spec.Overhead)
+				allocatedRequests = subtractResourceList(pod.Status.AllocatedResources, pod.Spec.Overhead)
 			}
 			effectiveReqs = effectivePodLevelResources(pod, pod.Spec.Resources.Requests, statusRequests, allocatedRequests)
 		}
@@ -402,13 +398,7 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	if !opts.SkipPodLevelResources && IsPodLevelResourcesSet(pod) {
 		effectiveLims := pod.Spec.Resources.Limits
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && pod.Status.Resources != nil {
-			var statusLimits v1.ResourceList
-			if pod.Status.Resources.Limits != nil {
-				statusLimits = pod.Status.Resources.Limits.DeepCopy()
-			}
-			if pod.Spec.Overhead != nil {
-				subtractResourceList(statusLimits, pod.Spec.Overhead)
-			}
+			statusLimits := subtractResourceList(pod.Status.Resources.Limits, pod.Spec.Overhead)
 			effectiveLims = effectivePodLevelResources(pod, pod.Spec.Resources.Limits, statusLimits)
 		}
 		applyPodLevelResources(limits, effectiveLims)
@@ -473,18 +463,23 @@ func addResourceList(list, newList v1.ResourceList) {
 	}
 }
 
-// subtractResourceList subtracts the resources in newList from list.
-// If the subtraction results in a value less than zero, it sets it to zero.
-func subtractResourceList(list, newList v1.ResourceList) {
+// subtractResourceList returns a copy of list with the resources in newList subtracted.
+// If list is nil, it returns nil. If subtraction results in a value less than zero, it sets it to zero.
+func subtractResourceList(list, newList v1.ResourceList) v1.ResourceList {
+	if list == nil {
+		return nil
+	}
+	result := list.DeepCopy()
 	for name, quantity := range newList {
-		if value, ok := list[name]; ok {
+		if value, ok := result[name]; ok {
 			value.Sub(quantity)
 			if value.Sign() < 0 {
 				value.Set(0)
 			}
-			list[name] = value
+			result[name] = value
 		}
 	}
+	return result
 }
 
 // maxResourceList sets list to the greater of list/newList for every resource in newList
