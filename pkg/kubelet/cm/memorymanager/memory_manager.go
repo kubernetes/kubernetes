@@ -165,7 +165,15 @@ func NewManager(logger klog.Logger, policyName string, machineInfo *cadvisorapi.
 			if err != nil {
 				return nil, err
 			}
-			policy, err = NewPolicyBestEffort(logger, machineInfo, systemReserved, affinity)
+			// The Windows BestEffort policy follows the CPU manager's NUMA
+			// decision, which it reads through the affinity Store. That requires
+			// the richer AuthoritativeStore interface (implemented by the Windows
+			// cpuFollowingStore); a plain Store is not sufficient.
+			authStore, ok := affinity.(topologymanager.AuthoritativeStore)
+			if !ok {
+				return nil, fmt.Errorf("policy %q requires an AuthoritativeStore affinity", policyTypeBestEffort)
+			}
+			policy, err = NewPolicyBestEffort(logger, machineInfo, systemReserved, authStore)
 			if err != nil {
 				return nil, err
 			}

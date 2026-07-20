@@ -171,6 +171,15 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 		cm.topologyManager.AddHintProvider(logger, cm.cpuManager)
 
 		logger.Info("Creating memory manager")
+		// On Windows memory affinity is best-effort and there is no cpuset.mems
+		// equivalent to pin memory to a NUMA node directly. We choose to have
+		// memory placement follow the CPU manager's NUMA decision as a best-effort
+		// design. Wrap the topology manager store so the memory manager's
+		// GetAffinity returns the NUMA nodes of the container's exclusive CPUs.
+		// This relies on the CPU manager already being registered as a hint
+		// provider above, so its Allocate runs first and its CPUs are committed by
+		// the time the memory manager reads the affinity.
+		memoryAffinity := newCPUFollowingStore(cm.topologyManager, cm.cpuManager, machineInfo)
 		cm.memoryManager, err = memorymanager.NewManager(
 			logger,
 			nodeConfig.MemoryManagerPolicy,
@@ -178,7 +187,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 			cm.GetNodeAllocatableReservation(),
 			nodeConfig.MemoryManagerReservedMemory,
 			nodeConfig.KubeletRootDir,
-			cm.topologyManager,
+			memoryAffinity,
 		)
 		if err != nil {
 			logger.Error(err, "Failed to initialize memory manager")

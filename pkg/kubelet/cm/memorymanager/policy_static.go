@@ -60,6 +60,15 @@ type staticPolicy struct {
 	// Note that the restartable init container memory is not included here,
 	// because it is not reusable.
 	initContainersReusableMemory reusableMemory
+	// skipExtend, when true, disables extending the Topology Manager hint to
+	// additional NUMA nodes even when the hint does not, by itself, satisfy the
+	// container's memory request. The Linux static policy always leaves it false.
+	// It is set per container by the Windows BestEffort policy (see
+	// policy_best_effort.go) when the container follows the CPU manager's NUMA
+	// decision: Windows has no cpuset.mems, so memory placement follows CPU
+	// affinity and the hint must not be widened beyond the CPU manager's
+	// exclusive-CPU nodes.
+	skipExtend bool
 }
 
 var _ Policy = &staticPolicy{}
@@ -489,8 +498,11 @@ func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod,
 	}
 
 	// topology manager returns the hint that does not satisfy completely the container request
-	// we should extend this hint to the one who will satisfy the request and include the current hint
-	if !isAffinitySatisfyRequest(machineState, bestHint.NUMANodeAffinity, requestedResources) {
+	// we should extend this hint to the one who will satisfy the request and include the current hint,
+	// unless skipExtend is set. skipExtend is set per container by the Windows BestEffort policy when
+	// the container follows the CPU manager's NUMA decision (see policy_best_effort.go); the Linux
+	// static policy never sets it, so the hint is extended as usual.
+	if !isAffinitySatisfyRequest(machineState, bestHint.NUMANodeAffinity, requestedResources) && !p.skipExtend {
 		extendedHint, err := p.extendTopologyManagerHint(machineState, pod, requestedResources, bestHint.NUMANodeAffinity)
 		if err != nil {
 			return err
