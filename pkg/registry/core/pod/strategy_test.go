@@ -752,7 +752,7 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			wantLimits:   getResourceList("500m", "512Mi"),
 		},
 		{
-			name:                "feature gate PodLevelResourcesFixUpdateDefaulting off - no limit defaulting",
+			name:                "feature gate PodLevelResourcesFixDefaulting off - no limit defaulting",
 			plrEnabled:          true,
 			plrFixUpdateEnabled: false,
 			pod: &api.Pod{
@@ -823,9 +823,9 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.plrEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, tc.plrFixUpdateEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixDefaulting, tc.plrFixUpdateEnabled)
 
-			applyPodLevelResourceDefaults(tc.pod)
+			podutil.DefaultPodLevelResources(tc.pod)
 
 			if len(tc.wantRequests) == 0 {
 				if tc.pod.Spec.Resources != nil && len(tc.pod.Spec.Resources.Requests) > 0 {
@@ -870,11 +870,20 @@ func TestPrepareForUpdatePodLevelResources(t *testing.T) {
 		wantLimits    api.ResourceList
 	}{
 		{
-			name:         "client omits spec.resources on update (nil) - leaves nil for validation",
+			name:         "client omits spec.resources on update (nil) for non-resize strategy - preserves old PLR",
 			useResize:    false,
 			oldResources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi"), Limits: getResourceList("200m", "256Mi")},
 			newResources: nil,
-			wantNil:      true,
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   getResourceList("200m", "256Mi"),
+		},
+		{
+			name:         "client omits spec.resources on resize update (nil) - preserves old PLR",
+			useResize:    true,
+			oldResources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi"), Limits: getResourceList("200m", "256Mi")},
+			newResources: nil,
+			wantRequests: getResourceList("200m", "256Mi"),
+			wantLimits:   getResourceList("200m", "256Mi"),
 		},
 		{
 			name:         "PLR-aware client explicitly updates spec.resources",
@@ -907,15 +916,15 @@ func TestPrepareForUpdatePodLevelResources(t *testing.T) {
 			wantLimits:   getResourceList("200m", "256Mi"),
 		},
 		{
-			name:         "scenario 3: old pod has memory set, new pod sets cpu",
+			name:         "scenario 3: old pod has memory set, new pod sets cpu (no merging old memory, defaults from container)",
 			useResize:    true,
 			oldResources: &api.ResourceRequirements{Requests: getResourceList("", "256Mi")},
 			newResources: &api.ResourceRequirements{Requests: getResourceList("100m", "")},
-			wantRequests: getResourceList("100m", "256Mi"),
+			wantRequests: getResourceList("100m", "128Mi"),
 			wantLimits:   getResourceList("200m", "256Mi"),
 		},
 		{
-			name:         "scenario 4: old pod had memory set only, container-level cpu added on update - cpu pod-level defaults applied",
+			name:         "scenario 4: new pod specifies empty resources - no PLR defaulted",
 			useResize:    true,
 			oldResources: &api.ResourceRequirements{Requests: getResourceList("", "256Mi")},
 			newResources: &api.ResourceRequirements{},
@@ -925,16 +934,16 @@ func TestPrepareForUpdatePodLevelResources(t *testing.T) {
 			newContainers: []api.Container{
 				newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
 			},
-			wantRequests: getResourceList("100m", "256Mi"),
-			wantLimits:   getResourceList("200m", "256Mi"),
+			wantRequests: nil,
+			wantLimits:   nil,
 		},
 		{
-			name:         "resize: old pod already has pod-level resources - skips defaulting and merges",
+			name:         "resize: old pod already has pod-level resources - new resources defaulted",
 			useResize:    true,
 			oldResources: &api.ResourceRequirements{Requests: getResourceList("200m", "256Mi"), Limits: getResourceList("200m", "256Mi")},
 			newResources: &api.ResourceRequirements{Requests: getResourceList("300m", "300Mi")},
 			wantRequests: getResourceList("300m", "300Mi"),
-			wantLimits:   getResourceList("200m", "256Mi"),
+			wantLimits:   getResourceList("300m", "300Mi"),
 		},
 		{
 			name:         "resize: old pod had pod-level CPU only, container memory present - defaults missing pod-level memory",
@@ -1004,7 +1013,7 @@ func TestPrepareForUpdatePodLevelResources(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixUpdateDefaulting, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixDefaulting, true)
 
 			defaultContainers := []api.Container{
 				newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
@@ -1046,67 +1055,6 @@ func TestPrepareForUpdatePodLevelResources(t *testing.T) {
 			}
 
 			if diff := cmp.Diff(tc.wantLimits, newPod.Spec.Resources.Limits); diff != "" {
-				t.Errorf("unexpected limits (-want, +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-// TestMergePodLevelResourcesDirect tests podutil.MergePodLevelResources directly.
-func TestMergePodLevelResourcesDirect(t *testing.T) {
-	tests := []struct {
-		name         string
-		newRes       *api.ResourceRequirements
-		oldRes       *api.ResourceRequirements
-		wantNil      bool
-		wantRequests api.ResourceList
-		wantLimits   api.ResourceList
-	}{
-		{
-			name:    "newRes is nil returns nil",
-			newRes:  nil,
-			oldRes:  &api.ResourceRequirements{Requests: getResourceList("100m", "128Mi")},
-			wantNil: true,
-		},
-		{
-			name:         "oldRes is nil returns deep copy of newRes",
-			newRes:       &api.ResourceRequirements{Requests: getResourceList("100m", "128Mi")},
-			oldRes:       nil,
-			wantRequests: getResourceList("100m", "128Mi"),
-			wantLimits:   nil,
-		},
-		{
-			name:         "merge newRes (cpu: 100m) and oldRes (memory: 256Mi)",
-			newRes:       &api.ResourceRequirements{Requests: getResourceList("100m", "")},
-			oldRes:       &api.ResourceRequirements{Requests: getResourceList("", "256Mi")},
-			wantRequests: getResourceList("100m", "256Mi"),
-			wantLimits:   nil,
-		},
-		{
-			name:         "merge preserves existing limits when patch only specifies requests",
-			newRes:       &api.ResourceRequirements{Requests: getResourceList("200m", "")},
-			oldRes:       &api.ResourceRequirements{Requests: getResourceList("100m", "128Mi"), Limits: getResourceList("500m", "512Mi")},
-			wantRequests: getResourceList("200m", "128Mi"),
-			wantLimits:   getResourceList("500m", "512Mi"),
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := podutil.MergePodLevelResources(tc.newRes, tc.oldRes)
-			if tc.wantNil {
-				if got != nil {
-					t.Errorf("expected nil, got %v", got)
-				}
-				return
-			}
-			if got == nil {
-				t.Fatalf("expected non-nil merged resources")
-			}
-			if diff := cmp.Diff(tc.wantRequests, got.Requests); diff != "" {
-				t.Errorf("unexpected requests (-want, +got):\n%s", diff)
-			}
-			if diff := cmp.Diff(tc.wantLimits, got.Limits); diff != "" {
 				t.Errorf("unexpected limits (-want, +got):\n%s", diff)
 			}
 		})

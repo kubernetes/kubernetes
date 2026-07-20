@@ -197,11 +197,11 @@ func SetDefaults_Pod(obj *v1.Pod) {
 	}
 
 	// Pod Requests default values must be applied after container-level default values
-	// have been populated. When PodLevelResourcesFixUpdateDefaulting is enabled, this
+	// have been populated. When PodLevelResourcesFixDefaulting is enabled, this
 	// defaulting is deferred to PrepareForCreate so it runs after admission webhooks
 	// have injected all containers, giving a complete view of the pod.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
 		defaultHugePagePodLimits(obj)
 		defaultPodRequests(obj)
 	}
@@ -523,7 +523,7 @@ func SetDefaults_PodLogOptions(obj *v1.PodLogOptions) {
 // This defaulting behavior ensures consistent resource accounting at the pod-level
 // while maintaining compatibility with the container-level specifications, as detailed
 // in KEP-2837: https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#proposed-validation--defaulting-rules
-// TODO(ndixita): Remove defaultPodRequests once PodLevelResourcesFixUpdateDefaulting feature gate is GA.
+// TODO(ndixita): Remove defaultPodRequests once PodLevelResourcesFixDefaulting feature gate is GA.
 func defaultPodRequests(obj *v1.Pod) {
 	// We only populate defaults when the pod-level resources are partly specified already.
 	if obj.Spec.Resources == nil {
@@ -577,7 +577,7 @@ func defaultPodRequests(obj *v1.Pod) {
 // limits set:
 // The pod-level limit becomes equal to the aggregated hugepages limit of all
 // the containers in the pod.
-// TODO(ndixita): Remove defaultHugePagePodLimits once PodLevelResourcesFixUpdateDefaulting feature gate is GA.
+// TODO(ndixita): Remove defaultHugePagePodLimits once PodLevelResourcesFixDefaulting feature gate is GA.
 func defaultHugePagePodLimits(pod *v1.Pod) {
 	// We only populate hugepage limit defaults when the pod-level resources are partly specified.
 	if pod.Spec.Resources == nil {

@@ -1966,9 +1966,48 @@ func hasRestartContainerForNonSidecarInitContainer(spec *api.PodSpec) bool {
 	return false
 }
 
-// DefaultHugePagePodLevelLimits applies default values for pod-level hugepage limits,
+// DefaultPodLevelResources runs all pod-level resource defaulting in dependency order,
+// converting container specs to v1.PodSpec once to avoid redundant conversions.
+//
+// Order matters:
+//  1. Set pod-level hugepage limits from aggregated container hugepage limits.
+//  2. Default pod-level requests from aggregated container requests (also fills requests
+//     for any resource that has a pod-level limit but no pod-level request, including
+//     hugepage limits set in step 1).
+//  3. Default pod-level limits to max(pod-level requests, aggregated container limits)
+//     for resources where all containers have limits. Step 2 must run first so that
+//     pod-level requests are complete before the max() comparison.
+func DefaultPodLevelResources(pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
+		return
+	}
+	if pod.Spec.Resources == nil {
+		return
+	}
+	if len(pod.Spec.Resources.Requests) == 0 && len(pod.Spec.Resources.Limits) == 0 {
+		return
+	}
+
+	v1PodSpec := &apiv1.PodSpec{}
+	// Ephemeral containers are excluded here as they cannot specify resources and do not contribute
+	// to QoS or pod-level resource defaulting. If this changes, this location may need to be updated.
+	if err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&api.PodSpec{
+		Containers:     pod.Spec.Containers,
+		InitContainers: pod.Spec.InitContainers,
+	}, v1PodSpec, nil); err != nil {
+		return
+	}
+	v1Pod := &apiv1.Pod{Spec: *v1PodSpec}
+
+	defaultHugePagePodLevelLimits(pod, v1Pod)
+	defaultPodLevelRequests(pod, v1Pod)
+	defaultPodLevelLimits(pod, v1Pod)
+}
+
+// defaultHugePagePodLevelLimits applies default values for pod-level hugepage limits,
 // setting pod-level hugepage limit equal to aggregated container limits if not specified.
-func DefaultHugePagePodLevelLimits(pod *api.Pod) {
+func defaultHugePagePodLevelLimits(pod *api.Pod, v1Pod *apiv1.Pod) {
 	if pod.Spec.Resources == nil {
 		return
 	}
@@ -1981,17 +2020,10 @@ func DefaultHugePagePodLevelLimits(pod *api.Pod) {
 		podLims = make(api.ResourceList)
 	}
 
-	v1PodSpec := &apiv1.PodSpec{}
-	if err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&api.PodSpec{
-		Containers:     pod.Spec.Containers,
-		InitContainers: pod.Spec.InitContainers,
-	}, v1PodSpec, nil); err != nil {
-		return
-	}
-
-	aggrCtrLims := resourcehelper.AggregateContainerLimits(&apiv1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
+	aggrCtrLims := resourcehelper.AggregateContainerLimits(v1Pod, resourcehelper.PodResourcesOptions{})
 	for key, aggrCtrLim := range aggrCtrLims {
 		coreKey := api.ResourceName(key)
+		// Only default hugepages here; non-hugepage resources (CPU/Memory) are overcommittable and defaulted in subsequent steps.
 		if !resourcehelper.IsSupportedPodLevelResource(key) || !helper.IsHugePageResourceName(coreKey) {
 			continue
 		}
@@ -2001,7 +2033,7 @@ func DefaultHugePagePodLevelLimits(pod *api.Pod) {
 		}
 
 		if _, exists := podLims[coreKey]; !exists {
-			podLims[coreKey] = aggrCtrLim.DeepCopy()
+			podLims[coreKey] = aggrCtrLim
 		}
 	}
 
@@ -2010,9 +2042,9 @@ func DefaultHugePagePodLevelLimits(pod *api.Pod) {
 	}
 }
 
-// DefaultPodLevelRequests applies default values for pod-level requests from aggregated container
+// defaultPodLevelRequests applies default values for pod-level requests from aggregated container
 // requests (for overcommittable resources) and pod-level limits.
-func DefaultPodLevelRequests(pod *api.Pod) {
+func defaultPodLevelRequests(pod *api.Pod, v1Pod *apiv1.Pod) {
 	if pod.Spec.Resources == nil {
 		return
 	}
@@ -2025,17 +2057,11 @@ func DefaultPodLevelRequests(pod *api.Pod) {
 		podReqs = make(api.ResourceList)
 	}
 
-	v1PodSpec := &apiv1.PodSpec{}
-	if err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&api.PodSpec{
-		Containers:     pod.Spec.Containers,
-		InitContainers: pod.Spec.InitContainers,
-	}, v1PodSpec, nil); err == nil {
-		aggrCtrReqs := resourcehelper.AggregateContainerRequests(&apiv1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
-		for key, aggrCtrReq := range aggrCtrReqs {
-			coreKey := api.ResourceName(key)
-			if _, exists := podReqs[coreKey]; !exists && resourcehelper.IsSupportedPodLevelResource(key) && helper.IsOvercommitAllowed(coreKey) {
-				podReqs[coreKey] = aggrCtrReq.DeepCopy()
-			}
+	aggrCtrReqs := resourcehelper.AggregateContainerRequests(v1Pod, resourcehelper.PodResourcesOptions{})
+	for key, aggrCtrReq := range aggrCtrReqs {
+		coreKey := api.ResourceName(key)
+		if _, exists := podReqs[coreKey]; !exists && resourcehelper.IsSupportedPodLevelResource(key) && helper.IsOvercommitAllowed(coreKey) {
+			podReqs[coreKey] = aggrCtrReq
 		}
 	}
 
@@ -2052,13 +2078,9 @@ func DefaultPodLevelRequests(pod *api.Pod) {
 	}
 }
 
-// DefaultPodLevelLimits sets pod-level limits equal to max(PLR request, aggregated container limits)
+// defaultPodLevelLimits sets pod-level limits equal to max(PLR request, aggregated container limits)
 // if all containers have limits set for candidate resources.
-func DefaultPodLevelLimits(pod *api.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) ||
-		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
-		return
-	}
+func defaultPodLevelLimits(pod *api.Pod, v1Pod *apiv1.Pod) {
 	if pod.Spec.Resources == nil {
 		return
 	}
@@ -2090,7 +2112,7 @@ func DefaultPodLevelLimits(pod *api.Pod) {
 		return
 	}
 
-	aggrLimits := aggregateContainerLimits(&pod.Spec, candidates)
+	aggrLimits := aggregateContainerLimits(&pod.Spec, candidates, v1Pod)
 	if aggrLimits == nil {
 		return
 	}
@@ -2115,13 +2137,13 @@ func DefaultPodLevelLimits(pod *api.Pod) {
 		if pod.Spec.Resources.Limits == nil {
 			pod.Spec.Resources.Limits = make(api.ResourceList)
 		}
-		pod.Spec.Resources.Limits[resName] = val.DeepCopy()
+		pod.Spec.Resources.Limits[resName] = val
 	}
 }
 
 // aggregateContainerLimits returns the aggregated limits for candidate resources across all containers in the pod spec.
 // It also filters the candidates set, removing any resource for which not all containers have limits specified.
-func aggregateContainerLimits(spec *api.PodSpec, candidates sets.Set[api.ResourceName]) apiv1.ResourceList {
+func aggregateContainerLimits(spec *api.PodSpec, candidates sets.Set[api.ResourceName], v1Pod *apiv1.Pod) apiv1.ResourceList {
 	// For a resource limit to be defaulted at the pod level, all containers (including init containers
 	// and sidecars) must specify a limit for that resource.
 	VisitContainers(spec, AllContainers, func(ctr *api.Container, _ ContainerType) bool {
@@ -2137,54 +2159,7 @@ func aggregateContainerLimits(spec *api.PodSpec, candidates sets.Set[api.Resourc
 		return nil
 	}
 
-	// Convert only containers and init containers to v1.PodSpec to leverage
-	// resourcehelper.AggregateContainerLimits without converting the full Pod object.
-	v1PodSpec := &apiv1.PodSpec{}
-	if err := corev1.Convert_core_PodSpec_To_v1_PodSpec(&api.PodSpec{
-		Containers:     spec.Containers,
-		InitContainers: spec.InitContainers,
-	}, v1PodSpec, nil); err != nil {
-		return nil
-	}
-
-	return resourcehelper.AggregateContainerLimits(&apiv1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
-}
-
-// MergePodLevelResources copies missing resource entries from oldRes into newRes
-// so that partial updates retain unspecified fields from oldPod.
-func MergePodLevelResources(newRes, oldRes *api.ResourceRequirements) *api.ResourceRequirements {
-	if newRes == nil {
-		return nil
-	}
-	if oldRes == nil {
-		return newRes.DeepCopy()
-	}
-
-	merged := oldRes.DeepCopy()
-
-	if len(newRes.Requests) > 0 {
-		if merged.Requests == nil {
-			merged.Requests = make(api.ResourceList)
-		}
-		for k, v := range newRes.Requests {
-			if resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(k)) {
-				merged.Requests[k] = v.DeepCopy()
-			}
-		}
-	}
-
-	if len(newRes.Limits) > 0 {
-		if merged.Limits == nil {
-			merged.Limits = make(api.ResourceList)
-		}
-		for k, v := range newRes.Limits {
-			if resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(k)) {
-				merged.Limits[k] = v.DeepCopy()
-			}
-		}
-	}
-
-	return merged
+	return resourcehelper.AggregateContainerLimits(v1Pod, resourcehelper.PodResourcesOptions{})
 }
 
 var initContainerAnnotations = map[string]struct{}{

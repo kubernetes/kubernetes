@@ -88,18 +88,19 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pod := obj.(*api.Pod)
 	pod.Generation = 1
 
-	podutil.DropDisabledPodFields(pod, nil)
-	applyPodLevelResourceDefaults(pod)
-
 	pod.Status = api.PodStatus{
-		Phase:    api.PodPending,
-		QOSClass: qos.GetPodQOS(pod),
+		Phase: api.PodPending,
 	}
+
+	podutil.DropDisabledPodFields(pod, nil)
 
 	applySchedulingGatedCondition(pod)
 	mutatePodAffinity(pod)
 	mutateTopologySpreadConstraints(pod)
 	applyAppArmorVersionSkew(ctx, pod)
+	podutil.DefaultPodLevelResources(pod)
+
+	pod.Status.QOSClass = qos.GetPodQOS(pod)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -107,6 +108,13 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
+		if newPod.Spec.Resources == nil && oldPod.Spec.Resources != nil {
+			// preserve existing PLR for requests from potentially PLR-unaware clients that completely dropped the field
+			newPod.Spec.Resources = oldPod.Spec.Resources.DeepCopy()
+		}
+	}
 
 	podutil.DropDisabledPodFields(newPod, oldPod)
 	updatePodGeneration(newPod, oldPod)
@@ -382,11 +390,7 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	// If PodLevelResources and InPlacePodLevelResourcesVerticalScaling feature gates is enabled,
 	// restore the saved pod-level resource requests to the new pod's spec.
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
-			newPod.Spec.Resources = podutil.MergePodLevelResources(newPodResources, oldPod.Spec.Resources)
-		} else {
-			newPod.Spec.Resources = newPodResources
-		}
+		newPod.Spec.Resources = newPodResources
 	}
 
 	newPod.Status = oldPod.Status
@@ -435,9 +439,14 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 
 	// When pod-level resources are set or updated via resize, apply defaulting
 	// so any unmanaged resources (e.g. memory when only CPU existed) are complete and consistent.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
+		if newPod.Spec.Resources == nil && oldPod.Spec.Resources != nil {
+			// preserve existing PLR for requests from potentially PLR-unaware clients that completely dropped the field
+			newPod.Spec.Resources = oldPod.Spec.Resources.DeepCopy()
+		}
+
 		if newPod.Spec.Resources != nil {
-			applyPodLevelResourceDefaults(newPod)
+			podutil.DefaultPodLevelResources(newPod)
 		}
 	}
 
@@ -1012,27 +1021,4 @@ func updatePodGeneration(newPod, oldPod *api.Pod) {
 	if !apiequality.Semantic.DeepEqual(newPod.Spec, oldPod.Spec) {
 		newPod.Generation++
 	}
-}
-
-// applyPodLevelResourceDefaults runs all pod-level resource defaulting in dependency order,
-// called exclusively from PrepareForCreate after admission webhooks have run so the full
-// container list is visible.
-//
-// Order matters:
-//  1. Set pod-level hugepage limits from aggregated container hugepage limits.
-//  2. Default pod-level requests from aggregated container requests (also fills requests
-//     for any resource that has a pod-level limit but no pod-level request, including
-//     hugepage limits set in step 1).
-//  3. Default pod-level limits to max(pod-level requests, aggregated container limits)
-//     for resources where all containers have limits. Step 2 must run first so that
-//     pod-level requests are complete before the max() comparison.
-func applyPodLevelResourceDefaults(pod *api.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) ||
-		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixUpdateDefaulting) {
-		return
-	}
-
-	podutil.DefaultHugePagePodLevelLimits(pod)
-	podutil.DefaultPodLevelRequests(pod)
-	podutil.DefaultPodLevelLimits(pod)
 }

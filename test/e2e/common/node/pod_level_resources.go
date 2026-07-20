@@ -466,9 +466,9 @@ func verifyContainersCgroupLimits(ctx context.Context, f *framework.Framework, p
 	return utilerrors.NewAggregate(errs)
 }
 
-// podLevelResourcesFixUpdateDefaultingTests contains tests that require both
-// PodLevelResources and PodLevelResourcesFixUpdateDefaulting feature gates.
-func podLevelResourcesFixUpdateDefaultingTests(f *framework.Framework) {
+// podLevelResourcesFixDefaultingTests contains tests that require both
+// PodLevelResources and PodLevelResourcesFixDefaulting feature gates.
+func podLevelResourcesFixDefaultingTests(f *framework.Framework) {
 	// When pod-level requests are set and all containers define limits, pod-level
 	// limits are auto-defaulted to the aggregated container limits. Since req==lim
 	// after defaulting, the pod gets Guaranteed QoS.
@@ -547,7 +547,7 @@ func podLevelResourcesFixUpdateDefaultingTests(f *framework.Framework) {
 	})
 }
 
-var _ = SIGDescribe("Pod Level Resources Fix Update Defaulting", framework.WithSerial(), feature.PodLevelResources, feature.PodLevelResourcesFixUpdateDefaulting, framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourcesFixUpdateDefaulting), func() {
+var _ = SIGDescribe("Pod Level Resources Fix Defaulting", framework.WithSerial(), framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourcesFixDefaulting), func() {
 	f := framework.NewDefaultFramework("pod-level-resources-fix-defaulting-tests")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -564,5 +564,5 @@ var _ = SIGDescribe("Pod Level Resources Fix Update Defaulting", framework.WithS
 		}
 	})
 
-	podLevelResourcesFixUpdateDefaultingTests(f)
+	podLevelResourcesFixDefaultingTests(f)
 })
