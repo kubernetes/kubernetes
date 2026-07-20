@@ -75,6 +75,7 @@ type DefaultPreemption struct {
 	Executor          *preemption.Executor
 	Evaluator         *preemption.Evaluator
 	pgLister          fwk.PodGroupLister
+	pgSnapshotLister  fwk.PodGroupLister
 	podGroupEvaluator podGroupEvaluator
 
 	// IsEligiblePod returns whether a victim (individual pod/pod group) is allowed to be preempted by a preemptor pod.
@@ -122,6 +123,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 
 	if pl.fts.EnableGenericWorkload {
 		pl.pgLister = fh.PodGroupManager().PodGroups()
+		pl.pgSnapshotLister = fh.SnapshotSharedLister().PodGroups()
 		pl.podGroupEvaluator = preemption.NewPodGroupEvaluator(fh, pl.Executor, pl.fts.EnablePodGroupPreemptionPolicy)
 	}
 
@@ -429,7 +431,7 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 
 		if nodeInfo, _ := nodeInfos.Get(nomNodeName); nodeInfo != nil {
 			for _, p := range nodeInfo.GetPods() {
-				victim := preemption.NewPodVictim(p, pl.pgLister)
+				victim := preemption.NewPodVictim(p, pl.pgSnapshotLister)
 
 				if pl.isPreemptionAllowed(nodeInfo, victim, pod) && preemption.PodTerminatingByPreemption(p.GetPod()) {
 					// There is a terminating pod on the nominated node.
