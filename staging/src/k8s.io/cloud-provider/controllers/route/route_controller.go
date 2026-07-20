@@ -65,8 +65,8 @@ const (
 	// routesSyncKey and routeCorrectionsKey are workqueue keys that both trigger a
 	// full-cluster route reconcile. They identify the trigger reason so we can
 	// attribute the outcome.
-	routesSyncKey       = "routes"
-	routeCorrectionsKey = "route-corrections"
+	routesSyncKey       = "node_change"
+	routeCorrectionsKey = "periodic"
 )
 
 var updateNetworkConditionBackoff = wait.Backoff{
@@ -167,7 +167,8 @@ func (rc *RouteController) handleNodeUpdate(oldObj, newObj interface{}) {
 	// In these cases, the old and new Node objects are identical. We use this event as a signal to perform
 	// a route reconciliation — our regular cleanup process — as described in the KEP 5237.
 	// We use a separate key to measure the amount of route reconciles due to a
-	// periodic reconcile. This is tracked in the metric `route_controller_route_corrections_total`
+	// periodic reconcile. This is tracked in the metric
+	// `route_controller_route_sync_total` via the `trigger="periodic"` label.
 	if oldNode.GetResourceVersion() == newNode.GetResourceVersion() {
 		rc.workqueue.AddRateLimited(routeCorrectionsKey)
 	}
@@ -206,9 +207,14 @@ func (rc *RouteController) Run(ctx context.Context, syncPeriod time.Duration, co
 		go wait.UntilWithContext(ctx, rc.runWorker, time.Second)
 	} else {
 		go wait.NonSlidingUntil(func() {
-			if _, err := rc.reconcileNodeRoutes(ctx); err != nil {
+			routesChanged, err := rc.reconcileNodeRoutes(ctx)
+			if err != nil {
 				klog.Errorf("Couldn't reconcile node routes: %v", err)
+				return
 			}
+			// Without the workqueue, reconciles are only driven by the
+			// syncPeriod timer, so the trigger is always periodic.
+			recordRouteSync(routesChanged, "periodic")
 		}, syncPeriod, ctx.Done())
 	}
 
@@ -250,9 +256,8 @@ func (rc *RouteController) processNextWorkItem(ctx context.Context) bool {
 			klog.Infof("Couldn't reconcile node routes: %v, requeuing", err)
 			return fmt.Errorf("couldn't reconcile node routes: %w, requeuing", err)
 		}
-		if key == routeCorrectionsKey && routesChanged {
-			routeCorrectionsCount.Inc()
-		}
+
+		recordRouteSync(routesChanged, key)
 
 		return nil
 	}(obj)
@@ -265,8 +270,6 @@ func (rc *RouteController) processNextWorkItem(ctx context.Context) bool {
 }
 
 func (rc *RouteController) reconcileNodeRoutes(ctx context.Context) (bool, error) {
-	routeSyncCount.Inc()
-
 	routeList, err := rc.routes.ListRoutes(ctx, rc.clusterName)
 	if err != nil {
 		return false, fmt.Errorf("error listing routes: %w", err)

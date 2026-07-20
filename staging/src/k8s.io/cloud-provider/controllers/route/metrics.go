@@ -30,25 +30,25 @@ const (
 
 var registration sync.Once
 
-var (
-	routeSyncCount = metrics.NewCounter(&metrics.CounterOpts{
-		Name:           "route_sync_total",
-		Subsystem:      subsystem,
-		Help:           "A metric counting the amount of times routes have been synced with the cloud provider.",
-		StabilityLevel: metrics.ALPHA,
-	})
-
-	routeCorrectionsCount = metrics.NewCounter(&metrics.CounterOpts{
-		Name:           "route_corrections_total",
-		Subsystem:      subsystem,
-		Help:           "A metric counting the number of periodically-triggered reconciles that resulted in at least one route being created or deleted.",
-		StabilityLevel: metrics.ALPHA,
-	})
-)
+var routeSyncCount = metrics.NewCounterVec(&metrics.CounterOpts{
+	Name:           "route_sync_total",
+	Subsystem:      subsystem,
+	Help:           "A metric counting the number of route reconciles with the cloud provider, labeled by the trigger (periodic or node_change) and the outcome (changed if at least one route was created or deleted, otherwise noop).",
+	StabilityLevel: metrics.ALPHA,
+}, []string{"outcome", "trigger"})
 
 func registerMetrics() {
 	registration.Do(func() {
 		legacyregistry.MustRegister(routeSyncCount)
-		legacyregistry.MustRegister(routeCorrectionsCount)
 	})
+}
+
+// recordRouteSync increments route_sync_total for a completed reconcile,
+// deriving the outcome label from whether any route was created or deleted.
+func recordRouteSync(routesChanged bool, trigger string) {
+	outcome := "noop"
+	if routesChanged {
+		outcome = "changed"
+	}
+	routeSyncCount.WithLabelValues(outcome, trigger).Inc()
 }
