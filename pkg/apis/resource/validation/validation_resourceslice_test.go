@@ -1853,6 +1853,35 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 			}(),
 			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
 		},
+		"consumable-capacity-valid-range-out-of-int64-bound": {
+			consumableCapacityFeatureGate: true,
+			wantFailures:                  field.ErrorList{field.Invalid(consumeableCapacityPath(0).Child("requestPolicy", "validRange", "min"), "-1", "must be greater than or equal to 0")},
+			oldResourceSlice:              testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					cap.RequestPolicy = &resourceapi.CapacityRequestPolicy{
+						Default:    new(resource.MustParse("0")),
+						ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("-1")), Step: new(resource.MustParse("1"))},
+					}
+				})
+				return slice
+			},
+		},
+		"consumable-capacity-valid-range-out-of-int64-bound-okay-if-stored": {
+			consumableCapacityFeatureGate: true,
+			wantFailures:                  nil,
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithConsumableCapacity(name, name, name, 1)
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					cap.RequestPolicy = &resourceapi.CapacityRequestPolicy{
+						Default:    new(resource.MustParse("0")),
+						ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("-1")), Step: new(resource.MustParse("1"))},
+					}
+				})
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
+		},
 		"consumable-capacity-valid-values-milli-values": {
 			consumableCapacityFeatureGate:      true,
 			fractionalCapacityRangeFeatureGate: true,

@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"slices"
 	"strconv"
@@ -1193,7 +1194,10 @@ func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity a
 	}
 	useMilli := false
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAFractionalCapacityRange) {
-		useMilli = rangeHasFractional(valueRange)
+		// The default is not part of the range, so rangeHasFractional does not see it.
+		// A fractional default with an integer range must still use the milli path, or the
+		// integer path reads default.Value() (which rounds) and accepts a non-multiple.
+		useMilli = rangeHasFractional(valueRange) || isFractionalQuantity(defaultValue)
 		// Overflow guards apply when DRAFractionalCapacityRange is enabled and the incoming
 		// range has fractional values.
 		if useMilli {
@@ -1231,11 +1235,38 @@ func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity a
 			if added.Cmp(maxCapacity) > 0 {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("step"), valueRange.Step.String(), fmt.Sprintf("one step %s is larger than capacity value: %s", added.String(), maxCapacity.String())))
 			}
-			// Use milli-value arithmetic whenever any field is fractional to preserve.
-			// useMilli is set only when the DRAFractionalCapacityRange feature gate is enabled.
-			allErrs = append(allErrs, validateRequestPolicyRangeStep(defaultValue, *valueRange.Min, *valueRange.Step, useMilli, fldPath.Child("step"))...)
-			if valueRange.Max != nil {
-				allErrs = append(allErrs, validateRequestPolicyRangeStep(*valueRange.Max, *valueRange.Min, *valueRange.Step, useMilli, fldPath.Child("step"))...)
+			// The integer path of validateRequestPolicyRangeStep below reads step,
+			// min, max and the default value with Quantity.Value(), which only holds
+			// in [0, MaxInt64]: above it a positive multiple of 2^64 reads as 0 and the
+			// step check divides by zero, and a negative decimal-backed bound can read
+			// back positive. Reject those before the arithmetic. The milli path is
+			// bounded by the hasUnsafeValue check above instead.
+			hasUnsafeValue := false
+			if !useMilli {
+				for _, pair := range []struct {
+					q    *apiresource.Quantity
+					name string
+				}{
+					{&defaultValue, "default"},
+					{valueRange.Min, "min"},
+					{valueRange.Max, "max"},
+					{valueRange.Step, "step"},
+				} {
+					if pair.q != nil {
+						if errs := validateInt64Range(*pair.q, fldPath.Child(pair.name)); len(errs) > 0 {
+							allErrs = append(allErrs, errs...)
+							hasUnsafeValue = true
+						}
+					}
+				}
+			}
+			if !hasUnsafeValue {
+				// Use milli-value arithmetic whenever any field is fractional.
+				// useMilli is set only when the DRAFractionalCapacityRange gate is on.
+				allErrs = append(allErrs, validateRequestPolicyRangeStep(defaultValue, *valueRange.Min, *valueRange.Step, useMilli, fldPath.Child("step"))...)
+				if valueRange.Max != nil {
+					allErrs = append(allErrs, validateRequestPolicyRangeStep(*valueRange.Max, *valueRange.Min, *valueRange.Step, useMilli, fldPath.Child("step"))...)
+				}
 			}
 		}
 	}
@@ -1261,6 +1292,26 @@ func validateRequestPolicyRangeStep(value, min, step apiresource.Quantity, useMi
 	}
 	if (val-minVal)%stepVal != 0 {
 		return field.ErrorList{field.Invalid(fldPath, value.String(), fmt.Sprintf("value is not a multiple of a given step (%s) from (%s)", step.String(), min.String()))}
+	}
+	return nil
+}
+
+// boundOverInt64Message is the field error for a consumable-capacity validRange
+// bound above the range where Quantity.Value() is usable.
+const boundOverInt64Message = "must not be larger than 9223372036854775807"
+
+// validateInt64Range reports whether q is in [0, MaxInt64], the range where
+// Quantity.Value() returns a number the bound can be reasoned about with. Above
+// MaxInt64 it overflows, so a positive multiple of 2^64 reads back as 0; below
+// zero it does not round as documented once the quantity is decimal-backed and
+// can read back with the wrong sign (#110653). Sign() alone misses the first
+// case and CmpInt64 alone misses the second, so the check needs both.
+func validateInt64Range(q apiresource.Quantity, fldPath *field.Path) field.ErrorList {
+	if q.Sign() < 0 {
+		return field.ErrorList{field.Invalid(fldPath, q.String(), apimachineryvalidation.IsNegativeErrorMsg)}
+	}
+	if q.CmpInt64(math.MaxInt64) > 0 {
+		return field.ErrorList{field.Invalid(fldPath, q.String(), boundOverInt64Message)}
 	}
 	return nil
 }
