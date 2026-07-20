@@ -84,12 +84,14 @@ func TestSchedulerCreation(t *testing.T) {
 	}
 	customSnapshot := internalcache.NewEmptySnapshot()
 	cases := []struct {
-		name                 string
-		opts                 []Option
-		wantErr              string
-		wantProfiles         []string
-		wantExtenders        []string
-		wantNodeInfoSnapshot *internalcache.Snapshot
+		name                            string
+		opts                            []Option
+		wantErr                         string
+		wantProfiles                    []string
+		wantExtenders                   []string
+		wantNodeInfoSnapshot            *internalcache.Snapshot
+		isSchedulerAsyncAPICallsEnabled bool
+		wantAPIDispatcher               bool
 	}{
 		{
 			name: "valid out-of-tree registry",
@@ -200,10 +202,29 @@ func TestSchedulerCreation(t *testing.T) {
 			wantProfiles:         []string{"default-scheduler"},
 			wantNodeInfoSnapshot: customSnapshot,
 		},
+		{
+			name: "With SchedulerAsyncAPICalls enabled",
+			opts: []Option{
+				WithProfiles(
+					schedulerapi.KubeSchedulerProfile{
+						SchedulerName: "default-scheduler",
+						Plugins: &schedulerapi.Plugins{
+							QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+						},
+					},
+				),
+			},
+			wantProfiles:                    []string{"default-scheduler"},
+			isSchedulerAsyncAPICallsEnabled: true,
+			wantAPIDispatcher:               true,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, tc.isSchedulerAsyncAPICallsEnabled)
+
 			client := fake.NewClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
@@ -230,6 +251,10 @@ func TestSchedulerCreation(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatalf("Failed to create scheduler: %v", err)
+			}
+
+			if tc.wantAPIDispatcher != (s.APIDispatcher != nil) {
+				t.Errorf("Unexpected APIDispatcher state, want: %v, got: %v", tc.wantAPIDispatcher, s.APIDispatcher != nil)
 			}
 
 			// Profiles

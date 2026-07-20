@@ -3508,6 +3508,42 @@ func TestUpdateNodeAllocatableDRAClaimState(t *testing.T) {
 	}
 }
 
+func TestUnrollWildCardResource_WithGenericWorkload(t *testing.T) {
+	tests := []struct {
+		name                  string
+		enableGenericWorkload bool
+		wantHasPodGroup       bool
+	}{
+		{
+			name:                  "Events should have PodGroup when GenericWorkload is enabled",
+			enableGenericWorkload: true,
+			wantHasPodGroup:       true,
+		},
+		{
+			name:                  "Events should not have PodGroup when GenericWorkload is disabled",
+			enableGenericWorkload: false,
+			wantHasPodGroup:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, tt.enableGenericWorkload)
+			events := UnrollWildCardResource()
+			hasPodGroup := false
+			for _, e := range events {
+				if e.Event.Resource == fwk.PodGroup {
+					hasPodGroup = true
+					break
+				}
+			}
+			if hasPodGroup != tt.wantHasPodGroup {
+				t.Errorf("UnrollWildCardResource() returned hasPodGroup = %v, want %v", hasPodGroup, tt.wantHasPodGroup)
+			}
+		})
+	}
+}
+
 func TestPodGroupInfoGetChildrenSorting(t *testing.T) {
 	now := time.Now()
 	pgInfo := func(name, namespace string, creationTime time.Time) *PodGroupInfo {
@@ -4309,5 +4345,68 @@ func TestQueuedPodGroupInfo_ForEachPodInfo(t *testing.T) {
 
 	if count != 1 {
 		t.Errorf("Expected 1 pod after early exit, got %d", count)
+	}
+}
+
+func TestNodeInfoDRANodeAllocatable(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod1-uid", Namespace: "default", Name: "pod1"},
+		Status: v1.PodStatus{
+			NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				{ResourceClaimName: "node-allocatable-claim-1"},
+			},
+		},
+	}
+
+	claimNamespacedName := types.NamespacedName{
+		Name:      "node-allocatable-claim-1",
+		Namespace: "default",
+	}
+
+	tests := []struct {
+		name                                string
+		DRANodeAllocatableResourcesEnabled  bool
+		expectNodeAllocatableDRAClaimStates bool
+	}{
+		{
+			name:                                "update NodeInfo DRA claim state with DRANodeAllocatableResources enabled",
+			DRANodeAllocatableResourcesEnabled:  true,
+			expectNodeAllocatableDRAClaimStates: true,
+		},
+		{
+			name:                                "Do not update NodeInfo DRA claim state with DRANodeAllocatableResources disabled",
+			DRANodeAllocatableResourcesEnabled:  false,
+			expectNodeAllocatableDRAClaimStates: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, tt.DRANodeAllocatableResourcesEnabled)
+			logger, _ := ktesting.NewTestContext(t)
+			ni := NewNodeInfo(pod)
+
+			if tt.expectNodeAllocatableDRAClaimStates {
+				if ni.NodeAllocatableDRAClaimStates == nil {
+					t.Fatalf("Expected NodeAllocatableDRAClaimStates to be initialized")
+				}
+				state, ok := ni.NodeAllocatableDRAClaimStates[claimNamespacedName]
+				if !ok {
+					t.Fatalf("Expected state for claim %s to exist", claimNamespacedName)
+				}
+				if !state.ConsumerPods.Has(pod.UID) {
+					t.Errorf("Expected state to contain consumer pod1-uid, got %v", state.ConsumerPods)
+				}
+			} else if len(ni.NodeAllocatableDRAClaimStates) != 0 {
+				t.Errorf("Expected NodeAllocatableDRAClaimStates to be empty, got %v", ni.NodeAllocatableDRAClaimStates)
+			}
+
+			if err := ni.RemovePod(logger, pod); err != nil {
+				t.Fatalf("Expected no error when removing pod, got %v", err)
+			}
+			if len(ni.NodeAllocatableDRAClaimStates) != 0 {
+				t.Errorf("Expected NodeAllocatableDRAClaimStates to be empty after removing pod, got %v", ni.NodeAllocatableDRAClaimStates)
+			}
+		})
 	}
 }
