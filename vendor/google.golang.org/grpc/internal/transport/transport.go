@@ -35,6 +35,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/internal/channelz"
+	"google.golang.org/grpc/internal/transport/internal"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/mem"
 	"google.golang.org/grpc/metadata"
@@ -45,6 +46,10 @@ import (
 )
 
 const logLevel = 2
+
+func init() {
+	internal.TimeNowFunc = func() int64 { return time.Now().UnixNano() }
+}
 
 // recvMsg represents the received msg from the transport. All transport
 // protocol specific info has been removed.

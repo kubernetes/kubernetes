@@ -59,6 +59,15 @@ var (
 	// unconditionally.
 	XDSEndpointHashKeyBackwardCompat = boolFromEnv("GRPC_XDS_ENDPOINT_HASH_KEY_BACKWARD_COMPAT", false)
 
+	// LabelServerGoroutines controls setting [runtime/pprof.Labels] on the
+	// goroutines spawned by [grpc.Server] type.
+	// For now, this is limited to the goroutines spawned to handle incoming
+	// requests on the server.
+	// Set "GRPC_GO_SERVER_GOROUTINE_LABELS" to "grpc.method=true" to
+	// enable this grpc.method label, or "all" to enable all valid labels.
+	// This variable is a bit-field.
+	LabelServerGoroutines = goroutineLabelsFromEnv("GRPC_GO_SERVER_GOROUTINE_LABELS", 0)
+
 	// RingHashSetRequestHashKey is set if the ring hash balancer can get the
 	// request hash header by setting the "requestHashHeader" field, according
 	// to gRFC A76. It can be disabled by setting the environment variable
@@ -78,12 +87,12 @@ var (
 	EnableDefaultPortForProxyTarget = boolFromEnv("GRPC_EXPERIMENTAL_ENABLE_DEFAULT_PORT_FOR_PROXY_TARGET", true)
 
 	// CaseSensitiveBalancerRegistries is set if the balancer registry should be
-	// case-sensitive. This is disabled by default, but can be enabled by setting
+	// case-sensitive. This is enabled by default, but can be disabled by setting
 	// the env variable "GRPC_GO_EXPERIMENTAL_CASE_SENSITIVE_BALANCER_REGISTRIES"
-	// to "true".
+	// to "false".
 	//
-	// TODO: After 2 releases, we will enable the env var by default.
-	CaseSensitiveBalancerRegistries = boolFromEnv("GRPC_GO_EXPERIMENTAL_CASE_SENSITIVE_BALANCER_REGISTRIES", false)
+	// This env varible will be removed in release v1.82.0.
+	CaseSensitiveBalancerRegistries = boolFromEnv("GRPC_GO_EXPERIMENTAL_CASE_SENSITIVE_BALANCER_REGISTRIES", true)
 
 	// XDSAuthorityRewrite indicates whether xDS authority rewriting is enabled.
 	// This feature is defined in gRFC A81 and is enabled by setting the
@@ -104,28 +113,24 @@ var (
 	// to "false".
 	XDSRecoverPanicInResourceParsing = boolFromEnv("GRPC_GO_EXPERIMENTAL_XDS_RESOURCE_PANIC_RECOVERY", true)
 
-	// DisableStrictPathChecking indicates whether strict path checking is
-	// disabled. This feature can be disabled by setting the environment
-	// variable GRPC_GO_EXPERIMENTAL_DISABLE_STRICT_PATH_CHECKING to "true".
-	//
-	// When strict path checking is enabled, gRPC will reject requests with
-	// paths that do not conform to the gRPC over HTTP/2 specification found at
-	// https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md.
-	//
-	// When disabled, gRPC will allow paths that do not contain a leading slash.
-	// Enabling strict path checking is recommended for security reasons, as it
-	// prevents potential path traversal vulnerabilities.
-	//
-	// A future release will remove this environment variable, enabling strict
-	// path checking behavior unconditionally.
-	DisableStrictPathChecking = boolFromEnv("GRPC_GO_EXPERIMENTAL_DISABLE_STRICT_PATH_CHECKING", false)
-
 	// EnablePriorityLBChildPolicyCache controls whether the priority balancer
 	// should cache child balancers that are removed from the LB policy config,
 	// for a period of 15 minutes. This is disabled by default, but can be
 	// enabled by setting the env variable
 	// GRPC_EXPERIMENTAL_ENABLE_PRIORITY_LB_CHILD_POLICY_CACHE to true.
 	EnablePriorityLBChildPolicyCache = boolFromEnv("GRPC_EXPERIMENTAL_ENABLE_PRIORITY_LB_CHILD_POLICY_CACHE", false)
+
+	// Enable8KBDefaultHeaderListSize indicates that default maximum header list
+	// size is restricted to 8KB. This is disabled by default, but can be enabled
+	// by setting the environment variable
+	// "GRPC_GO_EXPERIMENTAL_ENABLE_8KB_DEFAULT_HEADER_LIST_SIZE" to "true".
+	// When disabled, the default maximum header list size of 16MB is used.
+	//
+	// When enabled, RPCs with a total size of headers exceeding 8KB will fail
+	// unless explicitly configured otherwise by the user.
+	//
+	// TODO: In release v1.82.0, env var will be enabled by default.
+	Enable8KBDefaultHeaderListSize = boolFromEnv("GRPC_GO_EXPERIMENTAL_ENABLE_8KB_DEFAULT_HEADER_LIST_SIZE", false)
 
 	// EnableHTTPFramerReadBufferPooling enables the use of the
 	// readyreader.Reader interface to perform non-memory-pinning reads,
@@ -136,6 +141,17 @@ var (
 	// feature if unforeseen issues arise, and it will be removed in a future
 	// release.
 	EnableHTTPFramerReadBufferPooling = boolFromEnv("GRPC_GO_EXPERIMENTAL_HTTP_FRAMER_READ_BUFFER_POOLING", true)
+
+	// ControlBufferThrottleLimit is the maximum number of control frames that can
+	// be queued in the control buffer before throttling is applied. The value
+	// must be between 1 and 10,000, and is set to 100 by default.
+	//
+	// This environment variable serves as an escape hatch to increase the
+	// throttling limit if unforeseen issues arise, and it will be removed in a
+	// future release.
+	//
+	// TODO: Remove this env var once v1.83.0 is release.
+	ControlBufferThrottleLimit = uint64FromEnv("GRPC_GO_EXPERIMENTAL_CONTROL_BUFFER_THROTTLE_LIMIT", 100, 1, 10000)
 )
 
 func boolFromEnv(envVar string, def bool) bool {
@@ -160,3 +176,52 @@ func uint64FromEnv(envVar string, def, min, max uint64) uint64 {
 	}
 	return v
 }
+
+// GoroutineLabels is a bitfield indicating which goroutine labels are enabled.
+type GoroutineLabels uint16
+
+func goroutineLabelsFromEnv(envVar string, def GoroutineLabels) GoroutineLabels {
+	val := def
+	v := os.Getenv(envVar)
+	if strings.EqualFold(v, "all") {
+		return AllGoroutineLabels
+	} else if strings.EqualFold(v, "none") {
+		return 0
+	}
+	for s := range strings.SplitSeq(v, ",") {
+		s = strings.TrimSpace(s)
+		if len(s) == 0 {
+			continue
+		}
+		pre, post, ok := strings.Cut(s, "=")
+		if !ok {
+			// no equals sign
+			continue
+		}
+		post = strings.TrimSpace(post)
+		pre = strings.TrimSpace(pre)
+		bitDesignator := GoroutineLabels(0)
+		switch {
+		case strings.EqualFold(pre, "grpc.method"):
+			bitDesignator = GoroutineLabelServerMethod
+		default:
+			continue
+		}
+		if strings.EqualFold(post, "true") {
+			val |= bitDesignator
+		} else if strings.EqualFold(post, "false") {
+			val &^= bitDesignator
+		}
+	}
+	return val
+}
+
+const (
+	// GoroutineLabelServerMethod sets the grpc.method label on new
+	// server-side gRPC streams.
+	GoroutineLabelServerMethod GoroutineLabels = 1 << iota
+)
+
+// AllGoroutineLabels is an or'd together bitfield of all valid GoroutineLabels
+// constant values (above).
+const AllGoroutineLabels = GoroutineLabelServerMethod
