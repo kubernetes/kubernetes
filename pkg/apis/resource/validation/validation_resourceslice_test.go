@@ -1809,6 +1809,71 @@ func TestValidateResourceSlice(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("dra.example.com/gpu"), v1.ResourceName("dra.example.com/gpu"), "must be a node allocatable resource name"),
 			},
 		},
+		"non standard resource name": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceName("abc"): {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod: ptr.To(resource.MustParse("1")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("abc"), v1.ResourceName("abc"), "must be a node allocatable resource name"),
+			},
+		},
+		"kubernetes.io namespace is rejected": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceName("kubernetes.io/foo"): {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod: ptr.To(resource.MustParse("1")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("kubernetes.io/foo"), v1.ResourceName("kubernetes.io/foo"), "must be a node allocatable resource name"),
+			},
+		},
+		"ephemeral-storage is rejected": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceName("ephemeral-storage"): {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod: ptr.To(resource.MustParse("2Gi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("ephemeral-storage"), v1.ResourceName("ephemeral-storage"), "must be a node allocatable resource name"),
+			},
+		},
+		"valid hugepages resource": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceName("hugepages-2Mi"): {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod: ptr.To(resource.MustParse("2Mi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
 
 		"bad-node-allocatable-resources-overhead-neither-perpod-nor-percontainer-set": {
 			wantFailures: field.ErrorList{

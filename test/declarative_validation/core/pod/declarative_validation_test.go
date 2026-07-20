@@ -219,6 +219,7 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
 					field.Required(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("mapping").Index(0).Child("name"), ""),
+					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("mapping").Index(0).Child("name"), api.ResourceName(""), "must be a node allocatable resource name").MarkFromImperative(),
 				},
 			},
 			"invalid status: mapping quantity required": {
@@ -265,6 +266,7 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
 					field.Required(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("overhead").Index(0).Child("name"), ""),
+					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("overhead").Index(0).Child("name"), api.ResourceName(""), "must be a node allocatable resource name").MarkFromImperative(),
 				},
 			},
 			"invalid status: resourceClaimName required": {
@@ -280,6 +282,63 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 				expectedErrs: field.ErrorList{
 					field.Required(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("resourceClaimName"), ""),
 				},
+			},
+			"invalid status: mapping name not a standard container resource": {
+				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
+				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "claim-1",
+						Mapping: []api.NodeAllocatableMappedResources{
+							{Name: "abc", Quantity: new(apiresource.MustParse("1"))},
+						},
+					},
+				}),
+				subresource: "/status",
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("mapping").Index(0).Child("name"), api.ResourceName("abc"), "must be a node allocatable resource name").MarkFromImperative(),
+				},
+			},
+			"invalid status: mapping name ephemeral-storage": {
+				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
+				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "claim-1",
+						Mapping: []api.NodeAllocatableMappedResources{
+							{Name: "ephemeral-storage", Quantity: new(apiresource.MustParse("1Gi"))},
+						},
+					},
+				}),
+				subresource: "/status",
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("mapping").Index(0).Child("name"), api.ResourceName("ephemeral-storage"), "must be a node allocatable resource name").MarkFromImperative(),
+				},
+			},
+			"invalid status: overhead name in kubernetes.io namespace": {
+				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
+				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "claim-1",
+						Overhead: []api.NodeAllocatableOverheadResources{
+							{Name: "kubernetes.io/foo", PerPod: new(apiresource.MustParse("100m"))},
+						},
+					},
+				}),
+				subresource: "/status",
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("overhead").Index(0).Child("name"), api.ResourceName("kubernetes.io/foo"), "must be a node allocatable resource name").MarkFromImperative(),
+				},
+			},
+			"valid status: hugepages mapping name": {
+				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
+				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "claim-1",
+						Mapping: []api.NodeAllocatableMappedResources{
+							{Name: "hugepages-2Mi", Quantity: new(apiresource.MustParse("2Mi"))},
+						},
+					},
+				}),
+				subresource: "/status",
 			},
 		}
 

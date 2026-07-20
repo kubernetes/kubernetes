@@ -6325,7 +6325,7 @@ func validateNodeAllocatableMappedResources(mapping []core.NodeAllocatableMapped
 	allErrs := field.ErrorList{}
 	for i, item := range mapping {
 		itemPath := fldPath.Index(i)
-		if !helper.IsNativeResource(item.Name) {
+		if !helper.IsNodeAllocatableResourceName(item.Name) {
 			allErrs = append(allErrs, field.Invalid(itemPath.Child("name"), item.Name, "must be a node allocatable resource name"))
 		}
 		if item.Quantity != nil && item.Quantity.Cmp(resource.Quantity{}) < 0 {
@@ -6340,7 +6340,7 @@ func validateNodeAllocatableOverheadResources(overhead []core.NodeAllocatableOve
 	allErrs := field.ErrorList{}
 	for i, item := range overhead {
 		itemPath := fldPath.Index(i)
-		if !helper.IsNativeResource(item.Name) {
+		if !helper.IsNodeAllocatableResourceName(item.Name) {
 			allErrs = append(allErrs, field.Invalid(itemPath.Child("name"), item.Name, "must be a node allocatable resource name"))
 		}
 		if item.PerPod == nil && item.PerContainer == nil {

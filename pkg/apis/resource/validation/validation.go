@@ -48,6 +48,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	dracel "k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured"
+	core "k8s.io/kubernetes/pkg/apis/core"
+	corehelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -982,7 +984,7 @@ func validateNodeAllocatableResources(mappings map[corev1.ResourceName]resource.
 	var allErrs field.ErrorList
 	for resourceName, mapping := range mappings {
 		keyPath := fldPath.Key(string(resourceName))
-		if !v1helper.IsNativeResource(resourceName) {
+		if !corehelper.IsNodeAllocatableResourceName(core.ResourceName(resourceName)) {
 			allErrs = append(allErrs, field.Invalid(keyPath, resourceName, "must be a node allocatable resource name"))
 		}
 

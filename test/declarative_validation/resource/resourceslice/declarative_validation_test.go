@@ -333,6 +333,51 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("example.com/gpu"), "example.com/gpu", "must be a node allocatable resource name").MarkFromImperative(),
 					},
 				},
+				"invalid: node allocatable resource name unprefixed non-standard": {
+					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+						"abc": {
+							Overhead: &resource.NodeAllocatableOverhead{
+								PerPod: new(apiresource.MustParse("1")),
+							},
+						},
+					})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("abc"), "abc", "must be a node allocatable resource name").MarkFromImperative(),
+					},
+				},
+				"invalid: node allocatable resource name in kubernetes.io namespace": {
+					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+						"kubernetes.io/foo": {
+							Overhead: &resource.NodeAllocatableOverhead{
+								PerPod: new(apiresource.MustParse("1")),
+							},
+						},
+					})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("kubernetes.io/foo"), "kubernetes.io/foo", "must be a node allocatable resource name").MarkFromImperative(),
+					},
+				},
+				"invalid: node allocatable resource name ephemeral-storage": {
+					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+						"ephemeral-storage": {
+							Overhead: &resource.NodeAllocatableOverhead{
+								PerPod: new(apiresource.MustParse("2Gi")),
+							},
+						},
+					})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("ephemeral-storage"), "ephemeral-storage", "must be a node allocatable resource name").MarkFromImperative(),
+					},
+				},
+				"valid: node allocatable resource name hugepages": {
+					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+						"hugepages-2Mi": {
+							Overhead: &resource.NodeAllocatableOverhead{
+								PerPod: new(apiresource.MustParse("2Mi")),
+							},
+						},
+					})),
+				},
 				"invalid: node allocatable resource both mapping and overhead nil": {
 					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
 						"cpu": {},
