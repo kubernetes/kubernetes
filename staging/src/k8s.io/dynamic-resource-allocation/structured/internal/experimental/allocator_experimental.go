@@ -1491,8 +1491,9 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		return false, nil, nil
 	}
 
-	// Skip counter availability check for devices that allow multiple allocation and some capacity has already in-use.
-	skipCounterCheck := allowMultipleAllocations && alloc.deviceCapacityInUse(device.id)
+	// Admin access does not consume device resources, including counters. Also
+	// skip the check when a repeatable device already has capacity in use.
+	skipCounterCheck := request.adminAccess() || (allowMultipleAllocations && alloc.deviceCapacityInUse(device.id))
 
 	// The API validation logic has checked the ConsumesCounters referred should exist inside SharedCounters.
 	// countersReserved records whether checkAvailableCounters actually reserved

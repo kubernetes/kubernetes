@@ -1678,6 +1678,31 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device2, true),
 			)},
 		},
+		"admin-access-allocated-partitionable-device": {
+			features: Features{AdminAccess: true, PartitionableDevices: true},
+			claimsToAllocate: func() []wrapResourceClaim {
+				c := claimWithRequest(claim0, req0, classA)
+				c.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
+				return []wrapResourceClaim{c}
+			}(),
+			allocatedDevices: []DeviceID{MakeDeviceID(driverA, pool1, device1)},
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{capacity0: one}),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: one}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, true),
+			)},
+		},
 		"separate-claims-share-device-admin-access": {
 			features: Features{
 				AdminAccess: true,
