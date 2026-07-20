@@ -1353,9 +1353,14 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                    string
-		existingPodGroup        *schedulingv1alpha3.PodGroup
-		algorithmResult         podGroupAlgorithmResult
+		name             string
+		existingPodGroup *schedulingv1alpha3.PodGroup
+		// podResultsByPodName maps each pod name to its scheduling algorithm result.
+		// The final podResults slice is built in the order of UnscheduledPods after Pop,
+		// making the test independent of pod ordering within the pod group.
+		podResultsByPodName     map[string]algorithmResult
+		status                  *fwk.Status
+		waitingOnPreemption     bool
 		expectBound             sets.Set[string]
 		expectPreempting        map[string]string
 		expectFailed            sets.Set[string]
@@ -1364,18 +1369,10 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 	}{
 		{
 			name: "All pods feasible",
-			algorithmResult: podGroupAlgorithmResult{
-				status: nil,
-				podResults: []algorithmResult{{
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
-					status:         nil,
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
-					status:         nil,
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
-					status:         nil,
-				}},
+			podResultsByPodName: map[string]algorithmResult{
+				"p1": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
+				"p2": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
+				"p3": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
 			},
 			expectBound: sets.New("p1", "p2", "p3"),
 			expectCondition: &metav1.Condition{
@@ -1385,19 +1382,12 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			},
 		},
 		{
-			name: "All pods feasible, but podGroup unschedulable",
-			algorithmResult: podGroupAlgorithmResult{
-				status: fwk.NewStatus(fwk.Unschedulable, "not enough capacity for the gang"),
-				podResults: []algorithmResult{{
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
-					status:         nil,
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
-					status:         nil,
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
-					status:         nil,
-				}},
+			name:   "All pods feasible, but podGroup unschedulable",
+			status: fwk.NewStatus(fwk.Unschedulable, "not enough capacity for the gang"),
+			podResultsByPodName: map[string]algorithmResult{
+				"p1": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
+				"p2": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
+				"p3": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
 			},
 			expectFailed: sets.New("p1", "p2", "p3"),
 			expectCondition: &metav1.Condition{
@@ -1409,18 +1399,10 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 		},
 		{
 			name: "One unschedulable",
-			algorithmResult: podGroupAlgorithmResult{
-				status: nil,
-				podResults: []algorithmResult{{
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
-					status:         nil,
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
-					status:         nil,
-				}},
+			podResultsByPodName: map[string]algorithmResult{
+				"p1": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
+				"p2": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Unschedulable)},
+				"p3": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
 			},
 			expectBound:  sets.New("p1", "p3"),
 			expectFailed: sets.New("p2"),
@@ -1432,19 +1414,12 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			expectPodsInActiveQueue: sets.New("p2"),
 		},
 		{
-			name: "All pods unschedulable",
-			algorithmResult: podGroupAlgorithmResult{
-				status: fwk.NewStatus(fwk.Unschedulable, "0/3 nodes are available: insufficient cpu"),
-				podResults: []algorithmResult{{
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}},
+			name:   "All pods unschedulable",
+			status: fwk.NewStatus(fwk.Unschedulable, "0/3 nodes are available: insufficient cpu"),
+			podResultsByPodName: map[string]algorithmResult{
+				"p1": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Unschedulable)},
+				"p2": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Unschedulable)},
+				"p3": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Unschedulable)},
 			},
 			expectFailed: sets.New("p1", "p2", "p3"),
 			expectCondition: &metav1.Condition{
@@ -1455,19 +1430,12 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			},
 		},
 		{
-			name: "All pods unschedulable with nil nominatingInfo",
-			algorithmResult: podGroupAlgorithmResult{
-				status: fwk.NewStatus(fwk.Unschedulable, "0/3 nodes are available: insufficient cpu"),
-				podResults: []algorithmResult{{
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: nil},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: nil},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: nil},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}},
+			name:   "All pods unschedulable with nil nominatingInfo",
+			status: fwk.NewStatus(fwk.Unschedulable, "0/3 nodes are available: insufficient cpu"),
+			podResultsByPodName: map[string]algorithmResult{
+				"p1": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: nil}, status: fwk.NewStatus(fwk.Unschedulable)},
+				"p2": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: nil}, status: fwk.NewStatus(fwk.Unschedulable)},
+				"p3": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: nil}, status: fwk.NewStatus(fwk.Unschedulable)},
 			},
 			expectFailed: sets.New("p1", "p2", "p3"),
 			expectCondition: &metav1.Condition{
@@ -1478,19 +1446,12 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			},
 		},
 		{
-			name: "Unschedulable for the entire pod group",
-			algorithmResult: podGroupAlgorithmResult{
-				status: fwk.NewStatus(fwk.Unschedulable, "node affinity mismatch"),
-				podResults: []algorithmResult{{
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}},
+			name:   "Unschedulable for the entire pod group",
+			status: fwk.NewStatus(fwk.Unschedulable, "node affinity mismatch"),
+			podResultsByPodName: map[string]algorithmResult{
+				"p1": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Unschedulable)},
+				"p2": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Unschedulable)},
+				"p3": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Unschedulable)},
 			},
 			expectFailed: sets.New("p1", "p2", "p3"),
 			expectCondition: &metav1.Condition{
@@ -1501,19 +1462,12 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			},
 		},
 		{
-			name: "Error for one pod",
-			algorithmResult: podGroupAlgorithmResult{
-				status: fwk.NewStatus(fwk.Error, "plugin returned error"),
-				podResults: []algorithmResult{{
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
-					status:         nil,
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
-					status:         fwk.NewStatus(fwk.Error, "plugin returned error"),
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
-					status:         fwk.NewStatus(fwk.Error, "plugin returned error"),
-				}},
+			name:   "Error for one pod",
+			status: fwk.NewStatus(fwk.Error, "plugin returned error"),
+			podResultsByPodName: map[string]algorithmResult{
+				"p1": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
+				"p2": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Error, "plugin returned error")},
+				"p3": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Error, "plugin returned error")},
 			},
 			expectFailed: sets.New("p1", "p2", "p3"),
 			expectCondition: &metav1.Condition{
@@ -1537,18 +1491,10 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 					}},
 				},
 			},
-			algorithmResult: podGroupAlgorithmResult{
-				status: nil,
-				podResults: []algorithmResult{{
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
-					status:         nil,
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
-					status:         nil,
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
-					status:         nil,
-				}},
+			podResultsByPodName: map[string]algorithmResult{
+				"p1": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
+				"p2": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
+				"p3": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
 			},
 			expectBound: sets.New("p1", "p2", "p3"),
 			expectCondition: &metav1.Condition{
@@ -1571,18 +1517,11 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 					}},
 				},
 			},
-			algorithmResult: podGroupAlgorithmResult{
-				status: fwk.NewStatus(fwk.Unschedulable, "extra pods could not be placed"),
-				podResults: []algorithmResult{{
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}},
+			status: fwk.NewStatus(fwk.Unschedulable, "extra pods could not be placed"),
+			podResultsByPodName: map[string]algorithmResult{
+				"p1": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Unschedulable)},
+				"p2": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Unschedulable)},
+				"p3": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Unschedulable)},
 			},
 			expectFailed: sets.New("p1", "p2", "p3"),
 			expectCondition: &metav1.Condition{
@@ -1606,18 +1545,11 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 					}},
 				},
 			},
-			algorithmResult: podGroupAlgorithmResult{
-				status: fwk.NewStatus(fwk.Error),
-				podResults: []algorithmResult{{
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
-					status:         nil,
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
-					status:         fwk.NewStatus(fwk.Error),
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
-					status:         fwk.NewStatus(fwk.Error),
-				}},
+			status: fwk.NewStatus(fwk.Error),
+			podResultsByPodName: map[string]algorithmResult{
+				"p1": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
+				"p2": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Error)},
+				"p3": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Error)},
 			},
 			expectFailed: sets.New("p1", "p2", "p3"),
 			expectCondition: &metav1.Condition{
@@ -1633,20 +1565,13 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			// - some pods were successfully evaluated
 			// - pod group preemption successfully found placement
 			// The scheduler should use the nominating info from preemption instead of suggested host from evaluation.
-			name: "PodGroup waiting on preemption uses nominating info instead of suggested host for successfully evaluated pods",
-			algorithmResult: podGroupAlgorithmResult{
-				status:              fwk.NewStatus(fwk.Unschedulable, "waiting on preemption"),
-				waitingOnPreemption: true,
-				podResults: []algorithmResult{{
-					scheduleResult: ScheduleResult{SuggestedHost: "node1", nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node2", NominatingMode: fwk.ModeOverride}},
-					status:         nil,
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}, {
-					scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode},
-					status:         fwk.NewStatus(fwk.Unschedulable),
-				}},
+			name:                "PodGroup waiting on preemption uses nominating info instead of suggested host for successfully evaluated pods",
+			status:              fwk.NewStatus(fwk.Unschedulable, "waiting on preemption"),
+			waitingOnPreemption: true,
+			podResultsByPodName: map[string]algorithmResult{
+				"p1": {scheduleResult: ScheduleResult{SuggestedHost: "node1", nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node2", NominatingMode: fwk.ModeOverride}}, status: nil},
+				"p2": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Unschedulable)},
+				"p3": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Unschedulable)},
 			},
 			expectPreempting: map[string]string{"p1": "node2"},
 			expectFailed:     sets.New("p2", "p3"),
@@ -1658,13 +1583,10 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			},
 		},
 		{
-			name: "Different number of pods in result and queue, should fail all queue pods",
-			algorithmResult: podGroupAlgorithmResult{
-				status: fwk.NewStatus(fwk.Error),
-				podResults: []algorithmResult{{
-					scheduleResult: ScheduleResult{SuggestedHost: "node1"},
-					status:         nil,
-				}},
+			name:   "Different number of pods in result and queue, should fail all queue pods",
+			status: fwk.NewStatus(fwk.Error),
+			podResultsByPodName: map[string]algorithmResult{
+				"p1": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
 			},
 			expectFailed: sets.New("p1", "p2", "p3"),
 			expectCondition: &metav1.Condition{
@@ -1774,16 +1696,27 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 
 			podGroupCycleState := framework.NewCycleState()
 
-			tt.algorithmResult.podGroupInfo = podGroupInfo.PodGroupInfo
-			for i := range tt.algorithmResult.podResults {
-				pod := podGroupInfo.UnscheduledPods[i]
+			// Build the podResults slice in the order of UnscheduledPods after Pop,
+			// so the test is independent of pod ordering within the pod group.
+			algorithmResult := podGroupAlgorithmResult{
+				podGroupInfo:        podGroupInfo.PodGroupInfo,
+				status:              tt.status,
+				waitingOnPreemption: tt.waitingOnPreemption,
+			}
+			for _, pod := range podGroupInfo.UnscheduledPods {
+				result, ok := tt.podResultsByPodName[pod.Name]
+				if !ok {
+					// This pod was not processed by the algorithm (fewer results than pods in queue).
+					// Skip it — the test verifies that all queue pods are failed in this scenario.
+					continue
+				}
 				placementCycleState := framework.NewCycleState()
 				placementCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
-				podCtx := initPodSchedulingContext(ctx, pod, placementCycleState)
-				tt.algorithmResult.podResults[i].podCtx = podCtx
+				result.podCtx = initPodSchedulingContext(ctx, pod, placementCycleState)
+				algorithmResult.podResults = append(algorithmResult.podResults, result)
 			}
 
-			sched.submitPodGroupAlgorithmResult(ctx, schedFwk, podGroupCycleState, podGroupInfo, map[fwk.EntityKey]*podGroupAlgorithmResult{pgKey(tt.algorithmResult.podGroupInfo): &tt.algorithmResult}, time.Now(), tt.algorithmResult.status)
+			sched.submitPodGroupAlgorithmResult(ctx, schedFwk, podGroupCycleState, podGroupInfo, map[fwk.EntityKey]*podGroupAlgorithmResult{pgKey(algorithmResult.podGroupInfo): &algorithmResult}, time.Now(), tt.status)
 
 			if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 				lock.Lock()
