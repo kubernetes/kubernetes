@@ -22,9 +22,11 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -44,6 +46,8 @@ type PodStatusPatchCall struct {
 	podRef klog.ObjectRef
 	// podStatus contains the actual status of the pod.
 	podStatus *v1.PodStatus
+	// podResourceVersion contains the resource version of the pod used to calculate podStatus.
+	podResourceVersion string
 	// newConditions is a list of conditions to update.
 	newConditions []*v1.PodCondition
 	// nominatingInfo is a nominating info to update.
@@ -52,11 +56,12 @@ type PodStatusPatchCall struct {
 
 func NewPodStatusPatchCall(pod *v1.Pod, conditions []*v1.PodCondition, nominatingInfo *fwk.NominatingInfo) *PodStatusPatchCall {
 	return &PodStatusPatchCall{
-		podUID:         pod.UID,
-		podRef:         klog.KObj(pod),
-		podStatus:      pod.Status.DeepCopy(),
-		newConditions:  conditions,
-		nominatingInfo: nominatingInfo,
+		podUID:             pod.UID,
+		podRef:             klog.KObj(pod),
+		podStatus:          pod.Status.DeepCopy(),
+		podResourceVersion: pod.ResourceVersion,
+		newConditions:      conditions,
+		nominatingInfo:     nominatingInfo,
 	}
 }
 
@@ -95,7 +100,13 @@ func (psuc *PodStatusPatchCall) Execute(ctx context.Context, client clientset.In
 	for _, condition := range psuc.newConditions {
 		conditions = append(conditions, condition.DeepCopy())
 	}
-	podStatusCopy := psuc.podStatus.DeepCopy()
+	baseStatus := psuc.podStatus.DeepCopy()
+	baseResourceVersion := psuc.podResourceVersion
+	nominatingInfo := psuc.nominatingInfo
+	if nominatingInfo != nil {
+		nominatingInfoCopy := *nominatingInfo
+		nominatingInfo = &nominatingInfoCopy
+	}
 	psuc.lock.Unlock()
 
 	logger := klog.FromContext(ctx)
@@ -103,15 +114,31 @@ func (psuc *PodStatusPatchCall) Execute(ctx context.Context, client clientset.In
 		logger.V(3).Info("Updating pod condition", "pod", psuc.podRef, "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
 	}
 
-	// Sync status to have the condition and nominatingInfo applied on a podStatusCopy.
-	anySynced := syncStatus(podStatusCopy, conditions, psuc.nominatingInfo)
-	if !anySynced {
-		logger.V(5).Info("Pod status patch call does not need to be executed because it has no effect", "pod", psuc.podRef)
-		return nil
-	}
+	err := retry.OnError(retry.DefaultBackoff, apierrors.IsConflict, func() error {
+		podStatusCopy := baseStatus.DeepCopy()
+		// Sync status to have the condition and nominatingInfo applied on a podStatusCopy.
+		anySynced := syncStatus(podStatusCopy, conditions, nominatingInfo)
+		if !anySynced {
+			logger.V(5).Info("Pod status patch call does not need to be executed because it has no effect", "pod", psuc.podRef)
+			return nil
+		}
 
-	// It's safe to run PatchPodStatus even on outdated pod object.
-	err := util.PatchPodStatus(ctx, client, psuc.podRef.Name, psuc.podRef.Namespace, "", psuc.podStatus, podStatusCopy)
+		err := util.PatchPodStatus(ctx, client, psuc.podRef.Name, psuc.podRef.Namespace, baseResourceVersion, baseStatus, podStatusCopy)
+		if !apierrors.IsConflict(err) {
+			return err
+		}
+
+		pod, getErr := client.CoreV1().Pods(psuc.podRef.Namespace).Get(ctx, psuc.podRef.Name, metav1.GetOptions{})
+		if getErr != nil {
+			return getErr
+		}
+		if pod.UID != psuc.podUID {
+			return fmt.Errorf("pod %s UID changed from %q to %q", psuc.podRef, psuc.podUID, pod.UID)
+		}
+		baseStatus = pod.Status.DeepCopy()
+		baseResourceVersion = pod.ResourceVersion
+		return err
+	})
 	if err != nil {
 		logger.Error(err, "Failed to patch pod status", "pod", psuc.podRef)
 		return err
@@ -131,6 +158,7 @@ func (psuc *PodStatusPatchCall) Sync(obj metav1.Object) (metav1.Object, error) {
 		// Set podStatus only if the call execution haven't started yet,
 		// because otherwise it's irrelevant and might race.
 		psuc.podStatus = pod.Status.DeepCopy()
+		psuc.podResourceVersion = pod.ResourceVersion
 	}
 	newConditions := make([]*v1.PodCondition, 0, len(psuc.newConditions))
 	for _, condition := range psuc.newConditions {

@@ -22,8 +22,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2/ktesting"
@@ -433,6 +435,39 @@ func TestPodStatusPatchCall_Execute(t *testing.T) {
 		}
 		if patched {
 			t.Error("Expected patch API not to be called if the call is no-op")
+		}
+	})
+
+	t.Run("Refreshes pod status after conflict", func(t *testing.T) {
+		condition := &v1.PodCondition{
+			Type:    v1.PodScheduled,
+			Status:  v1.ConditionFalse,
+			Reason:  v1.PodReasonUnschedulable,
+			Message: "reject pod",
+		}
+		latestPod := pod.DeepCopy()
+		latestPod.Status.Conditions = []v1.PodCondition{*condition}
+		client := fake.NewClientset(latestPod)
+		patches := 0
+		gets := 0
+		client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+			patches++
+			return true, nil, apierrors.NewConflict(schema.GroupResource{Resource: "pods"}, pod.Name, nil)
+		})
+		client.PrependReactor("get", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+			gets++
+			return true, latestPod, nil
+		})
+
+		call := NewPodStatusPatchCall(pod, []*v1.PodCondition{condition}, &fwk.NominatingInfo{NominatingMode: fwk.ModeNoop})
+		if err := call.Execute(ctx, client); err != nil {
+			t.Fatalf("Unexpected error returned by Execute(): %v", err)
+		}
+		if patches == 0 {
+			t.Error("Expected patch API to be called")
+		}
+		if gets == 0 {
+			t.Error("Expected latest pod to be fetched after conflict")
 		}
 	})
 }
