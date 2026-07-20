@@ -34,6 +34,12 @@ const (
 	ifModeTagName            = "k8s:ifMode"
 )
 
+// ModeCondition represents a mode discriminator condition (e.g. +k8s:ifMode).
+type ModeCondition struct {
+	Modality string
+	Mode     string
+}
+
 // validGroupNameRegex restricts discriminator group names to identifiers that
 // start with a letter and contain only alphanumeric characters and underscores.
 var validGroupNameRegex = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
@@ -199,6 +205,7 @@ func (imtv *ifModeTagValidator) GetValidations(context Context, tag codetags.Tag
 		}
 	}
 
+	context = context.WithCondition(ModeCondition{Modality: groupName, Mode: value})
 	payloadValidations, err := imtv.validator.ExtractTagValidations(context, *tag.ValueTag)
 	if err != nil {
 		return Validations{}, err
@@ -339,11 +346,9 @@ func generateMemberFieldValidation(structType *types.Type, group *discriminatorG
 		// Mark each validation function with its stability level before merging.
 		v := rule.validations
 		if rule.stabilityLevel != "" {
-			marked := make([]FunctionGen, len(v.Functions))
-			for i, f := range v.Functions {
-				marked[i] = f.WithStabilityLevel(rule.stabilityLevel)
-			}
-			v.Functions = marked
+			v = WrapFunctions(v, func(f FunctionGen, _ DeferredScope) FunctionGen {
+				return f.WithStabilityLevel(rule.stabilityLevel)
+			})
 		}
 		// Accumulate this rule's validations with others that share the same discriminator value.
 		rulesByValue[rule.value].Add(v)
@@ -369,6 +374,9 @@ func generateMemberFieldValidation(structType *types.Type, group *discriminatorG
 	discriminatorType := group.discriminatorMember.Type
 	var discriminatedRules []any
 	for _, val := range values {
+		if err := rulesByValue[val].ResolveThisContextDeferred(); err != nil {
+			return Validations{}, fmt.Errorf("discriminator value %v: %w", val, err)
+		}
 		wrapper := MultiWrapperFunction{
 			Functions: rulesByValue[val].Functions,
 			ObjType:   nilableFieldType,

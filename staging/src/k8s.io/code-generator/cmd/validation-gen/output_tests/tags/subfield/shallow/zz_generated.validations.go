@@ -38,6 +38,21 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type SetByServerStruct
+	scheme.AddValidationFunc(
+		(*SetByServerStruct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_SetByServerStruct(
+					ctx, op, nil, /* fldPath */
+					obj.(*SetByServerStruct),
+					safe.Cast[*SetByServerStruct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type Struct
 	scheme.AddValidationFunc(
 		(*Struct)(nil),
@@ -54,6 +69,242 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 			}
 		})
 	return nil
+}
+
+// Validate_SetByServerStruct validates an instance of SetByServerStruct according
+// to declarative validation rules in the API schema.
+func Validate_SetByServerStruct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *SetByServerStruct) (errs field.ErrorList) {
+
+	// field SetByServerStruct.TypeMeta has no validation
+
+	{ // field SetByServerStruct.SubfieldSetByServer
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *StructWithOptionalField,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			func() { // cohort = "optionalField"
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "optionalField",
+					func(o *StructWithOptionalField) *string { return &o.OptionalField }, validate.DirectEqual, // optional fields set by the server are effectively required
+					validate.RequiredValue).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			// call the type's validation function
+			errs = append(errs, Validate_StructWithOptionalField(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SetByServerStruct) *StructWithOptionalField {
+				return &oldObj.SubfieldSetByServer
+			})
+		errs = append(errs, fn(fldPath.Child("subfieldSetByServer"), &obj.SubfieldSetByServer, oldVal, oldObj != nil)...)
+	}
+
+	{ // field SetByServerStruct.EmbeddedSetByServer
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *UnvalidatedStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			func() { // cohort = "stringField"
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
+					func(o *UnvalidatedStruct) *string { return &o.StringField }, validate.DirectEqual, // optional fields set by the server are effectively required
+					validate.RequiredValue).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SetByServerStruct) *UnvalidatedStruct {
+				return &oldObj.EmbeddedSetByServer
+			})
+		errs = append(errs, fn(fldPath.Child("embeddedSetByServer"), &obj.EmbeddedSetByServer, oldVal, oldObj != nil)...)
+	}
+
+	{ // field SetByServerStruct.OpaqueSubfieldRequired
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *StructWithOptionalField,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			func() { // cohort = "optionalField"
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "optionalField",
+					func(o *StructWithOptionalField) *string { return &o.OptionalField }, validate.DirectEqual, validate.RequiredValue).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SetByServerStruct) *StructWithOptionalField {
+				return &oldObj.OpaqueSubfieldRequired
+			})
+		errs = append(errs, fn(fldPath.Child("opaqueSubfieldRequired"), &obj.OpaqueSubfieldRequired, oldVal, oldObj != nil)...)
+	}
+
+	{ // field SetByServerStruct.SubfieldRequired
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *StructWithOptionalField,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			func() { // cohort = "optionalField"
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "optionalField",
+					func(o *StructWithOptionalField) *string { return &o.OptionalField }, validate.DirectEqual, validate.RequiredValue).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "optionalField",
+					func(o *StructWithOptionalField) *string { return &o.OptionalField }, validate.DirectEqual, validate.OptionalValue).MarkShortCircuit(); len(e) != 0 {
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			// call the type's validation function
+			errs = append(errs, Validate_StructWithOptionalField(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SetByServerStruct) *StructWithOptionalField {
+				return &oldObj.SubfieldRequired
+			})
+		errs = append(errs, fn(fldPath.Child("subfieldRequired"), &obj.SubfieldRequired, oldVal, oldObj != nil)...)
+	}
+
+	{ // field SetByServerStruct.SubfieldPtrSetByServer
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *StructWithOptionalField,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			func() { // cohort = "optionalField"
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "optionalField",
+					func(o *StructWithOptionalField) *string { return &o.OptionalField }, validate.DirectEqual, // optional fields set by the server are effectively required
+					validate.RequiredValue).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			// call the type's validation function
+			errs = append(errs, Validate_StructWithOptionalField(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SetByServerStruct) *StructWithOptionalField {
+				return oldObj.SubfieldPtrSetByServer
+			})
+		errs = append(errs, fn(fldPath.Child("subfieldPtrSetByServer"), obj.SubfieldPtrSetByServer, oldVal, oldObj != nil)...)
+	}
+
+	{ // field SetByServerStruct.SubfieldPtrRequired
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *StructWithOptionalField,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			func() { // cohort = "optionalField"
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "optionalField",
+					func(o *StructWithOptionalField) *string { return &o.OptionalField }, validate.DirectEqual, validate.RequiredValue).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "optionalField",
+					func(o *StructWithOptionalField) *string { return &o.OptionalField }, validate.DirectEqual, validate.OptionalValue).MarkShortCircuit(); len(e) != 0 {
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			// call the type's validation function
+			errs = append(errs, Validate_StructWithOptionalField(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SetByServerStruct) *StructWithOptionalField {
+				return oldObj.SubfieldPtrRequired
+			})
+		errs = append(errs, fn(fldPath.Child("subfieldPtrRequired"), obj.SubfieldPtrRequired, oldVal, oldObj != nil)...)
+	}
+
+	return errs
 }
 
 // Validate_Struct validates an instance of Struct according
@@ -103,8 +354,8 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "structField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "structField",
-					func(o *OtherStruct) *SmallStruct { return &o.StructField }, validate.DirectEqual,
-					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
+					func(o *OtherStruct) *UnvalidatedStruct { return &o.StructField }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *UnvalidatedStruct) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Struct.StructField.StructField")
 					}); len(e) != 0 {
 					errs = append(errs, e...)
@@ -176,8 +427,8 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "structField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "structField",
-					func(o *OtherStruct) *SmallStruct { return &o.StructField }, validate.DirectEqual,
-					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
+					func(o *OtherStruct) *UnvalidatedStruct { return &o.StructField }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *UnvalidatedStruct) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Struct.StructPtrField.StructField")
 					}); len(e) != 0 {
 					errs = append(errs, e...)
@@ -208,6 +459,43 @@ func Validate_Struct(
 				return oldObj.StructPtrField
 			})
 		errs = append(errs, fn(fldPath.Child("structPtrField"), obj.StructPtrField, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_StructWithOptionalField validates an instance of StructWithOptionalField according
+// to declarative validation rules in the API schema.
+func Validate_StructWithOptionalField(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *StructWithOptionalField) (errs field.ErrorList) {
+
+	{ // field StructWithOptionalField.OptionalField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *StructWithOptionalField) *string {
+				return &oldObj.OptionalField
+			})
+		errs = append(errs, fn(fldPath.Child("optionalField"), &obj.OptionalField, oldVal, oldObj != nil)...)
 	}
 
 	return errs

@@ -19,24 +19,223 @@ package shallow
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
+	st.Value(&SetByServerStruct{
+		SubfieldSetByServer: StructWithOptionalField{
+			OptionalField: "xyz",
+		},
+		EmbeddedSetByServer: UnvalidatedStruct{
+			StringField: "abc",
+		},
+		OpaqueSubfieldRequired: StructWithOptionalField{
+			OptionalField: "def",
+		},
+		SubfieldRequired: StructWithOptionalField{
+			OptionalField: "ghi",
+		},
+		SubfieldPtrSetByServer: &StructWithOptionalField{
+			OptionalField: "xyz",
+		},
+		SubfieldPtrRequired: &StructWithOptionalField{
+			OptionalField: "xyz",
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByField().ByType(), field.ErrorList{})
+
+	st.Value(&SetByServerStruct{
+		SubfieldSetByServer: StructWithOptionalField{
+			OptionalField: "",
+		},
+		EmbeddedSetByServer: UnvalidatedStruct{
+			StringField: "",
+		},
+		OpaqueSubfieldRequired: StructWithOptionalField{
+			OptionalField: "",
+		},
+		SubfieldRequired: StructWithOptionalField{
+			OptionalField: "",
+		},
+		SubfieldPtrSetByServer: &StructWithOptionalField{
+			OptionalField: "",
+		},
+		SubfieldPtrRequired: &StructWithOptionalField{
+			OptionalField: "",
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByField().ByType(), field.ErrorList{
+		field.Required(field.NewPath("subfieldSetByServer", "optionalField"), ""),
+		field.Required(field.NewPath("embeddedSetByServer", "stringField"), ""),
+		field.Required(field.NewPath("opaqueSubfieldRequired", "optionalField"), ""),
+		field.Required(field.NewPath("subfieldRequired", "optionalField"), ""),
+		field.Required(field.NewPath("subfieldPtrSetByServer", "optionalField"), ""),
+		field.Required(field.NewPath("subfieldPtrRequired", "optionalField"), ""),
+	})
+
+	// Test pointer fields being nil
+	st.Value(&SetByServerStruct{
+		SubfieldSetByServer: StructWithOptionalField{
+			OptionalField: "xyz",
+		},
+		EmbeddedSetByServer: UnvalidatedStruct{
+			StringField: "abc",
+		},
+		OpaqueSubfieldRequired: StructWithOptionalField{
+			OptionalField: "def",
+		},
+		SubfieldRequired: StructWithOptionalField{
+			OptionalField: "ghi",
+		},
+		SubfieldPtrSetByServer: nil,
+		SubfieldPtrRequired:    nil,
+	}).ExpectMatches(field.ErrorMatcher{}.ByField().ByType(), field.ErrorList{})
+
+	// Update tests for SetByServerStruct
+	// Update from non-empty to empty should fail.
+	st.Value(&SetByServerStruct{
+		SubfieldSetByServer: StructWithOptionalField{
+			OptionalField: "",
+		},
+		EmbeddedSetByServer: UnvalidatedStruct{
+			StringField: "",
+		},
+		OpaqueSubfieldRequired: StructWithOptionalField{
+			OptionalField: "",
+		},
+		SubfieldRequired: StructWithOptionalField{
+			OptionalField: "",
+		},
+		SubfieldPtrSetByServer: &StructWithOptionalField{
+			OptionalField: "",
+		},
+		SubfieldPtrRequired: &StructWithOptionalField{
+			OptionalField: "",
+		},
+	}).OldValue(&SetByServerStruct{
+		SubfieldSetByServer: StructWithOptionalField{
+			OptionalField: "xyz",
+		},
+		EmbeddedSetByServer: UnvalidatedStruct{
+			StringField: "abc",
+		},
+		OpaqueSubfieldRequired: StructWithOptionalField{
+			OptionalField: "def",
+		},
+		SubfieldRequired: StructWithOptionalField{
+			OptionalField: "ghi",
+		},
+		SubfieldPtrSetByServer: &StructWithOptionalField{
+			OptionalField: "xyz",
+		},
+		SubfieldPtrRequired: &StructWithOptionalField{
+			OptionalField: "xyz",
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByField().ByType(), field.ErrorList{
+		field.Required(field.NewPath("subfieldSetByServer", "optionalField"), ""),
+		field.Required(field.NewPath("embeddedSetByServer", "stringField"), ""),
+		field.Required(field.NewPath("opaqueSubfieldRequired", "optionalField"), ""),
+		field.Required(field.NewPath("subfieldRequired", "optionalField"), ""),
+		field.Required(field.NewPath("subfieldPtrSetByServer", "optionalField"), ""),
+		field.Required(field.NewPath("subfieldPtrRequired", "optionalField"), ""),
+	})
+
+	// Update from empty to empty should be skipped (success).
+	st.Value(&SetByServerStruct{
+		SubfieldSetByServer: StructWithOptionalField{
+			OptionalField: "",
+		},
+		EmbeddedSetByServer: UnvalidatedStruct{
+			StringField: "",
+		},
+		OpaqueSubfieldRequired: StructWithOptionalField{
+			OptionalField: "",
+		},
+		SubfieldRequired: StructWithOptionalField{
+			OptionalField: "",
+		},
+		SubfieldPtrSetByServer: &StructWithOptionalField{
+			OptionalField: "",
+		},
+		SubfieldPtrRequired: &StructWithOptionalField{
+			OptionalField: "",
+		},
+	}).OldValue(&SetByServerStruct{
+		SubfieldSetByServer: StructWithOptionalField{
+			OptionalField: "",
+		},
+		EmbeddedSetByServer: UnvalidatedStruct{
+			StringField: "",
+		},
+		OpaqueSubfieldRequired: StructWithOptionalField{
+			OptionalField: "",
+		},
+		SubfieldRequired: StructWithOptionalField{
+			OptionalField: "",
+		},
+		SubfieldPtrSetByServer: &StructWithOptionalField{
+			OptionalField: "",
+		},
+		SubfieldPtrRequired: &StructWithOptionalField{
+			OptionalField: "",
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByField().ByType(), field.ErrorList{})
+
+	// Update from empty to non-empty should succeed.
+	st.Value(&SetByServerStruct{
+		SubfieldSetByServer: StructWithOptionalField{
+			OptionalField: "xyz",
+		},
+		EmbeddedSetByServer: UnvalidatedStruct{
+			StringField: "abc",
+		},
+		OpaqueSubfieldRequired: StructWithOptionalField{
+			OptionalField: "def",
+		},
+		SubfieldRequired: StructWithOptionalField{
+			OptionalField: "ghi",
+		},
+		SubfieldPtrSetByServer: &StructWithOptionalField{
+			OptionalField: "xyz",
+		},
+		SubfieldPtrRequired: &StructWithOptionalField{
+			OptionalField: "xyz",
+		},
+	}).OldValue(&SetByServerStruct{
+		SubfieldSetByServer: StructWithOptionalField{
+			OptionalField: "",
+		},
+		EmbeddedSetByServer: UnvalidatedStruct{
+			StringField: "",
+		},
+		OpaqueSubfieldRequired: StructWithOptionalField{
+			OptionalField: "",
+		},
+		SubfieldRequired: StructWithOptionalField{
+			OptionalField: "",
+		},
+		SubfieldPtrSetByServer: &StructWithOptionalField{
+			OptionalField: "",
+		},
+		SubfieldPtrRequired: &StructWithOptionalField{
+			OptionalField: "",
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByField().ByType(), field.ErrorList{})
+
 	st.Value(&Struct{
 		StructField: OtherStruct{
 			StringField:  "",
 			PointerField: ptr.To(""),
-			StructField:  SmallStruct{},
+			StructField:  UnvalidatedStruct{},
 			SliceField:   []string{},
 			MapField:     map[string]string{},
 		},
 		StructPtrField: &OtherStruct{
 			StringField:  "",
 			PointerField: ptr.To(""),
-			StructField:  SmallStruct{},
+			StructField:  UnvalidatedStruct{},
 			SliceField:   []string{},
 			MapField:     map[string]string{},
 		},

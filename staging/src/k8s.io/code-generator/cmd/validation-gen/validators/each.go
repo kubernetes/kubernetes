@@ -18,6 +18,7 @@ package validators
 
 import (
 	"fmt"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -84,12 +85,13 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 
 	elemContext := Context{
 		// Scope is initialized below.
-		Type:           nt.Elem,
-		Path:           context.Path.Key("(vals)"),
-		Member:         nil, // NA for list/map values
-		ParentPath:     context.Path,
-		ParentType:     context.Type,
-		StabilityLevel: context.StabilityLevel,
+		Type:             nt.Elem,
+		Path:             context.Path.Key("(vals)"),
+		Member:           nil, // NA for list/map values
+		ParentPath:       context.Path,
+		ParentType:       context.Type,
+		StabilityLevel:   context.StabilityLevel,
+		GatingConditions: slices.Clone(context.GatingConditions),
 	}
 	switch nt.Kind {
 	case types.Slice, types.Array:
@@ -297,13 +299,14 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 	}
 
 	elemContext := Context{
-		Scope:          ScopeMapKey,
-		Type:           nt.Key,
-		Path:           context.Path.Key("(keys)"),
-		Member:         nil, // NA for map keys
-		ParentPath:     context.Path,
-		ParentType:     context.Type,
-		StabilityLevel: context.StabilityLevel,
+		Scope:            ScopeMapKey,
+		Type:             nt.Key,
+		Path:             context.Path.Key("(keys)"),
+		Member:           nil, // NA for map keys
+		ParentPath:       context.Path,
+		ParentType:       context.Type,
+		StabilityLevel:   context.StabilityLevel,
+		GatingConditions: slices.Clone(context.GatingConditions),
 	}
 
 	validations, err := ektv.validator.ExtractTagValidations(elemContext, *tag.ValueTag)

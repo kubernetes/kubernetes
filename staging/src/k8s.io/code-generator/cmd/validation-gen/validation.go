@@ -204,15 +204,16 @@ func (td *typeDiscoverer) Init(c *generator.Context) error {
 		}
 		for _, cnst := range pkg.Constants {
 			context := validators.Context{
-				Scope:          validators.ScopeConst,
-				Type:           cnst.Underlying,
-				Path:           nil, // NA when discovering a constant
-				Member:         nil, // NA when discovering a constant
-				ParentPath:     nil, // NA when discovering a constant
-				ListSelector:   nil, // NA for constants
-				ParentType:     nil, // NA for constants
-				Constants:      nil, // NA for constants
-				StabilityLevel: "",  // Default to stable unless overridden
+				Scope:            validators.ScopeConst,
+				Type:             cnst.Underlying,
+				Path:             nil, // NA when discovering a constant
+				Member:           nil, // NA when discovering a constant
+				ParentPath:       nil, // NA when discovering a constant
+				ListSelector:     nil, // NA for constants
+				ParentType:       nil, // NA for constants
+				Constants:        nil, // NA for constants
+				StabilityLevel:   "",  // Default to stable unless overridden
+				GatingConditions: nil, // NA for constants
 			}
 			tgs, err := td.validator.ExtractTags(context, cnst.CommentLines)
 			if err != nil {
@@ -443,15 +444,16 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		}
 		consts := td.constantsByType[t]
 		context := validators.Context{
-			Scope:          validators.ScopeType,
-			Type:           t,
-			Path:           fldPath,
-			Member:         nil, // NA when discovering a type
-			ParentPath:     nil, // NA when discovering a type
-			Constants:      consts,
-			ListSelector:   nil, // NA for type scope
-			ParentType:     nil, // NA for type scope
-			StabilityLevel: "",  // Default to stable unless overridden
+			Scope:            validators.ScopeType,
+			Type:             t,
+			Path:             fldPath,
+			Member:           nil, // NA when discovering a type
+			ParentPath:       nil, // NA when discovering a type
+			Constants:        consts,
+			ListSelector:     nil, // NA for type scope
+			ParentType:       nil, // NA for type scope
+			StabilityLevel:   "",  // Default to stable unless overridden
+			GatingConditions: nil, // NA for type scope
 		}
 		extractedTags, err := td.validator.ExtractTags(context, t.CommentLines)
 		if err != nil {
@@ -583,36 +585,9 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 
 	// These are validations that could not be fully resolved during tag extraction
 	// (e.g., because they need to wrap inner validations or depend on the full
-	// type graph being discovered). We resolve them iteratively because a
-	// deferred validation may yield further deferred validations.
-	deferred := thisNode.typeValidations.Deferred
-	thisNode.typeValidations.Deferred = nil
-	depth := 0
-	for len(deferred) > 0 {
-		depth++
-		if depth > 10 {
-			return nil, fmt.Errorf("deferred validation recursion depth exceeded "+
-				"10 for type %s at path %s", thisNode.valueType.String(), fldPath.String())
-		}
-		var nextDeferred []validators.DeferredGen
-		for _, def := range deferred {
-			res, err := def.Callback()
-			if err != nil {
-				return nil, err
-			}
-			if len(res.Deferred) > 0 {
-				nextDeferred = append(nextDeferred, res.Deferred...)
-				res.Deferred = nil
-			}
-			// Deferred validations can originate from fields with ParentContext scope (e.g., UnionValidations)
-			// or from validations on type definitions with ThisContext scope (e.g., eachVal on a slice type).
-			if def.Scope == validators.ThisContext || def.Scope == validators.ParentContext {
-				thisNode.typeValidations.Add(res)
-			} else {
-				return nil, fmt.Errorf("unexpected scope %v", def.Scope)
-			}
-		}
-		deferred = nextDeferred
+	// type graph being discovered).
+	if err := thisNode.typeValidations.ResolveThisContextDeferred(); err != nil {
+		return nil, fmt.Errorf("type %s at path %s: %w", thisNode.valueType.String(), fldPath.String(), err)
 	}
 
 	return thisNode, nil
@@ -746,15 +721,16 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 
 		// Extract any field-attached validation rules.
 		context := validators.Context{
-			Scope:          validators.ScopeField,
-			Type:           childType,
-			Path:           childPath,
-			Member:         &memb,
-			ParentPath:     fldPath,
-			ParentType:     thisNode.valueType,
-			ListSelector:   nil, // NA for fields
-			Constants:      nil, // NA for fields
-			StabilityLevel: "",  // Inherited or default
+			Scope:            validators.ScopeField,
+			Type:             childType,
+			Path:             childPath,
+			Member:           &memb,
+			ParentPath:       fldPath,
+			ParentType:       thisNode.valueType,
+			ListSelector:     nil, // NA for fields
+			Constants:        nil, // NA for fields
+			StabilityLevel:   "",  // Inherited or default
+			GatingConditions: nil, // NA for fields
 		}
 
 		tags, err := td.validator.ExtractTags(context, memb.CommentLines)
@@ -1158,6 +1134,7 @@ func (g *genValidations) emitValidationFunction(c *generator.Context, t *types.T
 	sw.Do("    fldPath *$.field.Path|raw$,\n", targs)
 	sw.Do("    obj, oldObj $.objTypePfx$$.inType|raw$) ", targs)
 	sw.Do("(errs $.field.ErrorList|raw$) {\n\n", targs)
+
 	fakeChild := &childNode{
 		node:      node,
 		childType: t,
@@ -1547,48 +1524,6 @@ func (g *genValidations) emitCallsToValidators(c *generator.Context, validations
 				}
 				if isShortCircuit {
 					sw.Do(".MarkShortCircuit()", nil)
-				}
-			}
-
-			// If validation is conditional, wrap the validation function with a conditions check.
-			if !v.Conditions.Empty() {
-				emitBaseFunction := emitCall
-				emitCall = func() {
-					// emitOptionLookup emits "<var>, defined := op.HasOption(<option>)" and
-					// surfaces an undefined option as an internal error.
-					emitOptionLookup := func(varName, option string) {
-						la := generator.Args{"field": targs["field"], "fmt": targs["fmt"], "opt": strconv.Quote(option)}
-						sw.Do("  "+varName+", defined := op.HasOption($.opt$)\n", la)
-						sw.Do("  if !defined {\n", nil)
-						sw.Do("    return $.field.ErrorList|raw${$.field.InternalError|raw$(fldPath, $.fmt.Errorf|raw$(\"undefined validation option %q\", $.opt$))}\n", la)
-						sw.Do("  }\n", nil)
-					}
-					sw.Do("func() $.field.ErrorList|raw$ {\n", targs)
-					if len(v.Conditions.OptionEnabled) > 0 {
-						emitOptionLookup("optionEnabled", v.Conditions.OptionEnabled)
-					}
-					if len(v.Conditions.OptionDisabled) > 0 {
-						emitOptionLookup("optionDisabled", v.Conditions.OptionDisabled)
-					}
-					sw.Do("  if ", nil)
-					firstCondition := true
-					if len(v.Conditions.OptionEnabled) > 0 {
-						sw.Do("optionEnabled", nil)
-						firstCondition = false
-					}
-					if len(v.Conditions.OptionDisabled) > 0 {
-						if !firstCondition {
-							sw.Do(" && ", nil)
-						}
-						sw.Do("!optionDisabled", nil)
-					}
-					sw.Do(" {\n", nil)
-					sw.Do("    return ", nil)
-					emitBaseFunction()
-					sw.Do("\n", nil)
-					sw.Do("  }\n", nil)
-					sw.Do("  return nil // skip validation\n", nil)
-					sw.Do("}()", nil)
 				}
 			}
 

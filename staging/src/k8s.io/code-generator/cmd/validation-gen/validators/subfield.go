@@ -18,6 +18,7 @@ package validators
 
 import (
 	"fmt"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/code-generator/cmd/validation-gen/util"
@@ -73,13 +74,14 @@ func (stv *subfieldTagValidator) GetValidations(context Context, tag codetags.Ta
 	}
 
 	subContext := Context{
-		Scope:          ScopeField,
-		Type:           submemb.Type,
-		Path:           context.Path.Child(subname),
-		Member:         submemb,
-		ParentPath:     context.Path,
-		ParentType:     context.Type,
-		StabilityLevel: context.StabilityLevel,
+		Scope:            ScopeField,
+		Type:             submemb.Type,
+		Path:             context.Path.Child(subname),
+		Member:           submemb,
+		ParentPath:       context.Path,
+		ParentType:       context.Type,
+		StabilityLevel:   context.StabilityLevel,
+		GatingConditions: slices.Clone(context.GatingConditions),
 	}
 
 	nilableStructType := context.Type

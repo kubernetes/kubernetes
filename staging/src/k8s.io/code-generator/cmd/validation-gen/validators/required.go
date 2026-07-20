@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -30,16 +31,18 @@ import (
 )
 
 const (
-	requiredTagName  = "k8s:required"
-	optionalTagName  = "k8s:optional"
-	forbiddenTagName = "k8s:forbidden"
-	defaultTagName   = "default" // TODO: this should eventually be +k8s:default
+	requiredTagName    = "k8s:required"
+	optionalTagName    = "k8s:optional"
+	forbiddenTagName   = "k8s:forbidden"
+	defaultTagName     = "default" // TODO: this should eventually be +k8s:default
+	setByServerTagName = "k8s:setByServer"
 )
 
 func init() {
 	RegisterTagValidator(requirednessTagValidator{requirednessRequired})
 	RegisterTagValidator(requirednessTagValidator{requirednessOptional})
 	RegisterTagValidator(requirednessTagValidator{requirednessForbidden})
+	RegisterTagValidator(requirednessTagValidator{requirednessSetByServer})
 }
 
 // requirednessTagValidator implements multiple modes of requiredness.
@@ -50,9 +53,10 @@ type requirednessTagValidator struct {
 type requirednessMode string
 
 const (
-	requirednessRequired  requirednessMode = requiredTagName
-	requirednessOptional  requirednessMode = optionalTagName
-	requirednessForbidden requirednessMode = forbiddenTagName
+	requirednessRequired    requirednessMode = requiredTagName
+	requirednessOptional    requirednessMode = optionalTagName
+	requirednessForbidden   requirednessMode = forbiddenTagName
+	requirednessSetByServer requirednessMode = setByServerTagName
 )
 
 func (requirednessTagValidator) Init(_ Config) {}
@@ -75,8 +79,33 @@ func (rtv requirednessTagValidator) GetValidations(context Context, _ codetags.T
 		return rtv.doOptional(context)
 	case requirednessForbidden:
 		return rtv.doForbidden(context)
+	case requirednessSetByServer:
+		return rtv.doSetByServer(context)
 	}
 	panic(fmt.Sprintf("unknown requiredness mode: %q", rtv.mode))
+}
+
+// globalSetByServerInfo records the field paths tagged with +k8s:setByServer
+// (including subfields targeted by +k8s:subfield(...)=+k8s:setByServer).
+// The optional validator (+k8s:optional) consults these in a deferred callback so that
+// all setByServer tags across the type graph have been registered before determining
+// whether to suppress optionality checks.
+var globalSetByServerInfo = map[string][]GatingConditions{}
+
+func (rtv requirednessTagValidator) doSetByServer(context Context) (Validations, error) {
+	if context.Path != nil {
+		path := context.Path.String()
+		globalSetByServerInfo[path] = append(globalSetByServerInfo[path], context.GatingConditions)
+	}
+
+	validations, err := rtv.doRequired(context)
+	if err != nil {
+		return Validations{}, err
+	}
+	for i, fn := range validations.Functions {
+		validations.Functions[i] = fn.WithComment("optional fields set by the server are effectively required")
+	}
+	return validations, nil
 }
 
 var (
@@ -144,7 +173,22 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 	// the zero value) and a client setting it to the zero value.
 	//
 	// TODO: handle default=ref(...)
-	// TODO: handle manual defaulting
+	var result Validations
+	result.AddDeferred(Deferred(ThisContext, func() (Validations, error) {
+		if context.Path != nil {
+			if conditions, ok := globalSetByServerInfo[context.Path.String()]; ok {
+				// SetByServer fields are not optional from server perspective for this path and this gating condions.
+				if slices.ContainsFunc(conditions, context.HasSameMatchingConditions) {
+					return Validations{}, nil
+				}
+			}
+		}
+		return rtv.doOptionalBase(context)
+	}))
+	return result, nil
+}
+
+func (rtv requirednessTagValidator) doOptionalBase(context Context) (Validations, error) {
 	if hasDefault, zeroDefault, err := rtv.hasZeroDefault(context); err != nil {
 		return Validations{}, err
 	} else if hasDefault {
@@ -325,10 +369,13 @@ func (rtv requirednessTagValidator) Docs() TagDoc {
 		doc.Description = "Indicates that a field must be specified by clients."
 	case requirednessOptional:
 		doc.StabilityLevel = TagStabilityLevelStable
-		doc.Description = "Indicates that a field is optional to clients."
+		doc.Description = "Indicates that a field is optional to clients. Fields with +default or +k8s:setByServer are effectively required on the server side."
 	case requirednessForbidden:
 		doc.StabilityLevel = TagStabilityLevelBeta
 		doc.Description = "Indicates that a field may not be specified."
+	case requirednessSetByServer:
+		doc.StabilityLevel = TagStabilityLevelStable
+		doc.Description = "Indicates that a field is set by the server and is effectively required."
 	default:
 		panic(fmt.Sprintf("unknown requiredness mode: %q", rtv.mode))
 	}
