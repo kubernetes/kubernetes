@@ -90,6 +90,33 @@ func loadVolumeData(dir string, fileName string) (map[string]string, error) {
 	return data, nil
 }
 
+// findGlobalMountDataBySpecVolID scans all CSI global mount data files under
+// pluginDir looking for one whose stored specVolID matches the one given.
+// Used as a fallback when pod-local vol_data.json is missing/corrupt during
+// kubelet volume reconstruction — see issue #101791.
+//
+// pluginDir is expected to be the CSI plugin root (e.g.
+// /var/lib/kubelet/plugins/kubernetes.io/csi). Returns the data dir where the
+// matching vol_data.json lives and its parsed contents.
+func findGlobalMountDataBySpecVolID(pluginDir, specVolID string) (string, map[string]string, error) {
+	matches, err := filepath.Glob(filepath.Join(pluginDir, "*", "*", volDataFileName))
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to scan CSI plugin dir %q: %w", pluginDir, err)
+	}
+	for _, match := range matches {
+		dir := filepath.Dir(match)
+		data, err := loadVolumeData(dir, volDataFileName)
+		if err != nil {
+			klog.V(4).Info(log("skipping unreadable vol_data.json at %s: %v", match, err))
+			continue
+		}
+		if data[volDataKey.specVolID] == specVolID {
+			return dir, data, nil
+		}
+	}
+	return "", nil, fmt.Errorf("no CSI global mount data found matching specVolID %q", specVolID)
+}
+
 func getCSISourceFromSpec(spec *volume.Spec) (*api.CSIPersistentVolumeSource, error) {
 	return getPVSourceFromSpec(spec)
 }

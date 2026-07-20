@@ -1165,6 +1165,15 @@ const (
 	// co-ordinate better with cluster-autoscaler for storage limits.
 	VolumeLimitScaling featuregate.Feature = "VolumeLimitScaling"
 
+	// owner: @cniackz
+	// kep: https://kep.k8s.io/6058
+	//
+	// On kubelet restart, when reconstructing a CSI volume from disk,
+	// fall back to reading vol_data.json from the global mount directory
+	// if the pod-local file is missing or corrupt. Prevents orphaned
+	// global mounts that can lead to data corruption (issue #101791).
+	VolumeReconstructionFallback featuregate.Feature = "VolumeReconstructionFallback"
+
 	// owner: @ksubrmnn
 	//
 	// Allows kube-proxy to create DSR loadbalancers for Windows
@@ -2057,6 +2066,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	VolumeReconstructionFallback: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	WinDSR: {
 		{Version: version.MustParse("1.14"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
@@ -2643,6 +2656,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	VolumeAttributesClass: {},
 
 	VolumeLimitScaling: {},
+
+	VolumeReconstructionFallback: {},
 
 	WinDSR: {},
 
