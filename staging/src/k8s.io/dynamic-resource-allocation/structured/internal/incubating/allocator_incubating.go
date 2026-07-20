@@ -1354,7 +1354,8 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		return false, nil, nil
 	}
 
-	// Skip counter availability check for devices that allow multiple allocation and some capacity has already in-use.
+	// Skip the counter check for an allow-multiple device in use: its counters are already
+	// accounted for, so a further share must not charge them again.
 	skipCounterCheck := allowMultipleAllocations && alloc.deviceCapacityInUse(device.id)
 
 	// The API validation logic has checked the ConsumesCounters referred should exist inside SharedCounters.
@@ -1684,8 +1685,17 @@ func (alloc *allocator) deviceInUse(deviceID DeviceID) bool {
 }
 
 func (alloc *allocator) deviceCapacityInUse(deviceID DeviceID) bool {
-	_, found := alloc.allocatedState.AggregatedCapacity[deviceID]
-	return found || alloc.allocatingCapacityForAnyClaim(deviceID)
+	if _, found := alloc.allocatedState.AggregatedCapacity[deviceID]; found {
+		return true
+	}
+	// A persisted allow-multiple allocation with no per-share capacity is recorded
+	// only in AllocatedSharedDeviceIDs (with no AggregatedCapacity entry).
+	for sharedDeviceID := range alloc.allocatedState.AllocatedSharedDeviceIDs {
+		if sharedDeviceID.GetDeviceID() == deviceID {
+			return true
+		}
+	}
+	return alloc.allocatingCapacityForAnyClaim(deviceID)
 }
 
 func (alloc *allocator) allocatingDeviceForAnyClaim(deviceID DeviceID) bool {
