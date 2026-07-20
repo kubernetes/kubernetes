@@ -141,9 +141,9 @@ func Validate_CSIDriver(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *storagev1.CSIDriver) (errs field.ErrorList) {
 
-	// field storagev1.CSIDriver.TypeMeta has no validation
+	// field CSIDriver.TypeMeta has no validation
 
-	{ // field storagev1.CSIDriver.ObjectMeta
+	{ // field CSIDriver.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -165,7 +165,7 @@ func Validate_CSIDriver(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field storagev1.CSIDriver.Spec
+	{ // field CSIDriver.Spec (k8s.io/api/storage/v1.CSIDriverSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *storagev1.CSIDriverSpec,
@@ -196,10 +196,10 @@ func Validate_CSIDriverSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *storagev1.CSIDriverSpec) (errs field.ErrorList) {
 
-	// field storagev1.CSIDriverSpec.AttachRequired has no validation
-	// field storagev1.CSIDriverSpec.PodInfoOnMount has no validation
+	// field CSIDriverSpec.AttachRequired has no validation
+	// field CSIDriverSpec.PodInfoOnMount has no validation
 
-	{ // field storagev1.CSIDriverSpec.VolumeLifecycleModes
+	{ // field CSIDriverSpec.VolumeLifecycleModes ([]k8s.io/api/storage/v1.VolumeLifecycleMode)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []storagev1.VolumeLifecycleMode,
@@ -231,14 +231,14 @@ func Validate_CSIDriverSpec(
 		errs = append(errs, fn(fldPath.Child("volumeLifecycleModes"), obj.VolumeLifecycleModes, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1.CSIDriverSpec.StorageCapacity has no validation
-	// field storagev1.CSIDriverSpec.FSGroupPolicy has no validation
-	// field storagev1.CSIDriverSpec.TokenRequests has no validation
-	// field storagev1.CSIDriverSpec.RequiresRepublish has no validation
-	// field storagev1.CSIDriverSpec.SELinuxMount has no validation
-	// field storagev1.CSIDriverSpec.NodeAllocatableUpdatePeriodSeconds has no validation
-	// field storagev1.CSIDriverSpec.ServiceAccountTokenInSecrets has no validation
-	// field storagev1.CSIDriverSpec.PreventPodSchedulingIfMissing has no validation
+	// field CSIDriverSpec.StorageCapacity has no validation
+	// field CSIDriverSpec.FSGroupPolicy has no validation
+	// field CSIDriverSpec.TokenRequests has no validation
+	// field CSIDriverSpec.RequiresRepublish has no validation
+	// field CSIDriverSpec.SELinuxMount has no validation
+	// field CSIDriverSpec.NodeAllocatableUpdatePeriodSeconds has no validation
+	// field CSIDriverSpec.ServiceAccountTokenInSecrets has no validation
+	// field CSIDriverSpec.PreventPodSchedulingIfMissing has no validation
 	return errs
 }
 
@@ -248,9 +248,9 @@ func Validate_CSINode(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *storagev1.CSINode) (errs field.ErrorList) {
 
-	// field storagev1.CSINode.TypeMeta has no validation
+	// field CSINode.TypeMeta has no validation
 
-	{ // field storagev1.CSINode.ObjectMeta
+	{ // field CSINode.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -272,7 +272,7 @@ func Validate_CSINode(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1.CSINode.Spec has no validation
+	// field CSINode.Spec has no validation
 	return errs
 }
 
@@ -282,9 +282,9 @@ func Validate_CSIStorageCapacity(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *storagev1.CSIStorageCapacity) (errs field.ErrorList) {
 
-	// field storagev1.CSIStorageCapacity.TypeMeta has no validation
+	// field CSIStorageCapacity.TypeMeta has no validation
 
-	{ // field storagev1.CSIStorageCapacity.ObjectMeta
+	{ // field CSIStorageCapacity.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -306,10 +306,10 @@ func Validate_CSIStorageCapacity(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1.CSIStorageCapacity.NodeTopology has no validation
-	// field storagev1.CSIStorageCapacity.StorageClassName has no validation
-	// field storagev1.CSIStorageCapacity.Capacity has no validation
-	// field storagev1.CSIStorageCapacity.MaximumVolumeSize has no validation
+	// field CSIStorageCapacity.NodeTopology has no validation
+	// field CSIStorageCapacity.StorageClassName has no validation
+	// field CSIStorageCapacity.Capacity has no validation
+	// field CSIStorageCapacity.MaximumVolumeSize has no validation
 	return errs
 }
 
@@ -319,9 +319,9 @@ func Validate_StorageClass(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *storagev1.StorageClass) (errs field.ErrorList) {
 
-	// field storagev1.StorageClass.TypeMeta has no validation
+	// field StorageClass.TypeMeta has no validation
 
-	{ // field storagev1.StorageClass.ObjectMeta
+	{ // field StorageClass.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -343,7 +343,7 @@ func Validate_StorageClass(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field storagev1.StorageClass.Provisioner
+	{ // field StorageClass.Provisioner (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -376,7 +376,7 @@ func Validate_StorageClass(
 		errs = append(errs, fn(fldPath.Child("provisioner"), &obj.Provisioner, oldVal, oldObj != nil)...)
 	}
 
-	{ // field storagev1.StorageClass.Parameters
+	{ // field StorageClass.Parameters (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -408,7 +408,7 @@ func Validate_StorageClass(
 		errs = append(errs, fn(fldPath.Child("parameters"), obj.Parameters, oldVal, oldObj != nil)...)
 	}
 
-	{ // field storagev1.StorageClass.ReclaimPolicy
+	{ // field StorageClass.ReclaimPolicy (k8s.io/api/core/v1.PersistentVolumeReclaimPolicy)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *corev1.PersistentVolumeReclaimPolicy,
@@ -440,10 +440,10 @@ func Validate_StorageClass(
 		errs = append(errs, fn(fldPath.Child("reclaimPolicy"), obj.ReclaimPolicy, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1.StorageClass.MountOptions has no validation
-	// field storagev1.StorageClass.AllowVolumeExpansion has no validation
+	// field StorageClass.MountOptions has no validation
+	// field StorageClass.AllowVolumeExpansion has no validation
 
-	{ // field storagev1.StorageClass.VolumeBindingMode
+	{ // field StorageClass.VolumeBindingMode (k8s.io/api/storage/v1.VolumeBindingMode)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *storagev1.VolumeBindingMode,
@@ -475,7 +475,7 @@ func Validate_StorageClass(
 		errs = append(errs, fn(fldPath.Child("volumeBindingMode"), obj.VolumeBindingMode, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1.StorageClass.AllowedTopologies has no validation
+	// field StorageClass.AllowedTopologies has no validation
 	return errs
 }
 
@@ -485,9 +485,9 @@ func Validate_VolumeAttachment(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *storagev1.VolumeAttachment) (errs field.ErrorList) {
 
-	// field storagev1.VolumeAttachment.TypeMeta has no validation
+	// field VolumeAttachment.TypeMeta has no validation
 
-	{ // field storagev1.VolumeAttachment.ObjectMeta
+	{ // field VolumeAttachment.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -509,7 +509,7 @@ func Validate_VolumeAttachment(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field storagev1.VolumeAttachment.Spec
+	{ // field VolumeAttachment.Spec (k8s.io/api/storage/v1.VolumeAttachmentSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *storagev1.VolumeAttachmentSpec,
@@ -540,7 +540,7 @@ func Validate_VolumeAttachment(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1.VolumeAttachment.Status has no validation
+	// field VolumeAttachment.Status has no validation
 	return errs
 }
 
@@ -550,7 +550,7 @@ func Validate_VolumeAttachmentSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *storagev1.VolumeAttachmentSpec) (errs field.ErrorList) {
 
-	{ // field storagev1.VolumeAttachmentSpec.Attacher
+	{ // field VolumeAttachmentSpec.Attacher (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -585,8 +585,8 @@ func Validate_VolumeAttachmentSpec(
 		errs = append(errs, fn(fldPath.Child("attacher"), &obj.Attacher, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1.VolumeAttachmentSpec.Source has no validation
-	// field storagev1.VolumeAttachmentSpec.NodeName has no validation
+	// field VolumeAttachmentSpec.Source has no validation
+	// field VolumeAttachmentSpec.NodeName has no validation
 	return errs
 }
 
@@ -596,9 +596,9 @@ func Validate_VolumeAttributesClass(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *storagev1.VolumeAttributesClass) (errs field.ErrorList) {
 
-	// field storagev1.VolumeAttributesClass.TypeMeta has no validation
+	// field VolumeAttributesClass.TypeMeta has no validation
 
-	{ // field storagev1.VolumeAttributesClass.ObjectMeta
+	{ // field VolumeAttributesClass.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -620,7 +620,7 @@ func Validate_VolumeAttributesClass(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1.VolumeAttributesClass.DriverName has no validation
-	// field storagev1.VolumeAttributesClass.Parameters has no validation
+	// field VolumeAttributesClass.DriverName has no validation
+	// field VolumeAttributesClass.Parameters has no validation
 	return errs
 }

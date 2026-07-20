@@ -76,7 +76,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.IntField
+	{ // field Struct.IntField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -100,7 +100,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("intField"), &obj.IntField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.IntPtrField
+	{ // field Struct.IntPtrField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -124,7 +124,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("intPtrField"), obj.IntPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Int16Field
+	{ // field Struct.Int16Field (int16)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int16,
@@ -148,7 +148,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("int16Field"), &obj.Int16Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Int32Field
+	{ // field Struct.Int32Field (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -172,7 +172,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("int32Field"), &obj.Int32Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Int64Field
+	{ // field Struct.Int64Field (int64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int64,
@@ -196,7 +196,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("int64Field"), &obj.Int64Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.UintField
+	{ // field Struct.UintField (uint)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *uint,
@@ -220,7 +220,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("uintField"), &obj.UintField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.UintPtrField
+	{ // field Struct.UintPtrField (uint)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *uint,
@@ -244,7 +244,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("uintPtrField"), obj.UintPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Uint16Field
+	{ // field Struct.Uint16Field (uint16)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *uint16,
@@ -268,7 +268,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("uint16Field"), &obj.Uint16Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Uint32Field
+	{ // field Struct.Uint32Field (uint32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *uint32,
@@ -292,7 +292,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("uint32Field"), &obj.Uint32Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Uint64Field
+	{ // field Struct.Uint64Field (uint64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *uint64,
@@ -316,7 +316,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("uint64Field"), &obj.Uint64Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.TypedefField
+	{ // field Struct.TypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/maximum.IntType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *IntType,
@@ -338,7 +338,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("typedefField"), &obj.TypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.TypedefPtrField
+	{ // field Struct.TypedefPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/maximum.IntType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *IntType,

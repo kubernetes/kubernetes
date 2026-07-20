@@ -62,7 +62,7 @@ func Validate_Struct(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *Struct) (errs field.ErrorList) {
 
-	{ // field Struct.StructType
+	{ // field Struct.StructType (k8s.io/code-generator/cmd/validation-gen/output_tests/_codegenignore/other.StructType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *other.StructType,

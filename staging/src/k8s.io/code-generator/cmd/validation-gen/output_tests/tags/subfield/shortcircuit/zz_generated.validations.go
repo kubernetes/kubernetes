@@ -289,7 +289,7 @@ func Validate_ParentWithAlphaOpaqueField(
 
 	// field ParentWithAlphaOpaqueField.TypeMeta has no validation
 
-	{ // field ParentWithAlphaOpaqueField.Field
+	{ // field ParentWithAlphaOpaqueField.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shortcircuit.TargetWithRequired)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *TargetWithRequired,
@@ -330,7 +330,7 @@ func Validate_ParentWithAlphaOpaqueImmutableField(
 
 	// field ParentWithAlphaOpaqueImmutableField.TypeMeta has no validation
 
-	{ // field ParentWithAlphaOpaqueImmutableField.Field
+	{ // field ParentWithAlphaOpaqueImmutableField.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shortcircuit.TargetWithImmutable)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *TargetWithImmutable,
@@ -371,7 +371,7 @@ func Validate_ParentWithForbidden(
 
 	// field ParentWithForbidden.TypeMeta has no validation
 
-	{ // field ParentWithForbidden.Field
+	{ // field ParentWithForbidden.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shortcircuit.TargetWithForbidden)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *TargetWithForbidden,
@@ -426,7 +426,7 @@ func Validate_ParentWithImmutable(
 
 	// field ParentWithImmutable.TypeMeta has no validation
 
-	{ // field ParentWithImmutable.Field
+	{ // field ParentWithImmutable.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shortcircuit.TargetWithImmutable)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *TargetWithImmutable,
@@ -477,7 +477,7 @@ func Validate_ParentWithMaxItems(
 
 	// field ParentWithMaxItems.TypeMeta has no validation
 
-	{ // field ParentWithMaxItems.Field
+	{ // field ParentWithMaxItems.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shortcircuit.TargetWithMaxItems)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *TargetWithMaxItems,
@@ -531,7 +531,7 @@ func Validate_ParentWithMaxProperties(
 
 	// field ParentWithMaxProperties.TypeMeta has no validation
 
-	{ // field ParentWithMaxProperties.Field
+	{ // field ParentWithMaxProperties.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shortcircuit.TargetWithMaxProperties)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *TargetWithMaxProperties,
@@ -585,7 +585,7 @@ func Validate_ParentWithMultipleShortCircuit(
 
 	// field ParentWithMultipleShortCircuit.TypeMeta has no validation
 
-	{ // field ParentWithMultipleShortCircuit.Field
+	{ // field ParentWithMultipleShortCircuit.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shortcircuit.TargetWithRequired)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *TargetWithRequired,
@@ -649,7 +649,7 @@ func Validate_ParentWithOpaqueAlias(
 
 	// field ParentWithOpaqueAlias.TypeMeta has no validation
 
-	{ // field ParentWithOpaqueAlias.Field
+	{ // field ParentWithOpaqueAlias.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shortcircuit.AliasOpaqueTargetWithRequired)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *AliasOpaqueTargetWithRequired,
@@ -690,7 +690,7 @@ func Validate_ParentWithOpaqueField(
 
 	// field ParentWithOpaqueField.TypeMeta has no validation
 
-	{ // field ParentWithOpaqueField.Field
+	{ // field ParentWithOpaqueField.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shortcircuit.TargetWithRequired)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *TargetWithRequired,
@@ -731,7 +731,7 @@ func Validate_ParentWithOpaqueImmutableAlias(
 
 	// field ParentWithOpaqueImmutableAlias.TypeMeta has no validation
 
-	{ // field ParentWithOpaqueImmutableAlias.Field
+	{ // field ParentWithOpaqueImmutableAlias.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shortcircuit.AliasOpaqueTargetWithImmutable)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *AliasOpaqueTargetWithImmutable,
@@ -772,7 +772,7 @@ func Validate_ParentWithOpaqueImmutableField(
 
 	// field ParentWithOpaqueImmutableField.TypeMeta has no validation
 
-	{ // field ParentWithOpaqueImmutableField.Field
+	{ // field ParentWithOpaqueImmutableField.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shortcircuit.TargetWithImmutable)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *TargetWithImmutable,
@@ -813,7 +813,7 @@ func Validate_ParentWithOptional(
 
 	// field ParentWithOptional.TypeMeta has no validation
 
-	{ // field ParentWithOptional.Field
+	{ // field ParentWithOptional.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shortcircuit.TargetWithOptional)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *TargetWithOptional,
@@ -864,7 +864,7 @@ func Validate_ParentWithPointerOpaqueAlias(
 
 	// field ParentWithPointerOpaqueAlias.TypeMeta has no validation
 
-	{ // field ParentWithPointerOpaqueAlias.Field
+	{ // field ParentWithPointerOpaqueAlias.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shortcircuit.AliasOpaqueTargetWithRequired)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *AliasOpaqueTargetWithRequired,
@@ -905,7 +905,7 @@ func Validate_ParentWithRequired(
 
 	// field ParentWithRequired.TypeMeta has no validation
 
-	{ // field ParentWithRequired.Field
+	{ // field ParentWithRequired.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shortcircuit.TargetWithRequired)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *TargetWithRequired,
@@ -956,7 +956,7 @@ func Validate_ParentWithSubfieldRequiredAndChildOptional(
 
 	// field ParentWithSubfieldRequiredAndChildOptional.TypeMeta has no validation
 
-	{ // field ParentWithSubfieldRequiredAndChildOptional.Field
+	{ // field ParentWithSubfieldRequiredAndChildOptional.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shortcircuit.TargetWithOptional)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *TargetWithOptional,
@@ -1012,7 +1012,7 @@ func Validate_ParentWithUpdate(
 
 	// field ParentWithUpdate.TypeMeta has no validation
 
-	{ // field ParentWithUpdate.Field
+	{ // field ParentWithUpdate.Field (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/shortcircuit.TargetWithUpdate)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *TargetWithUpdate,
@@ -1064,7 +1064,7 @@ func Validate_TargetWithForbidden(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *TargetWithForbidden) (errs field.ErrorList) {
 
-	{ // field TargetWithForbidden.Value
+	{ // field TargetWithForbidden.Value (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1105,7 +1105,7 @@ func Validate_TargetWithImmutable(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *TargetWithImmutable) (errs field.ErrorList) {
 
-	{ // field TargetWithImmutable.Value
+	{ // field TargetWithImmutable.Value (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1144,7 +1144,7 @@ func Validate_TargetWithMaxItems(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *TargetWithMaxItems) (errs field.ErrorList) {
 
-	{ // field TargetWithMaxItems.Value
+	{ // field TargetWithMaxItems.Value ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -1182,7 +1182,7 @@ func Validate_TargetWithMaxProperties(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *TargetWithMaxProperties) (errs field.ErrorList) {
 
-	{ // field TargetWithMaxProperties.Value
+	{ // field TargetWithMaxProperties.Value (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -1220,7 +1220,7 @@ func Validate_TargetWithOptional(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *TargetWithOptional) (errs field.ErrorList) {
 
-	{ // field TargetWithOptional.Value
+	{ // field TargetWithOptional.Value (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1257,7 +1257,7 @@ func Validate_TargetWithRequired(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *TargetWithRequired) (errs field.ErrorList) {
 
-	{ // field TargetWithRequired.Value
+	{ // field TargetWithRequired.Value (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1295,7 +1295,7 @@ func Validate_TargetWithUpdate(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *TargetWithUpdate) (errs field.ErrorList) {
 
-	{ // field TargetWithUpdate.Value
+	{ // field TargetWithUpdate.Value (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,

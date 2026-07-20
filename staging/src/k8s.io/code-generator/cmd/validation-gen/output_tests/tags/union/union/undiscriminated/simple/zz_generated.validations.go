@@ -108,7 +108,7 @@ func Validate_Struct(
 	// field Struct.TypeMeta has no validation
 	// field Struct.NonUnionField has no validation
 
-	{ // field Struct.M1
+	{ // field Struct.M1 (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/union/union/undiscriminated/simple.M1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *M1,
@@ -136,7 +136,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("m1"), obj.M1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.M2
+	{ // field Struct.M2 (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/union/union/undiscriminated/simple.M2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *M2,
@@ -164,7 +164,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("m2"), obj.M2, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.M3
+	{ // field Struct.M3 (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -192,7 +192,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("m3"), &obj.M3, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.M4
+	{ // field Struct.M4 (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -220,7 +220,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("m4"), obj.M4, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.M5
+	{ // field Struct.M5 ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -248,7 +248,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("m5"), obj.M5, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.M6
+	{ // field Struct.M6 (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,

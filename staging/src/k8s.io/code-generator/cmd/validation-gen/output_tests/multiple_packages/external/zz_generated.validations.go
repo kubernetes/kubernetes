@@ -38,9 +38,9 @@ func Validate_T1(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *types.T1) (errs field.ErrorList) {
 
-	// field types.T1.TypeMeta has no validation
+	// field T1.TypeMeta has no validation
 
-	{ // field types.T1.T2
+	{ // field T1.T2 (k8s.io/code-generator/cmd/validation-gen/output_tests/multiple_packages/types.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *types.T2,
@@ -66,7 +66,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("t2"), &obj.T2, oldVal, oldObj != nil)...)
 	}
 
-	{ // field types.T1.List
+	{ // field T1.List ([]k8s.io/code-generator/cmd/validation-gen/output_tests/multiple_packages/types.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []types.T2,
@@ -106,7 +106,7 @@ func Validate_T2(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *types.T2) (errs field.ErrorList) {
 
-	{ // field types.T2.S
+	{ // field T2.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -139,7 +139,7 @@ func Validate_T3(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *types.T3) (errs field.ErrorList) {
 
-	{ // field types.T3.S
+	{ // field T3.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,

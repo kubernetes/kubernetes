@@ -61,7 +61,7 @@ func Validate_Struct(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *Struct) (errs field.ErrorList) {
 
-	{ // field Struct.S
+	{ // field Struct.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -90,7 +90,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("s"), &obj.S, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.I
+	{ // field Struct.I (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -119,7 +119,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("i"), &obj.I, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.B
+	{ // field Struct.B (bool)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *bool,
@@ -148,7 +148,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("b"), &obj.B, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.F
+	{ // field Struct.F (float64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *float64,

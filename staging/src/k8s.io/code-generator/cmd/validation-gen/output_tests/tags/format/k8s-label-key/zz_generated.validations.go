@@ -76,7 +76,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.LabelKeyField
+	{ // field Struct.LabelKeyField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -100,7 +100,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("labelKeyField"), &obj.LabelKeyField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.LabelKeyPtrField
+	{ // field Struct.LabelKeyPtrField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -124,7 +124,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("labelKeyPtrField"), obj.LabelKeyPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.LabelKeyTypedefField
+	{ // field Struct.LabelKeyTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/format/k8s-label-key.LabelKeyStringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *LabelKeyStringType,

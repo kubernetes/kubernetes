@@ -110,9 +110,9 @@ func Validate_ClusterRole(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *rbacv1.ClusterRole) (errs field.ErrorList) {
 
-	// field rbacv1.ClusterRole.TypeMeta has no validation
+	// field ClusterRole.TypeMeta has no validation
 
-	{ // field rbacv1.ClusterRole.ObjectMeta
+	{ // field ClusterRole.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -134,7 +134,7 @@ func Validate_ClusterRole(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field rbacv1.ClusterRole.Rules
+	{ // field ClusterRole.Rules ([]k8s.io/api/rbac/v1.PolicyRule)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []rbacv1.PolicyRule,
@@ -166,7 +166,7 @@ func Validate_ClusterRole(
 		errs = append(errs, fn(fldPath.Child("rules"), obj.Rules, oldVal, oldObj != nil)...)
 	}
 
-	// field rbacv1.ClusterRole.AggregationRule has no validation
+	// field ClusterRole.AggregationRule has no validation
 	return errs
 }
 
@@ -176,9 +176,9 @@ func Validate_ClusterRoleBinding(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *rbacv1.ClusterRoleBinding) (errs field.ErrorList) {
 
-	// field rbacv1.ClusterRoleBinding.TypeMeta has no validation
+	// field ClusterRoleBinding.TypeMeta has no validation
 
-	{ // field rbacv1.ClusterRoleBinding.ObjectMeta
+	{ // field ClusterRoleBinding.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -200,7 +200,7 @@ func Validate_ClusterRoleBinding(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field rbacv1.ClusterRoleBinding.Subjects
+	{ // field ClusterRoleBinding.Subjects ([]k8s.io/api/rbac/v1.Subject)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []rbacv1.Subject,
@@ -232,7 +232,7 @@ func Validate_ClusterRoleBinding(
 		errs = append(errs, fn(fldPath.Child("subjects"), obj.Subjects, oldVal, oldObj != nil)...)
 	}
 
-	{ // field rbacv1.ClusterRoleBinding.RoleRef
+	{ // field ClusterRoleBinding.RoleRef (k8s.io/api/rbac/v1.RoleRef)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *rbacv1.RoleRef,
@@ -272,7 +272,7 @@ func Validate_PolicyRule(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *rbacv1.PolicyRule) (errs field.ErrorList) {
 
-	{ // field rbacv1.PolicyRule.Verbs
+	{ // field PolicyRule.Verbs ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -301,10 +301,10 @@ func Validate_PolicyRule(
 		errs = append(errs, fn(fldPath.Child("verbs"), obj.Verbs, oldVal, oldObj != nil)...)
 	}
 
-	// field rbacv1.PolicyRule.APIGroups has no validation
-	// field rbacv1.PolicyRule.Resources has no validation
-	// field rbacv1.PolicyRule.ResourceNames has no validation
-	// field rbacv1.PolicyRule.NonResourceURLs has no validation
+	// field PolicyRule.APIGroups has no validation
+	// field PolicyRule.Resources has no validation
+	// field PolicyRule.ResourceNames has no validation
+	// field PolicyRule.NonResourceURLs has no validation
 	return errs
 }
 
@@ -314,9 +314,9 @@ func Validate_Role(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *rbacv1.Role) (errs field.ErrorList) {
 
-	// field rbacv1.Role.TypeMeta has no validation
+	// field Role.TypeMeta has no validation
 
-	{ // field rbacv1.Role.ObjectMeta
+	{ // field Role.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -338,7 +338,7 @@ func Validate_Role(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field rbacv1.Role.Rules
+	{ // field Role.Rules ([]k8s.io/api/rbac/v1.PolicyRule)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []rbacv1.PolicyRule,
@@ -379,9 +379,9 @@ func Validate_RoleBinding(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *rbacv1.RoleBinding) (errs field.ErrorList) {
 
-	// field rbacv1.RoleBinding.TypeMeta has no validation
+	// field RoleBinding.TypeMeta has no validation
 
-	{ // field rbacv1.RoleBinding.ObjectMeta
+	{ // field RoleBinding.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -403,7 +403,7 @@ func Validate_RoleBinding(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field rbacv1.RoleBinding.Subjects
+	{ // field RoleBinding.Subjects ([]k8s.io/api/rbac/v1.Subject)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []rbacv1.Subject,
@@ -435,7 +435,7 @@ func Validate_RoleBinding(
 		errs = append(errs, fn(fldPath.Child("subjects"), obj.Subjects, oldVal, oldObj != nil)...)
 	}
 
-	{ // field rbacv1.RoleBinding.RoleRef
+	{ // field RoleBinding.RoleRef (k8s.io/api/rbac/v1.RoleRef)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *rbacv1.RoleRef,
@@ -475,10 +475,10 @@ func Validate_RoleRef(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *rbacv1.RoleRef) (errs field.ErrorList) {
 
-	// field rbacv1.RoleRef.APIGroup has no validation
-	// field rbacv1.RoleRef.Kind has no validation
+	// field RoleRef.APIGroup has no validation
+	// field RoleRef.Kind has no validation
 
-	{ // field rbacv1.RoleRef.Name
+	{ // field RoleRef.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -516,10 +516,10 @@ func Validate_Subject(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *rbacv1.Subject) (errs field.ErrorList) {
 
-	// field rbacv1.Subject.Kind has no validation
-	// field rbacv1.Subject.APIGroup has no validation
+	// field Subject.Kind has no validation
+	// field Subject.APIGroup has no validation
 
-	{ // field rbacv1.Subject.Name
+	{ // field Subject.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -548,6 +548,6 @@ func Validate_Subject(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	// field rbacv1.Subject.Namespace has no validation
+	// field Subject.Namespace has no validation
 	return errs
 }

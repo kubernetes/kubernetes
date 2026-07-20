@@ -64,7 +64,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.ListField
+	{ // field Struct.ListField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/immutable_transitions.Item)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Item,

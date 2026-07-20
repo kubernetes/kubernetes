@@ -40,7 +40,7 @@ func Validate_Device(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *Device) (errs field.ErrorList) {
 
-	{ // field Device.Driver
+	{ // field Device.Driver (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -75,7 +75,7 @@ func Validate_Device(
 		errs = append(errs, fn(fldPath.Child("driver"), &obj.Driver, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Device.Pool
+	{ // field Device.Pool (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -107,7 +107,7 @@ func Validate_Device(
 		errs = append(errs, fn(fldPath.Child("pool"), &obj.Pool, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Device.Name
+	{ // field Device.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -139,7 +139,7 @@ func Validate_Device(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Device.Attributes
+	{ // field Device.Attributes (map[k8s.io/api/resource/v1.QualifiedName]k8s.io/api/resource/v1.DeviceAttribute)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[v1.QualifiedName]v1.DeviceAttribute,
@@ -175,7 +175,7 @@ func Validate_Device(
 		errs = append(errs, fn(fldPath.Child("attributes"), obj.Attributes, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Device.NetworkData
+	{ // field Device.NetworkData (k8s.io/api/resource/v1.NetworkDeviceData)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.NetworkDeviceData,
@@ -218,7 +218,7 @@ func Validate_DeviceMetadata(
 
 	// field DeviceMetadata.TypeMeta has no validation
 
-	{ // field DeviceMetadata.ObjectMeta
+	{ // field DeviceMetadata.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -240,7 +240,7 @@ func Validate_DeviceMetadata(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceMetadata.PodClaimName
+	{ // field DeviceMetadata.PodClaimName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -271,7 +271,7 @@ func Validate_DeviceMetadata(
 		errs = append(errs, fn(fldPath.Child("podClaimName"), obj.PodClaimName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceMetadata.Requests
+	{ // field DeviceMetadata.Requests ([]k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1.DeviceMetadataRequest)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []DeviceMetadataRequest,
@@ -312,7 +312,7 @@ func Validate_DeviceMetadataRequest(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *DeviceMetadataRequest) (errs field.ErrorList) {
 
-	{ // field DeviceMetadataRequest.Name
+	{ // field DeviceMetadataRequest.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -341,7 +341,7 @@ func Validate_DeviceMetadataRequest(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field DeviceMetadataRequest.Devices
+	{ // field DeviceMetadataRequest.Devices ([]k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1.Device)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Device,

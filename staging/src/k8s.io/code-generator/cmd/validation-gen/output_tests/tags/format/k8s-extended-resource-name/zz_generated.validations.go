@@ -63,7 +63,7 @@ func Validate_MyType(
 
 	// field MyType.TypeMeta has no validation
 
-	{ // field MyType.NameField
+	{ // field MyType.NameField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -94,7 +94,7 @@ func Validate_MyType(
 		errs = append(errs, fn(fldPath.Child("nameField"), &obj.NameField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MyType.NamePtrField
+	{ // field MyType.NamePtrField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -125,7 +125,7 @@ func Validate_MyType(
 		errs = append(errs, fn(fldPath.Child("namePtrField"), obj.NamePtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MyType.NameTypedefField
+	{ // field MyType.NameTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/format/k8s-extended-resource-name.NameStringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *NameStringType,

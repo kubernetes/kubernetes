@@ -61,7 +61,7 @@ func Validate_T1(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T1) (errs field.ErrorList) {
 
-	{ // field T1.Public
+	{ // field T1.Public (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
