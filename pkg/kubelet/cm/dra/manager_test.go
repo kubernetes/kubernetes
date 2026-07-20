@@ -1674,6 +1674,59 @@ func TestPodMightNeedToUnprepareResources(t *testing.T) {
 	claimInfo.addPodReference(types.UID(podUID))
 	needsUnprepare := manager.PodMightNeedToUnprepareResources(types.UID(podUID))
 	assert.True(t, needsUnprepare)
+
+	// Unknown pod UID must return false.
+	assert.False(t, manager.PodMightNeedToUnprepareResources(types.UID("no-such-pod")))
+}
+
+// TestPodMightNeedToUnprepareResourcesConcurrentReads verifies that
+// PodMightNeedToUnprepareResources acquires only a read lock on the claim
+// info cache: multiple callers must be able to run concurrently with each
+// other and with an already-held read lock, without serializing on a writer.
+// This would deadlock or block if the method took a write lock.
+func TestPodMightNeedToUnprepareResourcesConcurrentReads(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeKubeClient := fake.NewSimpleClientset()
+	manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
+	require.NoError(t, err, "create DRA manager")
+	defer manager.Stop()
+
+	claimInfo := &ClaimInfo{
+		ClaimInfoState: state.ClaimInfoState{PodUIDs: sets.New(podUID), ClaimName: claimName, Namespace: namespace},
+	}
+	manager.cache.add(claimInfo)
+
+	// Hold a read lock on the cache for the duration of the concurrent calls.
+	// A correct implementation of PodMightNeedToUnprepareResources uses RLock
+	// and thus completes; a write-lock implementation would block until this
+	// outer lock is released, causing the test to time out.
+	//
+	// This test assumes no other goroutine takes the cache's write lock while
+	// it runs. sync.RWMutex does not guarantee that a second RLock will
+	// succeed if a writer is already waiting, so if the manager ever gains a
+	// background goroutine that writes to the cache, this test would need to
+	// keep that goroutine out or the RLock inside PodMightNeedToUnprepareResources
+	// could block behind the pending writer.
+	manager.cache.RLock()
+	defer manager.cache.RUnlock()
+
+	const workers = 16
+	done := make(chan bool, workers)
+	for range workers {
+		go func() {
+			done <- manager.PodMightNeedToUnprepareResources(types.UID(podUID))
+		}()
+	}
+
+	timeout := time.After(5 * time.Second)
+	for range workers {
+		select {
+		case got := <-done:
+			assert.True(t, got, "PodMightNeedToUnprepareResources should return true while pod reference is held")
+		case <-timeout:
+			t.Fatal("PodMightNeedToUnprepareResources blocked with an outer read lock held; it must use RLock")
+		}
+	}
 }
 
 func TestGetContainerClaimInfos(t *testing.T) {
