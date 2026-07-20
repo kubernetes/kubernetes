@@ -410,6 +410,8 @@ func device(name string, capacity any, attributes map[resourceapi.QualifiedName]
 	switch capacity := capacity.(type) {
 	case map[resourceapi.QualifiedName]resource.Quantity:
 		device.Capacity = toDeviceCapacity(capacity)
+	case map[resourceapi.QualifiedName]resourceapi.DeviceCapacity:
+		device.Capacity = capacity
 	case string:
 		if capacity == fromCounters {
 			capacityFromCounters = true
@@ -5869,6 +5871,39 @@ func TestAllocator(t *testing.T,
 			),
 			node:          node(node1, region1),
 			expectResults: []any{},
+		},
+		"consumable-capacity-requests-are-not-modified": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					deviceRequest(req0, classA, 1).withCapacityRequest(ptr.To(two)),
+					deviceRequest(req1, classA, 1).withCapacityRequest(ptr.To(resource.MustParse("1000000000000000000000"))),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+						capacity0: {
+							Value: resource.MustParse("1000000000000000000002"),
+							RequestPolicy: &resourceapi.CapacityRequestPolicy{
+								Default: ptr.To(resource.MustParse("1000000000000000000000")),
+								ValidRange: &resourceapi.CapacityRequestPolicyRange{
+									Min: &two,
+								},
+							},
+						},
+					}, nil).withAllowMultipleAllocations(),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+				deviceRequestAllocationResult(req1, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: resource.MustParse("1000000000000000000000")}),
+			)},
 		},
 		"allow-multiple-allocations-exclude-multi-allocatable-device-by-class-selector": {
 			features: Features{
