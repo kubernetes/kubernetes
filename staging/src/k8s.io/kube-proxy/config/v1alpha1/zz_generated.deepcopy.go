@@ -144,6 +144,11 @@ func (in *KubeProxyIPTablesConfiguration) DeepCopyInto(out *KubeProxyIPTablesCon
 		*out = new(bool)
 		**out = **in
 	}
+	if in.SNATNodeInternalIP != nil {
+		in, out := &in.SNATNodeInternalIP, &out.SNATNodeInternalIP
+		*out = new(bool)
+		**out = **in
+	}
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
 	return
@@ -191,6 +196,11 @@ func (in *KubeProxyNFTablesConfiguration) DeepCopyInto(out *KubeProxyNFTablesCon
 	if in.MasqueradeBit != nil {
 		in, out := &in.MasqueradeBit, &out.MasqueradeBit
 		*out = new(int32)
+		**out = **in
+	}
+	if in.SNATNodeInternalIP != nil {
+		in, out := &in.SNATNodeInternalIP, &out.SNATNodeInternalIP
+		*out = new(bool)
 		**out = **in
 	}
 	out.SyncPeriod = in.SyncPeriod
