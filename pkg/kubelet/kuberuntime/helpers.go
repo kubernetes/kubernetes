@@ -425,13 +425,13 @@ func convertResourceConfigToLinuxContainerResources(rc *cm.ResourceConfig) *runt
 	if rc.CPUPeriod != nil {
 		lcr.CpuPeriod = int64(*rc.CPUPeriod)
 	}
-	if rc.CPUQuota != nil {
+	if rc.CPUQuota != nil && *rc.CPUQuota > 0 {
 		lcr.CpuQuota = *rc.CPUQuota
 	}
 	if rc.CPUShares != nil {
 		lcr.CpuShares = int64(*rc.CPUShares)
 	}
-	if rc.Memory != nil {
+	if rc.Memory != nil && *rc.Memory > 0 {
 		lcr.MemoryLimitInBytes = *rc.Memory
 	}
 	if rc.CPUSet.Size() > 0 {

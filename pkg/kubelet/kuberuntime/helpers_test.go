@@ -585,22 +585,50 @@ func TestMergeResourceConfig(t *testing.T) {
 }
 
 func TestConvertResourceConfigToLinuxContainerResources(t *testing.T) {
-	resCfg := &cm.ResourceConfig{
-		Memory:        ptr.To[int64](2048),
-		CPUShares:     ptr.To[uint64](2),
-		CPUPeriod:     ptr.To[uint64](10000),
-		CPUQuota:      ptr.To[int64](5000),
-		HugePageLimit: map[int64]int64{4096: 2048},
-		Unified:       map[string]string{"key1": "value1"},
+	tests := []struct {
+		name     string
+		resCfg   *cm.ResourceConfig
+		expected *runtimeapi.LinuxContainerResources
+	}{
+		{
+			name: "finite limits",
+			resCfg: &cm.ResourceConfig{
+				Memory:        ptr.To[int64](2048),
+				CPUShares:     ptr.To[uint64](2),
+				CPUPeriod:     ptr.To[uint64](10000),
+				CPUQuota:      ptr.To[int64](5000),
+				HugePageLimit: map[int64]int64{4096: 2048},
+				Unified:       map[string]string{"key1": "value1"},
+			},
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          10000,
+				CpuQuota:           5000,
+				CpuShares:          2,
+				MemoryLimitInBytes: 2048,
+				Unified:            map[string]string{"key1": "value1"},
+			},
+		},
+		{
+			name: "unlimited cgroup sentinels",
+			resCfg: &cm.ResourceConfig{
+				Memory:    ptr.To[int64](-1),
+				CPUShares: ptr.To[uint64](2),
+				CPUPeriod: ptr.To[uint64](10000),
+				CPUQuota:  ptr.To[int64](-1),
+			},
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod: 10000,
+				CpuShares: 2,
+			},
+		},
 	}
 
-	lcr := convertResourceConfigToLinuxContainerResources(resCfg)
-
-	assert.Equal(t, int64(*resCfg.CPUPeriod), lcr.CpuPeriod)
-	assert.Equal(t, *resCfg.CPUQuota, lcr.CpuQuota)
-	assert.Equal(t, int64(*resCfg.CPUShares), lcr.CpuShares)
-	assert.Equal(t, *resCfg.Memory, lcr.MemoryLimitInBytes)
-	assert.Equal(t, resCfg.Unified, lcr.Unified)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lcr := convertResourceConfigToLinuxContainerResources(tt.resCfg)
+			assert.Equal(t, tt.expected, lcr)
+		})
+	}
 }
 
 func TestContainerByCreatedThenID(t *testing.T) {
