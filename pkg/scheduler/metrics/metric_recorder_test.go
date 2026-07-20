@@ -196,6 +196,29 @@ func TestInFlightEventAsync(t *testing.T) {
 	}
 }
 
+func TestCounterVecAsync(t *testing.T) {
+	SchedulerQueueIncomingPods.Reset()
+	t.Cleanup(SchedulerQueueIncomingPods.Reset)
+
+	r := &MetricAsyncRecorder{
+		bufferSize:         2,
+		counterVecBufferCh: make(chan *counterVecMetric, 2),
+	}
+	r.AddCounterVecAsync(SchedulerQueueIncomingPods, 2, "active", "test")
+	r.IncCounterVecAsync(SchedulerQueueIncomingPods, "active", "test")
+	r.FlushMetrics()
+
+	metricName := SchedulerSubsystem + "_" + SchedulerQueueIncomingPods.Name
+	want := `
+# HELP scheduler_queue_incoming_pods_total [STABLE] Number of pods added to scheduling queues by event and queue type.
+# TYPE scheduler_queue_incoming_pods_total counter
+scheduler_queue_incoming_pods_total{event="test",queue="active"} 3
+`
+	if err := testutil.CollectAndCompare(SchedulerQueueIncomingPods, strings.NewReader(want), metricName); err != nil {
+		t.Fatalf("unexpected collected metrics: %v", err)
+	}
+}
+
 func TestEntityToLabel(t *testing.T) {
 	tests := []struct {
 		name      string

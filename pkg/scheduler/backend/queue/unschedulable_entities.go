@@ -74,7 +74,7 @@ func (u *unschedulableEntities) addOrUpdate(entity framework.QueuedEntityInfo, g
 		} else {
 			u.unschedulableRecorder.Add(entity)
 		}
-		recordIncomingEntitiesMetrics("unschedulable", entity, event, strategy)
+		recordIncomingEntitiesMetrics(nil, "unschedulable", entity, event, strategy)
 	}
 	u.entityInfoMap[entityKey] = entity
 }

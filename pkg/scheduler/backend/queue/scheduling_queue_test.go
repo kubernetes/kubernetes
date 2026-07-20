@@ -5024,12 +5024,14 @@ func TestIncomingPodsMetrics(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			metrics.SchedulerQueueIncomingPods.Reset()
-			queue := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
+			recorder := metrics.NewMetricsAsyncRecorder(10, 20*time.Microsecond, tCtx.Done())
+			queue := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)), WithMetricsRecorder(recorder))
 			for _, op := range test.operations {
 				for _, pInfo := range pInfos {
 					op(tCtx, queue, pInfo)
 				}
 			}
+			recorder.FlushMetrics()
 			metricName := metrics.SchedulerSubsystem + "_" + metrics.SchedulerQueueIncomingPods.Name
 			if err := testutil.CollectAndCompare(metrics.SchedulerQueueIncomingPods, strings.NewReader(queueMetricMetadata+test.want), metricName); err != nil {
 				t.Errorf("unexpected collecting result:\n%s", err)
@@ -5122,9 +5124,11 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			metrics.SchedulerQueueIncomingEntities.Reset()
-			queue := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
+			recorder := metrics.NewMetricsAsyncRecorder(10, 20*time.Microsecond, tCtx.Done())
+			queue := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)), WithMetricsRecorder(recorder))
 			queue.AddPodGroup(logger, st.MakePodGroup().Name("pg-1").Namespace("ns-pg").Obj())
 			test.run(tCtx, queue)
+			recorder.FlushMetrics()
 			if err := testutil.CollectAndCompare(metrics.SchedulerQueueIncomingEntities, strings.NewReader(queueIncomingEntitiesMetricMetadata+test.want), metricName); err != nil {
 				t.Errorf("unexpected collecting result:\n%s", err)
 			}

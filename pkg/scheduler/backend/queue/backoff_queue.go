@@ -310,7 +310,7 @@ func (bq *backoffQueue) add(logger klog.Logger, entity framework.QueuedEntityInf
 			logger.Error(nil, "BackoffQueue add() was called with an entity that was already in the entityBackoffQ", "type", entity.Type(), "entity", klog.KObj(entity))
 			return
 		}
-		recordIncomingEntitiesMetrics("backoff", entity, event, strategy)
+		recordIncomingEntitiesMetrics(nil, "backoff", entity, event, strategy)
 		logger.V(5).Info("Entity moved to an internal scheduling queue", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", backoffQ)
 		return
 	}
@@ -320,7 +320,7 @@ func (bq *backoffQueue) add(logger klog.Logger, entity framework.QueuedEntityInf
 		logger.Error(nil, "BackoffQueue add() was called with an entity that was already in the entityErrorBackoffQ", "type", entity.Type(), "entity", klog.KObj(entity))
 		return
 	}
-	recordIncomingEntitiesMetrics("backoff", entity, event, strategy)
+	recordIncomingEntitiesMetrics(nil, "backoff", entity, event, strategy)
 	logger.V(5).Info("Entity moved to an internal scheduling queue", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", backoffQ)
 }
 
