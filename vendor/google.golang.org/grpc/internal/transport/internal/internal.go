@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021 gRPC authors.
+ * Copyright 2026 gRPC authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,10 @@
  *
  */
 
-package grpcutil
+// Package internal contains functionality internal to the transport package.
+package internal
 
-import "regexp"
-
-// FullMatchWithRegex returns whether the full text matches the regex provided.
-func FullMatchWithRegex(re *regexp.Regexp, text string) bool {
-	if len(text) == 0 {
-		return re.MatchString(text)
-	}
-	re.Longest()
-	rem := re.FindString(text)
-	return len(rem) == len(text)
-}
+// TimeNowFunc is a variable that can be set to override the default behavior of
+// getting the current time in nanoseconds. It is used in transport code to set
+// channelz timestamps, and is exposed here for testing purposes.
+var TimeNowFunc func() int64
