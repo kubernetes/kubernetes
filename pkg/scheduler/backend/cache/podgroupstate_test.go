@@ -270,3 +270,86 @@ func TestCompositePodGroupState_Children(t *testing.T) {
 		t.Errorf("Unexpected children result (-want,+got):\n%s", diff)
 	}
 }
+
+func TestPodGroupState_AssumedInThisCycleCount(t *testing.T) {
+	pod1 := st.MakePod().Namespace("ns1").Name("p1").UID("p1").PodGroupName("pg1").Obj()
+	pod2 := st.MakePod().Namespace("ns1").Name("p2").UID("p2").PodGroupName("pg1").Obj()
+	unknownPod := st.MakePod().Namespace("ns1").Name("unknown").UID("unknown").PodGroupName("pg1").Obj()
+
+	tests := []struct {
+		name          string
+		action        func(snap *podGroupStateSnapshot)
+		expectedCount int
+	}{
+		{
+			name:          "initial snapshot has count 0",
+			action:        func(snap *podGroupStateSnapshot) {},
+			expectedCount: 0,
+		},
+		{
+			name:          "assuming a pod in the snapshot increments count",
+			action:        func(snap *podGroupStateSnapshot) { snap.assumePod(pod2) },
+			expectedCount: 1,
+		},
+		{
+			name: "forgetting the assumed pod decrements count",
+			action: func(snap *podGroupStateSnapshot) {
+				snap.assumePod(pod2)
+				snap.forgetPod(pod2.UID)
+			},
+			expectedCount: 0,
+		},
+		{
+			name:          "assuming an unknown pod does not increment count (desync scenario)",
+			action:        func(snap *podGroupStateSnapshot) { snap.assumePod(unknownPod) },
+			expectedCount: 0,
+		},
+		{
+			name:          "re-assuming an already assumed pod does not increment count (spurious assume)",
+			action:        func(snap *podGroupStateSnapshot) { snap.assumePod(pod1) },
+			expectedCount: 0,
+		},
+		{
+			name:          "forgetting a pod assumed before the snapshot does not affect count",
+			action:        func(snap *podGroupStateSnapshot) { snap.forgetPod(pod1.UID) },
+			expectedCount: 0,
+		},
+		{
+			name: "re-assuming a pod assumed during the snapshot does not increment count",
+			action: func(snap *podGroupStateSnapshot) {
+				snap.assumePod(pod2)
+				snap.assumePod(pod2)
+			},
+			expectedCount: 1,
+		},
+		{
+			name:          "forgetting a pod that was never assumed does not affect count",
+			action:        func(snap *podGroupStateSnapshot) { snap.forgetPod(pod2.UID) },
+			expectedCount: 0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set up a fresh podGroupState for every subtest
+			pgs := newPodGroupState()
+			pgs.addPod(pod1)
+			pgs.addPod(pod2)
+
+			// Live state should always return 0 for AssumedInThisCycleCount.
+			pgs.assumePod(pod1)
+			if diff := cmp.Diff(0, pgs.AssumedInThisCycleCount()); diff != "" {
+				t.Fatalf("unexpected live podGroupState AssumedInThisCycleCount result (-want,+got):\n%s", diff)
+			}
+
+			// Spawn an isolated snapshot for this scenario
+			snap := pgs.snapshot()
+
+			tc.action(snap)
+
+			if diff := cmp.Diff(tc.expectedCount, snap.AssumedInThisCycleCount()); diff != "" {
+				t.Errorf("unexpected AssumedInThisCycleCount result (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
