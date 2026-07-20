@@ -32,7 +32,7 @@ import (
 )
 
 type RESTStorageProvider struct {
-	Authorizer   authorizer.UnconditionalAuthorizer
+	Authorizer   authorizer.Authorizer
 	RuleResolver authorizer.RuleResolver
 }
 
