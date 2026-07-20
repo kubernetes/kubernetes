@@ -537,13 +537,13 @@ func TestHandleNodeUpdate(t *testing.T) {
 			description:           "internal IP updated",
 			clientset:             fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
 			updatedNode:           v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.2"}}}},
-			expectedWorkqueueItem: "routes",
+			expectedWorkqueueItem: routesSyncKey,
 		},
 		{
 			description:           "pod CIDR updated",
 			clientset:             fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
 			updatedNode:           v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.121.0.0/24", PodCIDRs: []string{"10.121.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}}},
-			expectedWorkqueueItem: "routes",
+			expectedWorkqueueItem: routesSyncKey,
 		},
 		{
 			description: "node object not updated",
