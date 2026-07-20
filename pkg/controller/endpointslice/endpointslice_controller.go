@@ -360,9 +360,8 @@ func (c *Controller) handleErr(logger klog.Logger, err error, key string) {
 		return
 	}
 
-	logger.Info("Retry budget exceeded, dropping service out of the queue", "key", key, "err", err)
 	c.serviceQueue.Forget(key)
-	utilruntime.HandleError(err)
+	utilruntime.HandleErrorWithLogger(logger, err, "Retry budget exceeded, dropping service out of the queue", "key", key)
 }
 
 func (c *Controller) syncService(logger klog.Logger, key string) error {
@@ -480,9 +479,8 @@ func (c *Controller) handlePodErr(logger klog.Logger, err error, key *endpointsl
 		return
 	}
 
-	logger.Info("Dropping pod out of the queue", "PodProjectionKey", *key)
 	c.podQueue.Forget(key)
-	utilruntime.HandleError(err)
+	utilruntime.HandleErrorWithLogger(logger, err, "Dropping pod out of the queue", "PodProjectionKey", *key)
 }
 
 func (c *Controller) syncPod(logger klog.Logger, key *endpointsliceutil.PodProjectionKey) error {
@@ -555,7 +553,7 @@ func (c *Controller) onEndpointSliceUpdate(logger klog.Logger, prevObj, obj inte
 	prevEndpointSlice := prevObj.(*discovery.EndpointSlice)
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	if endpointSlice == nil || prevEndpointSlice == nil {
-		utilruntime.HandleError(fmt.Errorf("Invalid EndpointSlice provided to onEndpointSliceUpdate()"))
+		utilruntime.HandleErrorWithLogger(logger, nil, "Invalid EndpointSlice provided to onEndpointSliceUpdate()")
 		return
 	}
 	// EndpointSlice generation does not change when labels change. Although the
