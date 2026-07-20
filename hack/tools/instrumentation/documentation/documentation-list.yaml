@@ -7332,6 +7332,10 @@
   - 30
   - 45
   - 60
+  - 90
+  - 120
+  - 180
+  - 300
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics

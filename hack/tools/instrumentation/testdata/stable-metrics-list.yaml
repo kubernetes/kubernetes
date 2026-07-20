@@ -243,6 +243,10 @@
   - 30
   - 45
   - 60
+  - 90
+  - 120
+  - 180
+  - 300
 - name: x509_insecure_sha1_total
   subsystem: webhooks
   namespace: apiserver
