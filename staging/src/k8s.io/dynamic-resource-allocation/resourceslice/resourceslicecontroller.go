@@ -126,6 +126,11 @@ type Controller struct {
 
 	// Optional pool name to reconcile.
 	reconcilePoolWithName string
+
+	// usePoolNameFieldSelector is disabled when the API server rejects the
+	// spec.pool.name field selector. Access must be atomic because List and Watch
+	// can run concurrently.
+	usePoolNameFieldSelector atomic.Bool
 }
 
 // +k8s:deepcopy-gen=true
@@ -495,6 +500,7 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 			utilruntime.HandleErrorWithContext(ctx, err, msg)
 		}
 	}
+	c.usePoolNameFieldSelector.Store(c.reconcilePoolWithName != "")
 	if err := c.initInformer(ctx); err != nil {
 		return nil, err
 	}
@@ -508,19 +514,23 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 func (c *Controller) initInformer(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
 
-	// We always filter by driver name, by node name only for node-local resources.
-	selector := fields.Set{
-		resourceapi.ResourceSliceSelectorDriver:   c.driverName,
-		resourceapi.ResourceSliceSelectorNodeName: "",
+	fieldSelector := func(includePoolName bool) string {
+		// We always filter by driver name, by node name only for node-local resources.
+		selector := fields.Set{
+			resourceapi.ResourceSliceSelectorDriver:   c.driverName,
+			resourceapi.ResourceSliceSelectorNodeName: "",
+		}
+		if c.owner != nil && c.owner.APIVersion == "v1" && c.owner.Kind == "Node" && c.reconcilePoolWithName == "" {
+			selector[resourceapi.ResourceSliceSelectorNodeName] = c.owner.Name
+		}
+		if includePoolName {
+			selector[resourceapi.ResourceSliceSelectorPoolName] = c.reconcilePoolWithName
+		}
+
+		return selector.String()
 	}
-	// TODO: We can list/watch ResourceSlices with field selectors for NodeName or Driver.
-	// There is no field selector for PoolName, so we apply additional client-side filtering in list/watch. Issue for adding a PoolName field selector:                                                     │
-	// https://github.com/kubernetes/kubernetes/issues/137413
-	if c.owner != nil && c.owner.APIVersion == "v1" && c.owner.Kind == "Node" && c.reconcilePoolWithName == "" {
-		selector[resourceapi.ResourceSliceSelectorNodeName] = c.owner.Name
-	}
-	tweakListOptions := func(options *metav1.ListOptions) {
-		options.FieldSelector = selector.String()
+	tweakListOptions := func(options *metav1.ListOptions, includePoolName bool) {
+		options.FieldSelector = fieldSelector(includePoolName)
 	}
 	indexers := cache.Indexers{
 		poolNameIndex: func(obj interface{}) ([]string, error) {
@@ -534,25 +544,39 @@ func (c *Controller) initInformer(ctx context.Context) error {
 	informer := cache.NewSharedIndexInformer(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
-				tweakListOptions(&options)
+				usePoolNameFieldSelector := c.usePoolNameFieldSelector.Load()
+				tweakListOptions(&options, usePoolNameFieldSelector)
 				slices, err := c.resourceClient.ResourceSlices().List(ctx, options)
+				if err != nil && usePoolNameFieldSelector && isUnsupportedPoolNameFieldSelector(err) {
+					c.usePoolNameFieldSelector.Store(false)
+					usePoolNameFieldSelector = false
+					tweakListOptions(&options, usePoolNameFieldSelector)
+					slices, err = c.resourceClient.ResourceSlices().List(ctx, options)
+				}
 				if err == nil {
 					logger.V(5).Info("Listed ResourceSlices", "resourceAPI", c.resourceClient.CurrentAPI(), "numSlices", len(slices.Items), "listMeta", slices.ListMeta)
 				} else {
 					logger.V(5).Info("Listed ResourceSlices", "resourceAPI", c.resourceClient.CurrentAPI(), "err", err)
 				}
 
-				if c.reconcilePoolWithName != "" {
+				if err == nil && c.reconcilePoolWithName != "" && !usePoolNameFieldSelector {
 					retainSlicesByPoolName(slices, c.reconcilePoolWithName)
 				}
 				return slices, err
 			},
 			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
-				tweakListOptions(&options)
+				usePoolNameFieldSelector := c.usePoolNameFieldSelector.Load()
+				tweakListOptions(&options, usePoolNameFieldSelector)
 				w, err := c.resourceClient.ResourceSlices().Watch(ctx, options)
+				if err != nil && usePoolNameFieldSelector && isUnsupportedPoolNameFieldSelector(err) {
+					c.usePoolNameFieldSelector.Store(false)
+					usePoolNameFieldSelector = false
+					tweakListOptions(&options, usePoolNameFieldSelector)
+					w, err = c.resourceClient.ResourceSlices().Watch(ctx, options)
+				}
 				logger.V(5).Info("Started watching ResourceSlices", "resourceAPI", c.resourceClient.CurrentAPI(), "err", err)
 
-				if c.reconcilePoolWithName != "" {
+				if err == nil && c.reconcilePoolWithName != "" && !usePoolNameFieldSelector {
 					return filterSliceWatchByPoolName(ctx, w, c.reconcilePoolWithName), nil
 				}
 
@@ -1138,6 +1162,12 @@ func retainSlicesByPoolName(sliceList *resourceapi.ResourceSliceList, poolName s
 	sliceList.Items = slices.DeleteFunc(sliceList.Items, func(slice resourceapi.ResourceSlice) bool {
 		return slice.Spec.Pool.Name != poolName
 	})
+}
+
+// isUnsupportedPoolNameFieldSelector is needed for backwards compatibility.
+// The client-side list and watch filtering fallback can be removed in the future.
+func isUnsupportedPoolNameFieldSelector(err error) bool {
+	return apierrors.IsBadRequest(err)
 }
 
 func filterSliceWatchByPoolName(ctx context.Context, w watch.Interface, poolName string) watch.Interface {
