@@ -799,6 +799,17 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		return err
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI) && !cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntimeEndpoint) {
+		_, err := kubeDeps.RemoteRuntimeService.PodSandboxStats(ctx, "")
+		if err != nil {
+			s, ok := status.FromError(err)
+			if ok && s.Code() == codes.Unimplemented {
+				logger.Info("CRI implementation does not support PodSandboxStats, falling back to cadvisor stats")
+				kubeDeps.PodSandboxStatsUnimplemented = true
+			}
+		}
+	}
+
 	// Get cgroup driver setting from CRI
 	if err := getCgroupDriverFromCRI(ctx, s, kubeDeps); err != nil {
 		return err
@@ -832,7 +843,8 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 	if kubeDeps.CAdvisorInterface == nil {
 		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntimeEndpoint)
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(klog.FromContext(ctx), imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntimeEndpoint), s.LocalStorageCapacityIsolation)
+		disableContainerDiscovery := utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI) && !kubeDeps.PodSandboxStatsUnimplemented
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(klog.FromContext(ctx), imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntimeEndpoint), s.LocalStorageCapacityIsolation, disableContainerDiscovery)
 		if err != nil {
 			return err
 		}

@@ -29,9 +29,6 @@ import (
 	cadvisormemory "github.com/google/cadvisor/lib/cache/memory"
 	cadvisorfs "github.com/google/cadvisor/lib/fs"
 	cadvisorapi "github.com/google/cadvisor/lib/model"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -81,17 +78,16 @@ type criStatsProvider struct {
 	windowsNetworkStatsProvider interface{} //nolint:unused // U1000 We can't import hcsshim due to Build constraints in hcsshim
 	// clock is used report current time
 	clock clock.Clock
-	// fallbackStatsProvider is used to fill in missing information incase the CRI
-	// provides insufficient data.
-	// TODO: A lot of the cadvisorStatsProvider logic is duplicated in this file, and should be read
-	//       from the fallbackStatsProvider instead.
-	// Remove this once the CRI stats migration is complete.
+	// fallbackStatsProvider is a cadvisor-backed stats provider used when
+	// the CRI does not implement PodSandboxStats.
 	fallbackStatsProvider containerStatsProvider
+	// useCRIPodSandboxStats is true when PodAndContainerStatsFromCRI is
+	// enabled and the CRI implements PodSandboxStats.
+	useCRIPodSandboxStats bool
 
 	// cpuUsageCache caches the cpu usage for containers.
-	cpuUsageCache               map[string]*cpuUsageRecord
-	mutex                       sync.RWMutex
-	podAndContainerStatsFromCRI bool
+	cpuUsageCache map[string]*cpuUsageRecord
+	mutex         sync.RWMutex
 }
 
 // newCRIStatsProvider returns a containerStatsProvider implementation that
@@ -103,18 +99,19 @@ func newCRIStatsProvider(
 	imageService internalapi.ImageManagerService,
 	hostStatsProvider HostStatsProvider,
 	podAndContainerStatsFromCRI bool,
+	podSandboxStatsUnimplemented bool,
 	fallbackStatsProvider containerStatsProvider,
 ) containerStatsProvider {
 	return &criStatsProvider{
-		cadvisor:                    cadvisor,
-		resourceAnalyzer:            resourceAnalyzer,
-		runtimeService:              runtimeService,
-		imageService:                imageService,
-		hostStatsProvider:           hostStatsProvider,
-		cpuUsageCache:               make(map[string]*cpuUsageRecord),
-		podAndContainerStatsFromCRI: podAndContainerStatsFromCRI,
-		clock:                       clock.RealClock{},
-		fallbackStatsProvider:       fallbackStatsProvider,
+		cadvisor:              cadvisor,
+		resourceAnalyzer:      resourceAnalyzer,
+		runtimeService:        runtimeService,
+		imageService:          imageService,
+		hostStatsProvider:     hostStatsProvider,
+		cpuUsageCache:         make(map[string]*cpuUsageRecord),
+		useCRIPodSandboxStats: podAndContainerStatsFromCRI && !podSandboxStatsUnimplemented,
+		clock:                 clock.RealClock{},
+		fallbackStatsProvider: fallbackStatsProvider,
 	}
 }
 
@@ -152,20 +149,8 @@ func (p *criStatsProvider) listPodStats(ctx context.Context, updateCPUNanoCoreUs
 		return nil, fmt.Errorf("failed to get pod or container map: %v", err)
 	}
 
-	logger := klog.FromContext(ctx)
-	if p.podAndContainerStatsFromCRI {
-		result, err := p.listPodStatsStrictlyFromCRI(ctx, updateCPUNanoCoreUsage, containerMap, podSandboxMap, &rootFsInfo)
-		if err == nil {
-			// Call succeeded
-			return result, nil
-		}
-		s, ok := status.FromError(err)
-		// Legitimate failure, rather than the CRI implementation does not support ListPodSandboxStats.
-		if !ok || s.Code() != codes.Unimplemented {
-			return nil, err
-		}
-		// CRI implementation doesn't support ListPodSandboxStats, warn and fallback.
-		logger.V(5).Info("CRI implementation must be updated to support ListPodSandboxStats if PodAndContainerStatsFromCRI feature gate is enabled. Falling back to populating with cAdvisor; this call will fail in the future.", "err", err)
+	if p.useCRIPodSandboxStats {
+		return p.listPodStatsStrictlyFromCRI(ctx, updateCPUNanoCoreUsage, containerMap, podSandboxMap, &rootFsInfo)
 	}
 	return p.listPodStatsPartiallyFromCRI(ctx, updateCPUNanoCoreUsage, containerMap, podSandboxMap, &rootFsInfo)
 }
@@ -299,25 +284,14 @@ func (p *criStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v1.Pod
 		// The StartTime in the summary API is the pod creation time.
 		StartTime: metav1.NewTime(time.Unix(0, podSandbox.CreatedAt)),
 	}
-	if p.podAndContainerStatsFromCRI {
+	if p.useCRIPodSandboxStats {
 		criSandboxStats, err := p.runtimeService.PodSandboxStats(ctx, podSandbox.Id)
 		if err != nil {
-			// Call failed, why?
-			s, ok := status.FromError(err)
-			// Legitimate failure, rather than the CRI implementation does not support PodSandboxStats.
-			if !ok || s.Code() != codes.Unimplemented {
-				return nil, err
-			}
-			// CRI implementation doesn't support PodSandboxStats, warn and fallback.
-			logger.Error(err,
-				"CRI implementation must be updated to support PodSandboxStats if PodAndContainerStatsFromCRI feature gate is enabled. Falling back to populating with cAdvisor; this call will fail in the future.",
-			)
-		} else {
-			addCRIPodCPUStats(ps, criSandboxStats)
-			addCRIPodMemoryStats(ps, criSandboxStats)
+			return nil, err
 		}
+		addCRIPodCPUStats(ps, criSandboxStats)
+		addCRIPodMemoryStats(ps, criSandboxStats)
 	}
-
 	resp, err := p.runtimeService.ListContainerStats(ctx, &runtimeapi.ContainerStatsFilter{
 		PodSandboxId: podSandbox.Id,
 	})
@@ -325,32 +299,23 @@ func (p *criStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v1.Pod
 		return nil, fmt.Errorf("failed to list container stats from pod %s (sandbox %s): %w", format.Pod(pod), podSandbox.Id, err)
 	}
 
-	// Fallback if ListContainerStats doesn't return any results.
-	useFallback := ps.CPU == nil || ps.Memory == nil || len(resp) == 0
 	for _, stats := range resp {
 		containerStatus := podStatus.FindContainerStatusByName(stats.Attributes.Metadata.Name)
 		if containerStatus == nil {
 			logger.V(4).Info("Received stats for unknown container", "pod", klog.KObj(pod), "container", stats.Attributes.Metadata)
 			continue
 		}
-
-		// Fill available CPU and memory stats for full set of required pod stats
 		cs := p.makeContainerCPUAndMemoryStats(stats, containerStatus.CreatedAt, false)
-		useFallback = useFallback || cs.CPU == nil || cs.Memory == nil
 		ps.Containers = append(ps.Containers, *cs)
 	}
 
-	if useFallback {
+	if !p.useCRIPodSandboxStats {
 		fallbackStats, err := p.fallbackStatsProvider.PodCPUAndMemoryStats(ctx, pod, podStatus)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch stats for pod %s from fallback provider: %w", format.Pod(pod), err)
 		}
-		if ps.CPU == nil {
-			ps.CPU = fallbackStats.CPU
-		}
-		if ps.Memory == nil {
-			ps.Memory = fallbackStats.Memory
-		}
+		ps.CPU = fallbackStats.CPU
+		ps.Memory = fallbackStats.Memory
 
 		for _, fb := range fallbackStats.Containers {
 			var container *statsapi.ContainerStats
@@ -387,36 +352,24 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]stat
 	logger := klog.FromContext(ctx)
 
 	result := make([]statsapi.PodStats, 0, len(podSandboxMap))
-	if p.podAndContainerStatsFromCRI {
+	if p.useCRIPodSandboxStats {
 		criSandboxStats, err := p.runtimeService.ListPodSandboxStats(ctx, &runtimeapi.PodSandboxStatsFilter{})
-		// Call succeeded
-		if err == nil {
-			for _, criSandboxStat := range criSandboxStats {
-				podSandbox, found := podSandboxMap[criSandboxStat.Attributes.Id]
-				if !found {
-					continue
-				}
-				ps := buildPodStats(podSandbox)
-				// Add container-level CPU and memory stats from CRI
-				p.addCRIPodContainerCPUAndMemoryStats(criSandboxStat, ps, containerMap)
-				addCRIPodCPUStats(ps, criSandboxStat)
-				addCRIPodMemoryStats(ps, criSandboxStat)
-				// Aggregate pod swap from container swap stats (CRI doesn't have pod-level swap)
-				aggregatePodSwapStats(ps)
-				result = append(result, *ps)
-			}
-			return result, err
-		}
-		// Call failed, why?
-		s, ok := status.FromError(err)
-		// Legitimate failure, rather than the CRI implementation does not support ListPodSandboxStats.
-		if !ok || s.Code() != codes.Unimplemented {
+		if err != nil {
 			return nil, err
 		}
-		// CRI implementation doesn't support ListPodSandboxStats, warn and fallback.
-		logger.Error(err,
-			"CRI implementation must be updated to support ListPodSandboxStats if PodAndContainerStatsFromCRI feature gate is enabled. Falling back to populating with cAdvisor; this call will fail in the future.",
-		)
+		for _, criSandboxStat := range criSandboxStats {
+			podSandbox, found := podSandboxMap[criSandboxStat.Attributes.Id]
+			if !found {
+				continue
+			}
+			ps := buildPodStats(podSandbox)
+			p.addCRIPodContainerCPUAndMemoryStats(criSandboxStat, ps, containerMap)
+			addCRIPodCPUStats(ps, criSandboxStat)
+			addCRIPodMemoryStats(ps, criSandboxStat)
+			aggregatePodSwapStats(ps)
+			result = append(result, *ps)
+		}
+		return result, nil
 	}
 
 	resp, err := p.runtimeService.ListContainerStats(ctx, &runtimeapi.ContainerStatsFilter{})

@@ -342,6 +342,11 @@ type Dependencies struct {
 	HealthChecker             watchdog.HealthChecker
 	// remove it after cadvisor.UsingLegacyCadvisorStats dropped.
 	useLegacyCadvisorStats bool
+	// PodSandboxStatsUnimplemented is set during init when the CRI does not
+	// support PodSandboxStats. It can be removed once
+	// PodAndContainerStatsFromCRI is GA and cadvisor stats are no longer
+	// used as a fallback.
+	PodSandboxStatsUnimplemented bool
 }
 
 // newCrashLoopBackOff configures the backoff maximum to be used
@@ -863,6 +868,7 @@ func NewMainKubelet(ctx context.Context,
 			kubeDeps.RemoteImageService,
 			hostStatsProvider,
 			utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI),
+			kubeDeps.PodSandboxStatsUnimplemented,
 			cadvisorStatsProvider,
 		)
 	}
