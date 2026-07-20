@@ -275,6 +275,11 @@ var endpointVMapEntryRegexp = regexp.MustCompile(`\d+ : goto (\S+)`)
 var endpointDNATRegexp = regexp.MustCompile(`^dnat ip6* addr \. port to numgen random mod \d+ map \{(.*)\}$`)
 var endpointDNATEntryRegexp = regexp.MustCompile(`\d+ : (\S+) \. (\d+)`)
 
+// Shared "lb-N-endpoints" bucket chains: a concrete l4proto match (handled by
+// l4protoRegexp) followed by a DNAT that looks up the per-protocol endpoints
+// map by "destIP . destPort . slot".
+var endpointsMapDNATRegexp = regexp.MustCompile(`^dnat ip6* addr \. port to ip6* daddr \. (?:tcp|udp|sctp) dport \. numgen random mod \d+ map @(\S+)$`)
+
 var masqMarkRegexp = regexp.MustCompile(`^mark set mark or 0x[[:xdigit:]]+$`)
 var masqCheckRegexp = regexp.MustCompile(`^mark and 0x[[:xdigit:]]+ != 0 mark set mark xor 0x[[:xdigit:]]+`)
 var masqueradeRegexp = regexp.MustCompile(`^masquerade fully-random$`)
@@ -568,6 +573,24 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 
 					tracer.matches = append(tracer.matches, ruleObj.Rule)
 					tracer.outputs = append(tracer.outputs, net.JoinHostPort(endpointIP, endpointPort))
+				}
+				return true
+
+			case endpointsMapDNATRegexp.MatchString(rule):
+				// `^dnat ip6* addr \. port to ip6* daddr \. (tcp|udp|sctp) dport \. numgen random mod N map @(\S+)$`
+				// Used by the shared bucket chains: looks up
+				// "destIP . destPort . slot" in the per-protocol endpoints map
+				// (the protocol is encoded in the map name and already matched
+				// by the preceding "meta l4proto" guard) and DNATs to the
+				// result. For tracePacket's purposes, we DNAT to *all* of this
+				// service's endpoints in the map.
+				match := endpointsMapDNATRegexp.FindStringSubmatch(rule)
+				mapName := match[1]
+				for _, element := range tracer.nft.Table.Maps[mapName].Elements {
+					if element.Key[0] == destIP && element.Key[1] == destPort {
+						tracer.matches = append(tracer.matches, ruleObj.Rule)
+						tracer.outputs = append(tracer.outputs, net.JoinHostPort(element.Value[0], element.Value[1]))
+					}
 				}
 				return true
 
