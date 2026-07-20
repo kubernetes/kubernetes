@@ -1245,7 +1245,7 @@ func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state 
 			}
 		} else {
 			// Any status other than Success, Unschedulable or UnschedulableAndUnresolvable is Error.
-			return nil, fwk.AsStatus(fmt.Errorf("error in %q PostFilter plugins: %s", pl.Name(), status.Message())).WithPlugin(pl.Name())
+			return nil, fwk.AsStatus(fmt.Errorf("error in %q PodGroupPostFilter plugins: %s", pl.Name(), status.Message())).WithPlugin(pl.Name())
 		}
 	}
 

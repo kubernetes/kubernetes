@@ -946,7 +946,7 @@ func TestRunPodGroupPostFilterPlugins(t *testing.T) {
 				},
 			},
 			featureFlagEnabeled: true,
-			expectedStatus:      fwk.NewStatus(fwk.Error, "error in \"plugin1\" PostFilter plugins: "+injectReason).WithPlugin("plugin1"),
+			expectedStatus:      fwk.NewStatus(fwk.Error, "error in \"plugin1\" PodGroupPostFilter plugins: "+injectReason).WithPlugin("plugin1"),
 		},
 		{
 			name: "first plugin returns non supported status: Skip",
@@ -962,7 +962,7 @@ func TestRunPodGroupPostFilterPlugins(t *testing.T) {
 				},
 			},
 			featureFlagEnabeled: true,
-			expectedStatus:      fwk.NewStatus(fwk.Error, "error in \"plugin1\" PostFilter plugins: "+injectReason).WithPlugin("plugin1"),
+			expectedStatus:      fwk.NewStatus(fwk.Error, "error in \"plugin1\" PodGroupPostFilter plugins: "+injectReason).WithPlugin("plugin1"),
 		},
 		{
 			name: "first plugin returns success",
