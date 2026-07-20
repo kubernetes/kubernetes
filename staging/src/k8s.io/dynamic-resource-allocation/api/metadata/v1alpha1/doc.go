@@ -16,6 +16,8 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/dynamic-resource-allocation/api/metadata
+// +k8s:validation-gen=*
+// +k8s:validation-gen-scheme-registry=nil
 
 // Package v1alpha1 contains the v1alpha1 serialization format for DRA device
 // metadata. These types include JSON tags and are used for reading/writing
