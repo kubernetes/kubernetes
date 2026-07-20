@@ -49,7 +49,7 @@ func (HTTPIngressRuleValue) SwaggerDoc() map[string]string {
 
 var map_IPAddress = map[string]string{
 	"":         "IPAddress represents a single IP of a single IP Family. The object is designed to be used by APIs that operate on IP addresses. The object is used by the Service core API for allocation of IP addresses. An IP address can be represented in different formats, to guarantee the uniqueness of the IP, the name of the object is the IP address in canonical format, four decimal digits separated by dots suppressing leading zeros for IPv4 and the representation defined by RFC 5952 for IPv6. Valid: 192.168.1.5 or 2001:db8::1 or 2001:db8:aaaa:bbbb:cccc:dddd:eeee:1 Invalid: 10.01.2.3 or 2001:db8:0:0:0::1",
-	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"metadata": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "spec is the desired state of the IPAddress. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
 
@@ -69,7 +69,7 @@ func (IPAddressList) SwaggerDoc() map[string]string {
 
 var map_IPAddressSpec = map[string]string{
 	"":          "IPAddressSpec describe the attributes in an IP Address.",
-	"parentRef": "ParentRef references the resource that an IPAddress is attached to. An IPAddress must reference a parent object.",
+	"parentRef": "parentRef references the resource that an IPAddress is attached to. An IPAddress must reference a parent object.",
 }
 
 func (IPAddressSpec) SwaggerDoc() map[string]string {
@@ -78,7 +78,7 @@ func (IPAddressSpec) SwaggerDoc() map[string]string {
 
 var map_Ingress = map[string]string{
 	"":         "Ingress is a collection of rules that allow inbound connections to reach the endpoints defined by a backend. An Ingress can be configured to give services externally-reachable urls, load balance traffic, terminate SSL, offer name based virtual hosting etc.",
-	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"metadata": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "spec is the desired state of the Ingress. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 	"status":   "status is the current state of the Ingress. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
@@ -100,7 +100,7 @@ func (IngressBackend) SwaggerDoc() map[string]string {
 
 var map_IngressClass = map[string]string{
 	"":         "IngressClass represents the class of the Ingress, referenced by the Ingress Spec. The `ingressclass.kubernetes.io/is-default-class` annotation can be used to indicate that an IngressClass should be considered default. When a single IngressClass resource has this annotation set to true, new Ingress resources without a class specified will be assigned this default class.",
-	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"metadata": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "spec is the desired state of the IngressClass. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
 
@@ -192,7 +192,8 @@ func (IngressRule) SwaggerDoc() map[string]string {
 }
 
 var map_IngressRuleValue = map[string]string{
-	"": "IngressRuleValue represents a rule to apply against incoming requests. If the rule is satisfied, the request is routed to the specified backend. Currently mixing different types of rules in a single Ingress is disallowed, so exactly one of the following must be set.",
+	"":     "IngressRuleValue represents a rule to apply against incoming requests. If the rule is satisfied, the request is routed to the specified backend. Currently mixing different types of rules in a single Ingress is disallowed, so exactly one of the following must be set.",
+	"http": "http is a HTTP IngressRuleValue, which contains a list of http selectors",
 }
 
 func (IngressRuleValue) SwaggerDoc() map[string]string {
@@ -232,10 +233,10 @@ func (IngressTLS) SwaggerDoc() map[string]string {
 
 var map_ParentReference = map[string]string{
 	"":          "ParentReference describes a reference to a parent object.",
-	"group":     "Group is the group of the object being referenced.",
-	"resource":  "Resource is the resource of the object being referenced.",
-	"namespace": "Namespace is the namespace of the object being referenced.",
-	"name":      "Name is the name of the object being referenced.",
+	"group":     "group is the group of the object being referenced.",
+	"resource":  "resource is the resource of the object being referenced.",
+	"namespace": "namespace is the namespace of the object being referenced.",
+	"name":      "name is the name of the object being referenced.",
 }
 
 func (ParentReference) SwaggerDoc() map[string]string {
@@ -244,7 +245,7 @@ func (ParentReference) SwaggerDoc() map[string]string {
 
 var map_ServiceCIDR = map[string]string{
 	"":         "ServiceCIDR defines a range of IP addresses using CIDR format (e.g. 192.168.0.0/24 or 2001:db2::/64). This range is used to allocate ClusterIPs to Service objects.",
-	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"metadata": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "spec is the desired state of the ServiceCIDR. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 	"status":   "status represents the current state of the ServiceCIDR. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
@@ -265,7 +266,7 @@ func (ServiceCIDRList) SwaggerDoc() map[string]string {
 
 var map_ServiceCIDRSpec = map[string]string{
 	"":      "ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.",
-	"cidrs": "CIDRs defines the IP blocks in CIDR notation (e.g. \"192.168.0.0/24\" or \"2001:db8::/64\") from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family. This field is immutable.",
+	"cidrs": "cidrs defines the IP blocks in CIDR notation (e.g. \"192.168.0.0/24\" or \"2001:db8::/64\") from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family. This field is immutable.",
 }
 
 func (ServiceCIDRSpec) SwaggerDoc() map[string]string {
