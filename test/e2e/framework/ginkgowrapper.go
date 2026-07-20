@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"reflect"
@@ -349,6 +350,24 @@ func expandGinkgoArgs(leafNode bool, offset ginkgo.Offset, text string, args []a
 		}
 	}
 
+	var providerChecks [][]string
+	skipUnlessProviderIs := func() {
+		for _, supportedProviders := range providerChecks {
+			if !ProviderIs(supportedProviders...) {
+				ginkgo.Skip(fmt.Sprintf("Only supported for providers %v (not %s)", supportedProviders, TestContext.Provider))
+			}
+		}
+	}
+	injectSkipUnlessProviderIs := func() {
+		if leafNode {
+			// Check directly inside It.
+			skipUnlessProviderIs()
+		} else {
+			// Insert BeforeEach with the same check.
+			ginkgo.BeforeEach(skipUnlessProviderIs)
+		}
+	}
+
 	haveEmptyStrings := false
 	for _, arg := range args {
 		switch arg := arg.(type) {
@@ -356,6 +375,17 @@ func expandGinkgoArgs(leafNode bool, offset ginkgo.Offset, text string, args []a
 			addFeatureGate(arg.name, arg.spec, true)
 		case label:
 			fullLabel := arg.String()
+			if arg.parts[0] == "Provider" {
+				providerChecks = append(providerChecks, strings.Split(arg.parts[1], ","))
+				// Only add text, not as label: Ginkgo labels must not contain commas.
+				// We could split up into separate labels, but then the semantic is not clear:
+				// [Provider:gce,aws] means "provider must be one of these two",
+				// but [Provider:gce] [Provider:aws] could be either that or "must be
+				// gce and aws", i.e. the test always needs to be skipped (for example,
+				// because there are different independent WithProvider calls in different places).
+				texts = append(texts, fmt.Sprintf("[%s]", fullLabel))
+				continue
+			}
 			addLabel(fullLabel)
 			if !leafNodeLabels.Has(fullLabel) {
 				texts = append(texts, fmt.Sprintf("[%s]", fullLabel))
@@ -377,6 +407,34 @@ func expandGinkgoArgs(leafNode bool, offset ginkgo.Offset, text string, args []a
 				haveEmptyStrings = true
 			}
 			texts = append(texts, arg)
+		case func(context.Context):
+			// Wrapping shows up in stack backtraces. Avoid it if possible.
+			if len(providerChecks) > 0 {
+				body := arg
+				arg = func(ctx context.Context) {
+					injectSkipUnlessProviderIs()
+					body(ctx)
+				}
+			}
+			ginkgoArgs = append(ginkgoArgs, arg)
+		case func(ginkgo.SpecContext):
+			if len(providerChecks) > 0 {
+				body := arg
+				arg = func(ctx ginkgo.SpecContext) {
+					injectSkipUnlessProviderIs()
+					body(ctx)
+				}
+			}
+			ginkgoArgs = append(ginkgoArgs, arg)
+		case func():
+			if len(providerChecks) > 0 {
+				body := arg
+				arg = func() {
+					injectSkipUnlessProviderIs()
+					body()
+				}
+			}
+			ginkgoArgs = append(ginkgoArgs, arg)
 		default:
 			ginkgoArgs = append(ginkgoArgs, arg)
 		}
@@ -637,6 +695,29 @@ func withEnvironment(name Environment) interface{} {
 		RecordBug(NewBug(fmt.Sprintf("WithEnvironment: unknown environment %q", name), 2))
 	}
 	return newLabel("Environment", string(name))
+}
+
+// WithProvider specifies that a certain test or group of tests depend on
+// features that are only available with one of the listed cluster providers.
+// It inserts the [Provider: <provider1>,<provider2>, ...] tag into the test name
+// and injects a runtime skip check at the start of the function.
+//
+// Filtering by provider is a legacy mechanism with unclear semantics: which
+// provider supports which features is undefined. Prefer defining features and
+// calling WithFeature instead.
+//
+// Note that this must come before the function in the Describe/Context/It call!
+func WithProvider(providers ...string) interface{} {
+	return withProvider(providers)
+}
+
+// WithProvider is a shorthand for the corresponding package function.
+func (f *Framework) WithProvider(providers ...string) interface{} {
+	return withProvider(providers)
+}
+
+func withProvider(providers []string) interface{} {
+	return newLabel("Provider", strings.Join(providers, ","))
 }
 
 // WithConformance specifies that a certain test or group of tests must pass in

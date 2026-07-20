@@ -41,7 +41,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = utils.SIGDescribe(feature.Flexvolumes, "Mounted flexvolume volume expand", framework.WithSlow(), func() {
+var _ = utils.SIGDescribe(feature.Flexvolumes, "Mounted flexvolume volume expand", framework.WithSlow(), framework.WithProvider("aws", "gce", "local"), func() {
 	var (
 		c                 clientset.Interface
 		ns                string
@@ -58,7 +58,6 @@ var _ = utils.SIGDescribe(feature.Flexvolumes, "Mounted flexvolume volume expand
 	f := framework.NewDefaultFramework("mounted-flexvolume-expand")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("aws", "gce", "local")
 		e2eskipper.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessSSHKeyPresent()

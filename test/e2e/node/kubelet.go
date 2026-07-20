@@ -381,7 +381,7 @@ var _ = SIGDescribe("kubelet", func() {
 		//       If the nfs-server pod is deleted the client pod's mount can not be unmounted.
 		//       If the nfs-server pod is deleted and re-created, due to having a different ip
 		//       addr, the client pod's mount still cannot be unmounted.
-		ginkgo.Context("Host cleanup after disrupting NFS volume [NFS]", func() {
+		f.Context("Host cleanup after disrupting NFS volume [NFS]", f.WithProvider(framework.ProvidersWithSSH...), func() {
 			// issue #31272
 			var (
 				nfsServerPod *v1.Pod
@@ -402,7 +402,6 @@ var _ = SIGDescribe("kubelet", func() {
 			}
 
 			ginkgo.BeforeEach(func(ctx context.Context) {
-				e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 				_, nfsServerPod, nfsIP = e2evolume.NewNFSServer(ctx, c, ns, []string{"-G", "777", "/exports"})
 			})
 
@@ -519,8 +518,7 @@ var _ = SIGDescribe("kubelet", func() {
 			returns the last three lines of the kubelet log
 		*/
 
-		ginkgo.It("should return the last three lines of the kubelet logs", func(ctx context.Context) {
-			e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		f.It("should return the last three lines of the kubelet logs", f.WithProvider(framework.ProvidersWithSSH...), func(ctx context.Context) {
 			ginkgo.By("Starting the command")
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 
@@ -538,8 +536,7 @@ var _ = SIGDescribe("kubelet", func() {
 			returns kubelet logs for the current boot with the pattern container
 		*/
 
-		ginkgo.It("should return the kubelet logs for the current boot with the pattern container", func(ctx context.Context) {
-			e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		f.It("should return the kubelet logs for the current boot with the pattern container", f.WithProvider(framework.ProvidersWithSSH...), func(ctx context.Context) {
 			ginkgo.By("Starting the command")
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 
@@ -596,8 +593,7 @@ var _ = SIGDescribe("kubelet", func() {
 			returns the last three lines of the Microsoft-Windows-Security-SPP log
 		*/
 
-		ginkgo.It("should return the last three lines of the Microsoft-Windows-Security-SPP logs", func(ctx context.Context) {
-			e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		f.It("should return the last three lines of the Microsoft-Windows-Security-SPP logs", f.WithProvider(framework.ProvidersWithSSH...), func(ctx context.Context) {
 			if len(windowsNodeName) == 0 {
 				ginkgo.Skip("No Windows node found")
 			}
@@ -618,8 +614,7 @@ var _ = SIGDescribe("kubelet", func() {
 			returns the lines of the Microsoft-Windows-Security-SPP log with the pattern Health
 		*/
 
-		ginkgo.It("should return the Microsoft-Windows-Security-SPP logs with the pattern Health", func(ctx context.Context) {
-			e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		f.It("should return the Microsoft-Windows-Security-SPP logs with the pattern Health", f.WithProvider(framework.ProvidersWithSSH...), func(ctx context.Context) {
 			if len(windowsNodeName) == 0 {
 				ginkgo.Skip("No Windows node found")
 			}
