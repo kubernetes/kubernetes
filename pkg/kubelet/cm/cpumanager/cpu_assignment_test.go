@@ -406,6 +406,142 @@ func TestCPUAccumulatorFreeCPUs(t *testing.T) {
 	}
 }
 
+func TestCPUAccumulatorFreeCPUsSpreadRoundRobin(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	testCases := []struct {
+		description   string
+		topo          *topology.CPUTopology
+		availableCPUs cpuset.CPUSet
+		expect        []int
+	}{
+		{
+			"contiguous sibling CPU IDs",
+			&topology.CPUTopology{
+				NumCPUs:    8,
+				NumSockets: 1,
+				NumCores:   4,
+				CPUDetails: map[int]topology.CPUInfo{
+					0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					3: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					4: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					5: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					6: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					7: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+				},
+			},
+			cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			[]int{0, 2, 4, 6, 1, 3, 5, 7},
+		},
+		{
+			"interleaved sibling CPU IDs",
+			topoSingleSocketHT,
+			cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			[]int{0, 1, 2, 3, 4, 5, 6, 7},
+		},
+		{
+			"arbitrary logical CPU numbering",
+			&topology.CPUTopology{
+				NumCPUs:    8,
+				NumSockets: 1,
+				NumCores:   4,
+				CPUDetails: map[int]topology.CPUInfo{
+					0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					7:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2:  {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					11: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					5:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					9:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					1:  {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					14: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+				},
+			},
+			cpuset.New(0, 1, 2, 5, 7, 9, 11, 14),
+			[]int{0, 2, 5, 1, 7, 11, 9, 14},
+		},
+		{
+			"multiple sockets",
+			&topology.CPUTopology{
+				NumCPUs:    16,
+				NumSockets: 2,
+				NumCores:   8,
+				CPUDetails: map[int]topology.CPUInfo{
+					0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2:  {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					3:  {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					4:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					5:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					6:  {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					7:  {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					8:  {CoreID: 4, SocketID: 1, NUMANodeID: 1},
+					9:  {CoreID: 4, SocketID: 1, NUMANodeID: 1},
+					10: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+					11: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+					12: {CoreID: 6, SocketID: 1, NUMANodeID: 1},
+					13: {CoreID: 6, SocketID: 1, NUMANodeID: 1},
+					14: {CoreID: 7, SocketID: 1, NUMANodeID: 1},
+					15: {CoreID: 7, SocketID: 1, NUMANodeID: 1},
+				},
+			},
+			cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+			[]int{0, 2, 4, 6, 1, 3, 5, 7, 8, 10, 12, 14, 9, 11, 13, 15},
+		},
+		{
+			"partially available cores",
+			&topology.CPUTopology{
+				NumCPUs:    8,
+				NumSockets: 1,
+				NumCores:   4,
+				CPUDetails: map[int]topology.CPUInfo{
+					0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					3: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					4: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					5: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					6: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					7: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+				},
+			},
+			cpuset.New(0, 2, 3, 4, 6, 7),
+			[]int{0, 4, 2, 6, 3, 7},
+		},
+		{
+			"more than two CPUs per core",
+			&topology.CPUTopology{
+				NumCPUs:    9,
+				NumSockets: 1,
+				NumCores:   3,
+				CPUDetails: map[int]topology.CPUInfo{
+					0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					3: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					4: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					5: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					6: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					7: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					8: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+				},
+			},
+			cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+			[]int{0, 3, 6, 1, 4, 7, 2, 5, 8},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, CPUSortingStrategySpread)
+			result := acc.freeCPUs()
+			if !reflect.DeepEqual(result, tc.expect) {
+				t.Errorf("expected %v to equal %v", result, tc.expect)
+			}
+		})
+	}
+}
+
 func TestCPUAccumulatorTake(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
@@ -851,7 +987,7 @@ func TestTakeByTopologyWithSpreadPhysicalCPUsPreferredOption(t *testing.T) {
 			mustParseCPUSet(t, "0-287"),
 			12,
 			"",
-			mustParseCPUSet(t, "0-2,9-10,13-14,21-22,25-26,33"),
+			cpuset.New(0, 50, 57, 58, 71, 72, 79, 80, 87, 88, 95, 96),
 		},
 	}
 
