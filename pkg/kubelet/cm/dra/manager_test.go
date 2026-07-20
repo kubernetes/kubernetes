@@ -1037,6 +1037,35 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 `,
 		},
 		{
+			// Regression test: if a previous PrepareResources attempt
+			// appended devices to the cached ClaimInfo but returned before
+			// reaching setPrepared (e.g. a driver in the same batch failed),
+			// a retry must not duplicate those devices in the cache. The
+			// seeded ClaimInfo mimics that leftover state: prepared=false,
+			// DriverState already populated with the device the fake driver
+			// will return on retry. After the retry, DriverState must
+			// contain exactly one device, not two.
+			description:            "should not duplicate devices on prepare retry",
+			driverName:             driverName,
+			pod:                    genTestPod(),
+			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, false, nil),
+			resp:                   genPrepareResourcesResponse(claimUID),
+			expectedClaimInfoState: genClaimInfoState(cdiID),
+			expectedPrepareCalls:   1,
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareResources"} 1
+`,
+		},
+		{
 			description:          "should timeout",
 			driverName:           driverName,
 			pod:                  genTestPod(),
