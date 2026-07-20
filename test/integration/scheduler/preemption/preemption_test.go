@@ -689,6 +689,18 @@ func TestPreemption(t *testing.T) {
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, asyncAPICallsEnabled := range []bool{true, false} {
 			for _, clearingNominatedNodeNameAfterBinding := range []bool{true, false} {
+				// Start one API server per flag combination and share it across all
+				// test cases in this combo. GenericWorkload is always enabled so that
+				// both plain-pod and pod-group test cases can share the same server;
+				// the scheduler-side GenericWorkload gate is set per subtest below.
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
+					features.SchedulerAsyncAPICalls:                asyncAPICallsEnabled,
+					features.ClearingNominatedNodeNameAfterBinding: clearingNominatedNodeNameAfterBinding,
+					features.GenericWorkload:                       true,
+				})
+				sharedAPICtx := testutils.InitTestAPIServer(t, "preemption", nil)
+
 				for _, test := range tests {
 					t.Run(fmt.Sprintf("%s (Async preemption enabled: %v, Async API calls enabled: %v, ClearingNominatedNodeNameAfterBinding: %v)", test.name, asyncPreemptionEnabled, asyncAPICallsEnabled, clearingNominatedNodeNameAfterBinding), func(t *testing.T) {
 						featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -699,20 +711,32 @@ func TestPreemption(t *testing.T) {
 						})
 
 						testCtx := testutils.InitTestSchedulerWithOptions(t,
-							testutils.InitTestAPIServer(t, "preemption", nil),
+							testutils.WithNewNamespace(t, sharedAPICtx, "preemption"),
 							0,
 							scheduler.WithProfiles(cfg.Profiles...),
 							scheduler.WithFrameworkOutOfTreeRegistry(registry))
 						testutils.SyncSchedulerInformerFactory(testCtx)
-						go testCtx.Scheduler.Run(testCtx.Ctx)
+						go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+						defer testCtx.SchedulerCloseFn()
 
 						if _, err := createNode(testCtx.ClientSet, nodeObject); err != nil {
 							t.Fatalf("Error creating node: %v", err)
 						}
+						t.Cleanup(func() {
+							if err := testCtx.ClientSet.CoreV1().Nodes().Delete(testCtx.Ctx, nodeObject.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+								t.Errorf("Error deleting node %s: %v", nodeObject.Name, err)
+							}
+						})
 						for _, n := range test.extraNodes {
 							if _, err := createNode(testCtx.ClientSet, n); err != nil {
 								t.Fatalf("Error creating extra node %s: %v", n.Name, err)
 							}
+							n := n
+							t.Cleanup(func() {
+								if err := testCtx.ClientSet.CoreV1().Nodes().Delete(testCtx.Ctx, n.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+									t.Errorf("Error deleting node %s: %v", n.Name, err)
+								}
+							})
 						}
 
 						cs := testCtx.ClientSet

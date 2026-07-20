@@ -575,6 +575,25 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 	return testCtx
 }
 
+// WithNewNamespace creates a child TestContext that shares the API server from
+// parent but gets a fresh namespace. Only the namespace is deleted on t.Cleanup;
+// the API server lifecycle is managed by the caller. This is useful when
+// multiple subtests share one API server to avoid the per-subtest startup cost.
+func WithNewNamespace(t *testing.T, parent *TestContext, nsPrefix string) *TestContext {
+	t.Helper()
+	child := &TestContext{
+		ClientSet:  parent.ClientSet,
+		KubeConfig: parent.KubeConfig,
+		Ctx:        parent.Ctx,
+		CloseFn:    func() {}, // API server is owned by parent; do not tear it down here.
+	}
+	child.NS = framework.CreateNamespaceOrDie(child.ClientSet, nsPrefix+string(uuid.NewUUID()), t)
+	t.Cleanup(func() {
+		framework.DeleteNamespaceOrDie(child.ClientSet, child.NS, t)
+	})
+	return child
+}
+
 // WaitForSchedulerCacheCleanup waits for cleanup of scheduler's cache to complete
 func WaitForSchedulerCacheCleanup(ctx context.Context, sched *scheduler.Scheduler, t *testing.T) {
 	schedulerCacheIsEmpty := func(context.Context) (bool, error) {
