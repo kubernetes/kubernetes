@@ -29,6 +29,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
@@ -1193,6 +1194,75 @@ func TestPodGroupPreemption(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestPodGroupPreemptionStatus(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload: true,
+	})
+	testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-preemption-status")
+
+	cs := testCtx.ClientSet
+	ns := testCtx.NS.Name
+
+	// Create a node.
+	node := st.MakeNode().Name("node-1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+	if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
+	// Create a low-priority pod low-1 taking whole node
+	lowPod := st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).TerminationGracePeriodSeconds(30).Obj()
+	if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, lowPod, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create low-priority pod: %v", err)
+	}
+	// Wait for low-priority pod to be scheduled
+	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
+		testutils.PodScheduled(cs, ns, lowPod.Name)); err != nil {
+		t.Fatalf("Failed to wait for low-priority pod to be scheduled: %v", err)
+	}
+	// Create a high-priority pod high-1 belonging to pg1 (priority=100)
+	pg := st.MakePodGroup().Name("pg1").Namespace(ns).MinCount(1).Priority(100).Obj()
+	if _, err := cs.SchedulingV1alpha3().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create PodGroup: %v", err)
+	}
+	highPod := st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj()
+	if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, highPod, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create high-priority pod: %v", err)
+	}
+	// Poll until the low-priority pod gets DeletionTimestamp set (which indicates preemption is triggered)
+	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+		pod, err := cs.CoreV1().Pods(ns).Get(ctx, lowPod.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return pod.DeletionTimestamp != nil, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to wait for low-priority pod to get DeletionTimestamp set: %v", err)
+	}
+	// Verify the PodGroup condition.
+	// We want PodGroupInitiallyScheduled status to be False, Reason to be Unschedulable, and Message to contain
+	// both "minCount (1) cannot be satisfied" and "pod group preemption found a placement for podgroup"
+	var cond *metav1.Condition
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
+		currentPG, err := cs.SchedulingV1alpha3().PodGroups(ns).Get(ctx, pg.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		cond = apimeta.FindStatusCondition(currentPG.Status.Conditions, schedulingapi.PodGroupInitiallyScheduled)
+		if cond != nil &&
+			cond.Status == metav1.ConditionFalse &&
+			cond.Reason == schedulingapi.PodGroupReasonUnschedulable &&
+			strings.Contains(cond.Message, "minCount (1) cannot be satisfied") &&
+			strings.Contains(cond.Message, "pod group preemption: found a placement for podgroup, preempting 1 victims") {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Logf("Failed to verify PodGroup condition: %v", err)
+		t.Fatalf("Last observed podGroup condition: Status=%s, Reason=%s, Message=%q", cond.Status, cond.Reason, cond.Message)
 	}
 }
 

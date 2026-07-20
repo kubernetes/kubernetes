@@ -773,7 +773,8 @@ func applyPodGroupPostFilterResult(completePGResults map[fwk.EntityKey]*podGroup
 				}
 			}
 		}
-	} else if status.IsError() {
+	}
+	if status.IsError() {
 		for _, pgResult := range completePGResults {
 			pgResult.status = status
 		}
