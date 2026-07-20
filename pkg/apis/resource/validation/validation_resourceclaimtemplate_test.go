@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"testing"
 
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
@@ -208,6 +209,54 @@ func TestValidateClaimTemplate(t *testing.T) {
 			template: func() *resource.ResourceClaimTemplate {
 				template := testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable)
 				template.Spec.Spec.Devices.Requests[0].FirstAvailable[0].DeviceClassName = badName
+				return template
+			}(),
+		},
+		"capacity-too-many-requests": {
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "capacity", "requests"), 33, resource.MaxCapacityRequirements)},
+			template: func() *resource.ResourceClaimTemplate {
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
+				requests := map[resource.QualifiedName]apiresource.Quantity{}
+				for i := 0; i < 33; i++ {
+					requests[resource.QualifiedName(fmt.Sprintf("dra.example.com/cap%d", i))] = apiresource.MustParse("1")
+				}
+				template.Spec.Spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{Requests: requests}
+				return template
+			}(),
+		},
+		"capacity-negative-value": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "capacity", "requests").Key("dra.example.com/cores"), "-1", "must not be negative")},
+			template: func() *resource.ResourceClaimTemplate {
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
+				template.Spec.Spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{
+					Requests: map[resource.QualifiedName]apiresource.Quantity{
+						"dra.example.com/cores": apiresource.MustParse("-1"),
+					},
+				}
+				return template
+			}(),
+		},
+		"capacity-valid": {
+			wantFailures: nil,
+			template: func() *resource.ResourceClaimTemplate {
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
+				template.Spec.Spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{
+					Requests: map[resource.QualifiedName]apiresource.Quantity{
+						"dra.example.com/cores": apiresource.MustParse("2"),
+					},
+				}
+				return template
+			}(),
+		},
+		"capacity-bad-key": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "capacity", "requests"), "1bad", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')")},
+			template: func() *resource.ResourceClaimTemplate {
+				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
+				template.Spec.Spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{
+					Requests: map[resource.QualifiedName]apiresource.Quantity{
+						"1bad": apiresource.MustParse("1"),
+					},
+				}
 				return template
 			}(),
 		},
