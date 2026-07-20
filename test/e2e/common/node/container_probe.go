@@ -1482,6 +1482,115 @@ done
 			return false, nil
 		}, 1*time.Minute, framework.Poll).ShouldNot(gomega.BeTrueBecause("should not see liveness probes"))
 	})
+
+	ginkgo.It("should mark all containers as not-ready when all readiness probes fail simultaneously", func(ctx context.Context) {
+		const (
+			containerCount   = 40
+			sharedVolumeName = "health-vol"
+			healthFile       = "/health/ready"
+			periodSeconds    = 2
+		)
+
+		podName := "multi-container-probe-" + string(uuid.NewUUID())
+		containers := make([]v1.Container, containerCount)
+		for i := 0; i < containerCount; i++ {
+			containers[i] = v1.Container{
+				Name:    fmt.Sprintf("container-%d", i),
+				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+				Command: []string{"/bin/sh", "-c", fmt.Sprintf("touch %s && sleep 3600", healthFile)},
+				VolumeMounts: []v1.VolumeMount{
+					{Name: sharedVolumeName, MountPath: "/health"},
+				},
+				ReadinessProbe: &v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						Exec: &v1.ExecAction{
+							Command: []string{"cat", healthFile},
+						},
+					},
+					InitialDelaySeconds: 1,
+					PeriodSeconds:       periodSeconds,
+					FailureThreshold:    1,
+				},
+			}
+		}
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      podName,
+				Namespace: f.Namespace.Name,
+			},
+			Spec: v1.PodSpec{
+				Containers: containers,
+				Volumes: []v1.Volume{
+					{
+						Name: sharedVolumeName,
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{},
+						},
+					},
+				},
+			},
+		}
+
+		ginkgo.By("Creating a pod with 40 containers sharing a volume, each with a readiness probe")
+		podClient.Create(ctx, pod)
+
+		ginkgo.By("Waiting for all containers to become ready")
+		framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, podName,
+			"all containers ready", 3*time.Minute, func(pod *v1.Pod) (bool, error) {
+				if len(pod.Status.ContainerStatuses) < containerCount {
+					return false, nil
+				}
+				for _, cs := range pod.Status.ContainerStatuses {
+					if !cs.Ready {
+						return false, nil
+					}
+				}
+				return true, nil
+			}))
+
+		ginkgo.By("Removing the shared health file to fail all 40 probes simultaneously")
+		_, _, err := e2epod.ExecWithOptions(f, e2epod.ExecOptions{
+			Command:       []string{"rm", "-f", healthFile},
+			Namespace:     f.Namespace.Name,
+			PodName:       podName,
+			ContainerName: "container-0",
+			CaptureStdout: true,
+			CaptureStderr: true,
+		})
+		framework.ExpectNoError(err, "failed to delete shared health file")
+
+		ginkgo.By("Waiting 30 seconds for all patches to settle")
+		time.Sleep(30 * time.Second)
+
+		ginkgo.By("Verifying the ContainersReady condition lists all 40 containers as unready")
+		currentPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, podName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get pod after wait")
+
+		for _, cond := range currentPod.Status.Conditions {
+			if cond.Type != v1.ContainersReady {
+				continue
+			}
+			framework.Logf("ContainersReady condition: status=%s message=%q", cond.Status, cond.Message)
+			if cond.Status != v1.ConditionFalse {
+				framework.Failf("expected ContainersReady=False after all probes failed, got: %s", cond.Status)
+			}
+			for i := 0; i < containerCount; i++ {
+				containerName := fmt.Sprintf("container-%d", i)
+				if !strings.Contains(cond.Message, containerName) {
+					framework.Failf("expected ContainersReady message to mention %s after 30s, got: %q", containerName, cond.Message)
+				}
+			}
+			break
+		}
+
+		ginkgo.By("Verifying all container statuses are not-ready")
+		for _, cs := range currentPod.Status.ContainerStatuses {
+			if cs.Ready {
+				framework.Failf("container %s is still ready=true after 30s with failed probe", cs.Name)
+			}
+		}
+	})
 })
 
 // waitForPodStatusByInformer waits pod status change by informer
