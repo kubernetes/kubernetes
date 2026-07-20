@@ -1408,7 +1408,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Score, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	allNodePluginScores := make([]fwk.NodePluginScores, len(nodes))
-	plugins := f.filterScorePlugins(state)
+	plugins := f.nonSkippedScorePlugins(state)
 	if len(plugins) == 0 {
 		for i, nodeInfo := range nodes {
 			allNodePluginScores[i] = fwk.NodePluginScores{
@@ -1470,7 +1470,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 }
 
 func (f *frameworkImpl) RunRawScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) ([]fwk.PluginScore, *fwk.Status) {
-	plugins := f.filterScorePlugins(state)
+	plugins := f.nonSkippedScorePlugins(state)
 	if len(plugins) == 0 {
 		return nil, nil
 	}
@@ -1496,7 +1496,7 @@ func (f *frameworkImpl) runRawScorePlugins(ctx context.Context, state fwk.CycleS
 
 func (f *frameworkImpl) NormalizeScores(ctx context.Context, state fwk.CycleState, pod *v1.Pod,
 	scores []fwk.NodePluginScores) *fwk.Status {
-	plugins := f.filterScorePlugins(state)
+	plugins := f.nonSkippedScorePlugins(state)
 	if len(plugins) == 0 {
 		for i := range scores {
 			scores[i].Scores = make([]fwk.PluginScore, 0)
@@ -1581,7 +1581,8 @@ func (f *frameworkImpl) normalizeScores(ctx context.Context, state fwk.CycleStat
 	return nil
 }
 
-func (f *frameworkImpl) filterScorePlugins(state fwk.CycleState) []fwk.ScorePlugin {
+// nonSkippedScorePlugins returns score plugins that have not been marked for skipping in the cycle state.
+func (f *frameworkImpl) nonSkippedScorePlugins(state fwk.CycleState) []fwk.ScorePlugin {
 	plugins := make([]fwk.ScorePlugin, 0, len(f.scorePlugins))
 	for _, pl := range f.scorePlugins {
 		if !state.GetSkipScorePlugins().Has(pl.Name()) {
