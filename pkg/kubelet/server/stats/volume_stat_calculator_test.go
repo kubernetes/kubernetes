@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubestats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
@@ -119,7 +119,7 @@ func testPVCRef(tCtx ktesting.TContext) {
 	mockStats.EXPECT().ListBlockVolumesForPod(fakePod.UID).Return(blockVolumes, true)
 
 	eventStore := make(chan string, 1)
-	fakeEventRecorder := record.FakeRecorder{
+	fakeEventRecorder := events.FakeRecorder{
 		Events: eventStore,
 	}
 
@@ -182,7 +182,7 @@ func testNormalVolumeEvent(tCtx ktesting.TContext) {
 	mockStats.EXPECT().ListBlockVolumesForPod(fakePod.UID).Return(blockVolumes, true)
 
 	eventStore := make(chan string, 2)
-	fakeEventRecorder := record.FakeRecorder{
+	fakeEventRecorder := events.FakeRecorder{
 		Events: eventStore,
 	}
 
@@ -212,7 +212,7 @@ func testAbnormalVolumeEvent(tCtx ktesting.TContext) {
 	mockStats.EXPECT().ListBlockVolumesForPod(fakePod.UID).Return(blockVolumes, true)
 
 	eventStore := make(chan string, 2)
-	fakeEventRecorder := record.FakeRecorder{
+	fakeEventRecorder := events.FakeRecorder{
 		Events: eventStore,
 	}
 

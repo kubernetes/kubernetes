@@ -39,7 +39,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	toolsevents "k8s.io/client-go/tools/events"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/component-base/logs/logreduction"
@@ -113,7 +113,7 @@ type PodInitContainerTimeRecorder interface {
 
 type kubeGenericRuntimeManager struct {
 	runtimeName string
-	recorder    record.EventRecorderLogger
+	recorder    toolsevents.EventRecorderLogger
 	osInterface kubecontainer.OSInterface
 
 	// machineInfo contains the machine information.
@@ -213,7 +213,7 @@ type KubeGenericRuntime interface {
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
 func NewKubeGenericRuntimeManager(
 	ctx context.Context,
-	recorder record.EventRecorderLogger,
+	recorder toolsevents.EventRecorderLogger,
 	livenessManager proberesults.Manager,
 	readinessManager proberesults.Manager,
 	startupManager proberesults.Manager,
@@ -1484,7 +1484,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			logger.Error(err, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 		}
 		if podContainerChanges.SandboxID != "" {
-			m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeNormal, events.SandboxChanged, "Pod sandbox changed, it will be killed and re-created.")
+			m.recorder.WithLogger(logger).Eventf(ref, nil, v1.EventTypeNormal, events.SandboxChanged, "SyncingPod", "Pod sandbox changed, it will be killed and re-created.")
 		} else {
 			logger.V(4).Info("SyncPod received new pod, will create a sandbox for it", "pod", klog.KObj(pod))
 		}
@@ -1616,7 +1616,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 					logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 					return
 				}
-				m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.FailedPrepareDynamicResources, "Failed to prepare dynamic resources: %v", err)
+				m.recorder.WithLogger(logger).Eventf(ref, nil, v1.EventTypeWarning, events.FailedPrepareDynamicResources, "SyncingPod", "Failed to prepare dynamic resources: %v", err)
 				logger.Error(err, "Failed to prepare dynamic resources", "pod", klog.KObj(pod))
 				return
 			}
@@ -1642,7 +1642,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			if referr != nil {
 				logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 			}
-			m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.FailedCreatePodSandBox, "Failed to create pod sandbox: %v", err)
+			m.recorder.WithLogger(logger).Eventf(ref, nil, v1.EventTypeWarning, events.FailedCreatePodSandBox, "SyncingPod", "Failed to create pod sandbox: %v", err)
 			return
 		}
 		logger.V(4).Info("Created PodSandbox for pod", "podSandboxID", podSandboxID, "pod", klog.KObj(pod))
@@ -1653,7 +1653,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			if referr != nil {
 				logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 			}
-			m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.FailedStatusPodSandBox, "Unable to get pod sandbox status: %v", err)
+			m.recorder.WithLogger(logger).Eventf(ref, nil, v1.EventTypeWarning, events.FailedStatusPodSandBox, "SyncingPod", "Unable to get pod sandbox status: %v", err)
 			logger.Error(err, "Failed to get pod sandbox status; Skipping pod", "pod", klog.KObj(pod))
 			result.Fail(err)
 			return
@@ -1986,8 +1986,8 @@ func (m *kubeGenericRuntimeManager) doBackOff(ctx context.Context, pod *v1.Pod, 
 	key := GetBackoffKey(pod, container)
 	if backOff.IsInBackOffSince(key, ts) {
 		if containerRef, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
-			m.recorder.WithLogger(logger).Eventf(containerRef, v1.EventTypeWarning, events.BackOffStartContainer,
-				"Back-off restarting failed container %s in pod %s", container.Name, format.Pod(pod))
+			m.recorder.WithLogger(logger).Eventf(containerRef, nil, v1.EventTypeWarning, events.BackOffStartContainer, "RestartingContainer",
+				fmt.Sprintf("Back-off restarting failed container %s in pod %s", container.Name, format.Pod(pod)))
 		}
 		backoff := backOff.Get(key)
 		err := fmt.Errorf("back-off %s restarting failed container=%s pod=%s", backoff, container.Name, format.Pod(pod))

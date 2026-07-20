@@ -25,7 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/record"
+	toolsevents "k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -58,7 +58,7 @@ type sourceUpdate struct {
 
 // NewPodConfig creates an object that can merge many configuration sources into a stream
 // of normalized updates to a pod configuration.
-func NewPodConfig(recorder record.EventRecorderLogger, startupSLIObserver podStartupSLIObserver) *PodConfig {
+func NewPodConfig(recorder toolsevents.EventRecorderLogger, startupSLIObserver podStartupSLIObserver) *PodConfig {
 	updates := make(chan kubetypes.PodUpdate, 50)
 	storage := newPodStorage(updates, recorder, startupSLIObserver)
 	podConfig := &PodConfig{
@@ -122,7 +122,7 @@ type podStorage struct {
 	sourcesSeen     sets.Set[string]
 
 	// the EventRecorder to use
-	recorder record.EventRecorderLogger
+	recorder toolsevents.EventRecorderLogger
 
 	startupSLIObserver podStartupSLIObserver
 }
@@ -130,7 +130,7 @@ type podStorage struct {
 // TODO: PodConfigNotificationMode could be handled by a listener to the updates channel
 // in the future, especially with multiple listeners.
 // TODO: allow initialization of the current state of the store with snapshotted version.
-func newPodStorage(updates chan<- kubetypes.PodUpdate, recorder record.EventRecorderLogger, startupSLIObserver podStartupSLIObserver) *podStorage {
+func newPodStorage(updates chan<- kubetypes.PodUpdate, recorder toolsevents.EventRecorderLogger, startupSLIObserver podStartupSLIObserver) *podStorage {
 	return &podStorage{
 		pods:               make(map[string]map[types.UID]*v1.Pod),
 		updates:            updates,
@@ -263,7 +263,7 @@ func (s *podStorage) seenSources(sources ...string) bool {
 	return s.sourcesSeen.HasAll(sources...)
 }
 
-func filterInvalidPods(logger klog.Logger, pods []*v1.Pod, source string, recorder record.EventRecorderLogger) (filtered []*v1.Pod) {
+func filterInvalidPods(logger klog.Logger, pods []*v1.Pod, source string, recorder toolsevents.EventRecorderLogger) (filtered []*v1.Pod) {
 	names := sets.Set[string]{}
 	for i, pod := range pods {
 		// Pods from each source are assumed to have passed validation individually.
@@ -271,7 +271,7 @@ func filterInvalidPods(logger klog.Logger, pods []*v1.Pod, source string, record
 		name := kubecontainer.GetPodFullName(pod)
 		if names.Has(name) {
 			logger.Info("Pod failed validation due to duplicate pod name, ignoring", "index", i, "pod", klog.KObj(pod), "source", source)
-			recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedValidation, "Error validating pod %s from %s due to duplicate pod name %q, ignoring", format.Pod(pod), source, pod.Name)
+			recorder.WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, events.FailedValidation, "ValidatingPod", "Error validating pod %s from %s due to duplicate pod name %q, ignoring", format.Pod(pod), source, pod.Name)
 			continue
 		} else {
 			names.Insert(name)

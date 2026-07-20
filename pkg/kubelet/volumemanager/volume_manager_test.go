@@ -37,7 +37,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -318,7 +318,7 @@ func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		"",
-		&record.FakeRecorder{},
+		&events.FakeRecorder{},
 		volumetest.NewBlockVolumePathHandler())
 
 	tCtx := ktesting.Init(t)
@@ -507,7 +507,7 @@ func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manage
 			return spec.Volume != nil && spec.Volume.ConfigMap != nil
 		},
 	}
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	plugMgr := &volume.VolumePluginMgr{}
 	// TODO (#51147) inject mock prober
 	fakeVolumeHost := volumetest.NewFakeKubeletVolumeHost(t, tmpDir, kubeClient, nil)

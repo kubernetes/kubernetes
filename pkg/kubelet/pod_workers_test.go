@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -400,7 +400,7 @@ func createPodWorkers(logger klog.Logger) (*podWorkers, *containertest.FakeRunti
 func createPodWorkersWithLogger(logger klog.Logger) (*podWorkers, *containertest.FakeRuntime, map[types.UID][]syncPodRecord) {
 	lock := sync.Mutex{}
 	processed := make(map[types.UID][]syncPodRecord)
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeRuntime := &containertest.FakeRuntime{}
 	fakeCache := containertest.NewFakeCache(fakeRuntime)
 	fakeQueue := &fakeQueue{}
@@ -2153,7 +2153,7 @@ func (kl *simpleFakeKubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod,
 // for their invocation of the syncPodFn.
 func TestFakePodWorkers(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeRuntime := &containertest.FakeRuntime{}
 	fakeCache := containertest.NewFakeCache(fakeRuntime)
 
@@ -2226,7 +2226,7 @@ func TestFakePodWorkers(t *testing.T) {
 
 // TestKillPodNowFunc tests the blocking kill pod function works with pod workers as expected.
 func TestKillPodNowFunc(t *testing.T) {
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	logger, tCtx := ktesting.NewTestContext(t)
 	podWorkers, _, processed := createPodWorkers(logger)
 	killPodFunc := killPodNow(tCtx, podWorkers, fakeRecorder)

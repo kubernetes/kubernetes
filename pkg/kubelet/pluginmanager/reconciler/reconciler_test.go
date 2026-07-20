@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/operationexecutor"
@@ -145,7 +145,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 
 	dsw := cache.NewDesiredStateOfWorld()
 	asw := cache.NewActualStateOfWorld()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeRecorder,
 	))
@@ -177,7 +177,7 @@ func Test_Run_Positive_Register(t *testing.T) {
 	dsw := cache.NewDesiredStateOfWorld()
 	asw := cache.NewActualStateOfWorld()
 	di := NewDummyImpl()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeRecorder,
 	))
@@ -227,7 +227,7 @@ func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 	dsw := cache.NewDesiredStateOfWorld()
 	asw := cache.NewActualStateOfWorld()
 	di := NewDummyImpl()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeRecorder,
 	))
@@ -284,7 +284,7 @@ func Test_Run_Positive_ReRegister(t *testing.T) {
 	dsw := cache.NewDesiredStateOfWorld()
 	asw := cache.NewActualStateOfWorld()
 	di := NewDummyImpl()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeRecorder,
 	))

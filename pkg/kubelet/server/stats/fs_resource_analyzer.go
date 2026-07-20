@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 
 	"k8s.io/klog/v2"
 )
@@ -42,13 +42,13 @@ type fsResourceAnalyzer struct {
 	calcPeriod        time.Duration
 	cachedVolumeStats atomic.Value
 	startOnce         sync.Once
-	eventRecorder     record.EventRecorder
+	eventRecorder     events.EventRecorder
 }
 
 var _ fsResourceAnalyzerInterface = &fsResourceAnalyzer{}
 
 // newFsResourceAnalyzer returns a new fsResourceAnalyzer implementation
-func newFsResourceAnalyzer(statsProvider Provider, calcVolumePeriod time.Duration, eventRecorder record.EventRecorder) *fsResourceAnalyzer {
+func newFsResourceAnalyzer(statsProvider Provider, calcVolumePeriod time.Duration, eventRecorder events.EventRecorder) *fsResourceAnalyzer {
 	r := &fsResourceAnalyzer{
 		statsProvider: statsProvider,
 		calcPeriod:    calcVolumePeriod,
