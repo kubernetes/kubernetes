@@ -101,16 +101,29 @@ import (
 // +k8s:openapi-gen=true
 // +k8s:openapi-model-package=io.k8s.apimachinery.pkg.api.resource
 type Quantity struct {
-	// i is the quantity in int64 scaled form, if d.Dec == nil
-	i int64Amount
-	// d is the quantity in inf.Dec form if d.Dec != nil
-	d infDecAmount
+	// quantityState is shared between all shallow copies of the Quantity
+	// because it's a pointer.
+	*quantityState
+
 	// s is the generated value of this quantity to avoid recalculation
 	s string
 
 	// Change Format at will. See the comment for Canonicalize for
 	// more details.
 	Format
+}
+
+type quantityState struct {
+	// i is the quantity in int64 scaled form, if d.Dec == nil
+	i int64Amount
+	// d is the quantity in inf.Dec form if d.Dec != nil
+	d infDecAmount
+}
+
+func (q *Quantity) ensureState() {
+	if q.quantityState == nil {
+		q.quantityState = &quantityState{}
+	}
 }
 
 // CanonicalValue allows a quantity amount to be converted to a string.
@@ -276,21 +289,22 @@ Suffix:
 
 // ParseQuantity turns str into a Quantity, or returns an error.
 func ParseQuantity(str string) (Quantity, error) {
+	zero := Quantity{quantityState: &quantityState{}}
 	if len(str) == 0 {
-		return Quantity{}, ErrFormatWrong
+		return zero, ErrFormatWrong
 	}
 	if str == "0" {
-		return Quantity{Format: DecimalSI, s: str}, nil
+		return Quantity{quantityState: &quantityState{}, Format: DecimalSI, s: str}, nil
 	}
 
 	positive, value, num, denom, suf, err := parseQuantityString(str)
 	if err != nil {
-		return Quantity{}, err
+		return zero, err
 	}
 
 	base, exponent, format, ok := quantitySuffixer.interpret(suffix(suf))
 	if !ok {
-		return Quantity{}, ErrSuffix
+		return zero, ErrSuffix
 	}
 
 	precision := int32(0)
@@ -323,7 +337,7 @@ func ParseQuantity(str string) (Quantity, error) {
 			var value int64
 			value, err := strconv.ParseInt(shifted, 10, 64)
 			if err != nil {
-				return Quantity{}, ErrNumeric
+				return zero, ErrNumeric
 			}
 			if result, ok := int64Multiply(value, int64(mantissa)); ok {
 				if !positive {
@@ -333,21 +347,21 @@ func ParseQuantity(str string) (Quantity, error) {
 				switch format {
 				case BinarySI:
 					if exponent%10 == 0 && (value&0x07 != 0) {
-						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+						return Quantity{quantityState: &quantityState{i: int64Amount{value: result, scale: Scale(scale)}}, Format: format, s: str}, nil
 					}
 				default:
 					if scale%3 == 0 && !strings.HasSuffix(shifted, "000") && shifted[0] != '0' {
-						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+						return Quantity{quantityState: &quantityState{i: int64Amount{value: result, scale: Scale(scale)}}, Format: format, s: str}, nil
 					}
 				}
-				return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}, nil
+				return Quantity{quantityState: &quantityState{i: int64Amount{value: result, scale: Scale(scale)}}, Format: format}, nil
 			}
 		}
 	}
 
 	amount := new(inf.Dec)
 	if _, ok := amount.SetString(value); !ok {
-		return Quantity{}, ErrNumeric
+		return zero, ErrNumeric
 	}
 
 	// So that no one but us has to think about suffixes, remove it.
@@ -388,12 +402,17 @@ func ParseQuantity(str string) (Quantity, error) {
 		amount.Neg(amount)
 	}
 
-	return Quantity{d: infDecAmount{amount}, Format: format}, nil
+	return Quantity{quantityState: &quantityState{d: infDecAmount{amount}}, Format: format}, nil
 }
 
 // DeepCopy returns a deep-copy of the Quantity value.  Note that the method
 // receiver is a value, so we can mutate it in-place and return it.
 func (q Quantity) DeepCopy() Quantity {
+	if q.quantityState == nil {
+		q.quantityState = &quantityState{}
+	} else {
+		q.quantityState = new(*q.quantityState)
+	}
 	if q.d.Dec != nil {
 		tmp := &inf.Dec{}
 		q.d.Dec = tmp.Set(q.d.Dec)
@@ -468,6 +487,7 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 func (q *Quantity) AsApproximateFloat64() float64 {
 	var base float64
 	var exponent int
+	q.ensureState()
 	if q.d.Dec != nil {
 		base, _ = big.NewFloat(0).SetInt(q.d.Dec.UnscaledBig()).Float64()
 		exponent = int(-q.d.Dec.Scale())
@@ -515,6 +535,7 @@ func (q *Quantity) AsFloat64Slow() float64 {
 // AsInt64 returns a representation of the current value as an int64 if a fast conversion
 // is possible. If false is returned, callers must use the inf.Dec form of this quantity.
 func (q *Quantity) AsInt64() (int64, bool) {
+	q.ensureState()
 	if q.d.Dec != nil {
 		return 0, false
 	}
@@ -523,6 +544,7 @@ func (q *Quantity) AsInt64() (int64, bool) {
 
 // ToDec promotes the quantity in place to use an inf.Dec representation and returns itself.
 func (q *Quantity) ToDec() *Quantity {
+	q.ensureState()
 	if q.d.Dec == nil {
 		q.d.Dec = q.i.AsDec()
 		q.i = int64Amount{}
@@ -532,6 +554,7 @@ func (q *Quantity) ToDec() *Quantity {
 
 // AsDec returns the quantity as represented by a scaled inf.Dec.
 func (q *Quantity) AsDec() *inf.Dec {
+	q.ensureState()
 	if q.d.Dec != nil {
 		return q.d.Dec
 	}
@@ -544,6 +567,7 @@ func (q *Quantity) AsDec() *inf.Dec {
 // and base 10 exponent. The out byte slice may be passed to the method to avoid an extra
 // allocation.
 func (q *Quantity) AsCanonicalBytes(out []byte) (result []byte, exponent int32) {
+	q.ensureState()
 	if q.d.Dec != nil {
 		return q.d.AsCanonicalBytes(out)
 	}
@@ -552,6 +576,7 @@ func (q *Quantity) AsCanonicalBytes(out []byte) (result []byte, exponent int32) 
 
 // IsZero returns true if the quantity is equal to zero.
 func (q *Quantity) IsZero() bool {
+	q.ensureState()
 	if q.d.Dec != nil {
 		return q.d.Dec.Sign() == 0
 	}
@@ -561,6 +586,7 @@ func (q *Quantity) IsZero() bool {
 // Sign returns 0 if the quantity is zero, -1 if the quantity is less than zero, or 1 if the
 // quantity is greater than zero.
 func (q *Quantity) Sign() int {
+	q.ensureState()
 	if q.d.Dec != nil {
 		return q.d.Dec.Sign()
 	}
@@ -570,6 +596,7 @@ func (q *Quantity) Sign() int {
 // AsScale returns the current value, rounded up to the provided scale, and returns
 // false if the scale resulted in a loss of precision.
 func (q *Quantity) AsScale(scale Scale) (CanonicalValue, bool) {
+	q.ensureState()
 	if q.d.Dec != nil {
 		return q.d.AsScale(scale)
 	}
@@ -580,6 +607,7 @@ func (q *Quantity) AsScale(scale Scale) (CanonicalValue, bool) {
 // least 1. False is returned if the rounding operation resulted in a loss of precision.
 // Negative numbers are rounded away from zero (-9 scale 1 rounds to -10).
 func (q *Quantity) RoundUp(scale Scale) bool {
+	q.ensureState()
 	if q.d.Dec != nil {
 		q.s = ""
 		d, exact := q.d.AsScale(scale)
@@ -600,6 +628,8 @@ func (q *Quantity) RoundUp(scale Scale) bool {
 // the format of the quantity will be updated to the format of y.
 func (q *Quantity) Add(y Quantity) {
 	q.s = ""
+	q.ensureState()
+	y.ensureState()
 	if q.d.Dec == nil && y.d.Dec == nil {
 		if q.i.value == 0 {
 			q.Format = y.Format
@@ -620,6 +650,8 @@ func (q *Quantity) Sub(y Quantity) {
 	if q.IsZero() {
 		q.Format = y.Format
 	}
+	q.ensureState()
+	y.ensureState()
 	if q.d.Dec == nil && y.d.Dec == nil && q.i.Sub(y.i) {
 		return
 	}
@@ -630,6 +662,7 @@ func (q *Quantity) Sub(y Quantity) {
 // It will return false if the result is inexact. Otherwise, it will return true.
 func (q *Quantity) Mul(y int64) bool {
 	q.s = ""
+	q.ensureState()
 	if q.d.Dec == nil && q.i.Mul(y) {
 		return true
 	}
@@ -639,6 +672,8 @@ func (q *Quantity) Mul(y int64) bool {
 // Cmp returns 0 if the quantity is equal to y, -1 if the quantity is less than y, or 1 if the
 // quantity is greater than y.
 func (q *Quantity) Cmp(y Quantity) int {
+	q.ensureState()
+	y.ensureState()
 	if q.d.Dec == nil && y.d.Dec == nil {
 		return q.i.Cmp(y.i)
 	}
@@ -648,6 +683,7 @@ func (q *Quantity) Cmp(y Quantity) int {
 // CmpInt64 returns 0 if the quantity is equal to y, -1 if the quantity is less than y, or 1 if the
 // quantity is greater than y.
 func (q *Quantity) CmpInt64(y int64) int {
+	q.ensureState()
 	if q.d.Dec != nil {
 		return q.d.Dec.Cmp(inf.NewDec(y, inf.Scale(0)))
 	}
@@ -657,6 +693,7 @@ func (q *Quantity) CmpInt64(y int64) int {
 // Neg sets quantity to be the negative value of itself.
 func (q *Quantity) Neg() {
 	q.s = ""
+	q.ensureState()
 	if q.d.Dec == nil {
 		q.i.value = -q.i.value
 		return
@@ -732,6 +769,7 @@ func (q Quantity) ToUnstructured() interface{} {
 // TODO: Remove support for leading/trailing whitespace
 func (q *Quantity) UnmarshalJSON(value []byte) error {
 	l := len(value)
+	q.ensureState()
 	if l == 4 && bytes.Equal(value, []byte("null")) {
 		q.d.Dec = nil
 		q.i = int64Amount{}
@@ -753,6 +791,7 @@ func (q *Quantity) UnmarshalJSON(value []byte) error {
 
 func (q *Quantity) UnmarshalCBOR(value []byte) error {
 	var s *string
+	q.ensureState()
 	if err := cbor.Unmarshal(value, &s); err != nil {
 		return err
 	}
@@ -776,7 +815,9 @@ func (q *Quantity) UnmarshalCBOR(value []byte) error {
 // value in the given format.
 func NewDecimalQuantity(b inf.Dec, format Format) *Quantity {
 	return &Quantity{
-		d:      infDecAmount{&b},
+		quantityState: &quantityState{
+			d: infDecAmount{&b},
+		},
 		Format: format,
 	}
 }
@@ -785,7 +826,9 @@ func NewDecimalQuantity(b inf.Dec, format Format) *Quantity {
 // value in the given format.
 func NewQuantity(value int64, format Format) *Quantity {
 	return &Quantity{
-		i:      int64Amount{value: value},
+		quantityState: &quantityState{
+			i: int64Amount{value: value},
+		},
 		Format: format,
 	}
 }
@@ -796,7 +839,9 @@ func NewQuantity(value int64, format Format) *Quantity {
 // values x where (-1 < x < 1) && (x != 0).
 func NewMilliQuantity(value int64, format Format) *Quantity {
 	return &Quantity{
-		i:      int64Amount{value: value, scale: -3},
+		quantityState: &quantityState{
+			i: int64Amount{value: value, scale: -3},
+		},
 		Format: format,
 	}
 }
@@ -805,7 +850,9 @@ func NewMilliQuantity(value int64, format Format) *Quantity {
 // value * 10^scale in DecimalSI format.
 func NewScaledQuantity(value int64, scale Scale) *Quantity {
 	return &Quantity{
-		i:      int64Amount{value: value, scale: scale},
+		quantityState: &quantityState{
+			i: int64Amount{value: value, scale: scale},
+		},
 		Format: DecimalSI,
 	}
 }
@@ -826,6 +873,7 @@ func (q *Quantity) MilliValue() int64 {
 // This could overflow an int64.
 // To detect overflow, call Value() first and verify the expected magnitude.
 func (q *Quantity) ScaledValue(scale Scale) int64 {
+	q.ensureState()
 	if q.d.Dec == nil {
 		i, _ := q.i.AsScaledInt64(scale)
 		return i
@@ -847,6 +895,7 @@ func (q *Quantity) SetMilli(value int64) {
 // SetScaled sets q's value to be value * 10^scale
 func (q *Quantity) SetScaled(value int64, scale Scale) {
 	q.s = ""
+	q.ensureState()
 	q.d.Dec = nil
 	q.i = int64Amount{value: value, scale: scale}
 }
