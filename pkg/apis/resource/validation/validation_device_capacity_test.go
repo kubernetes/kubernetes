@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"math"
 	"testing"
 
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
@@ -65,6 +66,13 @@ func TestValidateDeviceCapacity(t *testing.T) {
 	two := apiresource.MustParse("2Gi")
 	maxCapacity := apiresource.MustParse("10Gi")
 	overCapacity := apiresource.MustParse("20Gi")
+
+	zero := apiresource.MustParse("0")
+	negOne := apiresource.MustParse("-1")
+	maxInt64Q := *apiresource.NewQuantity(math.MaxInt64, apiresource.DecimalSI) // MaxInt64: the largest bound Value() reads faithfully
+	maxInt64Plus1 := maxInt64Q.DeepCopy()                                       // MaxInt64+1: the first bound that does not fit int64
+	maxInt64Plus1.Add(*apiresource.NewQuantity(1, apiresource.DecimalSI))
+	twoPow64 := apiresource.MustParse("18446744073709551616") // a positive multiple of 2^64, whose Value() reads as 0
 
 	capacityField := field.NewPath("spec", "devices", "capacity")
 	policyField := capacityField.Child("requestPolicy")
@@ -179,6 +187,47 @@ func TestValidateDeviceCapacity(t *testing.T) {
 				field.Invalid(validRangeField.Child("step"), "2Gi", "value is not a multiple of a given step (2Gi) from (1Gi)"),
 				field.Invalid(validRangeField.Child("step"), "10Gi", "value is not a multiple of a given step (2Gi) from (1Gi)"),
 			},
+		},
+		"range-step-multiple-of-2^64": {
+			// step is a positive multiple of 2^64, whose Value() reads as 0; the
+			// step-multiple check used to divide by zero on it. Reject it before that.
+			capacity: testDeviceCapacity(twoPow64, testCapacityRequestPolicy(ptr.To(zero), nil, testValidRange(ptr.To(zero), nil, ptr.To(twoPow64)))),
+			wantFailures: field.ErrorList{
+				field.Invalid(validRangeField.Child("step"), "18446744073709551616", "must not be larger than 9223372036854775807"),
+			},
+		},
+		"range-step-at-int64-max": {
+			// MaxInt64 is the largest step Value() reads faithfully and must be accepted.
+			capacity: testDeviceCapacity(maxInt64Q, testCapacityRequestPolicy(ptr.To(zero), nil, testValidRange(ptr.To(zero), nil, ptr.To(maxInt64Q)))),
+		},
+		"range-step-int64-max-plus-one": {
+			// One past MaxInt64 is the first step that does not fit int64 and must be rejected.
+			capacity: testDeviceCapacity(maxInt64Plus1, testCapacityRequestPolicy(ptr.To(zero), nil, testValidRange(ptr.To(zero), nil, ptr.To(maxInt64Plus1)))),
+			wantFailures: field.ErrorList{
+				field.Invalid(validRangeField.Child("step"), "9223372036854775808", "must not be larger than 9223372036854775807"),
+			},
+		},
+		"range-negative-min-with-step": {
+			// A negative min with a step reaches the int64 arithmetic, where a
+			// decimal-backed negative can read back positive; reject it.
+			capacity: testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(ptr.To(zero), nil, testValidRange(ptr.To(negOne), nil, ptr.To(one)))),
+			wantFailures: field.ErrorList{
+				field.Invalid(validRangeField.Child("min"), "-1", "must be greater than or equal to 0"),
+			},
+		},
+		"range-fractional-default-integer-range": {
+			// A fractional default with an otherwise-integer range must still take the
+			// milli path; the integer path rounds the default and accepts a non-multiple.
+			capacity:                    testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(ptr.To(hundredMilli), nil, testValidRange(ptr.To(zero), nil, ptr.To(oneUnit)))),
+			fractionalCapacityRangeGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(validRangeField.Child("step"), "100m", "value is not a multiple of a given step (1) from (0)"),
+			},
+		},
+		"range-no-step-negative-bounds-accepted": {
+			// With no step nothing reads the bounds as an int64, so a negative min and
+			// default are accepted, consistently with the pre-existing behavior.
+			capacity: testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(ptr.To(negOne), nil, testValidRange(ptr.To(negOne), nil, nil))),
 		},
 		"valid-range-fractional-step": {
 			// min=0.2, step=0.1, max=1, default=0.2, capacity=1: 0.2 = min+0*0.1, 1.0 = min+8*0.1
