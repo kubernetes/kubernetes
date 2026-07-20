@@ -6137,10 +6137,14 @@
     endpoint: /metrics
 - name: route_sync_total
   subsystem: route_controller
-  help: A metric counting the amount of times routes have been synced with the cloud
-    provider.
+  help: A metric counting the number of route reconciles with the cloud provider,
+    labeled by the trigger (periodic or node_change) and the outcome (changed if at
+    least one route was created or deleted, otherwise noop).
   type: Counter
   stabilityLevel: ALPHA
+  labels:
+  - outcome
+  - trigger
   componentEndpoints:
   - component: cloud-controller-manager
     endpoint: /metrics
