@@ -1013,7 +1013,7 @@ func createObjTemplateFile(t *testing.T, obj any) *string {
 	}()
 
 	switch obj := obj.(type) {
-	case *v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim, *schedulingapi.PodGroup, *v1.Namespace:
+	case *v1.Namespace, *v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim, *schedulingapi.PodGroup:
 		if err := json.NewEncoder(f).Encode(obj); err != nil {
 			t.Fatalf("Failed to encode the template to %s: %v", templateFile, err)
 		}
