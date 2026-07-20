@@ -61,6 +61,16 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.podPreemptionPolicy": {
+				{ErrorType: "FieldValueForbidden"},
+			},
+			"spec.podPreemptionPolicy.disableResizePreemption": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.podPreemptionPolicy.disableResizePreemption[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
 			"spec.providerID": {
 				{ErrorType: "FieldValueInvalid", Origin: "update"},
 			},

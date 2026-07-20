@@ -22,8 +22,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	core "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/core/node"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
@@ -61,6 +64,66 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		IsResourceRequest: true,
 		Verb:              "create",
 	})
+
+	testCases := map[string]struct {
+		enablePreemptionGate bool
+		input                core.Node
+		expectedErrs         field.ErrorList
+	}{
+		"valid": {
+			input: mkValidNode(),
+		},
+		"podPreemptionPolicy forbidden when feature gate disabled": {
+			enablePreemptionGate: false,
+			input: mkValidNode(func(n *core.Node) {
+				n.Spec.PodPreemptionPolicy = &core.NodePodPreemptionPolicy{
+					DisableResizePreemption: []string{"policy1"},
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "podPreemptionPolicy"), ""),
+			},
+		},
+		"invalid podPreemptionPolicy maxItems": {
+			enablePreemptionGate: true,
+			input: mkValidNode(func(n *core.Node) {
+				n.Spec.PodPreemptionPolicy = &core.NodePodPreemptionPolicy{
+					DisableResizePreemption: []string{
+						"item-01", "item-02", "item-03", "item-04", "item-05",
+						"item-06", "item-07", "item-08", "item-09", "item-10",
+						"item-11", "item-12", "item-13", "item-14", "item-15",
+						"item-16", "item-17", "item-18", "item-19", "item-20",
+						"item-21",
+					},
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "podPreemptionPolicy", "disableResizePreemption"), 21, 20).WithOrigin("maxItems"),
+			},
+		},
+		"invalid podPreemptionPolicy format and duplicate": {
+			enablePreemptionGate: true,
+			input: mkValidNode(func(n *core.Node) {
+				n.Spec.PodPreemptionPolicy = &core.NodePodPreemptionPolicy{
+					DisableResizePreemption: []string{
+						"invalid_label!",
+						"duplicate-val",
+						"duplicate-val",
+					},
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podPreemptionPolicy", "disableResizePreemption").Index(0), nil, "").WithOrigin("format=k8s-label-key"),
+				field.Duplicate(field.NewPath("spec", "podPreemptionPolicy", "disableResizePreemption").Index(2), "duplicate-val"),
+			},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, tc.enablePreemptionGate)
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
+		})
+	}
 
 	obj := mkValidNode()
 	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())

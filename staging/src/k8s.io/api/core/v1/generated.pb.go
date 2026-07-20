@@ -258,6 +258,8 @@ func (m *NodeFeatures) Reset() { *m = NodeFeatures{} }
 
 func (m *NodeList) Reset() { *m = NodeList{} }
 
+func (m *NodePodPreemptionPolicy) Reset() { *m = NodePodPreemptionPolicy{} }
+
 func (m *NodeProxyOptions) Reset() { *m = NodeProxyOptions{} }
 
 func (m *NodeRuntimeHandler) Reset() { *m = NodeRuntimeHandler{} }
@@ -6664,6 +6666,38 @@ func (m *NodeList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *NodePodPreemptionPolicy) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *NodePodPreemptionPolicy) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *NodePodPreemptionPolicy) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.DisableResizePreemption) > 0 {
+		for iNdEx := len(m.DisableResizePreemption) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.DisableResizePreemption[iNdEx])
+			copy(dAtA[i:], m.DisableResizePreemption[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(m.DisableResizePreemption[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *NodeProxyOptions) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -6925,6 +6959,18 @@ func (m *NodeSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.PodPreemptionPolicy != nil {
+		{
+			size, err := m.PodPreemptionPolicy.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x42
+	}
 	if len(m.PodCIDRs) > 0 {
 		for iNdEx := len(m.PodCIDRs) - 1; iNdEx >= 0; iNdEx-- {
 			i -= len(m.PodCIDRs[iNdEx])
@@ -17374,6 +17420,21 @@ func (m *NodeList) Size() (n int) {
 	return n
 }
 
+func (m *NodePodPreemptionPolicy) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.DisableResizePreemption) > 0 {
+		for _, s := range m.DisableResizePreemption {
+			l = len(s)
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *NodeProxyOptions) Size() (n int) {
 	if m == nil {
 		return 0
@@ -17498,6 +17559,10 @@ func (m *NodeSpec) Size() (n int) {
 			l = len(s)
 			n += 1 + l + sovGenerated(uint64(l))
 		}
+	}
+	if m.PodPreemptionPolicy != nil {
+		l = m.PodPreemptionPolicy.Size()
+		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
 }
@@ -22223,6 +22288,16 @@ func (this *NodeList) String() string {
 	}, "")
 	return s
 }
+func (this *NodePodPreemptionPolicy) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&NodePodPreemptionPolicy{`,
+		`DisableResizePreemption:` + fmt.Sprintf("%v", this.DisableResizePreemption) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *NodeProxyOptions) String() string {
 	if this == nil {
 		return "nil"
@@ -22320,6 +22395,7 @@ func (this *NodeSpec) String() string {
 		`Taints:` + repeatedStringForTaints + `,`,
 		`ConfigSource:` + strings.Replace(this.ConfigSource.String(), "NodeConfigSource", "NodeConfigSource", 1) + `,`,
 		`PodCIDRs:` + fmt.Sprintf("%v", this.PodCIDRs) + `,`,
+		`PodPreemptionPolicy:` + strings.Replace(this.PodPreemptionPolicy.String(), "NodePodPreemptionPolicy", "NodePodPreemptionPolicy", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -44061,6 +44137,88 @@ func (m *NodeList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *NodePodPreemptionPolicy) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NodePodPreemptionPolicy: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NodePodPreemptionPolicy: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DisableResizePreemption", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DisableResizePreemption = append(m.DisableResizePreemption, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *NodeProxyOptions) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -44947,6 +45105,42 @@ func (m *NodeSpec) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.PodCIDRs = append(m.PodCIDRs, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PodPreemptionPolicy", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.PodPreemptionPolicy == nil {
+				m.PodPreemptionPolicy = &NodePodPreemptionPolicy{}
+			}
+			if err := m.PodPreemptionPolicy.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

@@ -47,8 +47,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
+						{Name: names.NodeUnschedulable},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
@@ -78,8 +78,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
+						{Name: names.NodeUnschedulable},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
@@ -110,8 +110,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
+						{Name: names.NodeUnschedulable},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
@@ -142,8 +142,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
+						{Name: names.NodeUnschedulable},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
@@ -173,8 +173,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
+						{Name: names.NodeUnschedulable},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
@@ -207,8 +207,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
+						{Name: names.NodeUnschedulable},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},

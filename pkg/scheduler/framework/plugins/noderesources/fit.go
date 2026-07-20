@@ -91,13 +91,14 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 
 // Fit is a plugin that checks if a node has sufficient resources.
 type Fit struct {
-	ignoredResources                              sets.Set[string]
-	ignoredResourceGroups                         sets.Set[string]
-	enableInPlacePodVerticalScaling               bool
-	enablePodLevelResources                       bool
-	enableDRAExtendedResource                     bool
-	enableInPlacePodLevelResourcesVerticalScaling bool
-	handle                                        fwk.Handle
+	ignoredResources                                   sets.Set[string]
+	ignoredResourceGroups                              sets.Set[string]
+	enableInPlacePodVerticalScaling                    bool
+	enablePodLevelResources                            bool
+	enableDRAExtendedResource                          bool
+	enableInPlacePodLevelResourcesVerticalScaling      bool
+	enableInPlacePodVerticalScalingSchedulerPreemption bool
+	handle                                             fwk.Handle
 	*resourceAllocationScorer
 	placementScorer *resourceAllocationScorer
 }
@@ -232,14 +233,15 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 	}
 
 	pl := &Fit{
-		ignoredResources:                              sets.New(args.IgnoredResources...),
-		ignoredResourceGroups:                         sets.New(args.IgnoredResourceGroups...),
-		enableInPlacePodVerticalScaling:               fts.EnableInPlacePodVerticalScaling,
-		handle:                                        h,
-		enablePodLevelResources:                       fts.EnablePodLevelResources,
-		enableDRAExtendedResource:                     fts.EnableDRAExtendedResource,
-		enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
-		resourceAllocationScorer:                      scorer,
+		ignoredResources:                                   sets.New(args.IgnoredResources...),
+		ignoredResourceGroups:                              sets.New(args.IgnoredResourceGroups...),
+		enableInPlacePodVerticalScaling:                    fts.EnableInPlacePodVerticalScaling,
+		handle:                                             h,
+		enablePodLevelResources:                            fts.EnablePodLevelResources,
+		enableDRAExtendedResource:                          fts.EnableDRAExtendedResource,
+		enableInPlacePodLevelResourcesVerticalScaling:      fts.EnableInPlacePodLevelResourcesVerticalScaling,
+		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
+		resourceAllocationScorer:                           scorer,
 	}
 
 	if fts.EnableTopologyAwareWorkloadScheduling {
@@ -258,9 +260,10 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 
 // ResourceRequestsOptions contains feature gate flags for resource request computation.
 type ResourceRequestsOptions struct {
-	EnablePodLevelResources           bool
-	EnableDRAExtendedResource         bool
-	EnableDRANodeAllocatableResources bool
+	EnablePodLevelResources                            bool
+	EnableDRAExtendedResource                          bool
+	EnableDRANodeAllocatableResources                  bool
+	EnableInPlacePodVerticalScalingSchedulerPreemption bool
 }
 
 // shouldDelegateResourceToDRA checks if the given resource should be delegated to the DRA plugin.
@@ -372,6 +375,11 @@ func (f *Fit) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, e
 			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterAssignedPodScaleDown},
 			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterTargetPodScaleDown})
 	}
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption {
+		events = append(events,
+			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleUp}, QueueingHintFn: f.isSchedulableAfterAssignedPodScaleUp},
+			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleUp}, QueueingHintFn: f.isSchedulableAfterTargetPodScaleUp})
+	}
 	return events, nil
 }
 
@@ -388,6 +396,13 @@ func (f *Fit) isSchedulableAfterAssignedPodDelete(logger klog.Logger, pod *v1.Po
 		return fwk.QueueSkip, nil
 	}
 
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		if deletedPod.Spec.NodeName != pod.Spec.NodeName {
+			logger.V(5).Info("another scheduled pod was deleted, but it's on a different node than the deferred resize pod", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+			return fwk.QueueSkip, nil
+		}
+	}
+
 	// any deletion event to a scheduled pod could make the unscheduled pod schedulable.
 	logger.V(5).Info("another scheduled pod was deleted, and it may make the unscheduled pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
 	return fwk.Queue, nil
@@ -396,6 +411,38 @@ func (f *Fit) isSchedulableAfterAssignedPodDelete(logger klog.Logger, pod *v1.Po
 // isSchedulableAfterTargetPodScaleDown is invoked when the target pod is scaled down, making itself schedulable.
 func (f *Fit) isSchedulableAfterTargetPodScaleDown(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	logger.V(5).Info("the target pod got scaled down and it may be schedulable now", "pod", klog.KObj(pod))
+	return fwk.Queue, nil
+}
+
+// isSchedulableAfterTargetPodScaleUp is invoked when the target pod is scaled up.
+// Requeuing is necessary because a pod parked in UnschedulableAndUnresolvable (fitting naturally)
+// may exceed available headroom upon scaling up further, requiring preemption to clear space.
+func (f *Fit) isSchedulableAfterTargetPodScaleUp(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	if !resource.IsPodResizeDeferred(pod) {
+		logger.V(5).Info("the target pod got scaled up, but it is not a deferred resize pod", "pod", klog.KObj(pod))
+		return fwk.QueueSkip, nil
+	}
+	logger.V(5).Info("the target pod got scaled up, re-evaluating", "pod", klog.KObj(pod))
+	return fwk.Queue, nil
+}
+
+// isSchedulableAfterAssignedPodScaleUp checks if another assigned pod scaled up on the same node.
+// Requeuing is necessary because a competing scale-up can consume the free headroom a parked pod
+// was waiting for, forcing the deferred pod back into active evaluation to initiate preemption.
+func (f *Fit) isSchedulableAfterAssignedPodScaleUp(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	_, modifiedPod, err := schedutil.As[*v1.Pod](oldObj, newObj)
+	if err != nil {
+		return fwk.Queue, err
+	}
+	if !resource.IsPodResizeDeferred(pod) {
+		logger.V(5).Info("another assigned pod got scaled up, but target pod is not a deferred resize pod", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
+		return fwk.QueueSkip, nil
+	}
+	if modifiedPod.Spec.NodeName != pod.Spec.NodeName {
+		logger.V(5).Info("another assigned pod got scaled up, but on a different node than the deferred resize pod", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
+		return fwk.QueueSkip, nil
+	}
+	logger.V(5).Info("another assigned pod got scaled up on the same node as the deferred resize pod, re-evaluating", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 	return fwk.Queue, nil
 }
 
@@ -427,6 +474,13 @@ func (f *Fit) haveEnoughRelevantResourcesDecreased(targetPod *v1.Pod, originalPo
 		// If the update event is for a unscheduled Pod,
 		// it wouldn't make targetPod schedulable.
 		return false
+	}
+
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(targetPod) {
+		// A pod with deferred resize is already bound to a specific node, so changes to other nodes do not affect its schedulability.
+		if modifiedPod.Spec.NodeName != targetPod.Spec.NodeName {
+			return false
+		}
 	}
 
 	// the other pod was scheduled, so modification or deletion may free up some resources.
@@ -470,6 +524,13 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 	originalNode, modifiedNode, err := schedutil.As[*v1.Node](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
+	}
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		// A pod with deferred resize is already bound to a specific node, so changes to other nodes do not affect its schedulability.
+		if modifiedNode.Name != pod.Spec.NodeName {
+			logger.V(5).Info("node was updated, but it is a different node than the deferred resize pod's node", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+			return fwk.QueueSkip, nil
+		}
 	}
 	// Use the DRA manager's extended resource cache for event handlers
 	var draManager fwk.SharedDRAManager
@@ -602,11 +663,12 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 	}
 
 	opts := ResourceRequestsOptions{
-		EnablePodLevelResources:   f.enablePodLevelResources,
-		EnableDRAExtendedResource: f.enableDRAExtendedResource,
+		EnablePodLevelResources:                            f.enablePodLevelResources,
+		EnableDRAExtendedResource:                          f.enableDRAExtendedResource,
+		EnableInPlacePodVerticalScalingSchedulerPreemption: f.enableInPlacePodVerticalScalingSchedulerPreemption,
 	}
 
-	insufficientResources := fitsRequest(s, nodeInfo, f.ignoredResources, f.ignoredResourceGroups, draManager, opts)
+	insufficientResources := fitsRequest(s, nodeInfo, f.ignoredResources, f.ignoredResourceGroups, draManager, opts, pod)
 
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
@@ -622,6 +684,7 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 
 		return fwk.NewStatus(statusCode, failureReasons...)
 	}
+
 	return nil
 }
 
@@ -641,10 +704,10 @@ type InsufficientResource struct {
 
 // Fits checks if node have enough resources to host the pod.
 func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) []InsufficientResource {
-	return fitsRequest(computePodResourceRequest(pod, opts), nodeInfo, nil, nil, draManager, opts)
+	return fitsRequest(computePodResourceRequest(pod, opts), nodeInfo, nil, nil, draManager, opts, pod)
 }
 
-func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) []InsufficientResource {
+func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], draManager fwk.SharedDRAManager, opts ResourceRequestsOptions, pod *v1.Pod) []InsufficientResource {
 	insufficientResources := make([]InsufficientResource, 0, 4)
 
 	allowedPodNumber := nodeInfo.GetAllocatable().GetAllowedPodNumber()
@@ -665,7 +728,9 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 		return insufficientResources
 	}
 
-	if podRequest.MilliCPU > 0 && podRequest.MilliCPU > (nodeInfo.GetAllocatable().GetMilliCPU()-nodeInfo.GetRequested().GetMilliCPU()) {
+	deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources := adjustDeltasToAccomodateCacheDiscrepancy(opts, podRequest, nodeInfo, pod)
+
+	if podRequest.MilliCPU > 0 && deltaMilliCPU > (nodeInfo.GetAllocatable().GetMilliCPU()-nodeInfo.GetRequested().GetMilliCPU()) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			ResourceName: v1.ResourceCPU,
 			Reason:       "Insufficient cpu",
@@ -675,7 +740,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 			Unresolvable: podRequest.MilliCPU > nodeInfo.GetAllocatable().GetMilliCPU(),
 		})
 	}
-	if podRequest.Memory > 0 && podRequest.Memory > (nodeInfo.GetAllocatable().GetMemory()-nodeInfo.GetRequested().GetMemory()) {
+	if podRequest.Memory > 0 && deltaMemory > (nodeInfo.GetAllocatable().GetMemory()-nodeInfo.GetRequested().GetMemory()) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			ResourceName: v1.ResourceMemory,
 			Reason:       "Insufficient memory",
@@ -686,7 +751,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 		})
 	}
 	if podRequest.EphemeralStorage > 0 &&
-		podRequest.EphemeralStorage > (nodeInfo.GetAllocatable().GetEphemeralStorage()-nodeInfo.GetRequested().GetEphemeralStorage()) {
+		deltaEphemeralStorage > (nodeInfo.GetAllocatable().GetEphemeralStorage()-nodeInfo.GetRequested().GetEphemeralStorage()) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			ResourceName: v1.ResourceEphemeralStorage,
 			Reason:       "Insufficient ephemeral-storage",
@@ -697,7 +762,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 		})
 	}
 
-	for rName, rQuant := range podRequest.ScalarResources {
+	for rName, rQuant := range deltaScalarResources {
 		// Skip in case request quantity is zero
 		if rQuant == 0 {
 			continue
@@ -718,7 +783,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 		if shouldDelegateResourceToDRA(rName, nodeInfo, draManager, opts) {
 			continue
 		}
-		if rQuant > (nodeInfo.GetAllocatable().GetScalarResources()[rName] - nodeInfo.GetRequested().GetScalarResources()[rName]) {
+		if podRequest.ScalarResources[rName] > 0 && rQuant > (nodeInfo.GetAllocatable().GetScalarResources()[rName]-nodeInfo.GetRequested().GetScalarResources()[rName]) {
 			insufficientResources = append(insufficientResources, InsufficientResource{
 				ResourceName: rName,
 				Reason:       fmt.Sprintf("Insufficient %v", rName),
@@ -731,6 +796,51 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 	}
 
 	return insufficientResources
+}
+
+// adjustDeltasToAccomodateCacheDiscrepancy calculates the resource requests to evaluate
+// for a pod. For an assigned pod, its desired resources are already accounted for in the
+// node cache (max(desired, allocated, actual)), so ideally we only check if the node is
+// overallocated. This function exists to amortize asynchronous discrepancies between the
+// pod info in the scheduling queue and the node snapshot cache.
+func adjustDeltasToAccomodateCacheDiscrepancy(opts ResourceRequestsOptions, podRequest *preFilterState, nodeInfo fwk.NodeInfo, pod *v1.Pod) (int64, int64, int64, map[v1.ResourceName]int64) {
+	deltaMilliCPU := podRequest.MilliCPU
+	deltaMemory := podRequest.Memory
+	deltaEphemeralStorage := podRequest.EphemeralStorage
+	deltaScalarResources := podRequest.ScalarResources
+
+	if !opts.EnableInPlacePodVerticalScalingSchedulerPreemption || pod == nil || len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName != nodeInfo.Node().Name {
+		return deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources
+	}
+
+	var cachedPodInfo fwk.PodInfo
+	for _, pInfo := range nodeInfo.GetPods() {
+		if pInfo.GetPod().UID == pod.UID {
+			cachedPodInfo = pInfo
+			break
+		}
+	}
+	if cachedPodInfo == nil {
+		return deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources
+	}
+
+	cachedRes := cachedPodInfo.CalculateResource().Resource
+	// We take max(0, ...) to prevent negative deltas when podRequest < cachedRes (e.g., during scale-down
+	// or asynchronous cache lag). Allowing a negative delta would improperly reduce the node's requested
+	// usage before the Kubelet has actually freed the resources. If a stale larger cachedRes causes
+	// preemption to fail, eventual cache convergence will emit a scale-down event to wake up the pod.
+	deltaMilliCPU = max(0, podRequest.MilliCPU-cachedRes.GetMilliCPU())
+	deltaMemory = max(0, podRequest.Memory-cachedRes.GetMemory())
+	deltaEphemeralStorage = max(0, podRequest.EphemeralStorage-cachedRes.GetEphemeralStorage())
+
+	adjustedScalars := make(map[v1.ResourceName]int64)
+	cachedScalars := cachedRes.GetScalarResources()
+	for rName, rQuant := range podRequest.ScalarResources {
+		adjustedScalars[rName] = max(0, rQuant-cachedScalars[rName])
+	}
+	deltaScalarResources = adjustedScalars
+
+	return deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources
 }
 
 // Score invoked at the Score extension point.
