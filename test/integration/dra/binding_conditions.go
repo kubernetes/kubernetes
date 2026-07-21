@@ -26,9 +26,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/ktesting"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/ktesting/format"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -54,6 +56,15 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 		tCtx.Run("TimeoutReached", func(tCtx ktesting.TContext) { testDeviceBindingConditionsTimeoutReached(tCtx) })
 		tCtx.Run("TimeoutRecover", func(tCtx ktesting.TContext) { testDeviceBindingConditionsTimeoutRecovery(tCtx) })
 	}
+}
+
+// Counter-free allocations record known zero consumption when snapshots are
+// enabled, so later ResourceSlice changes cannot invent an earlier counter cost.
+func emptyCounterConsumption() *resourceapi.CounterConsumption {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRASharedConsumableCapacity) {
+		return &resourceapi.CounterConsumption{}
+	}
+	return nil
 }
 
 // testBindingConditionsBasicFlow tests scheduling with mixed devices: one with BindingConditions, one without.
@@ -131,10 +142,11 @@ func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) 
 	gomega.NewWithT(tCtx).Expect(claim1).To(gomega.HaveField("Status.Allocation", gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 		"Devices": gomega.Equal(resourceapi.DeviceAllocationResult{
 			Results: []resourceapi.DeviceRequestAllocationResult{{
-				Request: claim1.Spec.Devices.Requests[0].Name,
-				Driver:  driverName,
-				Pool:    poolWithoutBinding,
-				Device:  "without-binding",
+				ConsumedCounters: emptyCounterConsumption(),
+				Request:          claim1.Spec.Devices.Requests[0].Name,
+				Driver:           driverName,
+				Pool:             poolWithoutBinding,
+				Device:           "without-binding",
 			}}}),
 		// NodeSelector intentionally not checked - that's covered elsewhere.
 		"AllocationTimestamp": gomega.HaveField("Time", gomega.And(
@@ -153,6 +165,7 @@ func testDeviceBindingConditionsBasicFlow(tCtx ktesting.TContext, enabled bool) 
 	gomega.NewWithT(tCtx).Expect(claim2).To(gomega.HaveField("Status.Allocation", gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 		"Devices": gomega.Equal(resourceapi.DeviceAllocationResult{
 			Results: []resourceapi.DeviceRequestAllocationResult{{
+				ConsumedCounters:         emptyCounterConsumption(),
 				Request:                  claim2.Spec.Devices.Requests[0].Name,
 				Driver:                   driverName,
 				Pool:                     poolWithBinding,
@@ -273,6 +286,7 @@ func testDeviceBindingFailureConditionsReschedule(tCtx ktesting.TContext, useTai
 	gomega.NewWithT(tCtx).Expect(claim1).To(gomega.HaveField("Status.Allocation", gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 		"Devices": gomega.Equal(resourceapi.DeviceAllocationResult{
 			Results: []resourceapi.DeviceRequestAllocationResult{{
+				ConsumedCounters:         emptyCounterConsumption(),
 				Request:                  claim1.Spec.Devices.Requests[0].Name,
 				Driver:                   driverName,
 				Pool:                     poolWithBinding,
@@ -376,10 +390,11 @@ func testDeviceBindingFailureConditionsReschedule(tCtx ktesting.TContext, useTai
 	gomega.NewWithT(tCtx).Expect(claim1).To(gomega.HaveField("Status.Allocation", gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 		"Devices": gomega.Equal(resourceapi.DeviceAllocationResult{
 			Results: []resourceapi.DeviceRequestAllocationResult{{
-				Request: claim1.Spec.Devices.Requests[0].Name,
-				Driver:  driverName,
-				Pool:    anotherPoolWithoutBinding,
-				Device:  "without-binding",
+				ConsumedCounters: emptyCounterConsumption(),
+				Request:          claim1.Spec.Devices.Requests[0].Name,
+				Driver:           driverName,
+				Pool:             anotherPoolWithoutBinding,
+				Device:           "without-binding",
 			}}}),
 	}))), "third allocated claim to the device without binding conditions")
 
@@ -440,6 +455,7 @@ profiles:
 		gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 			"Devices": gomega.Equal(resourceapi.DeviceAllocationResult{
 				Results: []resourceapi.DeviceRequestAllocationResult{{
+					ConsumedCounters:         emptyCounterConsumption(),
 					Request:                  allocatedClaim.Spec.Devices.Requests[0].Name,
 					Driver:                   driver,
 					Pool:                     poolWithBinding,
@@ -536,6 +552,7 @@ profiles:
 		gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 			"Devices": gomega.Equal(resourceapi.DeviceAllocationResult{
 				Results: []resourceapi.DeviceRequestAllocationResult{{
+					ConsumedCounters:         emptyCounterConsumption(),
 					Request:                  claim.Spec.Devices.Requests[0].Name,
 					Driver:                   driverName,
 					Pool:                     poolWithBinding,
@@ -600,10 +617,11 @@ profiles:
 		gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 			"Devices": gomega.Equal(resourceapi.DeviceAllocationResult{
 				Results: []resourceapi.DeviceRequestAllocationResult{{
-					Request: claim.Spec.Devices.Requests[0].Name,
-					Driver:  driverName,
-					Pool:    poolWithoutBinding,
-					Device:  "without-binding",
+					ConsumedCounters: emptyCounterConsumption(),
+					Request:          claim.Spec.Devices.Requests[0].Name,
+					Driver:           driverName,
+					Pool:             poolWithoutBinding,
+					Device:           "without-binding",
 				}},
 			}),
 		}),

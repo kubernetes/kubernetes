@@ -816,17 +816,18 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 
 func AllocatorFeatures(fts feature.Features) structured.Features {
 	return structured.Features{
-		AdminAccess:             fts.EnableDRAAdminAccess,
-		PrioritizedList:         fts.EnableDRAPrioritizedList,
-		PartitionableDevices:    fts.EnableDRAPartitionableDevices,
-		DeviceTaints:            fts.EnableDRADeviceTaints,
-		DeviceBindingAndStatus:  fts.EnableDRADeviceBindingConditions && fts.EnableDRAResourceClaimDeviceStatus,
-		ConsumableCapacity:      fts.EnableDRAConsumableCapacity,
-		FractionalCapacityRange: fts.EnableDRAFractionalCapacityRange,
-		ListTypeAttributes:      fts.EnableDRAListTypeAttributes,
-		OptionalNodeOperations:  fts.EnableDRAOptionalNodeOperations,
-		DerivedAttributes:       fts.EnableDRADerivedAttributes,
-		CompatibilityGroups:     fts.EnableDRADeviceCompatibilityGroups,
+		AdminAccess:              fts.EnableDRAAdminAccess,
+		PrioritizedList:          fts.EnableDRAPrioritizedList,
+		PartitionableDevices:     fts.EnableDRAPartitionableDevices,
+		DeviceTaints:             fts.EnableDRADeviceTaints,
+		DeviceBindingAndStatus:   fts.EnableDRADeviceBindingConditions && fts.EnableDRAResourceClaimDeviceStatus,
+		ConsumableCapacity:       fts.EnableDRAConsumableCapacity,
+		FractionalCapacityRange:  fts.EnableDRAFractionalCapacityRange,
+		ListTypeAttributes:       fts.EnableDRAListTypeAttributes,
+		OptionalNodeOperations:   fts.EnableDRAOptionalNodeOperations,
+		DerivedAttributes:        fts.EnableDRADerivedAttributes,
+		CompatibilityGroups:      fts.EnableDRADeviceCompatibilityGroups,
+		SharedConsumableCapacity: fts.EnableDRASharedConsumableCapacity,
 	}
 }
 
