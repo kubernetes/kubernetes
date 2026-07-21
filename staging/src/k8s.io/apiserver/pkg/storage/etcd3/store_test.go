@@ -564,7 +564,7 @@ func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, 
 				estimatedGetCalls++
 			}
 		}
-		if reads := recorder.GetReadsAndReset(); reads != estimatedGetCalls {
+		if reads := recorder.GetReadsAndReset() + recorder.GetStreamReadsAndReset(); reads != estimatedGetCalls {
 			t.Fatalf("unexpected reads: %d, want: %d", reads, estimatedGetCalls)
 		}
 	}

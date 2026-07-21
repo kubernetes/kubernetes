@@ -1087,8 +1087,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/second/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1, Continue: "/registry/pods/second/foo"},
+						Key:         "/registry/pods/second/foo",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1},
 					},
 				}
 			},
@@ -1110,8 +1110,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/second/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1, Continue: "/registry/pods/second/foo"},
+						Key:         "/registry/pods/second/foo",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1},
 					},
 				}
 			},
@@ -1892,8 +1892,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion), Limit: 1, Continue: "/registry/pods/first/bar\x00"},
+						Key:         "/registry/pods/first/bar\x00",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion), Limit: 1},
 					},
 				}
 			},
@@ -1915,8 +1915,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[1].ResourceVersion), Limit: 1, Continue: "/registry/pods/first/bar\x00"},
+						Key:         "/registry/pods/first/bar\x00",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[1].ResourceVersion), Limit: 1},
 					},
 				}
 			},
@@ -1938,8 +1938,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[2].ResourceVersion), Limit: 2, Continue: "/registry/pods/second/bar\x00"},
+						Key:         "/registry/pods/second/bar\x00",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[2].ResourceVersion), Limit: 2},
 					},
 				}
 			},
@@ -1964,8 +1964,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[4].ResourceVersion), Limit: 1, Continue: "/registry/pods/first/bar\x00"},
+						Key:         "/registry/pods/first/bar\x00",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[4].ResourceVersion), Limit: 1},
 					},
 				}
 			},
@@ -1990,8 +1990,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[5].ResourceVersion), Limit: 2, Continue: "/registry/pods/second/bar\x00"},
+						Key:         "/registry/pods/second/bar\x00",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[5].ResourceVersion), Limit: 2},
 					},
 				}
 			},
@@ -2013,8 +2013,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, updatedPod.ResourceVersion), Limit: 4, Continue: "/registry/pods/second/foo\x00"},
+						Key:         "/registry/pods/second/foo\x00",
+						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, updatedPod.ResourceVersion), Limit: 4},
 					},
 				}
 			},
@@ -2039,8 +2039,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 1, Continue: "/registry/pods/first/bar\x00"},
+						Key:         "/registry/pods/first/bar\x00",
+						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 1},
 					},
 				}
 			},
@@ -2061,8 +2061,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Continue: "/registry/pods/first/bar\x00"},
+						Key:         "/registry/pods/first/bar\x00",
+						ListOptions: kubernetes.ListOptions{},
 					},
 				}
 			},
@@ -2087,8 +2087,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Continue: "/registry/pods/first/bar\x00", Limit: 2},
+						Key:         "/registry/pods/first/bar\x00",
+						ListOptions: kubernetes.ListOptions{Limit: 2},
 					},
 				}
 			},
@@ -2109,8 +2109,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Continue: "/registry/pods/second/foo\x00"},
+						Key:         "/registry/pods/second/foo\x00",
+						ListOptions: kubernetes.ListOptions{},
 					},
 				}
 			},

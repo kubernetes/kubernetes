@@ -49,7 +49,8 @@ func (r *KVRecorder) GetReadsAndReset() uint64 {
 func (r *KVRecorder) GetStream(ctx context.Context, key string, opts ...clientv3.OpOption) (clientv3.GetStreamChan, error) {
 	atomic.AddUint64(&r.streamReads, 1)
 	if r.lists != nil {
-		r.lists.record(ctx, RecordedList{Key: key, ListOptions: kubernetes.ListOptions{Revision: clientv3.OpGet(key, opts...).Rev()}})
+		op := clientv3.OpGet(key, opts...)
+		r.lists.record(ctx, RecordedList{Key: key, ListOptions: kubernetes.ListOptions{Revision: op.Rev(), Limit: op.Limit()}})
 	}
 	return r.KV.GetStream(ctx, key, opts...)
 }
