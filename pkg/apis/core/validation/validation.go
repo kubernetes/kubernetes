@@ -2686,57 +2686,6 @@ var resizeStatusSet = sets.New(core.PersistentVolumeClaimControllerResizeInProgr
 	core.PersistentVolumeClaimNodeResizeInProgress,
 	core.PersistentVolumeClaimNodeResizeInfeasible)
 
-var validVolumeHealthStatusTypes = sets.New(
-	core.VolumeHealthInaccessible,
-	core.VolumeHealthDataLoss,
-	core.VolumeHealthDegraded,
-)
-
-const maxVolumeHealthConditions = 16
-
-func validateVolumeHealthCondition(condition core.VolumeHealthCondition, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if !validVolumeHealthStatusTypes.Has(condition.Status) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, sets.List(validVolumeHealthStatusTypes)))
-	}
-	if len(condition.Reason) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), ""))
-	} else if len(condition.Reason) > 256 {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), condition.Reason, 256))
-	}
-	if len(condition.Message) > 1024 {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), condition.Message, 1024))
-	}
-	return allErrs
-}
-
-func validateVolumeHealthConditions(conditions []core.VolumeHealthCondition, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if len(conditions) > maxVolumeHealthConditions {
-		allErrs = append(allErrs, field.TooMany(fldPath, len(conditions), maxVolumeHealthConditions))
-	}
-	seen := sets.New[string]()
-	for i, condition := range conditions {
-		key := string(condition.Status) + "/" + condition.Reason
-		idxPath := fldPath.Index(i)
-		if seen.Has(key) {
-			allErrs = append(allErrs, field.Duplicate(idxPath, key))
-		}
-		seen.Insert(key)
-		allErrs = append(allErrs, validateVolumeHealthCondition(condition, idxPath)...)
-	}
-	return allErrs
-}
-
-func validateVolumeHealthStatus(healthStatus *core.VolumeHealthStatus, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if healthStatus == nil {
-		return allErrs
-	}
-	allErrs = append(allErrs, validateVolumeHealthConditions(healthStatus.HealthConditions, fldPath.Child("healthConditions"))...)
-	return allErrs
-}
-
 func validatePodVolumeHealth(volumeHealth []core.PodVolumeHealth, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	volumeNames := sets.New[string]()
@@ -2745,20 +2694,11 @@ func validatePodVolumeHealth(volumeHealth []core.PodVolumeHealth, spec *core.Pod
 			volumeNames.Insert(v.Name)
 		}
 	}
-	seenNames := sets.New[string]()
 	for i, vh := range volumeHealth {
 		idxPath := fldPath.Index(i)
-		if len(vh.Name) == 0 {
-			allErrs = append(allErrs, field.Required(idxPath.Child("name"), ""))
-		}
-		if seenNames.Has(vh.Name) {
-			allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), vh.Name))
-		}
-		seenNames.Insert(vh.Name)
 		if len(vh.Name) > 0 && !volumeNames.Has(vh.Name) {
 			allErrs = append(allErrs, field.NotFound(idxPath.Child("name"), vh.Name))
 		}
-		allErrs = append(allErrs, validateVolumeHealthConditions(vh.HealthConditions, idxPath.Child("healthConditions"))...)
 	}
 	return allErrs
 }
@@ -2805,7 +2745,6 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVo
 			}
 		}
 	}
-	allErrs = append(allErrs, validateVolumeHealthStatus(newPvc.Status.HealthStatus, field.NewPath("status", "healthStatus"))...)
 	return allErrs
 }
 

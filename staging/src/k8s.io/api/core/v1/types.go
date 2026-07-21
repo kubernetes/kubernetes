@@ -767,6 +767,7 @@ type PersistentVolumeClaimCondition struct {
 
 // VolumeHealthStatusType describes the health status category of a volume.
 // +enum
+// +k8s:enum
 type VolumeHealthStatusType string
 
 const (
@@ -782,15 +783,21 @@ const (
 type VolumeHealthCondition struct {
 	// status is the machine-parseable health category.
 	// One of "Inaccessible", "DataLoss", "Degraded".
+	// +required
+	// +k8s:required
 	Status VolumeHealthStatusType `json:"status" protobuf:"bytes,1,opt,name=status,casttype=VolumeHealthStatusType"`
 	// reason is a brief CamelCase machine-parseable reason.
 	// Together with status it forms the unique identity of a condition entry.
-	// Maximum permitted length of a reason is 256 characters.a
+	// Maximum permitted length of a reason is 256 bytes.
 	// +required
+	// +k8s:required
+	// +k8s:maxBytes=256
 	Reason string `json:"reason" protobuf:"bytes,2,opt,name=reason"`
 	// message is a human-readable description.
+	// Maximum permitted length of a message is 1024 bytes.
 	// +optional
-	// Maximum permitted length of a message is 1024 characters.
+	// +k8s:optional
+	// +k8s:maxBytes=1024
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
 }
 
@@ -806,6 +813,11 @@ type VolumeHealthStatus struct {
 	// +patchMergeKey=status
 	// +patchStrategy=merge
 	// +listMapKey=reason
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=status
+	// +k8s:listMapKey=reason
+	// +k8s:maxItems=16
 	HealthConditions []VolumeHealthCondition `json:"healthConditions,omitempty" patchStrategy:"merge" patchMergeKey:"status" protobuf:"bytes,1,rep,name=healthConditions"`
 	// lastTransitionTime is when the current set of conditions first appeared.
 	// +optional
@@ -816,6 +828,8 @@ type VolumeHealthStatus struct {
 // reported by the CSI node plugin via the kubelet.
 type PodVolumeHealth struct {
 	// name matches an entry in pod.spec.volumes.
+	// +required
+	// +k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// conditions is the set of adverse conditions reported by
 	// the CSI node plugin for this volume on this node.
@@ -826,6 +840,11 @@ type PodVolumeHealth struct {
 	// +patchMergeKey=status
 	// +patchStrategy=merge
 	// +listMapKey=reason
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=status
+	// +k8s:listMapKey=reason
+	// +k8s:maxItems=16
 	HealthConditions []VolumeHealthCondition `json:"healthConditions,omitempty" patchStrategy:"merge" patchMergeKey:"status" protobuf:"bytes,2,rep,name=healthConditions"`
 	// lastTransitionTime is when the current set of conditions first appeared.
 	// +optional
@@ -929,6 +948,7 @@ type PersistentVolumeClaimStatus struct {
 	// for the volume bound to this claim.
 	// +featureGate=CSIVolumeHealth
 	// +optional
+	// +k8s:optional
 	HealthStatus *VolumeHealthStatus `json:"healthStatus,omitempty" protobuf:"bytes,10,opt,name=healthStatus"`
 }
 
@@ -5618,6 +5638,9 @@ type PodStatus struct {
 	// +optional
 	// +listType=map
 	// +listMapKey=name
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
 	VolumeHealth []PodVolumeHealth `json:"volumeHealth,omitempty" protobuf:"bytes,22,rep,name=volumeHealth"`
 }
 
