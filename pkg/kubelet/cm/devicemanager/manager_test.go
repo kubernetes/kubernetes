@@ -1138,6 +1138,29 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		as.Equal(testCase.expectedAllocatedResName2, testManager.allocatedDevices[res2.resourceName].Len())
 	}
 
+	zeroResourceName := "domain3.com/resource3"
+	testManager.healthyDevices[zeroResourceName] = sets.New[string]()
+	testManager.unhealthyDevices[zeroResourceName] = sets.New("dev5")
+	testManager.allDevices[zeroResourceName] = makeDevice(checkpoint.DevicesPerNUMA{0: []string{"dev5"}}, false)
+	allocateCalled := false
+	testManager.endpoints[zeroResourceName] = endpointInfo{
+		e: &MockEndpoint{
+			allocateFunc: func([]string) (*pluginapi.AllocateResponse, error) {
+				allocateCalled = true
+				return nil, nil
+			},
+		},
+	}
+	zeroPod := makePod(v1.ResourceList{
+		v1.ResourceName(zeroResourceName): *resource.NewQuantity(0, resource.DecimalSI),
+	})
+	activePods = append(activePods, zeroPod)
+	podsStub.updateActivePods(activePods)
+
+	as.NoError(testManager.Allocate(tCtx, zeroPod, &zeroPod.Spec.Containers[0], lifecycle.AddOperation))
+	as.False(allocateCalled)
+	as.Empty(testManager.allocatedDevices[zeroResourceName])
+
 }
 
 func TestPodContainerDeviceToAllocate(t *testing.T) {
