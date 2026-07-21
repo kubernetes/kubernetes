@@ -378,36 +378,45 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 	// Start with a fresh set that matches the current known state of the
 	// world according to the informers.
 	enabledConsumableCapacity := utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)
+	enabledSharedConsumableCapacity := utilfeature.DefaultFeatureGate.Enabled(features.DRASharedConsumableCapacity)
 
 	allocated, revision1 := c.allocatedDevices.get()
-	allocatedSharedDeviceIDs, revision2 := c.allocatedDevices.getSharedDeviceIDs()
 	aggregatedCapacity, revision3, err := c.allocatedDevices.getCapacities()
 	if err != nil {
 		return nil, err
 	}
+	counterSnapshots, revision4 := c.allocatedDevices.getCounters()
+	if !enabledSharedConsumableCapacity {
+		counterSnapshots = nil
+	}
 
-	if revision1 != revision2 || revision2 != revision3 {
+	if revision1 != revision3 || revision3 != revision4 {
 		// Already not consistent. Try again.
 		return nil, errClaimTrackerConcurrentModification
 	}
 
 	if !enabledConsumableCapacity {
-		// When the DRAConsumableCapacity feature is disabled, we fall back to the legacy
-		// dedicated device allocation model.
-		// This ensures backward compatibility with the original DRA behavior where devices
-		// could only be allocated exclusively to a single claim.
-		for deviceID := range allocatedSharedDeviceIDs {
-			allocated.Insert(deviceID)
-		}
-		// Reset allocatedSharedDeviceIDs and aggregatedCapacity
-		allocatedSharedDeviceIDs = sets.New[structured.DeviceID]()
 		aggregatedCapacity = make(schedulerapi.ConsumedCapacityCollection)
 	}
-
 	state := &structured.AllocatedState{
-		AllocatedDevices:         allocated,
-		AllocatedSharedDeviceIDs: allocatedSharedDeviceIDs,
-		AggregatedCapacity:       aggregatedCapacity,
+		AllocatedDevices:   allocated,
+		AggregatedCapacity: aggregatedCapacity,
+	}
+	if len(counterSnapshots) > 0 {
+		state.ConsumedCounters = make(schedulerapi.CounterConsumptionByDevice)
+		for id := range counterSnapshots {
+			state.ConsumedCounters[id.GetDeviceID()] = nil
+		}
+	}
+
+	var inFlightIDs sets.Set[structured.SharedDeviceID]
+	var counterCallback func(structured.SharedDeviceID, []resourceapi.CounterSetConsumption)
+	if enabledSharedConsumableCapacity {
+		inFlightIDs = sets.New[structured.SharedDeviceID]()
+		counterCallback = func(id structured.SharedDeviceID, _ []resourceapi.CounterSetConsumption) {
+			// The shared helper adds in-flight snapshots; omit their cached versions.
+			inFlightIDs.Insert(id)
+		}
 	}
 
 	// Whatever is in flight also has to be checked.
@@ -420,15 +429,47 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 						return
 					}
 				}
+				foreachConsumedCounters(inFlight.claim.Status.Allocation, counterCallback)
 				if !yield(inFlight.claim.Status.Allocation) {
 					return
 				}
 			}
 		},
-		structured.Features{ConsumableCapacity: enabledConsumableCapacity},
+		structured.Features{
+			ConsumableCapacity:       enabledConsumableCapacity,
+			SharedConsumableCapacity: enabledSharedConsumableCapacity,
+		},
 	)
 	if inFlightErr != nil {
 		return nil, inFlightErr
+	}
+	for id := range state.ConsumedCounters {
+		dedicatedID := structured.MakeSharedDeviceID(id, nil)
+		if allocated.Has(id) && !inFlightIDs.Has(dedicatedID) {
+			state.ConsumedCounters.Add(id, counterSnapshots[dedicatedID])
+		}
+	}
+	allocatedSharedDeviceIDs, revision2 := c.allocatedDevices.getSharedDeviceIDs(state.ConsumedCounters, counterSnapshots, inFlightIDs)
+	if revision1 != revision2 {
+		return nil, errClaimTrackerConcurrentModification
+	}
+	for id := range allocatedSharedDeviceIDs {
+		state.AllocatedSharedDeviceIDs.Insert(id)
+	}
+	// An empty in-flight replacement can remove the last saved snapshot for a device.
+	for id, snapshots := range state.ConsumedCounters {
+		if !slices.ContainsFunc(snapshots, func(snapshot schedulerapi.CounterConsumptionForAllocation) bool { return len(snapshot) > 0 }) {
+			delete(state.ConsumedCounters, id)
+		}
+	}
+	if len(state.ConsumedCounters) == 0 {
+		state.ConsumedCounters = nil
+	}
+	if !enabledConsumableCapacity {
+		for id := range state.AllocatedSharedDeviceIDs {
+			allocated.Insert(id)
+		}
+		state.AllocatedSharedDeviceIDs = sets.New[structured.DeviceID]()
 	}
 	if revision1 == c.allocatedDevices.getRevision() {
 		// Our current result is valid, nothing changed in the meantime.

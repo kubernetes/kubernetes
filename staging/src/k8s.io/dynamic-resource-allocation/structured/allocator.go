@@ -102,11 +102,28 @@ func ForEachAllocatedDevice(allocation *resourceapi.AllocationResult,
 
 // AddToAllocatedState adds the devices and consumed capacity from the
 // allocation results of allocated claims to the state, using
-// [ForEachAllocatedDevice]. The state must not be nil. Nil fields
-// get created. Nil allocation results are skipped. If consumable capacity
+// [ForEachAllocatedDevice]. The state must not be nil. Nil device sets and the
+// capacity map get created. Nil allocation results are skipped. If consumable capacity
 // is disabled in the features, all devices are treated as dedicated.
+//
+// With shared consumable capacity enabled, recorded counter snapshots are
+// appended per allocation. Empty snapshots are retained for devices with recorded
+// consumption, so provide all allocations of such a device together or preserve
+// their earlier snapshots in state.ConsumedCounters. The counter map is created
+// only when consumption was recorded. Admin access does not reserve resources and
+// is skipped.
 func AddToAllocatedState(state *AllocatedState, allocations iter.Seq[*resourceapi.AllocationResult], features Features) {
 	internal.AddToAllocatedState(state, allocations, features)
+}
+
+// ResolveCounterConsumption is a helper for callers outside the allocator to
+// resolve counter amounts using the allocator's rounding and policy checks.
+// The allocator itself uses the internal implementation directly.
+// The boolean is false when the resolved amount violates the policy;
+// an error indicates that resolution failed.
+// A nil requested value selects the policy default or the counter's full value.
+func ResolveCounterConsumption(requestedValue *resource.Quantity, counter resourceapi.Counter, features Features) (resource.Quantity, bool, error) {
+	return experimental.ResolveCounterConsumption(requestedValue, counter, features.FractionalCapacityRange)
 }
 
 // Allocator calculates how to allocate a set of unallocated claims which use

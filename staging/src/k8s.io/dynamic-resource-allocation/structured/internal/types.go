@@ -77,17 +77,18 @@ const (
 type Features struct {
 	// Sorted alphabetically. When adding a new entry, also extend Set, FeaturesFromSet and FeaturesAll.
 
-	AdminAccess             bool
-	CompatibilityGroups     bool
-	ConsumableCapacity      bool
-	DerivedAttributes       bool
-	DeviceBindingAndStatus  bool
-	DeviceTaints            bool
-	FractionalCapacityRange bool
-	ListTypeAttributes      bool
-	OptionalNodeOperations  bool
-	PartitionableDevices    bool
-	PrioritizedList         bool
+	AdminAccess              bool
+	CompatibilityGroups      bool
+	ConsumableCapacity       bool
+	DerivedAttributes        bool
+	DeviceBindingAndStatus   bool
+	DeviceTaints             bool
+	FractionalCapacityRange  bool
+	ListTypeAttributes       bool
+	OptionalNodeOperations   bool
+	PartitionableDevices     bool
+	PrioritizedList          bool
+	SharedConsumableCapacity bool
 }
 
 // Set returns all features which are set to true.
@@ -128,6 +129,9 @@ func (f Features) Set() sets.Set[string] {
 	if f.PrioritizedList {
 		enabled.Insert("DRAPrioritizedList")
 	}
+	if f.SharedConsumableCapacity {
+		enabled.Insert("DRASharedConsumableCapacity")
+	}
 	if f.DeviceBindingAndStatus {
 		enabled.Insert("DRADeviceBindingConditions")
 	}
@@ -161,6 +165,8 @@ func FeaturesFromSet(features sets.Set[string]) Features {
 			f.PartitionableDevices = true
 		case "DRAPrioritizedList":
 			f.PrioritizedList = true
+		case "DRASharedConsumableCapacity":
+			f.SharedConsumableCapacity = true
 		default:
 			panic("unknown feature name: " + feature)
 		}
@@ -169,15 +175,16 @@ func FeaturesFromSet(features sets.Set[string]) Features {
 }
 
 var FeaturesAll = Features{
-	AdminAccess:             true,
-	CompatibilityGroups:     true,
-	ConsumableCapacity:      true,
-	DerivedAttributes:       true,
-	DeviceBindingAndStatus:  true,
-	DeviceTaints:            true,
-	FractionalCapacityRange: true,
-	ListTypeAttributes:      true,
-	OptionalNodeOperations:  true,
-	PartitionableDevices:    true,
-	PrioritizedList:         true,
+	AdminAccess:              true,
+	CompatibilityGroups:      true,
+	ConsumableCapacity:       true,
+	DerivedAttributes:        true,
+	DeviceBindingAndStatus:   true,
+	DeviceTaints:             true,
+	FractionalCapacityRange:  true,
+	ListTypeAttributes:       true,
+	OptionalNodeOperations:   true,
+	PartitionableDevices:     true,
+	PrioritizedList:          true,
+	SharedConsumableCapacity: true,
 }
