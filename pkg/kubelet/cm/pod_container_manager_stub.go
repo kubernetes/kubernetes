@@ -51,7 +51,7 @@ func (m *podContainerManagerStub) GetAllPodsFromCgroups(_ klog.Logger) (map[type
 	return nil, nil
 }
 
-func (m *podContainerManagerStub) IsPodCgroup(cgroupfs string) (bool, types.UID) {
+func (m *podContainerManagerStub) IsPodCgroup(_ string) (bool, types.UID) {
 	return false, types.UID("")
 }
 

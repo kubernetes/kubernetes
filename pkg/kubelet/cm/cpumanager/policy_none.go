@@ -47,28 +47,28 @@ func (p *nonePolicy) Name() string {
 	return string(PolicyNone)
 }
 
-func (p *nonePolicy) Start(logger klog.Logger, s state.State) error {
+func (p *nonePolicy) Start(logger klog.Logger, _ state.State) error {
 	logger.Info("Start")
 	return nil
 }
 
-func (p *nonePolicy) Allocate(_ klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, _ lifecycle.Operation) error {
+func (p *nonePolicy) Allocate(_ klog.Logger, _ state.State, _ *v1.Pod, _ *v1.Container, _ lifecycle.Operation) error {
 	return nil
 }
 
-func (p *nonePolicy) RemoveContainer(_ klog.Logger, s state.State, podUID string, containerName string) error {
+func (p *nonePolicy) RemoveContainer(_ klog.Logger, _ state.State, _ string, _ string) error {
 	return nil
 }
 
-func (p *nonePolicy) GetTopologyHints(_ klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
+func (p *nonePolicy) GetTopologyHints(_ klog.Logger, _ state.State, _ *v1.Pod, _ *v1.Container, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *nonePolicy) GetPodTopologyHints(_ klog.Logger, s state.State, pod *v1.Pod, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
+func (p *nonePolicy) GetPodTopologyHints(_ klog.Logger, _ state.State, _ *v1.Pod, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *nonePolicy) AllocatePod(_ klog.Logger, s state.State, pod *v1.Pod, _ lifecycle.Operation) error {
+func (p *nonePolicy) AllocatePod(_ klog.Logger, _ state.State, _ *v1.Pod, _ lifecycle.Operation) error {
 	return nil
 }
 
@@ -77,6 +77,6 @@ func (p *nonePolicy) AllocatePod(_ klog.Logger, s state.State, pod *v1.Pod, _ li
 // Assignability of CPUs as a concept is only applicable in case of static policy i.e. scenarios where workloads
 // CAN get exclusive access to core(s).
 // Hence, we return empty set here: no cpus are assignable according to above definition with this policy.
-func (p *nonePolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
+func (p *nonePolicy) GetAllocatableCPUs(_ state.State) cpuset.CPUSet {
 	return cpuset.New()
 }

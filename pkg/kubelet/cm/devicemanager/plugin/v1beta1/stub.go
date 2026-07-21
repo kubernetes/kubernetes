@@ -69,7 +69,7 @@ type Stub struct {
 // stubGetPreferredAllocFunc is the function called when a getPreferredAllocation request is received from Kubelet
 type stubGetPreferredAllocFunc func(r *pluginapi.PreferredAllocationRequest, devs map[string]*pluginapi.Device) (*pluginapi.PreferredAllocationResponse, error)
 
-func defaultGetPreferredAllocFunc(r *pluginapi.PreferredAllocationRequest, devs map[string]*pluginapi.Device) (*pluginapi.PreferredAllocationResponse, error) {
+func defaultGetPreferredAllocFunc(_ *pluginapi.PreferredAllocationRequest, _ map[string]*pluginapi.Device) (*pluginapi.PreferredAllocationResponse, error) {
 	var response pluginapi.PreferredAllocationResponse
 
 	return &response, nil
@@ -78,7 +78,7 @@ func defaultGetPreferredAllocFunc(r *pluginapi.PreferredAllocationRequest, devs 
 // stubAllocFunc is the function called when an allocation request is received from Kubelet
 type stubAllocFunc func(r *pluginapi.AllocateRequest, devs map[string]*pluginapi.Device) (*pluginapi.AllocateResponse, error)
 
-func defaultAllocFunc(r *pluginapi.AllocateRequest, devs map[string]*pluginapi.Device) (*pluginapi.AllocateResponse, error) {
+func defaultAllocFunc(_ *pluginapi.AllocateRequest, _ map[string]*pluginapi.Device) (*pluginapi.AllocateResponse, error) {
 	var response pluginapi.AllocateResponse
 
 	return &response, nil
@@ -256,7 +256,7 @@ func (m *Stub) Watch(ctx context.Context, kubeletEndpoint, resourceName, pluginS
 }
 
 // GetInfo is the RPC which return pluginInfo
-func (m *Stub) GetInfo(ctx context.Context, req *watcherapi.InfoRequest) (*watcherapi.PluginInfo, error) {
+func (m *Stub) GetInfo(ctx context.Context, _ *watcherapi.InfoRequest) (*watcherapi.PluginInfo, error) {
 	klog.FromContext(ctx).Info("GetInfo")
 	return &watcherapi.PluginInfo{
 		Type:              watcherapi.DevicePlugin,
@@ -326,7 +326,7 @@ func (m *Stub) Register(ctx context.Context, kubeletEndpoint, resourceName strin
 }
 
 // GetDevicePluginOptions returns DevicePluginOptions settings for the device plugin.
-func (m *Stub) GetDevicePluginOptions(ctx context.Context, e *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
+func (m *Stub) GetDevicePluginOptions(_ context.Context, _ *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
 	options := &pluginapi.DevicePluginOptions{
 		PreStartRequired:                m.preStartContainerFlag,
 		GetPreferredAllocationAvailable: m.getPreferredAllocationFlag,
@@ -341,7 +341,7 @@ func (m *Stub) PreStartContainer(ctx context.Context, r *pluginapi.PreStartConta
 }
 
 // ListAndWatch lists devices and update that list according to the Update call
-func (m *Stub) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
+func (m *Stub) ListAndWatch(_ *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	// Use klog.TODO() because this method must match the generated device
 	// plugin gRPC signature in api_grpc.pb.go, which does not accept a logger.
 	klog.TODO().Info("ListAndWatch")

@@ -127,8 +127,8 @@ type sourcesReadyStub struct{}
 // PodReusableDevices is a map by pod name of devices to reuse.
 type PodReusableDevices map[string]map[string]sets.Set[string]
 
-func (s *sourcesReadyStub) AddSource(source string) {}
-func (s *sourcesReadyStub) AllReady() bool          { return true }
+func (s *sourcesReadyStub) AddSource(_ string) {}
+func (s *sourcesReadyStub) AllReady() bool     { return true }
 
 // NewManagerImpl creates a new manager.
 func NewManagerImpl(logger klog.Logger, topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
@@ -1143,7 +1143,7 @@ func (m *ManagerImpl) GetAllocatableDevices(logger klog.Logger) ResourceDeviceIn
 }
 
 // AllocatePod is called to trigger the allocation of resources to a pod.
-func (m *ManagerImpl) AllocatePod(logger klog.Logger, pod *v1.Pod, _ lifecycle.Operation) error {
+func (m *ManagerImpl) AllocatePod(logger klog.Logger, _ *v1.Pod, _ lifecycle.Operation) error {
 	// Device Manager does not support pod level resource allocation.
 	logger.V(2).Info("Device Manager does not support pod level resource allocation")
 	return nil
@@ -1154,7 +1154,7 @@ func (m *ManagerImpl) GetDevices(podUID, containerName string) ResourceDeviceIns
 	return m.podDevices.getContainerDevices(podUID, containerName)
 }
 
-func (m *ManagerImpl) UpdateAllocatedResourcesStatus(logger klog.Logger, pod *v1.Pod, status *v1.PodStatus) {
+func (m *ManagerImpl) UpdateAllocatedResourcesStatus(_ klog.Logger, pod *v1.Pod, status *v1.PodStatus) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 

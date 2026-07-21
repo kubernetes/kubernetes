@@ -464,6 +464,6 @@ func (m *qosContainerManagerNoop) Start(_ context.Context, _ func() v1.ResourceL
 	return nil
 }
 
-func (m *qosContainerManagerNoop) UpdateCgroups(logger klog.Logger) error {
+func (m *qosContainerManagerNoop) UpdateCgroups(_ klog.Logger) error {
 	return nil
 }

@@ -91,7 +91,7 @@ func (m *fakeManager) RemoveContainer(logger klog.Logger, containerID string) er
 	return nil
 }
 
-func (m *fakeManager) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (m *fakeManager) Admit(ctx context.Context, _ *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	logger := klog.FromContext(ctx)
 	logger.Info("Topology Admit Handler")
 	return admission.GetPodAdmitResult(nil)

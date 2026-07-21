@@ -161,7 +161,7 @@ func NewCgroupManager(logger klog.Logger, cs *CgroupSubsystems, cgroupDriver str
 	return NewCgroupV1Manager(logger, cs, cgroupDriver)
 }
 
-func newCgroupCommon(logger klog.Logger, cs *CgroupSubsystems, cgroupDriver string) cgroupCommon {
+func newCgroupCommon(_ klog.Logger, cs *CgroupSubsystems, cgroupDriver string) cgroupCommon {
 	return cgroupCommon{
 		subsystems: cs,
 		useSystemd: cgroupDriver == "systemd",
