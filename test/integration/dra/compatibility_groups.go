@@ -55,7 +55,7 @@ func compatGroupsSlices(nodeName, driverName, counterSet string, devices ...comp
 			Name: dev.name,
 			ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
 				CounterSet:          counterSet,
-				Counters:            map[string]resourceapi.Counter{"mem": {Value: resource.MustParse("4")}},
+				Counters:            map[string]resourceapi.CounterRequirement{"mem": {Value: new(resource.MustParse("4"))}},
 				CompatibilityGroups: dev.groups,
 			}},
 		})

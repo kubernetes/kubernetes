@@ -25,6 +25,7 @@ import (
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
 	"k8s.io/ktesting"
 
 	draapi "k8s.io/dynamic-resource-allocation/api"
@@ -66,23 +67,26 @@ func testCounterPoolDeviceIndex(tCtx ktesting.TContext) {
 	otherDriver.Driver = draapi.MakeUniqueString("driver-b")
 	capacity := id
 	capacity.Device = draapi.MakeUniqueString("capacity")
+	counter := id
+	counter.Device = draapi.MakeUniqueString("counter")
 	a := &Allocator{allocatedState: AllocatedState{
 		AllocatedDevices:         sets.New(id, other, otherDriver),
 		AllocatedSharedDeviceIDs: sets.New(shared),
 		AggregatedCapacity:       NewConsumedCapacityCollection(),
+		ConsumedCounters:         schedulerapi.CounterConsumptionByDevice{counter: {}},
 	}}
 	a.allocatedState.AggregatedCapacity.Insert(DeviceConsumedCapacity{DeviceID: capacity, ConsumedCapacity: NewConsumedCapacity()})
 	a.allocatedState.AggregatedCapacity.Insert(DeviceConsumedCapacity{DeviceID: shared, ConsumedCapacity: NewConsumedCapacity()})
 	tCtx.Expect(a.allocatedCounterDevices).To(g.BeNil())
 	pool := PoolID{Driver: id.Driver, Pool: id.Pool}
 	devices := a.devicesForCounterPool(pool)
-	tCtx.Expect(devices).To(g.Equal(sets.New(id, shared, capacity)))
+	tCtx.Expect(devices).To(g.Equal(sets.New(id, shared, capacity, counter)))
 	otherPool := PoolID{Driver: other.Driver, Pool: other.Pool}
 	driverPool := PoolID{Driver: otherDriver.Driver, Pool: otherDriver.Pool}
 	tCtx.Expect(a.allocatedCounterDevices[otherPool]).To(g.Equal(sets.New(other)))
 	tCtx.Expect(a.allocatedCounterDevices[driverPool]).To(g.Equal(sets.New(otherDriver)))
 	devices.Delete(id)
-	tCtx.Expect(a.devicesForCounterPool(pool)).To(g.Equal(sets.New(id, shared, capacity)))
+	tCtx.Expect(a.devicesForCounterPool(pool)).To(g.Equal(sets.New(id, shared, capacity, counter)))
 	tCtx.Expect(a.devicesForCounterPool(otherPool)).To(g.Equal(sets.New(other)))
 	tCtx.Expect(a.devicesForCounterPool(driverPool)).To(g.Equal(sets.New(otherDriver)))
 	tCtx.Expect(a.devicesForCounterPool(PoolID{Driver: id.Driver, Pool: draapi.MakeUniqueString("missing")})).To(g.BeEmpty())
@@ -141,7 +145,10 @@ func testAvailableCountersForPool(tCtx ktesting.TContext) {
 		availableCounters: make(map[PoolID]counterSets),
 	}
 	alloc := &allocator{Allocator: a}
-	available := alloc.availableCountersForPool(pool)
+	available, ok, err := alloc.availableCountersForPool(pool)
+	if err != nil || !ok {
+		tCtx.Fatalf("legacy counter accounting rejected a missing device: ok=%v, err=%v", ok, err)
+	}
 	if got := available[set]["counter"]; got.Value.Cmp(two) != 0 {
 		tCtx.Fatalf("available counter = %s, want 2", got.Value.String())
 	}

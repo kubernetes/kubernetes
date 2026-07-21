@@ -5413,7 +5413,7 @@ func TestAllocatorSelection(t *testing.T) {
 		"alpha": {
 			features:             "AllAlpha=true,AllBeta=true",
 			usingFeatureGroup:    true,
-			expectImplementation: "incubating", // This needs to become "experimental" again when adding a new alpha feature.
+			expectImplementation: "experimental",
 		},
 
 		// Let's also determine which allocator is picked for each of the
@@ -5463,6 +5463,10 @@ func TestAllocatorSelection(t *testing.T) {
 		"DerivedAttributes": {
 			features:             "AllAlpha=false,AllBeta=false,DRADerivedAttributes=true",
 			expectImplementation: "incubating",
+		},
+		"SharedConsumableCapacity": {
+			features:             "AllAlpha=false,AllBeta=false,DRAConsumableCapacity=true,DRAPartitionableDevices=true,DRASharedConsumableCapacity=true",
+			expectImplementation: "experimental",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

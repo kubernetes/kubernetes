@@ -23,6 +23,7 @@ import (
 	g "github.com/onsi/gomega"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/ktesting"
 )
@@ -156,6 +157,23 @@ func testConsumableCapacity(tCtx ktesting.TContext) {
 			tCtx.Expect(name.Identifier.String()).To(g.BeElementOf([]string{capacity0, capacity1, "dummy"}))
 			tCtx.Expect(val.Cmp(one)).To(g.BeZero())
 		}
+	})
+
+	tCtx.Run("resolve-qualified-name-uses-driver-domain", func(tCtx ktesting.TContext) {
+
+		driver := draapi.MakeUniqueString(driverA)
+		tCtx.Require(draapi.MakeFullyQualifiedName("memory", driver, draapi.MakeUniqueString).String()).To(g.Equal(driverA + "/memory"))
+		tCtx.Require(draapi.MakeFullyQualifiedName(resourceapi.QualifiedName(driverA+"/memory"), driver, draapi.MakeUniqueString).String()).To(g.Equal(driverA + "/memory"))
+	})
+
+	tCtx.Run("lookup-qualified-name-uses-driver-domain", func(tCtx ktesting.TContext) {
+
+		candidates := map[resourceapi.QualifiedName]resource.Quantity{
+			"memory": one,
+		}
+		match, found := draapi.LookupByQualifiedName(candidates, resourceapi.QualifiedName(driverA+"/memory"), driverA)
+		tCtx.Require(found).To(g.BeTrueBecause("expected %q to match driver-domain qualified capacity name", driverA+"/memory"))
+		tCtx.Require(match.Cmp(one)).To(g.BeZero())
 	})
 
 	tCtx.Run("violate-capacity-sharing", testViolateCapacityRequestPolicy)
@@ -308,6 +326,163 @@ func testCmpRequestOverCapacityAdminAccess(tCtx ktesting.TContext) {
 	_, ok, err = cmpRequestOverCapacity(NewConsumedCapacity(), requestNegative, device, NewConsumedCapacity(), false, true)
 	tCtx.Require(ok).To(g.BeFalseBecause("negative capacity request must not be satisfiable"))
 	tCtx.Require(err).To(g.MatchError(errNegativeCapacity))
+}
+
+// TestResolveConsumedCountersStaticPolicy verifies that fixed consumption uses the counter policy.
+func TestResolveConsumedCountersStaticPolicy(t *testing.T) {
+	testResolveConsumedCountersStaticPolicy(ktesting.Init(t))
+}
+func testResolveConsumedCountersStaticPolicy(tCtx ktesting.TContext) {
+	for name, tc := range map[string]struct {
+		value      resource.Quantity
+		policy     *resourceapi.CapacityRequestPolicy
+		want       resource.Quantity
+		wantSkip   bool
+		wantError  error
+		gateOff    bool
+		fractional bool
+	}{
+		"no-policy":             {value: three, want: three},
+		"negative-value-aborts": {value: negativeOne, wantError: errNegativeCapacity},
+		"negative-value-is-rejected-before-rounding": {
+			value: negativeOne, wantError: errNegativeCapacity,
+			policy: &resourceapi.CapacityRequestPolicy{Default: &one, ValidValues: []resource.Quantity{one, three}},
+		},
+		"valid-fixed-value": {
+			value: two, want: two,
+			policy: &resourceapi.CapacityRequestPolicy{Default: &one, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &one, Max: &three, Step: &one}},
+		},
+		"range-rounds-fixed-value": {
+			value: three, want: resource.MustParse("4"),
+			policy: &resourceapi.CapacityRequestPolicy{Default: &two, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &two, Max: &ten, Step: &two}},
+		},
+		"discrete-values-round-fixed-value": {
+			value: three, want: five,
+			policy: &resourceapi.CapacityRequestPolicy{Default: &two, ValidValues: []resource.Quantity{two, five}},
+		},
+		"range-rejects-fixed-value": {
+			value: five, wantSkip: true,
+			policy: &resourceapi.CapacityRequestPolicy{Default: &one, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &one, Max: &three, Step: &one}},
+		},
+		"discrete-values-reject-fixed-value": {
+			value: five, wantSkip: true,
+			policy: &resourceapi.CapacityRequestPolicy{Default: &one, ValidValues: []resource.Quantity{one, three}},
+		},
+		"explicit-zero-does-not-use-default": {
+			value: zero, want: zero,
+			policy: &resourceapi.CapacityRequestPolicy{Default: &three},
+		},
+		"fractional-range-rounds-fixed-value": {
+			value: pointTwoFive, want: pointThree, fractional: true,
+			policy: &resourceapi.CapacityRequestPolicy{Default: &pointOne, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &pointOne, Max: &one, Step: &pointOne}},
+		},
+		"range-overflow-aborts": {
+			value: maxInt64Q, wantError: errCapacityRequestNotRepresentable,
+			policy: &resourceapi.CapacityRequestPolicy{Default: &two, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &zero, Step: &two}},
+		},
+		"disabled-gate-ignores-policy": {
+			value: three, want: three, gateOff: true,
+			policy: &resourceapi.CapacityRequestPolicy{Default: &one, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &one, Max: &two, Step: &one}},
+		},
+	} {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			setName := draapi.MakeUniqueString("shared-counters")
+			device := deviceWithID{
+				Device: &draapi.Device{ConsumesCounters: []draapi.DeviceCounterConsumption{{
+					CounterSet: setName,
+					Counters:   map[string]resourceapi.CounterRequirement{"fixed": {Value: &tc.value}},
+				}}},
+				id: MakeDeviceID(driverA, pool1, device1),
+				pool: &Pool{CounterSets: map[draapi.UniqueString]*draapi.CounterSet{setName: {
+					Name: setName,
+					Counters: map[string]resourceapi.Counter{"fixed": {
+						Value: maxInt64Q, ConsumptionPolicy: tc.policy,
+					}},
+				}}},
+			}
+			alloc := &allocator{Allocator: &Allocator{features: Features{SharedConsumableCapacity: !tc.gateOff, FractionalCapacityRange: tc.fractional}}}
+			fixed, variable, ok, err := alloc.resolveConsumedCounters(device, nil)
+			if tc.wantError != nil {
+				tCtx.Require(err).To(g.MatchError(tc.wantError))
+				tCtx.Require(ok).To(g.BeFalseBecause("an invalid fixed counter value must abort allocation"))
+				return
+			}
+			tCtx.Require(err).NotTo(g.HaveOccurred())
+			tCtx.Require(ok).To(g.Equal(!tc.wantSkip))
+			if tc.wantSkip {
+				return
+			}
+			tCtx.Require(variable).To(g.BeEmpty())
+			tCtx.Require(counterSetsToConsumption(fixed)).To(g.HaveLen(1))
+			got := counterSetsToConsumption(fixed)[0].Counters["fixed"]
+			tCtx.Require(got.Cmp(tc.want)).To(g.BeZero())
+		})
+	}
+}
+
+func TestResolveConsumedCountersFatalBeatsSoft(t *testing.T) {
+	testResolveConsumedCountersFatalBeatsSoft(ktesting.Init(t))
+}
+func testResolveConsumedCountersFatalBeatsSoft(tCtx ktesting.TContext) {
+
+	setName := draapi.MakeUniqueString("shared-counters")
+	device := deviceWithID{
+		Device: &draapi.Device{
+			ConsumesCounters: []draapi.DeviceCounterConsumption{{
+				CounterSet: setName,
+				Counters: map[string]resourceapi.CounterRequirement{
+					"soft":  {ValueFrom: &resourceapi.CounterValueFrom{CapacityName: capacity0}},
+					"fatal": {ValueFrom: &resourceapi.CounterValueFrom{CapacityName: capacity1}},
+				},
+			}},
+		},
+		id: MakeDeviceID(driverA, pool1, device1),
+		pool: &Pool{
+			CounterSets: map[draapi.UniqueString]*draapi.CounterSet{
+				setName: {
+					Name: setName,
+					Counters: map[string]resourceapi.Counter{
+						"soft": {
+							Value: two,
+							ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{
+								Default:    &one,
+								ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &one, Max: &two, Step: &one},
+							},
+						},
+						"fatal": {
+							Value: maxInt64Q,
+							ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{
+								Default:    &two,
+								ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &zero, Step: &two},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	request := &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]resource.Quantity{
+			capacity0: three,
+			capacity1: maxInt64Q,
+		},
+	}
+	alloc := &allocator{Allocator: &Allocator{features: Features{SharedConsumableCapacity: true}}}
+	for _, mode := range []string{"valueFrom", "fixed"} {
+		tCtx.Run(mode, func(tCtx ktesting.TContext) {
+			if mode == "fixed" {
+				device.ConsumesCounters[0].Counters = map[string]resourceapi.CounterRequirement{
+					"soft": {Value: &three}, "fatal": {Value: &maxInt64Q},
+				}
+			}
+			// Repeat to expose a regression regardless of the map's initial iteration order.
+			for range 64 {
+				_, _, ok, err := alloc.resolveConsumedCounters(device, request)
+				tCtx.Require(ok).To(g.BeFalseBecause("an unrepresentable counter request must not be considered satisfiable"))
+				tCtx.Require(err).To(g.MatchError(errCapacityRequestNotRepresentable))
+			}
+		})
+	}
 }
 
 func testSafeMilliValue(tCtx ktesting.TContext) {
@@ -776,6 +951,194 @@ func testCalculateConsumedCapacity(tCtx ktesting.TContext) {
 				tCtx.Require(err).NotTo(g.HaveOccurred())
 				tCtx.Require(consumedCapacity.Cmp(tc.expectResult)).To(g.BeZero())
 			}
+		})
+	}
+}
+
+func TestFixedCounterConsumptionFatalBeatsMissingSnapshot(t *testing.T) {
+	testFixedCounterConsumptionFatalBeatsMissingSnapshot(ktesting.Init(t))
+}
+func testFixedCounterConsumptionFatalBeatsMissingSnapshot(tCtx ktesting.TContext) {
+	id := MakeDeviceID(driverA, pool1, device1)
+	poolID := PoolID{Driver: id.Driver, Pool: id.Pool}
+	setName := draapi.MakeUniqueString("shared")
+	pool := &Pool{
+		PoolID: poolID,
+		CounterSets: map[draapi.UniqueString]*draapi.CounterSet{setName: {
+			Name: setName,
+			Counters: map[string]resourceapi.Counter{"fixed": {
+				Value: maxInt64Q,
+				ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{
+					Default: &two, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &zero, Step: &two},
+				},
+			}},
+		}},
+		DeviceSlicesTargetingNode: []*draapi.ResourceSlice{{Spec: draapi.ResourceSliceSpec{
+			Driver: id.Driver, Pool: draapi.ResourcePool{Name: id.Pool},
+			Devices: []draapi.Device{{Name: id.Device, ConsumesCounters: []draapi.DeviceCounterConsumption{{
+				CounterSet: setName,
+				Counters: map[string]resourceapi.CounterRequirement{
+					"fixed":    {Value: &maxInt64Q},
+					"variable": {ValueFrom: &resourceapi.CounterValueFrom{CapacityName: capacity0}},
+				},
+			}}}},
+		}}},
+	}
+	pool.CounterSets[setName].Counters["variable"] = resourceapi.Counter{Value: two}
+	for range 64 {
+		alloc := &allocator{
+			Allocator: &Allocator{
+				features:       Features{SharedConsumableCapacity: true},
+				allocatedState: AllocatedState{AllocatedDevices: sets.New(id)},
+			},
+			logger:        tCtx.Logger(),
+			fixedCounters: make(map[PoolID]map[DeviceID][]resourceapi.CounterSetConsumption),
+		}
+		_, ok, err := alloc.fixedCounterConsumption(pool)
+		tCtx.Require(ok).To(g.BeFalseBecause("unknown consumption must not permit allocation"))
+		tCtx.Require(err).To(g.MatchError(errCapacityRequestNotRepresentable))
+	}
+}
+
+// TestFilterDeviceCapacityRequestsPreservesNormalRequests checks that normal
+// request aliases are rejected even when another requested name is missing.
+func TestFilterDeviceCapacityRequestsPreservesNormalRequests(t *testing.T) {
+	testFilterDeviceCapacityRequestsPreservesNormalRequests(ktesting.Init(t))
+}
+func testFilterDeviceCapacityRequestsPreservesNormalRequests(tCtx ktesting.TContext) {
+	slice := &draapi.ResourceSlice{}
+	driver := slice.MakeUniqueString(driverA)
+	device := deviceWithID{
+		Device: &draapi.Device{
+			Capacity: draapi.DeviceCapacities{
+				Nested: map[draapi.UniqueString]map[draapi.UniqueString]*draapi.DeviceCapacity{
+					driver: {slice.MakeUniqueString(capacity0): {Value: three}},
+				},
+				DriverName: driver,
+			},
+			ConsumesCounters: []draapi.DeviceCounterConsumption{{
+				CounterSet: slice.MakeUniqueString("shared"),
+				Counters: map[string]resourceapi.CounterRequirement{
+					"counter": {ValueFrom: &resourceapi.CounterValueFrom{CapacityName: "shared-only"}},
+				},
+			}},
+		},
+		id:    MakeDeviceID(driverA, pool1, device1),
+		slice: slice,
+	}
+	requests := &resourceapi.CapacityRequirements{Requests: map[resourceapi.QualifiedName]resource.Quantity{
+		capacity0:                 one,
+		driverA + "/" + capacity0: two,
+		"unavailable":             three,
+		"shared-only":             one,
+	}}
+	alloc := &allocator{Allocator: &Allocator{features: Features{
+		ConsumableCapacity: true, PartitionableDevices: true, SharedConsumableCapacity: true,
+	}}}
+	filtered, ok, err := alloc.filterDeviceCapacityRequests(requests, device, false)
+	tCtx.Require(err).To(g.MatchError(g.ContainSubstring("requested both")))
+	tCtx.Expect(ok).To(g.BeFalseBecause("normal request aliases must abort before a shared counter mismatch"))
+	tCtx.Expect(filtered).To(g.BeNil())
+}
+
+func TestFilterDeviceCapacityRequestsCounterTotals(t *testing.T) {
+	testFilterDeviceCapacityRequestsCounterTotals(ktesting.Init(t))
+}
+func testFilterDeviceCapacityRequestsCounterTotals(tCtx ktesting.TContext) {
+	for name, tc := range map[string]struct {
+		quantity       *resource.Quantity
+		ordinary       bool
+		policy         *resourceapi.CapacityRequestPolicy
+		qualified      bool
+		aliasConflict  bool
+		missingSet     bool
+		missingCounter bool
+		want           bool
+		wantError      string
+	}{
+		"not-requested":                {want: true},
+		"zero":                         {quantity: &zero, want: true},
+		"policy-is-ignored":            {quantity: &one, want: true},
+		"fraction-is-not-rounded":      {quantity: &pointTwoFive, want: true},
+		"at-smallest-total":            {quantity: &two, want: true},
+		"exceeds-one-counter":          {quantity: &three},
+		"qualified-name":               {quantity: &three, qualified: true},
+		"alias-error-before-limit":     {quantity: &three, aliasConflict: true, wantError: "requested both"},
+		"negative":                     {quantity: &negativeOne, wantError: "negative"},
+		"missing-counter-set":          {quantity: &one, missingSet: true, wantError: "counter set"},
+		"missing-counter":              {quantity: &one, missingCounter: true, wantError: "counter counter"},
+		"ordinary-exceeds-one-counter": {ordinary: true, quantity: &three},
+		"ordinary-rounds-request":      {ordinary: true, quantity: &one, want: true},
+		"ordinary-default":             {ordinary: true, want: true},
+		"ordinary-negative-default":    {ordinary: true, policy: &resourceapi.CapacityRequestPolicy{Default: new(resource.MustParse("-1"))}, wantError: "negative"},
+		"ordinary-negative":            {ordinary: true, quantity: &negativeOne, wantError: "negative"},
+		"ordinary-alias-error":         {ordinary: true, quantity: &three, aliasConflict: true, wantError: "requested both"},
+	} {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			slice := &draapi.ResourceSlice{}
+			driver := slice.MakeUniqueString(driverA)
+			set := slice.MakeUniqueString("shared")
+			otherSet := slice.MakeUniqueString("other")
+			device := deviceWithID{
+				Device: &draapi.Device{
+					Capacity: draapi.DeviceCapacities{
+						Nested: map[draapi.UniqueString]map[draapi.UniqueString]*draapi.DeviceCapacity{
+							driver: {slice.MakeUniqueString(capacity0): {Value: ten}},
+						},
+						DriverName: driver,
+					},
+					ConsumesCounters: []draapi.DeviceCounterConsumption{
+						{CounterSet: set, Counters: map[string]resourceapi.CounterRequirement{
+							"counter": {ValueFrom: &resourceapi.CounterValueFrom{CapacityName: capacity0}},
+							"fixed":   {Value: &maxInt64Q},
+						}},
+						{CounterSet: otherSet, Counters: map[string]resourceapi.CounterRequirement{
+							"counter": {ValueFrom: &resourceapi.CounterValueFrom{CapacityName: capacity0}},
+						}},
+					},
+				},
+				id:    MakeDeviceID(driverA, pool1, device1),
+				slice: slice,
+				pool: &Pool{CounterSets: map[draapi.UniqueString]*draapi.CounterSet{
+					set: {Name: set, Counters: map[string]resourceapi.Counter{
+						"counter": {Value: two, ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{Default: &two, ValidValues: []resource.Quantity{two}}},
+						"fixed":   {Value: zero},
+					}},
+					otherSet: {Name: otherSet, Counters: map[string]resourceapi.Counter{"counter": {Value: resource.MustParse("4")}}},
+				}},
+			}
+			if tc.policy != nil {
+				counter := device.pool.CounterSets[set].Counters["counter"]
+				counter.ConsumptionPolicy = tc.policy
+				device.pool.CounterSets[set].Counters["counter"] = counter
+			}
+			if tc.missingSet {
+				delete(device.pool.CounterSets, set)
+			}
+			if tc.missingCounter {
+				delete(device.pool.CounterSets[set].Counters, "counter")
+			}
+			var requests *resourceapi.CapacityRequirements
+			if tc.quantity != nil {
+				key := resourceapi.QualifiedName(capacity0)
+				if tc.qualified {
+					key = driverA + "/" + capacity0
+				}
+				requests = &resourceapi.CapacityRequirements{Requests: map[resourceapi.QualifiedName]resource.Quantity{key: *tc.quantity}}
+				if tc.aliasConflict {
+					requests.Requests[driverA+"/"+capacity0] = *tc.quantity
+				}
+			}
+			alloc := &allocator{Allocator: &Allocator{features: Features{SharedConsumableCapacity: true, PartitionableDevices: true}}}
+			filtered, ok, err := alloc.filterDeviceCapacityRequests(requests, device, !tc.ordinary)
+			if tc.wantError != "" {
+				tCtx.Require(err).To(g.MatchError(g.ContainSubstring(tc.wantError)))
+				tCtx.Require(ok).To(g.BeFalseBecause("invalid counter requests must not match a device"))
+				return
+			}
+			tCtx.Require(err).NotTo(g.HaveOccurred())
+			tCtx.Expect(ok).To(g.Equal(tc.want))
+			tCtx.Expect(filtered).To(g.Equal(requests))
 		})
 	}
 }
