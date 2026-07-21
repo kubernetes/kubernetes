@@ -84,3 +84,56 @@
       podsPerGroup: 1000
 
 
+- name: TopologyAwareSchedulingMultiPlacement
+  # Enables a second PlacementGenerate plugin (NodePoolPlacement) alongside the in-tree
+  # TopologyPlacement so the scheduler runs and merges multiple placement plugins per PodGroup.
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+  schedulerConfigPath: scheduler-config-multi-placement.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: templates/pool-node.yaml
+  - opcode: createNamespaces
+    prefix: tas-ns
+    count: 1
+  - opcode: createPodGroups
+    countParam: $initPodGroups
+    namespace: tas-ns-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  - opcode: createPods
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: tas-ns-0
+    podTemplatePath: templates/gang-pod.yaml
+    collectMetrics: true
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  workloads:
+  - name: 10Nodes_3Gangs
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      initPodGroups: 3
+      podsPerGroup: 3
+  - name: 100Nodes_10Gangs
+    labels: [integration-test]
+    params:
+      initNodes: 100
+      initPodGroups: 10
+      podsPerGroup: 3
+  - name: 5000Nodes_750Gangs_3000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPodGroups: 750
+      podsPerGroup: 4
+  - name: 5000Nodes_1500Gangs_6000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPodGroups: 1500
+      podsPerGroup: 4

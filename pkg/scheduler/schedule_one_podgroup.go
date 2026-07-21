@@ -1231,6 +1231,11 @@ func (sched *Scheduler) evaluatePlacement(ctx context.Context, schedFwk framewor
 	}
 	placementCycleState := framework.NewCycleState()
 	placementCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+	// Seed the per-placement state with any data a PlacementGeneratePlugin attached to this
+	// placement during generation, so the plugin can read it back in later phases.
+	if named, ok := podGroupCycleState.GetPlacementCycleStateForName(placement.Name).(*framework.CycleState); ok {
+		named.CopyPlacementDataInto(placementCycleState)
+	}
 	result, placementRevertFns := sched.podGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, podGroupInfo, queuedPodGroupInfo)
 	placementRevertFns.revert()
 
