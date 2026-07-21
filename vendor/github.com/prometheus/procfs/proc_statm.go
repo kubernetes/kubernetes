@@ -45,6 +45,7 @@ type ProcStatm struct {
 }
 
 // NewStatm returns the current status information of the process.
+//
 // Deprecated: Use p.Statm() instead.
 func (p Proc) NewStatm() (ProcStatm, error) {
 	return p.Statm()

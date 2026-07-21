@@ -30,7 +30,6 @@ import (
 
 type encoderOption struct {
 	withCreatedLines bool
-	withUnit         bool
 }
 
 type EncoderOption func(*encoderOption)
@@ -48,17 +47,6 @@ type EncoderOption func(*encoderOption)
 func WithCreatedLines() EncoderOption {
 	return func(t *encoderOption) {
 		t.withCreatedLines = true
-	}
-}
-
-// WithUnit is an EncoderOption enabling a set unit to be written to the output
-// and to be added to the metric name, if it's not there already, as a suffix.
-// Without opting in this way, the unit will not be added to the metric name and,
-// on top of that, the unit will not be passed onto the output, even if it
-// were declared in the *dto.MetricFamily struct, i.e. even if in.Unit !=nil.
-func WithUnit() EncoderOption {
-	return func(t *encoderOption) {
-		t.withUnit = true
 	}
 }
 
@@ -98,15 +86,6 @@ func WithUnit() EncoderOption {
 //     lines. A counter with a missing `_total` suffix is not an error. However,
 //     its type will be set to `unknown` in that case to avoid invalid OpenMetrics
 //     output.
-//
-//   - According to the OM specs, the `# UNIT` line is optional, but if populated,
-//     the unit has to be present in the metric name as its suffix:
-//     (see https://github.com/prometheus/OpenMetrics/blob/v1.0.0/specification/OpenMetrics.md#unit).
-//     However, in order to accommodate any potential scenario where such a change in the
-//     metric name is not desirable, the users are here given the choice of either explicitly
-//     opt in, in case they wish for the unit to be included in the output AND in the metric name
-//     as a suffix (see the description of the WithUnit function above),
-//     or not to opt in, in case they don't want for any of that to happen.
 //
 //   - No support for the following (optional) features: info type,
 //     stateset type, gaugehistogram type.
@@ -150,9 +129,6 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily, options ...E
 	)
 	if metricType == dto.MetricType_COUNTER && strings.HasSuffix(compliantName, "_total") {
 		compliantName = name[:len(name)-6]
-	}
-	if toOM.withUnit && in.Unit != nil && !strings.HasSuffix(compliantName, "_"+*in.Unit) {
-		compliantName = compliantName + "_" + *in.Unit
 	}
 
 	// Comments, first HELP, then TYPE.
@@ -217,7 +193,7 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily, options ...E
 	if err != nil {
 		return written, err
 	}
-	if toOM.withUnit && in.Unit != nil {
+	if in.Unit != nil {
 		n, err = w.WriteString("# UNIT ")
 		written += n
 		if err != nil {
