@@ -30,6 +30,12 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// mustParseQuantityPtr parses a quantity string and returns a pointer to it.
+func mustParseQuantityPtr(value string) *resource.Quantity {
+	quantity := resource.MustParse(value)
+	return &quantity
+}
+
 // NewMaxResourceSlices creates slices that are as large as possible given the current validation constraints.
 func NewMaxResourceSlices() map[string]*resourceapi.ResourceSlice {
 	slices := map[string]*resourceapi.ResourceSlice{
@@ -60,11 +66,11 @@ func newResourceSliceWithTaintsAndConsumesCounters() *resourceapi.ResourceSlice 
 			for i := range resourceapi.ResourceSliceMaxDeviceCounterConsumptionsPerDevice {
 				consumesCounters = append(consumesCounters, resourceapi.DeviceCounterConsumption{
 					CounterSet: maxDNSLabel(i),
-					Counters: func() map[string]resourceapi.Counter {
-						counters := make(map[string]resourceapi.Counter)
+					Counters: func() map[string]resourceapi.ConsumeCounter {
+						counters := make(map[string]resourceapi.ConsumeCounter)
 						for i := range resourceapi.ResourceSliceMaxCountersPerDeviceCounterConsumption {
-							counters[maxDNSLabel(i)] = resourceapi.Counter{
-								Value: resource.MustParse("80Gi"),
+							counters[maxDNSLabel(i)] = resourceapi.ConsumeCounter{
+								Value: mustParseQuantityPtr("80Gi"),
 							}
 						}
 						return counters
@@ -108,11 +114,11 @@ func newSharedCountersResourceSlice() *resourceapi.ResourceSlice {
 	for i := range resourceapi.ResourceSliceMaxCounterSets {
 		counterSets = append(counterSets, resourceapi.CounterSet{
 			Name: maxDNSLabel(i),
-			Counters: func() map[string]resourceapi.Counter {
-				counters := make(map[string]resourceapi.Counter)
+			Counters: func() map[string]resourceapi.SharedCounter {
+				counters := make(map[string]resourceapi.SharedCounter)
 				for i := range resourceapi.ResourceSliceMaxCountersPerCounterSet {
-					counters[maxDNSLabel(i)] = resourceapi.Counter{
-						Value: resource.MustParse("80Gi"),
+					counters[maxDNSLabel(i)] = resourceapi.SharedCounter{
+						Value: mustParseQuantityPtr("80Gi"),
 					}
 				}
 				return counters

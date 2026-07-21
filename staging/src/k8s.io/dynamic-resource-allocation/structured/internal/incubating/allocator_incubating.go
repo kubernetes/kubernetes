@@ -48,7 +48,6 @@ func MakeDeviceID(driver, pool, device string) DeviceID {
 	return internal.MakeDeviceID(driver, pool, device)
 }
 
-type SharedDeviceID = internal.SharedDeviceID
 type DeviceConsumedCapacity = internal.DeviceConsumedCapacity
 type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
 type ConsumedCapacity = internal.ConsumedCapacity
@@ -661,7 +660,7 @@ type allocator struct {
 
 // counterSets is a map with the name of counter sets to the counters in
 // the set.
-type counterSets map[draapi.UniqueString]map[string]resourceapi.Counter
+type counterSets map[draapi.UniqueString]map[string]resourceapi.SharedCounter
 
 // matchKey identifies a device/request pair.
 type matchKey struct {
@@ -1263,10 +1262,39 @@ func (alloc *allocator) CmpRequestOverCapacity(request requestAccessor, slice *d
 	allocatingCapacity := alloc.allocatingCapacity[deviceID]
 	allowMultipleAllocations := device.AllowMultipleAllocations
 	capacities := device.Capacity
-	if allocatedCapacity, found := alloc.allocatedState.AggregatedCapacity[deviceID]; found {
-		return CmpRequestOverCapacity(allocatedCapacity, request.capacities(), allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
+	filteredRequests, ok, err := alloc.filterDeviceCapacityRequests(request.capacities(), slice.Spec.Driver.String(), device)
+	if err != nil || !ok {
+		return ok, err
 	}
-	return CmpRequestOverCapacity(NewConsumedCapacity(), request.capacities(), allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
+	if len(capacities) == 0 {
+		return true, nil
+	}
+	if allocatedCapacity, found := alloc.allocatedState.AggregatedCapacity[deviceID]; found {
+		return CmpRequestOverCapacity(allocatedCapacity, filteredRequests, allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
+	}
+	return CmpRequestOverCapacity(NewConsumedCapacity(), filteredRequests, allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
+}
+
+func (alloc *allocator) filterDeviceCapacityRequests(requestedCapacity *resourceapi.CapacityRequirements, driver string, device draapi.Device) (*resourceapi.CapacityRequirements, bool, error) {
+	if requestedCapacity == nil || len(requestedCapacity.Requests) == 0 {
+		return requestedCapacity, true, nil
+	}
+	filtered := &resourceapi.CapacityRequirements{
+		Requests: make(map[resourceapi.QualifiedName]resource.Quantity),
+	}
+	for name, quantity := range requestedCapacity.Requests {
+		if capacityName, found := findMatchingQualifiedName(name, device.Capacity, driver); found {
+			filtered.Requests[capacityName] = quantity
+			continue
+		}
+		// A capacity request that this device cannot satisfy should exclude the
+		// device from consideration, not abort allocation for the entire request.
+		return nil, false, nil
+	}
+	if len(filtered.Requests) == 0 {
+		return nil, true, nil
+	}
+	return filtered, true, nil
 }
 
 func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
@@ -1586,9 +1614,10 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 	if !found {
 		availableCountersForPool = make(counterSets, len(pool.CounterSets))
 		for _, counterSet := range pool.CounterSets {
-			availableCountersForCounterSet := make(map[string]resourceapi.Counter, len(counterSet.Counters))
+			availableCountersForCounterSet := make(map[string]resourceapi.SharedCounter, len(counterSet.Counters))
 			for name, c := range counterSet.Counters {
-				c.Value = c.Value.DeepCopy()
+				quantity := c.Value.DeepCopy()
+				c.Value = &quantity
 				availableCountersForCounterSet[name] = c
 			}
 			availableCountersForPool[counterSet.Name] = availableCountersForCounterSet
@@ -1620,7 +1649,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 							}
 							// This can potentially result in negative available counters. That is fine,
 							// we just treat it as no counters available.
-							existingCounter.Value.Sub(c.Value)
+							existingCounter.Value.Sub(ptr.Deref(c.Value, resource.Quantity{}))
 							availableCountersForCounterSet[name] = existingCounter
 						}
 					}
@@ -1650,17 +1679,17 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 	for _, deviceCounterConsumption := range device.ConsumesCounters {
 		consumedCountersForCounterSet, found := consumedCountersForPool[deviceCounterConsumption.CounterSet]
 		if !found {
-			consumedCountersForCounterSet = make(map[string]resourceapi.Counter)
+			consumedCountersForCounterSet = make(map[string]resourceapi.SharedCounter)
 			consumedCountersForPool[deviceCounterConsumption.CounterSet] = consumedCountersForCounterSet
 		}
 		for name, c := range deviceCounterConsumption.Counters {
 			consumedCounters, found := consumedCountersForCounterSet[name]
 			if !found {
-				c.Value = c.Value.DeepCopy()
-				consumedCountersForCounterSet[name] = c
+				quantity := c.Value.DeepCopy()
+				consumedCountersForCounterSet[name] = resourceapi.SharedCounter{Value: &quantity}
 				continue
 			}
-			consumedCounters.Value.Add(c.Value)
+			consumedCounters.Value.Add(ptr.Deref(c.Value, resource.Quantity{}))
 			consumedCountersForCounterSet[name] = consumedCounters
 		}
 	}
@@ -1672,7 +1701,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		consumedCounters := consumedCountersForPool[availableCounterSetName]
 		for availableCounterName, availableCounter := range availableCounters {
 			consumedCounter := consumedCounters[availableCounterName]
-			if availableCounter.Value.Cmp(consumedCounter.Value) < 0 {
+			if availableCounter.Value.Cmp(ptr.Deref(consumedCounter.Value, resource.Quantity{})) < 0 {
 				alloc.deallocateCountersForDevice(device)
 				return false, nil
 			}
@@ -1724,7 +1753,7 @@ func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
 		consumedCounterSet := consumedCountersForPool[counterSetName]
 		for name, c := range deviceCounterConsumption.Counters {
 			consumedCounter := consumedCounterSet[name]
-			consumedCounter.Value.Sub(c.Value)
+			consumedCounter.Value.Sub(ptr.Deref(c.Value, resource.Quantity{}))
 			consumedCounterSet[name] = consumedCounter
 		}
 	}

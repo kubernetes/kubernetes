@@ -48,6 +48,10 @@ func MakeDeviceID(driver, pool, device string) DeviceID {
 	return internal.MakeDeviceID(driver, pool, device)
 }
 
+func MakeSharedDeviceID(deviceID DeviceID, shareID *types.UID) SharedDeviceID {
+	return internal.MakeSharedDeviceID(deviceID, shareID)
+}
+
 type SharedDeviceID = internal.SharedDeviceID
 type DeviceConsumedCapacity = internal.DeviceConsumedCapacity
 type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
@@ -75,14 +79,15 @@ func NewConsumedCapacityCollection() ConsumedCapacityCollection {
 // making this the variant that is used when any of those
 // are enabled.
 var SupportedFeatures = internal.Features{
-	AdminAccess:             true,
-	PrioritizedList:         true,
-	PartitionableDevices:    true,
-	DeviceTaints:            true,
-	DeviceBindingAndStatus:  true,
-	ConsumableCapacity:      true,
-	FractionalCapacityRange: true,
-	ListTypeAttributes:      true,
+	AdminAccess:              true,
+	PrioritizedList:          true,
+	PartitionableDevices:     true,
+	DeviceTaints:             true,
+	DeviceBindingAndStatus:   true,
+	ConsumableCapacity:       true,
+	FractionalCapacityRange:  true,
+	ListTypeAttributes:       true,
+	SharedConsumableCapacity: true,
 }
 
 type Allocator struct {
@@ -152,17 +157,18 @@ func (a *Allocator) Channel() internal.AllocatorChannel {
 
 func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim) (finalResult []resourceapi.AllocationResult, finalErr error) {
 	alloc := &allocator{
-		Allocator:            a,
-		ctx:                  ctx, // all methods share the same a and thus ctx
-		logger:               klog.FromContext(ctx),
-		node:                 node,
-		claimsToAllocate:     claims,
-		deviceMatchesRequest: make(map[matchKey]bool),
-		constraints:          make([][]constraint, len(claims)),
-		consumedCounters:     make(map[PoolID]counterSets),
-		requestData:          make(map[requestIndices]requestData),
-		result:               make([]internalAllocationResult, len(claims)),
-		allocatingCapacity:   NewConsumedCapacityCollection(),
+		Allocator:                   a,
+		ctx:                         ctx, // all methods share the same a and thus ctx
+		logger:                      klog.FromContext(ctx),
+		node:                        node,
+		claimsToAllocate:            claims,
+		deviceMatchesRequest:        make(map[matchKey]bool),
+		constraints:                 make([][]constraint, len(claims)),
+		consumedCounters:            make(map[PoolID]counterSets),
+		allocatedCounterConsumption: make(map[SharedDeviceID]counterSets),
+		requestData:                 make(map[requestIndices]requestData),
+		result:                      make([]internalAllocationResult, len(claims)),
+		allocatingCapacity:          NewConsumedCapacityCollection(),
 	}
 	slicesForNode := slices.Concat(alloc.slicesOnNode[node.Name], alloc.slicesShared)
 	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate), "numSlicesForNode", len(slicesForNode))
@@ -389,6 +395,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				Tolerations:      internal.lookupRequest(claim).tolerations(),
 				ShareID:          internal.shareID,
 				ConsumedCapacity: consumedCapacity,
+				ConsumedCounters: counterSetsToConsumption(internal.consumedCounters),
 			}
 			// Performance optimization: skip the for loop if the feature is off.
 			// Not needed for correctness because if the feature is off, the selected
@@ -647,7 +654,10 @@ type allocator struct {
 	// that are in the process of being allocated.
 	// The keys in the map are resource pool IDs (driver name and pool name).
 	consumedCounters map[PoolID]counterSets
-	requestData      map[requestIndices]requestData // one entry per request with no subrequests and one entry per subrequest
+	// allocatedCounterConsumption tracks the resolved counter consumption
+	// for allocations made during the current search so it can be rolled back.
+	allocatedCounterConsumption map[SharedDeviceID]counterSets
+	requestData                 map[requestIndices]requestData // one entry per request with no subrequests and one entry per subrequest
 	// allocatingDevices tracks which devices will be newly allocated for a
 	// particular attempt to find a solution. The map is indexed by device
 	// and its values represent for which of a pod's claims the device will
@@ -664,7 +674,27 @@ type allocator struct {
 
 // counterSets is a map with the name of counter sets to the counters in
 // the set.
-type counterSets map[draapi.UniqueString]map[string]resourceapi.Counter
+type counterSets map[draapi.UniqueString]map[string]resourceapi.SharedCounter
+
+// counterSetsToConsumption converts internal counterSets to the persisted
+// CounterSetConsumption status representation.
+func counterSetsToConsumption(cs counterSets) []resourceapi.CounterSetConsumption {
+	if len(cs) == 0 {
+		return nil
+	}
+	result := make([]resourceapi.CounterSetConsumption, 0, len(cs))
+	for setName, counters := range cs {
+		quantities := make(map[string]resource.Quantity, len(counters))
+		for name, counter := range counters {
+			quantities[name] = ptr.Deref(counter.Value, resource.Quantity{}).DeepCopy()
+		}
+		result = append(result, resourceapi.CounterSetConsumption{
+			CounterSet: setName.String(),
+			Counters:   quantities,
+		})
+	}
+	return result
+}
 
 // matchKey identifies a device/request pair.
 type matchKey struct {
@@ -742,6 +772,7 @@ type internalDeviceResult struct {
 	shareID          *types.UID
 	slice            *draapi.ResourceSlice
 	consumedCapacity map[resourceapi.QualifiedName]resource.Quantity
+	consumedCounters counterSets
 	adminAccess      *bool
 }
 
@@ -1400,10 +1431,55 @@ func (alloc *allocator) CmpRequestOverCapacity(request requestAccessor, slice *d
 	allocatingCapacity := alloc.allocatingCapacity[deviceID]
 	allowMultipleAllocations := device.AllowMultipleAllocations
 	capacities := device.Capacity
-	if allocatedCapacity, found := alloc.allocatedState.AggregatedCapacity[deviceID]; found {
-		return CmpRequestOverCapacity(allocatedCapacity, request.capacities(), allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
+	filteredRequests, ok, err := alloc.filterDeviceCapacityRequests(request.capacities(), slice.Spec.Driver.String(), device)
+	if err != nil || !ok {
+		return ok, err
 	}
-	return CmpRequestOverCapacity(NewConsumedCapacity(), request.capacities(), allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
+	if len(capacities) == 0 {
+		return true, nil
+	}
+	if allocatedCapacity, found := alloc.allocatedState.AggregatedCapacity[deviceID]; found {
+		return CmpRequestOverCapacity(allocatedCapacity, filteredRequests, allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
+	}
+	return CmpRequestOverCapacity(NewConsumedCapacity(), filteredRequests, allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
+}
+
+func (alloc *allocator) filterDeviceCapacityRequests(requestedCapacity *resourceapi.CapacityRequirements, driver string, device draapi.Device) (*resourceapi.CapacityRequirements, bool, error) {
+	if requestedCapacity == nil || len(requestedCapacity.Requests) == 0 {
+		return requestedCapacity, true, nil
+	}
+	filtered := &resourceapi.CapacityRequirements{
+		Requests: make(map[resourceapi.QualifiedName]resource.Quantity),
+	}
+	for name, quantity := range requestedCapacity.Requests {
+		if capacityName, found := findMatchingQualifiedName(name, device.Capacity, driver); found {
+			filtered.Requests[capacityName] = quantity
+			continue
+		}
+		if alloc.features.SharedConsumableCapacity && deviceConsumesCapacityName(device, driver, name) {
+			continue
+		}
+		// A capacity request that this device cannot satisfy should exclude the
+		// device from consideration, not abort allocation for the entire request.
+		return nil, false, nil
+	}
+	if len(filtered.Requests) == 0 {
+		return nil, true, nil
+	}
+	return filtered, true, nil
+}
+
+// deviceConsumesCapacityName reports whether a shared counter uses the given capacity name.
+func deviceConsumesCapacityName(device draapi.Device, driver string, capacityName resourceapi.QualifiedName) bool {
+	resolvedCapacityName := draapi.ResolveQualifiedName(capacityName, driver)
+	for _, counterConsumption := range device.ConsumesCounters {
+		for _, counter := range counterConsumption.Counters {
+			if counter.ValueFrom != nil && draapi.ResolveQualifiedName(counter.ValueFrom.CapacityName, driver) == resolvedCapacityName {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
@@ -1490,19 +1566,18 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		return false, nil, nil
 	}
 
-	// Skip the counter check for an allow-multiple device in use: its counters are already
-	// accounted for, so a further share must not charge them again.
-	skipCounterCheck := allowMultipleAllocations && alloc.deviceCapacityInUse(device.id)
+	var shareID *types.UID
+	if allowMultipleAllocations {
+		shareID = GenerateNewShareID()
+	}
+	counterReservationID := MakeSharedDeviceID(device.id, shareID)
+	includeStaticCounters := !allowMultipleAllocations || !alloc.deviceCapacityInUse(device.id)
 
 	// The API validation logic has checked the ConsumesCounters referred should exist inside SharedCounters.
-	// countersReserved records whether checkAvailableCounters actually reserved
-	// this device's counters. It is not the same as len(device.ConsumesCounters) > 0,
-	// because skipCounterCheck can bypass the reservation.
-	countersReserved := false
-	if !skipCounterCheck && len(device.ConsumesCounters) > 0 {
+	if len(device.ConsumesCounters) > 0 {
 		// If a device consumes counters from a counter set, verify that
 		// there is sufficient counters available.
-		ok, err := alloc.checkAvailableCounters(device)
+		ok, err := alloc.checkAvailableCounters(device, request, counterReservationID, includeStaticCounters)
 		if err != nil {
 			return false, nil, err
 		}
@@ -1510,7 +1585,6 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 			alloc.logger.V(7).Info("Insufficient counters", "device", device.id)
 			return false, nil, nil
 		}
-		countersReserved = true
 	}
 
 	var parentRequestName string
@@ -1531,8 +1605,9 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	// identical. Passing the state by value to rollbackDevice keeps it (and the flags) on the
 	// stack for the rejection paths; only the success closure escapes.
 	state := deviceRollbackState{
-		countersReserved:   countersReserved,
-		previousNumResults: len(alloc.result[r.claimIndex].devices),
+		countersReserved:     len(device.ConsumesCounters) > 0,
+		counterReservationID: counterReservationID,
+		previousNumResults:   len(alloc.result[r.claimIndex].devices),
 	}
 
 	// Might be tainted, in which case the taint has to be tolerated.
@@ -1569,7 +1644,6 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	}
 
 	consumedCapacity := make(map[resourceapi.QualifiedName]resource.Quantity, 0)
-	var shareID *types.UID
 	if alloc.features.ConsumableCapacity {
 		// Validate whether resource request over capacity
 		success, err := alloc.CmpRequestOverCapacity(requestData.request, device.slice, *device.Device)
@@ -1591,7 +1665,6 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 				alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
 				return false, nil, fmt.Errorf("claim %s, request %s: computing consumed capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), device.id, err)
 			}
-			shareID = GenerateNewShareID()
 			alloc.logger.V(7).Info("Device capacity allocated", "device", device.id,
 				"consumed capacity", klog.Format(consumedCapacity))
 			// A prior share of this device may already hold the capacity entry.
@@ -1619,6 +1692,9 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	if len(consumedCapacity) > 0 {
 		result.consumedCapacity = consumedCapacity
 	}
+	if resolved, ok := alloc.allocatedCounterConsumption[counterReservationID]; ok && len(resolved) > 0 {
+		result.consumedCounters = resolved
+	}
 	alloc.result[r.claimIndex].devices = append(alloc.result[r.claimIndex].devices, result)
 	state.resultAdded = true
 
@@ -1636,6 +1712,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 // and when the backtracking search abandons a previously successful candidate.
 type deviceRollbackState struct {
 	countersReserved     bool
+	counterReservationID SharedDeviceID
 	constraintsAdded     int
 	deviceMarked         bool
 	capacityInserted     bool
@@ -1670,7 +1747,7 @@ func (alloc *allocator) rollbackDevice(r deviceIndices, device deviceWithID, bas
 		alloc.constraints[r.claimIndex][i].remove(baseRequestName, subRequestName, device.Device, device.id)
 	}
 	if state.countersReserved {
-		alloc.deallocateCountersForDevice(device)
+		alloc.deallocateCountersForReservation(state.counterReservationID)
 	}
 	if state.resultAdded {
 		// Only a fully allocated candidate recorded a result, so this is a real
@@ -1706,7 +1783,7 @@ func taintTolerated(taint resourceapi.DeviceTaint, request requestAccessor) bool
 //
 // Gets called only if the partitionable devices feature is enabled and the device
 // consumes counters.
-func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error) {
+func (alloc *allocator) checkAvailableCounters(device deviceWithID, request requestAccessor, reservationID SharedDeviceID, includeStaticCounters bool) (bool, error) {
 	pool := device.pool
 	poolID := pool.PoolID
 
@@ -1723,9 +1800,10 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 	if !found {
 		availableCountersForPool = make(counterSets, len(pool.CounterSets))
 		for _, counterSet := range pool.CounterSets {
-			availableCountersForCounterSet := make(map[string]resourceapi.Counter, len(counterSet.Counters))
+			availableCountersForCounterSet := make(map[string]resourceapi.SharedCounter, len(counterSet.Counters))
 			for name, c := range counterSet.Counters {
-				c.Value = c.Value.DeepCopy()
+				quantity := c.Value.DeepCopy()
+				c.Value = &quantity
 				availableCountersForCounterSet[name] = c
 			}
 			availableCountersForPool[counterSet.Name] = availableCountersForCounterSet
@@ -1734,36 +1812,67 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		// Update the data structure to reflect counters already consumed by allocated devices. This
 		// only includes devices where the allocation process has completed, so this will never
 		// change during the allocation process.
-		for _, resourceSlices := range [][]*draapi.ResourceSlice{pool.DeviceSlicesTargetingNode, pool.DeviceSlicesNotTargetingNode} {
-			for _, slice := range resourceSlices {
-				for _, device := range slice.Spec.Devices {
-					deviceID := DeviceID{
-						Driver: slice.Spec.Driver,
-						Pool:   slice.Spec.Pool.Name,
-						Device: device.Name,
-					}
-					// Devices that aren't allocated doesn't consume any counters, so we don't
-					// need to consider them.
-					if !internal.IsDeviceAllocated(deviceID, &alloc.allocatedState) {
+		// When SharedConsumableCapacity is enabled, use the persisted ConsumedCounters
+		// snapshot from claim status instead of recomputing from live ResourceSlice definitions.
+		// This makes accounting independent of later changes to ValueFrom, RequestPolicy,
+		// or counter-set membership.
+		// Otherwise counter consumption is static on the device itself, so we can subtract the
+		// values declared directly in device.ConsumesCounters for already-allocated devices.
+		if alloc.features.SharedConsumableCapacity {
+			for _, claim := range alloc.allocatedState.AllocatedClaims {
+				if claim == nil || claim.Status.Allocation == nil {
+					continue
+				}
+				for _, result := range claim.Status.Allocation.Devices.Results {
+					if result.Driver != pool.PoolID.Driver.String() || result.Pool != pool.PoolID.Pool.String() {
 						continue
 					}
-					for _, deviceCounterConsumption := range device.ConsumesCounters {
-						availableCountersForCounterSet := availableCountersForPool[deviceCounterConsumption.CounterSet]
-						for name, c := range deviceCounterConsumption.Counters {
-							existingCounter, ok := availableCountersForCounterSet[name]
-							if !ok {
-								// the API validation logic has been added to make sure the counters referred should exist in counter sets.
-								continue
+					for _, consumption := range result.ConsumedCounters {
+						consumedCountersForSet := availableCountersForPool[draapi.MakeUniqueString(consumption.CounterSet)]
+						if consumedCountersForSet == nil {
+							continue
+						}
+						for name, quantity := range consumption.Counters {
+							if counter, ok := consumedCountersForSet[name]; ok {
+								counter.Value.Sub(quantity)
+								consumedCountersForSet[name] = counter
 							}
-							// This can potentially result in negative available counters. That is fine,
-							// we just treat it as no counters available.
-							existingCounter.Value.Sub(c.Value)
-							availableCountersForCounterSet[name] = existingCounter
 						}
 					}
-					// Note that we don't include devices in the alloc.allocatingDevices here since
-					// counters consumed by devices for the current claims are tracked in
-					// alloc.consumedCounters
+				}
+			}
+		} else {
+			for _, resourceSlices := range [][]*draapi.ResourceSlice{pool.DeviceSlicesTargetingNode, pool.DeviceSlicesNotTargetingNode} {
+				for _, slice := range resourceSlices {
+					for _, device := range slice.Spec.Devices {
+						deviceID := DeviceID{
+							Driver: slice.Spec.Driver,
+							Pool:   slice.Spec.Pool.Name,
+							Device: device.Name,
+						}
+						// Devices that aren't allocated doesn't consume any counters, so we don't
+						// need to consider them.
+						if !internal.IsDeviceAllocated(deviceID, &alloc.allocatedState) {
+							continue
+						}
+						for _, deviceCounterConsumption := range device.ConsumesCounters {
+							availableCountersForCounterSet := availableCountersForPool[deviceCounterConsumption.CounterSet]
+							for name, c := range deviceCounterConsumption.Counters {
+								existingCounter, ok := availableCountersForCounterSet[name]
+								if !ok {
+									// the API validation logic has been added to make sure the counters referred should exist in counter sets.
+									continue
+								}
+								// This can potentially result in negative available counters. That is fine,
+								// we just treat it as no counters available.
+								existingCounter.Value.Sub(ptr.Deref(c.Value, resource.Quantity{}))
+								availableCountersForCounterSet[name] = existingCounter
+							}
+						}
+						// Note that we don't include devices in the alloc.allocatingDevices here since
+						// counters consumed by devices for the current claims are tracked in
+						// alloc.consumedCounters
+					}
 				}
 			}
 		}
@@ -1784,20 +1893,32 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		consumedCountersForPool = make(counterSets)
 		alloc.consumedCounters[poolID] = consumedCountersForPool
 	}
-	for _, deviceCounterConsumption := range device.ConsumesCounters {
-		consumedCountersForCounterSet, found := consumedCountersForPool[deviceCounterConsumption.CounterSet]
+	resolvedCounters, ok, err := alloc.resolveConsumedCounters(device, request.capacities(), includeStaticCounters)
+	if err != nil {
+		return false, err
+	}
+	if !ok {
+		return false, nil
+	}
+	if len(resolvedCounters) == 0 {
+		return true, nil
+	}
+	alloc.allocatedCounterConsumption[reservationID] = resolvedCounters
+	for counterSetName, counters := range resolvedCounters {
+		consumedCountersForCounterSet, found := consumedCountersForPool[counterSetName]
 		if !found {
-			consumedCountersForCounterSet = make(map[string]resourceapi.Counter)
-			consumedCountersForPool[deviceCounterConsumption.CounterSet] = consumedCountersForCounterSet
+			consumedCountersForCounterSet = make(map[string]resourceapi.SharedCounter)
+			consumedCountersForPool[counterSetName] = consumedCountersForCounterSet
 		}
-		for name, c := range deviceCounterConsumption.Counters {
+		for name, c := range counters {
 			consumedCounters, found := consumedCountersForCounterSet[name]
 			if !found {
-				c.Value = c.Value.DeepCopy()
+				quantity := c.Value.DeepCopy()
+				c.Value = &quantity
 				consumedCountersForCounterSet[name] = c
 				continue
 			}
-			consumedCounters.Value.Add(c.Value)
+			consumedCounters.Value.Add(ptr.Deref(c.Value, resource.Quantity{}))
 			consumedCountersForCounterSet[name] = consumedCounters
 		}
 	}
@@ -1809,8 +1930,8 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		consumedCounters := consumedCountersForPool[availableCounterSetName]
 		for availableCounterName, availableCounter := range availableCounters {
 			consumedCounter := consumedCounters[availableCounterName]
-			if availableCounter.Value.Cmp(consumedCounter.Value) < 0 {
-				alloc.deallocateCountersForDevice(device)
+			if availableCounter.Value.Cmp(ptr.Deref(consumedCounter.Value, resource.Quantity{})) < 0 {
+				alloc.deallocateCountersForReservation(reservationID)
 				return false, nil
 			}
 		}
@@ -1850,21 +1971,69 @@ func (alloc *allocator) allocatingCapacityForAnyClaim(deviceID DeviceID) bool {
 	return found
 }
 
-// deallocateCountersForDevice subtracts the consumed counters of the provided
-// device from the consumedCounters data structure.
-func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
-	poolID := device.pool.PoolID
+func (alloc *allocator) resolveConsumedCounters(device deviceWithID, requestedCapacity *resourceapi.CapacityRequirements, includeStaticCounters bool) (counterSets, bool, error) {
+	resolvedCounters := make(counterSets, len(device.ConsumesCounters))
+	for _, deviceCounterConsumption := range device.ConsumesCounters {
+		counterSet, found := device.pool.CounterSets[deviceCounterConsumption.CounterSet]
+		if !found {
+			return nil, false, fmt.Errorf("counter set %s not found in pool %s", deviceCounterConsumption.CounterSet, device.pool.PoolID)
+		}
+		resolvedCountersForSet := make(map[string]resourceapi.SharedCounter, len(deviceCounterConsumption.Counters))
+		for name, counter := range deviceCounterConsumption.Counters {
+			if counter.ValueFrom == nil && !includeStaticCounters {
+				continue
+			}
+			quantity := ptr.Deref(counter.Value, resource.Quantity{}).DeepCopy()
+			resolvedCounter := resourceapi.SharedCounter{Value: &quantity}
+			if counter.ValueFrom != nil {
+				sharedCounter, found := counterSet.Counters[name]
+				if !found {
+					return nil, false, fmt.Errorf("counter %s not found in counter set %s", name, counterSet.Name)
+				}
+				var requestedValue *resource.Quantity
+				if requestedCapacity != nil && requestedCapacity.Requests != nil {
+					if requestName, found := findMatchingQualifiedName(counter.ValueFrom.CapacityName, requestedCapacity.Requests, device.slice.Spec.Driver.String()); found {
+						value := requestedCapacity.Requests[requestName]
+						requestedValue = &value
+					}
+				}
+				quantity, err := calculateConsumedCounter(requestedValue, sharedCounter, alloc.features.FractionalCapacityRange)
+				if err != nil {
+					return nil, false, fmt.Errorf("counter %s in counter set %s: %w", name, counterSet.Name, err)
+				}
+				resolvedCounter.Value = &quantity
+				if violatesPolicy(ptr.Deref(resolvedCounter.Value, resource.Quantity{}), sharedCounter.RequestPolicy, alloc.features.FractionalCapacityRange) {
+					return nil, false, nil
+				}
+			}
+			resolvedCountersForSet[name] = resolvedCounter
+		}
+		if len(resolvedCountersForSet) > 0 {
+			resolvedCounters[deviceCounterConsumption.CounterSet] = resolvedCountersForSet
+		}
+	}
+	return resolvedCounters, true, nil
+}
+
+// deallocateCountersForReservation subtracts the consumed counters of the provided
+// reservation from the consumedCounters data structure.
+func (alloc *allocator) deallocateCountersForReservation(reservationID SharedDeviceID) {
+	resolvedCounters, found := alloc.allocatedCounterConsumption[reservationID]
+	if !found {
+		return
+	}
+	poolID := PoolID{Driver: reservationID.Driver, Pool: reservationID.Pool}
 
 	consumedCountersForPool := alloc.consumedCounters[poolID]
-	for _, deviceCounterConsumption := range device.ConsumesCounters {
-		counterSetName := deviceCounterConsumption.CounterSet
+	for counterSetName, counters := range resolvedCounters {
 		consumedCounterSet := consumedCountersForPool[counterSetName]
-		for name, c := range deviceCounterConsumption.Counters {
+		for name, c := range counters {
 			consumedCounter := consumedCounterSet[name]
-			consumedCounter.Value.Sub(c.Value)
+			consumedCounter.Value.Sub(ptr.Deref(c.Value, resource.Quantity{}))
 			consumedCounterSet[name] = consumedCounter
 		}
 	}
+	delete(alloc.allocatedCounterConsumption, reservationID)
 }
 
 // createNodeSelector constructs a node selector for the allocation, if needed,
