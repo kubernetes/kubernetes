@@ -2929,6 +2929,7 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 				recordAdmissionRejection(reason)
 				continue
 			}
+			recordPodLevelResourcesAdmission(pod)
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 				// Backfill the queue of pending resizes, but only after all the pods have

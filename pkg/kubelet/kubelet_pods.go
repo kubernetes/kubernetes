@@ -2970,3 +2970,30 @@ func resolveRecursiveReadOnly(m v1.VolumeMount, runtimeSupportsRRO bool) (bool, 
 		return false, fmt.Errorf("unknown recursive read-only mode %q", rroMode)
 	}
 }
+
+func recordPodLevelResourcesAdmission(pod *v1.Pod) {
+	hasResources := func(containers []v1.Container) bool {
+		for _, c := range containers {
+			if len(c.Resources.Requests) > 0 || len(c.Resources.Limits) > 0 {
+				return true
+			}
+		}
+		return false
+	}
+
+	hasPodLevel := resourcehelper.IsPodLevelResourcesSet(pod)
+	hasContainerLevel := hasResources(pod.Spec.Containers) || hasResources(pod.Spec.InitContainers)
+
+	var configMode string
+	switch {
+	case hasPodLevel && hasContainerLevel:
+		configMode = "pod_and_container_level"
+	case hasPodLevel:
+		configMode = "pod_level"
+	case hasContainerLevel:
+		configMode = "container_level"
+	}
+
+	qosLabel := strings.ToLower(string(v1qos.GetPodQOS(pod)))
+	metrics.PodLevelResourcesAdmissionTotal.WithLabelValues(configMode, qosLabel).Inc()
+}

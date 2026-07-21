@@ -4217,6 +4217,19 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: pod_level_resources_admission_total
+  subsystem: kubelet
+  help: Total number of pods admitted during Kubelet admission, categorized by resource
+    configuration mode (pod_and_container_level, pod_level, container_level, or empty
+    for unconfigured/BestEffort) and QoS class.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - config_mode
+  - qos_class
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: pod_pending_resizes
   subsystem: kubelet
   help: 'Number of pending resizes for pods. Label ''priority_bucket'' classifies

@@ -47,6 +47,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/cri-streaming/pkg/streaming/portforward"
@@ -9294,6 +9295,113 @@ func TestMakemountsSubpathCleanupAccumulation(t *testing.T) {
 
 			require.ElementsMatch(t, tc.expectedCleanedSubPaths, tracker.cleanedSubPaths,
 				"expected cleaned subpaths %v but got %v", tc.expectedCleanedSubPaths, tracker.cleanedSubPaths)
+		})
+	}
+}
+
+func TestRecordPodLevelResourcesAdmission(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	_ = legacyregistry.Register(metrics.PodLevelResourcesAdmissionTotal)
+
+	testCases := []struct {
+		name           string
+		pod            *v1.Pod
+		expectedMetric string
+	}{
+		{
+			name: "pod and container level resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedMetric: `
+# HELP kubelet_pod_level_resources_admission_total [ALPHA] Total number of pods admitted during Kubelet admission, categorized by resource configuration mode (pod_and_container_level, pod_level, container_level, or empty for unconfigured/BestEffort) and QoS class.
+# TYPE kubelet_pod_level_resources_admission_total counter
+kubelet_pod_level_resources_admission_total{config_mode="pod_and_container_level",qos_class="burstable"} 1
+`,
+		},
+		{
+			name: "pod level only resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+						},
+					},
+				},
+			},
+			expectedMetric: `
+# HELP kubelet_pod_level_resources_admission_total [ALPHA] Total number of pods admitted during Kubelet admission, categorized by resource configuration mode (pod_and_container_level, pod_level, container_level, or empty for unconfigured/BestEffort) and QoS class.
+# TYPE kubelet_pod_level_resources_admission_total counter
+kubelet_pod_level_resources_admission_total{config_mode="pod_level",qos_class="burstable"} 1
+`,
+		},
+		{
+			name: "container level only resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedMetric: `
+# HELP kubelet_pod_level_resources_admission_total [ALPHA] Total number of pods admitted during Kubelet admission, categorized by resource configuration mode (pod_and_container_level, pod_level, container_level, or empty for unconfigured/BestEffort) and QoS class.
+# TYPE kubelet_pod_level_resources_admission_total counter
+kubelet_pod_level_resources_admission_total{config_mode="container_level",qos_class="burstable"} 1
+`,
+		},
+		{
+			name: "no resources best effort",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+						},
+					},
+				},
+			},
+			expectedMetric: `
+# HELP kubelet_pod_level_resources_admission_total [ALPHA] Total number of pods admitted during Kubelet admission, categorized by resource configuration mode (pod_and_container_level, pod_level, container_level, or empty for unconfigured/BestEffort) and QoS class.
+# TYPE kubelet_pod_level_resources_admission_total counter
+kubelet_pod_level_resources_admission_total{config_mode="",qos_class="besteffort"} 1
+`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			metrics.PodLevelResourcesAdmissionTotal.Reset()
+			recordPodLevelResourcesAdmission(tc.pod)
+
+			testMetric(t, metrics.PodLevelResourcesAdmissionTotal.FQName(), tc.expectedMetric)
 		})
 	}
 }
