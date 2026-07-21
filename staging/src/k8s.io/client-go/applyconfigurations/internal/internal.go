@@ -12963,9 +12963,21 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1.Counter
   map:
     fields:
+    - name: consumptionPolicy
+      type:
+        namedType: io.k8s.api.resource.v1.CapacityRequestPolicy
     - name: value
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.resource.v1.CounterRequirement
+  map:
+    fields:
+    - name: value
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: valueFrom
+      type:
+        namedType: io.k8s.api.resource.v1.CounterValueFrom
 - name: io.k8s.api.resource.v1.CounterSet
   map:
     fields:
@@ -12975,6 +12987,25 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1.Counter
     - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1.CounterSetConsumption
+  map:
+    fields:
+    - name: counterSet
+      type:
+        scalar: string
+      default: ""
+    - name: counters
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.resource.v1.CounterValueFrom
+  map:
+    fields:
+    - name: capacityName
       type:
         scalar: string
       default: ""
@@ -13227,7 +13258,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         map:
           elementType:
-            namedType: io.k8s.api.resource.v1.Counter
+            namedType: io.k8s.api.resource.v1.CounterRequirement
 - name: io.k8s.api.resource.v1.DeviceDerivedAttribute
   map:
     fields:
@@ -13278,6 +13309,14 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: consumedCounters
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.CounterSetConsumption
+          elementRelationship: associative
+          keys:
+          - counterSet
     - name: device
       type:
         scalar: string
@@ -14079,9 +14118,21 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta1.Counter
   map:
     fields:
+    - name: consumptionPolicy
+      type:
+        namedType: io.k8s.api.resource.v1beta1.CapacityRequestPolicy
     - name: value
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.resource.v1beta1.CounterRequirement
+  map:
+    fields:
+    - name: value
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: valueFrom
+      type:
+        namedType: io.k8s.api.resource.v1beta1.CounterValueFrom
 - name: io.k8s.api.resource.v1beta1.CounterSet
   map:
     fields:
@@ -14091,6 +14142,25 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.Counter
     - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta1.CounterSetConsumption
+  map:
+    fields:
+    - name: counterSet
+      type:
+        scalar: string
+      default: ""
+    - name: counters
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.resource.v1beta1.CounterValueFrom
+  map:
+    fields:
+    - name: capacityName
       type:
         scalar: string
       default: ""
@@ -14292,7 +14362,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         map:
           elementType:
-            namedType: io.k8s.api.resource.v1beta1.Counter
+            namedType: io.k8s.api.resource.v1beta1.CounterRequirement
 - name: io.k8s.api.resource.v1beta1.DeviceDerivedAttribute
   map:
     fields:
@@ -14374,6 +14444,14 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: consumedCounters
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.CounterSetConsumption
+          elementRelationship: associative
+          keys:
+          - counterSet
     - name: device
       type:
         scalar: string
@@ -14805,9 +14883,21 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta2.Counter
   map:
     fields:
+    - name: consumptionPolicy
+      type:
+        namedType: io.k8s.api.resource.v1beta2.CapacityRequestPolicy
     - name: value
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.resource.v1beta2.CounterRequirement
+  map:
+    fields:
+    - name: value
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: valueFrom
+      type:
+        namedType: io.k8s.api.resource.v1beta2.CounterValueFrom
 - name: io.k8s.api.resource.v1beta2.CounterSet
   map:
     fields:
@@ -14817,6 +14907,25 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta2.Counter
     - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.CounterSetConsumption
+  map:
+    fields:
+    - name: counterSet
+      type:
+        scalar: string
+      default: ""
+    - name: counters
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.resource.v1beta2.CounterValueFrom
+  map:
+    fields:
+    - name: capacityName
       type:
         scalar: string
       default: ""
@@ -15069,7 +15178,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         map:
           elementType:
-            namedType: io.k8s.api.resource.v1beta2.Counter
+            namedType: io.k8s.api.resource.v1beta2.CounterRequirement
 - name: io.k8s.api.resource.v1beta2.DeviceDerivedAttribute
   map:
     fields:
@@ -15120,6 +15229,14 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: consumedCounters
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.CounterSetConsumption
+          elementRelationship: associative
+          keys:
+          - counterSet
     - name: device
       type:
         scalar: string

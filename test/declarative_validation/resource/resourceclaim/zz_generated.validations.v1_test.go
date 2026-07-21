@@ -218,6 +218,24 @@ func init() {
 			"status.allocation.devices.results[*].consumedCapacity[*]": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"status.allocation.devices.results[*].consumedCounters": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"status.allocation.devices.results[*].consumedCounters[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.allocation.devices.results[*].consumedCounters[*].counterSet": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.allocation.devices.results[*].consumedCounters[*].counters": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooMany", Origin: "maxProperties"},
+			},
+			"status.allocation.devices.results[*].consumedCounters[*].counters[*]": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
 			"status.allocation.devices.results[*].driver": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name-caseless"},
 				{ErrorType: "FieldValueRequired"},
