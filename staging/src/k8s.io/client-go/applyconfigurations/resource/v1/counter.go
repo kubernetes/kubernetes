@@ -25,10 +25,17 @@ import (
 // CounterApplyConfiguration represents a declarative configuration of the Counter type for use
 // with apply.
 //
-// Counter describes a quantity associated with a device.
+// Counter describes a quantity that is available in a counter set.
 type CounterApplyConfiguration struct {
 	// value defines how much of a certain device counter is available.
 	Value *resource.Quantity `json:"value,omitempty"`
+	// consumptionPolicy defines how devices consume this counter. The consumed
+	// amount is rounded up according to the policy and must satisfy its limits.
+	//
+	// If unset, devices can consume any amount up to the available counter value.
+	// If and only if the required amount is unspecified, then the policy default is used
+	// (if set) or the full counter value (if not set).
+	ConsumptionPolicy *CapacityRequestPolicyApplyConfiguration `json:"consumptionPolicy,omitempty"`
 }
 
 // CounterApplyConfiguration constructs a declarative configuration of the Counter type for use with
@@ -42,5 +49,13 @@ func Counter() *CounterApplyConfiguration {
 // If called multiple times, the Value field is set to the value of the last call.
 func (b *CounterApplyConfiguration) WithValue(value resource.Quantity) *CounterApplyConfiguration {
 	b.Value = &value
+	return b
+}
+
+// WithConsumptionPolicy sets the ConsumptionPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ConsumptionPolicy field is set to the value of the last call.
+func (b *CounterApplyConfiguration) WithConsumptionPolicy(value *CapacityRequestPolicyApplyConfiguration) *CounterApplyConfiguration {
+	b.ConsumptionPolicy = value
 	return b
 }
