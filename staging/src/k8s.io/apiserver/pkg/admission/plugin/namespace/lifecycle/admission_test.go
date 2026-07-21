@@ -149,7 +149,7 @@ func TestAdmissionNamespaceDoesNotExist(t *testing.T) {
 		t.Errorf("Expected error rejecting creates in a namespace when it is missing")
 	}
 
-	// verify update operations in the namespace can proceed
+	// verify update operations in the namespace with no old object can proceed
 	err = handler.Admit(context.TODO(), admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("Unexpected error rejecting updates in a namespace when it is missing: %v", err)
