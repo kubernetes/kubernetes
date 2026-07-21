@@ -349,10 +349,12 @@ func (conn *Conn) handle(ws *websocket.Conn) {
 		conn.resetTimeout()
 		var data []byte
 		if err := websocket.Message.Receive(ws, &data); err != nil {
-			if err != io.EOF && !strings.Contains(err.Error(), "use of closed network connection") {
-				logger.Error(err, "Error on socket receive")
-			} else if err != io.EOF {
-				logger.V(4).Info("Websocket connection closed", "err", err)
+			if err != io.EOF {
+				if strings.Contains(err.Error(), "use of closed network connection") {
+					logger.V(4).Info("Websocket connection closed", "err", err)
+				} else {
+					logger.Error(err, "Error on socket receive")
+				}
 			}
 			break
 		}
