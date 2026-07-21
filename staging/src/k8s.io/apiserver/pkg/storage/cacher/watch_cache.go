@@ -341,7 +341,7 @@ func (w *watchCache) waitUntilFreshLocked(ctx context.Context, consistentReadSup
 	}
 
 	span := tracing.SpanFromContext(ctx)
-	span.AddEvent("watchCache locked acquired")
+	span.AddEvent("watchCache waiting for cache to catch up")
 	for w.resourceVersion < resourceVersion {
 		if w.config.clock.Since(startTime) >= blockTimeout {
 			// Request that the client retry after 'resourceVersionTooHighRetrySeconds' seconds.
