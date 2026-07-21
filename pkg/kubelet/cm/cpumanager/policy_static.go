@@ -1709,7 +1709,12 @@ func (p *staticPolicy) takeByTopologyForResize(logger klog.Logger, availableCPUs
 		return takeByTopologyNUMADistributedForResize(logger, p.topology, availableCPUs, numCPUs, cpuGroupSize, cpuSortingStrategy, p.options.AlignBySocket, currentlyAllocatedCPUs, baselineCPUs)
 	}
 
-	return takeByTopologyNUMAPackedForResize(logger, p.topology, availableCPUs, numCPUs, cpuSortingStrategy, p.options.PreferAlignByUncoreCacheOption, reusableCPUsForResize, baselineCPUs)
+	// If requested CPUs to be retained or reusable CPUs are empty
+	// for NUMA Packed, then we fail early.
+	if currentlyAllocatedCPUs.IsEmpty() || baselineCPUs.IsEmpty() {
+		return cpuset.New(), fmt.Errorf("neither requested CPUs to be retained %s nor reusable CPUs %s can be empty in NUMA Packed policy", baselineCPUs.String(), currentlyAllocatedCPUs.String())
+	}
+	return takeByTopologyNUMAPackedForResize(logger, p.topology, availableCPUs, numCPUs, cpuSortingStrategy, p.options.PreferAlignByUncoreCacheOption, currentlyAllocatedCPUs, baselineCPUs)
 }
 
 func (p *staticPolicy) getTopologyHintsForResize(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
