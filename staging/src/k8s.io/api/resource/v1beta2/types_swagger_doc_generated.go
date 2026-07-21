@@ -93,13 +93,24 @@ func (CapacityRequirements) SwaggerDoc() map[string]string {
 	return map_CapacityRequirements
 }
 
-var map_Counter = map[string]string{
-	"":      "Counter describes a quantity associated with a device.",
-	"value": "value defines how much of a certain device counter is available.",
+var map_ConsumeCounter = map[string]string{
+	"":          "ConsumeCounter describes how much of a counter a device consumes.",
+	"value":     "value defines the statically consumed amount.\n\nExactly one of Value or ValueFrom must be specified.",
+	"valueFrom": "valueFrom looks up the requested capacity value in a ResourceClaim via the capacity name. That value is then consumed from the counter instead of using a static value defined by the driver.",
 }
 
-func (Counter) SwaggerDoc() map[string]string {
-	return map_Counter
+func (ConsumeCounter) SwaggerDoc() map[string]string {
+	return map_ConsumeCounter
+}
+
+var map_CounterConsumption = map[string]string{
+	"":              "CounterConsumption separates costs of a physical device from costs of an individual allocation of that device.",
+	"perDevice":     "perDevice records static consumption charged once per driver, pool, and device while at least one non-admin allocation remains. Every allocation of the same device records the same snapshot.\n\nThe maximum number of counter sets is 2.",
+	"perAllocation": "perAllocation records resolved request-driven consumption charged for each allocation independently of other allocations of the same device.\n\nThe maximum number of counter sets is 2.",
+}
+
+func (CounterConsumption) SwaggerDoc() map[string]string {
+	return map_CounterConsumption
 }
 
 var map_CounterSet = map[string]string{
@@ -110,6 +121,25 @@ var map_CounterSet = map[string]string{
 
 func (CounterSet) SwaggerDoc() map[string]string {
 	return map_CounterSet
+}
+
+var map_CounterSetConsumption = map[string]string{
+	"":           "CounterSetConsumption records the resolved consumption for one counter set at allocation time.",
+	"counterSet": "counterSet is the name of the counter set from which counters were consumed.",
+	"counters":   "counters records the quantity consumed for each counter in the set.",
+}
+
+func (CounterSetConsumption) SwaggerDoc() map[string]string {
+	return map_CounterSetConsumption
+}
+
+var map_CounterValueFrom = map[string]string{
+	"":             "CounterValueFrom looks up the requested capacity value in a ResourceClaim via the capacity name.",
+	"capacityName": "capacityName is the name of a device capacity. This is the same name that users set in capacity requests.\n\nIf this name has no domain prefix, the driver name from the ResourceSlice is used as the domain when matching against capacity requests.",
+}
+
+func (CounterValueFrom) SwaggerDoc() map[string]string {
+	return map_CounterValueFrom
 }
 
 var map_Device = map[string]string{
@@ -303,6 +333,7 @@ var map_DeviceRequestAllocationResult = map[string]string{
 	"shareID":                  "shareID uniquely identifies an individual allocation share of the device, used when the device supports multiple simultaneous allocations. It serves as an additional map key to differentiate concurrent shares of the same device.",
 	"consumedCapacity":         "consumedCapacity tracks the amount of capacity consumed per device as part of the claim request. The consumed amount may differ from the requested amount: it is rounded up to the nearest valid value based on the device’s requestPolicy if applicable (i.e., may not be less than the requested amount).\n\nThe total consumed capacity for each device must not exceed the DeviceCapacity's Value.\n\nThis field is populated only for devices that allow multiple allocations. All capacity entries are included, even if the consumed amount is zero. The domain prefix in the capacity name may be omitted if it is the same as the driver name.",
 	"skipNodeOperations":       "skipNodeOperations lists node-local resource operations (gRPC calls) that will be skipped for this allocated device when determining whether operations are necessary on the node. If all allocated devices for a driver in a claim skip an operation, that gRPC call will be skipped. It is a copy of the ResourceSlice.spec.skipNodeOperations value at the time when the device was allocated.",
+	"consumedCounters":         "consumedCounters records counter consumption at allocation time instead of deriving it from mutable ResourceSlice definitions. Device costs are recorded on every share so releasing any share preserves the accounting. An empty object records known zero consumption; an absent field means that the allocation predates counter snapshots.",
 }
 
 func (DeviceRequestAllocationResult) SwaggerDoc() map[string]string {
@@ -608,6 +639,16 @@ var map_ResourceSliceSpec = map[string]string{
 
 func (ResourceSliceSpec) SwaggerDoc() map[string]string {
 	return map_ResourceSliceSpec
+}
+
+var map_SharedCounter = map[string]string{
+	"":              "SharedCounter describes a quantity that is available in a counter set.",
+	"value":         "value defines how much of a certain device counter is available for consumption by devices.",
+	"requestPolicy": "requestPolicy defines how this counter must be consumed when a device references this counter through ValueFrom.\n\nIf nil, the counter cannot be referenced through ValueFrom.",
+}
+
+func (SharedCounter) SwaggerDoc() map[string]string {
+	return map_SharedCounter
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

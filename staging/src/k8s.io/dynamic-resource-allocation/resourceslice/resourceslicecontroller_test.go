@@ -531,8 +531,8 @@ func TestControllerSyncPool(t *testing.T) {
 								PerDeviceNodeSelection: new(true),
 								SharedCounters: []resourceapi.CounterSet{{
 									Name: "gpu-0",
-									Counters: map[string]resourceapi.Counter{
-										"mem": {Value: resource.MustParse("1")},
+									Counters: map[string]resourceapi.SharedCounter{
+										"mem": {Value: new(resource.MustParse("1"))},
 									},
 								}},
 							},
@@ -544,8 +544,8 @@ func TestControllerSyncPool(t *testing.T) {
 										nodeNameField(ownerName),
 										[]resourceapi.DeviceCounterConsumption{{
 											CounterSet: "gpu-0",
-											Counters: map[string]resourceapi.Counter{
-												"mem": {Value: resource.MustParse("1")},
+											Counters: map[string]resourceapi.ConsumeCounter{
+												"mem": {Value: new(resource.MustParse("1"))},
 											},
 											CompatibilityGroups: []string{"group1", "group2"},
 										}},
@@ -569,8 +569,8 @@ func TestControllerSyncPool(t *testing.T) {
 					PerDeviceNodeSelection(true).
 					SharedCounters([]resourceapi.CounterSet{{
 						Name: "gpu-0",
-						Counters: map[string]resourceapi.Counter{
-							"mem": {Value: resource.MustParse("1")},
+						Counters: map[string]resourceapi.SharedCounter{
+							"mem": {Value: new(resource.MustParse("1"))},
 						},
 					}}).
 					Driver(driverName).
@@ -590,8 +590,8 @@ func TestControllerSyncPool(t *testing.T) {
 							nodeNameField(ownerName),
 							resourceapi.DeviceCounterConsumption{
 								CounterSet: "gpu-0",
-								Counters: map[string]resourceapi.Counter{
-									"mem": {Value: resource.MustParse("1")},
+								Counters: map[string]resourceapi.ConsumeCounter{
+									"mem": {Value: new(resource.MustParse("1"))},
 								},
 							},
 						),

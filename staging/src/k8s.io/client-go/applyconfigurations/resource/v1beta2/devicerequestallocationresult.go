@@ -103,6 +103,12 @@ type DeviceRequestAllocationResultApplyConfiguration struct {
 	// a claim skip an operation, that gRPC call will be skipped. It is a copy of
 	// the ResourceSlice.spec.skipNodeOperations value at the time when the device was allocated.
 	SkipNodeOperations []resourcev1beta2.SkipNodeOperation `json:"skipNodeOperations,omitempty"`
+	// consumedCounters records counter consumption at allocation time instead
+	// of deriving it from mutable ResourceSlice definitions. Device costs are
+	// recorded on every share so releasing any share preserves the accounting.
+	// An empty object records known zero consumption; an absent field means
+	// that the allocation predates counter snapshots.
+	ConsumedCounters *CounterConsumptionApplyConfiguration `json:"consumedCounters,omitempty"`
 }
 
 // DeviceRequestAllocationResultApplyConfiguration constructs a declarative configuration of the DeviceRequestAllocationResult type for use with
@@ -213,5 +219,13 @@ func (b *DeviceRequestAllocationResultApplyConfiguration) WithSkipNodeOperations
 	for i := range values {
 		b.SkipNodeOperations = append(b.SkipNodeOperations, values[i])
 	}
+	return b
+}
+
+// WithConsumedCounters sets the ConsumedCounters field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ConsumedCounters field is set to the value of the last call.
+func (b *DeviceRequestAllocationResultApplyConfiguration) WithConsumedCounters(value *CounterConsumptionApplyConfiguration) *DeviceRequestAllocationResultApplyConfiguration {
+	b.ConsumedCounters = value
 	return b
 }

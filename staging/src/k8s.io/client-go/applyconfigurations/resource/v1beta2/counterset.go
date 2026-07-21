@@ -37,7 +37,7 @@ type CounterSetApplyConfiguration struct {
 	// The name of each counter must be unique in that set and must be a DNS label.
 	//
 	// The maximum number of counters is 32.
-	Counters map[string]CounterApplyConfiguration `json:"counters,omitempty"`
+	Counters map[string]SharedCounterApplyConfiguration `json:"counters,omitempty"`
 }
 
 // CounterSetApplyConfiguration constructs a declarative configuration of the CounterSet type for use with
@@ -58,9 +58,9 @@ func (b *CounterSetApplyConfiguration) WithName(value string) *CounterSetApplyCo
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Counters field,
 // overwriting an existing map entries in Counters field with the same key.
-func (b *CounterSetApplyConfiguration) WithCounters(entries map[string]CounterApplyConfiguration) *CounterSetApplyConfiguration {
+func (b *CounterSetApplyConfiguration) WithCounters(entries map[string]SharedCounterApplyConfiguration) *CounterSetApplyConfiguration {
 	if b.Counters == nil && len(entries) > 0 {
-		b.Counters = make(map[string]CounterApplyConfiguration, len(entries))
+		b.Counters = make(map[string]SharedCounterApplyConfiguration, len(entries))
 	}
 	for k, v := range entries {
 		b.Counters[k] = v
