@@ -82,6 +82,11 @@ func (in StorageClassList) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in StorageHealth) OpenAPIModelName() string {
+	return "io.k8s.api.storage.v1beta1.StorageHealth"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in StorageHealthCondition) OpenAPIModelName() string {
 	return "io.k8s.api.storage.v1beta1.StorageHealthCondition"
 }

@@ -361,17 +361,14 @@ message CSINodeSpec {
 
 // CSINodeStatus contains health and status information for storage on a node.
 message CSINodeStatus {
-  // storageHealth is the set of backend health reports for
-  // each CSI driver registered on the node.
+  // storageHealth contains backend health reports for CSI drivers registered on the node.
   // +optional
   // +listType=map
   // +listMapKey=name
-  // +listMapKey=status
-  // +listMapKey=reason
   // +patchMergeKey=name
   // +patchStrategy=merge
   // +featureGate=CSIVolumeHealth
-  repeated StorageHealthCondition storageHealth = 1;
+  repeated StorageHealth storageHealth = 1;
 }
 
 // CSIStorageCapacity stores the result of one CSI GetCapacity call.
@@ -536,41 +533,48 @@ message StorageClassList {
   repeated StorageClass items = 2;
 }
 
-// StorageHealthCondition represents an adverse health condition reported
-// by a CSI driver for its storage backend on a node.
-message StorageHealthCondition {
+// StorageHealth contains storage backend health reported by a CSI driver on a node.
+message StorageHealth {
   // name is the CSI driver name, matching CSINodeDriver.name.
   // +required
   optional string name = 1;
 
+  // healthConditions are the adverse storage backend conditions reported by the CSI driver.
+  // At most 16 conditions may be reported.
+  // +optional
+  // +listType=atomic
+  repeated StorageHealthCondition healthConditions = 2;
+}
+
+// StorageHealthCondition represents an adverse health condition reported
+// by a CSI driver for its storage backend on a node.
+message StorageHealthCondition {
   // status is the health status category.
   // One of "StorageUnreachable", "StorageDegraded".
   // +required
-  optional string status = 2;
+  optional string status = 1;
 
   // reason is a brief CamelCase machine-parseable reason.
-  // Together with name and status it forms the unique identity of a condition entry.
   // +required
   // Maximum permitted length of a reason is 256 characters.
-  optional string reason = 3;
+  optional string reason = 2;
 
   // message is a human-readable description.
   // +optional
   // Maximum permitted length of a message is 1024 characters.
-  optional string message = 4;
+  optional string message = 3;
 
-  // accessModes are the access modes affected. An empty list means all access modes are affected.
+  // accessMode is the access mode affected. Nil means all access modes are affected.
   // +optional
-  // +listType=atomic
-  repeated string accessModes = 5;
+  optional string accessMode = 4;
 
   // volumeMode is the volume mode affected. Nil means both are affected.
   // +optional
-  optional string volumeMode = 6;
+  optional string volumeMode = 5;
 
   // lastTransitionTime is when this condition first appeared at its current state.
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 7;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 6;
 }
 
 // TokenRequest contains parameters of a service account token.

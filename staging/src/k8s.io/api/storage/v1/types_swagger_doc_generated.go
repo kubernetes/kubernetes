@@ -110,7 +110,7 @@ func (CSINodeSpec) SwaggerDoc() map[string]string {
 
 var map_CSINodeStatus = map[string]string{
 	"":              "CSINodeStatus contains health and status information for storage on a node.",
-	"storageHealth": "storageHealth is the set of backend health reports for each CSI driver registered on the node.",
+	"storageHealth": "storageHealth contains backend health reports for CSI drivers registered on the node.",
 }
 
 func (CSINodeStatus) SwaggerDoc() map[string]string {
@@ -166,13 +166,22 @@ func (StorageClassList) SwaggerDoc() map[string]string {
 	return map_StorageClassList
 }
 
+var map_StorageHealth = map[string]string{
+	"":                 "StorageHealth contains storage backend health reported by a CSI driver on a node.",
+	"name":             "name is the CSI driver name, matching CSINodeDriver.name.",
+	"healthConditions": "healthConditions are the adverse storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
+}
+
+func (StorageHealth) SwaggerDoc() map[string]string {
+	return map_StorageHealth
+}
+
 var map_StorageHealthCondition = map[string]string{
 	"":                   "StorageHealthCondition represents an adverse health condition reported by a CSI driver for its storage backend on a node.",
-	"name":               "name is the CSI driver name, matching CSINodeDriver.name.",
 	"status":             "status is the health status category. One of \"StorageUnreachable\", \"StorageDegraded\".",
-	"reason":             "reason is a brief CamelCase machine-parseable reason. Together with name and status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 characters.",
+	"reason":             "reason is a brief CamelCase machine-parseable reason. Maximum permitted length of a reason is 256 characters.",
 	"message":            "message is a human-readable description. Maximum permitted length of a message is 1024 characters.",
-	"accessModes":        "accessModes are the access modes affected. An empty list means all access modes are affected.",
+	"accessMode":         "accessMode is the access mode affected. Nil means all access modes are affected.",
 	"volumeMode":         "volumeMode is the volume mode affected. Nil means both are affected.",
 	"lastTransitionTime": "lastTransitionTime is when this condition first appeared at its current state.",
 }

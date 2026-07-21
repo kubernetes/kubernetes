@@ -23,9 +23,8 @@ package v1
 //
 // CSINodeStatus contains health and status information for storage on a node.
 type CSINodeStatusApplyConfiguration struct {
-	// storageHealth is the set of backend health reports for
-	// each CSI driver registered on the node.
-	StorageHealth []StorageHealthConditionApplyConfiguration `json:"storageHealth,omitempty"`
+	// storageHealth contains backend health reports for CSI drivers registered on the node.
+	StorageHealth []StorageHealthApplyConfiguration `json:"storageHealth,omitempty"`
 }
 
 // CSINodeStatusApplyConfiguration constructs a declarative configuration of the CSINodeStatus type for use with
@@ -37,7 +36,7 @@ func CSINodeStatus() *CSINodeStatusApplyConfiguration {
 // WithStorageHealth adds the given value to the StorageHealth field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the StorageHealth field.
-func (b *CSINodeStatusApplyConfiguration) WithStorageHealth(values ...*StorageHealthConditionApplyConfiguration) *CSINodeStatusApplyConfiguration {
+func (b *CSINodeStatusApplyConfiguration) WithStorageHealth(values ...*StorageHealthApplyConfiguration) *CSINodeStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithStorageHealth")

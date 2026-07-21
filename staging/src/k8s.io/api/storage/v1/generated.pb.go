@@ -59,6 +59,8 @@ func (m *StorageClass) Reset() { *m = StorageClass{} }
 
 func (m *StorageClassList) Reset() { *m = StorageClassList{} }
 
+func (m *StorageHealth) Reset() { *m = StorageHealth{} }
+
 func (m *StorageHealthCondition) Reset() { *m = StorageHealthCondition{} }
 
 func (m *TokenRequest) Reset() { *m = TokenRequest{} }
@@ -804,6 +806,48 @@ func (m *StorageClassList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *StorageHealth) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *StorageHealth) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StorageHealth) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.HealthConditions) > 0 {
+		for iNdEx := len(m.HealthConditions) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.HealthConditions[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
 func (m *StorageHealthCondition) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -833,41 +877,34 @@ func (m *StorageHealthCondition) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 		i = encodeVarintGenerated(dAtA, i, uint64(size))
 	}
 	i--
-	dAtA[i] = 0x3a
+	dAtA[i] = 0x32
 	if m.VolumeMode != nil {
 		i -= len(*m.VolumeMode)
 		copy(dAtA[i:], *m.VolumeMode)
 		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.VolumeMode)))
 		i--
-		dAtA[i] = 0x32
+		dAtA[i] = 0x2a
 	}
-	if len(m.AccessModes) > 0 {
-		for iNdEx := len(m.AccessModes) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.AccessModes[iNdEx])
-			copy(dAtA[i:], m.AccessModes[iNdEx])
-			i = encodeVarintGenerated(dAtA, i, uint64(len(m.AccessModes[iNdEx])))
-			i--
-			dAtA[i] = 0x2a
-		}
+	if m.AccessMode != nil {
+		i -= len(*m.AccessMode)
+		copy(dAtA[i:], *m.AccessMode)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.AccessMode)))
+		i--
+		dAtA[i] = 0x22
 	}
 	i -= len(m.Message)
 	copy(dAtA[i:], m.Message)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Message)))
 	i--
-	dAtA[i] = 0x22
+	dAtA[i] = 0x1a
 	i -= len(m.Reason)
 	copy(dAtA[i:], m.Reason)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Reason)))
 	i--
-	dAtA[i] = 0x1a
+	dAtA[i] = 0x12
 	i -= len(m.Status)
 	copy(dAtA[i:], m.Status)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Status)))
-	i--
-	dAtA[i] = 0x12
-	i -= len(m.Name)
-	copy(dAtA[i:], m.Name)
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
 	i--
 	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
@@ -1628,7 +1665,7 @@ func (m *StorageClassList) Size() (n int) {
 	return n
 }
 
-func (m *StorageHealthCondition) Size() (n int) {
+func (m *StorageHealth) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -1636,17 +1673,30 @@ func (m *StorageHealthCondition) Size() (n int) {
 	_ = l
 	l = len(m.Name)
 	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.HealthConditions) > 0 {
+		for _, e := range m.HealthConditions {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *StorageHealthCondition) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
 	l = len(m.Status)
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.Reason)
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.Message)
 	n += 1 + l + sovGenerated(uint64(l))
-	if len(m.AccessModes) > 0 {
-		for _, s := range m.AccessModes {
-			l = len(s)
-			n += 1 + l + sovGenerated(uint64(l))
-		}
+	if m.AccessMode != nil {
+		l = len(*m.AccessMode)
+		n += 1 + l + sovGenerated(uint64(l))
 	}
 	if m.VolumeMode != nil {
 		l = len(*m.VolumeMode)
@@ -1945,9 +1995,9 @@ func (this *CSINodeStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
-	repeatedStringForStorageHealth := "[]StorageHealthCondition{"
+	repeatedStringForStorageHealth := "[]StorageHealth{"
 	for _, f := range this.StorageHealth {
-		repeatedStringForStorageHealth += strings.Replace(strings.Replace(f.String(), "StorageHealthCondition", "StorageHealthCondition", 1), `&`, ``, 1) + ","
+		repeatedStringForStorageHealth += strings.Replace(strings.Replace(f.String(), "StorageHealth", "StorageHealth", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForStorageHealth += "}"
 	s := strings.Join([]string{`&CSINodeStatus{`,
@@ -2034,16 +2084,31 @@ func (this *StorageClassList) String() string {
 	}, "")
 	return s
 }
+func (this *StorageHealth) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForHealthConditions := "[]StorageHealthCondition{"
+	for _, f := range this.HealthConditions {
+		repeatedStringForHealthConditions += strings.Replace(strings.Replace(f.String(), "StorageHealthCondition", "StorageHealthCondition", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForHealthConditions += "}"
+	s := strings.Join([]string{`&StorageHealth{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`HealthConditions:` + repeatedStringForHealthConditions + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *StorageHealthCondition) String() string {
 	if this == nil {
 		return "nil"
 	}
 	s := strings.Join([]string{`&StorageHealthCondition{`,
-		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
 		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
 		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
-		`AccessModes:` + fmt.Sprintf("%v", this.AccessModes) + `,`,
+		`AccessMode:` + valueToStringGenerated(this.AccessMode) + `,`,
 		`VolumeMode:` + valueToStringGenerated(this.VolumeMode) + `,`,
 		`LastTransitionTime:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.LastTransitionTime), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
 		`}`,
@@ -3342,7 +3407,7 @@ func (m *CSINodeStatus) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.StorageHealth = append(m.StorageHealth, StorageHealthCondition{})
+			m.StorageHealth = append(m.StorageHealth, StorageHealth{})
 			if err := m.StorageHealth[len(m.StorageHealth)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -4220,7 +4285,7 @@ func (m *StorageClassList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *StorageHealthCondition) Unmarshal(dAtA []byte) error {
+func (m *StorageHealth) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -4243,10 +4308,10 @@ func (m *StorageHealthCondition) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: StorageHealthCondition: wiretype end group for non-group")
+			return fmt.Errorf("proto: StorageHealth: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: StorageHealthCondition: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: StorageHealth: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -4283,6 +4348,90 @@ func (m *StorageHealthCondition) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HealthConditions", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.HealthConditions = append(m.HealthConditions, StorageHealthCondition{})
+			if err := m.HealthConditions[len(m.HealthConditions)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *StorageHealthCondition) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: StorageHealthCondition: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: StorageHealthCondition: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
 			}
 			var stringLen uint64
@@ -4313,7 +4462,7 @@ func (m *StorageHealthCondition) Unmarshal(dAtA []byte) error {
 			}
 			m.Status = StorageHealthStatusType(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 3:
+		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Reason", wireType)
 			}
@@ -4345,7 +4494,7 @@ func (m *StorageHealthCondition) Unmarshal(dAtA []byte) error {
 			}
 			m.Reason = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 4:
+		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Message", wireType)
 			}
@@ -4377,9 +4526,9 @@ func (m *StorageHealthCondition) Unmarshal(dAtA []byte) error {
 			}
 			m.Message = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 5:
+		case 4:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field AccessModes", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field AccessMode", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -4407,9 +4556,10 @@ func (m *StorageHealthCondition) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.AccessModes = append(m.AccessModes, k8s_io_api_core_v1.PersistentVolumeAccessMode(dAtA[iNdEx:postIndex]))
+			s := k8s_io_api_core_v1.PersistentVolumeAccessMode(dAtA[iNdEx:postIndex])
+			m.AccessMode = &s
 			iNdEx = postIndex
-		case 6:
+		case 5:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field VolumeMode", wireType)
 			}
@@ -4442,7 +4592,7 @@ func (m *StorageHealthCondition) Unmarshal(dAtA []byte) error {
 			s := k8s_io_api_core_v1.PersistentVolumeMode(dAtA[iNdEx:postIndex])
 			m.VolumeMode = &s
 			iNdEx = postIndex
-		case 7:
+		case 6:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field LastTransitionTime", wireType)
 			}

@@ -1236,6 +1236,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		storagev1.CSIStorageCapacityList{}.OpenAPIModelName():                                                           schema_k8sio_api_storage_v1_CSIStorageCapacityList(ref),
 		storagev1.StorageClass{}.OpenAPIModelName():                                                                     schema_k8sio_api_storage_v1_StorageClass(ref),
 		storagev1.StorageClassList{}.OpenAPIModelName():                                                                 schema_k8sio_api_storage_v1_StorageClassList(ref),
+		storagev1.StorageHealth{}.OpenAPIModelName():                                                                    schema_k8sio_api_storage_v1_StorageHealth(ref),
 		storagev1.StorageHealthCondition{}.OpenAPIModelName():                                                           schema_k8sio_api_storage_v1_StorageHealthCondition(ref),
 		storagev1.TokenRequest{}.OpenAPIModelName():                                                                     schema_k8sio_api_storage_v1_TokenRequest(ref),
 		storagev1.VolumeAttachment{}.OpenAPIModelName():                                                                 schema_k8sio_api_storage_v1_VolumeAttachment(ref),
@@ -1269,6 +1270,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		storagev1beta1.CSIStorageCapacityList{}.OpenAPIModelName():                                                      schema_k8sio_api_storage_v1beta1_CSIStorageCapacityList(ref),
 		storagev1beta1.StorageClass{}.OpenAPIModelName():                                                                schema_k8sio_api_storage_v1beta1_StorageClass(ref),
 		storagev1beta1.StorageClassList{}.OpenAPIModelName():                                                            schema_k8sio_api_storage_v1beta1_StorageClassList(ref),
+		storagev1beta1.StorageHealth{}.OpenAPIModelName():                                                               schema_k8sio_api_storage_v1beta1_StorageHealth(ref),
 		storagev1beta1.StorageHealthCondition{}.OpenAPIModelName():                                                      schema_k8sio_api_storage_v1beta1_StorageHealthCondition(ref),
 		storagev1beta1.TokenRequest{}.OpenAPIModelName():                                                                schema_k8sio_api_storage_v1beta1_TokenRequest(ref),
 		storagev1beta1.VolumeAttachment{}.OpenAPIModelName():                                                            schema_k8sio_api_storage_v1beta1_VolumeAttachment(ref),
@@ -57914,8 +57916,6 @@ func schema_k8sio_api_storage_v1_CSINodeStatus(ref common.ReferenceCallback) com
 							Extensions: spec.Extensions{
 								"x-kubernetes-list-map-keys": []interface{}{
 									"name",
-									"status",
-									"reason",
 								},
 								"x-kubernetes-list-type":       "map",
 								"x-kubernetes-patch-merge-key": "name",
@@ -57923,12 +57923,12 @@ func schema_k8sio_api_storage_v1_CSINodeStatus(ref common.ReferenceCallback) com
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "storageHealth is the set of backend health reports for each CSI driver registered on the node.",
+							Description: "storageHealth contains backend health reports for CSI drivers registered on the node.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(storagev1.StorageHealthCondition{}.OpenAPIModelName()),
+										Ref: ref(storagev1.StorageHealth{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -57938,7 +57938,7 @@ func schema_k8sio_api_storage_v1_CSINodeStatus(ref common.ReferenceCallback) com
 			},
 		},
 		Dependencies: []string{
-			storagev1.StorageHealthCondition{}.OpenAPIModelName()},
+			storagev1.StorageHealth{}.OpenAPIModelName()},
 	}
 }
 
@@ -58225,11 +58225,11 @@ func schema_k8sio_api_storage_v1_StorageClassList(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_storage_v1_StorageHealthCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1_StorageHealth(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "StorageHealthCondition represents an adverse health condition reported by a CSI driver for its storage backend on a node.",
+				Description: "StorageHealth contains storage backend health reported by a CSI driver on a node.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -58240,6 +58240,40 @@ func schema_k8sio_api_storage_v1_StorageHealthCondition(ref common.ReferenceCall
 							Format:      "",
 						},
 					},
+					"healthConditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "healthConditions are the adverse storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(storagev1.StorageHealthCondition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			storagev1.StorageHealthCondition{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_storage_v1_StorageHealthCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "StorageHealthCondition represents an adverse health condition reported by a CSI driver for its storage backend on a node.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status is the health status category. One of \"StorageUnreachable\", \"StorageDegraded\".\n\nPossible enum values:\n - `\"StorageDegraded\"` indicates the storage backend is functioning with reduced capability.\n - `\"StorageUnreachable\"` indicates the storage backend is unreachable.",
@@ -58251,7 +58285,7 @@ func schema_k8sio_api_storage_v1_StorageHealthCondition(ref common.ReferenceCall
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "reason is a brief CamelCase machine-parseable reason. Together with name and status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 characters.",
+							Description: "reason is a brief CamelCase machine-parseable reason. Maximum permitted length of a reason is 256 characters.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -58264,24 +58298,12 @@ func schema_k8sio_api_storage_v1_StorageHealthCondition(ref common.ReferenceCall
 							Format:      "",
 						},
 					},
-					"accessModes": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
+					"accessMode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "accessModes are the access modes affected. An empty list means all access modes are affected.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
-										Enum:   []interface{}{"ReadOnlyMany", "ReadWriteMany", "ReadWriteOnce", "ReadWriteOncePod"},
-									},
-								},
-							},
+							Description: "accessMode is the access mode affected. Nil means all access modes are affected.\n\nPossible enum values:\n - `\"ReadOnlyMany\"` can be mounted in read-only mode to many hosts\n - `\"ReadWriteMany\"` can be mounted in read/write mode to many hosts\n - `\"ReadWriteOnce\"` can be mounted in read/write mode to exactly 1 host\n - `\"ReadWriteOncePod\"` can be mounted in read/write mode to exactly 1 pod cannot be used in combination with other access modes",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"ReadOnlyMany", "ReadWriteMany", "ReadWriteOnce", "ReadWriteOncePod"},
 						},
 					},
 					"volumeMode": {
@@ -58299,7 +58321,7 @@ func schema_k8sio_api_storage_v1_StorageHealthCondition(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"name", "status", "reason"},
+				Required: []string{"status", "reason"},
 			},
 		},
 		Dependencies: []string{
@@ -59615,8 +59637,6 @@ func schema_k8sio_api_storage_v1beta1_CSINodeStatus(ref common.ReferenceCallback
 							Extensions: spec.Extensions{
 								"x-kubernetes-list-map-keys": []interface{}{
 									"name",
-									"status",
-									"reason",
 								},
 								"x-kubernetes-list-type":       "map",
 								"x-kubernetes-patch-merge-key": "name",
@@ -59624,12 +59644,12 @@ func schema_k8sio_api_storage_v1beta1_CSINodeStatus(ref common.ReferenceCallback
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "storageHealth is the set of backend health reports for each CSI driver registered on the node.",
+							Description: "storageHealth contains backend health reports for CSI drivers registered on the node.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(storagev1beta1.StorageHealthCondition{}.OpenAPIModelName()),
+										Ref: ref(storagev1beta1.StorageHealth{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -59639,7 +59659,7 @@ func schema_k8sio_api_storage_v1beta1_CSINodeStatus(ref common.ReferenceCallback
 			},
 		},
 		Dependencies: []string{
-			storagev1beta1.StorageHealthCondition{}.OpenAPIModelName()},
+			storagev1beta1.StorageHealth{}.OpenAPIModelName()},
 	}
 }
 
@@ -59925,11 +59945,11 @@ func schema_k8sio_api_storage_v1beta1_StorageClassList(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_storage_v1beta1_StorageHealthCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1beta1_StorageHealth(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "StorageHealthCondition represents an adverse health condition reported by a CSI driver for its storage backend on a node.",
+				Description: "StorageHealth contains storage backend health reported by a CSI driver on a node.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -59940,6 +59960,40 @@ func schema_k8sio_api_storage_v1beta1_StorageHealthCondition(ref common.Referenc
 							Format:      "",
 						},
 					},
+					"healthConditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "healthConditions are the adverse storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(storagev1beta1.StorageHealthCondition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			storagev1beta1.StorageHealthCondition{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_storage_v1beta1_StorageHealthCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "StorageHealthCondition represents an adverse health condition reported by a CSI driver for its storage backend on a node.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status is the health status category. One of \"StorageUnreachable\", \"StorageDegraded\".\n\nPossible enum values:\n - `\"StorageDegraded\"` indicates the storage backend is functioning with reduced capability.\n - `\"StorageUnreachable\"` indicates the storage backend is unreachable.",
@@ -59951,7 +60005,7 @@ func schema_k8sio_api_storage_v1beta1_StorageHealthCondition(ref common.Referenc
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "reason is a brief CamelCase machine-parseable reason. Together with name and status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 characters.",
+							Description: "reason is a brief CamelCase machine-parseable reason. Maximum permitted length of a reason is 256 characters.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -59964,24 +60018,12 @@ func schema_k8sio_api_storage_v1beta1_StorageHealthCondition(ref common.Referenc
 							Format:      "",
 						},
 					},
-					"accessModes": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
+					"accessMode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "accessModes are the access modes affected. An empty list means all access modes are affected.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
-										Enum:   []interface{}{"ReadOnlyMany", "ReadWriteMany", "ReadWriteOnce", "ReadWriteOncePod"},
-									},
-								},
-							},
+							Description: "accessMode is the access mode affected. Nil means all access modes are affected.\n\nPossible enum values:\n - `\"ReadOnlyMany\"` can be mounted in read-only mode to many hosts\n - `\"ReadWriteMany\"` can be mounted in read/write mode to many hosts\n - `\"ReadWriteOnce\"` can be mounted in read/write mode to exactly 1 host\n - `\"ReadWriteOncePod\"` can be mounted in read/write mode to exactly 1 pod cannot be used in combination with other access modes",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"ReadOnlyMany", "ReadWriteMany", "ReadWriteOnce", "ReadWriteOncePod"},
 						},
 					},
 					"volumeMode": {
@@ -59999,7 +60041,7 @@ func schema_k8sio_api_storage_v1beta1_StorageHealthCondition(ref common.Referenc
 						},
 					},
 				},
-				Required: []string{"name", "status", "reason"},
+				Required: []string{"status", "reason"},
 			},
 		},
 		Dependencies: []string{

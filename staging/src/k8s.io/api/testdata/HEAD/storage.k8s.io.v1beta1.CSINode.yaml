@@ -42,11 +42,11 @@ spec:
     - topologyKeysValue
 status:
   storageHealth:
-  - accessModes:
-    - accessModesValue
-    lastTransitionTime: "2007-01-01T01:01:01Z"
-    message: messageValue
+  - healthConditions:
+    - accessMode: accessModeValue
+      lastTransitionTime: "2006-01-01T01:01:01Z"
+      message: messageValue
+      reason: reasonValue
+      status: statusValue
+      volumeMode: volumeModeValue
     name: nameValue
-    reason: reasonValue
-    status: statusValue
-    volumeMode: volumeModeValue

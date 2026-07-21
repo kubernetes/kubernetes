@@ -30,20 +30,17 @@ import (
 // StorageHealthCondition represents an adverse health condition reported
 // by a CSI driver for its storage backend on a node.
 type StorageHealthConditionApplyConfiguration struct {
-	// name is the CSI driver name, matching CSINodeDriver.name.
-	Name *string `json:"name,omitempty"`
 	// status is the health status category.
 	// One of "StorageUnreachable", "StorageDegraded".
 	Status *storagev1.StorageHealthStatusType `json:"status,omitempty"`
 	// reason is a brief CamelCase machine-parseable reason.
-	// Together with name and status it forms the unique identity of a condition entry.
 	// Maximum permitted length of a reason is 256 characters.
 	Reason *string `json:"reason,omitempty"`
 	// message is a human-readable description.
 	// Maximum permitted length of a message is 1024 characters.
 	Message *string `json:"message,omitempty"`
-	// accessModes are the access modes affected. An empty list means all access modes are affected.
-	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
+	// accessMode is the access mode affected. Nil means all access modes are affected.
+	AccessMode *corev1.PersistentVolumeAccessMode `json:"accessMode,omitempty"`
 	// volumeMode is the volume mode affected. Nil means both are affected.
 	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty"`
 	// lastTransitionTime is when this condition first appeared at its current state.
@@ -54,14 +51,6 @@ type StorageHealthConditionApplyConfiguration struct {
 // apply.
 func StorageHealthCondition() *StorageHealthConditionApplyConfiguration {
 	return &StorageHealthConditionApplyConfiguration{}
-}
-
-// WithName sets the Name field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Name field is set to the value of the last call.
-func (b *StorageHealthConditionApplyConfiguration) WithName(value string) *StorageHealthConditionApplyConfiguration {
-	b.Name = &value
-	return b
 }
 
 // WithStatus sets the Status field in the declarative configuration to the given value
@@ -88,13 +77,11 @@ func (b *StorageHealthConditionApplyConfiguration) WithMessage(value string) *St
 	return b
 }
 
-// WithAccessModes adds the given value to the AccessModes field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the AccessModes field.
-func (b *StorageHealthConditionApplyConfiguration) WithAccessModes(values ...corev1.PersistentVolumeAccessMode) *StorageHealthConditionApplyConfiguration {
-	for i := range values {
-		b.AccessModes = append(b.AccessModes, values[i])
-	}
+// WithAccessMode sets the AccessMode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AccessMode field is set to the value of the last call.
+func (b *StorageHealthConditionApplyConfiguration) WithAccessMode(value corev1.PersistentVolumeAccessMode) *StorageHealthConditionApplyConfiguration {
+	b.AccessMode = &value
 	return b
 }
 

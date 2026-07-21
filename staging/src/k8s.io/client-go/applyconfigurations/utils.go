@@ -1986,6 +1986,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsstoragev1.CSIStorageCapacityApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("StorageClass"):
 		return &applyconfigurationsstoragev1.StorageClassApplyConfiguration{}
+	case storagev1.SchemeGroupVersion.WithKind("StorageHealth"):
+		return &applyconfigurationsstoragev1.StorageHealthApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("StorageHealthCondition"):
 		return &applyconfigurationsstoragev1.StorageHealthConditionApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("TokenRequest"):
@@ -2038,6 +2040,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsstoragev1beta1.CSIStorageCapacityApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("StorageClass"):
 		return &applyconfigurationsstoragev1beta1.StorageClassApplyConfiguration{}
+	case storagev1beta1.SchemeGroupVersion.WithKind("StorageHealth"):
+		return &applyconfigurationsstoragev1beta1.StorageHealthApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("StorageHealthCondition"):
 		return &applyconfigurationsstoragev1beta1.StorageHealthConditionApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("TokenRequest"):
