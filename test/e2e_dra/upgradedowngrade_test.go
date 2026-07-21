@@ -267,6 +267,7 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 	var subTests = map[string]struct {
 		test            initialTestFunc
 		driverResources map[string]resourceslice.DriverResources
+		configureDriver func(*drautils.Driver)
 	}{
 		"core-dra": {
 			test:            coreDRA,
@@ -290,6 +291,14 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 			test:            extendedResourceUpgradeDowngrade(resourceTypeImplicit),
 			driverResources: extendedResourcesDriverResources(nodes),
 		},
+		"pool-name-field-selector-fallback": {
+			test:            poolNameFieldSelectorFallback,
+			driverResources: poolNameFieldSelectorFallbackResources(nodes),
+			configureDriver: func(d *drautils.Driver) {
+				d.ReconcilePoolWithName = poolNameFieldSelectorFallbackPool
+				d.UsePrivilegedClient = true
+			},
+		},
 	}
 
 	// Create a driver and builder for each sub-test. Opening sockets locally
@@ -302,6 +311,9 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 		d := drautils.NewDriverInstance(tCtx)
 		d.SetNameSuffix(tCtx, name)
 		d.IsLocal = true
+		if def.configureDriver != nil {
+			def.configureDriver(d)
+		}
 		d.Run(tCtx, "/var/lib/kubelet", nodes, def.driverResources)
 		b := drautils.NewBuilderNow(tCtx, d)
 		b.SkipCleanup = true
