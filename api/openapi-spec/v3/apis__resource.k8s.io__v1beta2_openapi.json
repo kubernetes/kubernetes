@@ -173,7 +173,7 @@
         "type": "object"
       },
       "io.k8s.api.resource.v1beta2.CapacityRequestPolicy": {
-        "description": "CapacityRequestPolicy defines how requests consume device capacity.\n\nMust not set more than one ValidRequestValues.",
+        "description": "CapacityRequestPolicy defines how requests consume device capacity and how devices consume counters.\n\nIt is used by DeviceCapacity.RequestPolicy and Counter.ConsumptionPolicy. For counter consumption, capacity means the available counter value, and a request means the device's required counter amount. Both uses share default selection, rounding and range arithmetic, including the DRAFractionalCapacityRange feature gate and the rules described by CapacityRequestPolicyRange.\n\nMust not set more than one ValidRequestValues.",
         "properties": {
           "default": {
             "allOf": [
@@ -249,8 +249,16 @@
         "type": "object"
       },
       "io.k8s.api.resource.v1beta2.Counter": {
-        "description": "Counter describes a quantity associated with a device.",
+        "description": "Counter describes a quantity that is available in a counter set.",
         "properties": {
+          "consumptionPolicy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.CapacityRequestPolicy"
+              }
+            ],
+            "description": "consumptionPolicy defines how devices consume this counter. The consumed amount is rounded up according to the policy and must satisfy its limits.\n\nIf unset, devices can consume any amount up to the available counter value. If and only if the required amount is unspecified, then the policy default is used (if set) or the full counter value (if not set)."
+          },
           "value": {
             "allOf": [
               {
@@ -263,6 +271,28 @@
         "required": [
           "value"
         ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1beta2.CounterRequirement": {
+        "description": "CounterRequirement describes how much of a counter a device consumes.",
+        "properties": {
+          "value": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
+            "description": "value defines the statically consumed amount.\n\nExactly one of value or valueFrom must be specified."
+          },
+          "valueFrom": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.CounterValueFrom"
+              }
+            ],
+            "description": "valueFrom looks up the requested capacity value in a ResourceClaim via the capacity name. That value is then consumed from the counter instead of using a static value defined by the driver."
+          }
+        },
         "type": "object"
       },
       "io.k8s.api.resource.v1beta2.CounterSet": {
@@ -284,6 +314,42 @@
         "required": [
           "name",
           "counters"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1beta2.CounterSetConsumption": {
+        "description": "CounterSetConsumption records one allocation's resolved valueFrom consumption from one counter set. The containing DeviceRequestAllocationResult identifies the allocated device and its pool.\n\nFor example, two allocations sharing a device may consume 2Gi and 3Gi from a \"memory\" counter. Each result records only its own amount; together they consume 5Gi. Releasing the first allocation leaves 3Gi charged. If the device also consumes one fixed \"slots\" counter, that charge is accounted for separately from current ResourceSlices. With unchanged slice definitions, the fixed charge remains until the last non-admin allocation is released.",
+        "properties": {
+          "counterSet": {
+            "default": "",
+            "description": "counterSet identifies a counter set in the pool named by the containing allocation result.",
+            "type": "string"
+          },
+          "counters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+            },
+            "description": "counters records this allocation's resolved quantity for each counter in the set. The map contains at most 32 counters; each quantity must be non-negative.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "counterSet",
+          "counters"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1beta2.CounterValueFrom": {
+        "description": "CounterValueFrom looks up the requested capacity value in a ResourceClaim via the capacity name.",
+        "properties": {
+          "capacityName": {
+            "default": "",
+            "description": "capacityName is the name of a device capacity. This is the same name that users set in capacity requests.\n\nIf this name has no domain prefix, the driver name from the ResourceSlice is used as the domain when matching against capacity requests.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capacityName"
         ],
         "type": "object"
       },
@@ -722,7 +788,7 @@
           },
           "counters": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.Counter"
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.CounterRequirement"
             },
             "description": "counters defines the counters that will be consumed by the device.\n\nThe maximum number of counters is 32.",
             "type": "object"
@@ -813,6 +879,17 @@
             },
             "description": "consumedCapacity tracks the amount of capacity consumed per device as part of the claim request. The consumed amount may differ from the requested amount: it is rounded up to the nearest valid value based on the device’s requestPolicy if applicable (i.e., may not be less than the requested amount).\n\nThe total consumed capacity for each device must not exceed the DeviceCapacity's Value.\n\nThis field is populated only for devices that allow multiple allocations. All capacity entries are included, even if the consumed amount is zero. The domain prefix in the capacity name may be omitted if it is the same as the driver name.\n\nConsumedCapacity may have at most 32 entries. The values must not be negative.",
             "type": "object"
+          },
+          "consumedCounters": {
+            "description": "consumedCounters records resolved valueFrom consumption for the single device identified by this allocation result, grouped by counter set in that device's pool. Each result records only its own request-dependent amounts. The scheduler sums these amounts across non-admin allocation results, including multiple shares of the same device. Releasing one allocation releases its recorded amounts without changing those of other allocations.\n\nQuantities are resolved at allocation time from the matching claim capacity requests, including consumptionPolicy rounding. They may therefore be greater than the requested amounts. If the claim omits a mapped capacity request, consumption uses the shared counter's policy default, or its full value when no default is defined. All resolved valueFrom counters are included, even when their quantity is zero.\n\nThe recorded amounts and counter-set references remain authoritative if ResourceSlice mappings, defaults, or policies change. A mapping change does not move an existing allocation's consumption to a different counter set. DRA drivers can use these amounts without access to ResourceSlices.\n\nFixed counter consumption is not recorded here. The scheduler determines fixed consumption from current ResourceSlices, including consumptionPolicy rounding, and counts it once per (driver, pool, device) while any non-admin allocation of that device remains. Current fixed consumption is added to the recorded request-dependent consumption; changing a counter from valueFrom to value does not replace the recorded amounts.\n\nCurrent shared-counter values still define the total budget. Reducing a counter below its recorded consumption prevents further counter consumption; existing allocation results are not changed. If an allocated device's definition is missing, or a recorded positive amount refers to a missing counter set or counter, further counter-consuming allocations from that pool are blocked. A recorded zero amount does not require a current counter-set or counter definition.\n\nThis field is populated only for non-admin allocations when DRASharedConsumableCapacity is enabled. An absent field means that no request-dependent consumption was recorded, including for allocations made before the feature was enabled. If an existing allocation has no recorded consumption but its current device definition uses valueFrom, further counter-consuming allocations from that pool are blocked because the allocation-time amount is unknown.\n\nThe list contains at most 2 counter sets, keyed by counterSet. Its order has no correspondence to the order of counter sets or devices in ResourceSlices.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.CounterSetConsumption"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "counterSet"
+            ],
+            "x-kubernetes-list-type": "map"
           },
           "device": {
             "default": "",

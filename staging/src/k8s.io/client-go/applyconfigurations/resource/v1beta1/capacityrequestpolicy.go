@@ -25,7 +25,15 @@ import (
 // CapacityRequestPolicyApplyConfiguration represents a declarative configuration of the CapacityRequestPolicy type for use
 // with apply.
 //
-// CapacityRequestPolicy defines how requests consume device capacity.
+// CapacityRequestPolicy defines how requests consume device capacity and
+// how devices consume counters.
+//
+// It is used by DeviceCapacity.RequestPolicy and Counter.ConsumptionPolicy.
+// For counter consumption, capacity means the available counter value,
+// and a request means the device's required counter amount.
+// Both uses share default selection, rounding and range arithmetic,
+// including the DRAFractionalCapacityRange feature gate and the rules
+// described by CapacityRequestPolicyRange.
 //
 // Must not set more than one ValidRequestValues.
 type CapacityRequestPolicyApplyConfiguration struct {

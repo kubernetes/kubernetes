@@ -62,8 +62,23 @@ func (in Counter) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CounterRequirement) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta1.CounterRequirement"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CounterSet) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1beta1.CounterSet"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CounterSetConsumption) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta1.CounterSetConsumption"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CounterValueFrom) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1beta1.CounterValueFrom"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
