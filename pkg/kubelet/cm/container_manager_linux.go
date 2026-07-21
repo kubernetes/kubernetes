@@ -1056,7 +1056,7 @@ func (cm *containerManagerImpl) GetAllocatableMemory(logger klog.Logger) []*podr
 	return containerMemoryFromBlock(cm.memoryManager.GetAllocatableMemory(logger))
 }
 
-func (cm *containerManagerImpl) GetPodMemory(logger klog.Logger, podUID string) []*podresourcesapi.ContainerMemory {
+func (cm *containerManagerImpl) GetPodMemory(_ klog.Logger, podUID string) []*podresourcesapi.ContainerMemory {
 	if cm.memoryManager == nil {
 		return []*podresourcesapi.ContainerMemory{}
 	}

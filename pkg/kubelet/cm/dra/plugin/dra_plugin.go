@@ -89,7 +89,7 @@ func (p *DRAPlugin) DriverName() string {
 func (p *DRAPlugin) NodePrepareResources(
 	ctx context.Context,
 	req *drapbv1.NodePrepareResourcesRequest,
-	opts ...grpc.CallOption,
+	_ ...grpc.CallOption,
 ) (*drapbv1.NodePrepareResourcesResponse, error) {
 	logger := klog.FromContext(ctx).WithName("dra-plugin")
 	logger = klog.LoggerWithValues(logger, "driverName", p.driverName, "endpoint", p.endpoint)
@@ -120,7 +120,7 @@ func (p *DRAPlugin) NodePrepareResources(
 func (p *DRAPlugin) NodeUnprepareResources(
 	ctx context.Context,
 	req *drapbv1.NodeUnprepareResourcesRequest,
-	opts ...grpc.CallOption,
+	_ ...grpc.CallOption,
 ) (*drapbv1.NodeUnprepareResourcesResponse, error) {
 	logger := klog.FromContext(ctx).WithName("dra-plugin")
 	logger = klog.LoggerWithValues(logger, "driverName", p.driverName, "endpoint", p.endpoint)

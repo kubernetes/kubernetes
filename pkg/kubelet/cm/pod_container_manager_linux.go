@@ -361,7 +361,7 @@ func (m *podContainerManagerNoop) GetAllPodsFromCgroups(_ klog.Logger) (map[type
 	return nil, nil
 }
 
-func (m *podContainerManagerNoop) IsPodCgroup(cgroupfs string) (bool, types.UID) {
+func (m *podContainerManagerNoop) IsPodCgroup(_ string) (bool, types.UID) {
 	return false, types.UID("")
 }
 
