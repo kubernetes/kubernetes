@@ -463,7 +463,7 @@ func Test_isSchedulableAfterPodGroupUpdated(t *testing.T) {
 			pod:                        st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
 			oldPodGroup:                st.MakePodGroup().Namespace("ns1").Name("pg").BasicPolicy().WorkloadRef("t", "w").Obj(),
 			newPodGroup:                st.MakePodGroup().Namespace("ns1").Name("pg").BasicPolicy().Obj(),
-			expectedHint:               fwk.Queue,
+			expectedHint:               fwk.QueueSkip,
 			isCompositePodGroupEnabled: true,
 		},
 		{
@@ -471,7 +471,7 @@ func Test_isSchedulableAfterPodGroupUpdated(t *testing.T) {
 			pod:                        st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
 			oldPodGroup:                st.MakePodGroup().Namespace("ns1").Name("pg").BasicPolicy().WorkloadRef("t", "w").Obj(),
 			newPodGroup:                st.MakePodGroup().Namespace("ns1").Name("pg").BasicPolicy().Obj(),
-			expectedHint:               fwk.Queue,
+			expectedHint:               fwk.QueueSkip,
 			isCompositePodGroupEnabled: false,
 		},
 		{
