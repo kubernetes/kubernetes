@@ -4089,6 +4089,38 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: pod_deferred_resize_duration_seconds
+  subsystem: kubelet
+  help: 'Duration in seconds that a pod resize remains deferred before completion.
+    Label ''priority_bucket'' classifies the pod priority (system-critical: >=2000000000,
+    high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1,
+    very-low: <=-1000, unknown: nil pod). Label ''resolution'' describes how the deferred
+    resize was resolved (accepted, reverted, terminated).'
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - priority_bucket
+  - resolution
+  buckets:
+  - 5
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
+  - 90
+  - 120
+  - 150
+  - 180
+  - 300
+  - 600
+  - 1200
+  - 1800
+  - 3600
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: pod_in_progress_resizes
   subsystem: kubelet
   help: Number of in-progress resizes for pods.
@@ -4109,10 +4141,14 @@
     endpoint: /metrics
 - name: pod_pending_resizes
   subsystem: kubelet
-  help: Number of pending resizes for pods.
+  help: 'Number of pending resizes for pods. Label ''priority_bucket'' classifies
+    the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium:
+    1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod).
+    Label ''reason'' describes the state (deferred, infeasible).'
   type: Gauge
   stabilityLevel: ALPHA
   labels:
+  - priority_bucket
   - reason
   componentEndpoints:
   - component: kubelet

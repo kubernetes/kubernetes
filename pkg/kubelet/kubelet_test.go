@@ -5063,7 +5063,7 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 			kubelet.podManager.AddPod(tc.oldPod)
 			kubelet.allocationManager.PushPendingResize(logger, pendingResizeDesired.UID)
 
-			kubelet.statusManager.ClearPodResizePendingCondition(pendingResizeDesired.UID)
+			kubelet.statusManager.ClearPodResizePendingCondition(pendingResizeDesired.UID, metrics.DeferredResizeResolutionAccepted)
 			kubelet.HandlePodReconcile(tCtx, []*v1.Pod{tc.newPod})
 			require.Equal(t, tc.shouldRetryPendingResize, kubelet.statusManager.IsPodResizeDeferred(pendingResizeDesired.UID))
 
