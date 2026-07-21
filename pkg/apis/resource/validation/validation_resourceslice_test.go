@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/core"
 	resourceapi "k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
@@ -52,16 +53,31 @@ func testCapacity() map[resourceapi.QualifiedName]resourceapi.DeviceCapacity {
 	}
 }
 
-func testCounters() map[string]resourceapi.Counter {
+func testSharedCounters() map[string]resourceapi.Counter {
 	return map[string]resourceapi.Counter{
 		"memory": {Value: resource.MustParse("1Gi")},
 	}
 }
 
-func testMultipleCounters(count int) map[string]resourceapi.Counter {
+func testCounters() map[string]resourceapi.CounterRequirement {
+	return map[string]resourceapi.CounterRequirement{
+		"memory": {Value: ptr.To(resource.MustParse("1Gi"))},
+	}
+}
+
+func testMultipleSharedCounters(count int) map[string]resourceapi.Counter {
 	counters := make(map[string]resourceapi.Counter)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		counters[fmt.Sprintf("memory-%d", i)] = resourceapi.Counter{Value: resource.MustParse("1Gi")}
+	}
+	return counters
+}
+
+func testMultipleConsumeCounters(count int) map[string]resourceapi.CounterRequirement {
+	counters := make(map[string]resourceapi.CounterRequirement)
+	for i := range count {
+		quantity := resource.MustParse("1Gi")
+		counters[fmt.Sprintf("memory-%d", i)] = resourceapi.CounterRequirement{Value: &quantity}
 	}
 	return counters
 }
@@ -97,7 +113,7 @@ func testResourceSliceWithSharedCounters(name, poolName, driverName string, numC
 	for i := 0; i < numCounterSets; i++ {
 		counterSet := resourceapi.CounterSet{
 			Name:     fmt.Sprintf("counterset-%d", i),
-			Counters: testCounters(),
+			Counters: testSharedCounters(),
 		}
 		slice.Spec.SharedCounters = append(slice.Spec.SharedCounters, counterSet)
 	}
@@ -245,6 +261,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		wantFailures                                 field.ErrorList
 		consumableCapacityFeatureGate                bool
 		fractionalCapacityRangeFeatureGate           bool
+		sharedConsumableCapacityFeatureGate          bool
 		enableDRANodeAllocatableResourcesFeatureGate bool
 	}{
 		"good": {
@@ -565,7 +582,7 @@ func TestValidateResourceSlice(t *testing.T) {
 				slice.Spec.SharedCounters = []resourceapi.CounterSet{
 					{
 						Name:     "counterset",
-						Counters: testCounters(),
+						Counters: testSharedCounters(),
 					},
 				}
 				return slice
@@ -1410,7 +1427,7 @@ func TestValidateResourceSlice(t *testing.T) {
 				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
 				slice.Spec.SharedCounters = []resourceapi.CounterSet{
 					{
-						Counters: testCounters(),
+						Counters: testSharedCounters(),
 					},
 				}
 				return slice
@@ -1425,7 +1442,7 @@ func TestValidateResourceSlice(t *testing.T) {
 				slice.Spec.SharedCounters = []resourceapi.CounterSet{
 					{
 						Name:     badName,
-						Counters: testCounters(),
+						Counters: testSharedCounters(),
 					},
 				}
 				return slice
@@ -1471,11 +1488,11 @@ func TestValidateResourceSlice(t *testing.T) {
 				slice.Spec.SharedCounters = []resourceapi.CounterSet{
 					{
 						Name:     goodName,
-						Counters: testCounters(),
+						Counters: testSharedCounters(),
 					},
 					{
 						Name:     goodName,
-						Counters: testCounters(),
+						Counters: testSharedCounters(),
 					},
 				}
 				return slice
@@ -1501,7 +1518,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		"max-counters-in-counter-set": {
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
-				slice.Spec.SharedCounters[0].Counters = testMultipleCounters(resourceapi.ResourceSliceMaxCountersPerCounterSet)
+				slice.Spec.SharedCounters[0].Counters = testMultipleSharedCounters(resourceapi.ResourceSliceMaxCountersPerCounterSet)
 				return slice
 			}(),
 		},
@@ -1511,9 +1528,66 @@ func TestValidateResourceSlice(t *testing.T) {
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
-				slice.Spec.SharedCounters[0].Counters = testMultipleCounters(resourceapi.ResourceSliceMaxCountersPerCounterSet + 1)
+				slice.Spec.SharedCounters[0].Counters = testMultipleSharedCounters(resourceapi.ResourceSliceMaxCountersPerCounterSet + 1)
 				return slice
 			}(),
+		},
+		"good-shared-counter-consumption-policy": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
+				counter := slice.Spec.SharedCounters[0].Counters["memory"]
+				counter.Value = resource.MustParse("8Gi")
+				counter.ConsumptionPolicy = &resourceapi.CapacityRequestPolicy{
+					Default: ptr.To(resource.MustParse("1Gi")),
+					ValidRange: &resourceapi.CapacityRequestPolicyRange{
+						Min:  ptr.To(resource.MustParse("1Gi")),
+						Max:  ptr.To(resource.MustParse("8Gi")),
+						Step: ptr.To(resource.MustParse("1Gi")),
+					},
+				}
+				slice.Spec.SharedCounters[0].Counters["memory"] = counter
+				return slice
+			}(),
+			consumableCapacityFeatureGate:       true,
+			sharedConsumableCapacityFeatureGate: true,
+		},
+		"shared-counter-consumption-policy-exceeds-implicit-zero-value": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("counters").Key("memory").Child("consumptionPolicy", "validRange", "min"), "1Gi", "min is larger than capacity value: 0"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters[0].Counters["memory"] = resourceapi.Counter{
+					ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{
+						Default: ptr.To(resource.MustParse("1Gi")),
+						ValidRange: &resourceapi.CapacityRequestPolicyRange{
+							Min: ptr.To(resource.MustParse("1Gi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			consumableCapacityFeatureGate:       true,
+			sharedConsumableCapacityFeatureGate: true,
+		},
+		"shared-counter-consumption-policy-invalid-with-value-present": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "sharedCounters").Index(0).Child("counters").Key("memory").Child("consumptionPolicy").Child("default"), "required when validRange is defined"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
+				counter := slice.Spec.SharedCounters[0].Counters["memory"]
+				counter.Value = resource.MustParse("8Gi")
+				counter.ConsumptionPolicy = &resourceapi.CapacityRequestPolicy{
+					ValidRange: &resourceapi.CapacityRequestPolicyRange{
+						Min: ptr.To(resource.MustParse("1Gi")),
+					},
+				}
+				slice.Spec.SharedCounters[0].Counters["memory"] = counter
+				return slice
+			}(),
+			consumableCapacityFeatureGate:       true,
+			sharedConsumableCapacityFeatureGate: true,
 		},
 		"missing-name-counterset-consumes-counter": {
 			wantFailures: field.ErrorList{
@@ -1605,7 +1679,7 @@ func TestValidateResourceSlice(t *testing.T) {
 				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
 					{
 						CounterSet: "counterset-0",
-						Counters:   testMultipleCounters(resourceapi.ResourceSliceMaxCountersPerDeviceCounterConsumption),
+						Counters:   testMultipleConsumeCounters(resourceapi.ResourceSliceMaxCountersPerDeviceCounterConsumption),
 					},
 				}
 				return slice
@@ -1622,11 +1696,52 @@ func TestValidateResourceSlice(t *testing.T) {
 				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
 					{
 						CounterSet: "counterset-0",
-						Counters:   testMultipleCounters(resourceapi.ResourceSliceMaxCountersPerDeviceCounterConsumption + 1),
+						Counters:   testMultipleConsumeCounters(resourceapi.ResourceSliceMaxCountersPerDeviceCounterConsumption + 1),
 					},
 				}
 				return slice
 			}(),
+		},
+		"good-consumes-counter-value-from": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet: "counterset-0",
+						Counters: map[string]resourceapi.CounterRequirement{
+							"memory": {
+								ValueFrom: &resourceapi.CounterValueFrom{CapacityName: "dra.example.com/bandwidth"},
+							},
+						},
+					},
+				}
+				return slice
+			}(),
+			consumableCapacityFeatureGate:       true,
+			sharedConsumableCapacityFeatureGate: true,
+		},
+		"consumes-counter-value-from-capacity-name-invalid": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters").Key("memory").Child("valueFrom", "capacityName"), "", "the domain must not be empty"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet: "counterset-0",
+						Counters: map[string]resourceapi.CounterRequirement{
+							"memory": {
+								ValueFrom: &resourceapi.CounterValueFrom{
+									CapacityName: "/memory",
+								},
+							},
+						},
+					},
+				}
+				return slice
+			}(),
+			consumableCapacityFeatureGate:       true,
+			sharedConsumableCapacityFeatureGate: true,
 		},
 		"max-number-of-devices-with-consumes-counters": {
 			slice: func() *resourceapi.ResourceSlice {
@@ -2124,6 +2239,7 @@ func TestValidateResourceSlice(t *testing.T) {
 				features.DRANodeAllocatableResources: scenario.enableDRANodeAllocatableResourcesFeatureGate,
 				features.DRAConsumableCapacity:       scenario.consumableCapacityFeatureGate,
 				features.DRAFractionalCapacityRange:  scenario.fractionalCapacityRangeFeatureGate,
+				features.DRASharedConsumableCapacity: scenario.sharedConsumableCapacityFeatureGate,
 			})
 			errs := ValidateResourceSlice(scenario.slice)
 			assertFailures(t, scenario.wantFailures, errs)
@@ -2578,12 +2694,31 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 	}
 }
 
+// TestSharedCounterValueDefaults checks that omitted budgets retain their implicit zero value across API versions.
+func TestSharedCounterValueDefaults(t *testing.T) {
+	for _, apiVersion := range []string{"v1", "v1beta1", "v1beta2"} {
+		for _, counterJSON := range []string{`{}`, `{"value":null}`, `{"value":"0"}`} {
+			t.Run(apiVersion+"/"+counterJSON, func(t *testing.T) {
+				data := fmt.Appendf(nil, `{"apiVersion":"resource.k8s.io/%s","kind":"ResourceSlice","spec":{"sharedCounters":[{"name":"set","counters":{"memory":%s}}]}}`, apiVersion, counterJSON)
+				obj, _, err := legacyscheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				counter := obj.(*resourceapi.ResourceSlice).Spec.SharedCounters[0].Counters["memory"]
+				if !counter.Value.IsZero() {
+					t.Fatalf("expected zero budget, got %s", counter.Value.String())
+				}
+			})
+		}
+	}
+}
+
 func createSharedCounters(count int) []resourceapi.CounterSet {
 	sharedCounters := make([]resourceapi.CounterSet, count)
 	for i := 0; i < count; i++ {
 		sharedCounters[i] = resourceapi.CounterSet{
 			Name:     fmt.Sprintf("counterset-%d", i),
-			Counters: testCounters(),
+			Counters: testSharedCounters(),
 		}
 	}
 	return sharedCounters

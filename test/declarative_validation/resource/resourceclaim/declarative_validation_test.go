@@ -726,7 +726,7 @@ func tweakConstraintRequests(count int) func(*resource.ResourceClaim) {
 			rc.Spec.Devices.Constraints = append(rc.Spec.Devices.Constraints, mkDeviceConstraint())
 		}
 		rc.Spec.Devices.Constraints[0].Requests = []string{}
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rc.Spec.Devices.Constraints[0].Requests = append(rc.Spec.Devices.Constraints[0].Requests, fmt.Sprintf("req-%d", i))
 		}
 	}
@@ -739,7 +739,7 @@ func tweakConfigRequests(count int) func(*resource.ResourceClaim) {
 			rc.Spec.Devices.Config = append(rc.Spec.Devices.Config, mkDeviceClaimConfiguration())
 		}
 		rc.Spec.Devices.Config[0].Requests = []string{}
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rc.Spec.Devices.Config[0].Requests = append(rc.Spec.Devices.Config[0].Requests, fmt.Sprintf("req-%d", i))
 		}
 	}
@@ -1023,6 +1023,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 	driverPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("driver")
 	configOpaqueDriverPath := field.NewPath("status", "allocation", "devices", "config").Index(0).Child("opaque", "driver")
 	resultTolerationPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("tolerations").Index(0)
+	consumedCountersPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("consumedCounters")
 	skipNodeOperationsPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("skipNodeOperations")
 
 	testCases := map[string]struct {
@@ -1303,6 +1304,94 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 			),
 			expectedErrs: field.ErrorList{
 				field.TooMany(field.NewPath("status", "allocation", "devices", "results"), 33, 32).WithOrigin("maxItems").MarkBeta(),
+			},
+		},
+		"valid status.allocation.devices.results[*].consumedCounters, empty": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationResultConsumedCounters(0)),
+		},
+		"valid status.allocation.devices.results[*].consumedCounters, max items": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationResultConsumedCounters(2)),
+		},
+		"valid status.allocation.devices.results[*].consumedCounters, unchanged oversized list": {
+			old:    mkResourceClaimWithStatus(tweakStatusAllocationResultConsumedCounters(3)),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationResultConsumedCounters(3)),
+		},
+		"valid status.allocation.devices.results[*].consumedCounters, unchanged duplicates": {
+			old:    mkResourceClaimWithStatus(tweakStatusAllocationResultDuplicateCounters()),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationResultDuplicateCounters()),
+		},
+		"invalid status.allocation.devices.results[*].consumedCounters, too many": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusAllocationResultConsumedCounters(3),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooMany(consumedCountersPath, 3, 2).WithOrigin("maxItems"),
+			},
+		},
+		"invalid status.allocation.devices.results[*].consumedCounters, duplicate counter set": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusAllocationResultDuplicateCounters(),
+			),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(consumedCountersPath.Index(1), "counterset-0"),
+			},
+		},
+		"invalid status.allocation.devices.results[*].consumedCounters, missing counter set": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationResultCounterSet("")),
+			expectedErrs: field.ErrorList{
+				field.Required(consumedCountersPath.Index(0).Child("counterSet"), ""),
+			},
+		},
+		"valid status.allocation.devices.results[*].consumedCounters, numeric counter set": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationResultCounterSet("0")),
+		},
+		"valid status.allocation.devices.results[*].consumedCounters, counter set at max length": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationResultCounterSet(strings.Repeat("a", 63))),
+		},
+		"invalid status.allocation.devices.results[*].consumedCounters, counter set too long": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationResultCounterSet(strings.Repeat("a", 64))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(consumedCountersPath.Index(0).Child("counterSet"), strings.Repeat("a", 64), "").WithOrigin("format=k8s-short-name"),
+			},
+		},
+		"invalid status.allocation.devices.results[*].consumedCounters, uppercase counter set": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationResultCounterSet("Set")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(consumedCountersPath.Index(0).Child("counterSet"), "Set", "").WithOrigin("format=k8s-short-name"),
+			},
+		},
+		"invalid status.allocation.devices.results[*].consumedCounters, dotted counter set": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationResultCounterSet("set.0")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(consumedCountersPath.Index(0).Child("counterSet"), "set.0", "").WithOrigin("format=k8s-short-name"),
+			},
+		},
+		"valid status.allocation.devices.results[*].consumedCounters, unchanged invalid counter set": {
+			old:    mkResourceClaimWithStatus(tweakStatusAllocationResultCounterSet("INVALID")),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationResultCounterSet("INVALID")),
+		},
+		"invalid status.allocation.devices.results[*].consumedCounters, too many with duplicate and invalid items (short-circuit check)": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusAllocationResultConsumedCounters(3),
+				func(rc *resource.ResourceClaim) {
+					results := rc.Status.Allocation.Devices.Results
+					results[0].ConsumedCounters[2].CounterSet = results[0].ConsumedCounters[0].CounterSet
+					results[0].ConsumedCounters[0].Counters["memory"] = apiresource.MustParse("-1")
+				},
+			),
+			expectedErrs: field.ErrorList{
+				field.TooMany(consumedCountersPath, 3, 2).WithOrigin("maxItems"),
 			},
 		},
 		"valid status.allocation.devices.config, max items": {
@@ -1760,6 +1849,102 @@ func tweakStatusAllocation(results ...resource.DeviceRequestAllocationResult) fu
 	}
 }
 
+func TestDeclarativeValidateCounterMap(t *testing.T) {
+	countersPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("consumedCounters").Index(0).Child("counters")
+	one := apiresource.MustParse("1")
+	makeCounters := func(count int) map[string]apiresource.Quantity {
+		counters := make(map[string]apiresource.Quantity, count)
+		for i := range count {
+			counters[fmt.Sprintf("counter-%d", i)] = one
+		}
+		return counters
+	}
+	oversized := makeCounters(33)
+	delete(oversized, "counter-0")
+	oversized["INVALID"] = apiresource.MustParse("-1")
+	testCases := map[string]struct {
+		counters     map[string]apiresource.Quantity
+		expectedErrs field.ErrorList
+		stored       bool
+	}{
+		"nil": {
+			expectedErrs: field.ErrorList{field.Required(countersPath, "")},
+		},
+		"empty": {
+			counters:     map[string]apiresource.Quantity{},
+			expectedErrs: field.ErrorList{field.Required(countersPath, "")},
+		},
+		"explicit zero":      {counters: map[string]apiresource.Quantity{"memory": apiresource.MustParse("0")}},
+		"implicit zero":      {counters: map[string]apiresource.Quantity{"memory": {}}},
+		"fractional":         {counters: map[string]apiresource.Quantity{"memory": apiresource.MustParse("0.001")}},
+		"max int64":          {counters: map[string]apiresource.Quantity{"memory": apiresource.MustParse("9223372036854775807")}},
+		"above int64":        {counters: map[string]apiresource.Quantity{"memory": apiresource.MustParse("10000000000000000000")}},
+		"32 entries":         {counters: makeCounters(32)},
+		"numeric key":        {counters: map[string]apiresource.Quantity{"0": one}},
+		"63-byte key":        {counters: map[string]apiresource.Quantity{strings.Repeat("a", 63): one}},
+		"stored nil":         {stored: true},
+		"stored negative":    {counters: map[string]apiresource.Quantity{"memory": apiresource.MustParse("-1")}, stored: true},
+		"stored invalid key": {counters: map[string]apiresource.Quantity{"INVALID": one}, stored: true},
+		"stored oversized":   {counters: oversized, stored: true},
+		"negative": {
+			counters:     map[string]apiresource.Quantity{"memory": apiresource.MustParse("-1")},
+			expectedErrs: field.ErrorList{field.Invalid(countersPath.Key("memory"), "-1", "").WithOrigin("minimum")},
+		},
+		"negative fractional": {
+			counters:     map[string]apiresource.Quantity{"memory": apiresource.MustParse("-0.001")},
+			expectedErrs: field.ErrorList{field.Invalid(countersPath.Key("memory"), "-1m", "").WithOrigin("minimum")},
+		},
+		"negative above int64": {
+			counters:     map[string]apiresource.Quantity{"memory": apiresource.MustParse("-10000000000000000000")},
+			expectedErrs: field.ErrorList{field.Invalid(countersPath.Key("memory"), "-10000000000000000000", "").WithOrigin("minimum")},
+		},
+		"33 entries with invalid items": {
+			counters:     oversized,
+			expectedErrs: field.ErrorList{field.TooMany(countersPath, 33, 32).WithOrigin("maxProperties")},
+		},
+		"empty key": {
+			counters:     map[string]apiresource.Quantity{"": one},
+			expectedErrs: field.ErrorList{field.Invalid(countersPath, "", "").WithOrigin("format=k8s-short-name")},
+		},
+		"uppercase key": {
+			counters:     map[string]apiresource.Quantity{"INVALID": one},
+			expectedErrs: field.ErrorList{field.Invalid(countersPath, "INVALID", "").WithOrigin("format=k8s-short-name")},
+		},
+		"dotted key": {
+			counters:     map[string]apiresource.Quantity{"counter.name": one},
+			expectedErrs: field.ErrorList{field.Invalid(countersPath, "counter.name", "").WithOrigin("format=k8s-short-name")},
+		},
+		"64-byte key with negative value": {
+			counters: map[string]apiresource.Quantity{strings.Repeat("a", 64): apiresource.MustParse("-1")},
+			expectedErrs: field.ErrorList{
+				field.Invalid(countersPath, strings.Repeat("a", 64), "").WithOrigin("format=k8s-short-name"),
+				field.Invalid(countersPath.Key(strings.Repeat("a", 64)), "-1", "").WithOrigin("minimum"),
+			},
+		},
+	}
+	strategy := registry.NewStatusStrategy(registry.NewStrategy(fake.NewClientset().CoreV1().Namespaces(), &fakeAuthorizer{true}))
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+				APIGroup: "resource.k8s.io", APIVersion: apiVersion, Resource: "resourceclaims", Subresource: "status", Verb: "update", IsResourceRequest: true,
+			})
+			ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{Name: "test-user"})
+			for name, tc := range testCases {
+				t.Run(name, func(t *testing.T) {
+					old := mkValidResourceClaim()
+					update := mkResourceClaimWithStatus(tweakStatusAllocationResultConsumedCounters(1))
+					update.Status.Allocation.Devices.Results[0].ConsumedCounters[0].Counters = tc.counters
+					if tc.stored {
+						old = *update.DeepCopy()
+					}
+					old.ResourceVersion, update.ResourceVersion = "1", "1"
+					apitesting.VerifyUpdateValidationEquivalence(t, ctx, &update, &old, strategy, tc.expectedErrs, apitesting.WithSubResources("status"))
+				})
+			}
+		})
+	}
+}
+
 func mkValidResourceClaim(tweaks ...func(rc *resource.ResourceClaim)) resource.ResourceClaim {
 	rc := resource.ResourceClaim{
 		ObjectMeta: v1.ObjectMeta{
@@ -1925,7 +2110,7 @@ func resourceClaimReference(uid string) resource.ResourceClaimConsumerReference 
 
 func generateResourceClaimReferences(count int) []resource.ResourceClaimConsumerReference {
 	refs := make([]resource.ResourceClaimConsumerReference, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		refs[i] = resource.ResourceClaimConsumerReference{
 			Resource: "pods",
 			Name:     fmt.Sprintf("pod-%d", i),
@@ -1944,7 +2129,7 @@ func tweakStatusReservedFor(refs ...resource.ResourceClaimConsumerReference) fun
 func tweakStatusAllocationDevicesResults(count int) func(rc *resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		rc.Status.Allocation.Devices.Results = []resource.DeviceRequestAllocationResult{}
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rc.Status.Allocation.Devices.Results = append(rc.Status.Allocation.Devices.Results, resource.DeviceRequestAllocationResult{
 				Request: "req-0",
 				Driver:  "dra.example.com",
@@ -1955,13 +2140,49 @@ func tweakStatusAllocationDevicesResults(count int) func(rc *resource.ResourceCl
 	}
 }
 
+func tweakStatusAllocationResultConsumedCounters(count int) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if rc.Status.Allocation == nil || len(rc.Status.Allocation.Devices.Results) == 0 {
+			return
+		}
+		rc.Status.Allocation.Devices.Results[0].ConsumedCounters = make([]resource.CounterSetConsumption, 0, count)
+		for i := range count {
+			rc.Status.Allocation.Devices.Results[0].ConsumedCounters = append(
+				rc.Status.Allocation.Devices.Results[0].ConsumedCounters,
+				resource.CounterSetConsumption{
+					CounterSet: fmt.Sprintf("counterset-%d", i),
+					Counters: map[string]apiresource.Quantity{
+						"memory": apiresource.MustParse("1"),
+					},
+				},
+			)
+		}
+	}
+}
+
+func tweakStatusAllocationResultCounterSet(name string) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		tweakStatusAllocationResultConsumedCounters(1)(rc)
+		rc.Status.Allocation.Devices.Results[0].ConsumedCounters[0].CounterSet = name
+	}
+}
+
+func tweakStatusAllocationResultDuplicateCounters() func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		tweakStatusAllocationResultConsumedCounters(2)(rc)
+		snapshot := rc.Status.Allocation.Devices.Results[0].ConsumedCounters
+		snapshot[1].CounterSet = snapshot[0].CounterSet
+		snapshot[1].Counters["memory"] = apiresource.MustParse("2")
+	}
+}
+
 func tweakStatusAllocationDevicesConfig(count int) func(rc *resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		if rc.Status.Allocation == nil {
 			return
 		}
 		rc.Status.Allocation.Devices.Config = []resource.DeviceAllocationConfiguration{}
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rc.Status.Allocation.Devices.Config = append(rc.Status.Allocation.Devices.Config, resource.DeviceAllocationConfiguration{
 				Source:   resource.AllocationConfigSourceClaim,
 				Requests: []string{"req-0"},
@@ -2183,7 +2404,7 @@ func tweakStatusAllocationConfigRequests(count int) func(rc *resource.ResourceCl
 				},
 			})
 		}
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rc.Status.Allocation.Devices.Config[0].Requests = append(rc.Status.Allocation.Devices.Config[0].Requests, fmt.Sprintf("req-%d", i))
 		}
 	}
@@ -2198,7 +2419,7 @@ func tweakStatusDevicesTooManyIPs(count int) func(rc *resource.ResourceClaim) {
 			rc.Status.Devices[0].NetworkData = &resource.NetworkDeviceData{}
 		}
 		rc.Status.Devices[0].NetworkData.IPs = []string{}
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rc.Status.Devices[0].NetworkData.IPs = append(rc.Status.Devices[0].NetworkData.IPs, fmt.Sprintf("1.2.3.%d/32", i))
 		}
 	}

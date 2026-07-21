@@ -1411,6 +1411,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		deviceStatusFeatureGate       bool
 		prioritizedListFeatureGate    bool
 		consumableCapacityFeatureGate bool
+		sharedConsumableCapacityGate  bool
 		oldClaim                      *resource.ResourceClaim
 		update                        func(claim *resource.ResourceClaim) *resource.ResourceClaim
 		wantFailures                  field.ErrorList
@@ -2698,6 +2699,22 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			consumableCapacityFeatureGate: true,
 			deviceStatusFeatureGate:       true,
 		},
+		"valid-counter-snapshots-above-int64": {
+			adminAccess:                   true,
+			deviceStatusFeatureGate:       true,
+			prioritizedListFeatureGate:    true,
+			consumableCapacityFeatureGate: true,
+			oldClaim:                      testClaim(goodName, goodNS, validClaimSpec),
+			sharedConsumableCapacityGate:  true,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				consumption := []resource.CounterSetConsumption{{CounterSet: "set", Counters: map[string]apiresource.Quantity{"counter": apiresource.MustParse("10000000000000000000")}}}
+				claim.Status.Allocation = &resource.AllocationResult{Devices: resource.DeviceAllocationResult{Results: []resource.DeviceRequestAllocationResult{{
+					Request: goodName, Driver: goodName, Pool: goodName, Device: goodName,
+					ConsumedCounters: consumption,
+				}}}}
+				return claim
+			},
+		},
 		"invalid-add-allocated-status-no-share-id": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("status", "devices").Index(0), structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), nil), "must be an allocated device in the claim"),
@@ -2847,15 +2864,19 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			if !scenario.adminAccess {
+			if !scenario.adminAccess && !scenario.sharedConsumableCapacityGate {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			overrides := featuregatetesting.FeatureOverrides{
 				features.DRAAdminAccess:               scenario.adminAccess,
 				features.DRAResourceClaimDeviceStatus: scenario.deviceStatusFeatureGate,
 				features.DRAPrioritizedList:           scenario.prioritizedListFeatureGate,
 				features.DRAConsumableCapacity:        scenario.consumableCapacityFeatureGate,
-			})
+			}
+			if scenario.sharedConsumableCapacityGate {
+				overrides[features.DRASharedConsumableCapacity] = true
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, overrides)
 
 			scenario.oldClaim.ResourceVersion = "1"
 			errs := ValidateResourceClaimStatusUpdate(scenario.update(scenario.oldClaim.DeepCopy()), scenario.oldClaim)

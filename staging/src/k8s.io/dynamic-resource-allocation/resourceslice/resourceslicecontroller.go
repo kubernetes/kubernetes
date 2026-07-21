@@ -96,6 +96,8 @@ type Controller struct {
 	mutationCacheTTL time.Duration
 	syncDelay        time.Duration
 	errorHandler     func(ctx context.Context, err error, msg string)
+	// Informer resyncs must wait for Update after the apiserver rejects a pool.
+	invalidPools sets.Set[string]
 
 	// Last time that a ResourceSlice of a pool was created.
 	// At that time + cache mutation TTL do we have to sync again
@@ -290,6 +292,8 @@ type Options struct {
 	// a problem while trying to publish ResourceSlices. The controller
 	// will retry transient errors once the handler returns. Publishing
 	// of invalid ResourceSlices stops until the slices are replaced.
+	// API validation failures are recognized by [apierrors.IsInvalid],
+	// and are not reported as [DroppedFieldsError].
 	//
 	// What the handler does with
 	// that information is up to the handler. It could log the error,
@@ -448,6 +452,43 @@ compatibilityGroups:
 		}
 	}
 
+	// Dropped fields for shared consumable capacity can be found in shared counter
+	// consumptionPolicy values or in consumed counters that use valueFrom.
+	detectedSharedConsumableCapacity := false
+	for i := 0; i < len(err.DesiredSlice.Spec.SharedCounters) && i < len(err.ActualSlice.Spec.SharedCounters) && !detectedSharedConsumableCapacity; i++ {
+		actualCounters := err.ActualSlice.Spec.SharedCounters[i].Counters
+		for counterName, desiredCounter := range err.DesiredSlice.Spec.SharedCounters[i].Counters {
+			if desiredCounter.ConsumptionPolicy == nil {
+				continue
+			}
+			actualCounter, found := actualCounters[counterName]
+			if !found || actualCounter.ConsumptionPolicy == nil {
+				disabled = append(disabled, "DRASharedConsumableCapacity")
+				detectedSharedConsumableCapacity = true
+				break
+			}
+		}
+	}
+	for i := 0; i < len(err.DesiredSlice.Spec.Devices) && i < len(err.ActualSlice.Spec.Devices) && !detectedSharedConsumableCapacity; i++ {
+		for j := 0; j < len(err.DesiredSlice.Spec.Devices[i].ConsumesCounters) && j < len(err.ActualSlice.Spec.Devices[i].ConsumesCounters); j++ {
+			actualCounters := err.ActualSlice.Spec.Devices[i].ConsumesCounters[j].Counters
+			for counterName, desiredCounter := range err.DesiredSlice.Spec.Devices[i].ConsumesCounters[j].Counters {
+				if desiredCounter.ValueFrom == nil {
+					continue
+				}
+				actualCounter, found := actualCounters[counterName]
+				if !found || actualCounter.ValueFrom == nil {
+					disabled = append(disabled, "DRASharedConsumableCapacity")
+					detectedSharedConsumableCapacity = true
+					break
+				}
+			}
+			if detectedSharedConsumableCapacity {
+				break
+			}
+		}
+	}
+
 	return disabled
 }
 
@@ -470,6 +511,7 @@ func (c *Controller) Stop() {
 func (c *Controller) Update(resources *DriverResources) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+	c.invalidPools = sets.New[string]()
 
 	// Sync all old pools..
 	if c.resources != nil {
@@ -745,11 +787,11 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	err := c.syncPool(klog.NewContext(ctx, klog.LoggerWithValues(logger, "poolName", poolName)), poolName)
 	if err != nil {
 		c.errorHandler(ctx, err, "processing ResourceSlice objects")
-		c.queue.AddRateLimited(poolName)
-
-		// Return without removing the work item from the queue.
-		// It will be retried.
-		return true
+		if !apierrors.IsInvalid(err) {
+			c.queue.AddRateLimited(poolName)
+			return true
+		}
+		// A rejected spec cannot be repaired by retrying the same resources.
 	}
 	c.queue.Forget(poolName)
 	return true
@@ -758,7 +800,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 // syncPool processes one pool. Only runs inside a single worker, so there
 // is no need for locking except when accessing c.resources, which may
 // be updated at any time by the user of the controller.
-func (c *Controller) syncPool(ctx context.Context, poolName string) error {
+func (c *Controller) syncPool(ctx context.Context, poolName string) (syncErr error) {
 	logger := klog.FromContext(ctx)
 	start := time.Now()
 
@@ -776,7 +818,22 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	var resources *DriverResources
 	c.mutex.RLock()
 	resources = c.resources
+	invalid := c.invalidPools.Has(poolName)
 	c.mutex.RUnlock()
+	if invalid {
+		return nil
+	}
+	defer func() {
+		if !apierrors.IsInvalid(syncErr) {
+			return
+		}
+		c.mutex.Lock()
+		defer c.mutex.Unlock()
+		// Do not block resources replaced while the rejected write was in flight.
+		if c.resources == resources {
+			c.invalidPools.Insert(poolName)
+		}
+	}()
 	pool, ok := resources.Pools[poolName]
 
 	// The informer only sees slices of the ReconcilePoolWithName pool, so

@@ -945,11 +945,15 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		}
 	}
 
-	allErrs = append(allErrs, validateSet(spec.SharedCounters, resource.ResourceSliceMaxCounterSets,
-		validateCounterSet,
-		func(counterSet resource.CounterSet) string {
-			return counterSet.Name
-		}, fldPath.Child("sharedCounters"), sizeCovered, uniquenessCovered)...)
+	// An unchanged consumptionPolicy may no longer validate if
+	// DRAFractionalCapacityRange was disabled after the policy was stored.
+	if oldSpec == nil || !apiequality.Semantic.DeepEqual(spec.SharedCounters, oldSpec.SharedCounters) {
+		allErrs = append(allErrs, validateSet(spec.SharedCounters, resource.ResourceSliceMaxCounterSets,
+			validateCounterSet,
+			func(counterSet resource.CounterSet) string {
+				return counterSet.Name
+			}, fldPath.Child("sharedCounters"), sizeCovered, uniquenessCovered)...)
+	}
 
 	// The name format is validated declaratively; see the field's tags.
 	if spec.PartitionTypeAttribute != nil {
@@ -1304,7 +1308,7 @@ func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCo
 		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), "").MarkCoveredByDeclarative())
 	} else {
 		allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, resource.ResourceSliceMaxCountersPerDeviceCounterConsumption,
-			validation.DNS1123LabelMaxLength, validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
+			validation.DNS1123LabelMaxLength, validateCounterName, validateDeviceCounterRequirement, fldPath.Child("counters"), keysCovered)...)
 	}
 	return allErrs
 }
@@ -1676,9 +1680,25 @@ func isFractionalQuantity(q apiresource.Quantity) bool {
 	return dec.Cmp(rounded) != 0
 }
 
+// validateDeviceCounter validates counters in new or changed shared counter lists.
 func validateDeviceCounter(counter resource.Counter, fldPath *field.Path) field.ErrorList {
-	// Any parsed quantity is valid.
-	return nil
+	var allErrs field.ErrorList
+	if counter.ConsumptionPolicy != nil {
+		allErrs = append(allErrs, validateRequestPolicy(counter.Value, counter.ConsumptionPolicy, fldPath.Child("consumptionPolicy"))...)
+	}
+	return allErrs
+}
+
+// validateDeviceCounterRequirement validates counters in new or changed device lists.
+func validateDeviceCounterRequirement(counter resource.CounterRequirement, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	// The quantity minimum and Value/ValueFrom union are enforced declaratively.
+
+	// Empty capacity names are rejected by declarative validation.
+	if counter.ValueFrom != nil && counter.ValueFrom.CapacityName != "" {
+		allErrs = append(allErrs, validateQualifiedName(counter.ValueFrom.CapacityName, fldPath.Child("valueFrom", "capacityName"))...)
+	}
+	return allErrs
 }
 
 func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) field.ErrorList {
