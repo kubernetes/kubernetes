@@ -40,6 +40,7 @@ import (
 	resourcev1alpha3listers "k8s.io/client-go/listers/resource/v1alpha3"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/resourcepoolstatusrequest/metrics"
 	"k8s.io/kubernetes/pkg/features"
@@ -475,6 +476,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 	// (allowMultipleAllocations). AdminAccess results are observers, not
 	// consumers, and are skipped.
 	allocatedDevices := make(map[string]map[string]struct{})
+	allocations := make(map[string][]resourcev1.DeviceRequestAllocationResult)
 	// Per-pool consumed capacity over non-AdminAccess claims; feeds shareableSummary.
 	consumedCapacity := make(map[string]map[resourcev1.QualifiedName]resource.Quantity)
 
@@ -493,12 +495,16 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 				continue
 			}
 			key := result.Driver + "/" + result.Pool
+			if _, requested := poolData[key]; !requested {
+				continue
+			}
 			devices, ok := allocatedDevices[key]
 			if !ok {
 				devices = make(map[string]struct{})
 				allocatedDevices[key] = devices
 			}
 			devices[result.Device] = struct{}{}
+			allocations[key] = append(allocations[key], result)
 
 			for capacityName, quantity := range result.ConsumedCapacity {
 				m := consumedCapacity[key]
@@ -559,7 +565,12 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 				devices:          info.devices,
 				sharedCounters:   info.sharedCounters,
 				inUse:            inUse,
+				allocations:      allocations[key],
 				consumedCapacity: consumedCapacity[key],
+				features: structured.Features{
+					SharedConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRASharedConsumableCapacity),
+					FractionalCapacityRange:  utilfeature.DefaultFeatureGate.Enabled(features.DRAFractionalCapacityRange),
+				},
 			}
 			resolveDevicePartitions(request.Spec.DefaultPartitionTypeAttribute, &viewInput)
 

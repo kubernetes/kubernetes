@@ -425,3 +425,83 @@ func testGatherAllocatedStateConsumedCapacity(tCtx ktesting.TContext) {
 		})
 	}
 }
+
+// TestGatherAllocatedStateConsumedCounters exercises bookkeeping without a claim-list cache.
+func TestGatherAllocatedStateConsumedCounters(t *testing.T) {
+	withCounters := func(uid types.UID, amount string) *resourceapi.ResourceClaim {
+		claim := claimWithConsumedCapacity(uid, "1")
+		claim.Status.Allocation.Devices.Results[0].ConsumedCounters = []resourceapi.CounterSetConsumption{{
+			CounterSet: "shared", Counters: map[string]resource.Quantity{"memory": resource.MustParse(amount)},
+		}}
+		return claim
+	}
+	first, second := withCounters("first", "5"), withCounters("second", "3")
+	zero := withCounters("zero", "0")
+	unknown := claimWithConsumedCapacity("unknown", "1")
+	unknownDedicated := unknown.DeepCopy()
+	unknownDedicated.Status.Allocation.Devices.Results[0].ShareID = nil
+	admin := withCounters("admin", "7")
+	admin.Status.Allocation.Devices.Results[0].AdminAccess = new(true)
+	dedicated := withCounters("dedicated", "2")
+	dedicated.Status.Allocation.Devices.Results[0].ShareID = nil
+	overridden := withCounters("first", "7")
+	missingOverride := claimWithConsumedCapacity("first", "1")
+
+	tests := map[string]struct {
+		allocated  []*resourceapi.ResourceClaim
+		removed    []*resourceapi.ResourceClaim
+		inFlight   []*resourceapi.ResourceClaim
+		disabled   bool
+		want       string
+		incomplete bool
+	}{
+		"ordinary DRA":                               {allocated: []*resourceapi.ResourceClaim{unknown}},
+		"disabled":                                   {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{second}, disabled: true},
+		"sum shares":                                 {allocated: []*resourceapi.ResourceClaim{first, second}, want: "8"},
+		"cached and in-flight duplicate":             {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{first}, want: "5"},
+		"in-flight replaces cached snapshot":         {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{overridden}, want: "7"},
+		"in-flight replaces snapshot with unknown":   {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{missingOverride}},
+		"missing cached dedicated allocation":        {allocated: []*resourceapi.ResourceClaim{unknownDedicated, first}, want: "5", incomplete: true},
+		"missing in-flight dedicated allocation":     {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{unknownDedicated}, want: "5", incomplete: true},
+		"snapshot after cached dedicated allocation": {allocated: []*resourceapi.ResourceClaim{unknownDedicated}, inFlight: []*resourceapi.ResourceClaim{first}, want: "5", incomplete: true},
+		"missing cached share":                       {allocated: []*resourceapi.ResourceClaim{unknown, first}, want: "5", incomplete: true},
+		"missing in-flight share":                    {allocated: []*resourceapi.ResourceClaim{first}, inFlight: []*resourceapi.ResourceClaim{unknown}, want: "5", incomplete: true},
+		"snapshot after missing in-flight share":     {inFlight: []*resourceapi.ResourceClaim{unknown, first}, want: "5", incomplete: true},
+		"release first share":                        {allocated: []*resourceapi.ResourceClaim{first, second}, removed: []*resourceapi.ResourceClaim{first}, want: "3"},
+		"release last share":                         {allocated: []*resourceapi.ResourceClaim{first}, removed: []*resourceapi.ResourceClaim{first}},
+		"release missing share":                      {allocated: []*resourceapi.ResourceClaim{unknown, zero}, removed: []*resourceapi.ResourceClaim{unknown}, want: "0"},
+		"known zero":                                 {allocated: []*resourceapi.ResourceClaim{zero}, want: "0"},
+		"zero and missing":                           {allocated: []*resourceapi.ResourceClaim{zero, unknown}, want: "0", incomplete: true},
+		"admin excluded":                             {allocated: []*resourceapi.ResourceClaim{admin, first}, want: "5"},
+		"dedicated allocation":                       {allocated: []*resourceapi.ResourceClaim{dedicated}, want: "2"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRASharedConsumableCapacity, !tc.disabled)
+			tracker := &claimTracker{logger: tCtx.Logger(), allocatedDevices: newAllocatedDevices(tCtx.Logger()), inFlightAllocations: make(map[types.UID]inFlightAllocation)}
+			for _, claim := range tc.allocated {
+				tracker.allocatedDevices.onAdd(claim)
+			}
+			for _, claim := range tc.removed {
+				tracker.allocatedDevices.onDelete(claim)
+			}
+			for _, claim := range tc.inFlight {
+				tracker.inFlightAllocations[claim.UID] = inFlightAllocation{claim: claim, sharers: 1}
+			}
+			state, err := tracker.GatherAllocatedState()
+			tCtx.ExpectNoError(err)
+			if tc.want == "" {
+				tCtx.Expect(state.ConsumedCounters).To(gomega.BeNil())
+				return
+			}
+			tCtx.Expect(state.ConsumedCounters).To(gomega.HaveLen(1))
+			usage := state.ConsumedCounters[structured.MakeDeviceID(sharedDriver, sharedPool, sharedDevice)]
+			tCtx.Expect(usage.Incomplete).To(gomega.Equal(tc.incomplete))
+			tCtx.Expect(usage.Counters).To(gomega.HaveLen(1))
+			amount := usage.Counters[0].Counters["memory"]
+			tCtx.Expect(amount.Cmp(resource.MustParse(tc.want))).To(gomega.BeZero())
+		})
+	}
+}

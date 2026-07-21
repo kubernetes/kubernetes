@@ -2013,7 +2013,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 							}
 							// This can potentially result in negative available counters. That is fine,
 							// we just treat it as no counters available.
-							existingCounter.Value.Sub(c.Value)
+							existingCounter.Value.Sub(*c.Value)
 							availableCountersForCounterSet[name] = existingCounter
 						}
 					}
@@ -2049,10 +2049,10 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		for name, c := range deviceCounterConsumption.Counters {
 			consumedCounters, found := consumedCountersForCounterSet[name]
 			if !found {
-				consumedCountersForCounterSet[name] = c
+				consumedCountersForCounterSet[name] = resourceapi.Counter{Value: *c.Value}
 				continue
 			}
-			consumedCounters.Value.Add(c.Value)
+			consumedCounters.Value.Add(*c.Value)
 			consumedCountersForCounterSet[name] = consumedCounters
 		}
 	}
@@ -2114,7 +2114,7 @@ func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
 		consumedCounterSet := consumedCountersForPool[counterSetName]
 		for name, c := range deviceCounterConsumption.Counters {
 			consumedCounter := consumedCounterSet[name]
-			consumedCounter.Value.Sub(c.Value)
+			consumedCounter.Value.Sub(*c.Value)
 			consumedCounterSet[name] = consumedCounter
 		}
 	}

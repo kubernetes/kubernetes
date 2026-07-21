@@ -93,6 +93,48 @@ type AllocatedState struct {
 	// AggregatedCapacity records the consumed capacity per device ID when
 	// the DRAConsumableCapacity feature is enabled.
 	AggregatedCapacity ConsumedCapacityCollection
+	// ConsumedCounters contains resolved, request-dependent counter usage per device,
+	// including in-flight allocations, consistent with the other fields. Only devices
+	// with at least one non-admin counter snapshot have entries, including known zero
+	// usage. An absent entry or Incomplete entry means that request-dependent
+	// consumption cannot be reconstructed safely.
+	// Fixed consumption is reconstructed from ResourceSlices instead.
+	// This field may be nil when DRASharedConsumableCapacity is disabled.
+	ConsumedCounters CounterConsumptionCollection
+}
+
+// CounterConsumption records the saved usage of a device's allocated claims.
+type CounterConsumption struct {
+	Counters []resourceapi.CounterSetConsumption
+	// Incomplete is true when any non-admin allocation of this device lacks a snapshot.
+	Incomplete bool
+}
+
+// CounterConsumptionCollection contains request-dependent counter usage per device.
+type CounterConsumptionCollection map[DeviceID]CounterConsumption
+
+// Add aggregates a saved snapshot without changing its quantities or dropping zeros.
+func (c CounterConsumptionCollection) Add(id DeviceID, consumption []resourceapi.CounterSetConsumption) {
+	device := c[id]
+	for _, set := range consumption {
+		index := -1
+		for i := range device.Counters {
+			if device.Counters[i].CounterSet == set.CounterSet {
+				index = i
+				break
+			}
+		}
+		if index < 0 {
+			index = len(device.Counters)
+			device.Counters = append(device.Counters, resourceapi.CounterSetConsumption{CounterSet: set.CounterSet, Counters: make(map[string]resource.Quantity)})
+		}
+		for name, quantity := range set.Counters {
+			total := device.Counters[index].Counters[name]
+			total.Add(quantity)
+			device.Counters[index].Counters[name] = total
+		}
+	}
+	c[id] = device
 }
 
 // ConsumedCapacity represents the consumed capacity of a specific resource.
