@@ -248,8 +248,8 @@
         },
         "type": "object"
       },
-      "io.k8s.api.resource.v1beta2.Counter": {
-        "description": "Counter describes a quantity associated with a device.",
+      "io.k8s.api.resource.v1beta2.ConsumeCounter": {
+        "description": "ConsumeCounter describes how much of a counter a device consumes.",
         "properties": {
           "value": {
             "allOf": [
@@ -257,12 +257,17 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
               }
             ],
-            "description": "Value defines how much of a certain device counter is available."
+            "description": "Value defines the statically consumed amount.\n\nExactly one of Value or ValueFrom must be specified."
+          },
+          "valueFrom": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.CounterValueFrom"
+              }
+            ],
+            "description": "ValueFrom looks up the requested capacity value in a ResourceClaim via the capacity name. That value is then consumed from the counter instead of using a static value defined by the driver."
           }
         },
-        "required": [
-          "value"
-        ],
         "type": "object"
       },
       "io.k8s.api.resource.v1beta2.CounterSet": {
@@ -270,7 +275,7 @@
         "properties": {
           "counters": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.Counter"
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.SharedCounter"
             },
             "description": "Counters defines the set of counters for this CounterSet The name of each counter must be unique in that set and must be a DNS label.\n\nThe maximum number of counters is 32.",
             "type": "object"
@@ -284,6 +289,42 @@
         "required": [
           "name",
           "counters"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1beta2.CounterSetConsumption": {
+        "description": "CounterSetConsumption records the resolved consumption for one counter set at allocation time.",
+        "properties": {
+          "counterSet": {
+            "default": "",
+            "description": "CounterSet is the name of the counter set from which counters were consumed.",
+            "type": "string"
+          },
+          "counters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+            },
+            "description": "Counters records the quantity consumed for each counter in the set.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "counterSet",
+          "counters"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1beta2.CounterValueFrom": {
+        "description": "CounterValueFrom looks up the requested capacity value in a ResourceClaim via the capacity name.",
+        "properties": {
+          "capacityName": {
+            "default": "",
+            "description": "CapacityName is the name of a device capacity. This is the same name that users set in capacity requests.\n\nIf this name has no domain prefix, the driver name from the ResourceSlice is used as the domain when matching against capacity requests.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capacityName"
         ],
         "type": "object"
       },
@@ -714,7 +755,7 @@
           },
           "counters": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.Counter"
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.ConsumeCounter"
             },
             "description": "Counters defines the counters that will be consumed by the device.\n\nThe maximum number of counters is 32.",
             "type": "object"
@@ -785,6 +826,14 @@
             },
             "description": "ConsumedCapacity tracks the amount of capacity consumed per device as part of the claim request. The consumed amount may differ from the requested amount: it is rounded up to the nearest valid value based on the device’s requestPolicy if applicable (i.e., may not be less than the requested amount).\n\nThe total consumed capacity for each device must not exceed the DeviceCapacity's Value.\n\nThis field is populated only for devices that allow multiple allocations. All capacity entries are included, even if the consumed amount is zero.",
             "type": "object"
+          },
+          "consumedCounters": {
+            "description": "ConsumedCounters records the resolved shared-counter consumption for this allocation at the time it was made. Each entry captures the amount consumed from one counter set. The scheduler uses this snapshot instead of recomputing consumption from live ResourceSlice definitions.\n\nThe maximum number of counter sets is 2.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.CounterSetConsumption"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
           },
           "device": {
             "default": "",
@@ -1722,6 +1771,31 @@
         "required": [
           "driver",
           "pool"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1beta2.SharedCounter": {
+        "description": "SharedCounter describes a quantity that is available in a counter set.",
+        "properties": {
+          "requestPolicy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.CapacityRequestPolicy"
+              }
+            ],
+            "description": "RequestPolicy defines how this counter must be consumed when a device references this counter through ValueFrom.\n\nIf nil, the counter cannot be referenced through ValueFrom."
+          },
+          "value": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
+            "description": "Value defines how much of a certain device counter is available for consumption by devices."
+          }
+        },
+        "required": [
+          "value"
         ],
         "type": "object"
       },

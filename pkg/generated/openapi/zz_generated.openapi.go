@@ -1028,8 +1028,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1.CapacityRequestPolicy{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1_CapacityRequestPolicy(ref),
 		resourcev1.CapacityRequestPolicyRange{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1_CapacityRequestPolicyRange(ref),
 		resourcev1.CapacityRequirements{}.OpenAPIModelName():                                                            schema_k8sio_api_resource_v1_CapacityRequirements(ref),
-		resourcev1.Counter{}.OpenAPIModelName():                                                                         schema_k8sio_api_resource_v1_Counter(ref),
+		resourcev1.ConsumeCounter{}.OpenAPIModelName():                                                                  schema_k8sio_api_resource_v1_ConsumeCounter(ref),
 		resourcev1.CounterSet{}.OpenAPIModelName():                                                                      schema_k8sio_api_resource_v1_CounterSet(ref),
+		resourcev1.CounterSetConsumption{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1_CounterSetConsumption(ref),
+		resourcev1.CounterValueFrom{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1_CounterValueFrom(ref),
 		resourcev1.Device{}.OpenAPIModelName():                                                                          schema_k8sio_api_resource_v1_Device(ref),
 		resourcev1.DeviceAllocationConfiguration{}.OpenAPIModelName():                                                   schema_k8sio_api_resource_v1_DeviceAllocationConfiguration(ref),
 		resourcev1.DeviceAllocationResult{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1_DeviceAllocationResult(ref),
@@ -1073,6 +1075,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1.ResourceSlice{}.OpenAPIModelName():                                                                   schema_k8sio_api_resource_v1_ResourceSlice(ref),
 		resourcev1.ResourceSliceList{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1_ResourceSliceList(ref),
 		resourcev1.ResourceSliceSpec{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1_ResourceSliceSpec(ref),
+		resourcev1.SharedCounter{}.OpenAPIModelName():                                                                   schema_k8sio_api_resource_v1_SharedCounter(ref),
 		v1alpha3.CELDeviceSelector{}.OpenAPIModelName():                                                                 schema_k8sio_api_resource_v1alpha3_CELDeviceSelector(ref),
 		v1alpha3.DeviceSelector{}.OpenAPIModelName():                                                                    schema_k8sio_api_resource_v1alpha3_DeviceSelector(ref),
 		v1alpha3.DeviceTaint{}.OpenAPIModelName():                                                                       schema_k8sio_api_resource_v1alpha3_DeviceTaint(ref),
@@ -1096,8 +1099,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta1.CapacityRequestPolicy{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta1_CapacityRequestPolicy(ref),
 		resourcev1beta1.CapacityRequestPolicyRange{}.OpenAPIModelName():                                                 schema_k8sio_api_resource_v1beta1_CapacityRequestPolicyRange(ref),
 		resourcev1beta1.CapacityRequirements{}.OpenAPIModelName():                                                       schema_k8sio_api_resource_v1beta1_CapacityRequirements(ref),
-		resourcev1beta1.Counter{}.OpenAPIModelName():                                                                    schema_k8sio_api_resource_v1beta1_Counter(ref),
+		resourcev1beta1.ConsumeCounter{}.OpenAPIModelName():                                                             schema_k8sio_api_resource_v1beta1_ConsumeCounter(ref),
 		resourcev1beta1.CounterSet{}.OpenAPIModelName():                                                                 schema_k8sio_api_resource_v1beta1_CounterSet(ref),
+		resourcev1beta1.CounterSetConsumption{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta1_CounterSetConsumption(ref),
+		resourcev1beta1.CounterValueFrom{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta1_CounterValueFrom(ref),
 		resourcev1beta1.Device{}.OpenAPIModelName():                                                                     schema_k8sio_api_resource_v1beta1_Device(ref),
 		resourcev1beta1.DeviceAllocationConfiguration{}.OpenAPIModelName():                                              schema_k8sio_api_resource_v1beta1_DeviceAllocationConfiguration(ref),
 		resourcev1beta1.DeviceAllocationResult{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1beta1_DeviceAllocationResult(ref),
@@ -1135,14 +1140,17 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta1.ResourceSlice{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta1_ResourceSlice(ref),
 		resourcev1beta1.ResourceSliceList{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta1_ResourceSliceList(ref),
 		resourcev1beta1.ResourceSliceSpec{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref),
+		resourcev1beta1.SharedCounter{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta1_SharedCounter(ref),
 		resourcev1beta2.AllocatedDeviceStatus{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta2_AllocatedDeviceStatus(ref),
 		resourcev1beta2.AllocationResult{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta2_AllocationResult(ref),
 		resourcev1beta2.CELDeviceSelector{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_CELDeviceSelector(ref),
 		resourcev1beta2.CapacityRequestPolicy{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta2_CapacityRequestPolicy(ref),
 		resourcev1beta2.CapacityRequestPolicyRange{}.OpenAPIModelName():                                                 schema_k8sio_api_resource_v1beta2_CapacityRequestPolicyRange(ref),
 		resourcev1beta2.CapacityRequirements{}.OpenAPIModelName():                                                       schema_k8sio_api_resource_v1beta2_CapacityRequirements(ref),
-		resourcev1beta2.Counter{}.OpenAPIModelName():                                                                    schema_k8sio_api_resource_v1beta2_Counter(ref),
+		resourcev1beta2.ConsumeCounter{}.OpenAPIModelName():                                                             schema_k8sio_api_resource_v1beta2_ConsumeCounter(ref),
 		resourcev1beta2.CounterSet{}.OpenAPIModelName():                                                                 schema_k8sio_api_resource_v1beta2_CounterSet(ref),
+		resourcev1beta2.CounterSetConsumption{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta2_CounterSetConsumption(ref),
+		resourcev1beta2.CounterValueFrom{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta2_CounterValueFrom(ref),
 		resourcev1beta2.Device{}.OpenAPIModelName():                                                                     schema_k8sio_api_resource_v1beta2_Device(ref),
 		resourcev1beta2.DeviceAllocationConfiguration{}.OpenAPIModelName():                                              schema_k8sio_api_resource_v1beta2_DeviceAllocationConfiguration(ref),
 		resourcev1beta2.DeviceAllocationResult{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1beta2_DeviceAllocationResult(ref),
@@ -1186,6 +1194,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta2.ResourceSlice{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta2_ResourceSlice(ref),
 		resourcev1beta2.ResourceSliceList{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_ResourceSliceList(ref),
 		resourcev1beta2.ResourceSliceSpec{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref),
+		resourcev1beta2.SharedCounter{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta2_SharedCounter(ref),
 		schedulingv1.PriorityClass{}.OpenAPIModelName():                                                                 schema_k8sio_api_scheduling_v1_PriorityClass(ref),
 		schedulingv1.PriorityClassList{}.OpenAPIModelName():                                                             schema_k8sio_api_scheduling_v1_PriorityClassList(ref),
 		schedulingv1alpha3.AllCompositeDisruptionMode{}.OpenAPIModelName():                                              schema_k8sio_api_scheduling_v1alpha3_AllCompositeDisruptionMode(ref),
@@ -48206,25 +48215,30 @@ func schema_k8sio_api_resource_v1_CapacityRequirements(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_resource_v1_Counter(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1_ConsumeCounter(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Counter describes a quantity associated with a device.",
+				Description: "ConsumeCounter describes how much of a counter a device consumes.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"value": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Value defines how much of a certain device counter is available.",
+							Description: "Value defines the statically consumed amount.\n\nExactly one of Value or ValueFrom must be specified.",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
+					"valueFrom": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ValueFrom looks up the requested capacity value in a ResourceClaim via the capacity name. That value is then consumed from the counter instead of using a static value defined by the driver.",
+							Ref:         ref(resourcev1.CounterValueFrom{}.OpenAPIModelName()),
+						},
+					},
 				},
-				Required: []string{"value"},
 			},
 		},
 		Dependencies: []string{
-			resource.Quantity{}.OpenAPIModelName()},
+			resourcev1.CounterValueFrom{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -48251,7 +48265,7 @@ func schema_k8sio_api_resource_v1_CounterSet(ref common.ReferenceCallback) commo
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(resourcev1.Counter{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.SharedCounter{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -48262,7 +48276,67 @@ func schema_k8sio_api_resource_v1_CounterSet(ref common.ReferenceCallback) commo
 			},
 		},
 		Dependencies: []string{
-			resourcev1.Counter{}.OpenAPIModelName()},
+			resourcev1.SharedCounter{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1_CounterSetConsumption(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterSetConsumption records the resolved consumption for one counter set at allocation time.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"counterSet": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CounterSet is the name of the counter set from which counters were consumed.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"counters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Counters records the quantity consumed for each counter in the set.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resource.Quantity{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"counterSet", "counters"},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1_CounterValueFrom(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterValueFrom looks up the requested capacity value in a ResourceClaim via the capacity name.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"capacityName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CapacityName is the name of a device capacity. This is the same name that users set in capacity requests.\n\nIf this name has no domain prefix, the driver name from the ResourceSlice is used as the domain when matching against capacity requests.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"capacityName"},
+			},
+		},
 	}
 }
 
@@ -49057,7 +49131,7 @@ func schema_k8sio_api_resource_v1_DeviceCounterConsumption(ref common.ReferenceC
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(resourcev1.Counter{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.ConsumeCounter{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49068,7 +49142,7 @@ func schema_k8sio_api_resource_v1_DeviceCounterConsumption(ref common.ReferenceC
 			},
 		},
 		Dependencies: []string{
-			resourcev1.Counter{}.OpenAPIModelName()},
+			resourcev1.ConsumeCounter{}.OpenAPIModelName()},
 	}
 }
 
@@ -49243,12 +49317,30 @@ func schema_k8sio_api_resource_v1_DeviceRequestAllocationResult(ref common.Refer
 							},
 						},
 					},
+					"consumedCounters": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ConsumedCounters records the resolved shared-counter consumption for this allocation at the time it was made. Each entry captures the amount consumed from one counter set. The scheduler uses this snapshot instead of recomputing consumption from live ResourceSlice definitions.\n\nThe maximum number of counter sets is 2.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1.CounterSetConsumption{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},
 		},
 		Dependencies: []string{
-			resourcev1.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+			resourcev1.CounterSetConsumption{}.OpenAPIModelName(), resourcev1.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -50503,6 +50595,34 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 	}
 }
 
+func schema_k8sio_api_resource_v1_SharedCounter(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SharedCounter describes a quantity that is available in a counter set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Value defines how much of a certain device counter is available for consumption by devices.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"requestPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RequestPolicy defines how this counter must be consumed when a device references this counter through ValueFrom.\n\nIf nil, the counter cannot be referenced through ValueFrom.",
+							Ref:         ref(resourcev1.CapacityRequestPolicy{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"value"},
+			},
+		},
+		Dependencies: []string{
+			resourcev1.CapacityRequestPolicy{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_resource_v1alpha3_CELDeviceSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -51653,25 +51773,30 @@ func schema_k8sio_api_resource_v1beta1_CapacityRequirements(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_resource_v1beta1_Counter(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1beta1_ConsumeCounter(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Counter describes a quantity associated with a device.",
+				Description: "ConsumeCounter describes how much of a counter a device consumes.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"value": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Value defines how much of a certain device counter is available.",
+							Description: "Value defines the statically consumed amount.\n\nExactly one of Value or ValueFrom must be specified.",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
+					"valueFrom": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ValueFrom looks up the requested capacity value in a ResourceClaim via the capacity name. That value is then consumed from the counter instead of using a static value defined by the driver.",
+							Ref:         ref(resourcev1beta1.CounterValueFrom{}.OpenAPIModelName()),
+						},
+					},
 				},
-				Required: []string{"value"},
 			},
 		},
 		Dependencies: []string{
-			resource.Quantity{}.OpenAPIModelName()},
+			resourcev1beta1.CounterValueFrom{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -51698,7 +51823,7 @@ func schema_k8sio_api_resource_v1beta1_CounterSet(ref common.ReferenceCallback) 
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(resourcev1beta1.Counter{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.SharedCounter{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -51709,7 +51834,67 @@ func schema_k8sio_api_resource_v1beta1_CounterSet(ref common.ReferenceCallback) 
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta1.Counter{}.OpenAPIModelName()},
+			resourcev1beta1.SharedCounter{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_CounterSetConsumption(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterSetConsumption records the resolved consumption for one counter set at allocation time.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"counterSet": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CounterSet is the name of the counter set from which counters were consumed.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"counters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Counters records the quantity consumed for each counter in the set.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resource.Quantity{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"counterSet", "counters"},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_CounterValueFrom(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterValueFrom looks up the requested capacity value in a ResourceClaim via the capacity name.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"capacityName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CapacityName is the name of a device capacity. This is the same name that users set in capacity requests.\n\nIf this name has no domain prefix, the driver name from the ResourceSlice is used as the domain when matching against capacity requests.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"capacityName"},
+			},
+		},
 	}
 }
 
@@ -52360,7 +52545,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceCounterConsumption(ref common.Refer
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(resourcev1beta1.Counter{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.ConsumeCounter{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52371,7 +52556,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceCounterConsumption(ref common.Refer
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta1.Counter{}.OpenAPIModelName()},
+			resourcev1beta1.ConsumeCounter{}.OpenAPIModelName()},
 	}
 }
 
@@ -52612,12 +52797,30 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 							},
 						},
 					},
+					"consumedCounters": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ConsumedCounters records the resolved shared-counter consumption for this allocation at the time it was made. Each entry captures the amount consumed from one counter set. The scheduler uses this snapshot instead of recomputing consumption from live ResourceSlice definitions.\n\nThe maximum number of counter sets is 2.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1beta1.CounterSetConsumption{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta1.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+			resourcev1beta1.CounterSetConsumption{}.OpenAPIModelName(), resourcev1beta1.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -53582,6 +53785,34 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 	}
 }
 
+func schema_k8sio_api_resource_v1beta1_SharedCounter(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SharedCounter describes a quantity that is available in a counter set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Value defines how much of a certain device counter is available for consumption by devices.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"requestPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RequestPolicy defines how this counter must be consumed when a device references this counter through ValueFrom.\n\nIf nil, the counter cannot be referenced through ValueFrom.",
+							Ref:         ref(resourcev1beta1.CapacityRequestPolicy{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"value"},
+			},
+		},
+		Dependencies: []string{
+			resourcev1beta1.CapacityRequestPolicy{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_resource_v1beta2_AllocatedDeviceStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -53826,25 +54057,30 @@ func schema_k8sio_api_resource_v1beta2_CapacityRequirements(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_resource_v1beta2_Counter(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1beta2_ConsumeCounter(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Counter describes a quantity associated with a device.",
+				Description: "ConsumeCounter describes how much of a counter a device consumes.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"value": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Value defines how much of a certain device counter is available.",
+							Description: "Value defines the statically consumed amount.\n\nExactly one of Value or ValueFrom must be specified.",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
+					"valueFrom": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ValueFrom looks up the requested capacity value in a ResourceClaim via the capacity name. That value is then consumed from the counter instead of using a static value defined by the driver.",
+							Ref:         ref(resourcev1beta2.CounterValueFrom{}.OpenAPIModelName()),
+						},
+					},
 				},
-				Required: []string{"value"},
 			},
 		},
 		Dependencies: []string{
-			resource.Quantity{}.OpenAPIModelName()},
+			resourcev1beta2.CounterValueFrom{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -53871,7 +54107,7 @@ func schema_k8sio_api_resource_v1beta2_CounterSet(ref common.ReferenceCallback) 
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(resourcev1beta2.Counter{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.SharedCounter{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -53882,7 +54118,67 @@ func schema_k8sio_api_resource_v1beta2_CounterSet(ref common.ReferenceCallback) 
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta2.Counter{}.OpenAPIModelName()},
+			resourcev1beta2.SharedCounter{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_CounterSetConsumption(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterSetConsumption records the resolved consumption for one counter set at allocation time.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"counterSet": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CounterSet is the name of the counter set from which counters were consumed.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"counters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Counters records the quantity consumed for each counter in the set.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resource.Quantity{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"counterSet", "counters"},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_CounterValueFrom(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterValueFrom looks up the requested capacity value in a ResourceClaim via the capacity name.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"capacityName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CapacityName is the name of a device capacity. This is the same name that users set in capacity requests.\n\nIf this name has no domain prefix, the driver name from the ResourceSlice is used as the domain when matching against capacity requests.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"capacityName"},
+			},
+		},
 	}
 }
 
@@ -54677,7 +54973,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceCounterConsumption(ref common.Refer
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(resourcev1beta2.Counter{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.ConsumeCounter{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -54688,7 +54984,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceCounterConsumption(ref common.Refer
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta2.Counter{}.OpenAPIModelName()},
+			resourcev1beta2.ConsumeCounter{}.OpenAPIModelName()},
 	}
 }
 
@@ -54863,12 +55159,30 @@ func schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref common.
 							},
 						},
 					},
+					"consumedCounters": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ConsumedCounters records the resolved shared-counter consumption for this allocation at the time it was made. Each entry captures the amount consumed from one counter set. The scheduler uses this snapshot instead of recomputing consumption from live ResourceSlice definitions.\n\nThe maximum number of counter sets is 2.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1beta2.CounterSetConsumption{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta2.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+			resourcev1beta2.CounterSetConsumption{}.OpenAPIModelName(), resourcev1beta2.DeviceToleration{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -56120,6 +56434,34 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 		},
 		Dependencies: []string{
 			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta2.CounterSet{}.OpenAPIModelName(), resourcev1beta2.Device{}.OpenAPIModelName(), resourcev1beta2.ResourcePool{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_SharedCounter(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SharedCounter describes a quantity that is available in a counter set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Value defines how much of a certain device counter is available for consumption by devices.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"requestPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RequestPolicy defines how this counter must be consumed when a device references this counter through ValueFrom.\n\nIf nil, the counter cannot be referenced through ValueFrom.",
+							Ref:         ref(resourcev1beta2.CapacityRequestPolicy{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"value"},
+			},
+		},
+		Dependencies: []string{
+			resourcev1beta2.CapacityRequestPolicy{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 

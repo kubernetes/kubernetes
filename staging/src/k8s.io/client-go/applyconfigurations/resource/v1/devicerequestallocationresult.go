@@ -94,6 +94,14 @@ type DeviceRequestAllocationResultApplyConfiguration struct {
 	// This field is populated only for devices that allow multiple allocations.
 	// All capacity entries are included, even if the consumed amount is zero.
 	ConsumedCapacity map[resourcev1.QualifiedName]resource.Quantity `json:"consumedCapacity,omitempty"`
+	// ConsumedCounters records the resolved shared-counter consumption
+	// for this allocation at the time it was made. Each entry captures
+	// the amount consumed from one counter set. The scheduler uses this
+	// snapshot instead of recomputing consumption from live ResourceSlice
+	// definitions.
+	//
+	// The maximum number of counter sets is 2.
+	ConsumedCounters []CounterSetConsumptionApplyConfiguration `json:"consumedCounters,omitempty"`
 }
 
 // DeviceRequestAllocationResultApplyConfiguration constructs a declarative configuration of the DeviceRequestAllocationResult type for use with
@@ -193,6 +201,19 @@ func (b *DeviceRequestAllocationResultApplyConfiguration) WithConsumedCapacity(e
 	}
 	for k, v := range entries {
 		b.ConsumedCapacity[k] = v
+	}
+	return b
+}
+
+// WithConsumedCounters adds the given value to the ConsumedCounters field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ConsumedCounters field.
+func (b *DeviceRequestAllocationResultApplyConfiguration) WithConsumedCounters(values ...*CounterSetConsumptionApplyConfiguration) *DeviceRequestAllocationResultApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithConsumedCounters")
+		}
+		b.ConsumedCounters = append(b.ConsumedCounters, *values[i])
 	}
 	return b
 }

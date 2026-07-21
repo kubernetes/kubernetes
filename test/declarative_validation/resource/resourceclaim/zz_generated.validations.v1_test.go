@@ -168,6 +168,9 @@ func init() {
 			"status.allocation.devices.results[*].bindingFailureConditions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
+			"status.allocation.devices.results[*].consumedCounters": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
 			"status.allocation.devices.results[*].driver": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name-caseless"},
 				{ErrorType: "FieldValueRequired"},

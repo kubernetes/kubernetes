@@ -115,7 +115,7 @@ func autoConvert_api_CounterSet_To_v1_CounterSet(in *CounterSet, out *v1.Counter
 	if err := Convert_api_UniqueString_To_string(&in.Name, &out.Name, s); err != nil {
 		return err
 	}
-	out.Counters = *(*map[string]v1.Counter)(unsafe.Pointer(&in.Counters))
+	out.Counters = *(*map[string]v1.SharedCounter)(unsafe.Pointer(&in.Counters))
 	return nil
 }
 
@@ -128,7 +128,7 @@ func autoConvert_v1_CounterSet_To_api_CounterSet(in *v1.CounterSet, out *Counter
 	if err := Convert_string_To_api_UniqueString(&in.Name, &out.Name, s); err != nil {
 		return err
 	}
-	out.Counters = *(*map[string]v1.Counter)(unsafe.Pointer(&in.Counters))
+	out.Counters = *(*map[string]v1.SharedCounter)(unsafe.Pointer(&in.Counters))
 	return nil
 }
 
@@ -213,7 +213,7 @@ func autoConvert_api_DeviceCounterConsumption_To_v1_DeviceCounterConsumption(in 
 	if err := Convert_api_UniqueString_To_string(&in.CounterSet, &out.CounterSet, s); err != nil {
 		return err
 	}
-	out.Counters = *(*map[string]v1.Counter)(unsafe.Pointer(&in.Counters))
+	out.Counters = *(*map[string]v1.ConsumeCounter)(unsafe.Pointer(&in.Counters))
 	return nil
 }
 
@@ -226,7 +226,7 @@ func autoConvert_v1_DeviceCounterConsumption_To_api_DeviceCounterConsumption(in 
 	if err := Convert_string_To_api_UniqueString(&in.CounterSet, &out.CounterSet, s); err != nil {
 		return err
 	}
-	out.Counters = *(*map[string]v1.Counter)(unsafe.Pointer(&in.Counters))
+	out.Counters = *(*map[string]v1.ConsumeCounter)(unsafe.Pointer(&in.Counters))
 	return nil
 }
 
