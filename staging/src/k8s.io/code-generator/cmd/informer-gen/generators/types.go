@@ -20,6 +20,7 @@ import "k8s.io/gengo/v2/types"
 
 var (
 	apiScheme                                    = types.Name{Package: "k8s.io/kubernetes/pkg/api/legacyscheme", Name: "Scheme"}
+	cacheDeletedObject                           = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "DeletedObject"}
 	cacheDoneChecker                             = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "DoneChecker"}
 	cacheGenericLister                           = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "GenericLister"}
 	cacheIndexers                                = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "Indexers"}
@@ -30,7 +31,14 @@ var (
 	cacheNewGenericLister                        = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "NewGenericLister"}
 	cacheNewSharedIndexInformer                  = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "NewSharedIndexInformer"}
 	cacheNewSharedIndexInformerWithOptions       = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "NewSharedIndexInformerWithOptions"}
+	cacheNewTypedSharedIndexInformer             = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "NewTypedSharedIndexInformer"}
 	cacheSharedIndexInformer                     = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "SharedIndexInformer"}
+	cacheTypedFilteringResourceEventHandler      = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TypedFilteringResourceEventHandler"}
+	cacheTypedResourceEventHandlerDetailedFuncs  = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TypedResourceEventHandlerDetailedFuncs"}
+	cacheTypedResourceEventHandlerFuncs          = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TypedResourceEventHandlerFuncs"}
+	cacheTypedIndexers                           = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TypedIndexers"}
+	cacheTypedIndexersToIndexers                 = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TypedIndexersToIndexers"}
+	cacheTypedSharedIndexInformer                = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TypedSharedIndexInformer"}
 	cacheSharedIndexInformerOptions              = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "SharedIndexInformerOptions"}
 	cacheSyncResult                              = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "SyncResult"}
 	cacheTransformFunc                           = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TransformFunc"}

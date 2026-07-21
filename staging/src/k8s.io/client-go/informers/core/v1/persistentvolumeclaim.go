@@ -34,11 +34,39 @@ import (
 )
 
 // PersistentVolumeClaimInformer provides access to a shared informer and lister for
-// PersistentVolumeClaims.
+// PersistentVolumeClaims. Prefer using the type-safe variant (see [TypedPersistentVolumeClaimInformer]).
 type PersistentVolumeClaimInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.PersistentVolumeClaimLister
 }
+
+// TypedPersistentVolumeClaimInformer provides access to a shared informer and lister for
+// PersistentVolumeClaims, including the type-safe TypedInformer variant.
+// It is a superset of PersistentVolumeClaimInformer.
+type TypedPersistentVolumeClaimInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() PersistentVolumeClaimIndexInformer
+	Lister() corev1.PersistentVolumeClaimLister
+}
+
+// PersistentVolumeClaimIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type PersistentVolumeClaimIndexInformer cache.TypedSharedIndexInformer[*apicorev1.PersistentVolumeClaim]
+
+// PersistentVolumeClaimHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for PersistentVolumeClaim.
+type PersistentVolumeClaimHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apicorev1.PersistentVolumeClaim]
+
+// PersistentVolumeClaimDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for PersistentVolumeClaim.
+type PersistentVolumeClaimDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apicorev1.PersistentVolumeClaim]
+
+// PersistentVolumeClaimFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for PersistentVolumeClaim.
+type PersistentVolumeClaimFilteringHandler = cache.TypedFilteringResourceEventHandler[*apicorev1.PersistentVolumeClaim]
+
+// PersistentVolumeClaimIndexers is a specialization of [cache.TypedIndexers] for PersistentVolumeClaim.
+type PersistentVolumeClaimIndexers = cache.TypedIndexers[*apicorev1.PersistentVolumeClaim]
+
+// DeletedPersistentVolumeClaim is a specialization of [cache.DeletedObject] for PersistentVolumeClaim.
+type DeletedPersistentVolumeClaim = cache.DeletedObject[*apicorev1.PersistentVolumeClaim]
 
 type persistentVolumeClaimInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +77,49 @@ type persistentVolumeClaimInformer struct {
 // NewPersistentVolumeClaimInformer constructs a new informer for PersistentVolumeClaim type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedPersistentVolumeClaimInformer]).
 func NewPersistentVolumeClaimInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewPersistentVolumeClaimInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedPersistentVolumeClaimInformer constructs a new informer for PersistentVolumeClaim type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedPersistentVolumeClaimInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers PersistentVolumeClaimIndexers) PersistentVolumeClaimIndexInformer {
+	return NewTypedPersistentVolumeClaimInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredPersistentVolumeClaimInformer constructs a new informer for PersistentVolumeClaim type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredPersistentVolumeClaimInformer]).
 func NewFilteredPersistentVolumeClaimInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewPersistentVolumeClaimInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedPersistentVolumeClaimInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredPersistentVolumeClaimInformer constructs a new informer for PersistentVolumeClaim type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredPersistentVolumeClaimInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers PersistentVolumeClaimIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) PersistentVolumeClaimIndexInformer {
+	return NewTypedPersistentVolumeClaimInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewPersistentVolumeClaimInformerWithOptions constructs a new informer for PersistentVolumeClaim type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedPersistentVolumeClaimInformerWithOptions]).
 func NewPersistentVolumeClaimInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedPersistentVolumeClaimInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedPersistentVolumeClaimInformerWithOptions constructs a new informer for PersistentVolumeClaim type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedPersistentVolumeClaimInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) PersistentVolumeClaimIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apicorev1.PersistentVolumeClaim](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,17 +152,57 @@ func NewPersistentVolumeClaimInformerWithOptions(client kubernetes.Interface, na
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *persistentVolumeClaimInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewPersistentVolumeClaimInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedPersistentVolumeClaimInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *persistentVolumeClaimInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.PersistentVolumeClaim{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *persistentVolumeClaimInformer) TypedInformer() PersistentVolumeClaimIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicorev1.PersistentVolumeClaim](f.factory.InformerFor(&apicorev1.PersistentVolumeClaim{}, f.defaultInformer))
 }
 
 func (f *persistentVolumeClaimInformer) Lister() corev1.PersistentVolumeClaimLister {
 	return corev1.NewPersistentVolumeClaimLister(f.Informer().GetIndexer())
+}
+
+// ToTypedPersistentVolumeClaimInformer converts an untyped informer into a TypedPersistentVolumeClaimInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *PersistentVolumeClaim. If that is not the case, calling type-safe methods of the returned
+// TypedPersistentVolumeClaimInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedPersistentVolumeClaimInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedPersistentVolumeClaimInformer(informer PersistentVolumeClaimInformer) TypedPersistentVolumeClaimInformer {
+	if informer, ok := informer.(TypedPersistentVolumeClaimInformer); ok {
+		return informer
+	}
+	return &persistentVolumeClaimTypedInformerAdapter{informer}
+}
+
+type persistentVolumeClaimTypedInformerAdapter struct {
+	PersistentVolumeClaimInformer
+}
+
+func (a *persistentVolumeClaimTypedInformerAdapter) TypedInformer() PersistentVolumeClaimIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicorev1.PersistentVolumeClaim](a.Informer())
+}
+
+// ToPersistentVolumeClaimIndexInformer converts an untyped informer into a PersistentVolumeClaimIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *PersistentVolumeClaim. If that is not the case, calling type-safe methods of the returned
+// PersistentVolumeClaimIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a PersistentVolumeClaimIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToPersistentVolumeClaimIndexInformer(informer cache.SharedIndexInformer) PersistentVolumeClaimIndexInformer {
+	if informer, ok := informer.(PersistentVolumeClaimIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apicorev1.PersistentVolumeClaim](informer)
 }
