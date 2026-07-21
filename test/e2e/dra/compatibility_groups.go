@@ -37,7 +37,7 @@ const compatGroupsCounterSet = "gpu"
 func compatGroupsCounters() []resourceapi.CounterSet {
 	return []resourceapi.CounterSet{{
 		Name:     compatGroupsCounterSet,
-		Counters: map[string]resourceapi.Counter{"mem": {Value: resource.MustParse("2")}},
+		Counters: map[string]resourceapi.SharedCounter{"mem": {Value: new(resource.MustParse("2"))}},
 	}}
 }
 
@@ -46,7 +46,7 @@ func compatGroupsDevice(name, group string) resourceapi.Device {
 		Name: name,
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
 			CounterSet:          compatGroupsCounterSet,
-			Counters:            map[string]resourceapi.Counter{"mem": {Value: resource.MustParse("1")}},
+			Counters:            map[string]resourceapi.ConsumeCounter{"mem": {Value: new(resource.MustParse("1"))}},
 			CompatibilityGroups: []string{group},
 		}},
 	}

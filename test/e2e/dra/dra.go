@@ -72,6 +72,12 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// mustParseQuantityPtr parses a quantity string and returns a pointer to it.
+func mustParseQuantityPtr(value string) *resource.Quantity {
+	quantity := resource.MustParse(value)
+	return &quantity
+}
+
 const (
 	// podStartTimeout is how long to wait for the pod to be started.
 	podStartTimeout = 5 * time.Minute
@@ -2468,9 +2474,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			[]resourceapi.CounterSet{
 				{
 					Name: "counter-1",
-					Counters: map[string]resourceapi.Counter{
+					Counters: map[string]resourceapi.SharedCounter{
 						"memory": {
-							Value: resource.MustParse("6Gi"),
+							Value: mustParseQuantityPtr("6Gi"),
 						},
 					},
 				},
@@ -2481,9 +2487,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 						{
 							CounterSet: "counter-1",
-							Counters: map[string]resourceapi.Counter{
+							Counters: map[string]resourceapi.ConsumeCounter{
 								"memory": {
-									Value: resource.MustParse("4Gi"),
+									Value: mustParseQuantityPtr("4Gi"),
 								},
 							},
 						},
@@ -2494,9 +2500,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 						{
 							CounterSet: "counter-1",
-							Counters: map[string]resourceapi.Counter{
+							Counters: map[string]resourceapi.ConsumeCounter{
 								"memory": {
-									Value: resource.MustParse("4Gi"),
+									Value: mustParseQuantityPtr("4Gi"),
 								},
 							},
 						},
@@ -2618,6 +2624,262 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			// There should be available capacity for pod2 now.
 			b.TestPod(tCtx, pod2)
+		})
+	}
+
+	sharedConsumableCapacityTests := func() {
+		nodes := drautils.NewNodes(f, 1, 1)
+		capacityName := resourceapi.QualifiedName("dra.example.com/bandwidth")
+		driver := drautils.NewDriver(
+			f,
+			nodes,
+			drautils.ToDriverResources(
+				[]resourceapi.CounterSet{
+					{
+						Name: "shared-bandwidth",
+						Counters: map[string]resourceapi.SharedCounter{
+							"bandwidth": {
+								Value: mustParseQuantityPtr("2"),
+								RequestPolicy: func() *resourceapi.CapacityRequestPolicy {
+									defaultVal := resource.MustParse("1")
+									minVal := resource.MustParse("1")
+									maxVal := resource.MustParse("2")
+									stepVal := resource.MustParse("1")
+									return &resourceapi.CapacityRequestPolicy{
+										Default: &defaultVal,
+										ValidRange: &resourceapi.CapacityRequestPolicyRange{
+											Min:  &minVal,
+											Max:  &maxVal,
+											Step: &stepVal,
+										},
+									}
+								}(),
+							},
+						},
+					},
+				},
+				func() []resourceapi.Device {
+					dynamicRole := "dynamic"
+					staticRole := "static"
+					return []resourceapi.Device{
+						{
+							Name: "vf-0",
+							Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+								"role": {StringValue: &dynamicRole},
+							},
+							ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
+								CounterSet: "shared-bandwidth",
+								Counters: map[string]resourceapi.ConsumeCounter{
+									"bandwidth": {
+										ValueFrom: &resourceapi.CounterValueFrom{
+											CapacityName: capacityName,
+										},
+									},
+								},
+							}},
+						},
+						{
+							Name: "vf-1",
+							Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+								"role": {StringValue: &dynamicRole},
+							},
+							ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
+								CounterSet: "shared-bandwidth",
+								Counters: map[string]resourceapi.ConsumeCounter{
+									"bandwidth": {
+										ValueFrom: &resourceapi.CounterValueFrom{
+											CapacityName: capacityName,
+										},
+									},
+								},
+							}},
+						},
+						{
+							Name: "vf-static",
+							Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+								"role": {StringValue: &staticRole},
+							},
+							ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
+								CounterSet: "shared-bandwidth",
+								Counters: map[string]resourceapi.ConsumeCounter{
+									"bandwidth": {
+										Value: mustParseQuantityPtr("1"),
+									},
+								},
+							}},
+						},
+					}
+				}()...,
+			),
+		)
+		b := drautils.NewBuilder(f, driver)
+
+		f.It("must account for shared consumable capacity across related devices", f.WithKubeletMinVersion("1.37"), func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+
+			claim := b.ExternalClaim()
+			claim.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
+					capacityName: resource.MustParse("1"),
+				},
+			}
+			pod := b.PodExternal(claim.Name)
+			b.Create(tCtx, claim, pod)
+			b.TestPod(tCtx, pod)
+
+			claim2 := b.ExternalClaim()
+			claim2.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
+					capacityName: resource.MustParse("1"),
+				},
+			}
+			pod2 := b.PodExternal(claim2.Name)
+			b.Create(tCtx, claim2, pod2)
+			b.TestPod(tCtx, pod2)
+
+			claim3 := b.ExternalClaim()
+			claim3.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
+					capacityName: resource.MustParse("1"),
+				},
+			}
+			pod3 := b.PodExternal(claim3.Name)
+			b.Create(tCtx, claim3, pod3)
+
+			gomega.Consistently(ctx, func(ctx context.Context) error {
+				testPod, err := f.ClientSet.CoreV1().Pods(pod3.Namespace).Get(ctx, pod3.Name, metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("expected the test pod %s to exist: %w", pod3.Name, err)
+				}
+				if testPod.Status.Phase != v1.PodPending {
+					return fmt.Errorf("pod %s: unexpected status %s, expected status: %s", pod3.Name, testPod.Status.Phase, v1.PodPending)
+				}
+				return nil
+			}, 20*time.Second, 200*time.Millisecond).Should(gomega.Succeed())
+
+			b.DeletePodAndWaitForNotFound(tCtx, pod)
+			b.TestPod(tCtx, pod3)
+		})
+
+		f.It("must account for mixed static and request-driven shared counter consumption", f.WithKubeletMinVersion("1.37"), func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			staticSelector := resourceapi.DeviceSelector{
+				CEL: &resourceapi.CELDeviceSelector{
+					Expression: fmt.Sprintf(`device.attributes["%s"].role == "static"`, driver.Name),
+				},
+			}
+			dynamicSelector := resourceapi.DeviceSelector{
+				CEL: &resourceapi.CELDeviceSelector{
+					Expression: fmt.Sprintf(`device.attributes["%s"].role == "dynamic"`, driver.Name),
+				},
+			}
+
+			staticClaim := b.ExternalClaim()
+			staticClaim.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{staticSelector}
+			staticPod := b.PodExternal(staticClaim.Name)
+			b.Create(tCtx, staticClaim, staticPod)
+			b.TestPod(tCtx, staticPod)
+
+			dynamicClaim1 := b.ExternalClaim()
+			dynamicClaim1.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{dynamicSelector}
+			dynamicClaim1.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
+					capacityName: resource.MustParse("1"),
+				},
+			}
+			dynamicPod1 := b.PodExternal(dynamicClaim1.Name)
+			b.Create(tCtx, dynamicClaim1, dynamicPod1)
+			b.TestPod(tCtx, dynamicPod1)
+
+			dynamicClaim2 := b.ExternalClaim()
+			dynamicClaim2.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{dynamicSelector}
+			dynamicClaim2.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
+					capacityName: resource.MustParse("1"),
+				},
+			}
+			dynamicPod2 := b.PodExternal(dynamicClaim2.Name)
+			b.Create(tCtx, dynamicClaim2, dynamicPod2)
+
+			gomega.Consistently(ctx, func(ctx context.Context) error {
+				testPod, err := f.ClientSet.CoreV1().Pods(dynamicPod2.Namespace).Get(ctx, dynamicPod2.Name, metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("expected the test pod %s to exist: %w", dynamicPod2.Name, err)
+				}
+				if testPod.Status.Phase != v1.PodPending {
+					return fmt.Errorf("pod %s: unexpected status %s, expected status: %s", dynamicPod2.Name, testPod.Status.Phase, v1.PodPending)
+				}
+				return nil
+			}, 20*time.Second, 200*time.Millisecond).Should(gomega.Succeed())
+
+			b.DeletePodAndWaitForNotFound(tCtx, staticPod)
+			b.TestPod(tCtx, dynamicPod2)
+		})
+	}
+
+	sharedStaticCounterTests := func() {
+		nodes := drautils.NewNodes(f, 1, 1)
+		consumption := []resourceapi.DeviceCounterConsumption{{
+			CounterSet: "shared-memory",
+			Counters:   map[string]resourceapi.ConsumeCounter{"memory": {Value: new(resource.MustParse("6Gi"))}},
+		}}
+		driver := drautils.NewDriver(f, nodes, drautils.ToDriverResources(
+			[]resourceapi.CounterSet{{Name: "shared-memory", Counters: map[string]resourceapi.SharedCounter{"memory": {Value: new(resource.MustParse("10Gi"))}}}},
+			resourceapi.Device{Name: "shared-device", AllowMultipleAllocations: new(true), ConsumesCounters: consumption},
+			resourceapi.Device{Name: "other-device", ConsumesCounters: consumption},
+		))
+		b := drautils.NewBuilder(f, driver)
+
+		f.It("must retain static counter consumption until the last share is released", f.WithKubeletMinVersion("1.37"), func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			var claims []*resourceapi.ResourceClaim
+			var pods []*v1.Pod
+			for range 2 {
+				claim := b.ExternalClaim()
+				claim.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{{CEL: &resourceapi.CELDeviceSelector{Expression: "device.allowMultipleAllocations"}}}
+				pod := b.PodExternal(claim.Name)
+				b.Create(tCtx, claim, pod)
+				b.TestPod(tCtx, pod)
+				allocated, err := f.ClientSet.ResourceV1().ResourceClaims(pod.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "get shared claim")
+				gomega.Expect(allocated.Status.Allocation).NotTo(gomega.BeNil())
+				gomega.Expect(allocated.Status.Allocation.Devices.Results).To(gomega.HaveLen(1))
+				result := allocated.Status.Allocation.Devices.Results[0]
+				gomega.Expect(result.Device).To(gomega.Equal("shared-device"))
+				gomega.Expect(result.ShareID).NotTo(gomega.BeNil())
+				gomega.Expect(result.ConsumedCounters).NotTo(gomega.BeNil())
+				gomega.Expect(result.ConsumedCounters.PerDevice).To(gomega.Equal([]resourceapi.CounterSetConsumption{{CounterSet: "shared-memory", Counters: map[string]resource.Quantity{"memory": resource.MustParse("6Gi")}}}))
+				gomega.Expect(result.ConsumedCounters.PerAllocation).To(gomega.BeEmpty())
+				claims = append(claims, allocated)
+				pods = append(pods, pod)
+			}
+			gomega.Expect(claims[0].Status.Allocation.Devices.Results[0].Pool).To(gomega.Equal(claims[1].Status.Allocation.Devices.Results[0].Pool))
+			gomega.Expect(claims[0].Status.Allocation.Devices.Results[0].ShareID).NotTo(gomega.Equal(claims[1].Status.Allocation.Devices.Results[0].ShareID))
+
+			otherClaim := b.ExternalClaim()
+			otherClaim.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{{CEL: &resourceapi.CELDeviceSelector{Expression: "!device.allowMultipleAllocations"}}}
+			otherPod := b.PodExternal(otherClaim.Name)
+			b.Create(tCtx, otherClaim, otherPod)
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, otherPod.Name, otherPod.Namespace))
+
+			ginkgo.By("releasing the first share while the second still reserves the device")
+			b.DeletePodAndWaitForNotFound(tCtx, pods[0])
+			gomega.Eventually(ctx, framework.GetObject(f.ClientSet.ResourceV1().ResourceClaims(pods[0].Namespace).Get, claims[0].Name, metav1.GetOptions{})).
+				WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.Allocation", gomega.BeNil()))
+			gomega.Consistently(ctx, framework.GetObject(f.ClientSet.CoreV1().Pods(otherPod.Namespace).Get, otherPod.Name, metav1.GetOptions{})).
+				WithTimeout(20*time.Second).WithPolling(200*time.Millisecond).Should(gomega.HaveField("Spec.NodeName", gomega.BeEmpty()), "6Gi must remain reserved while a share survives")
+			survivor, err := f.ClientSet.ResourceV1().ResourceClaims(pods[1].Namespace).Get(ctx, claims[1].Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "get surviving shared claim")
+			gomega.Expect(survivor.Status.Allocation).To(gomega.Equal(claims[1].Status.Allocation), "releasing another claim must not change the surviving allocation")
+
+			ginkgo.By("releasing the last share so the other device can use the counters")
+			b.DeletePodAndWaitForNotFound(tCtx, pods[1])
+			gomega.Eventually(ctx, framework.GetObject(f.ClientSet.ResourceV1().ResourceClaims(pods[1].Namespace).Get, claims[1].Name, metav1.GetOptions{})).
+				WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.Allocation", gomega.BeNil()))
+			b.TestPod(tCtx, otherPod)
+			allocated, err := f.ClientSet.ResourceV1().ResourceClaims(otherPod.Namespace).Get(ctx, otherClaim.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "get allocation after the last share was released")
+			gomega.Expect(allocated.Status.Allocation.Devices.Results[0].Device).To(gomega.Equal("other-device"))
 		})
 	}
 
@@ -2859,6 +3121,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAPrioritizedList), prioritizedListTests)
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAConsumableCapacity), consumableCapacityTests)
+
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAConsumableCapacity), f.WithFeatureGate(features.DRAPartitionableDevices), f.WithFeatureGate(features.DRASharedConsumableCapacity), sharedConsumableCapacityTests)
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAConsumableCapacity), f.WithFeatureGate(features.DRAPartitionableDevices), f.WithFeatureGate(features.DRASharedConsumableCapacity), sharedStaticCounterTests)
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "with v1beta1 API", v1beta1Tests)
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "with v1beta2 API", v1beta2Tests)
