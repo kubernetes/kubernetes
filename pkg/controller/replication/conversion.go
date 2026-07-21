@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	appsv1apply "k8s.io/client-go/applyconfigurations/apps/v1"
 	appsv1autoscaling "k8s.io/client-go/applyconfigurations/autoscaling/v1"
+	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
@@ -54,11 +55,15 @@ import (
 // informerAdapter implements ReplicaSetInformer by wrapping ReplicationControllerInformer
 // and converting objects.
 type informerAdapter struct {
-	rcInformer coreinformers.ReplicationControllerInformer
+	rcInformer coreinformers.TypedReplicationControllerInformer
 }
 
 func (i informerAdapter) Informer() cache.SharedIndexInformer {
 	return conversionInformer{i.rcInformer.Informer()}
+}
+
+func (i informerAdapter) TypedInformer() appsinformers.ReplicaSetIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apps.ReplicaSet](i.Informer())
 }
 
 func (i informerAdapter) Lister() appslisters.ReplicaSetLister {
@@ -75,6 +80,10 @@ func (i conversionInformer) AddEventHandler(handler cache.ResourceEventHandler) 
 
 func (i conversionInformer) AddEventHandlerWithResyncPeriod(handler cache.ResourceEventHandler, resyncPeriod time.Duration) (cache.ResourceEventHandlerRegistration, error) {
 	return i.SharedIndexInformer.AddEventHandlerWithResyncPeriod(conversionEventHandler{handler}, resyncPeriod)
+}
+
+func (i conversionInformer) AddEventHandlerWithOptions(handler cache.ResourceEventHandler, options cache.HandlerOptions) (cache.ResourceEventHandlerRegistration, error) {
+	return i.SharedIndexInformer.AddEventHandlerWithOptions(conversionEventHandler{handler}, options)
 }
 
 type conversionLister struct {

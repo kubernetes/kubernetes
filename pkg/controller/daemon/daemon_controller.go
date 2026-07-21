@@ -157,10 +157,10 @@ type DaemonSetsController struct {
 // NewDaemonSetsController creates a new DaemonSetsController
 func NewDaemonSetsController(
 	ctx context.Context,
-	daemonSetInformer appsinformers.DaemonSetInformer,
-	historyInformer appsinformers.ControllerRevisionInformer,
-	podInformer coreinformers.PodInformer,
-	nodeInformer coreinformers.NodeInformer,
+	daemonSetInformer appsinformers.TypedDaemonSetInformer,
+	historyInformer appsinformers.TypedControllerRevisionInformer,
+	podInformer coreinformers.TypedPodInformer,
+	nodeInformer coreinformers.TypedNodeInformer,
 	kubeClient clientset.Interface,
 	failedPodsBackoff *flowcontrol.Backoff,
 ) (*DaemonSetsController, error) {
@@ -221,29 +221,29 @@ func NewDaemonSetsController(
 		consistencyStore: consistencyStore,
 	}
 
-	daemonSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = daemonSetInformer.TypedInformer().AddTypedEventHandler(appsinformers.DaemonSetHandlerFuncs{
+		AddFunc: func(obj *apps.DaemonSet) {
 			dsc.addDaemonset(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *apps.DaemonSet) {
 			dsc.updateDaemonset(logger, oldObj, newObj)
 		},
-		DeleteFunc: func(obj interface{}) {
-			dsc.deleteDaemonset(logger, obj)
+		DeleteFunc: func(obj appsinformers.DeletedDaemonSet) {
+			dsc.deleteDaemonset(logger, obj.OptionalObj)
 		},
 	})
 	dsc.dsLister = daemonSetInformer.Lister()
 	dsc.dsStoreSynced = daemonSetInformer.Informer().HasSynced
 
-	historyInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = historyInformer.TypedInformer().AddTypedEventHandler(appsinformers.ControllerRevisionHandlerFuncs{
+		AddFunc: func(obj *apps.ControllerRevision) {
 			dsc.addHistory(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *apps.ControllerRevision) {
 			dsc.updateHistory(logger, oldObj, newObj)
 		},
-		DeleteFunc: func(obj interface{}) {
-			dsc.deleteHistory(logger, obj)
+		DeleteFunc: func(obj appsinformers.DeletedControllerRevision) {
+			dsc.deleteHistory(logger, obj.OptionalObj)
 		},
 	})
 	dsc.historyLister = historyInformer.Lister()
@@ -252,15 +252,15 @@ func NewDaemonSetsController(
 	// Watch for creation/deletion of pods. The reason we watch is that we don't want a daemon set to create/delete
 	// more pods until all the effects (expectations) of a daemon set's create/delete have been observed.
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = podInformer.TypedInformer().AddTypedEventHandler(coreinformers.PodHandlerFuncs{
+		AddFunc: func(obj *v1.Pod) {
 			dsc.addPod(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *v1.Pod) {
 			dsc.updatePod(logger, oldObj, newObj)
 		},
-		DeleteFunc: func(obj interface{}) {
-			dsc.deletePod(logger, obj)
+		DeleteFunc: func(obj coreinformers.DeletedPod) {
+			dsc.deletePod(logger, obj.OptionalObj)
 		},
 	})
 	dsc.podLister = podInformer.Lister()
@@ -269,11 +269,11 @@ func NewDaemonSetsController(
 	controller.AddPodControllerIndexer(podInformer.Informer())
 	dsc.podIndexer = podInformer.Informer().GetIndexer()
 
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = nodeInformer.TypedInformer().AddTypedEventHandler(coreinformers.NodeHandlerFuncs{
+		AddFunc: func(obj *v1.Node) {
 			dsc.addNode(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *v1.Node) {
 			dsc.updateNode(logger, oldObj, newObj)
 		},
 	},

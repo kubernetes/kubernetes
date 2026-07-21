@@ -68,8 +68,8 @@ type Controller struct {
 // NewPodGroupProtectionController returns a new instance of the PodGroup protection controller.
 func NewPodGroupProtectionController(
 	logger klog.Logger,
-	podGroupInformer schedulinginformers.PodGroupInformer,
-	podInformer coreinformers.PodInformer,
+	podGroupInformer schedulinginformers.TypedPodGroupInformer,
+	podInformer coreinformers.TypedPodInformer,
 	kubeClient clientset.Interface,
 ) (*Controller, error) {
 	c := &Controller{
@@ -84,11 +84,11 @@ func NewPodGroupProtectionController(
 		),
 	}
 
-	if _, err := podGroupInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	if _, err := podGroupInformer.TypedInformer().AddTypedEventHandler(schedulinginformers.PodGroupHandlerFuncs{
+		AddFunc: func(obj *schedulingv1alpha3.PodGroup) {
 			c.handlePodGroupUpdate(logger, obj)
 		},
-		UpdateFunc: func(old, new interface{}) {
+		UpdateFunc: func(old, new *schedulingv1alpha3.PodGroup) {
 			c.handlePodGroupUpdate(logger, new)
 		},
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {
@@ -99,14 +99,14 @@ func NewPodGroupProtectionController(
 		return nil, fmt.Errorf("could not initialize PodGroup protection controller: %w", err)
 	}
 
-	if _, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	if _, err := podInformer.TypedInformer().AddTypedEventHandler(coreinformers.PodHandlerFuncs{
+		AddFunc: func(obj *v1.Pod) {
 			c.handlePodChange(logger, nil, obj)
 		},
-		DeleteFunc: func(obj interface{}) {
-			c.handlePodChange(logger, obj, nil)
+		DeleteFunc: func(obj coreinformers.DeletedPod) {
+			c.handlePodChange(logger, obj.OptionalObj, nil)
 		},
-		UpdateFunc: func(old, new interface{}) {
+		UpdateFunc: func(old, new *v1.Pod) {
 			c.handlePodChange(logger, old, new)
 		},
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {

@@ -64,17 +64,17 @@ func NewPublisher(cmInformer coreinformers.TypedConfigMapInformer, nsInformer co
 		),
 	}
 
-	cmInformer.TypedInformer().AddTypedEventHandler(coreinformers.ConfigMapHandlerFuncs{
+	_, _ = cmInformer.TypedInformer().AddTypedEventHandler(coreinformers.ConfigMapHandlerFuncs{
 		DeleteFunc: e.configMapDeleted,
 		UpdateFunc: e.configMapUpdated,
-	}, cache.HandlerOptions{})
+	})
 	e.cmLister = cmInformer.Lister()
 	e.cmListerSynced = cmInformer.Informer().HasSynced
 
-	nsInformer.TypedInformer().AddTypedEventHandler(coreinformers.NamespaceHandlerFuncs{
+	_, _ = nsInformer.TypedInformer().AddTypedEventHandler(coreinformers.NamespaceHandlerFuncs{
 		AddFunc:    e.namespaceAdded,
 		UpdateFunc: e.namespaceUpdated,
-	}, cache.HandlerOptions{})
+	})
 	e.nsListerSynced = nsInformer.Informer().HasSynced
 
 	e.syncHandler = e.syncNamespace

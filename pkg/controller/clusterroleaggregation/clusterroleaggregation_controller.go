@@ -68,7 +68,7 @@ func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.TypedClusterRol
 	}
 	c.syncHandler = c.syncClusterRole
 
-	clusterRoleInformer.TypedInformer().AddTypedEventHandler(rbacinformers.ClusterRoleHandlerFuncs{
+	_, _ = clusterRoleInformer.TypedInformer().AddTypedEventHandler(rbacinformers.ClusterRoleHandlerFuncs{
 		AddFunc: func(_ *rbacv1.ClusterRole) {
 			c.enqueue()
 		},
@@ -78,7 +78,7 @@ func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.TypedClusterRol
 		DeleteFunc: func(_ rbacinformers.DeletedClusterRole) {
 			c.enqueue()
 		},
-	}, cache.HandlerOptions{})
+	})
 	return c
 }
 

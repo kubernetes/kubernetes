@@ -142,7 +142,7 @@ func testEvictCluster(tCtx ktesting.TContext, useRule useRuleMode) {
 	// Create a new factory and sync it so that when the controller starts, it is up-to-date.
 	// This works as long as this is the only test running it.
 	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
-	var ruleInformer resourceinformers.DeviceTaintRuleInformer
+	var ruleInformer resourceinformers.TypedDeviceTaintRuleInformer
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
 		ruleInformer = informerFactory.Resource().V1().DeviceTaintRules()
 	}

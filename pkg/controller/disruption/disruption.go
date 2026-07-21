@@ -133,12 +133,12 @@ type podControllerFinder func(ctx context.Context, controllerRef *metav1.OwnerRe
 
 func NewDisruptionController(
 	ctx context.Context,
-	podInformer coreinformers.PodInformer,
-	pdbInformer policyinformers.PodDisruptionBudgetInformer,
-	rcInformer coreinformers.ReplicationControllerInformer,
-	rsInformer appsv1informers.ReplicaSetInformer,
-	dInformer appsv1informers.DeploymentInformer,
-	ssInformer appsv1informers.StatefulSetInformer,
+	podInformer coreinformers.TypedPodInformer,
+	pdbInformer policyinformers.TypedPodDisruptionBudgetInformer,
+	rcInformer coreinformers.TypedReplicationControllerInformer,
+	rsInformer appsv1informers.TypedReplicaSetInformer,
+	dInformer appsv1informers.TypedDeploymentInformer,
+	ssInformer appsv1informers.TypedStatefulSetInformer,
 	kubeClient clientset.Interface,
 	restMapper apimeta.RESTMapper,
 	scaleNamespacer scaleclient.ScalesGetter,
@@ -164,12 +164,12 @@ func NewDisruptionController(
 // stalePodDisruptionTimeout
 // It is only supposed to be used by tests.
 func NewDisruptionControllerInternal(ctx context.Context,
-	podInformer coreinformers.PodInformer,
-	pdbInformer policyinformers.PodDisruptionBudgetInformer,
-	rcInformer coreinformers.ReplicationControllerInformer,
-	rsInformer appsv1informers.ReplicaSetInformer,
-	dInformer appsv1informers.DeploymentInformer,
-	ssInformer appsv1informers.StatefulSetInformer,
+	podInformer coreinformers.TypedPodInformer,
+	pdbInformer policyinformers.TypedPodDisruptionBudgetInformer,
+	rcInformer coreinformers.TypedReplicationControllerInformer,
+	rsInformer appsv1informers.TypedReplicaSetInformer,
+	dInformer appsv1informers.TypedDeploymentInformer,
+	ssInformer appsv1informers.TypedStatefulSetInformer,
 	kubeClient clientset.Interface,
 	restMapper apimeta.RESTMapper,
 	scaleNamespacer scaleclient.ScalesGetter,
@@ -212,29 +212,29 @@ func NewDisruptionControllerInternal(ctx context.Context,
 
 	dc.getUpdater = func() updater { return dc.writePdbStatus }
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = podInformer.TypedInformer().AddTypedEventHandler(coreinformers.PodHandlerFuncs{
+		AddFunc: func(obj *v1.Pod) {
 			dc.addPod(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *v1.Pod) {
 			dc.updatePod(logger, oldObj, newObj)
 		},
-		DeleteFunc: func(obj interface{}) {
-			dc.deletePod(logger, obj)
+		DeleteFunc: func(obj coreinformers.DeletedPod) {
+			dc.deletePod(logger, obj.OptionalObj)
 		},
 	})
 	dc.podLister = podInformer.Lister()
 	dc.podListerSynced = podInformer.Informer().HasSynced
 
-	pdbInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = pdbInformer.TypedInformer().AddTypedEventHandler(policyinformers.PodDisruptionBudgetHandlerFuncs{
+		AddFunc: func(obj *policy.PodDisruptionBudget) {
 			dc.addDB(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *policy.PodDisruptionBudget) {
 			dc.updateDB(logger, oldObj, newObj)
 		},
-		DeleteFunc: func(obj interface{}) {
-			dc.removeDB(logger, obj)
+		DeleteFunc: func(obj policyinformers.DeletedPodDisruptionBudget) {
+			dc.removeDB(logger, obj.OptionalObj)
 		},
 	})
 	dc.pdbLister = pdbInformer.Lister()

@@ -130,7 +130,7 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 		}
 	}
 
-	nodeInformer.TypedInformer().AddTypedEventHandler(informers.NodeHandlerFuncs{
+	_, _ = nodeInformer.TypedInformer().AddTypedEventHandler(informers.NodeHandlerFuncs{
 		AddFunc: func(node *v1.Node) {
 			ra.queue.Add(node.Name)
 		},
@@ -148,7 +148,7 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 				utilruntime.HandleErrorWithContext(ctx, err, "Error while processing CIDR Release")
 			}
 		},
-	}, cache.HandlerOptions{})
+	})
 
 	return ra, nil
 }

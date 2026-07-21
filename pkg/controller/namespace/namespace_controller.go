@@ -83,7 +83,7 @@ func NewNamespaceController(
 	}
 
 	// configure the namespace informer event handlers
-	namespaceInformer.TypedInformer().AddTypedEventHandler(
+	_, _ = namespaceInformer.TypedInformer().AddTypedEventHandler(
 		coreinformers.NamespaceHandlerFuncs{
 			AddFunc: func(namespace *v1.Namespace) {
 				namespaceController.enqueueNamespace(namespace)

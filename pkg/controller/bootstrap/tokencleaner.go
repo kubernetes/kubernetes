@@ -90,7 +90,7 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.TypedSecretIn
 	secretMatches := func(secret *v1.Secret) bool {
 		return secret.Type == bootstrapapi.SecretTypeBootstrapToken && secret.Namespace == e.tokenSecretNamespace
 	}
-	secrets.TypedInformer().AddTypedEventHandler(coreinformers.SecretHandlerFuncs{
+	_, _ = secrets.TypedInformer().AddTypedEventHandler(coreinformers.SecretHandlerFuncs{
 		AddFunc: func(secret *v1.Secret) {
 			if secretMatches(secret) {
 				e.enqueueSecrets(secret)

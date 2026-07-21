@@ -87,14 +87,14 @@ func New(ctx context.Context, jobInformer batchinformers.TypedJobInformer, clien
 	}
 
 	logger := klog.FromContext(ctx)
-	jobInformer.TypedInformer().AddTypedEventHandler(batchinformers.JobHandlerFuncs{
+	_, _ = jobInformer.TypedInformer().AddTypedEventHandler(batchinformers.JobHandlerFuncs{
 		AddFunc: func(obj *batch.Job) {
 			tc.addJob(logger, obj)
 		},
 		UpdateFunc: func(oldObj, newObj *batch.Job) {
 			tc.updateJob(logger, oldObj, newObj)
 		},
-	}, cache.HandlerOptions{})
+	})
 
 	tc.jLister = jobInformer.Lister()
 	tc.jListerSynced = jobInformer.Informer().HasSynced

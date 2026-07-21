@@ -72,7 +72,7 @@ func NewSVMController(
 	ctx context.Context,
 	kubeClient kubernetes.Interface,
 	dynamicClient *dynamic.DynamicClient,
-	svmInformer svminformers.StorageVersionMigrationInformer,
+	svmInformer svminformers.TypedStorageVersionMigrationInformer,
 	controllerName string,
 	mapper meta.ResettableRESTMapper,
 	dependencyGraphBuilder *garbagecollector.GraphBuilder,
@@ -95,11 +95,11 @@ func NewSVMController(
 		rateLimiter: rateLimiter,
 	}
 
-	_, err := svmInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, err := svmInformer.TypedInformer().AddTypedEventHandler(svminformers.StorageVersionMigrationHandlerFuncs{
+		AddFunc: func(obj *svmv1.StorageVersionMigration) {
 			svmController.addSVM(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *svmv1.StorageVersionMigration) {
 			svmController.updateSVM(logger, oldObj, newObj)
 		},
 	}, cache.HandlerOptions{Logger: &logger})

@@ -77,8 +77,8 @@ const (
 )
 
 // NewEndpointController returns a new *Controller.
-func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
-	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration) *Controller {
+func NewEndpointController(ctx context.Context, podInformer coreinformers.TypedPodInformer, serviceInformer coreinformers.TypedServiceInformer,
+	endpointsInformer coreinformers.TypedEndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration) *Controller {
 	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: ControllerName})
 
@@ -94,9 +94,9 @@ func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInf
 		workerLoopPeriod: time.Second,
 	}
 
-	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = serviceInformer.TypedInformer().AddTypedEventHandler(coreinformers.ServiceHandlerFuncs{
 		AddFunc: e.onServiceUpdate,
-		UpdateFunc: func(old, cur interface{}) {
+		UpdateFunc: func(old, cur *v1.Service) {
 			e.onServiceUpdate(cur)
 		},
 		DeleteFunc: e.onServiceDelete,
@@ -104,15 +104,15 @@ func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInf
 	e.serviceLister = serviceInformer.Lister()
 	e.servicesSynced = serviceInformer.Informer().HasSynced
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(obj interface{}) { e.onPodUpdate(nil, obj) },
+	_, _ = podInformer.TypedInformer().AddTypedEventHandler(coreinformers.PodHandlerFuncs{
+		AddFunc:    func(obj *v1.Pod) { e.onPodUpdate(nil, obj) },
 		UpdateFunc: e.onPodUpdate,
-		DeleteFunc: func(obj interface{}) { e.onPodUpdate(obj, nil) },
+		DeleteFunc: func(obj coreinformers.DeletedPod) { e.onPodUpdate(obj.OptionalObj, nil) },
 	})
 	e.podLister = podInformer.Lister()
 	e.podsSynced = podInformer.Informer().HasSynced
 
-	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = endpointsInformer.TypedInformer().AddTypedEventHandler(coreinformers.EndpointsHandlerFuncs{
 		DeleteFunc: e.onEndpointsDelete,
 	})
 	e.endpointsLister = endpointsInformer.Lister()
@@ -264,7 +264,7 @@ func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointA
 }
 
 // onServiceUpdate updates the Service Selector in the cache and queues the Service for processing.
-func (e *Controller) onServiceUpdate(obj interface{}) {
+func (e *Controller) onServiceUpdate(obj *v1.Service) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
@@ -274,30 +274,20 @@ func (e *Controller) onServiceUpdate(obj interface{}) {
 }
 
 // onServiceDelete removes the Service Selector from the cache and queues the Service for processing.
-func (e *Controller) onServiceDelete(obj interface{}) {
-	key, err := controller.KeyFunc(obj)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
-		return
-	}
-	e.queue.Add(key)
+func (e *Controller) onServiceDelete(obj coreinformers.DeletedService) {
+	e.queue.Add(obj.GetKey())
 }
 
 // onPodUpdate enqueues the pod's projection key on Add/Update/Delete events, to find matching services later.
-func (e *Controller) onPodUpdate(old, cur interface{}) {
+func (e *Controller) onPodUpdate(old, cur *v1.Pod) {
 	key := endpointsliceutil.GetPodUpdateProjectionKey(old, cur)
 	if key != nil {
 		e.podQueue.Add(key)
 	}
 }
 
-func (e *Controller) onEndpointsDelete(obj interface{}) {
-	key, err := controller.KeyFunc(obj)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
-		return
-	}
-	e.queue.Add(key)
+func (e *Controller) onEndpointsDelete(obj coreinformers.DeletedEndpoints) {
+	e.queue.Add(obj.GetKey())
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and

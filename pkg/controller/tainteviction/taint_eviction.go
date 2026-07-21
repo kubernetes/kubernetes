@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller/tainteviction/metrics"
-	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
 )
 
@@ -182,7 +181,7 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 }
 
 // New creates a new Controller that will use passed clientset to communicate with the API server.
-func New(ctx context.Context, c clientset.Interface, podInformer corev1informers.PodInformer, nodeInformer corev1informers.NodeInformer, controllerName string) (*Controller, error) {
+func New(ctx context.Context, c clientset.Interface, podInformer corev1informers.TypedPodInformer, nodeInformer corev1informers.TypedNodeInformer, controllerName string) (*Controller, error) {
 	logger := klog.FromContext(ctx)
 	metrics.Register()
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
@@ -222,30 +221,18 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 	}
 	tm.taintEvictionQueue = CreateWorkerQueue(deletePodHandler(c, tm.emitPodDeletionEvent, tm.name))
 
-	_, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			pod := obj.(*v1.Pod)
+	_, err := podInformer.TypedInformer().AddTypedEventHandler(corev1informers.PodHandlerFuncs{
+		AddFunc: func(pod *v1.Pod) {
 			tm.PodUpdated(nil, pod)
 		},
-		UpdateFunc: func(prev, obj interface{}) {
-			prevPod := prev.(*v1.Pod)
-			newPod := obj.(*v1.Pod)
-			tm.PodUpdated(prevPod, newPod)
+		UpdateFunc: func(prev, pod *v1.Pod) {
+			tm.PodUpdated(prev, pod)
 		},
-		DeleteFunc: func(obj interface{}) {
-			pod, isPod := obj.(*v1.Pod)
-			// We can get DeletedFinalStateUnknown instead of *v1.Pod here and we need to handle that correctly.
-			if !isPod {
-				deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
-				if !ok {
-					logger.Error(nil, "Received unexpected object", "object", obj)
-					return
-				}
-				pod, ok = deletedState.Obj.(*v1.Pod)
-				if !ok {
-					logger.Error(nil, "DeletedFinalStateUnknown contained non-Pod object", "object", deletedState.Obj)
-					return
-				}
+		DeleteFunc: func(deleted corev1informers.DeletedPod) {
+			pod := deleted.OptionalObj
+			if pod == nil {
+				logger.Error(nil, "Deleted Pod object is unavailable", "pod", deleted.GetKey())
+				return
 			}
 			tm.PodUpdated(pod, nil)
 		},
@@ -254,19 +241,25 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 		return nil, fmt.Errorf("unable to add pod event handler: %w", err)
 	}
 
-	_, err = nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
+	_, err = nodeInformer.TypedInformer().AddTypedEventHandler(corev1informers.NodeHandlerFuncs{
+		AddFunc: func(node *v1.Node) {
+			node = node.DeepCopy()
 			tm.NodeUpdated(nil, node)
-			return nil
-		}),
-		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(oldNode, newNode *v1.Node) error {
+		},
+		UpdateFunc: func(oldNode, newNode *v1.Node) {
+			oldNode = oldNode.DeepCopy()
+			newNode = newNode.DeepCopy()
 			tm.NodeUpdated(oldNode, newNode)
-			return nil
-		}),
-		DeleteFunc: controllerutil.CreateDeleteNodeHandler(logger, func(node *v1.Node) error {
+		},
+		DeleteFunc: func(deleted corev1informers.DeletedNode) {
+			node := deleted.OptionalObj
+			if node == nil {
+				logger.Error(nil, "Deleted Node object is unavailable", "node", deleted.GetKey())
+				return
+			}
+			node = node.DeepCopy()
 			tm.NodeUpdated(node, nil)
-			return nil
-		}),
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to add node event handler: %w", err)

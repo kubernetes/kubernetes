@@ -102,17 +102,17 @@ func NewController(
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ephemeral_volume"})
 
-	podInformer.TypedInformer().AddTypedEventHandler(coreinformers.PodHandlerFuncs{
+	_, _ = podInformer.TypedInformer().AddTypedEventHandler(coreinformers.PodHandlerFuncs{
 		AddFunc: ec.enqueuePod,
 		// The pod spec is immutable. Therefore the controller can ignore pod updates
 		// because there cannot be any changes that have to be copied into the generated
 		// PVC.
 		// Deletion of the PVC is handled through the owner reference and garbage collection.
 		// Therefore pod deletions also can be ignored.
-	}, cache.HandlerOptions{})
-	pvcInformer.TypedInformer().AddTypedEventHandler(coreinformers.PersistentVolumeClaimHandlerFuncs{
+	})
+	_, _ = pvcInformer.TypedInformer().AddTypedEventHandler(coreinformers.PersistentVolumeClaimHandlerFuncs{
 		DeleteFunc: ec.onPVCDelete,
-	}, cache.HandlerOptions{})
+	})
 	if err := common.AddPodPVCIndexerIfNotPresent(podInformer.Informer().GetIndexer()); err != nil {
 		return nil, fmt.Errorf("could not initialize ephemeral volume controller: %w", err)
 	}

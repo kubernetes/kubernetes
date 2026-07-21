@@ -101,7 +101,7 @@ type DeploymentController struct {
 }
 
 // NewDeploymentController creates a new DeploymentController.
-func NewDeploymentController(ctx context.Context, dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) (*DeploymentController, error) {
+func NewDeploymentController(ctx context.Context, dInformer appsinformers.TypedDeploymentInformer, rsInformer appsinformers.TypedReplicaSetInformer, podInformer coreinformers.TypedPodInformer, client clientset.Interface) (*DeploymentController, error) {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	logger := klog.FromContext(ctx)
 	dc := &DeploymentController{
@@ -120,32 +120,32 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 		Recorder:   dc.eventRecorder,
 	}
 
-	dInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = dInformer.TypedInformer().AddTypedEventHandler(appsinformers.DeploymentHandlerFuncs{
+		AddFunc: func(obj *apps.Deployment) {
 			dc.addDeployment(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *apps.Deployment) {
 			dc.updateDeployment(logger, oldObj, newObj)
 		},
 		// This will enter the sync loop and no-op, because the deployment has been deleted from the store.
-		DeleteFunc: func(obj interface{}) {
-			dc.deleteDeployment(logger, obj)
+		DeleteFunc: func(deleted appsinformers.DeletedDeployment) {
+			dc.deleteDeployment(logger, deleted)
 		},
 	})
-	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = rsInformer.TypedInformer().AddTypedEventHandler(appsinformers.ReplicaSetHandlerFuncs{
+		AddFunc: func(obj *apps.ReplicaSet) {
 			dc.addReplicaSet(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *apps.ReplicaSet) {
 			dc.updateReplicaSet(logger, oldObj, newObj)
 		},
-		DeleteFunc: func(obj interface{}) {
-			dc.deleteReplicaSet(logger, obj)
+		DeleteFunc: func(deleted appsinformers.DeletedReplicaSet) {
+			dc.deleteReplicaSet(logger, deleted)
 		},
 	})
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		DeleteFunc: func(obj interface{}) {
-			dc.deletePod(logger, obj)
+	_, _ = podInformer.TypedInformer().AddTypedEventHandler(coreinformers.PodHandlerFuncs{
+		DeleteFunc: func(deleted coreinformers.DeletedPod) {
+			dc.deletePod(logger, deleted)
 		},
 	})
 
@@ -198,45 +198,33 @@ func (dc *DeploymentController) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func (dc *DeploymentController) addDeployment(logger klog.Logger, obj interface{}) {
-	d := obj.(*apps.Deployment)
+func (dc *DeploymentController) addDeployment(logger klog.Logger, d *apps.Deployment) {
 	logger.V(4).Info("Adding deployment", "deployment", klog.KObj(d))
 	dc.enqueueDeployment(d)
 }
 
-func (dc *DeploymentController) updateDeployment(logger klog.Logger, old, cur interface{}) {
-	oldD := old.(*apps.Deployment)
-	curD := cur.(*apps.Deployment)
+func (dc *DeploymentController) updateDeployment(logger klog.Logger, oldD, curD *apps.Deployment) {
 	logger.V(4).Info("Updating deployment", "deployment", klog.KObj(oldD))
 	dc.enqueueDeployment(curD)
 }
 
-func (dc *DeploymentController) deleteDeployment(logger klog.Logger, obj interface{}) {
-	d, ok := obj.(*apps.Deployment)
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-			return
-		}
-		d, ok = tombstone.Obj.(*apps.Deployment)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Deployment %#v", obj))
-			return
-		}
+func (dc *DeploymentController) deleteDeployment(logger klog.Logger, deleted appsinformers.DeletedDeployment) {
+	if deleted.OptionalObj == nil {
+		utilruntime.HandleError(fmt.Errorf("deleted Deployment object %q is unavailable", deleted.GetKey()))
+		return
 	}
+	d := deleted.OptionalObj
 	logger.V(4).Info("Deleting deployment", "deployment", klog.KObj(d))
 	dc.enqueueDeployment(d)
 }
 
 // addReplicaSet enqueues the deployment that manages a ReplicaSet when the ReplicaSet is created.
-func (dc *DeploymentController) addReplicaSet(logger klog.Logger, obj interface{}) {
-	rs := obj.(*apps.ReplicaSet)
+func (dc *DeploymentController) addReplicaSet(logger klog.Logger, rs *apps.ReplicaSet) {
 
 	if rs.DeletionTimestamp != nil {
 		// On a restart of the controller manager, it's possible for an object to
 		// show up in a state that is already pending deletion.
-		dc.deleteReplicaSet(logger, rs)
+		dc.deleteReplicaSet(logger, appsinformers.DeletedReplicaSet{OptionalObj: rs})
 		return
 	}
 	// If it has a ControllerRef, that's all that matters.
@@ -286,9 +274,7 @@ func (dc *DeploymentController) getDeploymentsForReplicaSet(logger klog.Logger, 
 // is updated and wake them up. If the anything of the ReplicaSets have changed, we need to
 // awaken both the old and new deployments. old and cur must be *apps.ReplicaSet
 // types.
-func (dc *DeploymentController) updateReplicaSet(logger klog.Logger, old, cur interface{}) {
-	curRS := cur.(*apps.ReplicaSet)
-	oldRS := old.(*apps.ReplicaSet)
+func (dc *DeploymentController) updateReplicaSet(logger klog.Logger, oldRS, curRS *apps.ReplicaSet) {
 	if curRS.ResourceVersion == oldRS.ResourceVersion {
 		// Periodic resync will send update events for all known replica sets.
 		// Two different versions of the same replica set will always have different RVs.
@@ -333,25 +319,16 @@ func (dc *DeploymentController) updateReplicaSet(logger klog.Logger, old, cur in
 // deleteReplicaSet enqueues the deployment that manages a ReplicaSet when
 // the ReplicaSet is deleted. obj could be an *apps.ReplicaSet, or
 // a DeletionFinalStateUnknown marker item.
-func (dc *DeploymentController) deleteReplicaSet(logger klog.Logger, obj interface{}) {
-	rs, ok := obj.(*apps.ReplicaSet)
-
+func (dc *DeploymentController) deleteReplicaSet(logger klog.Logger, deleted appsinformers.DeletedReplicaSet) {
 	// When a delete is dropped, the relist will notice a pod in the store not
 	// in the list, leading to the insertion of a tombstone object which contains
 	// the deleted key/value. Note that this value might be stale. If the ReplicaSet
 	// changed labels the new deployment will not be woken up till the periodic resync.
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-			return
-		}
-		rs, ok = tombstone.Obj.(*apps.ReplicaSet)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a ReplicaSet %#v", obj))
-			return
-		}
+	if deleted.OptionalObj == nil {
+		utilruntime.HandleError(fmt.Errorf("deleted ReplicaSet object %q is unavailable", deleted.GetKey()))
+		return
 	}
+	rs := deleted.OptionalObj
 
 	controllerRef := metav1.GetControllerOf(rs)
 	if controllerRef == nil {
@@ -367,25 +344,16 @@ func (dc *DeploymentController) deleteReplicaSet(logger klog.Logger, obj interfa
 }
 
 // deletePod will enqueue a Recreate Deployment once all of its pods have stopped running.
-func (dc *DeploymentController) deletePod(logger klog.Logger, obj interface{}) {
-	pod, ok := obj.(*v1.Pod)
-
+func (dc *DeploymentController) deletePod(logger klog.Logger, deleted coreinformers.DeletedPod) {
 	// When a delete is dropped, the relist will notice a pod in the store not
 	// in the list, leading to the insertion of a tombstone object which contains
 	// the deleted key/value. Note that this value might be stale. If the Pod
 	// changed labels the new deployment will not be woken up till the periodic resync.
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-			return
-		}
-		pod, ok = tombstone.Obj.(*v1.Pod)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", obj))
-			return
-		}
+	if deleted.OptionalObj == nil {
+		utilruntime.HandleError(fmt.Errorf("deleted Pod object %q is unavailable", deleted.GetKey()))
+		return
 	}
+	pod := deleted.OptionalObj
 	d := dc.getDeploymentForPod(logger, pod)
 	if d == nil {
 		return

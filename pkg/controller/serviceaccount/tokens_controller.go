@@ -96,7 +96,7 @@ func NewTokensController(logger klog.Logger, serviceAccounts informers.TypedServ
 
 	e.serviceAccounts = serviceAccounts.Lister()
 	e.serviceAccountSynced = serviceAccounts.Informer().HasSynced
-	serviceAccounts.TypedInformer().AddTypedEventHandler(
+	_, _ = serviceAccounts.TypedInformer().AddTypedEventHandler(
 		informers.ServiceAccountHandlerFuncs{
 			AddFunc:    e.queueServiceAccountSync,
 			UpdateFunc: e.queueServiceAccountUpdateSync,
@@ -108,7 +108,7 @@ func NewTokensController(logger klog.Logger, serviceAccounts informers.TypedServ
 	e.secrets = secrets.Lister()
 	e.secretSynced = secrets.Informer().HasSynced
 	secretMatches := func(secret *v1.Secret) bool { return secret.Type == v1.SecretTypeServiceAccountToken }
-	secrets.TypedInformer().AddTypedEventHandler(
+	_, _ = secrets.TypedInformer().AddTypedEventHandler(
 		informers.SecretHandlerFuncs{
 			AddFunc: func(secret *v1.Secret) {
 				if secretMatches(secret) {

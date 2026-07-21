@@ -688,7 +688,7 @@ func computePodGroupName(workloadName, templateName string) string {
 
 // addSchedulingInformers wires up Workload and PodGroup informers
 // and indexers so that changes to those objects re-enqueue the owning Job.
-func (jm *Controller) addSchedulingInformers(logger klog.Logger, workloadInformer schedulinginformers.WorkloadInformer, podGroupInformer schedulinginformers.PodGroupInformer) error {
+func (jm *Controller) addSchedulingInformers(logger klog.Logger, workloadInformer schedulinginformers.TypedWorkloadInformer, podGroupInformer schedulinginformers.TypedPodGroupInformer) error {
 	if workloadInformer == nil {
 		return fmt.Errorf("workload informer is required when the feature gate %q is enabled", features.WorkloadWithJob)
 	}

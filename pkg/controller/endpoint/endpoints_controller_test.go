@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
@@ -203,11 +204,11 @@ func makeBlockingEndpointTestServer(t *testing.T, controller *endpointController
 					// Delay the deletion of endpoints to make endpoints cache out of sync
 					<-blockDelete
 					_ = controller.endpointsStore.Delete(endpoint)
-					controller.onEndpointsDelete(endpoint)
+					controller.onEndpointsDelete(coreinformers.DeletedEndpoints{OptionalObj: endpoint})
 				}()
 			} else {
 				_ = controller.endpointsStore.Delete(endpoint)
-				controller.onEndpointsDelete(endpoint)
+				controller.onEndpointsDelete(coreinformers.DeletedEndpoints{OptionalObj: endpoint})
 			}
 			blockNextAction <- struct{}{}
 		}
@@ -2227,7 +2228,7 @@ func TestPodDeleteBatching(t *testing.T) {
 					t.Fatalf("Pod %q doesn't exist", update.podName)
 				}
 				endpoints.podStore.Delete(old)
-				endpoints.onPodUpdate(old, nil)
+				endpoints.onPodUpdate(old.(*v1.Pod), nil)
 			}
 
 			time.Sleep(tc.finalDelay)
@@ -2565,7 +2566,7 @@ func TestMultipleServiceChanges(t *testing.T) {
 	waitForChanReceive(t, 1*time.Second, blockNextAction, "Service Add should have caused a request to be sent to the test server")
 
 	controller.serviceStore.Delete(svc)
-	controller.onServiceDelete(svc)
+	controller.onServiceDelete(coreinformers.DeletedService{OptionalObj: svc})
 	waitForChanReceive(t, 1*time.Second, blockNextAction, "Service Delete should have caused a request to be sent to the test server")
 
 	// If endpoints cache has not updated before service update is registered
@@ -2914,7 +2915,7 @@ func TestEndpointsDeletionEvents(t *testing.T) {
 
 	// Test Unexpected and Expected Deletes
 	store.Delete(ep1)
-	controller.onEndpointsDelete(ep1)
+	controller.onEndpointsDelete(coreinformers.DeletedEndpoints{OptionalObj: ep1})
 
 	if controller.queue.Len() != 1 {
 		t.Errorf("Expected one service to be in the queue, found %d", controller.queue.Len())

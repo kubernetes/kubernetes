@@ -61,14 +61,14 @@ func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.Type
 
 	e.pvLister = pvInformer.Lister()
 	e.pvListerSynced = pvInformer.Informer().HasSynced
-	pvInformer.TypedInformer().AddTypedEventHandler(coreinformers.PersistentVolumeHandlerFuncs{
+	_, _ = pvInformer.TypedInformer().AddTypedEventHandler(coreinformers.PersistentVolumeHandlerFuncs{
 		AddFunc: func(obj *v1.PersistentVolume) {
 			e.pvAddedUpdated(logger, obj)
 		},
 		UpdateFunc: func(_, newObj *v1.PersistentVolume) {
 			e.pvAddedUpdated(logger, newObj)
 		},
-	}, cache.HandlerOptions{})
+	})
 
 	return e
 }

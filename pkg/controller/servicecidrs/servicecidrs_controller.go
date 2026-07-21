@@ -89,14 +89,14 @@ func NewController(
 		AddFunc:    c.addServiceCIDR,
 		UpdateFunc: c.updateServiceCIDR,
 		DeleteFunc: c.deleteServiceCIDR,
-	}, cache.HandlerOptions{})
+	})
 	c.serviceCIDRLister = serviceCIDRInformer.Lister()
 	c.serviceCIDRsSynced = serviceCIDRInformer.Informer().HasSynced
 
 	_, _ = ipAddressInformer.TypedInformer().AddTypedEventHandler(networkinginformers.IPAddressHandlerFuncs{
 		AddFunc:    c.addIPAddress,
 		DeleteFunc: c.deleteIPAddress,
-	}, cache.HandlerOptions{})
+	})
 
 	c.ipAddressLister = ipAddressInformer.Lister()
 	c.ipAddressSynced = ipAddressInformer.Informer().HasSynced

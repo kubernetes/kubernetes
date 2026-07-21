@@ -44,6 +44,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	appsinformers "k8s.io/client-go/informers/apps/v1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
@@ -261,7 +263,7 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 	rsSpec := newReplicaSet(1, labelMap)
 	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rsSpec)
 	pods := newPodList(nil, 1, v1.PodRunning, labelMap, rsSpec, "pod")
-	manager.deletePod(logger, cache.DeletedFinalStateUnknown{Key: "foo", Obj: &pods.Items[0]})
+	manager.deletePod(logger, coreinformers.DeletedPod{OptionalObj: &pods.Items[0], FinalStateUnknown: &cache.DeletedFinalStateUnknown{Key: "foo", Obj: &pods.Items[0]}})
 
 	go manager.worker(ctx)
 
@@ -1032,7 +1034,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 				// don't double delete.
 				for i := range podsToDelete[1:] {
 					informers.Core().V1().Pods().Informer().GetIndexer().Delete(podsToDelete[i])
-					manager.deletePod(logger, podsToDelete[i])
+					manager.deletePod(logger, coreinformers.DeletedPod{OptionalObj: podsToDelete[i]})
 				}
 				podExp, exists, err := manager.expectations.GetExpectations(rsKey)
 				if !exists || err != nil {
@@ -1075,7 +1077,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 					},
 				}
 				informers.Core().V1().Pods().Informer().GetIndexer().Delete(lastPod)
-				manager.deletePod(logger, lastPod)
+				manager.deletePod(logger, coreinformers.DeletedPod{OptionalObj: lastPod})
 			}
 			pods.Items = pods.Items[expectedPods:]
 		}
@@ -1174,7 +1176,7 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 		t.Errorf("No expectations found for ReplicaSet")
 	}
 	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Delete(rs)
-	manager.deleteRS(logger, rs)
+	manager.deleteRS(logger, appsinformers.DeletedReplicaSet{OptionalObj: rs})
 	manager.syncReplicaSet(ctx, GetKey(rs, t))
 
 	_, exists, err = manager.expectations.GetExpectations(rsKey)
@@ -1485,14 +1487,14 @@ func TestDeletionTimestamp(t *testing.T) {
 
 	// A pod with a non-nil deletion timestamp should also be ignored by the
 	// delete handler, because it's already been counted in the update.
-	manager.deletePod(logger, &pod)
+	manager.deletePod(logger, coreinformers.DeletedPod{OptionalObj: &pod})
 	podExp, exists, err = manager.expectations.GetExpectations(rsKey)
 	if !exists || err != nil || podExp.Fulfilled() {
 		t.Fatalf("Wrong expectations %#v", podExp)
 	}
 
 	// Deleting the second pod should clear expectations.
-	manager.deletePod(logger, secondPod)
+	manager.deletePod(logger, coreinformers.DeletedPod{OptionalObj: secondPod})
 
 	queueRS, _ = manager.queue.Get()
 	if queueRS != rsKey {

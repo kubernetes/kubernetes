@@ -1687,7 +1687,7 @@ func TestPodDeleteBatching(t *testing.T) {
 				require.NoError(t, err, "error while retrieving old value of %q: %v", update.podName, err)
 				assert.True(t, exists, "pod should exist")
 				esController.podStore.Delete(old)
-				esController.onPodUpdate(old, nil)
+				esController.onPodUpdate(old.(*v1.Pod), nil)
 			}
 
 			time.Sleep(tc.finalDelay)

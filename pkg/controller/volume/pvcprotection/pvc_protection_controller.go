@@ -122,7 +122,7 @@ var unusedSinceNowFunc = metav1.Now
 type podUsageCheckFunc func(logger klog.Logger, pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool
 
 // NewPVCProtectionController returns a new instance of PVCProtectionController.
-func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface) (*Controller, error) {
+func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.TypedPersistentVolumeClaimInformer, podInformer coreinformers.TypedPodInformer, cl clientset.Interface) (*Controller, error) {
 	e := &Controller{
 		client: cl,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -134,11 +134,11 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 
 	e.pvcLister = pvcInformer.Lister()
 	e.pvcListerSynced = pvcInformer.Informer().HasSynced
-	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = pvcInformer.TypedInformer().AddTypedEventHandler(coreinformers.PersistentVolumeClaimHandlerFuncs{
+		AddFunc: func(obj *v1.PersistentVolumeClaim) {
 			e.pvcAddedUpdated(logger, obj)
 		},
-		UpdateFunc: func(old, new interface{}) {
+		UpdateFunc: func(old, new *v1.PersistentVolumeClaim) {
 			e.pvcAddedUpdated(logger, new)
 		},
 	})
@@ -149,14 +149,14 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 	if err := common.AddIndexerIfNotPresent(e.podIndexer, common.PodPVCIndex, common.PodPVCIndexFunc()); err != nil {
 		return nil, fmt.Errorf("could not initialize pvc protection controller: %w", err)
 	}
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = podInformer.TypedInformer().AddTypedEventHandler(coreinformers.PodHandlerFuncs{
+		AddFunc: func(obj *v1.Pod) {
 			e.podAddedDeletedUpdated(logger, nil, obj, false)
 		},
-		DeleteFunc: func(obj interface{}) {
-			e.podAddedDeletedUpdated(logger, nil, obj, true)
+		DeleteFunc: func(obj coreinformers.DeletedPod) {
+			e.podAddedDeletedUpdated(logger, nil, obj.OptionalObj, true)
 		},
-		UpdateFunc: func(old, new interface{}) {
+		UpdateFunc: func(old, new *v1.Pod) {
 			e.podAddedDeletedUpdated(logger, old, new, false)
 		},
 	})

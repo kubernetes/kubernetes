@@ -96,12 +96,12 @@ type Controller struct {
 
 	client        clientset.Interface
 	recorder      record.EventRecorder
-	podInformer   coreinformers.PodInformer
+	podInformer   coreinformers.TypedPodInformer
 	podLister     corelisters.PodLister
-	claimInformer resourceinformers.ResourceClaimInformer
-	sliceInformer resourceinformers.ResourceSliceInformer
-	ruleInformer  resourceinformers.DeviceTaintRuleInformer
-	classInformer resourceinformers.DeviceClassInformer
+	claimInformer resourceinformers.TypedResourceClaimInformer
+	sliceInformer resourceinformers.TypedResourceSliceInformer
+	ruleInformer  resourceinformers.TypedDeviceTaintRuleInformer
+	classInformer resourceinformers.TypedDeviceClassInformer
 	ruleLister    resourcelisters.DeviceTaintRuleLister
 	haveSynced    []cache.DoneChecker
 	hasSynced     atomic.Int32
@@ -731,11 +731,11 @@ func (tc *Controller) countTaintedDevices(rule *resourceapi.DeviceTaintRule) (nu
 
 // New creates a new Controller that will use passed clientset to communicate with the API server.
 // Spawns no goroutines. That happens in Run.
-func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInformer resourceinformers.ResourceClaimInformer, sliceInformer resourceinformers.ResourceSliceInformer, ruleInformer resourceinformers.DeviceTaintRuleInformer, classInformer resourceinformers.DeviceClassInformer, controllerName string) *Controller {
+func New(c clientset.Interface, podInformer coreinformers.TypedPodInformer, claimInformer resourceinformers.TypedResourceClaimInformer, sliceInformer resourceinformers.TypedResourceSliceInformer, ruleInformer resourceinformers.TypedDeviceTaintRuleInformer, classInformer resourceinformers.TypedDeviceClassInformer, controllerName string) *Controller {
 	return newWithFeatures(c, podInformer, claimInformer, sliceInformer, ruleInformer, classInformer, controllerName, utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims))
 }
 
-func newWithFeatures(c clientset.Interface, podInformer coreinformers.PodInformer, claimInformer resourceinformers.ResourceClaimInformer, sliceInformer resourceinformers.ResourceSliceInformer, ruleInformer resourceinformers.DeviceTaintRuleInformer, classInformer resourceinformers.DeviceClassInformer, controllerName string, workloadResourceClaimsEnabled bool) *Controller {
+func newWithFeatures(c clientset.Interface, podInformer coreinformers.TypedPodInformer, claimInformer resourceinformers.TypedResourceClaimInformer, sliceInformer resourceinformers.TypedResourceSliceInformer, ruleInformer resourceinformers.TypedDeviceTaintRuleInformer, classInformer resourceinformers.TypedDeviceClassInformer, controllerName string, workloadResourceClaimsEnabled bool) *Controller {
 	metrics.Register() // It would be nicer to pass the controller name here, but that probably would break generating https://kubernetes.io/docs/reference/instrumentation/metrics.
 
 	tc := &Controller{
@@ -834,38 +834,21 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 		return err
 	}
 
-	claimHandler, err := tc.claimInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj any) {
-			claim, ok := obj.(*resourceapi.ResourceClaim)
-			if !ok {
-				logger.Error(nil, "Expected ResourceClaim", "actual", fmt.Sprintf("%T", obj))
-				return
-			}
+	claimHandler, err := tc.claimInformer.TypedInformer().AddTypedEventHandler(resourceinformers.ResourceClaimHandlerFuncs{
+		AddFunc: func(claim *resourceapi.ResourceClaim) {
 			tc.mutex.Lock()
 			defer tc.mutex.Unlock()
 			tc.handleClaimChange(nil, claim)
 		},
-		UpdateFunc: func(oldObj, newObj any) {
-			oldClaim, ok := oldObj.(*resourceapi.ResourceClaim)
-			if !ok {
-				logger.Error(nil, "Expected ResourceClaim", "actual", fmt.Sprintf("%T", oldObj))
-				return
-			}
-			newClaim, ok := newObj.(*resourceapi.ResourceClaim)
-			if !ok {
-				logger.Error(nil, "Expected ResourceClaim", "actual", fmt.Sprintf("%T", newObj))
-			}
+		UpdateFunc: func(oldClaim, newClaim *resourceapi.ResourceClaim) {
 			tc.mutex.Lock()
 			defer tc.mutex.Unlock()
 			tc.handleClaimChange(oldClaim, newClaim)
 		},
-		DeleteFunc: func(obj any) {
-			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-				obj = tombstone.Obj
-			}
-			claim, ok := obj.(*resourceapi.ResourceClaim)
-			if !ok {
-				logger.Error(nil, "Expected ResourceClaim", "actual", fmt.Sprintf("%T", obj))
+		DeleteFunc: func(deleted resourceinformers.DeletedResourceClaim) {
+			claim := deleted.OptionalObj
+			if claim == nil {
+				logger.Error(nil, "Deleted ResourceClaim object is unavailable", "claim", deleted.GetKey())
 				return
 			}
 			tc.mutex.Lock()
@@ -881,38 +864,21 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 	}()
 	tc.haveSynced = append(tc.haveSynced, claimHandler.HasSyncedChecker())
 
-	podHandler, err := tc.podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj any) {
-			pod, ok := obj.(*v1.Pod)
-			if !ok {
-				logger.Error(nil, "Expected Pod", "actual", fmt.Sprintf("%T", obj))
-				return
-			}
+	podHandler, err := tc.podInformer.TypedInformer().AddTypedEventHandler(coreinformers.PodHandlerFuncs{
+		AddFunc: func(pod *v1.Pod) {
 			tc.mutex.Lock()
 			defer tc.mutex.Unlock()
 			tc.handlePodChange(nil, pod)
 		},
-		UpdateFunc: func(oldObj, newObj any) {
-			oldPod, ok := oldObj.(*v1.Pod)
-			if !ok {
-				logger.Error(nil, "Expected Pod", "actual", fmt.Sprintf("%T", oldObj))
-				return
-			}
-			newPod, ok := newObj.(*v1.Pod)
-			if !ok {
-				logger.Error(nil, "Expected Pod", "actual", fmt.Sprintf("%T", newObj))
-			}
+		UpdateFunc: func(oldPod, newPod *v1.Pod) {
 			tc.mutex.Lock()
 			defer tc.mutex.Unlock()
 			tc.handlePodChange(oldPod, newPod)
 		},
-		DeleteFunc: func(obj any) {
-			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-				obj = tombstone.Obj
-			}
-			pod, ok := obj.(*v1.Pod)
-			if !ok {
-				logger.Error(nil, "Expected Pod", "actual", fmt.Sprintf("%T", obj))
+		DeleteFunc: func(deleted coreinformers.DeletedPod) {
+			pod := deleted.OptionalObj
+			if pod == nil {
+				logger.Error(nil, "Deleted Pod object is unavailable", "pod", deleted.GetKey())
 				return
 			}
 			tc.mutex.Lock()
@@ -929,38 +895,21 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 	tc.haveSynced = append(tc.haveSynced, podHandler.HasSyncedChecker())
 
 	if tc.ruleInformer != nil {
-		ruleHandler, err := tc.ruleInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj any) {
-				rule, ok := obj.(*resourceapi.DeviceTaintRule)
-				if !ok {
-					logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", obj))
-					return
-				}
+		ruleHandler, err := tc.ruleInformer.TypedInformer().AddTypedEventHandler(resourceinformers.DeviceTaintRuleHandlerFuncs{
+			AddFunc: func(rule *resourceapi.DeviceTaintRule) {
 				tc.mutex.Lock()
 				defer tc.mutex.Unlock()
 				tc.handleRuleChange(nil, rule)
 			},
-			UpdateFunc: func(oldObj, newObj any) {
-				oldRule, ok := oldObj.(*resourceapi.DeviceTaintRule)
-				if !ok {
-					logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", oldObj))
-					return
-				}
-				newRule, ok := newObj.(*resourceapi.DeviceTaintRule)
-				if !ok {
-					logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", newObj))
-				}
+			UpdateFunc: func(oldRule, newRule *resourceapi.DeviceTaintRule) {
 				tc.mutex.Lock()
 				defer tc.mutex.Unlock()
 				tc.handleRuleChange(oldRule, newRule)
 			},
-			DeleteFunc: func(obj any) {
-				if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-					obj = tombstone.Obj
-				}
-				rule, ok := obj.(*resourceapi.DeviceTaintRule)
-				if !ok {
-					logger.Error(nil, "Expected DeviceTaintRule", "actual", fmt.Sprintf("%T", obj))
+			DeleteFunc: func(deleted resourceinformers.DeletedDeviceTaintRule) {
+				rule := deleted.OptionalObj
+				if rule == nil {
+					logger.Error(nil, "Deleted DeviceTaintRule object is unavailable", "rule", deleted.GetKey())
 					return
 				}
 				tc.mutex.Lock()
@@ -977,36 +926,21 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 		tc.haveSynced = append(tc.haveSynced, ruleHandler.HasSyncedChecker())
 	}
 
-	sliceHandler, err := tc.sliceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj any) {
-			slice, ok := obj.(*resourceapi.ResourceSlice)
-			if !ok {
-				logger.Error(nil, "Expected ResourceSlice", "actual", fmt.Sprintf("%T", obj))
-				return
-			}
+	sliceHandler, err := tc.sliceInformer.TypedInformer().AddTypedEventHandler(resourceinformers.ResourceSliceHandlerFuncs{
+		AddFunc: func(slice *resourceapi.ResourceSlice) {
 			tc.mutex.Lock()
 			defer tc.mutex.Unlock()
 			tc.handleSliceChange(nil, slice)
 		},
-		UpdateFunc: func(oldObj, newObj any) {
-			oldSlice, ok := oldObj.(*resourceapi.ResourceSlice)
-			if !ok {
-				logger.Error(nil, "Expected ResourceSlice", "actual", fmt.Sprintf("%T", oldObj))
-				return
-			}
-			newSlice, ok := newObj.(*resourceapi.ResourceSlice)
-			if !ok {
-				logger.Error(nil, "Expected ResourceSlice", "actual", fmt.Sprintf("%T", newObj))
-			}
+		UpdateFunc: func(oldSlice, newSlice *resourceapi.ResourceSlice) {
 			tc.mutex.Lock()
 			defer tc.mutex.Unlock()
 			tc.handleSliceChange(oldSlice, newSlice)
 		},
-		DeleteFunc: func(obj any) {
-			// No need to check for DeletedFinalStateUnknown here, the resourceslicetracker doesn't use that.
-			slice, ok := obj.(*resourceapi.ResourceSlice)
-			if !ok {
-				logger.Error(nil, "Expected ResourceSlice", "actual", fmt.Sprintf("%T", obj))
+		DeleteFunc: func(deleted resourceinformers.DeletedResourceSlice) {
+			slice := deleted.OptionalObj
+			if slice == nil {
+				logger.Error(nil, "Deleted ResourceSlice object is unavailable", "slice", deleted.GetKey())
 				return
 			}
 			tc.mutex.Lock()

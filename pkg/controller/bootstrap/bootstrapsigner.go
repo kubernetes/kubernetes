@@ -113,7 +113,7 @@ func NewSigner(cl clientset.Interface, secrets informers.TypedSecretInformer, co
 	configMapMatches := func(cm *v1.ConfigMap) bool {
 		return cm.Name == options.ConfigMapName && cm.Namespace == options.ConfigMapNamespace
 	}
-	configMaps.TypedInformer().AddTypedEventHandler(informers.ConfigMapHandlerFuncs{
+	_, _ = configMaps.TypedInformer().AddTypedEventHandler(informers.ConfigMapHandlerFuncs{
 		AddFunc: func(cm *v1.ConfigMap) {
 			if configMapMatches(cm) {
 				e.pokeConfigMapSync()
@@ -129,7 +129,7 @@ func NewSigner(cl clientset.Interface, secrets informers.TypedSecretInformer, co
 	secretMatches := func(secret *v1.Secret) bool {
 		return secret.Type == bootstrapapi.SecretTypeBootstrapToken && secret.Namespace == e.secretNamespace
 	}
-	secrets.TypedInformer().AddTypedEventHandler(informers.SecretHandlerFuncs{
+	_, _ = secrets.TypedInformer().AddTypedEventHandler(informers.SecretHandlerFuncs{
 		AddFunc: func(secret *v1.Secret) {
 			if secretMatches(secret) {
 				e.pokeConfigMapSync()

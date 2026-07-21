@@ -90,7 +90,7 @@ func NewController(policyInformer informerv1.TypedValidatingAdmissionPolicyInfor
 		UpdateFunc: func(_, newObj *v1.ValidatingAdmissionPolicy) {
 			c.enqueuePolicy(newObj)
 		},
-	}, cache.HandlerOptions{})
+	})
 	if err != nil {
 		return nil, err
 	}

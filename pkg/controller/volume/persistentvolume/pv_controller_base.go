@@ -65,11 +65,11 @@ type ControllerParameters struct {
 	KubeClient                clientset.Interface
 	SyncPeriod                time.Duration
 	VolumePlugins             []vol.VolumePlugin
-	VolumeInformer            coreinformers.PersistentVolumeInformer
-	ClaimInformer             coreinformers.PersistentVolumeClaimInformer
-	ClassInformer             storageinformers.StorageClassInformer
-	PodInformer               coreinformers.PodInformer
-	NodeInformer              coreinformers.NodeInformer
+	VolumeInformer            coreinformers.TypedPersistentVolumeInformer
+	ClaimInformer             coreinformers.TypedPersistentVolumeClaimInformer
+	ClassInformer             storageinformers.TypedStorageClassInformer
+	PodInformer               coreinformers.TypedPodInformer
+	NodeInformer              coreinformers.TypedNodeInformer
 	EnableDynamicProvisioning bool
 }
 
@@ -105,21 +105,23 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 		return nil, fmt.Errorf("could not initialize volume plugins for PersistentVolume Controller: %w", err)
 	}
 
-	p.VolumeInformer.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    func(obj interface{}) { controller.enqueueWork(ctx, controller.volumeQueue, obj) },
-			UpdateFunc: func(oldObj, newObj interface{}) { controller.enqueueWork(ctx, controller.volumeQueue, newObj) },
-			DeleteFunc: func(obj interface{}) { controller.enqueueWork(ctx, controller.volumeQueue, obj) },
+	_, _ = p.VolumeInformer.TypedInformer().AddTypedEventHandler(
+		coreinformers.PersistentVolumeHandlerFuncs{
+			AddFunc:    func(obj *v1.PersistentVolume) { controller.enqueueWork(ctx, controller.volumeQueue, obj) },
+			UpdateFunc: func(oldObj, newObj *v1.PersistentVolume) { controller.enqueueWork(ctx, controller.volumeQueue, newObj) },
+			DeleteFunc: func(obj coreinformers.DeletedPersistentVolume) { controller.volumeQueue.Add(obj.GetKey()) },
 		},
 	)
 	controller.volumeLister = p.VolumeInformer.Lister()
 	controller.volumeListerSynced = p.VolumeInformer.Informer().HasSynced
 
-	p.ClaimInformer.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    func(obj interface{}) { controller.enqueueWork(ctx, controller.claimQueue, obj) },
-			UpdateFunc: func(oldObj, newObj interface{}) { controller.enqueueWork(ctx, controller.claimQueue, newObj) },
-			DeleteFunc: func(obj interface{}) { controller.enqueueWork(ctx, controller.claimQueue, obj) },
+	_, _ = p.ClaimInformer.TypedInformer().AddTypedEventHandler(
+		coreinformers.PersistentVolumeClaimHandlerFuncs{
+			AddFunc: func(obj *v1.PersistentVolumeClaim) { controller.enqueueWork(ctx, controller.claimQueue, obj) },
+			UpdateFunc: func(oldObj, newObj *v1.PersistentVolumeClaim) {
+				controller.enqueueWork(ctx, controller.claimQueue, newObj)
+			},
+			DeleteFunc: func(obj coreinformers.DeletedPersistentVolumeClaim) { controller.claimQueue.Add(obj.GetKey()) },
 		},
 	)
 	controller.claimLister = p.ClaimInformer.Lister()

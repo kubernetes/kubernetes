@@ -209,18 +209,18 @@ var (
 // workloadInformer and podGroupInformer may be nil when the WorkloadWithJob
 // feature gate is disabled; they are required when the gate is enabled.
 func NewController(ctx context.Context, kubeClient clientset.Interface,
-	podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer,
-	workloadInformer schedulinginformers.WorkloadInformer,
-	podGroupInformer schedulinginformers.PodGroupInformer) (*Controller, error) {
+	podInformer coreinformers.TypedPodInformer, jobInformer batchinformers.TypedJobInformer,
+	workloadInformer schedulinginformers.TypedWorkloadInformer,
+	podGroupInformer schedulinginformers.TypedPodGroupInformer) (*Controller, error) {
 
 	return newControllerWithClock(ctx, kubeClient, &clock.RealClock{},
 		podInformer, jobInformer, workloadInformer, podGroupInformer)
 }
 
 func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface, clock clock.WithTicker,
-	podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer,
-	workloadInformer schedulinginformers.WorkloadInformer,
-	podGroupInformer schedulinginformers.PodGroupInformer,
+	podInformer coreinformers.TypedPodInformer, jobInformer batchinformers.TypedJobInformer,
+	workloadInformer schedulinginformers.TypedWorkloadInformer,
+	podGroupInformer schedulinginformers.TypedPodGroupInformer,
 ) (*Controller, error) {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	logger := klog.FromContext(ctx)
@@ -269,15 +269,15 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 		consistencyStore:        consistencyStore,
 	}
 
-	if _, err := jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	if _, err := jobInformer.TypedInformer().AddTypedEventHandler(batchinformers.JobHandlerFuncs{
+		AddFunc: func(obj *batch.Job) {
 			jm.addJob(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *batch.Job) {
 			jm.updateJob(logger, oldObj, newObj)
 		},
-		DeleteFunc: func(obj interface{}) {
-			jm.deleteJob(logger, obj)
+		DeleteFunc: func(obj batchinformers.DeletedJob) {
+			jm.deleteJob(logger, obj.OptionalObj)
 		},
 	}); err != nil {
 		return nil, fmt.Errorf("adding Job event handler: %w", err)
@@ -285,15 +285,15 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 	jm.jobLister = jobInformer.Lister()
 	jm.jobStoreSynced = jobInformer.Informer().HasSynced
 
-	if _, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	if _, err := podInformer.TypedInformer().AddTypedEventHandler(coreinformers.PodHandlerFuncs{
+		AddFunc: func(obj *v1.Pod) {
 			jm.addPod(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *v1.Pod) {
 			jm.updatePod(logger, oldObj, newObj)
 		},
-		DeleteFunc: func(obj interface{}) {
-			jm.deletePod(logger, obj, true)
+		DeleteFunc: func(obj coreinformers.DeletedPod) {
+			jm.deletePod(logger, obj.OptionalObj, true)
 		},
 	}); err != nil {
 		return nil, fmt.Errorf("adding Pod event handler: %w", err)

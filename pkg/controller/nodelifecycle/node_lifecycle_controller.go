@@ -313,10 +313,10 @@ type Controller struct {
 // NewNodeLifecycleController returns a new taint controller.
 func NewNodeLifecycleController(
 	ctx context.Context,
-	leaseInformer coordinformers.LeaseInformer,
-	podInformer coreinformers.PodInformer,
-	nodeInformer coreinformers.NodeInformer,
-	daemonSetInformer appsv1informers.DaemonSetInformer,
+	leaseInformer coordinformers.TypedLeaseInformer,
+	podInformer coreinformers.TypedPodInformer,
+	nodeInformer coreinformers.TypedNodeInformer,
+	daemonSetInformer appsv1informers.TypedDaemonSetInformer,
 	kubeClient clientset.Interface,
 	nodeMonitorPeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
@@ -366,15 +366,12 @@ func NewNodeLifecycleController(
 	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
 	nc.computeZoneStateFunc = nc.ComputeZoneState
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			pod := obj.(*v1.Pod)
+	_, _ = podInformer.TypedInformer().AddTypedEventHandler(coreinformers.PodHandlerFuncs{
+		AddFunc: func(pod *v1.Pod) {
 			nc.podUpdated(nil, pod)
 		},
-		UpdateFunc: func(prev, obj interface{}) {
-			prevPod := prev.(*v1.Pod)
-			newPod := obj.(*v1.Pod)
-			nc.podUpdated(prevPod, newPod)
+		UpdateFunc: func(prev, pod *v1.Pod) {
+			nc.podUpdated(prev, pod)
 		},
 	})
 	nc.podInformerSynced = podInformer.Informer().HasSynced
@@ -408,19 +405,24 @@ func NewNodeLifecycleController(
 	}
 
 	logger.Info("Controller will reconcile labels")
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
+	_, _ = nodeInformer.TypedInformer().AddTypedEventHandler(coreinformers.NodeHandlerFuncs{
+		AddFunc: func(node *v1.Node) {
+			node = node.DeepCopy()
 			nc.nodeUpdateQueue.Add(node.Name)
-			return nil
-		}),
-		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
+		},
+		UpdateFunc: func(_, newNode *v1.Node) {
+			newNode = newNode.DeepCopy()
 			nc.nodeUpdateQueue.Add(newNode.Name)
-			return nil
-		}),
-		DeleteFunc: controllerutil.CreateDeleteNodeHandler(logger, func(node *v1.Node) error {
+		},
+		DeleteFunc: func(deleted coreinformers.DeletedNode) {
+			node := deleted.OptionalObj
+			if node == nil {
+				logger.Error(nil, "Deleted Node object is unavailable", "node", deleted.GetKey())
+				return
+			}
+			node = node.DeepCopy()
 			nc.nodesToRetry.Delete(node.Name)
-			return nil
-		}),
+		},
 	})
 
 	nc.leaseLister = leaseInformer.Lister()
