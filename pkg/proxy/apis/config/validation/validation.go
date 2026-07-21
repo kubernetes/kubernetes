@@ -247,16 +247,21 @@ func validateHostPort(input string, fldPath *field.Path) field.ErrorList {
 func validateKubeProxyNodePortAddress(nodePortAddresses []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
+	seenKeywords := sets.New[string]()
 	for i := range nodePortAddresses {
-		if nodePortAddresses[i] == kubeproxyconfig.NodePortAddressesPrimary {
-			if i != 0 || len(nodePortAddresses) != 1 {
-				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), nodePortAddresses[i], "can't use both 'primary' and CIDRs"))
+		switch nodePortAddresses[i] {
+		case kubeproxyconfig.NodePortAddressesPrimary,
+			kubeproxyconfig.NodePortAddressesLocalhost,
+			kubeproxyconfig.NodePortAddressesAll:
+			if seenKeywords.Has(nodePortAddresses[i]) {
+				allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), nodePortAddresses[i]))
 			}
-			break
+			seenKeywords.Insert(nodePortAddresses[i])
+			continue
 		}
 
 		if _, _, err := netutils.ParseCIDRSloppy(nodePortAddresses[i]); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), nodePortAddresses[i], "must be a valid CIDR"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), nodePortAddresses[i], "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'"))
 		}
 	}
 

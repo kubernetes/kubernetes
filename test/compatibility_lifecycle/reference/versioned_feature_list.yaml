@@ -1073,6 +1073,12 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.37"
+- name: KubeProxyNFTablesLocalhostNodePorts
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: ListFromCacheSnapshot
   versionedSpecs:
   - default: false

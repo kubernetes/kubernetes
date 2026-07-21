@@ -243,6 +243,10 @@ var (
 	// TODO: document the feature (when to use this feature for a test)
 	LocalStorageCapacityIsolationQuota = framework.WithFeature(framework.ValidFeatures.Add("LocalStorageCapacityIsolationQuota"))
 
+	// Owner: sig-network
+	// Marks tests that require the service proxy to support localhost NodePort services
+	LocalhostNodePorts = framework.WithFeature(framework.ValidFeatures.Add("LocalhostNodePorts"))
+
 	// owning-sig: sig-node
 	// Marks a disruptive test for lock contention
 	LockContention = framework.WithFeature(framework.ValidFeatures.Add("LockContention"))
