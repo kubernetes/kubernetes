@@ -55,24 +55,6 @@ func (topo *CPUTopology) CPUsPerCore() int {
 	return topo.NumCPUs / topo.NumCores
 }
 
-// CPUsPerSocket returns the number of logical CPUs are associated with
-// each socket.
-func (topo *CPUTopology) CPUsPerSocket() int {
-	if topo.NumSockets == 0 {
-		return 0
-	}
-	return topo.NumCPUs / topo.NumSockets
-}
-
-// CPUsPerUncore returns the number of logicial CPUs that are associated with
-// each UncoreCache
-func (topo *CPUTopology) CPUsPerUncore() int {
-	if topo.NumUncoreCache == 0 {
-		return 0
-	}
-	return topo.NumCPUs / topo.NumUncoreCache
-}
-
 // CPUCoreID returns the physical core ID which the given logical CPU
 // belongs to.
 func (topo *CPUTopology) CPUCoreID(cpu int) (int, error) {
