@@ -32314,7 +32314,7 @@ func schema_k8sio_api_core_v1_TopologySelectorLabelRequirement(ref common.Refere
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "An array of string values. One value must match the label to be selected. Each entry in Values is ORed.",
+							Description: "An array of string values. A label with this key matches the selector if at least one value in this array equals the label value. Each entry in Values is ORed.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -56508,7 +56508,7 @@ func schema_k8sio_api_storage_v1_StorageClass(ref common.ReferenceCallback) comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "allowedTopologies restrict the node topologies where volumes can be dynamically provisioned. Each volume plugin defines its own supported topology specifications. An empty TopologySelectorTerm list means there is no topology restriction. This field is only honored by servers that enable the VolumeScheduling feature.",
+							Description: "allowedTopologies restrict the node topologies where volumes can be dynamically provisioned. A provisioner may create a volume accessible from one or more of these topologies, depending on its capabilities and the StorageClass parameters. Each volume plugin defines its own supported topology specifications. An empty TopologySelectorTerm list means there is no topology restriction. This field is only honored by servers that enable the VolumeScheduling feature.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{

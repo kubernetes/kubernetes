@@ -2718,7 +2718,7 @@ func (Toleration) SwaggerDoc() map[string]string {
 var map_TopologySelectorLabelRequirement = map[string]string{
 	"":       "A topology selector requirement is a selector that matches given label. This is an alpha feature and may change in the future.",
 	"key":    "The label key that the selector applies to.",
-	"values": "An array of string values. One value must match the label to be selected. Each entry in Values is ORed.",
+	"values": "An array of string values. A label with this key matches the selector if at least one value in this array equals the label value. Each entry in Values is ORed.",
 }
 
 func (TopologySelectorLabelRequirement) SwaggerDoc() map[string]string {
