@@ -629,14 +629,14 @@ func (in wrapDevice) withCapacityRequestPolicyValidValues(defaultValue resource.
 func deviceCounterConsumption(counterSet string, counters map[string]resource.Quantity) resourceapi.DeviceCounterConsumption {
 	return resourceapi.DeviceCounterConsumption{
 		CounterSet: counterSet,
-		Counters:   toCounters(counters),
+		Counters:   toConsumeCounters(counters),
 	}
 }
 
 func deviceCounterConsumptionWithGroups(counterSet string, counters map[string]resource.Quantity, compatibilityGroups ...string) resourceapi.DeviceCounterConsumption {
 	return resourceapi.DeviceCounterConsumption{
 		CounterSet:          counterSet,
-		Counters:            toCounters(counters),
+		Counters:            toConsumeCounters(counters),
 		CompatibilityGroups: compatibilityGroups,
 	}
 }
@@ -958,14 +958,24 @@ func sliceWithMultipleDevices(name string, nodeSelection, pool any, driver strin
 func counterSet(name string, counters map[string]resource.Quantity) resourceapi.CounterSet {
 	return resourceapi.CounterSet{
 		Name:     name,
-		Counters: toCounters(counters),
+		Counters: toSharedCounters(counters),
 	}
 }
 
-func toCounters(counters map[string]resource.Quantity) map[string]resourceapi.Counter {
+// toSharedCounters converts shared counter quantities into Counter values.
+func toSharedCounters(counters map[string]resource.Quantity) map[string]resourceapi.Counter {
 	out := make(map[string]resourceapi.Counter, len(counters))
 	for name, quantity := range counters {
-		out[name] = resourceapi.Counter{Value: quantity}
+		out[string(name)] = resourceapi.Counter{Value: quantity}
+	}
+	return out
+}
+
+// toConsumeCounters converts static consumed counter quantities into CounterRequirement values.
+func toConsumeCounters(counters map[string]resource.Quantity) map[string]resourceapi.CounterRequirement {
+	out := make(map[string]resourceapi.CounterRequirement, len(counters))
+	for name, quantity := range counters {
+		out[string(name)] = resourceapi.CounterRequirement{Value: &quantity}
 	}
 	return out
 }

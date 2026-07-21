@@ -36,9 +36,9 @@ func counterSet(name string, counters map[string]string) resourcev1.CounterSet {
 }
 
 func consumes(set string, counters map[string]string) resourcev1.DeviceCounterConsumption {
-	c := make(map[string]resourcev1.Counter, len(counters))
+	c := make(map[string]resourcev1.CounterRequirement, len(counters))
 	for k, v := range counters {
-		c[k] = resourcev1.Counter{Value: qty(v)}
+		c[k] = resourcev1.CounterRequirement{Value: new(qty(v))}
 	}
 	return resourcev1.DeviceCounterConsumption{CounterSet: set, Counters: c}
 }
