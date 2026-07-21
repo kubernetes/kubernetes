@@ -5463,6 +5463,107 @@ func TestAllocator(t *testing.T,
 				),
 			},
 		},
+		"consumable-capacity-range-policy-request-above-int64-rejected": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			// A capacity request above MaxInt64 cannot be rounded on the integer Step path
+			// without reading it through Quantity.Value(), which wraps. The request is not
+			// representable, so allocation aborts with a specific error instead of skipping.
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(new(resource.MustParse("18446744073709551616")))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations().withCapacityRequestPolicyRange(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: gomega.MatchError(gomega.ContainSubstring("cannot be represented")),
+		},
+		"consumable-capacity-range-policy-rounded-value-overflow-rejected": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			// Rounding a MaxInt64 request up to the next Step multiple passes MaxInt64 and
+			// would wrap to a negative value. The rounded value is not representable, so
+			// allocation aborts with a specific error instead of acting on the wrapped read.
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(new(resource.MustParse("9223372036854775807")))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations().withCapacityRequestPolicyRange(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: gomega.MatchError(gomega.ContainSubstring("cannot be represented")),
+		},
+		"consumable-capacity-range-policy-overflow-aborts-not-skip": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			// device-1 has a Step range, so a request above MaxInt64 overflows its integer
+			// rounding. device-2 has no Step and could satisfy the same request by exact
+			// comparison, but a not-representable request is fail-closed: allocation aborts
+			// rather than skipping device-1 to allocate device-2. Aborting on the first
+			// overflowing device is what stops the backtracking a user-controlled
+			// out-of-range request would otherwise force.
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(new(resource.MustParse("18446744073709551616")))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations().withCapacityRequestPolicyRange(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
+					device(device2, map[resourceapi.QualifiedName]resource.Quantity{capacity0: resource.MustParse("36893488147419103232")}, nil).withAllowMultipleAllocations(),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: gomega.MatchError(gomega.ContainSubstring("cannot be represented")),
+		},
+		"consumable-capacity-range-policy-allocation-mode-all-overflow-aborts": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			// The all-devices pre-scan in validateDeviceRequest validates capacity too. An
+			// out-of-range request must abort there, not silently drop the overflowing
+			// device from the set and allocate whatever remains. The count-mode cases above
+			// exercise allocateOne; this one exercises the AllocationModeAll pre-scan.
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(new(resource.MustParse("18446744073709551616")))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations().withCapacityRequestPolicyRange(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: gomega.MatchError(gomega.ContainSubstring("cannot be represented")),
+		},
+		"consumable-capacity-negative-request-aborts": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			// A stored request or slice from before stricter validation could carry a
+			// negative capacity, which admission does not re-check on existing objects. A
+			// negative value must abort rather than record negative consumed capacity and
+			// over-allocate the device.
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(new(resource.MustParse("-5")))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, map[resourceapi.QualifiedName]resource.Quantity{capacity0: resource.MustParse("10")}, nil).withAllowMultipleAllocations(),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: gomega.MatchError(gomega.ContainSubstring("negative")),
+		},
 		"consumable-capacity-multi-allocatable-device-with-valid-values-policy": {
 			features: Features{
 				ConsumableCapacity: true,
