@@ -1251,6 +1251,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
+- name: NFTablesNetlink
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: NFTablesProxyMode
   versionedSpecs:
   - default: false

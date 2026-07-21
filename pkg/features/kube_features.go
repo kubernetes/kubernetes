@@ -673,6 +673,12 @@ const (
 	// Enables mutable scheduling directives for suspended Jobs, regardless of whether they have started before.
 	MutableSchedulingDirectivesForSuspendedJobs featuregate.Feature = "MutableSchedulingDirectivesForSuspendedJobs"
 
+	// owner: @aojea
+	//
+	// Allows kube-proxy to use netlink directly for nftables operations,
+	// rather than executing the nft command-line binary.
+	NFTablesNetlink featuregate.Feature = "NFTablesNetlink"
+
 	// owner: @danwinship
 	// kep: https://kep.k8s.io/3866
 	//
@@ -1689,6 +1695,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	NFTablesNetlink: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	NFTablesProxyMode: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
@@ -2507,6 +2517,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	MutablePodResourcesForSuspendedJobs: {},
 
 	MutableSchedulingDirectivesForSuspendedJobs: {},
+
+	NFTablesNetlink: {},
 
 	NFTablesProxyMode: {},
 
