@@ -438,7 +438,8 @@
           "resources": [
             {
               "categories": [
-                "all"
+                "all",
+                "podautoscalers"
               ],
               "resource": "horizontalpodautoscalers",
               "responseKind": {
@@ -485,7 +486,8 @@
           "resources": [
             {
               "categories": [
-                "all"
+                "all",
+                "podautoscalers"
               ],
               "resource": "horizontalpodautoscalers",
               "responseKind": {
