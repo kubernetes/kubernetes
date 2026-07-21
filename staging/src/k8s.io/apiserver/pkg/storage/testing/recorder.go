@@ -50,7 +50,7 @@ func (r *KVRecorder) GetStream(ctx context.Context, key string, opts ...clientv3
 	atomic.AddUint64(&r.streamReads, 1)
 	if r.lists != nil {
 		op := clientv3.OpGet(key, opts...)
-		r.lists.record(ctx, RecordedList{Key: key, ListOptions: kubernetes.ListOptions{Revision: op.Rev(), Limit: op.Limit()}})
+		r.lists.record(ctx, RecordedList{Key: key, Revision: op.Rev(), Limit: op.Limit()})
 	}
 	return r.KV.GetStream(ctx, key, opts...)
 }
@@ -74,7 +74,12 @@ func NewKubernetesRecorder(client kubernetes.Interface) *KubernetesRecorder {
 }
 
 func (r *KubernetesRecorder) List(ctx context.Context, key string, opts kubernetes.ListOptions) (kubernetes.ListResponse, error) {
-	r.record(ctx, RecordedList{Key: key, ListOptions: opts})
+	// Continue, when set, is where the range actually starts (see kubernetes.Client.List), so fold it into Key.
+	rangeStart := key
+	if opts.Continue != "" {
+		rangeStart = opts.Continue
+	}
+	r.record(ctx, RecordedList{Key: rangeStart, Revision: opts.Revision, Limit: opts.Limit})
 	return r.Interface.List(ctx, key, opts)
 }
 
@@ -94,9 +99,12 @@ func (r *KubernetesRecorder) ListRequestForKey(key string) []RecordedList {
 	return r.listsPerKey[key]
 }
 
+// RecordedList is a list request captured by the recorder. Paged and streamed
+// reads both fold their resume point into Key.
 type RecordedList struct {
-	Key string
-	kubernetes.ListOptions
+	Key      string
+	Revision int64
+	Limit    int64
 }
 
 var RecorderContextKey recorderKeyType
