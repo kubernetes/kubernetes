@@ -427,12 +427,12 @@ func AddHandlers(h printers.PrintHandler) {
 
 	podCertificateRequestColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "PodName", Type: "string", Description: certificatesv1beta1.PodCertificateRequestSpec{}.SwaggerDoc()["podName"]},
-		{Name: "ServiceAccountName", Type: "string", Description: certificatesv1beta1.PodCertificateRequestSpec{}.SwaggerDoc()["serviceAccountName"]},
-		{Name: "NodeName", Type: "string", Description: certificatesv1beta1.PodCertificateRequestSpec{}.SwaggerDoc()["nodeName"]},
-		{Name: "SignerName", Type: "string", Description: certificatesv1beta1.PodCertificateRequestSpec{}.SwaggerDoc()["signerName"]},
+		{Name: "PodName", Type: "string", Description: certificatesv1.PodCertificateRequestSpec{}.SwaggerDoc()["podName"]},
+		{Name: "ServiceAccountName", Type: "string", Description: certificatesv1.PodCertificateRequestSpec{}.SwaggerDoc()["serviceAccountName"]},
+		{Name: "NodeName", Type: "string", Description: certificatesv1.PodCertificateRequestSpec{}.SwaggerDoc()["nodeName"]},
+		{Name: "SignerName", Type: "string", Description: certificatesv1.PodCertificateRequestSpec{}.SwaggerDoc()["signerName"]},
 		{Name: "State", Type: "string", Description: "Is the request Pending, Issued, Denied, or Failed?"},
-		{Name: "UnverifiedUserAnnotations", Type: "string", Description: certificatesv1beta1.PodCertificateRequestSpec{}.SwaggerDoc()["unverifiedUserAnnotations"]},
+		{Name: "UnverifiedUserAnnotations", Type: "string", Description: certificatesv1.PodCertificateRequestSpec{}.SwaggerDoc()["unverifiedUserAnnotations"]},
 	}
 	h.TableHandler(podCertificateRequestColumnDefinitions, printPodCertificateRequest)
 	h.TableHandler(podCertificateRequestColumnDefinitions, printPodCertificateRequestList)

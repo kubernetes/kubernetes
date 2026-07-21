@@ -1417,6 +1417,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.37"
 - name: PodDeletionCost
   versionedSpecs:
   - default: false

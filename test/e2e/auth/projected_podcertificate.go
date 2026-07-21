@@ -70,7 +70,14 @@ var _ = SIGDescribe("Projected PodCertificate",
 			go signer.Run(signerCtx)
 		})
 
-		ginkgo.It("should allow server and client pods to establish an mTLS connection", func(ctx context.Context) {
+		/*
+			Release: v1.37
+			Testname: Projected PodCertificate mTLS Connection
+			Description:
+			A pod configured with a projected podCertificate volume and an associated ClusterTrustBundle MUST project a valid leaf certificate chain and key.
+			Two pods configured with such certificates and keys under the same CA MUST be able to establish a mutually authenticated TLS (mTLS) connection.
+		*/
+		framework.ConformanceIt("should allow server and client pods to establish an mTLS connection [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 			namespace := f.Namespace.Name
 			ginkgo.By("Using namespace: " + namespace)
 
@@ -109,7 +116,14 @@ var _ = SIGDescribe("Projected PodCertificate",
 				"client logs did not contain expected success message pattern")
 		})
 
-		ginkgo.It("should honor UserAnnotations for SPIFFE URI path", func(ctx context.Context) {
+		/*
+			Release: v1.37
+			Testname: Projected PodCertificate UserAnnotations
+			Description:
+			The podCertificate volume projection MUST support passing unverified user annotations from the pod spec to the signer.
+			The signer MUST be able to receive and process these annotations (e.g. to override the SPIFFE URI path in the generated certificate SANs).
+		*/
+		framework.ConformanceIt("should honor UserAnnotations for SPIFFE URI path [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 			namespace := f.Namespace.Name
 			ginkgo.By("Using namespace: " + namespace)
 
@@ -158,7 +172,13 @@ var _ = SIGDescribe("Projected PodCertificate",
 
 		ginkgo.Describe("MaxExpirationSeconds validations", func() {
 
-			ginkgo.It("should issue certificate with default life time (24h) when MaxExpirationSeconds is not set", func(ctx context.Context) {
+			/*
+				Release: v1.37
+				Testname: Projected PodCertificate Default Expiration
+				Description:
+				If MaxExpirationSeconds is omitted from the projected volume spec, the issued certificate MUST have a default lifetime of 24 hours.
+			*/
+			framework.ConformanceIt("should issue certificate with default life time (24h) when MaxExpirationSeconds is not set [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 				namespace := f.Namespace.Name
 				ginkgo.By("Using namespace: " + namespace)
 
@@ -193,7 +213,13 @@ var _ = SIGDescribe("Projected PodCertificate",
 				gomega.Expect(lifeTime).To(gomega.BeNumerically("==", expectedDuration), "Certificate duration should be 24 hours")
 			})
 
-			ginkgo.It("should issue certificate with specified duration (1h) when MaxExpirationSeconds is set", func(ctx context.Context) {
+			/*
+				Release: v1.37
+				Testname: Projected PodCertificate Custom Expiration
+				Description:
+				If MaxExpirationSeconds is specified in the projected volume spec (e.g. 1 hour), the issued certificate MUST have a lifetime matching that duration.
+			*/
+			framework.ConformanceIt("should issue certificate with specified duration (1h) when MaxExpirationSeconds is set [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 				namespace := f.Namespace.Name
 				ginkgo.By("Using namespace: " + namespace)
 
@@ -229,7 +255,13 @@ var _ = SIGDescribe("Projected PodCertificate",
 				gomega.Expect(lifeTime).To(gomega.BeNumerically("==", expectedDuration), "Certificate duration should be 1 hour")
 			})
 
-			ginkgo.It("should fail pod startup when MaxExpirationSeconds exceeds maximum (91d)", func(ctx context.Context) {
+			/*
+				Release: v1.37
+				Testname: Projected PodCertificate Expiration Maximum Validation
+				Description:
+				Creating a pod with a projected podCertificate volume requesting a MaxExpirationSeconds exceeding the maximum of 91 days MUST be rejected by the API server during admission.
+			*/
+			framework.ConformanceIt("should reject pod creation when MaxExpirationSeconds exceeds maximum (91d) [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 				namespace := f.Namespace.Name
 				ginkgo.By("Using namespace: " + namespace)
 
@@ -239,16 +271,20 @@ var _ = SIGDescribe("Projected PodCertificate",
 				ginkgo.By("Creating pod requesting >91d MaxExpirationSeconds...")
 				_, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, testPod, metav1.CreateOptions{})
 				if err == nil {
-					framework.Fail("Error message does not match the expected.")
+					framework.Fail("Expected pod creation to fail due to too long MaxExpirationSeconds, but it succeeded")
 				}
-				if err != nil {
-					if !strings.Contains(err.Error(), "if provided, maxExpirationSeconds must be <= 7862400") {
-						framework.Failf("failed to create pod: %v", err)
-					}
+				if !strings.Contains(err.Error(), "if provided, maxExpirationSeconds must be <= 7862400") {
+					framework.Fail("Error message does not match the expected")
 				}
 			})
 
-			ginkgo.It("should fail pod startup when MaxExpirationSeconds is less than minimum (1h)", func(ctx context.Context) {
+			/*
+				Release: v1.37
+				Testname: Projected PodCertificate Expiration Minimum Validation
+				Description:
+				Creating a pod with a projected podCertificate volume requesting a MaxExpirationSeconds less than the minimum of 1 hour MUST be rejected by the API server during admission.
+			*/
+			framework.ConformanceIt("should reject pod creation when MaxExpirationSeconds is less than minimum (1h) [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 				namespace := f.Namespace.Name
 				ginkgo.By("Using namespace: " + namespace)
 
@@ -257,10 +293,11 @@ var _ = SIGDescribe("Projected PodCertificate",
 				testPod := createInspectorPod(namespace, "too-short-duration-pod", nil, &tooShortSeconds, spiffeSignerName)
 				ginkgo.By("Creating pod requesting <1h MaxExpirationSeconds...")
 				_, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, testPod, metav1.CreateOptions{})
-				if err != nil {
-					if !strings.Contains(err.Error(), "if provided, maxExpirationSeconds must be >= 3600") {
-						framework.Fail("Error message does not match the expected")
-					}
+				if err == nil {
+					framework.Fail("Expected pod creation to fail due to too short MaxExpirationSeconds, but it succeeded")
+				}
+				if !strings.Contains(err.Error(), "if provided, maxExpirationSeconds must be >= 3600") {
+					framework.Fail("Error message does not match the expected")
 				}
 			})
 		})
