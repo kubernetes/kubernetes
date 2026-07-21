@@ -17,29 +17,60 @@ limitations under the License.
 package node
 
 import (
+	"context"
+	"fmt"
 	"time"
-
-	"k8s.io/klog/v2"
 
 	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	certsv1informers "k8s.io/client-go/informers/certificates/v1"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
+	certsv1listers "k8s.io/client-go/listers/certificates/v1"
+	corev1listers "k8s.io/client-go/listers/core/v1"
+	resourcev1listers "k8s.io/client-go/listers/resource/v1"
+	storagev1listers "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 )
 
 type graphPopulator struct {
 	graph *Graph
+
+	podQueue        workqueue.TypedRateLimitingInterface[string]
+	pvQueue         workqueue.TypedRateLimitingInterface[string]
+	attachmentQueue workqueue.TypedRateLimitingInterface[string]
+	sliceQueue      workqueue.TypedRateLimitingInterface[string]
+	pcrQueue        workqueue.TypedRateLimitingInterface[string]
+
+	podLister        corev1listers.PodLister
+	pvLister         corev1listers.PersistentVolumeLister
+	attachmentLister storagev1listers.VolumeAttachmentLister
+	sliceLister      resourcev1listers.ResourceSliceLister
+	pcrLister        certsv1listers.PodCertificateRequestLister
+}
+
+func newRateLimitingQueue(name string) workqueue.TypedRateLimitingInterface[string] {
+	return workqueue.NewTypedRateLimitingQueueWithConfig(
+		workqueue.DefaultTypedControllerRateLimiter[string](),
+		workqueue.TypedRateLimitingQueueConfig[string]{
+			Name: name,
+		},
+	)
 }
 
 func AddGraphEventHandlers(
+	ctx context.Context,
 	graph *Graph,
 	nodes corev1informers.NodeInformer,
 	pods corev1informers.PodInformer,
@@ -49,7 +80,22 @@ func AddGraphEventHandlers(
 	pcrs certsv1informers.PodCertificateRequestInformer,
 ) {
 	g := &graphPopulator{
-		graph: graph,
+		graph:            graph,
+		podQueue:         newRateLimitingQueue("node_authorizer_pod_populator"),
+		pvQueue:          newRateLimitingQueue("node_authorizer_pv_populator"),
+		attachmentQueue:  newRateLimitingQueue("node_authorizer_attachment_populator"),
+		podLister:        pods.Lister(),
+		pvLister:         pvs.Lister(),
+		attachmentLister: attachments.Lister(),
+	}
+
+	if slices != nil {
+		g.sliceQueue = newRateLimitingQueue("node_authorizer_slice_populator")
+		g.sliceLister = slices.Lister()
+	}
+	if pcrs != nil {
+		g.pcrQueue = newRateLimitingQueue("node_authorizer_pcr_populator")
+		g.pcrLister = pcrs.Lister()
 	}
 
 	podHandler, _ := pods.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -92,7 +138,33 @@ func AddGraphEventHandlers(
 		synced = append(synced, pcrHandler.HasSynced)
 	}
 
-	go cache.WaitForNamedCacheSync("node_authorizer", wait.NeverStop, synced...)
+	queues := []workqueue.TypedRateLimitingInterface[string]{
+		g.podQueue, g.pvQueue, g.attachmentQueue,
+	}
+	workers := []func(){
+		g.runPodWorker, g.runPVWorker, g.runAttachmentWorker,
+	}
+	if g.sliceQueue != nil {
+		queues = append(queues, g.sliceQueue)
+		workers = append(workers, g.runSliceWorker)
+	}
+	if g.pcrQueue != nil {
+		queues = append(queues, g.pcrQueue)
+		workers = append(workers, g.runPCRWorker)
+	}
+
+	go func() {
+		<-ctx.Done()
+		for _, q := range queues {
+			q.ShutDown()
+		}
+	}()
+
+	for _, run := range workers {
+		go wait.Until(run, time.Second, ctx.Done())
+	}
+
+	go cache.WaitForNamedCacheSync("node_authorizer", ctx.Done(), synced...)
 }
 
 func (g *graphPopulator) addPod(obj interface{}) {
@@ -100,7 +172,11 @@ func (g *graphPopulator) addPod(obj interface{}) {
 }
 
 func (g *graphPopulator) updatePod(oldObj, obj interface{}) {
-	pod := obj.(*corev1.Pod)
+	pod, ok := obj.(*corev1.Pod)
+	if !ok {
+		klog.Infof("unexpected type %T", obj)
+		return
+	}
 	if len(pod.Spec.NodeName) == 0 {
 		// No node assigned
 		klog.V(5).Infof("updatePod %s/%s, no node", pod.Namespace, pod.Name)
@@ -119,10 +195,12 @@ func (g *graphPopulator) updatePod(oldObj, obj interface{}) {
 		}
 	}
 
-	klog.V(4).Infof("updatePod %s/%s for node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
-	startTime := time.Now()
-	g.graph.AddPod(pod)
-	klog.V(5).Infof("updatePod %s/%s for node %s completed in %v", pod.Namespace, pod.Name, pod.Spec.NodeName, time.Since(startTime))
+	key, err := cache.MetaNamespaceKeyFunc(pod)
+	if err != nil {
+		klog.Infof("failed to get key for %T: %v", obj, err)
+		return
+	}
+	g.podQueue.Add(key)
 }
 
 func (g *graphPopulator) deletePod(obj interface{}) {
@@ -139,10 +217,12 @@ func (g *graphPopulator) deletePod(obj interface{}) {
 		return
 	}
 
-	klog.V(4).Infof("deletePod %s/%s for node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
-	startTime := time.Now()
-	g.graph.DeletePod(pod.Name, pod.Namespace)
-	klog.V(5).Infof("deletePod %s/%s for node %s completed in %v", pod.Namespace, pod.Name, pod.Spec.NodeName, time.Since(startTime))
+	key, err := cache.MetaNamespaceKeyFunc(pod)
+	if err != nil {
+		klog.Infof("failed to get key for %T: %v", obj, err)
+		return
+	}
+	g.podQueue.Add(key)
 }
 
 func (g *graphPopulator) addPV(obj interface{}) {
@@ -150,9 +230,12 @@ func (g *graphPopulator) addPV(obj interface{}) {
 }
 
 func (g *graphPopulator) updatePV(oldObj, obj interface{}) {
-	pv := obj.(*corev1.PersistentVolume)
-	// TODO: skip add if uid, pvc, and secrets are all identical between old and new
-	g.graph.AddPV(pv)
+	pv, ok := obj.(*corev1.PersistentVolume)
+	if !ok {
+		klog.Infof("unexpected type %T", obj)
+		return
+	}
+	g.pvQueue.Add(pv.Name)
 }
 
 func (g *graphPopulator) deletePV(obj interface{}) {
@@ -164,7 +247,7 @@ func (g *graphPopulator) deletePV(obj interface{}) {
 		klog.Infof("unexpected type %T", obj)
 		return
 	}
-	g.graph.DeletePV(pv.Name)
+	g.pvQueue.Add(pv.Name)
 }
 
 func (g *graphPopulator) addVolumeAttachment(obj interface{}) {
@@ -172,15 +255,18 @@ func (g *graphPopulator) addVolumeAttachment(obj interface{}) {
 }
 
 func (g *graphPopulator) updateVolumeAttachment(oldObj, obj interface{}) {
-	attachment := obj.(*storagev1.VolumeAttachment)
-	if oldObj != nil {
+	attachment, ok := obj.(*storagev1.VolumeAttachment)
+	if !ok {
+		klog.Infof("unexpected type %T", obj)
+		return
+	}
+	if oldAttachment, ok := oldObj.(*storagev1.VolumeAttachment); ok && oldAttachment != nil {
 		// skip add if node name is identical
-		oldAttachment := oldObj.(*storagev1.VolumeAttachment)
 		if oldAttachment.Spec.NodeName == attachment.Spec.NodeName {
 			return
 		}
 	}
-	g.graph.AddVolumeAttachment(attachment.Name, attachment.Spec.NodeName)
+	g.attachmentQueue.Add(attachment.Name)
 }
 
 func (g *graphPopulator) deleteVolumeAttachment(obj interface{}) {
@@ -192,7 +278,7 @@ func (g *graphPopulator) deleteVolumeAttachment(obj interface{}) {
 		klog.Infof("unexpected type %T", obj)
 		return
 	}
-	g.graph.DeleteVolumeAttachment(attachment.Name)
+	g.attachmentQueue.Add(attachment.Name)
 }
 
 func (g *graphPopulator) addResourceSlice(obj interface{}) {
@@ -201,7 +287,7 @@ func (g *graphPopulator) addResourceSlice(obj interface{}) {
 		klog.Infof("unexpected type %T", obj)
 		return
 	}
-	g.graph.AddResourceSlice(slice.Name, ptr.Deref(slice.Spec.NodeName, ""))
+	g.sliceQueue.Add(slice.Name)
 }
 
 func (g *graphPopulator) deleteResourceSlice(obj interface{}) {
@@ -213,7 +299,7 @@ func (g *graphPopulator) deleteResourceSlice(obj interface{}) {
 		klog.Infof("unexpected type %T", obj)
 		return
 	}
-	g.graph.DeleteResourceSlice(slice.Name)
+	g.sliceQueue.Add(slice.Name)
 }
 
 func (g *graphPopulator) addPCR(obj any) {
@@ -222,7 +308,12 @@ func (g *graphPopulator) addPCR(obj any) {
 		klog.Infof("unexpected type %T", obj)
 		return
 	}
-	g.graph.AddPodCertificateRequest(pcr)
+	key, err := cache.MetaNamespaceKeyFunc(pcr)
+	if err != nil {
+		klog.Infof("failed to get key for %T: %v", obj, err)
+		return
+	}
+	g.pcrQueue.Add(key)
 }
 
 func (g *graphPopulator) deletePCR(obj any) {
@@ -234,5 +325,184 @@ func (g *graphPopulator) deletePCR(obj any) {
 		klog.Infof("unexpected type %T", obj)
 		return
 	}
-	g.graph.DeletePodCertificateRequest(pcr)
+	key, err := cache.MetaNamespaceKeyFunc(pcr)
+	if err != nil {
+		klog.Infof("failed to get key for %T: %v", obj, err)
+		return
+	}
+	g.pcrQueue.Add(key)
+}
+
+func runWorker(queue workqueue.TypedRateLimitingInterface[string], processKey func(string) error) {
+	for processNextWorkItem(queue, processKey) {
+	}
+}
+
+func processNextWorkItem(queue workqueue.TypedRateLimitingInterface[string], processKey func(string) error) bool {
+	key, shutdown := queue.Get()
+	if shutdown {
+		return false
+	}
+	defer queue.Done(key)
+
+	err := processKey(key)
+	if err == nil {
+		queue.Forget(key)
+		return true
+	}
+
+	utilruntime.HandleError(fmt.Errorf("node authorizer graph populator: failed to process %q: %w", key, err))
+	queue.AddRateLimited(key)
+
+	return true
+}
+
+func (g *graphPopulator) runPodWorker() {
+	runWorker(g.podQueue, g.processPodKey)
+}
+
+func (g *graphPopulator) processPodKey(key string) error {
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err
+	}
+	pod, err := g.podLister.Pods(namespace).Get(name)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			g.processDeletePod(name, namespace)
+			return nil
+		}
+		return err
+	}
+	g.processAddOrUpdatePod(pod)
+	return nil
+}
+
+func (g *graphPopulator) runPVWorker() {
+	runWorker(g.pvQueue, g.processPVKey)
+}
+
+func (g *graphPopulator) processPVKey(key string) error {
+	pv, err := g.pvLister.Get(key)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			g.processDeletePV(key)
+			return nil
+		}
+		return err
+	}
+	g.processAddOrUpdatePV(pv)
+	return nil
+}
+
+func (g *graphPopulator) runAttachmentWorker() {
+	runWorker(g.attachmentQueue, g.processAttachmentKey)
+}
+
+func (g *graphPopulator) processAttachmentKey(key string) error {
+	attachment, err := g.attachmentLister.Get(key)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			g.processDeleteVolumeAttachment(key)
+			return nil
+		}
+		return err
+	}
+	g.processAddOrUpdateVolumeAttachment(attachment)
+	return nil
+}
+
+func (g *graphPopulator) runSliceWorker() {
+	runWorker(g.sliceQueue, g.processSliceKey)
+}
+
+func (g *graphPopulator) processSliceKey(key string) error {
+	if g.sliceLister == nil {
+		return nil
+	}
+	slice, err := g.sliceLister.Get(key)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			g.processDeleteResourceSlice(key)
+			return nil
+		}
+		return err
+	}
+	g.processAddResourceSlice(slice)
+	return nil
+}
+
+func (g *graphPopulator) runPCRWorker() {
+	runWorker(g.pcrQueue, g.processPCRKey)
+}
+
+func (g *graphPopulator) processPCRKey(key string) error {
+	if g.pcrLister == nil {
+		return nil
+	}
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err
+	}
+	pcr, err := g.pcrLister.PodCertificateRequests(namespace).Get(name)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			g.processDeletePCR(name, namespace)
+			return nil
+		}
+		return err
+	}
+	g.processAddPCR(pcr)
+	return nil
+}
+
+func (g *graphPopulator) processDeletePod(name, namespace string) {
+	klog.V(4).Infof("deletePod %s/%s", namespace, name)
+	startTime := time.Now()
+	g.graph.DeletePod(name, namespace)
+	klog.V(5).Infof("deletePod %s/%s completed in %v", namespace, name, time.Since(startTime))
+}
+
+func (g *graphPopulator) processAddOrUpdatePod(pod *corev1.Pod) {
+	klog.V(4).Infof("updatePod %s/%s for node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
+	startTime := time.Now()
+	g.graph.AddPod(pod)
+	klog.V(5).Infof("updatePod %s/%s for node %s completed in %v", pod.Namespace, pod.Name, pod.Spec.NodeName, time.Since(startTime))
+}
+
+func (g *graphPopulator) processDeletePV(name string) {
+	g.graph.DeletePV(name)
+}
+
+func (g *graphPopulator) processAddOrUpdatePV(pv *corev1.PersistentVolume) {
+	g.graph.AddPV(pv)
+}
+
+func (g *graphPopulator) processDeleteVolumeAttachment(name string) {
+	g.graph.DeleteVolumeAttachment(name)
+}
+
+func (g *graphPopulator) processAddOrUpdateVolumeAttachment(attachment *storagev1.VolumeAttachment) {
+	g.graph.AddVolumeAttachment(attachment.Name, attachment.Spec.NodeName)
+}
+
+func (g *graphPopulator) processDeleteResourceSlice(name string) {
+	g.graph.DeleteResourceSlice(name)
+}
+
+func (g *graphPopulator) processAddResourceSlice(slice *resourceapi.ResourceSlice) {
+	g.graph.AddResourceSlice(slice.Name, ptr.Deref(slice.Spec.NodeName, ""))
+}
+
+func (g *graphPopulator) processDeletePCR(name, namespace string) {
+	g.graph.DeletePodCertificateRequest(&certsv1.PodCertificateRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	})
+}
+
+func (g *graphPopulator) processAddPCR(pcr *certsv1.PodCertificateRequest) {
+	g.graph.AddPodCertificateRequest(pcr)
 }
