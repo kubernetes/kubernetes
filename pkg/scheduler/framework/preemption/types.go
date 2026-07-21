@@ -89,15 +89,15 @@ func (p *podGroupPreemptor) PreemptionPolicy() schedulingapi.PreemptionPolicy {
 // It abstracts the scheduling domain, which can range from a single Node (for standard Pod preemption)
 // to a group of Nodes or the entire Cluster (for PodGroup preemption).
 type domain struct {
-	nodes              []fwk.NodeInfo
+	nodes              map[string]fwk.NodeInfo
 	name               string
 	allPossibleVictims []*DomainVictim
 }
 
-// Nodes returns a list of NodeInfo objects that belong to this domain.
+// Nodes returns a map of NodeInfo objects by node name that belong to this domain.
 // The preemption logic uses this to check feasibility and resource availability
 // within the specific scope.
-func (d *domain) Nodes() []fwk.NodeInfo {
+func (d *domain) Nodes() map[string]fwk.NodeInfo {
 	return d.nodes
 }
 
@@ -164,8 +164,15 @@ func newDomainForWorkloadPreemption(snapshot fwk.SharedLister, podGroupSnapshot 
 		return nil, err
 	}
 
+	nodesMap := make(map[string]fwk.NodeInfo, len(nodes))
+	for _, nodeInfo := range nodes {
+		if nodeInfo != nil && nodeInfo.Node() != nil {
+			nodesMap[nodeInfo.Node().Name] = nodeInfo
+		}
+	}
+
 	return &domain{
-		nodes:              nodes,
+		nodes:              nodesMap,
 		allPossibleVictims: allPossibleVictims,
 		name:               name,
 	}, nil

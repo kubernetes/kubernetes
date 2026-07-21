@@ -60,19 +60,11 @@ func NewPodGroupEvaluator(fh fwk.Handle, executor *Executor, enablePodGroupPreem
 }
 
 // evaluate determines the victims for preemption, without actuation.
-func (ev *PodGroupEvaluator) evaluate(ctx context.Context, preemptor *podGroupPreemptor, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (res *selectVictimsResult, status *fwk.Status) {
+func (ev *PodGroupEvaluator) evaluate(ctx context.Context, preemptor *podGroupPreemptor, domain *domain, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (res *selectVictimsResult, status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.PreemptionEvaluationDuration.WithLabelValues("podgroup", status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
 	}()
-
-	// In case of workload-aware preemption, the domain is whole cluster.
-	// We do not make a snapshot of node info. Those nodes will be shared
-	// with the PodGroup scheduling algorithm passed as podGroupSchedulingFunc.
-	domain, err := newDomainForWorkloadPreemption(ev.Handle.MutableSnapshotSharedLister(), ev.podGroupSnapshot, "cluster-domain")
-	if err != nil {
-		return nil, fwk.AsStatus(fmt.Errorf("failed to create domain: %w", err))
-	}
 
 	pdbs, err := getPodDisruptionBudgets(ev.pdbLister)
 	if err != nil {
@@ -96,8 +88,27 @@ func (ev *PodGroupEvaluator) evaluate(ctx context.Context, preemptor *podGroupPr
 // The caller is expected to backup the NodeInfo before calling this function
 // And rollback the state to the backup after function is finished.
 func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
+	logger := klog.FromContext(ctx)
+	// In case of workload-aware preemption, the domain is whole cluster.
+	// We do not make a snapshot of node info. Those nodes will be shared
+	// with the PodGroup scheduling algorithm passed as podGroupSchedulingFunc.
+	domain, err := newDomainForWorkloadPreemption(ev.Handle.MutableSnapshotSharedLister(), ev.podGroupSnapshot, "cluster-domain")
+	if err != nil {
+		return nil, fwk.AsStatus(fmt.Errorf("failed to create domain: %w", err))
+	}
 	preemptor := newPodGroupPreemptor(pg, pods, ev.enablePodGroupPreemptionPolicy)
-	res, status := ev.evaluate(ctx, preemptor, podGroupSchedulingFunc)
+
+	// Ensure the preemptor is eligible to preempt other pods.
+	if ok, msg := ev.preemptorEligibleToPreemptOthers(ctx, preemptor); !ok {
+		logger.V(5).Info("Preemptor is not eligible for preemption", "preemptor", klog.KObj(preemptor.podGroup), "reason", msg)
+		return nil, fwk.NewStatus(fwk.Unschedulable, msg)
+	}
+
+	if ev.isOngoingPreemption(ctx, preemptor, domain.Nodes()) {
+		return &fwk.PodGroupPostFilterResult{NominatingInfos: buildCurrentNominatingInfos(preemptor)}, fwk.NewStatus(fwk.Success, "ongoing preemption on nominated nodes")
+	}
+
+	res, status := ev.evaluate(ctx, preemptor, domain, podGroupSchedulingFunc)
 	if !status.IsSuccess() {
 		return nil, status
 	}
@@ -130,18 +141,9 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*selectVictimsResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 
-	nameToNode := make(map[string]fwk.NodeInfo)
-	for _, nodeInfo := range domain.Nodes() {
-		nameToNode[nodeInfo.Node().Name] = nodeInfo
-	}
+	nameToNode := domain.Nodes()
 
 	mutableLister := ev.Handle.MutableSnapshotSharedLister()
-
-	// Ensure the preemptor is eligible to preempt other pods.
-	if ok, msg := ev.preemptorEligibleToPreemptOthers(ctx, preemptor, nameToNode); !ok {
-		logger.V(5).Info("Preemptor is not eligible for preemption", "preemptor", klog.KObj(preemptor.podGroup), "reason", msg)
-		return nil, fwk.NewStatus(fwk.Unschedulable, msg)
-	}
 
 	// removePods removes all victims from the snapshot.
 	// This is called before the podGroupSchedulingFunc so it does not have
@@ -373,11 +375,17 @@ func (ev *PodGroupEvaluator) isPreemptionAllowed(victim Victim, preemptor *podGr
 // preemptorEligibleToPreemptOthers returns one bool and one string. The bool
 // indicates whether this preemptor should be considered for preempting other pods or
 // not. The string includes the reason if this preemptor isn't eligible.
-func (ev *PodGroupEvaluator) preemptorEligibleToPreemptOthers(_ context.Context, preemptor *podGroupPreemptor, nameToNode map[string]fwk.NodeInfo) (bool, string) {
+func (ev *PodGroupEvaluator) preemptorEligibleToPreemptOthers(_ context.Context, preemptor *podGroupPreemptor) (bool, string) {
 	if preemptor.PreemptionPolicy() == schedulingapi.PreemptNever {
 		return false, "not eligible due to preemptionPolicy=Never."
 	}
 
+	return true, ""
+}
+
+// isOngoingPreemption checks whether there is an ongoing preemption on the
+// nominated nodes for pods from this pod group.
+func (ev *PodGroupEvaluator) isOngoingPreemption(_ context.Context, preemptor *podGroupPreemptor, nameToNode map[string]fwk.NodeInfo) bool {
 	nominatedNodes := sets.New[string]()
 	for _, pod := range preemptor.Members() {
 		if len(pod.Status.NominatedNodeName) > 0 {
@@ -389,11 +397,25 @@ func (ev *PodGroupEvaluator) preemptorEligibleToPreemptOthers(_ context.Context,
 		if nodeInfo, exists := nameToNode[nomNodeName]; exists {
 			for _, p := range nodeInfo.GetPods() {
 				if GetPodPriority(p.GetPod(), ev.podGroupSnapshot) < preemptor.Priority() && PodTerminatingByPreemption(p.GetPod()) {
-					return false, "not eligible due to a terminating pod on the nominated node."
+					return true
 				}
 			}
 		}
 	}
 
-	return true, ""
+	return false
+}
+
+// buildCurrentNominatingInfos builds a map of nominating infos based on
+// currently set NNN for the preemptor pods
+func buildCurrentNominatingInfos(preemptor *podGroupPreemptor) map[types.NamespacedName]*fwk.NominatingInfo {
+	n := make(map[types.NamespacedName]*fwk.NominatingInfo)
+	for _, pod := range preemptor.Members() {
+		podKey := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+		n[podKey] = &fwk.NominatingInfo{
+			NominatingMode:    fwk.ModeOverride,
+			NominatedNodeName: pod.Status.NominatedNodeName,
+		}
+	}
+	return n
 }
