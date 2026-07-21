@@ -156,23 +156,31 @@ func (d ConditionsAwareDecision) IsUnconditional() bool {
 }
 
 // UnconditionalParts splits a ConditionsAwareDecision into the
-// triple that Authorize expects. If the decision is
-// conditional, FailureDecision() is returned.
-// This function is meant to be called when IsUnconditional() == true.
-func (d ConditionsAwareDecision) UnconditionalParts() (Decision, string, error) {
+// standard (unconditional Decision, reason, error) triple.
+// When expectConditional is true, the caller says "return the unconditional triple or round it down".
+// When expectConditional is false, the caller says "I know d is unconditional, just split it into the triple".
+func (d ConditionsAwareDecision) UnconditionalParts(expectConditional bool) (Decision, string, error) {
 	switch {
-	case d.IsAllow():
-		return DecisionAllow, d.Reason(), d.Error()
 	case d.IsDeny():
 		return DecisionDeny, d.Reason(), d.Error()
 	case d.IsNoOpinion():
 		return DecisionNoOpinion, d.Reason(), d.Error()
+	case d.IsAllow():
+		return DecisionAllow, d.Reason(), d.Error()
+	// After this, it's known that the response is conditional
+	case expectConditional:
+		// When expectConditional is true, the caller explicitly said
+		// "return the unconditional response or round it down"
+		failureDecision := d.FailureDecision()
+		reason := fmt.Sprintf(
+			"failed closed from conditional decision (with possible outcomes %v) to %s during unconditional authorization",
+			sets.List(d.PossibleDecisions()),
+			failureDecision.String(),
+		)
+		return failureDecision, reason, nil
 	default:
-		// An error is not returned here, as that could yield a HTTP response code of 500 instead of 403.
-		// For the use-case described above with regards to calling this function in Authorize, not returning
-		// an error is important, as it is valid to always fail closed, as if this happens, no unconditional
-		// permissions were given the requestor.
-		return d.FailureDecision(), "failed closed: tried to return conditional decision to conditions-unaware authorizer", nil
+		// When expectConditional is false, down-casting the conditional decision to an unconditional one is an error
+		return d.FailureDecision(), "failed closed", fmt.Errorf("tried to return an unexpected conditional decision during unconditional authorization")
 	}
 }
 
