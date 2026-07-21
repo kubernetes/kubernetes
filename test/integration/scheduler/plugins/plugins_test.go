@@ -622,7 +622,7 @@ func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state fwk.CycleState
 	for _, nodeInfo := range nodeInfos {
 		pp.fh.RunFilterPlugins(ctx, state, pod, nodeInfo)
 	}
-	pp.fh.RunScorePlugins(ctx, state, pod, nodeInfos)
+	pp.fh.RunScorePluginsAndNormalize(ctx, state, pod, nodeInfos)
 
 	if pp.failPostFilter {
 		return nil, fwk.NewStatus(fwk.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))

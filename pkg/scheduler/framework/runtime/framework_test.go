@@ -1860,7 +1860,7 @@ func TestRunPreScorePlugins(t *testing.T) {
 	}
 }
 
-func TestRunScorePlugins(t *testing.T) {
+func TestRunScorePluginsAndNormalize(t *testing.T) {
 	tests := []struct {
 		name           string
 		registry       Registry
@@ -1868,7 +1868,7 @@ func TestRunScorePlugins(t *testing.T) {
 		pluginConfigs  []config.PluginConfig
 		want           []fwk.NodePluginScores
 		skippedPlugins sets.Set[string]
-		// If err is true, we expect RunScorePlugin to fail.
+		// If err is true, we expect RunScorePluginsAndNormalize to fail.
 		err bool
 	}{
 		{
@@ -2247,7 +2247,7 @@ func TestRunScorePlugins(t *testing.T) {
 
 			state := framework.NewCycleState()
 			state.SetSkipScorePlugins(tt.skippedPlugins)
-			res, status := f.RunScorePlugins(ctx, state, pod, BuildNodeInfos(nodes))
+			res, status := f.RunScorePluginsAndNormalize(ctx, state, pod, BuildNodeInfos(nodes))
 
 			if tt.err {
 				if status.IsSuccess() {
@@ -3980,7 +3980,7 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "Score - Success",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunScorePlugins(ctx, state, pod, BuildNodeInfos(nodes))
+				f.RunScorePluginsAndNormalize(ctx, state, pod, BuildNodeInfos(nodes))
 			},
 			wantExtensionPoint: "Score",
 			wantStatus:         fwk.Success,
@@ -4076,7 +4076,7 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "Score - Error",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunScorePlugins(ctx, state, pod, BuildNodeInfos(nodes))
+				f.RunScorePluginsAndNormalize(ctx, state, pod, BuildNodeInfos(nodes))
 			},
 			inject:             injectedResult{ScoreStatus: int(fwk.Error)},
 			wantExtensionPoint: "Score",
@@ -5176,8 +5176,8 @@ func TestPluginEvaluationTotalMetric(t *testing.T) {
 	if st := f1.RunPreScorePlugins(ctx, state1, pod, nil); st != nil && !st.IsSuccess() {
 		t.Fatalf("RunPreScorePlugins returned unexpected status: %v", st)
 	}
-	if _, st := f1.RunScorePlugins(ctx, state1, pod, BuildNodeInfos(nodes)); st != nil && !st.IsSuccess() {
-		t.Fatalf("RunScorePlugins returned unexpected status: %v", st)
+	if _, st := f1.RunScorePluginsAndNormalize(ctx, state1, pod, BuildNodeInfos(nodes)); st != nil && !st.IsSuccess() {
+		t.Fatalf("RunScorePluginsAndNormalize returned unexpected status: %v", st)
 	}
 
 	// Profile 2: exercise a different plugin and profile label on Filter.

@@ -1396,13 +1396,13 @@ func (f *frameworkImpl) runPreScorePlugin(ctx context.Context, pl fwk.PreScorePl
 	return status
 }
 
-// RunScorePlugins runs the set of configured scoring plugins.
-// It returns a list that stores scores from each plugin and total score for each Node.
-// It also returns *Status, which is set to non-success if any of the plugins returns
-// a non-success status.
+// RunScorePluginsAndNormalize runs the set of configured scoring plugins,
+// followed by normalization. It returns a list that stores scores from each
+// plugin and total score for each Node. It also returns *Status, which is set
+// to non-success if any of the plugins returns a non-success status.
 //
 // This function mostly duplicates RunPlacementScorePlugins. Any changes to it should likely be reflected in both places.
-func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (ns []fwk.NodePluginScores, status *fwk.Status) {
+func (f *frameworkImpl) RunScorePluginsAndNormalize(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (ns []fwk.NodePluginScores, status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Score, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
@@ -1540,7 +1540,7 @@ func (f *frameworkImpl) runScoreExtension(ctx context.Context, pl fwk.ScorePlugi
 // (1:1 by index): placementStates[i] is the state with which podGroupAssignments[i] was
 // processed, and is passed to ScorePlacement for that placement.
 //
-// This function mostly duplicates RunScorePlugins. Any changes to it should likely be reflected in both places.
+// This function mostly duplicates RunScorePluginsAndNormalize. Any changes to it should likely be reflected in both places.
 func (f *frameworkImpl) RunPlacementScorePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo, podGroupAssignments []*fwk.PodGroupAssignments, placementStates []fwk.PlacementCycleState) (ps []fwk.PlacementPluginScores, status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {

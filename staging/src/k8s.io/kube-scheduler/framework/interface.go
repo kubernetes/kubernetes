@@ -968,11 +968,11 @@ type PluginsRunner interface {
 	// RunPreScorePlugins runs the set of configured PreScore plugins. If any
 	// of these plugins returns any status other than "Success", the given pod is rejected.
 	RunPreScorePlugins(context.Context, CycleState, *v1.Pod, []NodeInfo) *Status
-	// RunScorePlugins runs the set of configured scoring plugins.
-	// It returns a list that stores scores from each plugin and total score for each Node.
-	// It also returns *Status, which is set to non-success if any of the plugins returns
-	// a non-success status.
-	RunScorePlugins(context.Context, CycleState, *v1.Pod, []NodeInfo) ([]NodePluginScores, *Status)
+	// RunScorePluginsAndNormalize runs the set of configured scoring plugins,
+	// followed by normalization. It returns a list that stores scores from each
+	// plugin and total score for each Node. It also returns *Status, which is set
+	// to non-success if any of the plugins returns a non-success status.
+	RunScorePluginsAndNormalize(context.Context, CycleState, *v1.Pod, []NodeInfo) ([]NodePluginScores, *Status)
 	// RunFilterPlugins runs the set of configured Filter plugins for pod on
 	// the given node. Note that for the node being evaluated, the passed nodeInfo
 	// reference could be different from the one in NodeInfoSnapshot map (e.g., pods

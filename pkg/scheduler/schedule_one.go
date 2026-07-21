@@ -937,7 +937,7 @@ func findNodesThatPassExtenders(ctx context.Context, extenders []fwk.Extender, p
 }
 
 // prioritizeNodes prioritizes the nodes by running the score plugins,
-// which return a score for each node from the call to RunScorePlugins().
+// which return a score for each node from the call to RunScorePluginsAndNormalize().
 // The scores from each plugin are added together to make the score for that node, then
 // any extenders are run as well.
 // All scores are finally combined (added) to get the total weighted scores of all nodes
@@ -970,7 +970,7 @@ func prioritizeNodes(
 	}
 
 	// Run the Score plugins.
-	nodesScores, scoreStatus := schedFramework.RunScorePlugins(ctx, state, pod, nodes)
+	nodesScores, scoreStatus := schedFramework.RunScorePluginsAndNormalize(ctx, state, pod, nodes)
 	if !scoreStatus.IsSuccess() {
 		return nil, scoreStatus.AsError()
 	}
