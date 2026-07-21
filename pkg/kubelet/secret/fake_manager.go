@@ -17,6 +17,7 @@ limitations under the License.
 package secret
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -42,7 +43,7 @@ func NewFakeManagerWithSecrets(secrets []*v1.Secret) Manager {
 
 // GetSecret function returns the searched secret if it was provided during the manager initialization, otherwise, it returns an error.
 // If the manager was initialized without any secrets, it returns a nil secret."
-func (s *fakeManager) GetSecret(namespace, name string) (*v1.Secret, error) {
+func (s *fakeManager) GetSecret(_ context.Context, namespace, name string) (*v1.Secret, error) {
 	if s.secrets == nil {
 		return nil, nil
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/klog/v2"
@@ -83,14 +84,14 @@ func (ctrl *PersistentVolumeController) GetAttachedVolumesFromNodeStatus() (map[
 	return map[v1.UniqueVolumeName]string{}, nil
 }
 
-func (ctrl *PersistentVolumeController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return func(_, _ string) (*v1.Secret, error) {
+func (ctrl *PersistentVolumeController) GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
+	return func(_ context.Context, _, _ string) (*v1.Secret, error) {
 		return nil, fmt.Errorf("GetSecret unsupported in PersistentVolumeController")
 	}
 }
 
-func (ctrl *PersistentVolumeController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
-	return func(_, _ string) (*v1.ConfigMap, error) {
+func (ctrl *PersistentVolumeController) GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
+	return func(_ context.Context, _, _ string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("GetConfigMap unsupported in PersistentVolumeController")
 	}
 }

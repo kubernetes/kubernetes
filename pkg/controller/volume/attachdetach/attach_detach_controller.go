@@ -827,14 +827,14 @@ func (adc *attachDetachController) GetAttachedVolumesFromNodeStatus() (map[v1.Un
 	return map[v1.UniqueVolumeName]string{}, nil
 }
 
-func (adc *attachDetachController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return func(_, _ string) (*v1.Secret, error) {
+func (adc *attachDetachController) GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
+	return func(_ context.Context, _, _ string) (*v1.Secret, error) {
 		return nil, fmt.Errorf("GetSecret unsupported in attachDetachController")
 	}
 }
 
-func (adc *attachDetachController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
-	return func(_, _ string) (*v1.ConfigMap, error) {
+func (adc *attachDetachController) GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
+	return func(_ context.Context, _, _ string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("GetConfigMap unsupported in attachDetachController")
 	}
 }

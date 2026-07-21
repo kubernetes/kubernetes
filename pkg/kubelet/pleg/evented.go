@@ -211,10 +211,11 @@ func (e *EventedPLEG) watchEventsChannel(ctx context.Context) {
 	}()
 
 	if isEventedPLEGInUse() {
-		e.processCRIEvents(logger, containerEventsResponseCh)
+		e.processCRIEvents(ctx, containerEventsResponseCh)
 	}
 }
-func (e *EventedPLEG) processCRIEvents(logger klog.Logger, containerEventsResponseCh chan *runtimeapi.ContainerEventResponse) {
+func (e *EventedPLEG) processCRIEvents(ctx context.Context, containerEventsResponseCh chan *runtimeapi.ContainerEventResponse) {
+	logger := klog.FromContext(ctx)
 	for event := range containerEventsResponseCh {
 		// Ignore the event if PodSandboxStatus is nil.
 		// This might happen under some race condition where the podSandbox has
@@ -232,7 +233,7 @@ func (e *EventedPLEG) processCRIEvents(logger klog.Logger, containerEventsRespon
 		podID := types.UID(event.PodSandboxStatus.Metadata.Uid)
 		shouldSendPLEGEvent := false
 
-		status := e.runtime.GeneratePodStatus(event)
+		status := e.runtime.GeneratePodStatus(ctx, event)
 		if klogV := logger.V(6); klogV.Enabled() {
 			logger.Info("Evented PLEG: Generated pod status from the received event", "podUID", podID, "podStatus", status)
 		} else {
