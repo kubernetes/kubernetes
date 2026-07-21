@@ -31,7 +31,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/lithammer/dedent"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	netutils "k8s.io/utils/net"
 	"sigs.k8s.io/knftables"
@@ -274,6 +274,7 @@ var endpointVMapRegexp = regexp.MustCompile(`^numgen random mod \d+ vmap \{(.*)\
 var endpointVMapEntryRegexp = regexp.MustCompile(`\d+ : goto (\S+)`)
 var endpointDNATRegexp = regexp.MustCompile(`^dnat ip6* addr \. port to numgen random mod \d+ map \{(.*)\}$`)
 var endpointDNATEntryRegexp = regexp.MustCompile(`\d+ : (\S+) \. (\d+)`)
+var singleEndpointDNATRegexp = regexp.MustCompile(`^dnat ip6* addr \. port to (\S+) \. (\d+)$`)
 
 var masqMarkRegexp = regexp.MustCompile(`^mark set mark or 0x[[:xdigit:]]+$`)
 var masqCheckRegexp = regexp.MustCompile(`^mark and 0x[[:xdigit:]]+ != 0 mark set mark xor 0x[[:xdigit:]]+`)
@@ -569,6 +570,16 @@ func (tracer *nftablesTracer) runChain(chname, sourceIP, protocol, destIP, destP
 					tracer.matches = append(tracer.matches, ruleObj.Rule)
 					tracer.outputs = append(tracer.outputs, net.JoinHostPort(endpointIP, endpointPort))
 				}
+				return true
+
+			case singleEndpointDNATRegexp.MatchString(rule):
+				// `^dnat ip6* addr \. port to (\S+) \. (\d+)$`
+				// DNATs directly to a single endpoint and terminates processing.
+				match := singleEndpointDNATRegexp.FindStringSubmatch(rule)
+				endpointIP, endpointPort := match[1], match[2]
+
+				tracer.matches = append(tracer.matches, ruleObj.Rule)
+				tracer.outputs = append(tracer.outputs, net.JoinHostPort(endpointIP, endpointPort))
 				return true
 
 			default:
