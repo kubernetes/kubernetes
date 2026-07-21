@@ -24,8 +24,12 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/go-logr/logr"
 	"golang.org/x/net/websocket"
+
+	"k8s.io/klog/v2"
 )
 
 func newServer(handler http.Handler) (*httptest.Server, string) {
@@ -114,6 +118,92 @@ func TestRawConn(t *testing.T) {
 
 	client.Close()
 	wg.Wait()
+}
+
+// recordingLogSink is a minimal logr.LogSink that records whether Error or
+// Info was called, and signals "logged" the first time either happens, so
+// tests can assert on log severity.
+type recordingLogSink struct {
+	logged     chan struct{}
+	loggedOnce sync.Once
+
+	mu        sync.Mutex
+	errorCall bool
+	infoCall  bool
+}
+
+func newRecordingLogSink() *recordingLogSink {
+	return &recordingLogSink{logged: make(chan struct{})}
+}
+
+func (s *recordingLogSink) Init(logr.RuntimeInfo)                        {}
+func (s *recordingLogSink) Enabled(level int) bool                       { return true }
+func (s *recordingLogSink) WithValues(keysAndValues ...any) logr.LogSink { return s }
+func (s *recordingLogSink) WithName(name string) logr.LogSink            { return s }
+func (s *recordingLogSink) Info(level int, msg string, keysAndValues ...any) {
+	s.mu.Lock()
+	s.infoCall = true
+	s.mu.Unlock()
+	s.loggedOnce.Do(func() { close(s.logged) })
+}
+func (s *recordingLogSink) Error(err error, msg string, keysAndValues ...any) {
+	s.mu.Lock()
+	s.errorCall = true
+	s.mu.Unlock()
+	s.loggedOnce.Do(func() { close(s.logged) })
+}
+
+func (s *recordingLogSink) calls() (errorCall, infoCall bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.errorCall, s.infoCall
+}
+
+// TestConnCloseWhileReceivingDoesNotLogError verifies that closing the
+// connection while "handle" is blocked in a receive (mirroring what
+// httpstream translation layers do once a session finishes) is logged at
+// V(4), not as an error, since it is the expected way an in-progress
+// websocket connection ends.
+func TestConnCloseWhileReceivingDoesNotLogError(t *testing.T) {
+	channels := []ChannelType{ReadWriteChannel}
+	conn := NewConn(NewDefaultChannelProtocols(channels))
+	sink := newRecordingLogSink()
+	logger := logr.New(sink)
+
+	s, addr := newServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		req = req.WithContext(klog.NewContext(req.Context(), logger))
+		conn.Open(w, req)
+	}))
+	defer s.Close()
+
+	client, err := websocket.Dial("ws://"+addr, "", "http://localhost/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	<-conn.ready
+
+	// Close the connection out from under "handle" while its receive loop is
+	// still blocked waiting for the next frame, the same way a caller of
+	// Open() closes the connection once it is done streaming.
+	if err := conn.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-sink.logged:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for the closed connection to be logged")
+	}
+
+	errorCall, infoCall := sink.calls()
+	if errorCall {
+		t.Errorf("expected no error-level log for a connection closed while receiving")
+	}
+	if !infoCall {
+		t.Errorf("expected a V(4) info log for a connection closed while receiving")
+	}
 }
 
 func TestBase64Conn(t *testing.T) {
