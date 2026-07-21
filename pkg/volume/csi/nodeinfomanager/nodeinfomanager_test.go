@@ -1366,21 +1366,17 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 			expectUpdate: true,
 		},
 		{
-			name:           "duplicate multiplicity change updates conditions",
+			name:           "no-op when duplicate reports share the same identities",
 			featureEnabled: true,
 			existingCSINode: &storage.CSINode{
 				ObjectMeta: getCSINodeObjectMeta(),
 				Spec:       storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{{Name: driver1, NodeID: "n1"}}},
-				Status: storage.CSINodeStatus{StorageHealth: []storage.StorageHealth{
-					{Name: driver1, HealthConditions: []storage.StorageHealthCondition{cond1, cond1, cond2}},
-				}},
+				Status:     storage.CSINodeStatus{StorageHealth: []storage.StorageHealth{health1}},
 			},
-			driverName: driver1,
-			conditions: []storage.StorageHealthCondition{cond1, cond2, cond2},
-			expectStatus: []storage.StorageHealth{
-				{Name: driver1, HealthConditions: []storage.StorageHealthCondition{cond1, cond2, cond2}},
-			},
-			expectUpdate: true,
+			driverName:   driver1,
+			conditions:   []storage.StorageHealthCondition{cond1, cond1},
+			expectStatus: []storage.StorageHealth{health1},
+			expectUpdate: false,
 		},
 		{
 			name:           "clear driver conditions",

@@ -788,24 +788,19 @@ func (nim *nodeInfoManager) tryUpdateCSINodeStorageHealth(
 }
 
 // storageHealthIdentityEqual reports whether two condition slices have the same
-// status, reason, and volume-capability identities. Message and transition time
-// are ignored so repeated reports do not cause status write churn.
+// set of status, reason, and volume-capability identities. Message, transition
+// time, and duplicate entries are ignored so repeated or duplicate reports do
+// not cause status write churn.
 func storageHealthIdentityEqual(a, b []storagev1.StorageHealthCondition) bool {
-	if len(a) != len(b) {
-		return false
+	return storageHealthIdentities(a).Equal(storageHealthIdentities(b))
+}
+
+func storageHealthIdentities(conditions []storagev1.StorageHealthCondition) sets.Set[storageHealthIdentity] {
+	identities := sets.New[storageHealthIdentity]()
+	for _, c := range conditions {
+		identities.Insert(storageHealthConditionIdentity(c))
 	}
-	identities := make(map[storageHealthIdentity]int, len(a))
-	for _, c := range a {
-		identities[storageHealthConditionIdentity(c)]++
-	}
-	for _, c := range b {
-		identity := storageHealthConditionIdentity(c)
-		if identities[identity] == 0 {
-			return false
-		}
-		identities[identity]--
-	}
-	return true
+	return identities
 }
 
 type storageHealthIdentity struct {
