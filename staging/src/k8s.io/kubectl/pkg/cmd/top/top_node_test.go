@@ -25,14 +25,14 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	core "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
-	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 )
 
@@ -41,494 +41,233 @@ const (
 	apiVersion = "v1"
 )
 
-func TestTopNodeAllMetricsFrom(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
-	expectedMetrics, nodes := testNodeV1beta1MetricsData()
-	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
+func TestTopNode(t *testing.T) {
+	listNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	ns := scheme.Codecs.WithoutConversion()
-
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == "/api":
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
-			case p == "/apis":
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
-			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, nodes)}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\nGot URL: %#v\n", req, req.URL)
-				return nil, nil
-			}
-		}),
-	}
-	fakemetricsClientset := &metricsfake.Clientset{}
-	fakemetricsClientset.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		return true, expectedMetrics, nil
-	})
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
-
-	cmd := NewCmdTopNode(tf, nil, streams)
-
-	// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
-	// TODO then check the particular Run functionality and harvest results from fake clients
-	cmdOptions := &TopNodeOptions{
-		IOStreams: streams,
-	}
-	if err := cmdOptions.Complete(tf, cmd, []string{}); err != nil {
-		t.Fatal(err)
-	}
-	cmdOptions.MetricsClient = fakemetricsClientset
-	if err := cmdOptions.Validate(); err != nil {
-		t.Fatal(err)
-	}
-	if err := cmdOptions.RunTopNode(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Check the presence of node names in the output.
-	result := buf.String()
-	for _, m := range expectedMetrics.Items {
-		if !strings.Contains(result, m.Name) {
-			t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-		}
-	}
-}
-
-func TestTopNodeWithNameMetricsFrom(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
-	metrics, nodes := testNodeV1beta1MetricsData()
-	expectedMetrics := metrics.Items[0]
-	expectedNode := nodes.Items[0]
-	nonExpectedMetrics := metricsv1beta1api.NodeMetricsList{
-		ListMeta: metrics.ListMeta,
-		Items:    metrics.Items[1:],
-	}
-	expectedNodePath := fmt.Sprintf("/%s/%s/nodes/%s", apiPrefix, apiVersion, expectedMetrics.Name)
-
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	ns := scheme.Codecs.WithoutConversion()
-
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == "/api":
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
-			case p == "/apis":
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
-			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &expectedNode)}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\nGot URL: %#v\n", req, req.URL)
-				return nil, nil
-			}
-		}),
-	}
-	fakemetricsClientset := &metricsfake.Clientset{}
-	fakemetricsClientset.AddReactor("get", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		return true, &expectedMetrics, nil
-	})
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
-
-	cmd := NewCmdTopNode(tf, nil, streams)
-
-	// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
-	// TODO then check the particular Run functionality and harvest results from fake clients
-	cmdOptions := &TopNodeOptions{
-		IOStreams: streams,
-	}
-	if err := cmdOptions.Complete(tf, cmd, []string{expectedMetrics.Name}); err != nil {
-		t.Fatal(err)
-	}
-	cmdOptions.MetricsClient = fakemetricsClientset
-	if err := cmdOptions.Validate(); err != nil {
-		t.Fatal(err)
-	}
-	if err := cmdOptions.RunTopNode(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Check the presence of node names in the output.
-	result := buf.String()
-	if !strings.Contains(result, expectedMetrics.Name) {
-		t.Errorf("missing metrics for %s: \n%s", expectedMetrics.Name, result)
-	}
-	for _, m := range nonExpectedMetrics.Items {
-		if strings.Contains(result, m.Name) {
-			t.Errorf("unexpected metrics for %s: \n%s", m.Name, result)
-		}
-	}
-}
-
-func TestTopNodeWithLabelSelectorMetricsFrom(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
-	metrics, nodes := testNodeV1beta1MetricsData()
-	expectedMetrics := &metricsv1beta1api.NodeMetricsList{
-		ListMeta: metrics.ListMeta,
-		Items:    metrics.Items[0:1],
-	}
-	expectedNodes := v1.NodeList{
-		ListMeta: nodes.ListMeta,
-		Items:    nodes.Items[0:1],
-	}
-	nonExpectedMetrics := &metricsv1beta1api.NodeMetricsList{
-		ListMeta: metrics.ListMeta,
-		Items:    metrics.Items[1:],
-	}
-	label := "key=value"
-	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
-
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	ns := scheme.Codecs.WithoutConversion()
-
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m, _ := req.URL.Path, req.Method, req.URL.RawQuery; {
-			case p == "/api":
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
-			case p == "/apis":
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
-			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &expectedNodes)}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\nGot URL: %#v\n", req, req.URL)
-				return nil, nil
-			}
-		}),
-	}
-
-	fakemetricsClientset := &metricsfake.Clientset{}
-	fakemetricsClientset.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		return true, expectedMetrics, nil
-	})
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
-
-	cmd := NewCmdTopNode(tf, nil, streams)
-	cmd.Flags().Set("selector", label)
-
-	// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
-	// TODO then check the particular Run functionality and harvest results from fake clients
-	cmdOptions := &TopNodeOptions{
-		IOStreams: streams,
-	}
-	if err := cmdOptions.Complete(tf, cmd, []string{}); err != nil {
-		t.Fatal(err)
-	}
-	cmdOptions.MetricsClient = fakemetricsClientset
-	if err := cmdOptions.Validate(); err != nil {
-		t.Fatal(err)
-	}
-	if err := cmdOptions.RunTopNode(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Check the presence of node names in the output.
-	result := buf.String()
-	for _, m := range expectedMetrics.Items {
-		if !strings.Contains(result, m.Name) {
-			t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-		}
-	}
-	for _, m := range nonExpectedMetrics.Items {
-		if strings.Contains(result, m.Name) {
-			t.Errorf("unexpected metrics for %s: \n%s", m.Name, result)
-		}
-	}
-}
-
-func TestTopNodeWithSortByCpuMetricsFrom(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
-	metrics, nodes := testNodeV1beta1MetricsData()
-	expectedMetrics := &metricsv1beta1api.NodeMetricsList{
-		ListMeta: metrics.ListMeta,
-		Items:    metrics.Items[:],
-	}
-	expectedNodes := v1.NodeList{
-		ListMeta: nodes.ListMeta,
-		Items:    nodes.Items[:],
-	}
-	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
-	expectedNodesNames := []string{"node2", "node3", "node1"}
-
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	ns := scheme.Codecs
-
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == "/api":
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
-			case p == "/apis":
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
-			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &expectedNodes)}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\nGot URL: %#v\n", req, req.URL)
-				return nil, nil
-			}
-		}),
-	}
-	fakemetricsClientset := &metricsfake.Clientset{}
-	fakemetricsClientset.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		return true, expectedMetrics, nil
-	})
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
-
-	cmd := NewCmdTopNode(tf, nil, streams)
-	cmd.Flags().Set("sort-by", "cpu")
-
-	// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
-	// TODO then check the particular Run functionality and harvest results from fake clients
-	cmdOptions := &TopNodeOptions{
-		IOStreams: streams,
-		SortBy:    "cpu",
-	}
-	if err := cmdOptions.Complete(tf, cmd, []string{}); err != nil {
-		t.Fatal(err)
-	}
-	cmdOptions.MetricsClient = fakemetricsClientset
-	if err := cmdOptions.Validate(); err != nil {
-		t.Fatal(err)
-	}
-	if err := cmdOptions.RunTopNode(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Check the presence of node names in the output.
-	result := buf.String()
-
-	for _, m := range expectedMetrics.Items {
-		if !strings.Contains(result, m.Name) {
-			t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-		}
-	}
-
-	resultLines := strings.Split(result, "\n")
-	resultNodes := make([]string, len(resultLines)-2) // don't process first (header) and last (empty) line
-
-	for i, line := range resultLines[1 : len(resultLines)-1] { // don't process first (header) and last (empty) line
-		lineFirstColumn := strings.Split(line, " ")[0]
-		resultNodes[i] = lineFirstColumn
-	}
-
-	if !reflect.DeepEqual(resultNodes, expectedNodesNames) {
-		t.Errorf("kinds not matching:\n\texpectedKinds: %v\n\tgotKinds: %v\n", expectedNodesNames, resultNodes)
-	}
-
-}
-
-func TestTopNodeWithSortByMemoryMetricsFrom(t *testing.T) {
-	cmdtesting.InitTestErrorHandler(t)
-	metrics, nodes := testNodeV1beta1MetricsData()
-	expectedMetrics := &metricsv1beta1api.NodeMetricsList{
-		ListMeta: metrics.ListMeta,
-		Items:    metrics.Items[:],
-	}
-	expectedNodes := v1.NodeList{
-		ListMeta: nodes.ListMeta,
-		Items:    nodes.Items[:],
-	}
-	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
-	expectedNodesNames := []string{"node2", "node3", "node1"}
-
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	ns := scheme.Codecs
-
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == "/api":
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
-			case p == "/apis":
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
-			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &expectedNodes)}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\nGot URL: %#v\n", req, req.URL)
-				return nil, nil
-			}
-		}),
-	}
-	fakemetricsClientset := &metricsfake.Clientset{}
-	fakemetricsClientset.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		return true, expectedMetrics, nil
-	})
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
-
-	cmd := NewCmdTopNode(tf, nil, streams)
-	cmd.Flags().Set("sort-by", "memory")
-
-	// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
-	// TODO then check the particular Run functionality and harvest results from fake clients
-	cmdOptions := &TopNodeOptions{
-		IOStreams: streams,
-		SortBy:    "memory",
-	}
-	if err := cmdOptions.Complete(tf, cmd, []string{}); err != nil {
-		t.Fatal(err)
-	}
-	cmdOptions.MetricsClient = fakemetricsClientset
-	if err := cmdOptions.Validate(); err != nil {
-		t.Fatal(err)
-	}
-	if err := cmdOptions.RunTopNode(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Check the presence of node names in the output.
-	result := buf.String()
-
-	for _, m := range expectedMetrics.Items {
-		if !strings.Contains(result, m.Name) {
-			t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-		}
-	}
-
-	resultLines := strings.Split(result, "\n")
-	resultNodes := make([]string, len(resultLines)-2) // don't process first (header) and last (empty) line
-
-	for i, line := range resultLines[1 : len(resultLines)-1] { // don't process first (header) and last (empty) line
-		lineFirstColumn := strings.Split(line, " ")[0]
-		resultNodes[i] = lineFirstColumn
-	}
-
-	if !reflect.DeepEqual(resultNodes, expectedNodesNames) {
-		t.Errorf("kinds not matching:\n\texpectedKinds: %v\n\tgotKinds: %v\n", expectedNodesNames, resultNodes)
-	}
-
-}
-
-func TestTopNodeWithSwap(t *testing.T) {
-	runTopCmd := func(expectedMetrics *metricsv1beta1api.NodeMetricsList, nodes *v1.NodeList) (result string) {
-		cmdtesting.InitTestErrorHandler(t)
-		expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
-
-		tf := cmdtesting.NewTestFactory().WithNamespace("test")
-		defer tf.Cleanup()
-
-		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-		ns := scheme.Codecs.WithoutConversion()
-
-		tf.Client = &fake.RESTClient{
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == "/api":
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
-				case p == "/apis":
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
-				case p == expectedNodePath && m == "GET":
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, nodes)}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\nGot URL: %#v\n", req, req.URL)
-					return nil, nil
-				}
-			}),
-		}
-		fakemetricsClientset := &metricsfake.Clientset{}
-		fakemetricsClientset.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			return true, expectedMetrics, nil
-		})
-		tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-		streams, _, buf, _ := genericiooptions.NewTestIOStreams()
-
-		cmd := NewCmdTopNode(tf, nil, streams)
-
-		// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
-		// TODO then check the particular Run functionality and harvest results from fake clients
-		cmdOptions := &TopNodeOptions{
-			IOStreams: streams,
-			ShowSwap:  true,
-		}
-		if err := cmdOptions.Complete(tf, cmd, []string{}); err != nil {
-			t.Fatal(err)
-		}
-		cmdOptions.MetricsClient = fakemetricsClientset
-		if err := cmdOptions.Validate(); err != nil {
-			t.Fatal(err)
-		}
-		if err := cmdOptions.RunTopNode(); err != nil {
-			t.Fatal(err)
-		}
-
-		return buf.String()
-	}
-
-	for _, tc := range []struct {
-		name                  string
-		isSwapDisabledOnNodes bool
+	testCases := []struct {
+		name                string
+		args                []string
+		selector            string
+		sortBy              string
+		showSwap            bool
+		noSwapOnNodes       bool
+		nodeIndices         []int // fixture items served by the fakes; nil means all
+		expectedNodes       []string
+		nonExpectedNodes    []string
+		expectedSortedNodes []string
 	}{
 		{
-			name:                  "nodes with swap",
-			isSwapDisabledOnNodes: false,
+			name:          "all nodes",
+			expectedNodes: []string{"node1", "node2", "node3"},
 		},
 		{
-			name:                  "nodes without swap",
-			isSwapDisabledOnNodes: true,
+			name:             "node with name",
+			args:             []string{"node1"},
+			nodeIndices:      []int{0},
+			expectedNodes:    []string{"node1"},
+			nonExpectedNodes: []string{"node2", "node3"},
 		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			expectedMetrics, nodes := testNodeV1beta1MetricsData()
-			if tc.isSwapDisabledOnNodes {
-				for i := range expectedMetrics.Items {
-					delete(expectedMetrics.Items[i].Usage, "swap")
-				}
-				for i := range nodes.Items {
-					nodes.Items[i].Status.NodeInfo.Swap = nil
-				}
-			}
+		{
+			name:             "node with label selector",
+			selector:         "key=value",
+			nodeIndices:      []int{0},
+			expectedNodes:    []string{"node1"},
+			nonExpectedNodes: []string{"node2", "node3"},
+		},
+		{
+			name:                "node sort by cpu",
+			sortBy:              "cpu",
+			expectedNodes:       []string{"node1", "node2", "node3"},
+			expectedSortedNodes: []string{"node2", "node3", "node1"},
+		},
+		{
+			name:                "node sort by memory",
+			sortBy:              "memory",
+			expectedNodes:       []string{"node1", "node2", "node3"},
+			expectedSortedNodes: []string{"node2", "node3", "node1"},
+		},
+		{
+			name:          "nodes with swap",
+			showSwap:      true,
+			expectedNodes: []string{"node1", "node2", "node3"},
+		},
+		{
+			name:          "nodes without swap",
+			showSwap:      true,
+			noSwapOnNodes: true,
+			expectedNodes: []string{"node1", "node2", "node3"},
+		},
+	}
 
-			result := runTopCmd(expectedMetrics, nodes)
-			fmt.Printf("%s\n", result)
+	for _, version := range metricsAPIVersions {
+		t.Run(version.name, func(t *testing.T) {
+			for _, testCase := range testCases {
+				t.Run(testCase.name, func(t *testing.T) {
+					metrics, nodes := testNodeMetricsData()
+					if testCase.nodeIndices != nil {
+						var metricsItems []metricsapi.NodeMetrics
+						var nodeItems []v1.Node
+						for _, i := range testCase.nodeIndices {
+							metricsItems = append(metricsItems, metrics.Items[i])
+							nodeItems = append(nodeItems, nodes.Items[i])
+						}
+						metrics.Items = metricsItems
+						nodes.Items = nodeItems
+					}
+					if testCase.noSwapOnNodes {
+						for i := range metrics.Items {
+							delete(metrics.Items[i].Usage, "swap")
+						}
+						for i := range nodes.Items {
+							nodes.Items[i].Status.NodeInfo.Swap = nil
+						}
+					}
 
-			if !strings.Contains(result, "SWAP(bytes)") {
-				t.Errorf("missing SWAP(bytes) header: \n%s", result)
-			}
-			if !strings.Contains(result, "SWAP(%)") {
-				t.Errorf("missing SWAP(%%) header: \n%s", result)
-			}
+					metricsList, firstMetrics := versionedNodeMetricsList(t, version.name, metrics)
+					fakeMetrics := &metricsfake.Clientset{}
+					fakeMetrics.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+						return true, firstMetrics, nil
+					})
+					fakeMetrics.AddReactor("list", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+						return true, metricsList, nil
+					})
 
-			if tc.isSwapDisabledOnNodes {
-				if !strings.Contains(result, "<unknown>") {
-					t.Errorf("expected swap to be <unknown>: \n%s", result)
-				}
-			}
+					expectedPath := listNodePath
+					var nodeBody runtime.Object = nodes
+					if len(testCase.args) > 0 {
+						expectedPath = fmt.Sprintf("%s/%s", listNodePath, testCase.args[0])
+						nodeBody = &nodes.Items[0]
+					}
 
-			for _, m := range expectedMetrics.Items {
-				if !strings.Contains(result, m.Name) {
-					t.Errorf("missing metrics for %s: \n%s", m.Name, result)
-				}
-				if _, foundSwapMetric := m.Usage["swap"]; foundSwapMetric != !tc.isSwapDisabledOnNodes {
-					t.Errorf("missing swap metric for %s: \n%s", m.Name, result)
-				}
+					result := runTopNodeTest(t, runTopNodeOpts{
+						apisBody:     version.apisBody,
+						expectedPath: expectedPath,
+						nodeBody:     nodeBody,
+						fakeMetrics:  fakeMetrics,
+						cmdArgs:      testCase.args,
+						selector:     testCase.selector,
+						sortBy:       testCase.sortBy,
+						showSwap:     testCase.showSwap,
+					})
+
+					assertTopNodeOutput(t, topNodeAssertion{
+						result:              result,
+						expectedNodes:       testCase.expectedNodes,
+						nonExpectedNodes:    testCase.nonExpectedNodes,
+						expectedSortedNodes: testCase.expectedSortedNodes,
+						showSwap:            testCase.showSwap,
+						expectUnknownSwap:   testCase.noSwapOnNodes,
+					})
+				})
 			}
 		})
 	}
+}
+
+type topNodeAssertion struct {
+	result              string
+	expectedNodes       []string // names that should appear in the output
+	nonExpectedNodes    []string // names that should not appear in the output
+	expectedSortedNodes []string // sort assertion (column 0)
+	showSwap            bool
+	expectUnknownSwap   bool
+}
+
+func assertTopNodeOutput(t *testing.T, a topNodeAssertion) {
+	t.Helper()
+	for _, name := range a.expectedNodes {
+		if !strings.Contains(a.result, name) {
+			t.Errorf("missing metrics for %s: \n%s", name, a.result)
+		}
+	}
+	for _, name := range a.nonExpectedNodes {
+		if strings.Contains(a.result, name) {
+			t.Errorf("unexpected metrics for %s: \n%s", name, a.result)
+		}
+	}
+	if a.expectedSortedNodes != nil {
+		resultNodes := extractNodeNamesFromTopOutput(a.result)
+		if !reflect.DeepEqual(a.expectedSortedNodes, resultNodes) {
+			t.Errorf("nodes not matching:\n\texpectedNodes: %v\n\tresultNodes: %v\n", a.expectedSortedNodes, resultNodes)
+		}
+	}
+	if a.showSwap {
+		if !strings.Contains(a.result, "SWAP(bytes)") {
+			t.Errorf("missing SWAP(bytes) header: \n%s", a.result)
+		}
+		if !strings.Contains(a.result, "SWAP(%)") {
+			t.Errorf("missing SWAP(%%) header: \n%s", a.result)
+		}
+	}
+	if a.expectUnknownSwap && !strings.Contains(a.result, "<unknown>") {
+		t.Errorf("expected swap to be <unknown>: \n%s", a.result)
+	}
+}
+
+func extractNodeNamesFromTopOutput(result string) []string {
+	lines := strings.Split(result, "\n")
+	names := make([]string, len(lines)-2) // don't process first (header) and last (empty) line
+	for i, line := range lines[1 : len(lines)-1] {
+		names[i] = strings.Split(line, " ")[0]
+	}
+	return names
+}
+
+func runTopNodeTest(t *testing.T, opts runTopNodeOpts) string {
+	cmdtesting.InitTestErrorHandler(t)
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	ns := scheme.Codecs.WithoutConversion()
+
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/api":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+			case p == "/apis":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(opts.apisBody)))}, nil
+			case p == opts.expectedPath && m == "GET":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, opts.nodeBody)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\nGot URL: %#v\n", req, req.URL)
+				return nil, nil
+			}
+		}),
+	}
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+
+	cmd := NewCmdTopNode(tf, nil, streams)
+	cmdOptions := &TopNodeOptions{
+		IOStreams: streams,
+		Selector:  opts.selector,
+		SortBy:    opts.sortBy,
+		ShowSwap:  opts.showSwap,
+	}
+	if err := cmdOptions.Complete(tf, cmd, opts.cmdArgs); err != nil {
+		t.Fatal(err)
+	}
+	cmdOptions.MetricsClient = opts.fakeMetrics
+	if err := cmdOptions.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdOptions.RunTopNode(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.String()
+}
+
+type runTopNodeOpts struct {
+	apisBody     string
+	expectedPath string
+	nodeBody     runtime.Object // *v1.NodeList or *v1.Node — passed to cmdtesting.ObjBody
+	fakeMetrics  *metricsfake.Clientset
+	cmdArgs      []string
+	selector     string
+	sortBy       string
+	showSwap     bool
 }
