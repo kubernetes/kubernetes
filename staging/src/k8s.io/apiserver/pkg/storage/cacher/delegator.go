@@ -19,13 +19,10 @@ package cacher
 import (
 	"context"
 	"sync"
-	"time"
 
-	"go.opentelemetry.io/otel/attribute"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/consistency"
@@ -33,7 +30,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 )
 
@@ -112,22 +108,15 @@ func (c *CacheDelegator) Watch(ctx context.Context, key string, opts storage.Lis
 }
 
 func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
-	ctx, span := tracing.Start(ctx, "cacher.Get",
-		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
-		attribute.String("key", key),
-		attribute.String("resource-version", opts.ResourceVersion))
-	defer span.End(500 * time.Millisecond)
 	if opts.ResourceVersion == "" {
 		// If resourceVersion is not specified, serve it from underlying
 		// storage (for backward compatibility).
-		span.AddEvent("About to Get from underlying storage")
 		return c.storage.Get(ctx, key, opts, objPtr)
 	}
 
 	if !c.cacher.Ready() {
 		// If Cache is not initialized, delegator Get requests to storage
 		// as described in https://kep.k8s.io/4568
-		span.AddEvent("About to Get from underlying storage - cache not initialized")
 		return c.storage.Get(ctx, key, opts, objPtr)
 	}
 	// If resourceVersion is specified, serve it from cache.
@@ -136,7 +125,6 @@ func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOp
 	if _, err := c.cacher.versioner.ParseResourceVersion(opts.ResourceVersion); err != nil {
 		return err
 	}
-	span.AddEvent("About to fetch object from cache")
 	return c.cacher.Get(ctx, key, opts, objPtr)
 }
 

@@ -455,7 +455,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"Encode succeeded",
 						"TransformToStorage succeeded",
 						"Txn call succeeded",
-						"decode succeeded",
+						"Decode succeeded",
 					},
 				},
 				{
@@ -549,6 +549,114 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
+					name: "Get etcd3",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"key": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/minions/fake"
+						},
+						"resource": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "nodes"
+						},
+					},
+					events: []string{
+						"Get call succeeded",
+						"TransformFromStorage succeeded",
+						"Decode succeeded",
+					},
+				},
+				{
+					name: "etcdserverpb.KV/Range",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"rpc.system.name": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "grpc"
+						},
+					},
+				},
+				{
+					name: "SerializeObject",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/api/v1/nodes/fake"
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+						"method": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "GET"
+						},
+						"mediaType": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf"
+						},
+						"encoder": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "{\"encodeGV\":\"v1\",\"encoder\":\"protobuf\",\"name\":\"versioning\"}"
+						},
+					},
+					events: []string{
+						"About to start writing response",
+						"Write call succeeded",
+					},
+				},
+			},
+		},
+		{
+			desc: "get node from cache",
+			apiCall: func(ctx context.Context) error {
+				_, err = clientSet.CoreV1().Nodes().Get(ctx, "fake", metav1.GetOptions{ResourceVersion: "0"})
+				return err
+			},
+			expectedTrace: []*spanExpectation{
+				{
+					name: "GET /api/v1/nodes/{:name}",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"user_agent.original": func(v *commonv1.AnyValue) bool {
+							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
+						},
+						"url.path": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/api/v1/nodes/fake"
+						},
+						"http.request.method": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "GET"
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+					},
+				},
+				{
+					name: "Get",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return strings.HasSuffix(v.GetStringValue(), "/api/v1/nodes/fake")
+						},
+						"user-agent": func(v *commonv1.AnyValue) bool {
+							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"client": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "127.0.0.1"
+						},
+						"accept": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf, */*"
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+					},
+					events: []string{
+						"About to Get from storage",
+						"About to write a response",
+						"Writing http response done",
+					},
+				},
+				{
 					name: "cacher.Get",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"audit-id": func(v *commonv1.AnyValue) bool {
@@ -558,19 +666,13 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() == "/minions/fake"
 						},
 						"resource-version": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == ""
+							return v.GetStringValue() == "0"
 						},
 					},
 					events: []string{
-						"About to Get from underlying storage",
-					},
-				},
-				{
-					name: "etcdserverpb.KV/Range",
-					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"rpc.system.name": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == "grpc"
-						},
+						"watchCache locked acquired",
+						"watchCache fresh enough",
+						"GetByKey success",
 					},
 				},
 				{
@@ -764,8 +866,10 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 					events: []string{
 						"Ready",
+						"getCurrentRV success",
 						"watchCache locked acquired",
 						"watchCache fresh enough",
+						"GetLatestSnapshotOrBuildLocked success",
 						"Listed items from cache",
 						"Filtered items",
 					},
@@ -892,7 +996,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"Transaction prepared",
 						"Txn call completed",
 						"Transaction committed",
-						"decode succeeded",
+						"Decode succeeded",
 					},
 				},
 				{
@@ -1035,7 +1139,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"Transaction prepared",
 						"Txn call completed",
 						"Transaction committed",
-						"decode succeeded",
+						"Decode succeeded",
 					},
 				},
 				{
