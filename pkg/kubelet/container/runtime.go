@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -815,3 +816,22 @@ const (
 	// log output that the termination message can contain.
 	MaxContainerTerminationMessageLogLines = 80
 )
+
+type commandRunner struct {
+	runtimeService internalapi.RuntimeService
+}
+
+var _ CommandRunner = &commandRunner{}
+
+// NewCommandRunner creates a new CommandRunner that uses the CRI RuntimeService.
+func NewCommandRunner(runtimeService internalapi.RuntimeService) CommandRunner {
+	return &commandRunner{runtimeService: runtimeService}
+}
+
+func (r *commandRunner) RunInContainer(ctx context.Context, id ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
+	stdout, stderr, err := r.runtimeService.ExecSync(ctx, id.ID, cmd, timeout)
+	// NOTE(tallclair): This does not correctly interleave stdout & stderr, but should be sufficient
+	// for logging purposes. A combined output option will need to be added to the ExecSyncRequest
+	// if more precise output ordering is ever required.
+	return append(stdout, stderr...), err
+}

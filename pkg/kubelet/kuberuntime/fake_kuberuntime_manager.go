@@ -145,7 +145,7 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 	)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(
 		&fakeHTTP{},
-		kubeRuntimeManager,
+		kubecontainer.NewCommandRunner(runtimeService),
 		kubeRuntimeManager,
 		recorder)
 
