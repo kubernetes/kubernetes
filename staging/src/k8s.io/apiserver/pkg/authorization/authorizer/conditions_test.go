@@ -29,6 +29,7 @@ import (
 	"testing"
 
 	"github.com/google/cel-go/cel"
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -1123,7 +1124,7 @@ var _ authorizer.Authorizer = sampleAuthorizer{}
 type sampleAuthorizer struct{}
 
 func (a sampleAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
-	return a.ConditionsAwareAuthorize(ctx, attrs).UnconditionalParts()
+	return a.ConditionsAwareAuthorize(ctx, attrs).UnconditionalParts(true)
 }
 
 func (a sampleAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attrs authorizer.Attributes) authorizer.ConditionsAwareDecision {
@@ -1315,11 +1316,11 @@ func TestSampleAuthorizer(t *testing.T) {
 					object:    objWithLabels(map[string]string{"owner": "carol"}),
 					oldObject: objWithLabels(map[string]string{"owner": "carol"}),
 					authorizeDecision: [2]string{
-						`NoOpinion(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`,
+						`NoOpinion(reason="failed closed from conditional decision (with possible outcomes [Allow NoOpinion]) to NoOpinion during unconditional authorization")`,
 						`ConditionsMap(allows=1)`,
 					},
 					finalDecision: [2]string{
-						`NoOpinion(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`,
+						`NoOpinion(reason="failed closed from conditional decision (with possible outcomes [Allow NoOpinion]) to NoOpinion during unconditional authorization")`,
 						`Allow(reason="condition \"example.com/owner-label-is-set\" allowed the request")`,
 					},
 				},
@@ -1328,11 +1329,11 @@ func TestSampleAuthorizer(t *testing.T) {
 					object:    objWithLabels(map[string]string{"owner": "carol"}),
 					oldObject: objWithLabels(nil),
 					authorizeDecision: [2]string{
-						`NoOpinion(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`,
+						`NoOpinion(reason="failed closed from conditional decision (with possible outcomes [Allow NoOpinion]) to NoOpinion during unconditional authorization")`,
 						`ConditionsMap(allows=1)`,
 					},
 					finalDecision: [2]string{
-						`NoOpinion(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`,
+						`NoOpinion(reason="failed closed from conditional decision (with possible outcomes [Allow NoOpinion]) to NoOpinion during unconditional authorization")`,
 						`NoOpinion(reason="no conditions matched")`,
 					},
 				},
@@ -1341,11 +1342,11 @@ func TestSampleAuthorizer(t *testing.T) {
 					object:    objWithLabels(map[string]string{"owner": "alice"}),
 					oldObject: objWithLabels(map[string]string{"owner": "carol"}),
 					authorizeDecision: [2]string{
-						`NoOpinion(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`,
+						`NoOpinion(reason="failed closed from conditional decision (with possible outcomes [Allow NoOpinion]) to NoOpinion during unconditional authorization")`,
 						`ConditionsMap(allows=1)`,
 					},
 					finalDecision: [2]string{
-						`NoOpinion(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`,
+						`NoOpinion(reason="failed closed from conditional decision (with possible outcomes [Allow NoOpinion]) to NoOpinion during unconditional authorization")`,
 						`NoOpinion(reason="no conditions matched")`,
 					},
 				},
@@ -1384,29 +1385,29 @@ func TestSampleAuthorizer(t *testing.T) {
 					name:              "both objects with supersecret",
 					object:            objWithLabels(map[string]string{"supersecret": "yes"}),
 					oldObject:         objWithLabels(map[string]string{"supersecret": "yes"}),
-					authorizeDecision: [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(denies=2)`},
-					finalDecision:     [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `Deny(reason="condition \"example.com/deny-supersecret-label-on-oldObject\" denied the request")`},
+					authorizeDecision: [2]string{`Deny(reason="failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization")`, `ConditionsMap(denies=2)`},
+					finalDecision:     [2]string{`Deny(reason="failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization")`, `Deny(reason="condition \"example.com/deny-supersecret-label-on-oldObject\" denied the request")`},
 				},
 				{
 					name:              "new with supersecret old without",
 					object:            objWithLabels(map[string]string{"supersecret": "yes"}),
 					oldObject:         objWithLabels(nil),
-					authorizeDecision: [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(denies=2)`},
-					finalDecision:     [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `Deny(reason="condition \"example.com/deny-supersecret-label-on-object\" denied the request")`},
+					authorizeDecision: [2]string{`Deny(reason="failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization")`, `ConditionsMap(denies=2)`},
+					finalDecision:     [2]string{`Deny(reason="failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization")`, `Deny(reason="condition \"example.com/deny-supersecret-label-on-object\" denied the request")`},
 				},
 				{
 					name:              "new without old with supersecret",
 					object:            objWithLabels(nil),
 					oldObject:         objWithLabels(map[string]string{"supersecret": "yes"}),
-					authorizeDecision: [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(denies=2)`},
-					finalDecision:     [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `Deny(reason="condition \"example.com/deny-supersecret-label-on-oldObject\" denied the request")`},
+					authorizeDecision: [2]string{`Deny(reason="failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization")`, `ConditionsMap(denies=2)`},
+					finalDecision:     [2]string{`Deny(reason="failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization")`, `Deny(reason="condition \"example.com/deny-supersecret-label-on-oldObject\" denied the request")`},
 				},
 				{
 					name:              "both without supersecret",
 					object:            objWithLabels(map[string]string{"safe": "true"}),
 					oldObject:         objWithLabels(map[string]string{"safe": "true"}),
-					authorizeDecision: [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(denies=2)`},
-					finalDecision:     [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `NoOpinion(reason="no conditions matched")`},
+					authorizeDecision: [2]string{`Deny(reason="failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization")`, `ConditionsMap(denies=2)`},
+					finalDecision:     [2]string{`Deny(reason="failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization")`, `NoOpinion(reason="no conditions matched")`},
 				},
 			},
 		},
@@ -1420,14 +1421,14 @@ func TestSampleAuthorizer(t *testing.T) {
 				{
 					name:              "create with supersecret",
 					object:            objWithLabels(map[string]string{"supersecret": "yes"}),
-					authorizeDecision: [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(denies=2)`},
-					finalDecision:     [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `Deny(reason="condition \"example.com/deny-supersecret-label-on-object\" denied the request")`},
+					authorizeDecision: [2]string{`Deny(reason="failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization")`, `ConditionsMap(denies=2)`},
+					finalDecision:     [2]string{`Deny(reason="failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization")`, `Deny(reason="condition \"example.com/deny-supersecret-label-on-object\" denied the request")`},
 				},
 				{
 					name:              "create without supersecret",
 					object:            objWithLabels(map[string]string{"safe": "true"}),
-					authorizeDecision: [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(denies=2)`},
-					finalDecision:     [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `NoOpinion(reason="no conditions matched")`},
+					authorizeDecision: [2]string{`Deny(reason="failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization")`, `ConditionsMap(denies=2)`},
+					finalDecision:     [2]string{`Deny(reason="failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization")`, `NoOpinion(reason="no conditions matched")`},
 				},
 			},
 		},
@@ -1441,14 +1442,14 @@ func TestSampleAuthorizer(t *testing.T) {
 				{
 					name:              "delete with supersecret on old object",
 					oldObject:         objWithLabels(map[string]string{"supersecret": "yes"}),
-					authorizeDecision: [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(denies=2)`},
-					finalDecision:     [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `Deny(reason="condition \"example.com/deny-supersecret-label-on-oldObject\" denied the request")`},
+					authorizeDecision: [2]string{`Deny(reason="failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization")`, `ConditionsMap(denies=2)`},
+					finalDecision:     [2]string{`Deny(reason="failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization")`, `Deny(reason="condition \"example.com/deny-supersecret-label-on-oldObject\" denied the request")`},
 				},
 				{
 					name:              "delete without supersecret on old object",
 					oldObject:         objWithLabels(map[string]string{"safe": "true"}),
-					authorizeDecision: [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `ConditionsMap(denies=2)`},
-					finalDecision:     [2]string{`Deny(reason="failed closed: tried to return conditional decision to conditions-unaware authorizer")`, `NoOpinion(reason="no conditions matched")`},
+					authorizeDecision: [2]string{`Deny(reason="failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization")`, `ConditionsMap(denies=2)`},
+					finalDecision:     [2]string{`Deny(reason="failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization")`, `NoOpinion(reason="no conditions matched")`},
 				},
 			},
 		},
@@ -1635,4 +1636,120 @@ func TestConditionsAwareDecisionUnionedDecisions(t *testing.T) {
 			t.Errorf("expected early break after 1 iteration, got %d", count)
 		}
 	})
+}
+
+// unconditionalPartsResult bundles the (Decision, reason, err) triple returned
+// by ConditionsAwareDecision.UnconditionalParts so cmp.Diff can compare a whole
+// outcome in one shot.
+type unconditionalPartsResult struct {
+	Decision authorizer.Decision
+	Reason   string
+	Err      error
+}
+
+// errorByString treats errors as equal iff their Error() strings match, and
+// nil-equals-nil. It exists because distinct error values with identical
+// messages never compare equal under go-cmp's default rules.
+var errorByString = cmp.Comparer(func(a, b error) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.Error() == b.Error()
+})
+
+func TestConditionsAwareDecisionUnconditionalParts(t *testing.T) {
+	origErr := fmt.Errorf("boom")
+	mkCond := func(id string) authorizer.Condition {
+		return authorizer.GenericCondition{ID: "example.com/" + id, Condition: "true", Type: "example.com/cel"}
+	}
+	// PossibleDecisions={Allow, NoOpinion}, FailureDecision=NoOpinion
+	allowCondMap := authorizer.ConditionsAwareDecisionConditionsMap(nil, nil, []authorizer.Condition{mkCond("a")})
+	// PossibleDecisions={Deny, NoOpinion}, FailureDecision=Deny
+	denyCondMap := authorizer.ConditionsAwareDecisionConditionsMap([]authorizer.Condition{mkCond("d")}, nil, nil)
+	// PossibleDecisions={Deny, Allow, NoOpinion}, FailureDecision=Deny
+	mixedCondMap := authorizer.ConditionsAwareDecisionConditionsMap([]authorizer.Condition{mkCond("d")}, nil, []authorizer.Condition{mkCond("a")})
+
+	// The invariant-violation error emitted when a caller passes
+	// expectConditional=false to a conditional decision.
+	invariantErr := fmt.Errorf("tried to return an unexpected conditional decision during unconditional authorization")
+
+	tests := []struct {
+		name     string
+		decision authorizer.ConditionsAwareDecision
+		// Every case asserts both branches of expectConditional so we notice
+		// if one flavor regresses independently. For unconditional decisions
+		// both are identical (expectConditional is ignored); for conditional
+		// decisions they differ (fail-closed vs. round-down).
+		wantWhenFalse unconditionalPartsResult
+		wantWhenTrue  unconditionalPartsResult
+	}{
+		{
+			name:          "allow",
+			decision:      authorizer.ConditionsAwareDecisionAllow("rbac allowed", nil),
+			wantWhenFalse: unconditionalPartsResult{Decision: authorizer.DecisionAllow, Reason: "rbac allowed"},
+			wantWhenTrue:  unconditionalPartsResult{Decision: authorizer.DecisionAllow, Reason: "rbac allowed"},
+		},
+		{
+			name:          "deny",
+			decision:      authorizer.ConditionsAwareDecisionDeny("policy denied", nil),
+			wantWhenFalse: unconditionalPartsResult{Decision: authorizer.DecisionDeny, Reason: "policy denied"},
+			wantWhenTrue:  unconditionalPartsResult{Decision: authorizer.DecisionDeny, Reason: "policy denied"},
+		},
+		{
+			name:          "noOpinion propagates error verbatim",
+			decision:      authorizer.ConditionsAwareDecisionNoOpinion("webhook failure", origErr),
+			wantWhenFalse: unconditionalPartsResult{Decision: authorizer.DecisionNoOpinion, Reason: "webhook failure", Err: origErr},
+			wantWhenTrue:  unconditionalPartsResult{Decision: authorizer.DecisionNoOpinion, Reason: "webhook failure", Err: origErr},
+		},
+		{
+			name:          "zero value == deny",
+			decision:      authorizer.ConditionsAwareDecision{},
+			wantWhenFalse: unconditionalPartsResult{Decision: authorizer.DecisionDeny},
+			wantWhenTrue:  unconditionalPartsResult{Decision: authorizer.DecisionDeny},
+		},
+		{
+			name:          "allow-only condMap",
+			decision:      allowCondMap,
+			wantWhenFalse: unconditionalPartsResult{Decision: authorizer.DecisionNoOpinion, Reason: "failed closed", Err: invariantErr},
+			wantWhenTrue:  unconditionalPartsResult{Decision: authorizer.DecisionNoOpinion, Reason: "failed closed from conditional decision (with possible outcomes [Allow NoOpinion]) to NoOpinion during unconditional authorization"},
+		},
+		{
+			name:          "deny-only condMap",
+			decision:      denyCondMap,
+			wantWhenFalse: unconditionalPartsResult{Decision: authorizer.DecisionDeny, Reason: "failed closed", Err: invariantErr},
+			wantWhenTrue:  unconditionalPartsResult{Decision: authorizer.DecisionDeny, Reason: "failed closed from conditional decision (with possible outcomes [Deny NoOpinion]) to Deny during unconditional authorization"},
+		},
+		{
+			name:          "mixed condMap (deny effect present)",
+			decision:      mixedCondMap,
+			wantWhenFalse: unconditionalPartsResult{Decision: authorizer.DecisionDeny, Reason: "failed closed", Err: invariantErr},
+			wantWhenTrue:  unconditionalPartsResult{Decision: authorizer.DecisionDeny, Reason: "failed closed from conditional decision (with possible outcomes [Deny Allow NoOpinion]) to Deny during unconditional authorization"},
+		},
+		{
+			name:          "union of allow-only condMaps",
+			decision:      unionDecision(allowCondMap, allowCondMap),
+			wantWhenFalse: unconditionalPartsResult{Decision: authorizer.DecisionNoOpinion, Reason: "failed closed", Err: invariantErr},
+			wantWhenTrue:  unconditionalPartsResult{Decision: authorizer.DecisionNoOpinion, Reason: "failed closed from conditional decision (with possible outcomes [Allow NoOpinion]) to NoOpinion during unconditional authorization"},
+		},
+	}
+
+	run := func(t *testing.T, decision authorizer.ConditionsAwareDecision, expectConditional bool, want unconditionalPartsResult) {
+		t.Helper()
+		d, r, e := decision.UnconditionalParts(expectConditional)
+		got := unconditionalPartsResult{Decision: d, Reason: r, Err: e}
+		if diff := cmp.Diff(want, got, errorByString); diff != "" {
+			t.Errorf("mismatch (-want +got):\n%s", diff)
+		}
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run("expectConditional=false", func(t *testing.T) {
+				run(t, tc.decision, false, tc.wantWhenFalse)
+			})
+			t.Run("expectConditional=true", func(t *testing.T) {
+				run(t, tc.decision, true, tc.wantWhenTrue)
+			})
+		})
+	}
 }

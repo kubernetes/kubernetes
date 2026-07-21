@@ -108,7 +108,7 @@ func (c ConditionsMap) Evaluate(ctx context.Context, data ConditionsData, evalua
 			return ConditionEvaluationResultError(err)
 		}
 		return ConditionEvaluationResultBoolean(applied)
-	}).UnconditionalParts()
+	}).UnconditionalParts(false)
 }
 
 // partiallyEvaluateConditionsMapInternal evaluates the ConditionsMap primarily using the Conditions' own Evaluate() function,
