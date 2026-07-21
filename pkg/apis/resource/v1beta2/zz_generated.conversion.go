@@ -97,13 +97,23 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*resourcev1beta2.Counter)(nil), (*resource.Counter)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_Counter_To_resource_Counter(a.(*resourcev1beta2.Counter), b.(*resource.Counter), scope)
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta2.ConsumeCounter)(nil), (*resource.ConsumeCounter)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_ConsumeCounter_To_resource_ConsumeCounter(a.(*resourcev1beta2.ConsumeCounter), b.(*resource.ConsumeCounter), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*resource.Counter)(nil), (*resourcev1beta2.Counter)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_resource_Counter_To_v1beta2_Counter(a.(*resource.Counter), b.(*resourcev1beta2.Counter), scope)
+	if err := s.AddGeneratedConversionFunc((*resource.ConsumeCounter)(nil), (*resourcev1beta2.ConsumeCounter)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_ConsumeCounter_To_v1beta2_ConsumeCounter(a.(*resource.ConsumeCounter), b.(*resourcev1beta2.ConsumeCounter), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta2.CounterConsumption)(nil), (*resource.CounterConsumption)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_CounterConsumption_To_resource_CounterConsumption(a.(*resourcev1beta2.CounterConsumption), b.(*resource.CounterConsumption), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.CounterConsumption)(nil), (*resourcev1beta2.CounterConsumption)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_CounterConsumption_To_v1beta2_CounterConsumption(a.(*resource.CounterConsumption), b.(*resourcev1beta2.CounterConsumption), scope)
 	}); err != nil {
 		return err
 	}
@@ -114,6 +124,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*resource.CounterSet)(nil), (*resourcev1beta2.CounterSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_resource_CounterSet_To_v1beta2_CounterSet(a.(*resource.CounterSet), b.(*resourcev1beta2.CounterSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta2.CounterSetConsumption)(nil), (*resource.CounterSetConsumption)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_CounterSetConsumption_To_resource_CounterSetConsumption(a.(*resourcev1beta2.CounterSetConsumption), b.(*resource.CounterSetConsumption), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.CounterSetConsumption)(nil), (*resourcev1beta2.CounterSetConsumption)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_CounterSetConsumption_To_v1beta2_CounterSetConsumption(a.(*resource.CounterSetConsumption), b.(*resourcev1beta2.CounterSetConsumption), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta2.CounterValueFrom)(nil), (*resource.CounterValueFrom)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_CounterValueFrom_To_resource_CounterValueFrom(a.(*resourcev1beta2.CounterValueFrom), b.(*resource.CounterValueFrom), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.CounterValueFrom)(nil), (*resourcev1beta2.CounterValueFrom)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_CounterValueFrom_To_v1beta2_CounterValueFrom(a.(*resource.CounterValueFrom), b.(*resourcev1beta2.CounterValueFrom), scope)
 	}); err != nil {
 		return err
 	}
@@ -557,6 +587,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta2.SharedCounter)(nil), (*resource.SharedCounter)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_SharedCounter_To_resource_SharedCounter(a.(*resourcev1beta2.SharedCounter), b.(*resource.SharedCounter), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.SharedCounter)(nil), (*resourcev1beta2.SharedCounter)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_SharedCounter_To_v1beta2_SharedCounter(a.(*resource.SharedCounter), b.(*resourcev1beta2.SharedCounter), scope)
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -680,24 +720,44 @@ func Convert_resource_CapacityRequirements_To_v1beta2_CapacityRequirements(in *r
 	return autoConvert_resource_CapacityRequirements_To_v1beta2_CapacityRequirements(in, out, s)
 }
 
-func autoConvert_v1beta2_Counter_To_resource_Counter(in *resourcev1beta2.Counter, out *resource.Counter, s conversion.Scope) error {
-	*out = *(*resource.Counter)(unsafe.Pointer(in))
+func autoConvert_v1beta2_ConsumeCounter_To_resource_ConsumeCounter(in *resourcev1beta2.ConsumeCounter, out *resource.ConsumeCounter, s conversion.Scope) error {
+	*out = *(*resource.ConsumeCounter)(unsafe.Pointer(in))
 	return nil
 }
 
-// Convert_v1beta2_Counter_To_resource_Counter is an autogenerated conversion function.
-func Convert_v1beta2_Counter_To_resource_Counter(in *resourcev1beta2.Counter, out *resource.Counter, s conversion.Scope) error {
-	return autoConvert_v1beta2_Counter_To_resource_Counter(in, out, s)
+// Convert_v1beta2_ConsumeCounter_To_resource_ConsumeCounter is an autogenerated conversion function.
+func Convert_v1beta2_ConsumeCounter_To_resource_ConsumeCounter(in *resourcev1beta2.ConsumeCounter, out *resource.ConsumeCounter, s conversion.Scope) error {
+	return autoConvert_v1beta2_ConsumeCounter_To_resource_ConsumeCounter(in, out, s)
 }
 
-func autoConvert_resource_Counter_To_v1beta2_Counter(in *resource.Counter, out *resourcev1beta2.Counter, s conversion.Scope) error {
-	*out = *(*resourcev1beta2.Counter)(unsafe.Pointer(in))
+func autoConvert_resource_ConsumeCounter_To_v1beta2_ConsumeCounter(in *resource.ConsumeCounter, out *resourcev1beta2.ConsumeCounter, s conversion.Scope) error {
+	*out = *(*resourcev1beta2.ConsumeCounter)(unsafe.Pointer(in))
 	return nil
 }
 
-// Convert_resource_Counter_To_v1beta2_Counter is an autogenerated conversion function.
-func Convert_resource_Counter_To_v1beta2_Counter(in *resource.Counter, out *resourcev1beta2.Counter, s conversion.Scope) error {
-	return autoConvert_resource_Counter_To_v1beta2_Counter(in, out, s)
+// Convert_resource_ConsumeCounter_To_v1beta2_ConsumeCounter is an autogenerated conversion function.
+func Convert_resource_ConsumeCounter_To_v1beta2_ConsumeCounter(in *resource.ConsumeCounter, out *resourcev1beta2.ConsumeCounter, s conversion.Scope) error {
+	return autoConvert_resource_ConsumeCounter_To_v1beta2_ConsumeCounter(in, out, s)
+}
+
+func autoConvert_v1beta2_CounterConsumption_To_resource_CounterConsumption(in *resourcev1beta2.CounterConsumption, out *resource.CounterConsumption, s conversion.Scope) error {
+	*out = *(*resource.CounterConsumption)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta2_CounterConsumption_To_resource_CounterConsumption is an autogenerated conversion function.
+func Convert_v1beta2_CounterConsumption_To_resource_CounterConsumption(in *resourcev1beta2.CounterConsumption, out *resource.CounterConsumption, s conversion.Scope) error {
+	return autoConvert_v1beta2_CounterConsumption_To_resource_CounterConsumption(in, out, s)
+}
+
+func autoConvert_resource_CounterConsumption_To_v1beta2_CounterConsumption(in *resource.CounterConsumption, out *resourcev1beta2.CounterConsumption, s conversion.Scope) error {
+	*out = *(*resourcev1beta2.CounterConsumption)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_resource_CounterConsumption_To_v1beta2_CounterConsumption is an autogenerated conversion function.
+func Convert_resource_CounterConsumption_To_v1beta2_CounterConsumption(in *resource.CounterConsumption, out *resourcev1beta2.CounterConsumption, s conversion.Scope) error {
+	return autoConvert_resource_CounterConsumption_To_v1beta2_CounterConsumption(in, out, s)
 }
 
 func autoConvert_v1beta2_CounterSet_To_resource_CounterSet(in *resourcev1beta2.CounterSet, out *resource.CounterSet, s conversion.Scope) error {
@@ -718,6 +778,46 @@ func autoConvert_resource_CounterSet_To_v1beta2_CounterSet(in *resource.CounterS
 // Convert_resource_CounterSet_To_v1beta2_CounterSet is an autogenerated conversion function.
 func Convert_resource_CounterSet_To_v1beta2_CounterSet(in *resource.CounterSet, out *resourcev1beta2.CounterSet, s conversion.Scope) error {
 	return autoConvert_resource_CounterSet_To_v1beta2_CounterSet(in, out, s)
+}
+
+func autoConvert_v1beta2_CounterSetConsumption_To_resource_CounterSetConsumption(in *resourcev1beta2.CounterSetConsumption, out *resource.CounterSetConsumption, s conversion.Scope) error {
+	*out = *(*resource.CounterSetConsumption)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta2_CounterSetConsumption_To_resource_CounterSetConsumption is an autogenerated conversion function.
+func Convert_v1beta2_CounterSetConsumption_To_resource_CounterSetConsumption(in *resourcev1beta2.CounterSetConsumption, out *resource.CounterSetConsumption, s conversion.Scope) error {
+	return autoConvert_v1beta2_CounterSetConsumption_To_resource_CounterSetConsumption(in, out, s)
+}
+
+func autoConvert_resource_CounterSetConsumption_To_v1beta2_CounterSetConsumption(in *resource.CounterSetConsumption, out *resourcev1beta2.CounterSetConsumption, s conversion.Scope) error {
+	*out = *(*resourcev1beta2.CounterSetConsumption)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_resource_CounterSetConsumption_To_v1beta2_CounterSetConsumption is an autogenerated conversion function.
+func Convert_resource_CounterSetConsumption_To_v1beta2_CounterSetConsumption(in *resource.CounterSetConsumption, out *resourcev1beta2.CounterSetConsumption, s conversion.Scope) error {
+	return autoConvert_resource_CounterSetConsumption_To_v1beta2_CounterSetConsumption(in, out, s)
+}
+
+func autoConvert_v1beta2_CounterValueFrom_To_resource_CounterValueFrom(in *resourcev1beta2.CounterValueFrom, out *resource.CounterValueFrom, s conversion.Scope) error {
+	*out = *(*resource.CounterValueFrom)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta2_CounterValueFrom_To_resource_CounterValueFrom is an autogenerated conversion function.
+func Convert_v1beta2_CounterValueFrom_To_resource_CounterValueFrom(in *resourcev1beta2.CounterValueFrom, out *resource.CounterValueFrom, s conversion.Scope) error {
+	return autoConvert_v1beta2_CounterValueFrom_To_resource_CounterValueFrom(in, out, s)
+}
+
+func autoConvert_resource_CounterValueFrom_To_v1beta2_CounterValueFrom(in *resource.CounterValueFrom, out *resourcev1beta2.CounterValueFrom, s conversion.Scope) error {
+	*out = *(*resourcev1beta2.CounterValueFrom)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_resource_CounterValueFrom_To_v1beta2_CounterValueFrom is an autogenerated conversion function.
+func Convert_resource_CounterValueFrom_To_v1beta2_CounterValueFrom(in *resource.CounterValueFrom, out *resourcev1beta2.CounterValueFrom, s conversion.Scope) error {
+	return autoConvert_resource_CounterValueFrom_To_v1beta2_CounterValueFrom(in, out, s)
 }
 
 func autoConvert_v1beta2_Device_To_resource_Device(in *resourcev1beta2.Device, out *resource.Device, s conversion.Scope) error {
@@ -1650,4 +1750,24 @@ func autoConvert_resource_ResourceSliceSpec_To_v1beta2_ResourceSliceSpec(in *res
 // Convert_resource_ResourceSliceSpec_To_v1beta2_ResourceSliceSpec is an autogenerated conversion function.
 func Convert_resource_ResourceSliceSpec_To_v1beta2_ResourceSliceSpec(in *resource.ResourceSliceSpec, out *resourcev1beta2.ResourceSliceSpec, s conversion.Scope) error {
 	return autoConvert_resource_ResourceSliceSpec_To_v1beta2_ResourceSliceSpec(in, out, s)
+}
+
+func autoConvert_v1beta2_SharedCounter_To_resource_SharedCounter(in *resourcev1beta2.SharedCounter, out *resource.SharedCounter, s conversion.Scope) error {
+	*out = *(*resource.SharedCounter)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta2_SharedCounter_To_resource_SharedCounter is an autogenerated conversion function.
+func Convert_v1beta2_SharedCounter_To_resource_SharedCounter(in *resourcev1beta2.SharedCounter, out *resource.SharedCounter, s conversion.Scope) error {
+	return autoConvert_v1beta2_SharedCounter_To_resource_SharedCounter(in, out, s)
+}
+
+func autoConvert_resource_SharedCounter_To_v1beta2_SharedCounter(in *resource.SharedCounter, out *resourcev1beta2.SharedCounter, s conversion.Scope) error {
+	*out = *(*resourcev1beta2.SharedCounter)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_resource_SharedCounter_To_v1beta2_SharedCounter is an autogenerated conversion function.
+func Convert_resource_SharedCounter_To_v1beta2_SharedCounter(in *resource.SharedCounter, out *resourcev1beta2.SharedCounter, s conversion.Scope) error {
+	return autoConvert_resource_SharedCounter_To_v1beta2_SharedCounter(in, out, s)
 }
