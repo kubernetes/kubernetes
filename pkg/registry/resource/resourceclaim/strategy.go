@@ -270,6 +270,7 @@ func dropDisabledStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
 	dropDisabledDRAAdminAccessStatusFields(newClaim, oldClaim)
 	dropDisabledDRAResourceClaimConsumableCapacityStatusFields(newClaim, oldClaim)
 	dropDeviceBindingConditionsFields(newClaim, oldClaim)
+	dropDisabledDRASharedConsumableCapacityStatusFields(newClaim, oldClaim)
 }
 
 func dropDisabledDRAAdminAccessStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
@@ -458,4 +459,34 @@ func dropDeviceBindingConditionsFields(newClaim, oldClaim *resource.ResourceClai
 			newClaim.Status.Allocation.Devices.Results[i].BindingFailureConditions = nil
 		}
 	}
+}
+
+// dropDisabledDRASharedConsumableCapacityStatusFields drops ConsumedCounters
+// from allocation results if the DRASharedConsumableCapacity feature is disabled
+// and was not already in use.
+func dropDisabledDRASharedConsumableCapacityStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRASharedConsumableCapacity) ||
+		draSharedConsumableCapacityStatusInUse(oldClaim) {
+		return
+	}
+
+	if allocation := newClaim.Status.Allocation; allocation != nil {
+		for i := range allocation.Devices.Results {
+			newClaim.Status.Allocation.Devices.Results[i].ConsumedCounters = nil
+		}
+	}
+}
+
+func draSharedConsumableCapacityStatusInUse(claim *resource.ResourceClaim) bool {
+	if claim == nil {
+		return false
+	}
+	if allocation := claim.Status.Allocation; allocation != nil {
+		for _, result := range allocation.Devices.Results {
+			if len(result.ConsumedCounters) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }

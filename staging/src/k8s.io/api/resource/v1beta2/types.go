@@ -240,7 +240,7 @@ type CounterSet struct {
 	// +required
 	// +k8s:beta(since: "1.37")=+k8s:required
 	// +k8s:beta(since: "1.37")=+k8s:eachKey=+k8s:format=k8s-short-name
-	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,name=counters"`
+	Counters map[string]SharedCounter `json:"counters,omitempty" protobuf:"bytes,2,name=counters"`
 }
 
 // DriverNameMaxLength is the maximum valid length of a driver name in the
@@ -600,7 +600,7 @@ type DeviceCounterConsumption struct {
 	// +required
 	// +k8s:beta(since: "1.37")=+k8s:required
 	// +k8s:beta(since: "1.37")=+k8s:eachKey=+k8s:format=k8s-short-name
-	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,opt,name=counters"`
+	Counters map[string]ConsumeCounter `json:"counters,omitempty" protobuf:"bytes,2,opt,name=counters"`
 }
 
 // DeviceCapacity describes a quantity associated with a device.
@@ -629,12 +629,58 @@ type DeviceCapacity struct {
 	RequestPolicy *CapacityRequestPolicy `json:"requestPolicy,omitempty" protobuf:"bytes,2,opt,name=requestPolicy"`
 }
 
-// Counter describes a quantity associated with a device.
-type Counter struct {
-	// Value defines how much of a certain device counter is available.
+// SharedCounter describes a quantity that is available in a counter set.
+type SharedCounter struct {
+	// Value defines how much of a certain device counter is available
+	// for consumption by devices.
 	//
 	// +required
-	Value resource.Quantity `json:"value" protobuf:"bytes,1,rep,name=value"`
+	Value *resource.Quantity `json:"value,omitempty" protobuf:"bytes,1,opt,name=value"`
+
+	// RequestPolicy defines how this counter must be consumed when
+	// a device references this counter through ValueFrom.
+	//
+	// If nil, the counter cannot be referenced through ValueFrom.
+	//
+	// +optional
+	// +featureGate=DRASharedConsumableCapacity
+	RequestPolicy *CapacityRequestPolicy `json:"requestPolicy,omitempty" protobuf:"bytes,2,opt,name=requestPolicy"`
+}
+
+// ConsumeCounter describes how much of a counter a device consumes.
+type ConsumeCounter struct {
+	// Value defines the statically consumed amount.
+	//
+	// Exactly one of Value or ValueFrom must be specified.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:zeroOrOneOfMember
+	Value *resource.Quantity `json:"value,omitempty" protobuf:"bytes,1,opt,name=value"`
+
+	// ValueFrom looks up the requested capacity value in a ResourceClaim via
+	// the capacity name. That value is then consumed from the counter instead
+	// of using a static value defined by the driver.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:zeroOrOneOfMember
+	// +featureGate=DRASharedConsumableCapacity
+	ValueFrom *CounterValueFrom `json:"valueFrom,omitempty" protobuf:"bytes,3,opt,name=valueFrom"`
+}
+
+// CounterValueFrom looks up the requested capacity value in a ResourceClaim
+// via the capacity name.
+type CounterValueFrom struct {
+	// CapacityName is the name of a device capacity.
+	// This is the same name that users set in capacity requests.
+	//
+	// If this name has no domain prefix, the driver
+	// name from the ResourceSlice is used as the domain when matching against
+	// capacity requests.
+	//
+	// +required
+	CapacityName QualifiedName `json:"capacityName" protobuf:"bytes,1,opt,name=capacityName"`
 }
 
 // CapacityRequestPolicy defines how requests consume device capacity.
@@ -1990,6 +2036,11 @@ type DeviceAllocationResult struct {
 // entries in allocation.devices.results.
 const AllocationResultsMaxSize = 32
 
+// DeviceRequestAllocationResultMaxConsumedCounterSets is the maximum number of
+// counter sets in DeviceRequestAllocationResult.ConsumedCounters. It matches
+// the maximum number of counter sets that one device may consume.
+const DeviceRequestAllocationResultMaxConsumedCounterSets = ResourceSliceMaxDeviceCounterConsumptionsPerDevice
+
 // DeviceRequestAllocationResult contains the allocation result for one request.
 type DeviceRequestAllocationResult struct {
 	// Request is the name of the request in the claim which caused this
@@ -2108,6 +2159,37 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +featureGate=DRAConsumableCapacity
 	ConsumedCapacity map[QualifiedName]resource.Quantity `json:"consumedCapacity,omitempty" protobuf:"bytes,10,rep,name=consumedCapacity"`
+
+	// ConsumedCounters records the resolved shared-counter consumption
+	// for this allocation at the time it was made. Each entry captures
+	// the amount consumed from one counter set. The scheduler uses this
+	// snapshot instead of recomputing consumption from live ResourceSlice
+	// definitions.
+	//
+	// The maximum number of counter sets is 2.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRASharedConsumableCapacity
+	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.37")=+k8s:maxItems=2
+	ConsumedCounters []CounterSetConsumption `json:"consumedCounters,omitempty" protobuf:"bytes,11,rep,name=consumedCounters"`
+}
+
+// CounterSetConsumption records the resolved consumption for one counter set
+// at allocation time.
+type CounterSetConsumption struct {
+	// CounterSet is the name of the counter set from which counters
+	// were consumed.
+	//
+	// +required
+	CounterSet string `json:"counterSet" protobuf:"bytes,1,opt,name=counterSet"`
+
+	// Counters records the quantity consumed for each counter in the set.
+	//
+	// +required
+	//nolint:kubeapilinter // Keep quantity maps consistent with the rest of the resource API.
+	Counters map[string]resource.Quantity `json:"counters" protobuf:"bytes,2,rep,name=counters"`
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.

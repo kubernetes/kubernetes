@@ -357,7 +357,7 @@ func deviceFits(cost []resourcev1.DeviceCounterConsumption, avail map[string]map
 			if !ok {
 				return false
 			}
-			if have.Cmp(c.Value) < 0 {
+			if have.Cmp(ptr.Deref(c.Value, resource.Quantity{})) < 0 {
 				return false
 			}
 		}
@@ -377,7 +377,7 @@ func deductCounters(cost []resourcev1.DeviceCounterConsumption, avail map[string
 			if !ok {
 				continue
 			}
-			have.Sub(c.Value)
+			have.Sub(ptr.Deref(c.Value, resource.Quantity{}))
 			set[name] = have
 		}
 	}
@@ -409,7 +409,8 @@ func consumesCountersKey(cost []resourcev1.DeviceCounterConsumption) string {
 		sort.Strings(names)
 		for _, name := range names {
 			q := cc.Counters[name]
-			parts = append(parts, cc.CounterSet+"/"+name+"="+q.Value.String())
+			quantity := ptr.Deref(q.Value, resource.Quantity{})
+			parts = append(parts, cc.CounterSet+"/"+name+"="+quantity.String())
 		}
 	}
 	sort.Strings(parts)

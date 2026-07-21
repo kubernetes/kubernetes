@@ -526,6 +526,9 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 	allErrs = append(allErrs, validatePoolName(result.Pool, fldPath.Child("pool")).MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validateDeviceName(result.Device, fldPath.Child("device"))...)
 	allErrs = append(allErrs, validateDeviceBindingParameters(result.BindingConditions, result.BindingFailureConditions, fldPath)...)
+	allErrs = append(allErrs, validateSlice(result.ConsumedCounters, resource.DeviceRequestAllocationResultMaxConsumedCounterSets,
+		validateCounterSetConsumption,
+		fldPath.Child("consumedCounters"), sizeCovered)...)
 	for i, toleration := range result.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
 	}
@@ -880,7 +883,7 @@ func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path) fie
 	} else {
 		// The size limit is enforced for across all sets by the caller.
 		allErrs = append(allErrs, validateMap(counterSet.Counters, resource.ResourceSliceMaxCountersPerCounterSet, validation.DNS1123LabelMaxLength,
-			validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
+			validateCounterName, validateSharedCounter, fldPath.Child("counters"), keysCovered)...)
 	}
 
 	return allErrs
@@ -1084,7 +1087,27 @@ func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCo
 		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), "").MarkCoveredByDeclarative())
 	} else {
 		allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, resource.ResourceSliceMaxCountersPerDeviceCounterConsumption,
-			validation.DNS1123LabelMaxLength, validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
+			validation.DNS1123LabelMaxLength, validateCounterName, validateConsumedCounter, fldPath.Child("counters"), keysCovered)...)
+	}
+	return allErrs
+}
+
+// validateCounterSetConsumption validates persisted shared-counter consumption snapshots
+// stored in allocation results.
+func validateCounterSetConsumption(counterSetConsumption resource.CounterSetConsumption, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if len(counterSetConsumption.CounterSet) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("counterSet"), ""))
+	} else {
+		allErrs = append(allErrs, validateCounterName(counterSetConsumption.CounterSet, fldPath.Child("counterSet"))...)
+	}
+	if len(counterSetConsumption.Counters) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), ""))
+	} else {
+		allErrs = append(allErrs, validateMap(counterSetConsumption.Counters, resource.ResourceSliceMaxCountersPerDeviceCounterConsumption,
+			validation.DNS1123LabelMaxLength, validateCounterName, validateInt64Range,
+			fldPath.Child("counters"))...)
 	}
 	return allErrs
 }
@@ -1446,9 +1469,40 @@ func isFractionalQuantity(q apiresource.Quantity) bool {
 	return dec.Cmp(rounded) != 0
 }
 
-func validateDeviceCounter(counter resource.Counter, fldPath *field.Path) field.ErrorList {
-	// Any parsed quantity is valid.
-	return nil
+// validateSharedCounter validates counters used in ResourceSlice.sharedCounters.
+func validateSharedCounter(counter resource.SharedCounter, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if counter.Value == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("value"), ""))
+	} else if counter.RequestPolicy != nil {
+		allErrs = append(allErrs, validateRequestPolicy(*counter.Value, counter.RequestPolicy, fldPath.Child("requestPolicy"))...)
+	}
+	return allErrs
+}
+
+// validateConsumedCounter validates counters used in DeviceCounterConsumption.
+func validateConsumedCounter(counter resource.ConsumeCounter, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	setFields := 0
+	if counter.Value != nil {
+		setFields++
+	}
+	if counter.ValueFrom != nil {
+		setFields++
+	}
+
+	if setFields == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one of value or valueFrom must be set"))
+	}
+
+	if counter.ValueFrom != nil {
+		if counter.ValueFrom.CapacityName == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("valueFrom", "capacityName"), ""))
+		} else {
+			allErrs = append(allErrs, validateQualifiedName(counter.ValueFrom.CapacityName, fldPath.Child("valueFrom", "capacityName"))...)
+		}
+	}
+	return allErrs
 }
 
 func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) field.ErrorList {

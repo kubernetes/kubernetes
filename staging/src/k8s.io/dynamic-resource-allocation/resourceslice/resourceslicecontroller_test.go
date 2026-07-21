@@ -54,6 +54,12 @@ func init() {
 	klog.InitFlags(nil)
 }
 
+// mustParseQuantityPtr parses a quantity string and returns a pointer to it.
+func mustParseQuantityPtr(value string) *resource.Quantity {
+	quantity := resource.MustParse(value)
+	return &quantity
+}
+
 // TestControllerSyncPool verifies that syncPool produces the right ResourceSlices.
 // Update vs. Create API calls are checked by bumping the ResourceVersion in
 // updates.
@@ -955,8 +961,8 @@ func TestControllerSyncPool(t *testing.T) {
 								PerDeviceNodeSelection: ptr.To(true),
 								SharedCounters: []resourceapi.CounterSet{{
 									Name: "gpu-0",
-									Counters: map[string]resourceapi.Counter{
-										"mem": {Value: resource.MustParse("1")},
+									Counters: map[string]resourceapi.SharedCounter{
+										"mem": {Value: mustParseQuantityPtr("1")},
 									},
 								}},
 							},
@@ -968,8 +974,8 @@ func TestControllerSyncPool(t *testing.T) {
 										nodeNameField(ownerName),
 										[]resourceapi.DeviceCounterConsumption{{
 											CounterSet: "gpu-0",
-											Counters: map[string]resourceapi.Counter{
-												"mem": {Value: resource.MustParse("1")},
+											Counters: map[string]resourceapi.ConsumeCounter{
+												"mem": {Value: mustParseQuantityPtr("1")},
 											},
 										}},
 									),
@@ -992,8 +998,8 @@ func TestControllerSyncPool(t *testing.T) {
 					PerDeviceNodeSelection(true).
 					SharedCounters([]resourceapi.CounterSet{{
 						Name: "gpu-0",
-						Counters: map[string]resourceapi.Counter{
-							"mem": {Value: resource.MustParse("1")},
+						Counters: map[string]resourceapi.SharedCounter{
+							"mem": {Value: mustParseQuantityPtr("1")},
 						},
 					}}).
 					Driver(driverName).
@@ -1013,8 +1019,8 @@ func TestControllerSyncPool(t *testing.T) {
 							nodeNameField(ownerName),
 							resourceapi.DeviceCounterConsumption{
 								CounterSet: "gpu-0",
-								Counters: map[string]resourceapi.Counter{
-									"mem": {Value: resource.MustParse("1")},
+								Counters: map[string]resourceapi.ConsumeCounter{
+									"mem": {Value: mustParseQuantityPtr("1")},
 								},
 							},
 						),
@@ -1034,8 +1040,8 @@ func TestControllerSyncPool(t *testing.T) {
 								PerDeviceNodeSelection: ptr.To(true),
 								SharedCounters: []resourceapi.CounterSet{{
 									Name: "gpu-0",
-									Counters: map[string]resourceapi.Counter{
-										"mem": {Value: resource.MustParse("1")},
+									Counters: map[string]resourceapi.SharedCounter{
+										"mem": {Value: mustParseQuantityPtr("1")},
 									},
 								}},
 							},
@@ -1047,8 +1053,8 @@ func TestControllerSyncPool(t *testing.T) {
 										nodeNameField(ownerName),
 										resourceapi.DeviceCounterConsumption{
 											CounterSet: "gpu-0",
-											Counters: map[string]resourceapi.Counter{
-												"mem": {Value: resource.MustParse("1")},
+											Counters: map[string]resourceapi.ConsumeCounter{
+												"mem": {Value: mustParseQuantityPtr("1")},
 											},
 										},
 									),
@@ -1159,6 +1165,93 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedErrors: []string{`create ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRADeviceBindingConditions`},
 		},
+		"drop-shared-consumable-capacity": {
+			features: features{disableSharedConsumableCapacity: true},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{
+							{
+								SharedCounters: []resourceapi.CounterSet{{
+									Name: "gpu-0",
+									Counters: map[string]resourceapi.SharedCounter{
+										"mem": {
+											Value: mustParseQuantityPtr("8Gi"),
+											RequestPolicy: &resourceapi.CapacityRequestPolicy{
+												Default: func() *resource.Quantity {
+													quantity := resource.MustParse("1Gi")
+													return &quantity
+												}(),
+											},
+										},
+									},
+								}},
+							},
+							{
+								Devices: []resourceapi.Device{
+									newDevice(
+										deviceName,
+										resourceapi.DeviceCounterConsumption{
+											CounterSet: "gpu-0",
+											Counters: map[string]resourceapi.ConsumeCounter{
+												"mem": {
+													ValueFrom: &resourceapi.CounterValueFrom{CapacityName: "dra.example.com/memory"},
+												},
+											},
+										},
+									),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 2,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					ResourceVersion("1").
+					AppOwnerReferences(ownerName).
+					AllNodes(false).
+					NodeName("").
+					NodeSelector(nil).
+					Driver(driverName).
+					SharedCounters([]resourceapi.CounterSet{{
+						Name: "gpu-0",
+						Counters: map[string]resourceapi.SharedCounter{
+							"mem": {Value: mustParseQuantityPtr("8Gi")},
+						},
+					}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 2}).
+					Obj(),
+				*MakeResourceSlice().Name(resourceSlice2).GenerateName(generateName2).
+					ResourceVersion("1").
+					AppOwnerReferences(ownerName).
+					AllNodes(false).
+					NodeName("").
+					NodeSelector(nil).
+					Driver(driverName).
+					Devices([]resourceapi.Device{
+						newDevice(
+							deviceName,
+							resourceapi.DeviceCounterConsumption{
+								CounterSet: "gpu-0",
+								Counters: map[string]resourceapi.ConsumeCounter{
+									"mem": {},
+								},
+							},
+						),
+					}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 2}).
+					Obj(),
+			},
+			expectedErrors: []string{
+				`create ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRASharedConsumableCapacity`,
+				`create ResourceSlice: pool "pool", slice #1: some fields were dropped by the apiserver, probably because these features are disabled: DRASharedConsumableCapacity`,
+			},
+		},
 		"detect-resource-pools-with-duplicate-counter-sets": {
 			nodeUID: nodeUID,
 			inputDriverResources: &DriverResources{
@@ -1258,9 +1351,9 @@ func TestControllerSyncPool(t *testing.T) {
 								SharedCounters: []resourceapi.CounterSet{
 									{
 										Name: "counterset",
-										Counters: map[string]resourceapi.Counter{
+										Counters: map[string]resourceapi.SharedCounter{
 											"memory": {
-												Value: resource.MustParse("8Gi"),
+												Value: mustParseQuantityPtr("8Gi"),
 											},
 										},
 									},
@@ -1273,9 +1366,9 @@ func TestControllerSyncPool(t *testing.T) {
 										ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 											{
 												CounterSet: "counterset",
-												Counters: map[string]resourceapi.Counter{
+												Counters: map[string]resourceapi.ConsumeCounter{
 													"cpu": {
-														Value: resource.MustParse("4"),
+														Value: mustParseQuantityPtr("4"),
 													},
 												},
 											},
@@ -1801,10 +1894,11 @@ func sortResourceSlices(slices []resourceapi.ResourceSlice) {
 }
 
 type features struct {
-	disableBindingConditions    bool
-	disableDeviceTaints         bool
-	disablePartitionableDevices bool
-	disableConsumableCapacity   bool
+	disableBindingConditions        bool
+	disableDeviceTaints             bool
+	disablePartitionableDevices     bool
+	disableConsumableCapacity       bool
+	disableSharedConsumableCapacity bool
 }
 
 func createTestClient(features features, timeAdded metav1.Time, objects ...runtime.Object) *fake.Clientset {
@@ -1884,6 +1978,22 @@ func dropDisabledFields(features features, resourceslice *resourceapi.ResourceSl
 	if features.disableConsumableCapacity {
 		for i := range resourceslice.Spec.Devices {
 			resourceslice.Spec.Devices[i].AllowMultipleAllocations = nil
+		}
+	}
+	if features.disableSharedConsumableCapacity {
+		for i := range resourceslice.Spec.SharedCounters {
+			for name, counter := range resourceslice.Spec.SharedCounters[i].Counters {
+				counter.RequestPolicy = nil
+				resourceslice.Spec.SharedCounters[i].Counters[name] = counter
+			}
+		}
+		for i := range resourceslice.Spec.Devices {
+			for j := range resourceslice.Spec.Devices[i].ConsumesCounters {
+				for name, counter := range resourceslice.Spec.Devices[i].ConsumesCounters[j].Counters {
+					counter.ValueFrom = nil
+					resourceslice.Spec.Devices[i].ConsumesCounters[j].Counters[name] = counter
+				}
+			}
 		}
 	}
 }

@@ -116,9 +116,9 @@ var sliceWithPartitionableDevicesConsumesCounters = &resource.ResourceSlice{
 				ConsumesCounters: []resource.DeviceCounterConsumption{
 					{
 						CounterSet: "pool-1",
-						Counters: map[string]resource.Counter{
+						Counters: map[string]resource.ConsumeCounter{
 							"memory": {
-								Value: k8sresource.MustParse("40Gi"),
+								Value: &fortyGiQuantity,
 							},
 						},
 					},
@@ -141,6 +141,8 @@ var sliceWithPartitionableDevicesConsumesCounters = &resource.ResourceSlice{
 	},
 }
 
+var fortyGiQuantity = k8sresource.MustParse("40Gi")
+
 var sliceWithPartitionableDevicesSharedCounters = &resource.ResourceSlice{
 	ObjectMeta: metav1.ObjectMeta{
 		Name: "valid-resource-slice",
@@ -156,9 +158,9 @@ var sliceWithPartitionableDevicesSharedCounters = &resource.ResourceSlice{
 		SharedCounters: []resource.CounterSet{
 			{
 				Name: "pool-1",
-				Counters: map[string]resource.Counter{
+				Counters: map[string]resource.SharedCounter{
 					"memory": {
-						Value: k8sresource.MustParse("40Gi"),
+						Value: &fortyGiQuantity,
 					},
 				},
 			},
@@ -166,11 +168,37 @@ var sliceWithPartitionableDevicesSharedCounters = &resource.ResourceSlice{
 	},
 }
 
+var sliceWithSharedConsumableSharedCounters = func() *resource.ResourceSlice {
+	obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+	defaultVal := k8sresource.MustParse("1Gi")
+	minVal := k8sresource.MustParse("1Gi")
+	obj.Spec.SharedCounters[0].Counters["memory"] = resource.SharedCounter{
+		Value: &fortyGiQuantity,
+		RequestPolicy: &resource.CapacityRequestPolicy{
+			Default: &defaultVal,
+			ValidRange: &resource.CapacityRequestPolicyRange{
+				Min: &minVal,
+			},
+		},
+	}
+	return obj
+}()
+
 var sliceWithCapacity = func() *resource.ResourceSlice {
 	obj := slice.DeepCopy()
 	obj.Spec.Devices[0].Capacity = map[resource.QualifiedName]resource.DeviceCapacity{
 		"memory": {
 			Value: k8sresource.MustParse("40Gi"),
+		},
+	}
+	return obj
+}()
+
+var sliceWithSharedConsumableConsumesCounters = func() *resource.ResourceSlice {
+	obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+	obj.Spec.Devices[0].ConsumesCounters[0].Counters["memory"] = resource.ConsumeCounter{
+		ValueFrom: &resource.CounterValueFrom{
+			CapacityName: "dra.example.com/memory",
 		},
 	}
 	return obj
@@ -334,6 +362,38 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true},
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-shared-consumable-capacity-shared-counters": {
+			obj:              sliceWithSharedConsumableSharedCounters,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRASharedConsumableCapacity: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-fields-shared-consumable-capacity-shared-counters": {
+			obj:              sliceWithSharedConsumableSharedCounters,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAConsumableCapacity: true, features.DRASharedConsumableCapacity: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableSharedCounters.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-shared-consumable-capacity-consumes-counters": {
+			obj:                     sliceWithSharedConsumableConsumesCounters,
+			featureOverrides:        featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRASharedConsumableCapacity: false},
+			expectedValidationError: true,
+		},
+		"keep-fields-shared-consumable-capacity-consumes-counters": {
+			obj:              sliceWithSharedConsumableConsumesCounters,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAConsumableCapacity: true, features.DRASharedConsumableCapacity: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableConsumesCounters.DeepCopy()
 				obj.Generation = 1
 				return obj
 			}(),
@@ -730,6 +790,89 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: false},
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"drop-fields-shared-consumable-capacity-shared-counters-disabled-feature": {
+			oldObj: sliceWithPartitionableDevicesSharedCounters,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRASharedConsumableCapacity: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-fields-shared-consumable-capacity-shared-counters": {
+			oldObj: sliceWithPartitionableDevicesSharedCounters,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAConsumableCapacity: true, features.DRASharedConsumableCapacity: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-existing-fields-shared-consumable-capacity-shared-counters-disabled-feature": {
+			oldObj: sliceWithSharedConsumableSharedCounters,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRASharedConsumableCapacity: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableSharedCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"drop-fields-shared-consumable-capacity-consumes-counters-disabled-feature": {
+			oldObj: sliceWithPartitionableDevicesConsumesCounters,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableConsumesCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRASharedConsumableCapacity: false},
+			expectValidationError: true,
+		},
+		"keep-fields-shared-consumable-capacity-consumes-counters": {
+			oldObj: sliceWithPartitionableDevicesConsumesCounters,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableConsumesCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAConsumableCapacity: true, features.DRASharedConsumableCapacity: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableConsumesCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-existing-fields-shared-consumable-capacity-consumes-counters-disabled-feature": {
+			oldObj: sliceWithSharedConsumableConsumesCounters,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableConsumesCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRASharedConsumableCapacity: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithSharedConsumableConsumesCounters.DeepCopy()
 				obj.ResourceVersion = "4"
 				return obj
 			}(),
