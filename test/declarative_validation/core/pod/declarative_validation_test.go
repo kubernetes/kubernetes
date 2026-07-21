@@ -148,7 +148,7 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 				},
 			},
 			"reason max bytes": {
-				volumeHealth: []api.PodVolumeHealth{{Name: "vol", HealthConditions: []api.VolumeHealthCondition{{Status: api.VolumeHealthDegraded, Reason: strings.Repeat("𝄞", 65)}}}},
+				volumeHealth: []api.PodVolumeHealth{{Name: "vol", HealthConditions: []api.VolumeHealthCondition{{Status: api.VolumeHealthDegraded, Reason: strings.Repeat("a", 257)}}}},
 				expectedErrs: field.ErrorList{
 					field.TooLong(conditionPath.Index(0).Child("reason"), "", 256).WithOrigin("maxBytes"),
 				},

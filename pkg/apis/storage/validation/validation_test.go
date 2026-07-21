@@ -2807,6 +2807,14 @@ func TestValidateCSINodeStatusUpdate(t *testing.T) {
 			expectedErr: "status.storageHealth[0].healthConditions[0].reason",
 		},
 		{
+			name: "invalid reason format",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageUnreachable, Reason: "invalid;val"},
+			}}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].healthConditions[0].reason",
+		},
+		{
 			name: "duplicate driver",
 			new: newNode(
 				storage.StorageHealth{Name: "driver1"},

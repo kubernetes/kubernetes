@@ -22842,6 +22842,19 @@ func TestValidatePodVolumeHealth(t *testing.T) {
 			isErr:       true,
 			expectedErr: "volumeHealth[0].name",
 		},
+		{
+			name: "invalid reason format",
+			volumeHealth: []core.PodVolumeHealth{
+				{
+					Name: "vol1",
+					HealthConditions: []core.VolumeHealthCondition{
+						{Status: core.VolumeHealthDegraded, Reason: "invalid;val"},
+					},
+				},
+			},
+			isErr:       true,
+			expectedErr: "volumeHealth[0].healthConditions[0].reason",
+		},
 	}
 
 	for _, tt := range tests {

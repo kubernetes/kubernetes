@@ -108,7 +108,7 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 				expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "healthStatus", "healthConditions").Index(0).Child("reason"), "")},
 			},
 			"reason max bytes": {
-				conditions:   []core.VolumeHealthCondition{{Status: core.VolumeHealthDegraded, Reason: strings.Repeat("𝄞", 65)}},
+				conditions:   []core.VolumeHealthCondition{{Status: core.VolumeHealthDegraded, Reason: strings.Repeat("a", 257)}},
 				expectedErrs: field.ErrorList{field.TooLong(field.NewPath("status", "healthStatus", "healthConditions").Index(0).Child("reason"), "", 256).WithOrigin("maxBytes")},
 			},
 			"message max bytes": {

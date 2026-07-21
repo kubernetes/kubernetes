@@ -327,8 +327,13 @@ func validateStorageHealthCondition(condition storage.StorageHealthCondition, fl
 	}
 	if len(condition.Reason) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), ""))
-	} else if len(condition.Reason) > 256 {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), condition.Reason, 256))
+	} else {
+		for _, msg := range metav1validation.IsValidConditionReason(condition.Reason) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("reason"), condition.Reason, msg))
+		}
+		if len(condition.Reason) > 256 {
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), condition.Reason, 256))
+		}
 	}
 	if len(condition.Message) > 1024 {
 		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), condition.Message, 1024))
