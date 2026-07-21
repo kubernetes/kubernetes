@@ -33251,7 +33251,7 @@ func schema_k8sio_api_core_v1_VolumeHealthCondition(ref common.ReferenceCallback
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "reason is a brief CamelCase machine-parseable reason. Together with status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 characters.a",
+							Description: "reason is a brief CamelCase machine-parseable reason. Together with status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 bytes.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -33259,7 +33259,7 @@ func schema_k8sio_api_core_v1_VolumeHealthCondition(ref common.ReferenceCallback
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Description: "message is a human-readable description. Maximum permitted length of a message is 1024 characters.",
+							Description: "message is a human-readable description. Maximum permitted length of a message is 1024 bytes.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

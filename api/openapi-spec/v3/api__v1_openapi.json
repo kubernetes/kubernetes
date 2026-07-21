@@ -8340,12 +8340,12 @@
         "description": "VolumeHealthCondition represents an adverse health condition reported for a volume.",
         "properties": {
           "message": {
-            "description": "message is a human-readable description. Maximum permitted length of a message is 1024 characters.",
+            "description": "message is a human-readable description. Maximum permitted length of a message is 1024 bytes.",
             "type": "string"
           },
           "reason": {
             "default": "",
-            "description": "reason is a brief CamelCase machine-parseable reason. Together with status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 characters.a",
+            "description": "reason is a brief CamelCase machine-parseable reason. Together with status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 bytes.",
             "type": "string"
           },
           "status": {

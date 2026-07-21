@@ -2818,8 +2818,8 @@ func (VolumeDevice) SwaggerDoc() map[string]string {
 var map_VolumeHealthCondition = map[string]string{
 	"":        "VolumeHealthCondition represents an adverse health condition reported for a volume.",
 	"status":  "status is the machine-parseable health category. One of \"Inaccessible\", \"DataLoss\", \"Degraded\".",
-	"reason":  "reason is a brief CamelCase machine-parseable reason. Together with status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 characters.a",
-	"message": "message is a human-readable description. Maximum permitted length of a message is 1024 characters.",
+	"reason":  "reason is a brief CamelCase machine-parseable reason. Together with status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 bytes.",
+	"message": "message is a human-readable description. Maximum permitted length of a message is 1024 bytes.",
 }
 
 func (VolumeHealthCondition) SwaggerDoc() map[string]string {

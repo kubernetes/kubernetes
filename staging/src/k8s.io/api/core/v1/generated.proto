@@ -3482,6 +3482,7 @@ message PersistentVolumeClaimStatus {
   // for the volume bound to this claim.
   // +featureGate=CSIVolumeHealth
   // +optional
+  // +k8s:optional
   optional VolumeHealthStatus healthStatus = 10;
 }
 
@@ -5092,6 +5093,9 @@ message PodStatus {
   // +optional
   // +listType=map
   // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
   repeated PodVolumeHealth volumeHealth = 22;
 }
 
@@ -5137,6 +5141,8 @@ message PodTemplateSpec {
 // reported by the CSI node plugin via the kubelet.
 message PodVolumeHealth {
   // name matches an entry in pod.spec.volumes.
+  // +required
+  // +k8s:required
   optional string name = 1;
 
   // conditions is the set of adverse conditions reported by
@@ -5148,6 +5154,11 @@ message PodVolumeHealth {
   // +patchMergeKey=status
   // +patchStrategy=merge
   // +listMapKey=reason
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=status
+  // +k8s:listMapKey=reason
+  // +k8s:maxItems=16
   repeated VolumeHealthCondition healthConditions = 2;
 
   // lastTransitionTime is when the current set of conditions first appeared.
@@ -7030,17 +7041,23 @@ message VolumeDevice {
 message VolumeHealthCondition {
   // status is the machine-parseable health category.
   // One of "Inaccessible", "DataLoss", "Degraded".
+  // +required
+  // +k8s:required
   optional string status = 1;
 
   // reason is a brief CamelCase machine-parseable reason.
   // Together with status it forms the unique identity of a condition entry.
-  // Maximum permitted length of a reason is 256 characters.a
+  // Maximum permitted length of a reason is 256 bytes.
   // +required
+  // +k8s:required
+  // +k8s:maxBytes=256
   optional string reason = 2;
 
   // message is a human-readable description.
+  // Maximum permitted length of a message is 1024 bytes.
   // +optional
-  // Maximum permitted length of a message is 1024 characters.
+  // +k8s:optional
+  // +k8s:maxBytes=1024
   optional string message = 3;
 }
 
@@ -7056,6 +7073,11 @@ message VolumeHealthStatus {
   // +patchMergeKey=status
   // +patchStrategy=merge
   // +listMapKey=reason
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=status
+  // +k8s:listMapKey=reason
+  // +k8s:maxItems=16
   repeated VolumeHealthCondition healthConditions = 1;
 
   // lastTransitionTime is when the current set of conditions first appeared.

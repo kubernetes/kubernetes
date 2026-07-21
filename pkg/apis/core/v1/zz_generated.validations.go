@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	sets "k8s.io/apimachinery/pkg/util/sets"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -711,7 +712,77 @@ func Validate_PersistentVolumeClaim(
 	}
 
 	// field corev1.PersistentVolumeClaim.Spec has no validation
-	// field corev1.PersistentVolumeClaim.Status has no validation
+
+	{ // field corev1.PersistentVolumeClaim.Status
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PersistentVolumeClaimStatus,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PersistentVolumeClaimStatus(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PersistentVolumeClaim) *corev1.PersistentVolumeClaimStatus {
+				return &oldObj.Status
+			})
+		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_PersistentVolumeClaimStatus validates an instance of PersistentVolumeClaimStatus according
+// to declarative validation rules in the API schema.
+func Validate_PersistentVolumeClaimStatus(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.PersistentVolumeClaimStatus) (errs field.ErrorList) {
+
+	// field corev1.PersistentVolumeClaimStatus.Phase has no validation
+	// field corev1.PersistentVolumeClaimStatus.AccessModes has no validation
+	// field corev1.PersistentVolumeClaimStatus.Capacity has no validation
+	// field corev1.PersistentVolumeClaimStatus.Conditions has no validation
+	// field corev1.PersistentVolumeClaimStatus.AllocatedResources has no validation
+	// field corev1.PersistentVolumeClaimStatus.AllocatedResourceStatuses has no validation
+	// field corev1.PersistentVolumeClaimStatus.CurrentVolumeAttributesClassName has no validation
+	// field corev1.PersistentVolumeClaimStatus.ModifyVolumeStatus has no validation
+
+	{ // field corev1.PersistentVolumeClaimStatus.HealthStatus
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.VolumeHealthStatus,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_VolumeHealthStatus(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PersistentVolumeClaimStatus) *corev1.VolumeHealthStatus {
+				return oldObj.HealthStatus
+			})
+		errs = append(errs, fn(fldPath.Child("healthStatus"), obj.HealthStatus, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -767,7 +838,28 @@ func Validate_Pod(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.Pod.Status has no validation
+	{ // field corev1.Pod.Status
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PodStatus,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodStatus(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.Pod) *corev1.PodStatus {
+				return &oldObj.Status
+			})
+		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -851,6 +943,75 @@ func Validate_PodSpec(
 	// field corev1.PodSpec.Resources has no validation
 	// field corev1.PodSpec.HostnameOverride has no validation
 	// field corev1.PodSpec.SchedulingGroup has no validation
+	return errs
+}
+
+// Validate_PodStatus validates an instance of PodStatus according
+// to declarative validation rules in the API schema.
+func Validate_PodStatus(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.PodStatus) (errs field.ErrorList) {
+
+	// field corev1.PodStatus.ObservedGeneration has no validation
+	// field corev1.PodStatus.Phase has no validation
+	// field corev1.PodStatus.Conditions has no validation
+	// field corev1.PodStatus.Message has no validation
+	// field corev1.PodStatus.Reason has no validation
+	// field corev1.PodStatus.NominatedNodeName has no validation
+	// field corev1.PodStatus.HostIP has no validation
+	// field corev1.PodStatus.HostIPs has no validation
+	// field corev1.PodStatus.PodIP has no validation
+	// field corev1.PodStatus.PodIPs has no validation
+	// field corev1.PodStatus.StartTime has no validation
+	// field corev1.PodStatus.InitContainerStatuses has no validation
+	// field corev1.PodStatus.ContainerStatuses has no validation
+	// field corev1.PodStatus.QOSClass has no validation
+	// field corev1.PodStatus.EphemeralContainerStatuses has no validation
+	// field corev1.PodStatus.Resize has no validation
+	// field corev1.PodStatus.ResourceClaimStatuses has no validation
+	// field corev1.PodStatus.ExtendedResourceClaimStatus has no validation
+	// field corev1.PodStatus.AllocatedResources has no validation
+	// field corev1.PodStatus.Resources has no validation
+	// field corev1.PodStatus.NodeAllocatableResourceClaimStatuses has no validation
+
+	{ // field corev1.PodStatus.VolumeHealth
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []corev1.PodVolumeHealth,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *corev1.PodVolumeHealth, b *corev1.PodVolumeHealth) bool { return a.Name == b.Name }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *corev1.PodVolumeHealth, b *corev1.PodVolumeHealth) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_PodVolumeHealth); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodStatus) []corev1.PodVolumeHealth {
+				return oldObj.VolumeHealth
+			})
+		errs = append(errs, fn(fldPath.Child("volumeHealth"), obj.VolumeHealth, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -939,6 +1100,91 @@ func Validate_PodTemplateSpec(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
+	return errs
+}
+
+// Validate_PodVolumeHealth validates an instance of PodVolumeHealth according
+// to declarative validation rules in the API schema.
+func Validate_PodVolumeHealth(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.PodVolumeHealth) (errs field.ErrorList) {
+
+	{ // field corev1.PodVolumeHealth.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodVolumeHealth) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.PodVolumeHealth.HealthConditions
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []corev1.VolumeHealthCondition,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 16).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *corev1.VolumeHealthCondition, b *corev1.VolumeHealthCondition) bool {
+					return a.Status == b.Status && a.Reason == b.Reason
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *corev1.VolumeHealthCondition, b *corev1.VolumeHealthCondition) bool {
+					return a.Status == b.Status && a.Reason == b.Reason
+				}, validate.DirectEqual, Validate_VolumeHealthCondition); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodVolumeHealth) []corev1.VolumeHealthCondition {
+				return oldObj.HealthConditions
+			})
+		errs = append(errs, fn(fldPath.Child("healthConditions"), obj.HealthConditions, oldVal, oldObj != nil)...)
+	}
+
+	// field corev1.PodVolumeHealth.LastTransitionTime has no validation
 	return errs
 }
 
@@ -1328,5 +1574,179 @@ func Validate_Toleration(
 	// field corev1.Toleration.Value has no validation
 	// field corev1.Toleration.Effect has no validation
 	// field corev1.Toleration.TolerationSeconds has no validation
+	return errs
+}
+
+// Validate_VolumeHealthCondition validates an instance of VolumeHealthCondition according
+// to declarative validation rules in the API schema.
+func Validate_VolumeHealthCondition(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.VolumeHealthCondition) (errs field.ErrorList) {
+
+	{ // field corev1.VolumeHealthCondition.Status
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.VolumeHealthStatusType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_VolumeHealthStatusType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.VolumeHealthCondition) *corev1.VolumeHealthStatusType {
+				return &oldObj.Status
+			})
+		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.VolumeHealthCondition.Reason
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 256); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.VolumeHealthCondition) *string {
+				return &oldObj.Reason
+			})
+		errs = append(errs, fn(fldPath.Child("reason"), &obj.Reason, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.VolumeHealthCondition.Message
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 1024); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.VolumeHealthCondition) *string {
+				return &oldObj.Message
+			})
+		errs = append(errs, fn(fldPath.Child("message"), &obj.Message, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_VolumeHealthStatus validates an instance of VolumeHealthStatus according
+// to declarative validation rules in the API schema.
+func Validate_VolumeHealthStatus(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.VolumeHealthStatus) (errs field.ErrorList) {
+
+	{ // field corev1.VolumeHealthStatus.HealthConditions
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []corev1.VolumeHealthCondition,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 16).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *corev1.VolumeHealthCondition, b *corev1.VolumeHealthCondition) bool {
+					return a.Status == b.Status && a.Reason == b.Reason
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *corev1.VolumeHealthCondition, b *corev1.VolumeHealthCondition) bool {
+					return a.Status == b.Status && a.Reason == b.Reason
+				}, validate.DirectEqual, Validate_VolumeHealthCondition); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.VolumeHealthStatus) []corev1.VolumeHealthCondition {
+				return oldObj.HealthConditions
+			})
+		errs = append(errs, fn(fldPath.Child("healthConditions"), obj.HealthConditions, oldVal, oldObj != nil)...)
+	}
+
+	// field corev1.VolumeHealthStatus.LastTransitionTime has no validation
+	return errs
+}
+
+var symbolsForVolumeHealthStatusType = sets.New(corev1.VolumeHealthDataLoss, corev1.VolumeHealthDegraded, corev1.VolumeHealthInaccessible)
+
+// Validate_VolumeHealthStatusType validates an instance of VolumeHealthStatusType according
+// to declarative validation rules in the API schema.
+func Validate_VolumeHealthStatusType(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.VolumeHealthStatusType) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForVolumeHealthStatusType, nil); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
 	return errs
 }
