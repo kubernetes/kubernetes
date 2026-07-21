@@ -116,10 +116,8 @@ func BindPod(ctx context.Context, cs kubernetes.Interface, binding *v1.Binding) 
 }
 
 // PatchPodStatus calculates the delta bytes change from <old.Status> to <newStatus>,
-// and then submit a request to API server to patch the pod changes. When
-// resourceVersion is not empty, it is included in the patch to detect
-// conflicts.
-func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, name string, namespace string, resourceVersion string, oldStatus *v1.PodStatus, newStatus *v1.PodStatus) error {
+// and then submit a request to API server to patch the pod changes.
+func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, name string, namespace string, oldStatus *v1.PodStatus, newStatus *v1.PodStatus) error {
 	if newStatus == nil {
 		return nil
 	}
@@ -133,11 +131,7 @@ func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, name string, n
 		return err
 	}
 
-	newPod := v1.Pod{Status: *newStatus}
-	if resourceVersion != "" {
-		newPod.ResourceVersion = resourceVersion
-	}
-	newData, err := json.Marshal(newPod)
+	newData, err := json.Marshal(v1.Pod{Status: *newStatus})
 	if err != nil {
 		return err
 	}
@@ -155,14 +149,7 @@ func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, name string, n
 		return err
 	}
 
-	retryFn := RetriableWithConflict
-	if resourceVersion != "" {
-		// A conflict probably means the Pod was updated in the meantime.
-		// Retrying with the same patch will continue to hit the same error.
-		// Return faster in that case so the caller can generate a different patch.
-		retryFn = Retriable
-	}
-	return retry.OnError(retry.DefaultBackoff, retryFn, patchFn)
+	return retry.OnError(retry.DefaultBackoff, RetriableWithConflict, patchFn)
 }
 
 // PatchPodGroupStatus calculates the delta bytes change from <old.Status> to <newStatus>,
