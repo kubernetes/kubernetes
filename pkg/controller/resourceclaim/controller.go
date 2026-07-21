@@ -88,6 +88,9 @@ const (
 	// podGroupMembersIndex is used to find Pods in a given PodGroup.
 	podGroupMembersIndex = "podGroupMembers"
 
+	// claimMutationCacheSize is the size of the LRU in the claim mutation cache.
+	claimMutationCacheSize = 1000
+
 	// Field manager used to update the pod status.
 	fieldManager = "ResourceClaimController"
 
@@ -347,15 +350,21 @@ func newControllerWithFeatures(
 	if err := claimInformerCache.AddIndexers(cache.Indexers{claimPodOwnerIndex: claimPodOwnerIndexFunc}); err != nil {
 		return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
 	}
-	ec.claimCache = cache.NewIntegerResourceVersionMutationCache(logger, claimInformerCache, claimInformerCache,
+	ec.claimCache = cache.NewIntegerResourceVersionMutationCacheWithOptions(logger, claimInformerCache, cache.MutationCacheOptions{
+		Indexer: claimInformerCache,
 		// Very long time to live, unlikely to be needed because
 		// the informer cache should get updated soon.
-		time.Hour,
+		TTL: time.Hour,
 		// Allow storing objects not in the underlying cache - that's the point...
 		// It's safe because in case of a race (claim is in mutation cache, claim
 		// gets deleted, controller updates status based on mutation cache) the
 		// "bad" pod status will get detected and fixed when the informer catches up.
-		true,
+		IncludeAdds: true,
+		// Tracks more recently mutated objects than the default (100)
+		// so that lookups still succeed locally while the informer cache lags
+		// behind etcd, avoiding the fallback GET against the apiserver.
+		MaxCacheSize: claimMutationCacheSize,
+	},
 	)
 
 	return ec, nil
@@ -1034,21 +1043,26 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podGroup *sc
 		claimName := *claimName
 		// The ResourceClaim should exist because it is recorded in the pod.status.resourceClaimStatuses,
 		// but perhaps it was deleted accidentally. In that case we re-create it.
-		claim, err := ec.claimLister.ResourceClaims(pod.Namespace).Get(claimName)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		if claim != nil {
-			var err error
+		checkClaimOwnedByPod := func(claim *resourceapi.ResourceClaim) bool {
 			if mustCheckOwner {
-				err = resourceclaim.IsForPod(pod, claim, ec.features.WorkloadResourceClaims)
+				if err := resourceclaim.IsForPod(pod, claim, ec.features.WorkloadResourceClaims); err != nil {
+					logger.Error(err, "Claim that was created for the pod is no longer owned by the pod, creating a new one",
+						"podClaim", podClaim.Name, "resourceClaim", claimName)
+					return false
+				}
 			}
-			if err == nil {
-				// Already created, nothing more to do.
-				logger.V(5).Info("Claim already created", "podClaim", podClaim.Name, "resourceClaim", claimName)
-				return nil
-			}
-			logger.Error(err, "Claim that was created for the pod is no longer owned by the pod, creating a new one", "podClaim", podClaim.Name, "resourceClaim", claimName)
+
+			return true
+		}
+
+		exists, err := ec.claimExists(ctx, pod.Namespace, claimName, checkClaimOwnedByPod)
+		if err != nil {
+			return fmt.Errorf("checking claim existence: %w", err)
+		}
+		if exists {
+			// Already created, nothing more to do.
+			logger.V(5).Info("Claim already created", "podClaim", podClaim.Name, "resourceClaim", claimName)
+			return nil
 		}
 	}
 
@@ -1287,21 +1301,26 @@ func (ec *Controller) handlePodGroupClaim(ctx context.Context, podGroup *schedul
 		claimName := *claimName
 		// The ResourceClaim should exist because it is recorded in the podgroup.status.resourceClaimStatuses,
 		// but perhaps it was deleted accidentally. In that case we re-create it.
-		claim, err := ec.claimLister.ResourceClaims(podGroup.Namespace).Get(claimName)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		if claim != nil {
-			var err error
+		checkClaimOwnedByPodGroup := func(claim *resourceapi.ResourceClaim) bool {
 			if mustCheckOwner {
-				err = resourceclaim.IsForPodGroup(podGroup, claim)
+				if err := resourceclaim.IsForPodGroup(podGroup, claim); err != nil {
+					logger.Error(err, "Claim that was created for the PodGroup is no longer owned by the PodGroup, creating a new one",
+						"podGroupClaim", podGroupClaim.Name, "resourceClaim", claimName)
+					return false
+				}
 			}
-			if err == nil {
-				// Already created, nothing more to do.
-				logger.V(5).Info("Claim already created", "podGroupClaim", podGroupClaim.Name, "resourceClaim", claimName)
-				return nil
-			}
-			logger.Error(err, "Claim that was created for the PodGroup is no longer owned by the PodGroup, creating a new one", "podGroupClaim", podGroupClaim.Name, "resourceClaim", claimName)
+
+			return true
+		}
+
+		exists, err := ec.claimExists(ctx, podGroup.Namespace, claimName, checkClaimOwnedByPodGroup)
+		if err != nil {
+			return fmt.Errorf("checking claim existence: %w", err)
+		}
+		if exists {
+			// Already created, nothing more to do.
+			logger.V(5).Info("Claim already created", "podGroupClaim", podGroupClaim.Name, "resourceClaim", claimName)
+			return nil
 		}
 	}
 
@@ -1389,6 +1408,42 @@ func (ec *Controller) handlePodGroupClaim(ctx context.Context, podGroup *schedul
 	(*newPodGroupClaims)[podGroupClaim.Name] = claim.Name
 
 	return nil
+}
+
+type checkClaimOwnerFunc func(claim *resourceapi.ResourceClaim) bool
+
+// claimExists reports whether the named ResourceClaim still exists and is owned by the expected object.
+// It looks in the mutation cache first and falls back to the apiserver if the claim is not found there.
+// A false result means the claim is gone (e.g. deleted by accident) and the caller should re-create it.
+func (ec *Controller) claimExists(ctx context.Context, namespace, claimName string, checkClaimOwner checkClaimOwnerFunc) (bool, error) {
+	key := cache.NewObjectName(namespace, claimName)
+
+	// This may incorrectly return a claim from the mutation cache that
+	// was already deleted again on the apiserver. The sync logic for the
+	// mutation cache (checking after TTL for created
+	// claims, reacting to informer events) will detect that eventually.
+	claim, exists, err := ec.claimCache.GetByKey(key.String())
+	if err != nil && !apierrors.IsNotFound(err) {
+		return false, err
+	}
+
+	if !exists {
+		// Missing from the mutation cache and informer (e.g. evicted): fall back to the apiserver.
+		claim, err = ec.kubeClient.ResourceV1().ResourceClaims(namespace).Get(ctx, claimName, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
+
+			return false, err
+		}
+	}
+
+	if !checkClaimOwner(claim.(*resourceapi.ResourceClaim)) {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // findPodGroupResourceClaim looks for an existing ResourceClaim with the right

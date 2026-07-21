@@ -58,7 +58,28 @@ type ResourceVersionComparator interface {
 	CompareResourceVersion(lhs, rhs runtime.Object) int
 }
 
-// NewIntegerResourceVersionMutationCache returns a MutationCache that understands how to
+// MutationCacheOptions configures the MutationCache returned by NewIntegerResourceVersionMutationCacheWithOptions.
+type MutationCacheOptions struct {
+	// Indexer is used by ByIndex to look up objects. May be nil, in which case ByIndex returns an error.
+	Indexer Indexer
+
+	// TTL controls how long an item remains in the mutation cache before it is removed.
+	// Zero means the default of 5 minutes.
+	TTL time.Duration
+
+	// IncludeAdds makes the cache return objects even if they don't exist
+	// in the underlying store. This is only safe if your use of the cache
+	// can handle mutation entries remaining in the cache for up to TTL
+	// when mutations and deletes occur very closely in time.
+	IncludeAdds bool
+
+	// MaxCacheSize limits how many mutated objects are tracked; the least
+	// recently used entries are evicted once the limit is reached.
+	// Zero means the default of 100.
+	MaxCacheSize int
+}
+
+// NewIntegerResourceVersionMutationCacheWithOptions returns a MutationCache that understands how to
 // deal with objects that have a resource version that:
 //
 //   - is an integer
@@ -86,16 +107,38 @@ type ResourceVersionComparator interface {
 // the informer might never see the added object when the add is followed
 // quickly by a delete. The caller has to handle stale added objects by
 // checking whether they still exist once the TTL is over.
-func NewIntegerResourceVersionMutationCache(logger klog.Logger, backingCache Store, indexer Indexer, ttl time.Duration, includeAdds bool) MutationCache {
+func NewIntegerResourceVersionMutationCacheWithOptions(logger klog.Logger, backingCache Store, options MutationCacheOptions) MutationCache {
+	var (
+		maxCacheSize = 100
+		ttl          = 5 * time.Minute
+	)
+
+	if options.MaxCacheSize != 0 {
+		maxCacheSize = options.MaxCacheSize
+	}
+	if options.TTL != 0 {
+		ttl = options.TTL
+	}
+
 	return &mutationCache{
 		backingCache:  backingCache,
-		indexer:       indexer,
-		mutationCache: utilcache.NewLRUExpireCache(100),
+		indexer:       options.Indexer,
+		mutationCache: utilcache.NewLRUExpireCache(maxCacheSize),
 		comparator:    etcdObjectVersioner{},
 		ttl:           ttl,
-		includeAdds:   includeAdds,
+		includeAdds:   options.IncludeAdds,
 		logger:        logger,
 	}
+}
+
+// NewIntegerResourceVersionMutationCache is like NewIntegerResourceVersionMutationCacheWithOptions with a fixed cache size of 100.
+func NewIntegerResourceVersionMutationCache(logger klog.Logger, backingCache Store, indexer Indexer, ttl time.Duration, includeAdds bool) MutationCache {
+	return NewIntegerResourceVersionMutationCacheWithOptions(logger, backingCache, MutationCacheOptions{
+		TTL:          ttl,
+		Indexer:      indexer,
+		IncludeAdds:  includeAdds,
+		MaxCacheSize: 100,
+	})
 }
 
 // mutationCache doesn't guarantee that it returns values added via Mutation since they can page out and
