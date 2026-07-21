@@ -2611,7 +2611,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 						status: fwk.NewStatus(fwk.Unschedulable, "0/1 nodes are available:"),
 					},
 				},
-				status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status").WithError(errPodGroupUnschedulable),
+				status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, reported placement status: injected placementFeasible status").WithError(errPodGroupUnschedulable),
 			},
 		},
 		"when all placements are infeasible, but pods are feasible, returns unschedulable": {
@@ -2651,7 +2651,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 						status: nil,
 					},
 				},
-				status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status").WithError(errPodGroupUnschedulable),
+				status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, reported placement status: injected placementFeasible status").WithError(errPodGroupUnschedulable),
 			},
 		},
 		"filters out infeasible placements": {
@@ -2911,6 +2911,254 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 				assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_placement_evaluation_duration_seconds", infeasibleLabels, tt.expectedInfeasibleEvaluations)
 			})
 		}
+	}
+}
+
+// TestPodGroupSchedulingPlacementAlgorithm_NominatedNode covers the NominatedNodeName path:
+// the placement matching the pods' NNN is evaluated first, short-circuits scoring when the
+// gang is feasible there, and otherwise falls through to normal score-based selection.
+func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.TopologyAwareWorkloadScheduling: true,
+		features.GenericWorkload:                 true,
+	})
+
+	nodes := []*v1.Node{
+		st.MakeNode().Name("node1").Obj(),
+		st.MakeNode().Name("node2").Obj(),
+	}
+
+	podGroupKey := "podgroup/default/pg"
+	tests := map[string]struct {
+		placementPlugin           fakePlacementPlugin
+		placementFeasibleStatuses [][]fwk.Code
+		// nominatedNodeName is written to the pod's status before scheduling.
+		nominatedNodeName string
+		// rootIsCPG makes the scheduling root a CompositePodGroup, which gates off the NNN fast path.
+		rootIsCPG bool
+		// expectedHost is the node the gang should land on. Empty means unschedulable.
+		expectedHost string
+		expectError  bool
+	}{
+		"nominated placement short-circuits scoring even with a lower score": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: map[string]map[string][]string{
+					podGroupKey: {
+						"placement1": {nodes[0].Name},
+						"placement2": {nodes[1].Name},
+					},
+				},
+				// placement1 scores higher, so without the NNN short-circuit the gang would
+				// land on node1. The nomination points at node2, which must win instead.
+				scorePlacementsResult: map[string]map[string]int64{
+					podGroupKey: {
+						"placement1": 2,
+						"placement2": 1,
+					},
+				},
+			},
+			nominatedNodeName: nodes[1].Name,
+			expectedHost:      nodes[1].Name,
+		},
+		"infeasible nominated placement falls back to scoring": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: map[string]map[string][]string{
+					podGroupKey: {
+						"placement1": {nodes[0].Name},
+						"placement2": {nodes[1].Name},
+					},
+				},
+				scorePlacementsResult: map[string]map[string]int64{
+					podGroupKey: {
+						"placement1": 1,
+					},
+				},
+				// The nominated node is infeasible, so its placement can't short-circuit and
+				// the gang falls back to the only feasible placement.
+				filterStatus: map[string]*fwk.Status{
+					nodes[1].Name: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+			placementFeasibleStatuses: [][]fwk.Code{{fwk.Unschedulable}, {fwk.Success}},
+			nominatedNodeName:         nodes[1].Name,
+			expectedHost:              nodes[0].Name,
+		},
+		"error on the nominated placement propagates": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: map[string]map[string][]string{
+					podGroupKey: {
+						"placement1": {nodes[0].Name},
+						"placement2": {nodes[1].Name},
+					},
+				},
+				scorePlacementsResult: map[string]map[string]int64{
+					podGroupKey: {
+						"placement1": 1,
+					},
+				},
+				filterStatus: map[string]*fwk.Status{
+					nodes[1].Name: fwk.NewStatus(fwk.Error, "injected filter error"),
+				},
+			},
+			nominatedNodeName: nodes[1].Name,
+			expectError:       true,
+		},
+		"CPG root skips the nominated fast path and scores every placement": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: map[string]map[string][]string{
+					podGroupKey: {
+						"placement1": {nodes[0].Name},
+						"placement2": {nodes[1].Name},
+					},
+				},
+				// Same setup as the short-circuit case: placement1 scores higher and the
+				// nomination points at node2. Because the root is a CompositePodGroup, the NNN
+				// fast path is disabled and the higher-scored placement1 (node1) must win.
+				scorePlacementsResult: map[string]map[string]int64{
+					podGroupKey: {
+						"placement1": 2,
+						"placement2": 1,
+					},
+				},
+			},
+			nominatedNodeName: nodes[1].Name,
+			rootIsCPG:         true,
+			expectedHost:      nodes[0].Name,
+		},
+		"feasible nominated placement that schedules no new pod does not short-circuit": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: map[string]map[string][]string{
+					podGroupKey: {
+						"placement1": {nodes[0].Name},
+						"placement2": {nodes[1].Name},
+					},
+				},
+				// The nominated placement2 even scores higher, so nothing but the anyScheduled
+				// guard keeps it from winning.
+				scorePlacementsResult: map[string]map[string]int64{
+					podGroupKey: {
+						"placement1": 1,
+						"placement2": 2,
+					},
+				},
+				// The pod can't be placed on the nominated node, so no new pod is scheduled on
+				// placement2. PlacementFeasible still reports Success there (as it would when
+				// minCount is already met by pods scheduled in previous cycles). Without the
+				// anyScheduled guard the nominated placement would short-circuit and the gang
+				// would land nowhere; the guard makes it fall back to placement1 (node1).
+				filterStatus: map[string]*fwk.Status{
+					nodes[1].Name: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+			placementFeasibleStatuses: [][]fwk.Code{{fwk.Success}, {fwk.Success}},
+			nominatedNodeName:         nodes[1].Name,
+			expectedHost:              nodes[0].Name,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(), 0)
+			queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
+
+			tt.placementPlugin.name = "FakePlacementPlugin"
+			orderedPlacementGeneratePlugin := &orderedPlacementPlugin{&tt.placementPlugin}
+			placementFeasiblePlugin := &fakePlacementFeasiblePlugin{
+				placementFeasibleStatuses: tt.placementFeasibleStatuses,
+			}
+
+			registry := []tf.RegisterPluginFunc{
+				tf.RegisterPlacementGeneratePlugin(orderedPlacementGeneratePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return orderedPlacementGeneratePlugin, nil
+				}),
+				tf.RegisterPlacementScorePlugin(tt.placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return &tt.placementPlugin, nil
+				}, 1),
+				tf.RegisterFilterPlugin(tt.placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return &tt.placementPlugin, nil
+				}),
+				tf.RegisterPermitPlugin(placementFeasiblePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return placementFeasiblePlugin, nil
+				}),
+			}
+
+			snapshot := internalcache.NewEmptySnapshot()
+
+			schedFwk, err := tf.NewFramework(ctx,
+				append(registry,
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				),
+				"test-scheduler",
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithPodNominator(queue),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create new framework: %v", err)
+			}
+
+			cache := internalcache.New(ctx, nil, true, true /* CompositePodGroup */)
+			for _, node := range nodes {
+				cache.AddNode(logger, node)
+			}
+			testPodGroup := &schedulingv1beta1.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
+			}
+			cache.AddPodGroup(testPodGroup)
+
+			sched := &Scheduler{
+				Cache:            cache,
+				nodeInfoSnapshot: snapshot,
+				SchedulingQueue:  queue,
+				Profiles:         profile.Map{"test-scheduler": schedFwk},
+			}
+			sched.SchedulePod = sched.schedulePod
+
+			if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
+				t.Fatalf("Failed to update snapshot: %v", err)
+			}
+
+			pod := st.MakePod().Name("foo").UID("foo").PodGroupName("pg").NominatedNodeName(tt.nominatedNodeName).Obj()
+			queuedPodInfos := []*framework.QueuedPodInfo{{PodInfo: &framework.PodInfo{Pod: pod}}}
+			childPodGroupInfo := &framework.PodGroupInfo{
+				Name:            "pg",
+				Namespace:       "default",
+				Type:            fwk.PodGroupKeyType,
+				PodGroup:        testPodGroup,
+				UnscheduledPods: []*v1.Pod{pod},
+			}
+			// The root is normally the pod group itself, but for the CPG case it is a separate
+			// CompositePodGroup wrapping the child, which is what gates off the NNN fast path.
+			rootPodGroupInfo := childPodGroupInfo
+			if tt.rootIsCPG {
+				rootPodGroupInfo = &framework.PodGroupInfo{
+					Name:      "pg",
+					Namespace: "default",
+					Type:      fwk.CompositePodGroupKeyType,
+				}
+			}
+			pgInfo := &framework.QueuedPodGroupInfo{
+				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{fwk.MustParseEntityKey("podgroup/default/pg"): queuedPodInfos},
+				PodGroupInfo:   rootPodGroupInfo,
+			}
+
+			result, _ := sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), childPodGroupInfo, pgInfo)
+
+			if tt.expectError {
+				if result.status == nil || !result.status.IsError() {
+					t.Fatalf("expected an error status, got %v", result.status)
+				}
+				return
+			}
+			if result.status != nil && !result.status.IsSuccess() {
+				t.Fatalf("expected the gang to be scheduled, got status %v", result.status)
+			}
+			if got := result.podResults[0].scheduleResult.SuggestedHost; got != tt.expectedHost {
+				t.Fatalf("gang landed on %q, want %q", got, tt.expectedHost)
+			}
+		})
 	}
 }
 
