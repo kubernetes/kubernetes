@@ -2098,6 +2098,12 @@ message HTTPGetAction {
   // +optional
   // +listType=atomic
   repeated HTTPHeader httpHeaders = 5;
+
+  // Protocol selects the wire protocol for the probe connection.
+  // Nil defaults to HTTP/1.1.
+  // +optional
+  // +featureGate=H2CContainerProbe
+  optional string protocol = 6;
 }
 
 // HTTPHeader describes a custom header to be used in HTTP probes

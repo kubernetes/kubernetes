@@ -2643,6 +2643,19 @@ type HTTPHeader struct {
 	Value string `json:"value" protobuf:"bytes,2,opt,name=value"`
 }
 
+// HTTPProtocol selects the wire protocol for the HTTP probe,
+// independently of the URI scheme.
+// +enum
+type HTTPProtocol string
+
+const (
+	// HTTPProtocolHTTP1 uses HTTP/1.1 (the existing default).
+	HTTPProtocolHTTP1 HTTPProtocol = "HTTP1"
+	// HTTPProtocolHTTP2 uses HTTP/2.
+	// Currently, only cleartext with prior knowledge (h2c) is supported, and must be used with scheme HTTP.
+	HTTPProtocolHTTP2 HTTPProtocol = "HTTP2"
+)
+
 // HTTPGetAction describes an action based on HTTP Get requests.
 type HTTPGetAction struct {
 	// Path to access on the HTTP server.
@@ -2664,6 +2677,11 @@ type HTTPGetAction struct {
 	// +optional
 	// +listType=atomic
 	HTTPHeaders []HTTPHeader `json:"httpHeaders,omitempty" protobuf:"bytes,5,rep,name=httpHeaders"`
+	// Protocol selects the wire protocol for the probe connection.
+	// Nil defaults to HTTP/1.1.
+	// +optional
+	// +featureGate=H2CContainerProbe
+	Protocol *HTTPProtocol `json:"protocol,omitempty" protobuf:"bytes,6,opt,name=protocol,casttype=HTTPProtocol"`
 }
 
 // URIScheme identifies the scheme used for connection to a host for Get actions

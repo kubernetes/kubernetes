@@ -212,6 +212,12 @@ func SetDefaults_Pod(obj *v1.Pod) {
 		defaultHostNetworkPorts(&obj.Spec.Containers)
 		defaultHostNetworkPorts(&obj.Spec.InitContainers)
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.H2CContainerProbe) {
+		defaultHTTPProbeProtocol(obj.Spec.Containers)
+		defaultHTTPProbeProtocol(obj.Spec.InitContainers)
+		defaultHTTPProbeProtocolEphemeral(obj.Spec.EphemeralContainers)
+	}
 }
 func SetDefaults_PodStatus(obj *v1.PodStatus) {
 	// Keep the singular PodIP and the PodIPs list in sync.
@@ -433,6 +439,57 @@ func defaultHostNetworkPorts(containers *[]v1.Container) {
 		for j := range (*containers)[i].Ports {
 			if (*containers)[i].Ports[j].HostPort == 0 {
 				(*containers)[i].Ports[j].HostPort = (*containers)[i].Ports[j].ContainerPort
+			}
+		}
+	}
+}
+
+func defaultHTTPGetProtocol(action *v1.HTTPGetAction) {
+	if action != nil && action.Protocol == nil {
+		defaultProtocol := v1.HTTPProtocolHTTP1
+		action.Protocol = &defaultProtocol
+	}
+}
+
+func defaultHTTPProbeProtocol(containers []v1.Container) {
+	for i := range containers {
+		if containers[i].LivenessProbe != nil {
+			defaultHTTPGetProtocol(containers[i].LivenessProbe.HTTPGet)
+		}
+		if containers[i].ReadinessProbe != nil {
+			defaultHTTPGetProtocol(containers[i].ReadinessProbe.HTTPGet)
+		}
+		if containers[i].StartupProbe != nil {
+			defaultHTTPGetProtocol(containers[i].StartupProbe.HTTPGet)
+		}
+		if containers[i].Lifecycle != nil {
+			if containers[i].Lifecycle.PostStart != nil {
+				defaultHTTPGetProtocol(containers[i].Lifecycle.PostStart.HTTPGet)
+			}
+			if containers[i].Lifecycle.PreStop != nil {
+				defaultHTTPGetProtocol(containers[i].Lifecycle.PreStop.HTTPGet)
+			}
+		}
+	}
+}
+
+func defaultHTTPProbeProtocolEphemeral(containers []v1.EphemeralContainer) {
+	for i := range containers {
+		if containers[i].LivenessProbe != nil {
+			defaultHTTPGetProtocol(containers[i].LivenessProbe.HTTPGet)
+		}
+		if containers[i].ReadinessProbe != nil {
+			defaultHTTPGetProtocol(containers[i].ReadinessProbe.HTTPGet)
+		}
+		if containers[i].StartupProbe != nil {
+			defaultHTTPGetProtocol(containers[i].StartupProbe.HTTPGet)
+		}
+		if containers[i].Lifecycle != nil {
+			if containers[i].Lifecycle.PostStart != nil {
+				defaultHTTPGetProtocol(containers[i].Lifecycle.PostStart.HTTPGet)
+			}
+			if containers[i].Lifecycle.PreStop != nil {
+				defaultHTTPGetProtocol(containers[i].Lifecycle.PreStop.HTTPGet)
 			}
 		}
 	}
