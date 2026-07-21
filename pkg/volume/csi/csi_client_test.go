@@ -366,7 +366,7 @@ func (c *fakeCsiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets 
 	if err != nil {
 		return nil, err
 	}
-	return mapStorageBackendHealth(resp.GetBackendHealth()), nil
+	return mapStorageBackendHealth(resp.GetBackendHealth())
 }
 
 func (c *fakeCsiDriverClient) NodeSupportsSingleNodeMultiWriterAccessMode(ctx context.Context) (bool, error) {
@@ -1276,5 +1276,102 @@ func TestNodeGetStorageHealth(t *testing.T) {
 				t.Fatalf("expected NodeSupportsStorageHealth=%v, got %v", tc.storageHealthSet, supported)
 			}
 		})
+	}
+}
+
+func TestMapStorageHealthVolumeCapability(t *testing.T) {
+	tests := []struct {
+		name           string
+		capability     *csipbv1.VolumeCapability
+		wantAccessMode api.PersistentVolumeAccessMode
+		wantVolumeMode api.PersistentVolumeMode
+		wantError      bool
+	}{
+		{
+			name: "block single node writer",
+			capability: &csipbv1.VolumeCapability{
+				AccessType: &csipbv1.VolumeCapability_Block{Block: &csipbv1.VolumeCapability_BlockVolume{}},
+				AccessMode: &csipbv1.VolumeCapability_AccessMode{Mode: csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_WRITER},
+			},
+			wantAccessMode: api.ReadWriteOnce,
+			wantVolumeMode: api.PersistentVolumeBlock,
+		},
+		{
+			name: "mount single node single writer",
+			capability: &csipbv1.VolumeCapability{
+				AccessType: &csipbv1.VolumeCapability_Mount{Mount: &csipbv1.VolumeCapability_MountVolume{}},
+				AccessMode: &csipbv1.VolumeCapability_AccessMode{Mode: csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER},
+			},
+			wantAccessMode: api.ReadWriteOncePod,
+			wantVolumeMode: api.PersistentVolumeFilesystem,
+		},
+		{
+			name: "mount multi node reader only",
+			capability: &csipbv1.VolumeCapability{
+				AccessType: &csipbv1.VolumeCapability_Mount{Mount: &csipbv1.VolumeCapability_MountVolume{}},
+				AccessMode: &csipbv1.VolumeCapability_AccessMode{Mode: csipbv1.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY},
+			},
+			wantAccessMode: api.ReadOnlyMany,
+			wantVolumeMode: api.PersistentVolumeFilesystem,
+		},
+		{
+			name: "mount multi node writer",
+			capability: &csipbv1.VolumeCapability{
+				AccessType: &csipbv1.VolumeCapability_Mount{Mount: &csipbv1.VolumeCapability_MountVolume{}},
+				AccessMode: &csipbv1.VolumeCapability_AccessMode{Mode: csipbv1.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER},
+			},
+			wantAccessMode: api.ReadWriteMany,
+			wantVolumeMode: api.PersistentVolumeFilesystem,
+		},
+		{
+			name: "missing access type",
+			capability: &csipbv1.VolumeCapability{
+				AccessMode: &csipbv1.VolumeCapability_AccessMode{Mode: csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_WRITER},
+			},
+			wantError: true,
+		},
+		{
+			name: "missing access mode",
+			capability: &csipbv1.VolumeCapability{
+				AccessType: &csipbv1.VolumeCapability_Block{Block: &csipbv1.VolumeCapability_BlockVolume{}},
+			},
+			wantError: true,
+		},
+		{
+			name: "unknown access mode",
+			capability: &csipbv1.VolumeCapability{
+				AccessType: &csipbv1.VolumeCapability_Block{Block: &csipbv1.VolumeCapability_BlockVolume{}},
+				AccessMode: &csipbv1.VolumeCapability_AccessMode{Mode: csipbv1.VolumeCapability_AccessMode_UNKNOWN},
+			},
+			wantError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotAccessMode, gotVolumeMode, err := mapStorageHealthVolumeCapability(tc.capability)
+			if (err != nil) != tc.wantError {
+				t.Fatalf("mapStorageHealthVolumeCapability() error = %v, wantError %v", err, tc.wantError)
+			}
+			if tc.wantError {
+				return
+			}
+			if gotAccessMode != tc.wantAccessMode || gotVolumeMode != tc.wantVolumeMode {
+				t.Errorf("mapStorageHealthVolumeCapability() = (%q, %q), want (%q, %q)", gotAccessMode, gotVolumeMode, tc.wantAccessMode, tc.wantVolumeMode)
+			}
+		})
+	}
+}
+
+func TestMapStorageBackendHealthLimit(t *testing.T) {
+	entries := make([]*csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth, maxStorageHealthConditions+1)
+	for i := range entries {
+		entries[i] = &csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth{
+			Status: csipbv1.StorageHealthErrorType_STORAGE_DEGRADED,
+		}
+	}
+
+	if _, err := mapStorageBackendHealth(entries); err == nil {
+		t.Fatalf("mapStorageBackendHealth() expected an error for %d conditions", len(entries))
 	}
 }

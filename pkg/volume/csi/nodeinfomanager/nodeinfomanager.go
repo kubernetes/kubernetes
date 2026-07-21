@@ -96,7 +96,7 @@ type Interface interface {
 
 	// UpdateCSINodeStorageHealth updates CSINode.Status.StorageHealth for the given
 	// driver with the provided conditions. Other drivers' entries are preserved.
-	// No-ops if the (name,status,reason) set for this driver is unchanged.
+	// No-ops if the condition identity set for this driver is unchanged.
 	UpdateCSINodeStorageHealth(driverName string, conditions []storagev1.StorageHealthCondition) error
 }
 
@@ -720,7 +720,8 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
 
 // UpdateCSINodeStorageHealth updates CSINode.Status.StorageHealth for the given
 // driver with the provided conditions. Other drivers' entries are preserved.
-// No-ops if the (name,status,reason) set for this driver is unchanged.
+// No-ops if the status, reason, and volume-capability identities for this driver
+// are unchanged.
 func (nim *nodeInfoManager) UpdateCSINodeStorageHealth(driverName string, conditions []storagev1.StorageHealthCondition) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
 		return nil
@@ -762,13 +763,13 @@ func (nim *nodeInfoManager) tryUpdateCSINodeStorageHealth(
 		return err
 	}
 
-	existingDriverConds := make([]storagev1.StorageHealthCondition, 0)
-	otherDriversConds := make([]storagev1.StorageHealthCondition, 0, len(nodeInfo.Status.StorageHealth))
-	for _, cond := range nodeInfo.Status.StorageHealth {
-		if cond.Name == driverName {
-			existingDriverConds = append(existingDriverConds, cond)
+	var existingDriverConds []storagev1.StorageHealthCondition
+	otherDriversHealth := make([]storagev1.StorageHealth, 0, len(nodeInfo.Status.StorageHealth))
+	for _, health := range nodeInfo.Status.StorageHealth {
+		if health.Name == driverName {
+			existingDriverConds = health.HealthConditions
 		} else {
-			otherDriversConds = append(otherDriversConds, cond)
+			otherDriversHealth = append(otherDriversHealth, health)
 		}
 	}
 
@@ -776,30 +777,51 @@ func (nim *nodeInfoManager) tryUpdateCSINodeStorageHealth(
 		return nil
 	}
 
-	combined := make([]storagev1.StorageHealthCondition, 0, len(otherDriversConds)+len(conditions))
-	combined = append(combined, otherDriversConds...)
-	combined = append(combined, conditions...)
+	combined := make([]storagev1.StorageHealth, 0, len(otherDriversHealth)+1)
+	combined = append(combined, otherDriversHealth...)
+	if len(conditions) > 0 {
+		combined = append(combined, storagev1.StorageHealth{Name: driverName, HealthConditions: conditions})
+	}
 	nodeInfo.Status.StorageHealth = combined
 	_, err = csiKubeClient.StorageV1().CSINodes().UpdateStatus(context.TODO(), nodeInfo, metav1.UpdateOptions{})
 	return err
 }
 
 // storageHealthIdentityEqual reports whether two condition slices have the same
-// (name,status,reason) identity set. Other fields (message, accessModes, etc.) are ignored.
+// status, reason, and volume-capability identities. Message and transition time
+// are ignored so repeated reports do not cause status write churn.
 func storageHealthIdentityEqual(a, b []storagev1.StorageHealthCondition) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	type identity struct {
-		name, status, reason string
-	}
-	setA := sets.New[identity]()
+	identities := make(map[storageHealthIdentity]int, len(a))
 	for _, c := range a {
-		setA.Insert(identity{c.Name, string(c.Status), c.Reason})
+		identities[storageHealthConditionIdentity(c)]++
 	}
-	setB := sets.New[identity]()
 	for _, c := range b {
-		setB.Insert(identity{c.Name, string(c.Status), c.Reason})
+		identity := storageHealthConditionIdentity(c)
+		if identities[identity] == 0 {
+			return false
+		}
+		identities[identity]--
 	}
-	return setA.Equal(setB)
+	return true
+}
+
+type storageHealthIdentity struct {
+	status, reason, accessMode, volumeMode string
+}
+
+func storageHealthConditionIdentity(condition storagev1.StorageHealthCondition) storageHealthIdentity {
+	identity := storageHealthIdentity{
+		status: string(condition.Status),
+		reason: condition.Reason,
+	}
+	if condition.AccessMode != nil {
+		identity.accessMode = string(*condition.AccessMode)
+	}
+	if condition.VolumeMode != nil {
+		identity.volumeMode = string(*condition.VolumeMode)
+	}
+	return identity
 }

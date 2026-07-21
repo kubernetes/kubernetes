@@ -311,13 +311,17 @@ var validStorageHealthStatusTypes = sets.New(
 	storage.StorageDegraded,
 )
 
+var validStorageHealthAccessModes = sets.New(
+	api.ReadWriteOnce,
+	api.ReadOnlyMany,
+	api.ReadWriteMany,
+	api.ReadWriteOncePod,
+)
+
+const maxStorageHealthConditions = 16
+
 func validateStorageHealthCondition(condition storage.StorageHealthCondition, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(condition.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
-	} else {
-		allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(condition.Name, fldPath.Child("name"))...)
-	}
 	if !validStorageHealthStatusTypes.Has(condition.Status) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, sets.List(validStorageHealthStatusTypes)))
 	}
@@ -329,22 +333,44 @@ func validateStorageHealthCondition(condition storage.StorageHealthCondition, fl
 	if len(condition.Message) > 1024 {
 		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), condition.Message, 1024))
 	}
+	if condition.AccessMode != nil && !validStorageHealthAccessModes.Has(*condition.AccessMode) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("accessMode"), *condition.AccessMode, sets.List(validStorageHealthAccessModes)))
+	}
+	if condition.VolumeMode != nil && *condition.VolumeMode != api.PersistentVolumeFilesystem && *condition.VolumeMode != api.PersistentVolumeBlock {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("volumeMode"), *condition.VolumeMode, []api.PersistentVolumeMode{api.PersistentVolumeFilesystem, api.PersistentVolumeBlock}))
+	}
+	return allErrs
+}
+
+func validateStorageHealth(health storage.StorageHealth, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(health.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	} else {
+		allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(health.Name, fldPath.Child("name"))...)
+	}
+	if len(health.HealthConditions) > maxStorageHealthConditions {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("healthConditions"), len(health.HealthConditions), maxStorageHealthConditions))
+		return allErrs
+	}
+	for i, condition := range health.HealthConditions {
+		allErrs = append(allErrs, validateStorageHealthCondition(condition, fldPath.Child("healthConditions").Index(i))...)
+	}
 	return allErrs
 }
 
 // ValidateCSINodeStatusUpdate validates an update to the status of a CSINode.
 func ValidateCSINodeStatusUpdate(new, old *storage.CSINode) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
-	fldPath := field.NewPath("status")
+	fldPath := field.NewPath("status", "storageHealth")
 	seen := sets.New[string]()
-	for i, cond := range new.Status.StorageHealth {
-		key := cond.Name + "/" + string(cond.Status) + "/" + cond.Reason
-		idxPath := fldPath.Child("storageHealth").Index(i)
-		if seen.Has(key) {
-			allErrs = append(allErrs, field.Duplicate(idxPath, key))
+	for i, health := range new.Status.StorageHealth {
+		idxPath := fldPath.Index(i)
+		if seen.Has(health.Name) {
+			allErrs = append(allErrs, field.Duplicate(idxPath, health.Name))
 		}
-		seen.Insert(key)
-		allErrs = append(allErrs, validateStorageHealthCondition(cond, idxPath)...)
+		seen.Insert(health.Name)
+		allErrs = append(allErrs, validateStorageHealth(health, idxPath)...)
 	}
 	return allErrs
 }

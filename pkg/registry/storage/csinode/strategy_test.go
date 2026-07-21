@@ -365,11 +365,12 @@ func getValidCSINode(name string) *storage.CSINode {
 func getCSINodeWithStatus() *storage.CSINode {
 	node := getValidCSINode("foo")
 	node.Status = storage.CSINodeStatus{
-		StorageHealth: []storage.StorageHealthCondition{
+		StorageHealth: []storage.StorageHealth{
 			{
-				Name:   "valid-driver-name",
-				Status: storage.StorageUnreachable,
-				Reason: "BackendDown",
+				Name: "valid-driver-name",
+				HealthConditions: []storage.StorageHealthCondition{
+					{Status: storage.StorageUnreachable, Reason: "BackendDown"},
+				},
 			},
 		},
 	}

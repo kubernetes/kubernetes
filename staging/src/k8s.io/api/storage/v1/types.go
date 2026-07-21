@@ -681,47 +681,51 @@ const (
 // StorageHealthCondition represents an adverse health condition reported
 // by a CSI driver for its storage backend on a node.
 type StorageHealthCondition struct {
-	// name is the CSI driver name, matching CSINodeDriver.name.
-	// +required
-	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// status is the health status category.
 	// One of "StorageUnreachable", "StorageDegraded".
 	// +required
-	Status StorageHealthStatusType `json:"status" protobuf:"bytes,2,opt,name=status,casttype=StorageHealthStatusType"`
+	Status StorageHealthStatusType `json:"status" protobuf:"bytes,1,opt,name=status,casttype=StorageHealthStatusType"`
 	// reason is a brief CamelCase machine-parseable reason.
-	// Together with name and status it forms the unique identity of a condition entry.
 	// Maximum permitted length of a reason is 256 characters.
 	// +required
-	Reason string `json:"reason" protobuf:"bytes,3,opt,name=reason"`
+	Reason string `json:"reason" protobuf:"bytes,2,opt,name=reason"`
 	// message is a human-readable description.
 	// +optional
 	// Maximum permitted length of a message is 1024 characters.
-	Message string `json:"message,omitempty" protobuf:"bytes,4,opt,name=message"`
-	// accessModes are the access modes affected. An empty list means all access modes are affected.
+	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
+	// accessMode is the access mode affected. Nil means all access modes are affected.
 	// +optional
-	// +listType=atomic
-	AccessModes []v1.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,5,rep,name=accessModes,casttype=k8s.io/api/core/v1.PersistentVolumeAccessMode"`
+	AccessMode *v1.PersistentVolumeAccessMode `json:"accessMode,omitempty" protobuf:"bytes,4,opt,name=accessMode,casttype=k8s.io/api/core/v1.PersistentVolumeAccessMode"`
 	// volumeMode is the volume mode affected. Nil means both are affected.
 	// +optional
-	VolumeMode *v1.PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=k8s.io/api/core/v1.PersistentVolumeMode"`
+	VolumeMode *v1.PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,5,opt,name=volumeMode,casttype=k8s.io/api/core/v1.PersistentVolumeMode"`
 	// lastTransitionTime is when this condition first appeared at its current state.
 	// +optional
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,7,opt,name=lastTransitionTime"`
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,6,opt,name=lastTransitionTime"`
+}
+
+// StorageHealth contains storage backend health reported by a CSI driver on a node.
+type StorageHealth struct {
+	// name is the CSI driver name, matching CSINodeDriver.name.
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// healthConditions are the adverse storage backend conditions reported by the CSI driver.
+	// At most 16 conditions may be reported.
+	// +optional
+	// +listType=atomic
+	HealthConditions []StorageHealthCondition `json:"healthConditions,omitempty" protobuf:"bytes,2,rep,name=healthConditions"`
 }
 
 // CSINodeStatus contains health and status information for storage on a node.
 type CSINodeStatus struct {
-	// storageHealth is the set of backend health reports for
-	// each CSI driver registered on the node.
+	// storageHealth contains backend health reports for CSI drivers registered on the node.
 	// +optional
 	// +listType=map
 	// +listMapKey=name
-	// +listMapKey=status
-	// +listMapKey=reason
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	// +featureGate=CSIVolumeHealth
-	StorageHealth []StorageHealthCondition `json:"storageHealth,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,1,rep,name=storageHealth"`
+	StorageHealth []StorageHealth `json:"storageHealth,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,1,rep,name=storageHealth"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

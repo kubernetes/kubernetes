@@ -1865,8 +1865,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "mynode"},
 					Spec:       nodeInfo.Spec,
 					Status: storage.CSINodeStatus{
-						StorageHealth: []storage.StorageHealthCondition{
-							{Name: "com.example.csi/mydriver", Status: storage.StorageDegraded, Reason: "DiskSlow"},
+						StorageHealth: []storage.StorageHealth{
+							{Name: "com.example.csi/mydriver", HealthConditions: []storage.StorageHealthCondition{{Status: storage.StorageDegraded, Reason: "DiskSlow"}}},
 						},
 					},
 				},
@@ -1882,8 +1882,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "mynode"},
 					Spec:       nodeInfo.Spec,
 					Status: storage.CSINodeStatus{
-						StorageHealth: []storage.StorageHealthCondition{
-							{Name: "com.example.csi/mydriver", Status: storage.StorageDegraded, Reason: "DiskSlow"},
+						StorageHealth: []storage.StorageHealth{
+							{Name: "com.example.csi/mydriver", HealthConditions: []storage.StorageHealthCondition{{Status: storage.StorageDegraded, Reason: "DiskSlow"}}},
 						},
 					},
 				},
@@ -1925,8 +1925,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 						},
 					},
 					Status: storage.CSINodeStatus{
-						StorageHealth: []storage.StorageHealthCondition{
-							{Name: "com.example.csi/mydriver", Status: storage.StorageDegraded, Reason: "DiskSlow"},
+						StorageHealth: []storage.StorageHealth{
+							{Name: "com.example.csi/mydriver", HealthConditions: []storage.StorageHealthCondition{{Status: storage.StorageDegraded, Reason: "DiskSlow"}}},
 						},
 					},
 				},

@@ -730,7 +730,7 @@ func (c *csiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[
 	if err != nil {
 		return nil, err
 	}
-	return mapStorageBackendHealth(resp.GetBackendHealth()), nil
+	return mapStorageBackendHealth(resp.GetBackendHealth())
 }
 
 func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondition {
@@ -772,12 +772,17 @@ func mapVolumeHealthStatus(status csipbv1.VolumeHealthErrorType) (api.VolumeHeal
 	}
 }
 
-func mapStorageBackendHealth(entries []*csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth) []storagev1.StorageHealthCondition {
+const maxStorageHealthConditions = 16
+
+func mapStorageBackendHealth(entries []*csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth) ([]storagev1.StorageHealthCondition, error) {
 	if len(entries) == 0 {
-		return nil
+		return nil, nil
+	}
+	if len(entries) > maxStorageHealthConditions {
+		return nil, fmt.Errorf("NodeGetStorageHealth returned %d conditions, maximum is %d", len(entries), maxStorageHealthConditions)
 	}
 	out := make([]storagev1.StorageHealthCondition, 0, len(entries))
-	for _, entry := range entries {
+	for i, entry := range entries {
 		if entry == nil {
 			continue
 		}
@@ -785,13 +790,55 @@ func mapStorageBackendHealth(entries []*csipbv1.NodeGetStorageHealthResponse_Sto
 		if !ok {
 			continue
 		}
-		out = append(out, storagev1.StorageHealthCondition{
+		condition := storagev1.StorageHealthCondition{
 			Status:  status,
 			Reason:  entry.GetReason(),
 			Message: entry.GetMessage(),
-		})
+		}
+		if capability := entry.GetVolumeCapability(); capability != nil {
+			accessMode, volumeMode, err := mapStorageHealthVolumeCapability(capability)
+			if err != nil {
+				return nil, fmt.Errorf("NodeGetStorageHealth condition %d has invalid volume capability: %w", i, err)
+			}
+			condition.AccessMode = &accessMode
+			condition.VolumeMode = &volumeMode
+		}
+		out = append(out, condition)
 	}
-	return out
+	return out, nil
+}
+
+func mapStorageHealthVolumeCapability(capability *csipbv1.VolumeCapability) (api.PersistentVolumeAccessMode, api.PersistentVolumeMode, error) {
+	var volumeMode api.PersistentVolumeMode
+	switch capability.GetAccessType().(type) {
+	case *csipbv1.VolumeCapability_Block:
+		volumeMode = api.PersistentVolumeBlock
+	case *csipbv1.VolumeCapability_Mount:
+		volumeMode = api.PersistentVolumeFilesystem
+	default:
+		return "", "", errors.New("access type is required")
+	}
+
+	if capability.GetAccessMode() == nil {
+		return "", "", errors.New("access mode is required")
+	}
+	var accessMode api.PersistentVolumeAccessMode
+	switch capability.GetAccessMode().GetMode() {
+	case csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+		csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
+		csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER:
+		accessMode = api.ReadWriteOnce
+	case csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER:
+		accessMode = api.ReadWriteOncePod
+	case csipbv1.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
+		accessMode = api.ReadOnlyMany
+	case csipbv1.VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER,
+		csipbv1.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER:
+		accessMode = api.ReadWriteMany
+	default:
+		return "", "", fmt.Errorf("unsupported access mode %q", capability.GetAccessMode().GetMode())
+	}
+	return accessMode, volumeMode, nil
 }
 
 func mapStorageHealthStatus(status csipbv1.StorageHealthErrorType) (storagev1.StorageHealthStatusType, bool) {

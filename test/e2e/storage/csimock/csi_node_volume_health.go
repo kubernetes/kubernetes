@@ -254,16 +254,19 @@ func podVolumeHealthMatches(pod *v1.Pod, abnormal bool) bool {
 }
 
 func csiNodeStorageHealthMatches(csiNode *storagev1.CSINode, driverName string, unhealthy bool) bool {
-	for _, condition := range csiNode.Status.StorageHealth {
-		if condition.Name != driverName {
+	for _, health := range csiNode.Status.StorageHealth {
+		if health.Name != driverName {
 			continue
 		}
 		if !unhealthy {
-			return false
+			return len(health.HealthConditions) == 0
 		}
-		if condition.Status == storagev1.StorageUnreachable && condition.Reason == "BackendUnavailable" {
-			return true
+		for _, condition := range health.HealthConditions {
+			if condition.Status == storagev1.StorageUnreachable && condition.Reason == "BackendUnavailable" {
+				return true
+			}
 		}
+		return false
 	}
 	return !unhealthy
 }

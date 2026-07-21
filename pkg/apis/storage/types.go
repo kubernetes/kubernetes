@@ -646,20 +646,17 @@ const (
 // StorageHealthCondition represents an adverse health condition reported
 // by a CSI driver for its storage backend on a node.
 type StorageHealthCondition struct {
-	// name is the CSI driver name, matching CSINodeDriver.name.
-	Name string
 	// status is the health status category.
 	// One of "StorageUnreachable", "StorageDegraded".
 	Status StorageHealthStatusType
 	// reason is a brief CamelCase machine-parseable reason.
-	// Together with name and status it forms the unique identity of a condition entry.
 	Reason string
 	// message is a human-readable description.
 	// +optional
 	Message string
-	// accessModes are the access modes affected. An empty list means all access modes are affected.
+	// accessMode is the access mode affected. Nil means all access modes are affected.
 	// +optional
-	AccessModes []api.PersistentVolumeAccessMode
+	AccessMode *api.PersistentVolumeAccessMode
 	// volumeMode is the volume mode affected. Nil means both are affected.
 	// +optional
 	VolumeMode *api.PersistentVolumeMode
@@ -668,17 +665,25 @@ type StorageHealthCondition struct {
 	LastTransitionTime metav1.Time
 }
 
+// StorageHealth contains storage backend health reported by a CSI driver on a node.
+type StorageHealth struct {
+	// name is the CSI driver name, matching CSINodeDriver.name.
+	Name string
+	// healthConditions are the adverse storage backend conditions reported by the CSI driver.
+	// At most 16 conditions may be reported.
+	// +optional
+	// +listType=atomic
+	HealthConditions []StorageHealthCondition
+}
+
 // CSINodeStatus contains health and status information for storage on a node.
 type CSINodeStatus struct {
-	// storageHealth is the set of backend health reports for
-	// each CSI driver registered on the node.
+	// storageHealth contains backend health reports for CSI drivers registered on the node.
 	// +optional
 	// +listType=map
 	// +listMapKey=name
-	// +listMapKey=status
-	// +listMapKey=reason
 	// +featureGate=CSIVolumeHealth
-	StorageHealth []StorageHealthCondition
+	StorageHealth []StorageHealth
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

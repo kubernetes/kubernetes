@@ -160,10 +160,6 @@ func (m *manager) probeStorageHealth(ctx context.Context) {
 			continue
 		}
 
-		for i := range backendHealth {
-			backendHealth[i].Name = driverName
-		}
-
 		gaugeKeys := make([]storageHealthKey, 0, len(backendHealth))
 		for _, c := range backendHealth {
 			gaugeKeys = append(gaugeKeys, storageHealthKey{status: string(c.Status), reason: c.Reason})

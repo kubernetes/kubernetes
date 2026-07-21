@@ -1231,27 +1231,33 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 	driver1 := "com.example.csi.driver1"
 	driver2 := "com.example.csi.driver2"
 	cond1 := storage.StorageHealthCondition{
-		Name:    driver1,
 		Status:  storage.StorageDegraded,
 		Reason:  "DiskSlow",
 		Message: "disk is slow",
 	}
 	cond1UpdatedMsg := storage.StorageHealthCondition{
-		Name:    driver1,
 		Status:  storage.StorageDegraded,
 		Reason:  "DiskSlow",
 		Message: "disk is still slow",
 	}
 	cond1New := storage.StorageHealthCondition{
-		Name:   driver1,
 		Status: storage.StorageUnreachable,
 		Reason: "NetworkDown",
 	}
 	cond2 := storage.StorageHealthCondition{
-		Name:   driver2,
 		Status: storage.StorageDegraded,
 		Reason: "OtherIssue",
 	}
+	cond1Block := cond1
+	cond1Block.AccessMode = ptr.To(v1.ReadWriteOnce)
+	cond1Block.VolumeMode = ptr.To(v1.PersistentVolumeBlock)
+	cond1Filesystem := cond1
+	cond1Filesystem.AccessMode = ptr.To(v1.ReadWriteOnce)
+	cond1Filesystem.VolumeMode = ptr.To(v1.PersistentVolumeFilesystem)
+	health1 := storage.StorageHealth{Name: driver1, HealthConditions: []storage.StorageHealthCondition{cond1}}
+	health1New := storage.StorageHealth{Name: driver1, HealthConditions: []storage.StorageHealthCondition{cond1New}}
+	health2 := storage.StorageHealth{Name: driver2, HealthConditions: []storage.StorageHealthCondition{cond2}}
+	health1Filesystem := storage.StorageHealth{Name: driver1, HealthConditions: []storage.StorageHealthCondition{cond1Filesystem}}
 
 	testcases := []struct {
 		name            string
@@ -1259,7 +1265,7 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 		existingCSINode *storage.CSINode
 		driverName      string
 		conditions      []storage.StorageHealthCondition
-		expectStatus    []storage.StorageHealthCondition
+		expectStatus    []storage.StorageHealth
 		expectUpdate    bool
 	}{
 		{
@@ -1283,7 +1289,7 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 			},
 			driverName:   driver1,
 			conditions:   []storage.StorageHealthCondition{cond1},
-			expectStatus: []storage.StorageHealthCondition{cond1},
+			expectStatus: []storage.StorageHealth{health1},
 			expectUpdate: true,
 		},
 		{
@@ -1295,11 +1301,11 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 					{Name: driver1, NodeID: "n1"},
 					{Name: driver2, NodeID: "n2"},
 				}},
-				Status: storage.CSINodeStatus{StorageHealth: []storage.StorageHealthCondition{cond2}},
+				Status: storage.CSINodeStatus{StorageHealth: []storage.StorageHealth{health2}},
 			},
 			driverName:   driver1,
 			conditions:   []storage.StorageHealthCondition{cond1},
-			expectStatus: []storage.StorageHealthCondition{cond2, cond1},
+			expectStatus: []storage.StorageHealth{health2, health1},
 			expectUpdate: true,
 		},
 		{
@@ -1308,11 +1314,11 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 			existingCSINode: &storage.CSINode{
 				ObjectMeta: getCSINodeObjectMeta(),
 				Spec:       storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{{Name: driver1, NodeID: "n1"}}},
-				Status:     storage.CSINodeStatus{StorageHealth: []storage.StorageHealthCondition{cond1}},
+				Status:     storage.CSINodeStatus{StorageHealth: []storage.StorageHealth{health1}},
 			},
 			driverName:   driver1,
 			conditions:   []storage.StorageHealthCondition{cond1New},
-			expectStatus: []storage.StorageHealthCondition{cond1New},
+			expectStatus: []storage.StorageHealth{health1New},
 			expectUpdate: true,
 		},
 		{
@@ -1324,11 +1330,11 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 					{Name: driver1, NodeID: "n1"},
 					{Name: driver2, NodeID: "n2"},
 				}},
-				Status: storage.CSINodeStatus{StorageHealth: []storage.StorageHealthCondition{cond1, cond2}},
+				Status: storage.CSINodeStatus{StorageHealth: []storage.StorageHealth{health1, health2}},
 			},
 			driverName:   driver1,
 			conditions:   []storage.StorageHealthCondition{cond1New},
-			expectStatus: []storage.StorageHealthCondition{cond2, cond1New},
+			expectStatus: []storage.StorageHealth{health2, health1New},
 			expectUpdate: true,
 		},
 		{
@@ -1337,12 +1343,44 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 			existingCSINode: &storage.CSINode{
 				ObjectMeta: getCSINodeObjectMeta(),
 				Spec:       storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{{Name: driver1, NodeID: "n1"}}},
-				Status:     storage.CSINodeStatus{StorageHealth: []storage.StorageHealthCondition{cond1}},
+				Status:     storage.CSINodeStatus{StorageHealth: []storage.StorageHealth{health1}},
 			},
 			driverName:   driver1,
 			conditions:   []storage.StorageHealthCondition{cond1UpdatedMsg},
-			expectStatus: []storage.StorageHealthCondition{cond1},
+			expectStatus: []storage.StorageHealth{health1},
 			expectUpdate: false,
+		},
+		{
+			name:           "capability change updates conditions",
+			featureEnabled: true,
+			existingCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{{Name: driver1, NodeID: "n1"}}},
+				Status: storage.CSINodeStatus{StorageHealth: []storage.StorageHealth{
+					{Name: driver1, HealthConditions: []storage.StorageHealthCondition{cond1Block}},
+				}},
+			},
+			driverName:   driver1,
+			conditions:   []storage.StorageHealthCondition{cond1Filesystem},
+			expectStatus: []storage.StorageHealth{health1Filesystem},
+			expectUpdate: true,
+		},
+		{
+			name:           "duplicate multiplicity change updates conditions",
+			featureEnabled: true,
+			existingCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{{Name: driver1, NodeID: "n1"}}},
+				Status: storage.CSINodeStatus{StorageHealth: []storage.StorageHealth{
+					{Name: driver1, HealthConditions: []storage.StorageHealthCondition{cond1, cond1, cond2}},
+				}},
+			},
+			driverName: driver1,
+			conditions: []storage.StorageHealthCondition{cond1, cond2, cond2},
+			expectStatus: []storage.StorageHealth{
+				{Name: driver1, HealthConditions: []storage.StorageHealthCondition{cond1, cond2, cond2}},
+			},
+			expectUpdate: true,
 		},
 		{
 			name:           "clear driver conditions",
@@ -1353,11 +1391,11 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 					{Name: driver1, NodeID: "n1"},
 					{Name: driver2, NodeID: "n2"},
 				}},
-				Status: storage.CSINodeStatus{StorageHealth: []storage.StorageHealthCondition{cond1, cond2}},
+				Status: storage.CSINodeStatus{StorageHealth: []storage.StorageHealth{health1, health2}},
 			},
 			driverName:   driver1,
 			conditions:   nil,
-			expectStatus: []storage.StorageHealthCondition{cond2},
+			expectStatus: []storage.StorageHealth{health2},
 			expectUpdate: true,
 		},
 	}
