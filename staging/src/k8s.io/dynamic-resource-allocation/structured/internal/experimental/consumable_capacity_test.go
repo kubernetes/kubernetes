@@ -149,6 +149,22 @@ func TestConsumableCapacity(t *testing.T) {
 		}
 	})
 
+	t.Run("resolve-qualified-name-uses-driver-domain", func(t *testing.T) {
+		g := NewWithT(t)
+		g.Expect(draapi.MakeFullyQualifiedName("memory", driverA).String()).To(Equal(driverA + "/memory"))
+		g.Expect(draapi.MakeFullyQualifiedName(resourceapi.QualifiedName(driverA+"/memory"), driverA).String()).To(Equal(driverA + "/memory"))
+	})
+
+	t.Run("lookup-qualified-name-uses-driver-domain", func(t *testing.T) {
+		g := NewWithT(t)
+		candidates := map[resourceapi.QualifiedName]resource.Quantity{
+			"memory": one,
+		}
+		match, found := draapi.LookupByQualifiedName(candidates, resourceapi.QualifiedName(driverA+"/memory"), driverA)
+		g.Expect(found).To(BeTrueBecause("expected %q to match driver-domain qualified capacity name", driverA+"/memory"))
+		g.Expect(match.Cmp(one)).To(BeZero())
+	})
+
 	t.Run("violate-capacity-sharing", testViolateCapacityRequestPolicy)
 
 	t.Run("calculate-consumed-capacity", testCalculateConsumedCapacity)
