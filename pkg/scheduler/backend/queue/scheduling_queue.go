@@ -439,13 +439,13 @@ func NewPriorityQueue(
 	isCompositePodGroupEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup)
 	lessConverted := convertLessFn(lessFn)
 
-	backoffQ := newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessConverted, isPopFromBackoffQEnabled)
+	backoffQ := newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessConverted, isPopFromBackoffQEnabled, options.metricsRecorder)
 	pq := &PriorityQueue{
 		clock:                             options.clock,
 		stop:                              make(chan struct{}),
 		podMaxInUnschedulablePodsDuration: options.podMaxInUnschedulablePodsDuration,
 		backoffQ:                          backoffQ,
-		unschedulableEntities:             newUnschedulableEntities(metrics.NewUnschedulableEntitiesRecorder(), metrics.NewGatedEntitiesRecorder()),
+		unschedulableEntities:             newUnschedulableEntities(metrics.NewUnschedulableEntitiesRecorder(), metrics.NewGatedEntitiesRecorder(), options.metricsRecorder),
 		pendingPodGroupPods:               newPodGroupMemberPods(metrics.PendingPodGroupPods()),
 		incompletePodGroupPods:            newPodGroupMemberPods(metrics.IncompletePodGroupPods()),
 		workloadForest:                    newWorkloadForest(isCompositePodGroupEnabled),

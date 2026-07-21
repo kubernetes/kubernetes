@@ -5118,16 +5118,31 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="pod"} 1
 			`,
 		},
+		{
+			name: "add individual pod to unschedulable queue",
+			run: func(_ ktesting.TContext, queue *PriorityQueue) {
+				queue.unschedulableEntities.addOrUpdate(pInfos[0], false, framework.EventUnscheduledPodAdd.Label(), nil)
+			},
+			want: `
+				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="unschedulable",type="pod"} 1
+			`,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			metrics.SchedulerQueueIncomingEntities.Reset()
-			recorder := metrics.NewMetricsAsyncRecorder(10, 20*time.Microsecond, tCtx.Done())
+			stopCh := make(chan struct{})
+			recorder := metrics.NewMetricsAsyncRecorder(10, time.Millisecond, stopCh)
+			close(stopCh)
+			<-recorder.IsStoppedCh
 			queue := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)), WithMetricsRecorder(recorder))
 			queue.AddPodGroup(logger, st.MakePodGroup().Name("pg-1").Namespace("ns-pg").Obj())
 			test.run(tCtx, queue)
+			if err := testutil.CollectAndCompare(metrics.SchedulerQueueIncomingEntities, strings.NewReader(queueIncomingEntitiesMetricMetadata), metricName); err != nil {
+				t.Errorf("incoming entity metrics were recorded synchronously:\n%s", err)
+			}
 			recorder.FlushMetrics()
 			if err := testutil.CollectAndCompare(metrics.SchedulerQueueIncomingEntities, strings.NewReader(queueIncomingEntitiesMetricMetadata+test.want), metricName); err != nil {
 				t.Errorf("unexpected collecting result:\n%s", err)
