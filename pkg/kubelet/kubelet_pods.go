@@ -2467,10 +2467,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 					resources.Limits[v1.ResourceCPU] = cStatus.Resources.CPULimit.DeepCopy()
 				}
 			} else {
-				// To support InPlacePodVerticalScaling of container with exclusive CPUs,
-				// CPULimit and CPURequests must not be set independently, otherwise the resize operation fails.
-				// for that case, and for those containers we update CPULimit equal to CPURequests,
-				// when CPURequest changes.
+				// CPU quota is disabled for containers with exclusive CPUs.
+				// Default the CPU limit to match the request, as it must for exclusive CPU allocation.
 				if kl.containerManager.ContainerHasExclusiveCPUs(logger, pod, allocatedContainer) {
 					resources.Limits[v1.ResourceCPU] = resources.Requests[v1.ResourceCPU].DeepCopy()
 				} else {
