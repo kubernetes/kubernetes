@@ -220,10 +220,18 @@ func (x *ListPodResourcesResponse) GetPodResources() []*PodResources {
 
 // PodResources contains information about the node resources assigned to a pod
 type PodResources struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Namespace     string                 `protobuf:"bytes,2,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	Containers    []*ContainerResources  `protobuf:"bytes,3,rep,name=containers,proto3" json:"containers,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Name       string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Namespace  string                 `protobuf:"bytes,2,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Containers []*ContainerResources  `protobuf:"bytes,3,rep,name=containers,proto3" json:"containers,omitempty"`
+	// List of exclusive CPU ids allocated at the pod level. Populated only when
+	// the pod has a pod-level exclusive allocation. CPUs exclusively assigned
+	// to individual containers within the pod are also included here, so
+	// pod-level and container-level cpu_ids intentionally overlap.
+	CpuIds []int64 `protobuf:"varint,4,rep,packed,name=cpu_ids,json=cpuIds,proto3" json:"cpu_ids,omitempty"`
+	// List of memory blocks allocated at the pod level, following the same
+	// population and overlap semantics as cpu_ids.
+	Memory        []*ContainerMemory `protobuf:"bytes,5,rep,name=memory,proto3" json:"memory,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -275,6 +283,20 @@ func (x *PodResources) GetNamespace() string {
 func (x *PodResources) GetContainers() []*ContainerResources {
 	if x != nil {
 		return x.Containers
+	}
+	return nil
+}
+
+func (x *PodResources) GetCpuIds() []int64 {
+	if x != nil {
+		return x.CpuIds
+	}
+	return nil
+}
+
+func (x *PodResources) GetMemory() []*ContainerMemory {
+	if x != nil {
+		return x.Memory
 	}
 	return nil
 }
@@ -356,7 +378,7 @@ func (x *ContainerResources) GetDynamicResources() []*DynamicResource {
 	return nil
 }
 
-// ContainerMemory contains information about memory and hugepages assigned to a container
+// ContainerMemory contains information about memory and hugepages assigned to a pod / container
 type ContainerMemory struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	MemoryType    string                 `protobuf:"bytes,1,opt,name=memory_type,json=memoryType,proto3" json:"memory_type,omitempty"`
@@ -870,13 +892,15 @@ const file_staging_src_k8s_io_kubelet_pkg_apis_podresources_v1_api_proto_rawDesc
 	"\x06memory\x18\x03 \x03(\v2\x13.v1.ContainerMemoryR\x06memory\"\x19\n" +
 	"\x17ListPodResourcesRequest\"Q\n" +
 	"\x18ListPodResourcesResponse\x125\n" +
-	"\rpod_resources\x18\x01 \x03(\v2\x10.v1.PodResourcesR\fpodResources\"x\n" +
+	"\rpod_resources\x18\x01 \x03(\v2\x10.v1.PodResourcesR\fpodResources\"\xbe\x01\n" +
 	"\fPodResources\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1c\n" +
 	"\tnamespace\x18\x02 \x01(\tR\tnamespace\x126\n" +
 	"\n" +
 	"containers\x18\x03 \x03(\v2\x16.v1.ContainerResourcesR\n" +
-	"containers\"\xe0\x01\n" +
+	"containers\x12\x17\n" +
+	"\acpu_ids\x18\x04 \x03(\x03R\x06cpuIds\x12+\n" +
+	"\x06memory\x18\x05 \x03(\v2\x13.v1.ContainerMemoryR\x06memory\"\xe0\x01\n" +
 	"\x12ContainerResources\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12.\n" +
 	"\adevices\x18\x02 \x03(\v2\x14.v1.ContainerDevicesR\adevices\x12\x17\n" +
@@ -959,26 +983,27 @@ var file_staging_src_k8s_io_kubelet_pkg_apis_podresources_v1_api_proto_depIdxs =
 	6,  // 1: v1.AllocatableResourcesResponse.memory:type_name -> v1.ContainerMemory
 	4,  // 2: v1.ListPodResourcesResponse.pod_resources:type_name -> v1.PodResources
 	5,  // 3: v1.PodResources.containers:type_name -> v1.ContainerResources
-	7,  // 4: v1.ContainerResources.devices:type_name -> v1.ContainerDevices
-	6,  // 5: v1.ContainerResources.memory:type_name -> v1.ContainerMemory
-	10, // 6: v1.ContainerResources.dynamic_resources:type_name -> v1.DynamicResource
-	8,  // 7: v1.ContainerMemory.topology:type_name -> v1.TopologyInfo
-	8,  // 8: v1.ContainerDevices.topology:type_name -> v1.TopologyInfo
-	9,  // 9: v1.TopologyInfo.nodes:type_name -> v1.NUMANode
-	11, // 10: v1.DynamicResource.claim_resources:type_name -> v1.ClaimResource
-	12, // 11: v1.ClaimResource.cdi_devices:type_name -> v1.CDIDevice
-	4,  // 12: v1.GetPodResourcesResponse.pod_resources:type_name -> v1.PodResources
-	2,  // 13: v1.PodResourcesLister.List:input_type -> v1.ListPodResourcesRequest
-	0,  // 14: v1.PodResourcesLister.GetAllocatableResources:input_type -> v1.AllocatableResourcesRequest
-	13, // 15: v1.PodResourcesLister.Get:input_type -> v1.GetPodResourcesRequest
-	3,  // 16: v1.PodResourcesLister.List:output_type -> v1.ListPodResourcesResponse
-	1,  // 17: v1.PodResourcesLister.GetAllocatableResources:output_type -> v1.AllocatableResourcesResponse
-	14, // 18: v1.PodResourcesLister.Get:output_type -> v1.GetPodResourcesResponse
-	16, // [16:19] is the sub-list for method output_type
-	13, // [13:16] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	6,  // 4: v1.PodResources.memory:type_name -> v1.ContainerMemory
+	7,  // 5: v1.ContainerResources.devices:type_name -> v1.ContainerDevices
+	6,  // 6: v1.ContainerResources.memory:type_name -> v1.ContainerMemory
+	10, // 7: v1.ContainerResources.dynamic_resources:type_name -> v1.DynamicResource
+	8,  // 8: v1.ContainerMemory.topology:type_name -> v1.TopologyInfo
+	8,  // 9: v1.ContainerDevices.topology:type_name -> v1.TopologyInfo
+	9,  // 10: v1.TopologyInfo.nodes:type_name -> v1.NUMANode
+	11, // 11: v1.DynamicResource.claim_resources:type_name -> v1.ClaimResource
+	12, // 12: v1.ClaimResource.cdi_devices:type_name -> v1.CDIDevice
+	4,  // 13: v1.GetPodResourcesResponse.pod_resources:type_name -> v1.PodResources
+	2,  // 14: v1.PodResourcesLister.List:input_type -> v1.ListPodResourcesRequest
+	0,  // 15: v1.PodResourcesLister.GetAllocatableResources:input_type -> v1.AllocatableResourcesRequest
+	13, // 16: v1.PodResourcesLister.Get:input_type -> v1.GetPodResourcesRequest
+	3,  // 17: v1.PodResourcesLister.List:output_type -> v1.ListPodResourcesResponse
+	1,  // 18: v1.PodResourcesLister.GetAllocatableResources:output_type -> v1.AllocatableResourcesResponse
+	14, // 19: v1.PodResourcesLister.Get:output_type -> v1.GetPodResourcesResponse
+	17, // [17:20] is the sub-list for method output_type
+	14, // [14:17] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_staging_src_k8s_io_kubelet_pkg_apis_podresources_v1_api_proto_init() }

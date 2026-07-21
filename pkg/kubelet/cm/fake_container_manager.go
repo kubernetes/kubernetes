@@ -229,10 +229,17 @@ func (cm *FakeContainerManager) UpdateAllocatedDevices(_ klog.Logger) {
 	return
 }
 
-func (cm *FakeContainerManager) GetCPUs(_, _ string) []int64 {
+func (cm *FakeContainerManager) GetCPUs(pod *v1.Pod, container *v1.Container) []int64 {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetCPUs")
+	return nil
+}
+
+func (cm *FakeContainerManager) GetPodCPUs(_ string) []int64 {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetPodCPUs")
 	return nil
 }
 
@@ -242,10 +249,17 @@ func (cm *FakeContainerManager) GetAllocatableCPUs() []int64 {
 	return nil
 }
 
-func (cm *FakeContainerManager) GetMemory(_ klog.Logger, _, _ string) []*podresourcesapi.ContainerMemory {
+func (cm *FakeContainerManager) GetMemory(_ klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.ContainerMemory {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetMemory")
+	return nil
+}
+
+func (cm *FakeContainerManager) GetPodMemory(_ klog.Logger, _ string) []*podresourcesapi.ContainerMemory {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetPodMemory")
 	return nil
 }
 
