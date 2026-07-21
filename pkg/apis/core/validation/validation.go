@@ -7577,7 +7577,7 @@ func validateResourceName(value core.ResourceName, fldPath *field.Path) field.Er
 
 // Validate container resource name
 // Refer to docs/design/resources.md for more details.
-func validateContainerResourceName(value core.ResourceName, fldPath *field.Path) field.ErrorList {
+func ValidateContainerResourceName(value core.ResourceName, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
 
 	if len(strings.Split(string(value), "/")) == 1 {
@@ -7645,7 +7645,7 @@ func validateLimitRangeTypeName(value core.LimitType, fldPath *field.Path) field
 func validateLimitRangeResourceName(limitType core.LimitType, value core.ResourceName, fldPath *field.Path) field.ErrorList {
 	switch limitType {
 	case core.LimitTypePod, core.LimitTypeContainer:
-		return validateContainerResourceName(value, fldPath)
+		return ValidateContainerResourceName(value, fldPath)
 	default:
 		return validateResourceName(value, fldPath)
 	}
@@ -7960,7 +7960,7 @@ func validatePodResourceRequirements(requirements *core.ResourceRequirements, po
 }
 
 func ValidateContainerResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
-	return validateResourceRequirements(requirements, validateContainerResourceName, podClaimNames, fldPath, opts)
+	return validateResourceRequirements(requirements, ValidateContainerResourceName, podClaimNames, fldPath, opts)
 }
 
 // Validates resource requirement spec.
