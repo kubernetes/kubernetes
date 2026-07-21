@@ -378,6 +378,7 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 	// Start with a fresh set that matches the current known state of the
 	// world according to the informers.
 	enabledConsumableCapacity := utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)
+	enabledSharedConsumableCapacity := utilfeature.DefaultFeatureGate.Enabled(features.DRASharedConsumableCapacity)
 
 	allocated, revision1 := c.allocatedDevices.get()
 	allocatedShares, revision2 := c.allocatedDevices.getSharedDeviceIDs()
@@ -385,8 +386,12 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 	if err != nil {
 		return nil, err
 	}
+	counterSnapshots, revision4 := c.allocatedDevices.getCounters()
+	if !enabledSharedConsumableCapacity {
+		counterSnapshots = nil
+	}
 
-	if revision1 != revision2 || revision2 != revision3 {
+	if revision1 != revision2 || revision2 != revision3 || revision3 != revision4 {
 		// Already not consistent. Try again.
 		return nil, errClaimTrackerConcurrentModification
 	}
@@ -422,6 +427,16 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 		return result.ShareID != nil && allocatedShares.Has(structured.MakeSharedDeviceID(id, result.ShareID))
 	}
 
+	var inFlightIDs sets.Set[structured.SharedDeviceID]
+	var counterCallback func(structured.SharedDeviceID, []resourceapi.CounterSetConsumption)
+	if enabledSharedConsumableCapacity {
+		inFlightIDs = sets.New[structured.SharedDeviceID]()
+		counterCallback = func(id structured.SharedDeviceID, _ []resourceapi.CounterSetConsumption) {
+			// The shared helper adds in-flight snapshots; omit their cached versions.
+			inFlightIDs.Insert(id)
+		}
+	}
+
 	// Whatever is in flight also has to be checked.
 	var inFlightErr error
 	structured.AddToAllocatedState(state,
@@ -438,15 +453,28 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 					filtered.Devices.Results = slices.DeleteFunc(slices.Clone(allocation.Devices.Results), isCachedShare)
 					allocation = &filtered
 				}
+				foreachConsumedCounters(allocation, counterCallback)
 				if !yield(allocation) {
 					return
 				}
 			}
 		},
-		structured.Features{ConsumableCapacity: enabledConsumableCapacity},
+		structured.Features{
+			ConsumableCapacity:       enabledConsumableCapacity,
+			SharedConsumableCapacity: enabledSharedConsumableCapacity,
+		},
 	)
 	if inFlightErr != nil {
 		return nil, inFlightErr
+	}
+	for id, snapshot := range counterSnapshots {
+		if inFlightIDs.Has(id) {
+			continue
+		}
+		if state.ConsumedCounters == nil {
+			state.ConsumedCounters = make(schedulerapi.CounterConsumptionByDevice)
+		}
+		state.ConsumedCounters.Add(id.GetDeviceID(), snapshot)
 	}
 	if revision1 == c.allocatedDevices.getRevision() {
 		// Our current result is valid, nothing changed in the meantime.

@@ -1377,6 +1377,186 @@ func testConsumedCapacityPreBindHandoff(tCtx ktesting.TContext) {
 	require.True(tCtx, status.IsSuccess(), "the persisted allocation remains counted once after cleanup: %v", status)
 }
 
+// TestSharedCounterPreBindHandoff checks that capacity and counter consumption
+// remain counted once while an allocation moves from pending to persisted and
+// PreBind finally removes its pending copy.
+func TestSharedCounterPreBindHandoff(t *testing.T) {
+	testSharedCounterPreBindHandoff(ktesting.Init(t))
+}
+
+func testSharedCounterPreBindHandoff(tCtx ktesting.TContext) {
+	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.DRAPartitionableDevices:     true,
+		features.DRAConsumableCapacity:       true,
+		features.DRASharedConsumableCapacity: true,
+	})
+	claim := pendingClaim.DeepCopy()
+	claim.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]apiresource.Quantity{
+			"shares":    apiresource.MustParse("2"),
+			"bandwidth": apiresource.MustParse("3"),
+		},
+	}
+	deviceSlice := workerNodeSliceWithShares.DeepCopy()
+	deviceSlice.Spec.Pool.ResourceSliceCount = 2
+	deviceSlice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{{
+		CounterSet: "shared",
+		Counters: map[string]resourceapi.CounterRequirement{
+			"bandwidth": {ValueFrom: &resourceapi.CounterValueFrom{CapacityName: "bandwidth"}},
+		},
+	}}
+	counterSlice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "counter-slice", UID: "counter-slice-uid", ResourceVersion: "1"},
+		Spec: resourceapi.ResourceSliceSpec{
+			Driver: driver, NodeName: &nodeName, Pool: deviceSlice.Spec.Pool,
+			SharedCounters: []resourceapi.CounterSet{{
+				Name: "shared", Counters: map[string]resourceapi.Counter{"bandwidth": {Value: apiresource.MustParse("6")}},
+			}},
+		},
+	}
+	tc := setup(tCtx, nil, []*v1.Node{workerNode}, []*resourceapi.ResourceClaim{claim}, []*resourceapi.DeviceClass{deviceClass}, nil, []apiruntime.Object{deviceSlice, counterSlice}, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate), false, nil)
+	checkConsumption := func(stage string) {
+		tCtx.Helper()
+		allocated, err := tc.draManager.ResourceClaims().GatherAllocatedState()
+		require.NoError(tCtx, err)
+		deviceID := structured.MakeDeviceID(driver, deviceSlice.Spec.Pool.Name, "instance-1")
+		require.Len(tCtx, allocated.AggregatedCapacity, 1, stage)
+		capacity := allocated.AggregatedCapacity[deviceID][draapi.MakeFullyQualifiedName("shares", deviceID.Driver, draapi.MakeUniqueString)]
+		require.NotNil(tCtx, capacity, stage)
+		require.Equal(tCtx, "2", capacity.String(), stage)
+		require.Equal(tCtx, schedulerapi.CounterConsumptionByDevice{
+			deviceID: {{
+				{CounterSet: "shared", Counters: map[string]apiresource.Quantity{"bandwidth": apiresource.MustParse("3")}},
+			}},
+		}, allocated.ConsumedCounters, stage)
+	}
+	cycle := framework.NewCycleState()
+	_, status := tc.p.PreFilter(tCtx, cycle, podWithClaimName, tc.nodeInfos)
+	require.True(tCtx, status.IsSuccess(), "PreFilter: %v", status)
+	require.True(tCtx, tc.p.Filter(tCtx, cycle, podWithClaimName, tc.nodeInfos[0]).IsSuccess())
+	require.True(tCtx, tc.p.Reserve(tCtx, cycle, podWithClaimName, nodeName).IsSuccess())
+	checkConsumption("pending")
+	state, err := getStateData(cycle)
+	require.NoError(tCtx, err)
+	persisted, cleanup, err := tc.p.bindClaim(tCtx, state, 0, podWithClaimName, nodeName)
+	require.NoError(tCtx, err)
+	require.NotNil(tCtx, persisted.Status.Allocation)
+	require.NotNil(tCtx, cleanup)
+	checkConsumption("persisted but still pending")
+	cleanup()
+	checkConsumption("after cleanup")
+}
+
+// TestResourceSliceUpdatePreservesSharedCounterAllocation verifies that slice
+// updates do not resize or revoke existing allocations. A saved charge of 7
+// and a new request for 4 initially fit a budget of 12. Reducing the budget to 6
+// and removing the allocated device must preserve the existing allocation and
+// its recorded charge, blocking the new request. Releasing that allocation
+// must then allow the new request.
+func TestResourceSliceUpdatePreservesSharedCounterAllocation(t *testing.T) {
+	testResourceSliceUpdatePreservesSharedCounterAllocation(ktesting.Init(t))
+}
+
+func testResourceSliceUpdatePreservesSharedCounterAllocation(tCtx ktesting.TContext) {
+	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.DRAPartitionableDevices:     true,
+		features.DRAConsumableCapacity:       true,
+		features.DRASharedConsumableCapacity: true,
+	})
+	allocated := pendingClaim.DeepCopy()
+	allocated.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]apiresource.Quantity{"bandwidth": apiresource.MustParse("7")},
+	}
+	allocated.Status.Allocation = allocationResult.DeepCopy()
+	allocated.Status.Allocation.Devices.Results[0].ConsumedCounters = []resourceapi.CounterSetConsumption{{
+		CounterSet: "shared", Counters: map[string]apiresource.Quantity{"bandwidth": apiresource.MustParse("7")},
+	}}
+	allocated = addAllocationTimestamp(allocated)
+	candidate := pendingClaim2.DeepCopy()
+	candidate.Spec.Devices.Requests[0].Exactly.Capacity = &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]apiresource.Quantity{"bandwidth": apiresource.MustParse("4")},
+	}
+	pool := resourceapi.ResourcePool{Name: nodeName, Generation: 1, ResourceSliceCount: 2}
+	counterSlice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "counter-slice", UID: "counter-slice-uid", ResourceVersion: "1"},
+		Spec: resourceapi.ResourceSliceSpec{Driver: driver, NodeName: &nodeName, Pool: pool,
+			SharedCounters: []resourceapi.CounterSet{{Name: "shared", Counters: map[string]resourceapi.Counter{"bandwidth": {Value: apiresource.MustParse("12")}}}},
+		},
+	}
+	deviceSlice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "device-slice", UID: "device-slice-uid", ResourceVersion: "1"},
+		Spec:       resourceapi.ResourceSliceSpec{Driver: driver, NodeName: &nodeName, Pool: pool},
+	}
+	for _, name := range []string{"instance-1", "instance-2"} {
+		deviceSlice.Spec.Devices = append(deviceSlice.Spec.Devices, resourceapi.Device{
+			Name: name,
+			ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
+				CounterSet: "shared",
+				Counters: map[string]resourceapi.CounterRequirement{"bandwidth": {
+					ValueFrom: &resourceapi.CounterValueFrom{CapacityName: "bandwidth"},
+				}},
+			}},
+		})
+	}
+	feats := feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate)
+	testCtx := setup(tCtx, nil, []*v1.Node{workerNode}, []*resourceapi.ResourceClaim{allocated, candidate}, []*resourceapi.DeviceClass{deviceClass}, nil, []apiruntime.Object{counterSlice, deviceSlice}, feats, false, nil)
+	candidatePod := podWithClaimName.DeepCopy()
+	candidatePod.Spec.ResourceClaims[0].ResourceClaimName = &claimName2
+	filter := func(pod *v1.Pod) (fwk.CycleState, *fwk.Status) {
+		state := framework.NewCycleState()
+		_, status := testCtx.p.PreFilter(tCtx, state, pod, testCtx.nodeInfos)
+		require.True(tCtx, status.IsSuccess(), "PreFilter: %v", status)
+		return state, testCtx.p.Filter(tCtx, state, pod, testCtx.nodeInfos[0])
+	}
+	_, status := filter(candidatePod)
+	require.True(tCtx, status.IsSuccess(), "the new request fits the original budget: %v", status)
+
+	counterSlice = counterSlice.DeepCopy()
+	deviceSlice = deviceSlice.DeepCopy()
+	counterSlice.Spec.Pool.Generation++
+	deviceSlice.Spec.Pool.Generation++
+	counterSlice.Spec.SharedCounters[0].Counters["bandwidth"] = resourceapi.Counter{Value: apiresource.MustParse("6")}
+	deviceSlice.Spec.Devices = deviceSlice.Spec.Devices[1:]
+	var err error
+	counterSlice, err = testCtx.client.ResourceV1().ResourceSlices().Update(tCtx, counterSlice, metav1.UpdateOptions{})
+	require.NoError(tCtx, err)
+	_, err = testCtx.client.ResourceV1().ResourceSlices().Update(tCtx, deviceSlice, metav1.UpdateOptions{})
+	require.NoError(tCtx, err)
+	require.NoError(tCtx, wait.PollUntilContextTimeout(tCtx, time.Millisecond, 10*time.Second, true, func(context.Context) (bool, error) {
+		sliceList, err := testCtx.draManager.ResourceSlices().ListWithDeviceTaintRules()
+		if err != nil {
+			return false, err
+		}
+		for _, slice := range sliceList {
+			if slice.Spec.Pool.Generation != counterSlice.Spec.Pool.Generation {
+				return false, nil
+			}
+		}
+		return len(sliceList) == 2, nil
+	}))
+
+	state, status := filter(podWithClaimName)
+	require.True(tCtx, status.IsSuccess(), "the allocated claim remains usable after the slice update: %v", status)
+	require.True(tCtx, testCtx.p.Reserve(tCtx, state, podWithClaimName, nodeName).IsSuccess())
+	require.True(tCtx, testCtx.p.PreBind(tCtx, state, podWithClaimName, nodeName).IsSuccess())
+	unchanged, err := testCtx.client.ResourceV1().ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
+	require.NoError(tCtx, err)
+	require.Equal(tCtx, allocated.Status.Allocation, unchanged.Status.Allocation, "slice updates must not resize or revoke the existing allocation")
+	_, status = filter(candidatePod)
+	require.True(tCtx, status.IsRejected(), "the saved charge of 7 exceeds the new budget of 6, including after its device disappears: %v", status)
+
+	// Releasing the old allocation frees its saved charge; slice updates alone did not.
+	released, err := testCtx.client.ResourceV1().ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
+	require.NoError(tCtx, err)
+	released.Status.Allocation = nil
+	released.Status.ReservedFor = nil
+	released, err = testCtx.client.ResourceV1().ResourceClaims(namespace).UpdateStatus(tCtx, released, metav1.UpdateOptions{})
+	require.NoError(tCtx, err)
+	require.NoError(tCtx, testCtx.draManager.ResourceClaims().AssumeClaimAfterAPICall(released))
+	_, status = filter(candidatePod)
+	require.True(tCtx, status.IsSuccess(), "the new request fits the reduced budget after release: %v", status)
+}
+
 func TestPlugin(t *testing.T) {
 	testPlugin(ktesting.Init(t))
 }
@@ -5526,7 +5706,7 @@ func TestAllocatorSelection(t *testing.T) {
 		"alpha": {
 			features:             "AllAlpha=true,AllBeta=true",
 			usingFeatureGroup:    true,
-			expectImplementation: "incubating", // This needs to become "experimental" again when adding a new alpha feature.
+			expectImplementation: "experimental",
 		},
 
 		// Let's also determine which allocator is picked for each of the
@@ -5576,6 +5756,10 @@ func TestAllocatorSelection(t *testing.T) {
 		"DerivedAttributes": {
 			features:             "AllAlpha=false,AllBeta=false,DRADerivedAttributes=true",
 			expectImplementation: "incubating",
+		},
+		"SharedConsumableCapacity": {
+			features:             "AllAlpha=false,AllBeta=false,DRAConsumableCapacity=true,DRAPartitionableDevices=true,DRASharedConsumableCapacity=true",
+			expectImplementation: "experimental",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

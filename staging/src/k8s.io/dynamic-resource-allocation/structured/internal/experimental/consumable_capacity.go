@@ -179,10 +179,21 @@ func resolveCapacityRequests(deviceRequestCapacity *resourceapi.CapacityRequirem
 	}
 	resolved := make(map[draapi.FullyQualifiedName]resource.Quantity, len(deviceRequestCapacity.Requests))
 	missing := false
+	counterRequests := make(map[draapi.FullyQualifiedName]struct{})
 	for reqName, reqVal := range deviceRequestCapacity.Requests {
 		key := draapi.MakeFullyQualifiedName(reqName, device.id.Driver, device.slice.LookupUniqueString)
 		_, ok := device.Capacity.Lookup(key)
 		if !ok {
+			if deviceConsumesCapacityName(device, reqName) {
+				// Satisfied by counters, not by a per-device capacity.
+				// Different spellings of the same name are ambiguous.
+				name := draapi.MakeFullyQualifiedName(reqName, device.id.Driver, draapi.MakeUniqueString)
+				if _, alreadySeen := counterRequests[name]; alreadySeen {
+					return nil, false, fmt.Errorf("capacity %q requested both with and without the driver domain", name.Identifier)
+				}
+				counterRequests[name] = struct{}{}
+				continue
+			}
 			// Keep going so that a conflict is an error regardless of map order.
 			missing = true
 			continue
@@ -205,40 +216,72 @@ func resolveCapacityRequests(deviceRequestCapacity *resourceapi.CapacityRequirem
 	return resolved, true, nil
 }
 
+// deviceConsumesCapacityName reports whether a counter of the device
+// takes its value from the given capacity name.
+func deviceConsumesCapacityName(device deviceWithID, name resourceapi.QualifiedName) bool {
+	fullName := draapi.MakeFullyQualifiedName(name, device.id.Driver, draapi.MakeUniqueString)
+	for _, consumption := range device.ConsumesCounters {
+		for _, counter := range consumption.Counters {
+			if counter.ValueFrom != nil && draapi.MakeFullyQualifiedName(counter.ValueFrom.CapacityName, device.id.Driver, draapi.MakeUniqueString) == fullName {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // calculateConsumedCapacity returns valid capacity to be consumed regarding the requested capacity and device capacity policy.
 //
 // If no requestPolicy, return capacity.Value.
-// If no requestVal, fill the quantity by fillEmptyRequest function
+// If no requestVal, fill the quantity by fillEmptyRequestQuantity.
 // Otherwise, use requestPolicy to calculate the consumed capacity from request if applicable.
 func calculateConsumedCapacity(requestedVal *resource.Quantity, capacity *draapi.DeviceCapacity, fractionalCapacityRange bool) (resource.Quantity, error) {
+	return calculateConsumedQuantity(requestedVal, capacity.Value, capacity.RequestPolicy, fractionalCapacityRange)
+}
+
+// ResolveCounterConsumption provides the implementation of the externally-usable
+// ResolveCounterConsumption in k8s.io/dynamic-resource-allocation/structured.
+func ResolveCounterConsumption(requestedValue *resource.Quantity, counter resourceapi.Counter, fractionalCapacityRange bool) (resource.Quantity, bool, error) {
+	quantity, err := calculateConsumedQuantity(requestedValue, counter.Value, counter.ConsumptionPolicy, fractionalCapacityRange)
+	if err != nil {
+		return resource.Quantity{}, false, err
+	}
+	if quantity.Sign() < 0 {
+		return resource.Quantity{}, false, errNegativeCapacity
+	}
+	return quantity, !violatesPolicy(quantity, counter.ConsumptionPolicy, fractionalCapacityRange), nil
+}
+
+// calculateConsumedQuantity returns valid consumed amount for a request,
+// according to the advertised quantity and optional request policy.
+func calculateConsumedQuantity(requestedVal *resource.Quantity, total resource.Quantity, requestPolicy *resourceapi.CapacityRequestPolicy, fractionalCapacityRange bool) (resource.Quantity, error) {
 	if requestedVal == nil {
-		return fillEmptyRequest(capacity), nil
+		return fillEmptyRequestQuantity(total, requestPolicy), nil
 	}
 	// Must be checked before rounding: the request policy can round a negative
 	// request up to a valid value, which would hide it from the caller's check.
 	if requestedVal.Sign() < 0 {
 		return resource.Quantity{}, fmt.Errorf("%w: request %s", errNegativeCapacity, requestedVal.String())
 	}
-	if capacity.RequestPolicy == nil {
+	if requestPolicy == nil {
 		return *requestedVal, nil
 	}
 	switch {
-	case capacity.RequestPolicy.ValidRange != nil && capacity.RequestPolicy.ValidRange.Min != nil:
-		return roundUpRange(requestedVal, capacity.RequestPolicy.ValidRange, fractionalCapacityRange)
-	case capacity.RequestPolicy.ValidValues != nil:
-		return roundUpValidValues(requestedVal, capacity.RequestPolicy.ValidValues), nil
+	case requestPolicy.ValidRange != nil && requestPolicy.ValidRange.Min != nil:
+		return roundUpRange(requestedVal, requestPolicy.ValidRange, fractionalCapacityRange)
+	case requestPolicy.ValidValues != nil:
+		return roundUpValidValues(requestedVal, requestPolicy.ValidValues), nil
 	}
 	return *requestedVal, nil
 }
 
-// fillEmptyRequest
-// return requestPolicy.default if defined.
-// Otherwise, return capacity value.
-func fillEmptyRequest(capacity *draapi.DeviceCapacity) resource.Quantity {
-	if capacity.RequestPolicy != nil && capacity.RequestPolicy.Default != nil {
-		return *capacity.RequestPolicy.Default
+// fillEmptyRequestQuantity returns the default request quantity if defined,
+// otherwise it returns the full advertised quantity.
+func fillEmptyRequestQuantity(total resource.Quantity, requestPolicy *resourceapi.CapacityRequestPolicy) resource.Quantity {
+	if requestPolicy != nil && requestPolicy.Default != nil {
+		return *requestPolicy.Default
 	}
-	return capacity.Value
+	return total
 }
 
 // roundUpRange rounds the requestedVal up to fit within the specified validRange.

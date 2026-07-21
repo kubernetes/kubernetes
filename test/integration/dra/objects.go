@@ -114,11 +114,11 @@ func newResourceSliceWithTaintsAndConsumesCounters() *resourceapi.ResourceSlice 
 			for i := range resourceapi.ResourceSliceMaxDeviceCounterConsumptionsPerDevice {
 				consumesCounters = append(consumesCounters, resourceapi.DeviceCounterConsumption{
 					CounterSet: maxDNSLabel(i),
-					Counters: func() map[string]resourceapi.Counter {
-						counters := make(map[string]resourceapi.Counter)
+					Counters: func() map[string]resourceapi.CounterRequirement {
+						counters := make(map[string]resourceapi.CounterRequirement)
 						for i := range resourceapi.ResourceSliceMaxCountersPerDeviceCounterConsumption {
-							counters[maxDNSLabel(i)] = resourceapi.Counter{
-								Value: resource.MustParse("80Gi"),
+							counters[maxDNSLabel(i)] = resourceapi.CounterRequirement{
+								Value: new(resource.MustParse("80Gi")),
 							}
 						}
 						return counters

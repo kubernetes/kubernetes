@@ -158,6 +158,13 @@ func testConsumableCapacity(tCtx ktesting.TContext) {
 		}
 	})
 
+	tCtx.Run("resolve-qualified-name-uses-driver-domain", func(tCtx ktesting.TContext) {
+
+		driver := draapi.MakeUniqueString(driverA)
+		tCtx.Require(draapi.MakeFullyQualifiedName("memory", driver, draapi.MakeUniqueString).String()).To(g.Equal(driverA + "/memory"))
+		tCtx.Require(draapi.MakeFullyQualifiedName(resourceapi.QualifiedName(driverA+"/memory"), driver, draapi.MakeUniqueString).String()).To(g.Equal(driverA + "/memory"))
+	})
+
 	tCtx.Run("violate-capacity-sharing", testViolateCapacityRequestPolicy)
 
 	tCtx.Run("calculate-consumed-capacity", testCalculateConsumedCapacity)
@@ -775,6 +782,75 @@ func testCalculateConsumedCapacity(tCtx ktesting.TContext) {
 			} else {
 				tCtx.Require(err).NotTo(g.HaveOccurred())
 				tCtx.Require(consumedCapacity.Cmp(tc.expectResult)).To(g.BeZero())
+			}
+		})
+	}
+}
+
+// TestResolveConsumedCountersFatalBeatsSoft verifies that an unrepresentable
+// counter request is reported as an error even when another counter exceeds its
+// policy limit, for both fixed and valueFrom consumption, regardless of map iteration order.
+func TestResolveConsumedCountersFatalBeatsSoft(t *testing.T) {
+	testResolveConsumedCountersFatalBeatsSoft(ktesting.Init(t))
+}
+func testResolveConsumedCountersFatalBeatsSoft(tCtx ktesting.TContext) {
+
+	setName := draapi.MakeUniqueString("shared-counters")
+	device := deviceWithID{
+		Device: &draapi.Device{
+			ConsumesCounters: []draapi.DeviceCounterConsumption{{
+				CounterSet: setName,
+				Counters: map[string]resourceapi.CounterRequirement{
+					"soft":  {ValueFrom: &resourceapi.CounterValueFrom{CapacityName: capacity0}},
+					"fatal": {ValueFrom: &resourceapi.CounterValueFrom{CapacityName: capacity1}},
+				},
+			}},
+		},
+		id: MakeDeviceID(driverA, pool1, device1),
+		pool: &Pool{
+			CounterSets: map[draapi.UniqueString]*draapi.CounterSet{
+				setName: {
+					Name: setName,
+					Counters: map[string]resourceapi.Counter{
+						"soft": {
+							Value: two,
+							ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{
+								Default:    &one,
+								ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &one, Max: &two, Step: &one},
+							},
+						},
+						"fatal": {
+							Value: maxInt64Q,
+							ConsumptionPolicy: &resourceapi.CapacityRequestPolicy{
+								Default:    &two,
+								ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &zero, Step: &two},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	request := &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]resource.Quantity{
+			capacity0: three,
+			capacity1: maxInt64Q,
+		},
+	}
+	accessor := &exactDeviceRequestAccessor{request: &resourceapi.DeviceRequest{Exactly: &resourceapi.ExactDeviceRequest{Capacity: request}}}
+	alloc := &allocator{Allocator: &Allocator{features: Features{SharedConsumableCapacity: true}}}
+	for _, mode := range []string{"valueFrom", "fixed"} {
+		tCtx.Run(mode, func(tCtx ktesting.TContext) {
+			if mode == "fixed" {
+				device.ConsumesCounters[0].Counters = map[string]resourceapi.CounterRequirement{
+					"soft": {Value: &three}, "fatal": {Value: &maxInt64Q},
+				}
+			}
+			// Repeat to expose a regression regardless of the map's initial iteration order.
+			for range 64 {
+				_, _, ok, err := alloc.resolveConsumedCounters(device, accessor, false)
+				tCtx.Require(ok).To(g.BeFalseBecause("an unrepresentable counter request must not be considered satisfiable"))
+				tCtx.Require(err).To(g.MatchError(errCapacityRequestNotRepresentable))
 			}
 		})
 	}
