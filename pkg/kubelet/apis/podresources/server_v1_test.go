@@ -665,6 +665,8 @@ func TestListPodResourcesUsesOnlyActivePodsV1(t *testing.T) {
 			mockMemoryProvider.EXPECT().GetMemory(logger, mock.Anything, mock.Anything).Return(mems).Maybe()
 			mockDevicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
 			mockCPUsProvider.EXPECT().GetAllocatableCPUs().Return([]int64{}).Maybe()
+			mockCPUsProvider.EXPECT().GetPodCPUs(mock.Anything).Return([]int64{}).Maybe()
+			mockMemoryProvider.EXPECT().GetPodMemory(logger, mock.Anything).Return([]*podresourcesapi.ContainerMemory{}).Maybe()
 			mockDevicesProvider.EXPECT().GetAllocatableDevices(logger).Return([]*podresourcesapi.ContainerDevices{}).Maybe()
 			mockMemoryProvider.EXPECT().GetAllocatableMemory(logger).Return([]*podresourcesapi.ContainerMemory{}).Maybe()
 			mockDynamicResourcesProvider.EXPECT().GetDynamicResources(logger, mock.Anything, mock.Anything).Return([]*podresourcesapi.DynamicResource{}).Maybe()
@@ -1016,6 +1018,8 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 			mockPodsProvider.EXPECT().GetPods().Return(tc.pods).Maybe()
 			mockPodsProvider.EXPECT().GetActivePods().Return(tc.pods).Maybe()
 			tc.mockFunc(tc.pods, mockDevicesProvider, mockCPUsProvider, mockMemoryProvider, mockDynamicResourcesProvider)
+			mockCPUsProvider.EXPECT().GetPodCPUs(mock.Anything).Return([]int64{}).Maybe()
+			mockMemoryProvider.EXPECT().GetPodMemory(logger, mock.Anything).Return([]*podresourcesapi.ContainerMemory{}).Maybe()
 
 			providers := PodResourcesProviders{
 				Pods:             mockPodsProvider,
@@ -2063,6 +2067,8 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 
 			mockPodsProvider.EXPECT().GetPodByName(podNamespace, podName).Return(tc.pod, true).Maybe()
 			tc.mockFunc(tc.pod, mockDevicesProvider, mockCPUsProvider, mockMemoryProvider, mockDynamicResourcesProvider)
+			mockCPUsProvider.EXPECT().GetPodCPUs(mock.Anything).Return([]int64{}).Maybe()
+			mockMemoryProvider.EXPECT().GetPodMemory(logger, mock.Anything).Return([]*podresourcesapi.ContainerMemory{}).Maybe()
 
 			providers := PodResourcesProviders{
 				Pods:             mockPodsProvider,
