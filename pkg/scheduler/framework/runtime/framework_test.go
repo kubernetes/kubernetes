@@ -69,6 +69,7 @@ const (
 	bindPlugin                        = "bind-plugin"
 	testCloseErrorPlugin              = "test-close-error-plugin"
 	placementGeneratePlugin           = "placement-generate-plugin"
+	placementGeneratePlugin2          = "placement-generate-plugin-2"
 	defaultPreemptionPlugin           = names.DefaultPreemption
 
 	testProfileName              = "test-profile"
@@ -460,6 +461,14 @@ func newTestPlacementGeneratePlugin(_ context.Context, injArgs runtime.Object, _
 	return &TestPlacementGeneratePlugin{placementGeneratePlugin, inj}, nil
 }
 
+func newTestPlacementGeneratePlugin2(_ context.Context, injArgs runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+	var inj injectedResult
+	if err := DecodeInto(injArgs, &inj); err != nil {
+		return nil, err
+	}
+	return &TestPlacementGeneratePlugin{placementGeneratePlugin2, inj}, nil
+}
+
 // nolint:errcheck   // Ignore the error returned by Register as before
 var registry = func() Registry {
 	r := make(Registry)
@@ -474,6 +483,7 @@ var registry = func() Registry {
 	r.Register(bindPlugin, newBindPlugin)
 	r.Register(testCloseErrorPlugin, newTestCloseErrorPlugin)
 	r.Register(placementGeneratePlugin, newTestPlacementGeneratePlugin)
+	r.Register(placementGeneratePlugin2, newTestPlacementGeneratePlugin2)
 	r.Register(placementScorePlugin1, newPlacementScorePluginFactory(placementScorePlugin1))
 	r.Register(defaultPreemptionPlugin, newMockDefaultPreemptionPlugin)
 	return r
@@ -619,34 +629,6 @@ func TestNewFrameworkErrors(t *testing.T) {
 			},
 			wantErr: "repeated config for plugin",
 		},
-		{
-			name: "more than one PlacementGeneratePlugin",
-			plugins: &config.Plugins{
-				QueueSort: config.PluginSet{
-					Enabled: []config.Plugin{
-						{Name: queueSortPlugin},
-					},
-				},
-				Bind: config.PluginSet{
-					Enabled: []config.Plugin{
-						{Name: bindPlugin},
-					},
-				},
-				PlacementGenerate: config.PluginSet{
-					Enabled: []config.Plugin{
-						{Name: testPlugin},
-						{Name: placementGeneratePlugin},
-					},
-				},
-			},
-			pluginCfg: []config.PluginConfig{
-				{Name: queueSortPlugin},
-				{Name: bindPlugin},
-				{Name: testPlugin},
-				{Name: placementGeneratePlugin},
-			},
-			wantErr: "at most one placement generate plugin is allowed",
-		},
 	}
 
 	for _, tc := range tests {
@@ -663,6 +645,43 @@ func TestNewFrameworkErrors(t *testing.T) {
 				t.Errorf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
 			}
 		})
+	}
+}
+
+// TestNewFramework_MultiplePlacementGenerate verifies that registering more than one
+// PlacementGenerate plugin is allowed (it used to be rejected at construction time).
+func TestNewFramework_MultiplePlacementGenerate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	profile := &config.KubeSchedulerProfile{
+		Plugins: &config.Plugins{
+			QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: queueSortPlugin}}},
+			Bind:      config.PluginSet{Enabled: []config.Plugin{{Name: bindPlugin}}},
+			PlacementGenerate: config.PluginSet{Enabled: []config.Plugin{
+				{Name: placementGeneratePlugin},
+				{Name: placementGeneratePlugin2},
+			}},
+		},
+		PluginConfig: []config.PluginConfig{
+			{Name: queueSortPlugin},
+			{Name: bindPlugin},
+			{Name: placementGeneratePlugin},
+			{Name: placementGeneratePlugin2},
+		},
+	}
+
+	fw, err := NewFramework(ctx, registry, profile)
+	if err != nil {
+		t.Fatalf("NewFramework with two PlacementGenerate plugins failed: %v", err)
+	}
+	impl, ok := fw.(*frameworkImpl)
+	if !ok {
+		t.Fatalf("expected *frameworkImpl, got %T", fw)
+	}
+	if got := len(impl.placementGeneratePlugins); got != 2 {
+		t.Errorf("expected 2 PlacementGenerate plugins, got %d", got)
 	}
 }
 
