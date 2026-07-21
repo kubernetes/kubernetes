@@ -785,11 +785,14 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	var count int64
 	var numFetched int
 	var numEvald int
+	var streamed bool
+	startTime := time.Now()
 	// Because these metrics are for understanding the costs of handling LIST requests,
 	// get them recorded even in error cases.
 	defer func() {
 		numReturn := v.Len()
 		metrics.RecordStorageListMetrics(s.groupResource, "", numFetched, numEvald, numReturn)
+		metrics.RecordListLatency(s.groupResource, streamed, startTime)
 	}()
 
 	aggregator := s.listErrAggrFactory()
@@ -799,6 +802,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		streamChunks, supported := s.streamChunks(ctx, keyPrefix, withRev, limit, continueKey)
 		if supported {
 			chunks = streamChunks
+			streamed = true
 		} else {
 			etcdfeature.DefaultFeatureSupportChecker.MarkUnsupported(storage.RangeStream)
 			klog.V(4).Infof("etcd server does not support RangeStream for %v; falling back to paginated list", s.groupResource)
