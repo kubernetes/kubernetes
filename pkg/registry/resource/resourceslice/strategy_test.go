@@ -327,6 +327,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		},
 		"drop-fields-binding-conditions": {
 			obj:              sliceWithBindingConditions,
+			emulatedVersion:  "1.35",
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceBindingConditions: false, features.DRAResourceClaimDeviceStatus: false},
 			expectObj: func() *resource.ResourceSlice {
 				obj := slice.DeepCopy()
@@ -701,6 +702,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				obj.Generation = 1
 				return obj
 			}(),
+			emulatedVersion:  "1.35",
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceBindingConditions: false, features.DRAResourceClaimDeviceStatus: false},
 		},
 		"drop-fields-binding-conditions-with-binding-conditions": {

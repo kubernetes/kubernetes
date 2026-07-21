@@ -170,7 +170,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				})
 				runSubTest(tCtx, "ExplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, true) })
 				runSubTest(tCtx, "ImplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, false) })
-				runSubTest(tCtx, "ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
+				runSubTest(tCtx, "ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
 				runSubTest(tCtx, "DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, false) })
 				runSubTest(tCtx, "ResourceSliceController", func(tCtx ktesting.TContext) {
 					namespace := createTestNamespace(tCtx, nil)
@@ -222,6 +222,16 @@ func run(tCtx ktesting.TContext, whatRE string) {
 			},
 			f: func(tCtx ktesting.TContext) {
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
+			},
+		},
+		"GA-opt-out-1.36": {
+			version: "1.36",
+			apis:    map[schema.GroupVersion]bool{},
+			features: map[featuregate.Feature]bool{
+				features.DRAResourceClaimDeviceStatus: false,
+			},
+			f: func(tCtx ktesting.TContext) {
+				runSubTest(tCtx, "ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
 			},
 		},
 		"v1beta1": {
