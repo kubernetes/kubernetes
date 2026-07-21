@@ -54,11 +54,17 @@ func NodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, node
 // Out-dated slices are silently ignored. Pools may be incomplete (not all
 // required slices available) or invalid (for example, device names not unique).
 // Both is recorded in the result.
-func GatherPools(ctx context.Context, slices []*draapi.ResourceSlice, node *v1.Node, features Features) ([]*Pool, error) {
+func GatherPools(ctx context.Context, allSlices []*draapi.ResourceSlice, node *v1.Node, features Features) ([]*Pool, error) {
 	pools := make(map[PoolID][]*draapi.ResourceSlice)
 
-	for _, slice := range slices {
+	for _, slice := range allSlices {
 		if !features.PartitionableDevices && (slice.Spec.PerDeviceNodeSelection != nil || len(slice.Spec.SharedCounters) > 0) {
+			continue
+		}
+
+		// Ignoring unsupported consumption makes the pool incomplete, preventing under-accounting for its other devices.
+		if !features.SharedConsumableCapacity && sliceUsesSharedConsumableCapacity(slice) {
+			klog.FromContext(ctx).V(5).Info("Ignoring resource slice because it uses valueFrom while the DRASharedConsumableCapacity feature is disabled; its pool will be treated as incomplete", "resourceslice", klog.KObj(slice))
 			continue
 		}
 
@@ -138,7 +144,7 @@ func GatherPools(ctx context.Context, slices []*draapi.ResourceSlice, node *v1.N
 		// which were filtered out above because their node selection made them look irrelevant
 		// for the current node. This is necessary for "allocate all" mode (it rejects incomplete
 		// pools).
-		isObsolete, allSlicesForPool := checkSlicesInPool(slices, poolID, slicesForPool[0].Spec.Pool.Generation)
+		isObsolete, allSlicesForPool := checkSlicesInPool(allSlices, poolID, slicesForPool[0].Spec.Pool.Generation)
 		if isObsolete {
 			// A more thorough check determined that the DRA driver is in the process
 			// of replacing the current generation. The newer one didn't have any slice
@@ -153,6 +159,10 @@ func GatherPools(ctx context.Context, slices []*draapi.ResourceSlice, node *v1.N
 			// considered complete even though its devices with compatibility
 			// groups are not visible to the allocator.
 			allSlicesForPool = slicesWithoutCompatibilityGroups(allSlicesForPool)
+		}
+		if !features.SharedConsumableCapacity {
+			// The fallback must not restore slices excluded for unsupported consumption.
+			allSlicesForPool = slices.DeleteFunc(allSlicesForPool, sliceUsesSharedConsumableCapacity)
 		}
 		// Use the more complete number of slices to check for "incomplete pool".
 		//
@@ -179,6 +189,19 @@ func GatherPools(ctx context.Context, slices []*draapi.ResourceSlice, node *v1.N
 	}
 
 	return result, nil
+}
+
+func sliceUsesSharedConsumableCapacity(slice *draapi.ResourceSlice) bool {
+	for _, device := range slice.Spec.Devices {
+		for _, consumption := range device.ConsumesCounters {
+			for _, counter := range consumption.Counters {
+				if counter.ValueFrom != nil {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func addSlice(pools map[PoolID][]*draapi.ResourceSlice, slice *draapi.ResourceSlice) error {

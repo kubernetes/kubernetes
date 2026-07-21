@@ -1687,6 +1687,8 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		for _, counterSet := range pool.CounterSets {
 			availableCountersForCounterSet := make(map[string]resourceapi.Counter, len(counterSet.Counters))
 			for name, c := range counterSet.Counters {
+				quantity := ptr.Deref(c.Value, resource.Quantity{})
+				c.Value = &quantity
 				availableCountersForCounterSet[name] = c
 			}
 			availableCountersForPool[counterSet.Name] = availableCountersForCounterSet
@@ -1718,7 +1720,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 							}
 							// This can potentially result in negative available counters. That is fine,
 							// we just treat it as no counters available.
-							existingCounter.Value.Sub(c.Value)
+							existingCounter.Value.Sub(ptr.Deref(c.Value, resource.Quantity{}))
 							availableCountersForCounterSet[name] = existingCounter
 						}
 					}
@@ -1754,10 +1756,11 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		for name, c := range deviceCounterConsumption.Counters {
 			consumedCounters, found := consumedCountersForCounterSet[name]
 			if !found {
-				consumedCountersForCounterSet[name] = c
+				quantity := *c.Value
+				consumedCountersForCounterSet[name] = resourceapi.Counter{Value: &quantity}
 				continue
 			}
-			consumedCounters.Value.Add(c.Value)
+			consumedCounters.Value.Add(ptr.Deref(c.Value, resource.Quantity{}))
 			consumedCountersForCounterSet[name] = consumedCounters
 		}
 	}
@@ -1769,7 +1772,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		consumedCounters := consumedCountersForPool[availableCounterSetName]
 		for availableCounterName, availableCounter := range availableCounters {
 			consumedCounter := consumedCounters[availableCounterName]
-			if availableCounter.Value.Cmp(consumedCounter.Value) < 0 {
+			if availableCounter.Value.Cmp(ptr.Deref(consumedCounter.Value, resource.Quantity{})) < 0 {
 				alloc.deallocateCountersForDevice(device)
 				return false, nil
 			}
@@ -1819,7 +1822,7 @@ func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
 		consumedCounterSet := consumedCountersForPool[counterSetName]
 		for name, c := range deviceCounterConsumption.Counters {
 			consumedCounter := consumedCounterSet[name]
-			consumedCounter.Value.Sub(c.Value)
+			consumedCounter.Value.Sub(ptr.Deref(c.Value, resource.Quantity{}))
 			consumedCounterSet[name] = consumedCounter
 		}
 	}

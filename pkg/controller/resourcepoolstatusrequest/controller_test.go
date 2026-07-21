@@ -1292,12 +1292,25 @@ func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
 		declarePoolAttr bool
 		requestAttr     *string
 		// mixedClass adds a second device slice grouped by a different attribute.
-		mixedClass bool
-		want       map[string][2]int32
+		mixedClass               bool
+		consumptionPolicy        bool
+		sharedConsumableCapacity bool
+		want                     map[string][2]int32
 	}{
 		"pool declares the attribute": {
 			declarePoolAttr: true,
 			want:            map[string][2]int32{key(profileAttr, "Full"): {1, 1}, key(profileAttr, "Half"): {2, 2}},
+		},
+		"fixed counter consumption policy rounds costs": {
+			declarePoolAttr:          true,
+			consumptionPolicy:        true,
+			sharedConsumableCapacity: true,
+			want:                     map[string][2]int32{key(profileAttr, "Full"): {1, 1}, key(profileAttr, "Half"): {2, 1}},
+		},
+		"disabled feature ignores retained counter consumption policy": {
+			declarePoolAttr:   true,
+			consumptionPolicy: true,
+			want:              map[string][2]int32{key(profileAttr, "Full"): {1, 1}, key(profileAttr, "Half"): {2, 2}},
 		},
 		// The slices declare driver/profile. The request names a different
 		// attribute that no device carries: if it won, every device would look
@@ -1332,6 +1345,15 @@ func TestCalculatePoolStatus_PartitionSummary(t *testing.T) {
 			}
 			counters := makePartitionCounterSlice("counters", driver, "pool-0", "node-0", sliceCount)
 			devices := makePartitionDeviceSlice("devices", driver, "pool-0", "node-0", sliceCount)
+			if tc.consumptionPolicy {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRASharedConsumableCapacity, tc.sharedConsumableCapacity)
+				counter := counters.Spec.SharedCounters[0].Counters["memory"]
+				counter.ConsumptionPolicy = &resourcev1.CapacityRequestPolicy{
+					Default:     ptr.To(resource.MustParse("80Gi")),
+					ValidValues: []resource.Quantity{resource.MustParse("80Gi")},
+				}
+				counters.Spec.SharedCounters[0].Counters["memory"] = counter
+			}
 			all := []*resourcev1.ResourceSlice{counters, devices}
 			if tc.mixedClass {
 				all = append(all, makePartitionClassSlice("class-devices", driver, "pool-0", "node-0", sliceCount))
@@ -1417,6 +1439,85 @@ func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
 			if !maps.Equal(got, tc.want) {
 				t.Errorf("capacity {total,consumed,available} = %v, want %v", got, tc.want)
 			}
+		})
+	}
+}
+
+func TestCalculatePoolStatus_CounterSnapshots(t *testing.T) {
+	const driver = "gpu.example.com"
+	consumption := func(value string) []resourcev1.CounterSetConsumption {
+		return []resourcev1.CounterSetConsumption{{CounterSet: "gpu-0", Counters: map[string]resource.Quantity{"memory": qty(value)}}}
+	}
+	dynamic := consumption("10Gi")
+	missing := consumption("10Gi")
+	missing[0].CounterSet = "removed"
+	zeroMissing := consumption("0")
+	zeroMissing[0].CounterSet = "removed"
+	for name, tc := range map[string]struct {
+		snapshots    [][]resourcev1.CounterSetConsumption
+		fixedCost    string
+		removeDevice bool
+		valueFrom    bool
+		admin        bool
+		wantHalf     int32
+		wantError    bool
+	}{
+		"fixed costs follow live definitions":                      {snapshots: [][]resourcev1.CounterSetConsumption{nil}, fixedCost: "40Gi", wantHalf: 1},
+		"fixed costs charged once for two shares":                  {snapshots: [][]resourcev1.CounterSetConsumption{nil, nil}, fixedCost: "40Gi", wantHalf: 1},
+		"dynamic snapshot charged for every share":                 {snapshots: [][]resourcev1.CounterSetConsumption{dynamic, dynamic}, fixedCost: "40Gi", wantHalf: 0},
+		"explicit zero retains live fixed cost":                    {snapshots: [][]resourcev1.CounterSetConsumption{consumption("0")}, fixedCost: "40Gi", wantHalf: 1},
+		"legacy allocation uses live consumption":                  {snapshots: [][]resourcev1.CounterSetConsumption{nil}, wantHalf: 0},
+		"missing allocated device":                                 {snapshots: [][]resourcev1.CounterSetConsumption{nil}, removeDevice: true, wantError: true},
+		"missing allocated device with saved variable consumption": {snapshots: [][]resourcev1.CounterSetConsumption{dynamic}, removeDevice: true, wantError: true},
+		"missing saved counter set":                                {snapshots: [][]resourcev1.CounterSetConsumption{missing}, wantError: true},
+		"missing zero saved counter set is harmless":               {snapshots: [][]resourcev1.CounterSetConsumption{zeroMissing}, fixedCost: "40Gi", wantHalf: 1},
+		"admin observers do not consume counters":                  {snapshots: [][]resourcev1.CounterSetConsumption{dynamic}, admin: true, wantHalf: 2},
+		"request-dependent costs need a claim":                     {snapshots: [][]resourcev1.CounterSetConsumption{dynamic}, valueFrom: true, wantError: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			counters := makePartitionCounterSlice("counters", driver, "pool-0", "node-0", 2)
+			devices := makePartitionDeviceSlice("devices", driver, "pool-0", "node-0", 2)
+			if tc.fixedCost != "" {
+				devices.Spec.Devices[0].ConsumesCounters = []resourcev1.DeviceCounterConsumption{consumes("gpu-0", map[string]string{"memory": tc.fixedCost})}
+			}
+			if tc.removeDevice {
+				devices.Spec.Devices = devices.Spec.Devices[1:]
+			} else if tc.valueFrom {
+				devices.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
+				devices.Spec.Devices[0].ConsumesCounters[0].Counters["memory"] = resourcev1.CounterRequirement{ValueFrom: &resourcev1.CounterValueFrom{CapacityName: "memory"}}
+			}
+			var claims []*resourcev1.ResourceClaim
+			for i, snapshot := range tc.snapshots {
+				claim := makeAllocatedClaim(fmt.Sprintf("claim-%d", i), "ns", driver, "pool-0", "full-0")
+				claim.Status.Allocation.Devices.Results[0].ConsumedCounters = snapshot
+				claim.Status.Allocation.Devices.Results[0].AdminAccess = ptr.To(tc.admin)
+				claims = append(claims, claim)
+			}
+			pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), []*resourcev1.ResourceSlice{counters, devices}, claims))
+			if tc.wantError {
+				if pool.ValidationError == nil || !strings.HasPrefix(*pool.ValidationError, prefixCounterAccounting) || pool.PartitionSummary != nil {
+					t.Fatalf("expected unavailable counter accounting and no partition summary, got %+v", pool)
+				}
+				if tc.valueFrom && pool.ShareableSummary == nil {
+					t.Fatal("independent shareable summary must remain available")
+				}
+				if pool.TotalDevices == nil {
+					t.Fatal("basic device counts must remain available")
+				}
+				return
+			}
+			if pool.ValidationError != nil {
+				t.Fatalf("unexpected validation error: %s", *pool.ValidationError)
+			}
+			for _, summary := range pool.PartitionSummary {
+				if summary.Type == "Half" {
+					if got := ptr.Deref(summary.Allocatable, -1); got != tc.wantHalf {
+						t.Fatalf("allocatable half devices = %d, want %d", got, tc.wantHalf)
+					}
+					return
+				}
+			}
+			t.Fatal("missing Half partition summary")
 		})
 	}
 }

@@ -17,11 +17,13 @@ limitations under the License.
 package resourcepoolstatusrequest
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/utils/ptr"
 )
 
@@ -30,15 +32,15 @@ func qty(s string) resource.Quantity { return resource.MustParse(s) }
 func counterSet(name string, counters map[string]string) resourcev1.CounterSet {
 	c := make(map[string]resourcev1.Counter, len(counters))
 	for k, v := range counters {
-		c[k] = resourcev1.Counter{Value: qty(v)}
+		c[k] = resourcev1.Counter{Value: new(qty(v))}
 	}
 	return resourcev1.CounterSet{Name: name, Counters: c}
 }
 
 func consumes(set string, counters map[string]string) resourcev1.DeviceCounterConsumption {
-	c := make(map[string]resourcev1.Counter, len(counters))
+	c := make(map[string]resourcev1.CounterRequirement, len(counters))
 	for k, v := range counters {
-		c[k] = resourcev1.Counter{Value: qty(v)}
+		c[k] = resourcev1.CounterRequirement{Value: new(qty(v))}
 	}
 	return resourcev1.DeviceCounterConsumption{CounterSet: set, Counters: c}
 }
@@ -474,5 +476,146 @@ func TestResolvePartitionType(t *testing.T) {
 		if v, ok := resolvePartitionType("gpu.example.com", both, "gpu.example.com/profile"); !ok || v != "Explicit" {
 			t.Fatalf("colliding keys: got (%q,%v), want (Explicit,true)", v, ok)
 		}
+	}
+}
+
+func TestPartitionSummaryRequestDependentCounters(t *testing.T) {
+	set := counterSet("shared", map[string]string{"memory": "1"})
+	set.Counters["memory"] = resourcev1.Counter{Value: new(qty("1")), ConsumptionPolicy: &resourcev1.CapacityRequestPolicy{Default: new(qty("1"))}}
+	dynamic := resourcev1.DeviceCounterConsumption{CounterSet: "shared", Counters: map[string]resourcev1.CounterRequirement{"memory": {ValueFrom: &resourcev1.CounterValueFrom{CapacityName: "memory"}}}}
+	in := poolViewInput{
+		driver: "gpu.example.com", poolName: "pool", sharedCounters: []resourcev1.CounterSet{set},
+		devices: []deviceRecord{partitionDevice("used", "Dynamic", dynamic), partitionDevice("fresh", "Static", consumes("shared", map[string]string{"memory": "1"}))},
+		inUse:   inUseSet("used"),
+	}
+	// An ungrouped device still consumes the budget shared by grouped devices.
+	in.devices[0].partitionAttr = ""
+	result, err := computePartitionSummary(in)
+	if !strings.HasPrefix(err, prefixCounterAccounting) || result != nil {
+		t.Fatalf("expected uncomputable partition view, got %v, %q", result, err)
+	}
+}
+
+// TestPartitionSummaryCounterConsumptionPolicy verifies estimates use scheduler-resolved costs.
+func TestPartitionSummaryCounterConsumptionPolicy(t *testing.T) {
+	tests := map[string]struct {
+		budget       string
+		costs        []string
+		policy       *resourcev1.CapacityRequestPolicy
+		disabled     bool
+		fractional   bool
+		unusedPolicy bool
+		shares       int
+		want         int32
+		wantErr      string
+	}{
+		"valid values round fixed costs": {
+			budget: "10Gi", costs: []string{"5Gi", "5Gi", "5Gi"},
+			policy: &resourcev1.CapacityRequestPolicy{Default: new(qty("6Gi")), ValidValues: []resource.Quantity{qty("6Gi")}},
+			want:   1,
+		},
+		"equivalent resolved costs share a partition type": {
+			budget: "10Gi", costs: []string{"4Gi", "5Gi"},
+			policy: &resourcev1.CapacityRequestPolicy{Default: new(qty("6Gi")), ValidValues: []resource.Quantity{qty("6Gi")}},
+			want:   1,
+		},
+		"range rounds fixed costs": {
+			budget: "10Gi", costs: []string{"4Gi", "4Gi", "4Gi"},
+			policy: &resourcev1.CapacityRequestPolicy{Default: new(qty("3Gi")), ValidRange: &resourcev1.CapacityRequestPolicyRange{Min: new(qty("3Gi")), Step: new(qty("3Gi"))}},
+			want:   1,
+		},
+		"policy rejects fixed costs": {
+			budget: "10Gi", costs: []string{"7Gi", "7Gi"},
+			policy: &resourcev1.CapacityRequestPolicy{Default: new(qty("6Gi")), ValidValues: []resource.Quantity{qty("6Gi")}},
+			want:   0,
+		},
+		"rounded cost exceeds range maximum": {
+			budget: "10Gi", costs: []string{"4Gi", "4Gi"},
+			policy: &resourcev1.CapacityRequestPolicy{Default: new(qty("1Gi")), ValidRange: &resourcev1.CapacityRequestPolicyRange{Min: new(qty("1Gi")), Max: new(qty("4Gi")), Step: new(qty("2Gi"))}},
+			want:   0,
+		},
+		"fixed zero does not use policy default": {
+			budget: "10Gi", costs: []string{"0", "0", "0"},
+			policy: &resourcev1.CapacityRequestPolicy{Default: new(qty("6Gi"))},
+			want:   3,
+		},
+		"disabled feature ignores retained policies": {
+			budget: "10Gi", costs: []string{"5Gi", "5Gi", "5Gi"},
+			policy:   &resourcev1.CapacityRequestPolicy{Default: new(qty("6Gi")), ValidValues: []resource.Quantity{qty("6Gi")}},
+			disabled: true, want: 2,
+		},
+		"unused policy does not suppress summary": {
+			budget: "10Gi", costs: []string{"5Gi", "5Gi", "5Gi"},
+			policy:       &resourcev1.CapacityRequestPolicy{Default: new(qty("6Gi")), ValidValues: []resource.Quantity{qty("6Gi")}},
+			unusedPolicy: true, want: 2,
+		},
+		"existing allocations follow live policy changes": {
+			budget: "10Gi", costs: []string{"5Gi", "5Gi", "5Gi"},
+			policy: &resourcev1.CapacityRequestPolicy{Default: new(qty("6Gi")), ValidValues: []resource.Quantity{qty("6Gi")}},
+			shares: 1, want: 0,
+		},
+		"fixed costs are charged once for two shares": {
+			budget: "12Gi", costs: []string{"5Gi", "5Gi", "5Gi"},
+			policy: &resourcev1.CapacityRequestPolicy{Default: new(qty("6Gi")), ValidValues: []resource.Quantity{qty("6Gi")}},
+			shares: 2, want: 1,
+		},
+		"allocations without snapshots use rounded live costs": {
+			budget: "11Gi", costs: []string{"5Gi", "5Gi", "5Gi"},
+			policy: &resourcev1.CapacityRequestPolicy{Default: new(qty("6Gi")), ValidValues: []resource.Quantity{qty("6Gi")}},
+			shares: 1, want: 0,
+		},
+		"fractional ranges use milli precision": {
+			budget: "1", costs: []string{"250m", "250m", "250m", "250m"},
+			policy:     &resourcev1.CapacityRequestPolicy{Default: new(qty("100m")), ValidRange: &resourcev1.CapacityRequestPolicyRange{Min: new(qty("100m")), Step: new(qty("100m"))}},
+			fractional: true, want: 3,
+		},
+		"disabled fractional ranges use scheduler integer arithmetic": {
+			budget: "1", costs: []string{"250m", "250m", "250m", "250m"},
+			policy: &resourcev1.CapacityRequestPolicy{Default: new(qty("100m")), ValidRange: &resourcev1.CapacityRequestPolicyRange{Min: new(qty("100m")), Step: new(qty("100m"))}},
+			want:   1,
+		},
+		"unrepresentable rounding does not report capacity": {
+			budget: "9223372036854775808", costs: []string{"9223372036854775807"},
+			policy:  &resourcev1.CapacityRequestPolicy{Default: new(qty("2")), ValidRange: &resourcev1.CapacityRequestPolicyRange{Min: new(qty("2")), Step: new(qty("2"))}},
+			wantErr: prefixCounterAccounting,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			set := counterSet("shared", map[string]string{"memory": tc.budget})
+			policyCounter := "memory"
+			if tc.unusedPolicy {
+				policyCounter = "unused"
+			}
+			set.Counters[policyCounter] = resourcev1.Counter{Value: new(qty(tc.budget)), ConsumptionPolicy: tc.policy}
+			in := poolViewInput{
+				driver: "gpu.example.com", poolName: "pool", sharedCounters: []resourcev1.CounterSet{set},
+				features: structured.Features{SharedConsumableCapacity: !tc.disabled, FractionalCapacityRange: tc.fractional},
+			}
+			for i, cost := range tc.costs {
+				in.devices = append(in.devices, partitionDevice(fmt.Sprintf("device-%d", i), "Static", consumes("shared", map[string]string{"memory": cost})))
+			}
+			if tc.shares > 0 {
+				in.inUse = inUseSet("device-0")
+				for range tc.shares {
+					in.allocations = append(in.allocations, resourcev1.DeviceRequestAllocationResult{
+						Device: "device-0",
+					})
+				}
+			}
+			result, err := computePartitionSummary(in)
+			if tc.wantErr != "" {
+				if !strings.HasPrefix(err, tc.wantErr) || result != nil {
+					t.Fatalf("expected unavailable summary, got %v, %q", result, err)
+				}
+				return
+			}
+			if err != "" {
+				t.Fatalf("unexpected error: %s", err)
+			}
+			if len(result) != 1 || ptr.Deref(result[0].Total, 0) != int32(len(tc.costs)) || ptr.Deref(result[0].Allocatable, 0) != tc.want {
+				t.Fatalf("got %+v, want total %d, allocatable %d", result, len(tc.costs), tc.want)
+			}
+		})
 	}
 }

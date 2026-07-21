@@ -158,6 +158,23 @@ func testConsumableCapacity(tCtx ktesting.TContext) {
 		}
 	})
 
+	tCtx.Run("resolve-qualified-name-uses-driver-domain", func(tCtx ktesting.TContext) {
+
+		driver := draapi.MakeUniqueString(driverA)
+		tCtx.Require(draapi.MakeFullyQualifiedName("memory", driver, draapi.MakeUniqueString).String()).To(g.Equal(driverA + "/memory"))
+		tCtx.Require(draapi.MakeFullyQualifiedName(resourceapi.QualifiedName(driverA+"/memory"), driver, draapi.MakeUniqueString).String()).To(g.Equal(driverA + "/memory"))
+	})
+
+	tCtx.Run("lookup-qualified-name-uses-driver-domain", func(tCtx ktesting.TContext) {
+
+		candidates := map[resourceapi.QualifiedName]resource.Quantity{
+			"memory": one,
+		}
+		match, found := draapi.LookupByQualifiedName(candidates, resourceapi.QualifiedName(driverA+"/memory"), driverA)
+		tCtx.Require(found).To(g.BeTrueBecause("expected %q to match driver-domain qualified capacity name", driverA+"/memory"))
+		tCtx.Require(match.Cmp(one)).To(g.BeZero())
+	})
+
 	tCtx.Run("violate-capacity-sharing", testViolateCapacityRequestPolicy)
 
 	tCtx.Run("calculate-consumed-capacity", testCalculateConsumedCapacity)
