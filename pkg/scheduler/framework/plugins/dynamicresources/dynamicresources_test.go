@@ -5999,3 +5999,187 @@ func TestPodGroupPostFilter(t *testing.T) {
 		})
 	}
 }
+func TestPreQueueingHint(t *testing.T) {
+	tests := map[string]struct {
+		oldObj, newObj interface{}
+		wantKeys       sets.Set[string]
+	}{
+		"claim with no pod in indexer returns empty set": {
+			newObj: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "claim-1",
+					Namespace: "ns1",
+				},
+			},
+			wantKeys: sets.New[string](), // no pod in indexer
+		},
+		"shared claim returns nil": {
+			newObj: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "shared-claim",
+					Namespace: "ns1",
+				},
+			},
+			wantKeys: sets.New[string](), // no pod in indexer
+		},
+		"claim with no matching pods returns empty set": {
+			newObj: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "claim-2",
+					Namespace: "ns1",
+				},
+			},
+			wantKeys: sets.New[string](), // no pod in indexer
+		},
+		"delete event uses oldObj": {
+			oldObj: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "claim-3",
+					Namespace: "ns2",
+				},
+			},
+			newObj:   nil,
+			wantKeys: sets.New[string](), // no pod in indexer
+		},
+		"delete of allocated claim returns AllPods": {
+			oldObj: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "claim-allocated",
+					Namespace: "ns1",
+				},
+				Status: resourceapi.ResourceClaimStatus{
+					Allocation: &resourceapi.AllocationResult{},
+				},
+			},
+			newObj:   nil,
+			wantKeys: nil, // AllPods - deletion frees resources
+		},
+
+		"deallocation returns nil to evaluate all pods": {
+			oldObj: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "claim-4",
+					Namespace: "ns1",
+				},
+				Status: resourceapi.ResourceClaimStatus{
+					Allocation: &resourceapi.AllocationResult{},
+				},
+			},
+			newObj: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "claim-4",
+					Namespace: "ns1",
+				},
+			},
+			wantKeys: nil,
+		},
+		"non-claim object returns nil": {
+			newObj:   "not-a-claim",
+			wantKeys: nil,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			logger := klog.Background()
+			pl := &DynamicResources{podIndexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndexPrefix + "-test": podResourceClaimIndexFunc}), podResourceClaimIndex: podResourceClaimIndexPrefix + "-test"}
+			got, err := pl.preQueueingHint(logger, tc.oldObj, tc.newObj)
+			if err != nil {
+				t.Fatalf("preQueueingHint returned unexpected error: %v", err)
+			}
+			if tc.wantKeys == nil {
+				// nil wantKeys means AllPods should be true
+				if !got.AllPods {
+					t.Errorf("expected AllPods=true, got %+v", got)
+				}
+			} else {
+				if got.AllPods {
+					t.Errorf("expected AllPods=false with specific pods, got AllPods=true")
+				}
+				gotPods := sets.New[string]()
+				for _, nn := range got.Pods {
+					gotPods.Insert(nn.Name + "_" + nn.Namespace)
+				}
+				wantPods := sets.New[string]()
+				for k := range tc.wantKeys {
+					wantPods.Insert(k)
+				}
+				if !gotPods.Equal(wantPods) {
+					t.Errorf("expected pods %v, got %v", wantPods, gotPods)
+				}
+			}
+		})
+	}
+}
+
+func TestPreQueueingHint_WithPodInIndexer(t *testing.T) {
+	// Verify that when a pod referencing a claim exists in the indexer,
+	// preQueueingHint returns that pod's key.
+	logger := klog.Background()
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndexPrefix + "-test": podResourceClaimIndexFunc})
+
+	// Add a pod that references "claim-x" in namespace "ns1".
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "ns1"},
+		Spec: v1.PodSpec{
+			ResourceClaims: []v1.PodResourceClaim{
+				{Name: "gpu", ResourceClaimName: new("claim-x")},
+			},
+		},
+	}
+	if err := indexer.Add(pod); err != nil {
+		t.Fatal(err)
+	}
+
+	pl := &DynamicResources{podIndexer: indexer, podResourceClaimIndex: podResourceClaimIndexPrefix + "-test"}
+
+	got, err := pl.preQueueingHint(logger, nil, &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "claim-x", Namespace: "ns1"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.AllPods {
+		t.Fatal("expected AllPods=false, got true")
+	}
+	if len(got.Pods) != 1 || got.Pods[0].Name != "my-pod" || got.Pods[0].Namespace != "ns1" {
+		t.Errorf("expected [{my-pod ns1}], got %v", got.Pods)
+	}
+}
+
+func TestPreQueueingHint_SharedClaimMultiplePods(t *testing.T) {
+	// Verify that for a shared claim referenced by multiple pods,
+	// preQueueingHint returns all referencing pods.
+	logger := klog.Background()
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndexPrefix + "-test": podResourceClaimIndexFunc})
+
+	// Add multiple pods referencing the same shared claim.
+	for _, name := range []string{"pod-a", "pod-b", "pod-c"} {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "ns1"},
+			Spec: v1.PodSpec{
+				ResourceClaims: []v1.PodResourceClaim{
+					{Name: "shared", ResourceClaimName: new("shared-claim")},
+				},
+			},
+		}
+		if err := indexer.Add(pod); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	pl := &DynamicResources{podIndexer: indexer, podResourceClaimIndex: podResourceClaimIndexPrefix + "-test"}
+
+	got, err := pl.preQueueingHint(logger, nil, &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "shared-claim", Namespace: "ns1"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.AllPods {
+		t.Fatal("expected AllPods=false, got true")
+	}
+	if len(got.Pods) != 3 {
+		t.Errorf("expected 3 pods, got %d: %v", len(got.Pods), got.Pods)
+	}
+}
