@@ -475,6 +475,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 	// (allowMultipleAllocations). AdminAccess results are observers, not
 	// consumers, and are skipped.
 	allocatedDevices := make(map[string]map[string]struct{})
+	allocations := make(map[string][]resourcev1.DeviceRequestAllocationResult)
 	// Per-pool consumed capacity over non-AdminAccess claims; feeds shareableSummary.
 	consumedCapacity := make(map[string]map[resourcev1.QualifiedName]resource.Quantity)
 
@@ -493,12 +494,16 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 				continue
 			}
 			key := result.Driver + "/" + result.Pool
+			if _, requested := poolData[key]; !requested {
+				continue
+			}
 			devices, ok := allocatedDevices[key]
 			if !ok {
 				devices = make(map[string]struct{})
 				allocatedDevices[key] = devices
 			}
 			devices[result.Device] = struct{}{}
+			allocations[key] = append(allocations[key], result)
 
 			for capacityName, quantity := range result.ConsumedCapacity {
 				m := consumedCapacity[key]
@@ -559,6 +564,7 @@ func (c *Controller) calculatePoolStatus(ctx context.Context, request *resourcev
 				devices:          info.devices,
 				sharedCounters:   info.sharedCounters,
 				inUse:            inUse,
+				allocations:      allocations[key],
 				consumedCapacity: consumedCapacity[key],
 			}
 			resolveDevicePartitions(request.Spec.DefaultPartitionTypeAttribute, &viewInput)

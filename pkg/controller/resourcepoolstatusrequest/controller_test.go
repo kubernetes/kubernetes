@@ -1420,3 +1420,75 @@ func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
 		})
 	}
 }
+
+func TestCalculatePoolStatus_CounterSnapshots(t *testing.T) {
+	const driver = "gpu.example.com"
+	consumption := func(value string) []resourcev1.CounterSetConsumption {
+		return []resourcev1.CounterSetConsumption{{CounterSet: "gpu-0", Counters: map[string]resource.Quantity{"memory": qty(value)}}}
+	}
+	static := &resourcev1.CounterConsumption{PerDevice: consumption("40Gi")}
+	dynamic := &resourcev1.CounterConsumption{PerDevice: consumption("40Gi"), PerAllocation: consumption("10Gi")}
+	for name, tc := range map[string]struct {
+		snapshots    []*resourcev1.CounterConsumption
+		removeDevice bool
+		valueFrom    bool
+		admin        bool
+		wantHalf     int32
+		wantError    bool
+	}{
+		"static snapshot survives definition change":  {snapshots: []*resourcev1.CounterConsumption{static}, wantHalf: 1},
+		"static snapshot survives device removal":     {snapshots: []*resourcev1.CounterConsumption{static}, removeDevice: true, wantHalf: 1},
+		"static snapshot charged once for two shares": {snapshots: []*resourcev1.CounterConsumption{static, static}, wantHalf: 1},
+		"dynamic snapshot charged for every share":    {snapshots: []*resourcev1.CounterConsumption{dynamic, dynamic}, wantHalf: 0},
+		"explicit zero does not use live consumption": {snapshots: []*resourcev1.CounterConsumption{{}}, wantHalf: 2},
+		"legacy allocation uses live consumption":     {snapshots: []*resourcev1.CounterConsumption{nil}, wantHalf: 0},
+		"missing legacy device":                       {snapshots: []*resourcev1.CounterConsumption{nil}, removeDevice: true, wantError: true},
+		"missing legacy device alongside snapshot":    {snapshots: []*resourcev1.CounterConsumption{nil, static}, removeDevice: true, wantError: true},
+		"conflicting static snapshots":                {snapshots: []*resourcev1.CounterConsumption{static, {}}, wantError: true},
+		"admin observers do not consume counters":     {snapshots: []*resourcev1.CounterConsumption{static}, admin: true, wantHalf: 2},
+		"request-dependent costs need a claim":        {snapshots: []*resourcev1.CounterConsumption{dynamic}, valueFrom: true, wantError: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			counters := makePartitionCounterSlice("counters", driver, "pool-0", "node-0", 2)
+			devices := makePartitionDeviceSlice("devices", driver, "pool-0", "node-0", 2)
+			if tc.removeDevice {
+				devices.Spec.Devices = devices.Spec.Devices[1:]
+			} else if tc.valueFrom {
+				devices.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
+				devices.Spec.Devices[0].ConsumesCounters[0].Counters["memory"] = resourcev1.ConsumeCounter{ValueFrom: &resourcev1.CounterValueFrom{CapacityName: "memory"}}
+			}
+			var claims []*resourcev1.ResourceClaim
+			for i, snapshot := range tc.snapshots {
+				claim := makeAllocatedClaim(fmt.Sprintf("claim-%d", i), "ns", driver, "pool-0", "full-0")
+				claim.Status.Allocation.Devices.Results[0].ConsumedCounters = snapshot
+				claim.Status.Allocation.Devices.Results[0].AdminAccess = ptr.To(tc.admin)
+				claims = append(claims, claim)
+			}
+			pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), []*resourcev1.ResourceSlice{counters, devices}, claims))
+			if tc.wantError {
+				if pool.ValidationError == nil || !strings.HasPrefix(*pool.ValidationError, prefixCounterAccounting) || pool.PartitionSummary != nil {
+					t.Fatalf("expected unavailable counter accounting and no partition summary, got %+v", pool)
+				}
+				if tc.valueFrom && pool.ShareableSummary == nil {
+					t.Fatal("independent shareable summary must remain available")
+				}
+				if pool.TotalDevices == nil {
+					t.Fatal("basic device counts must remain available")
+				}
+				return
+			}
+			if pool.ValidationError != nil {
+				t.Fatalf("unexpected validation error: %s", *pool.ValidationError)
+			}
+			for _, summary := range pool.PartitionSummary {
+				if summary.Type == "Half" {
+					if got := ptr.Deref(summary.Allocatable, -1); got != tc.wantHalf {
+						t.Fatalf("allocatable half devices = %d, want %d", got, tc.wantHalf)
+					}
+					return
+				}
+			}
+			t.Fatal("missing Half partition summary")
+		})
+	}
+}

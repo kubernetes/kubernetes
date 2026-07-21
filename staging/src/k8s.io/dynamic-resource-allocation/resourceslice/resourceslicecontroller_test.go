@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
@@ -48,6 +49,12 @@ import (
 	"k8s.io/ktesting"
 	"k8s.io/utils/ptr"
 )
+
+// mustParseQuantityPtr parses a quantity string and returns a pointer to it.
+func mustParseQuantityPtr(value string) *resource.Quantity {
+	quantity := resource.MustParse(value)
+	return &quantity
+}
 
 // TestControllerSyncPool verifies that syncPool produces the right ResourceSlices.
 // Update vs. Create API calls are checked by bumping the ResourceVersion in
@@ -1250,8 +1257,8 @@ func testControllerSyncPool(tCtx ktesting.TContext) {
 								PerDeviceNodeSelection: ptr.To(true),
 								SharedCounters: []resourceapi.CounterSet{{
 									Name: "gpu-0",
-									Counters: map[string]resourceapi.Counter{
-										"mem": {Value: resource.MustParse("1")},
+									Counters: map[string]resourceapi.SharedCounter{
+										"mem": {Value: mustParseQuantityPtr("1")},
 									},
 								}},
 							},
@@ -1263,8 +1270,8 @@ func testControllerSyncPool(tCtx ktesting.TContext) {
 										nodeNameField(ownerName),
 										[]resourceapi.DeviceCounterConsumption{{
 											CounterSet: "gpu-0",
-											Counters: map[string]resourceapi.Counter{
-												"mem": {Value: resource.MustParse("1")},
+											Counters: map[string]resourceapi.ConsumeCounter{
+												"mem": {Value: mustParseQuantityPtr("1")},
 											},
 										}},
 									),
@@ -1287,8 +1294,8 @@ func testControllerSyncPool(tCtx ktesting.TContext) {
 					PerDeviceNodeSelection(true).
 					SharedCounters([]resourceapi.CounterSet{{
 						Name: "gpu-0",
-						Counters: map[string]resourceapi.Counter{
-							"mem": {Value: resource.MustParse("1")},
+						Counters: map[string]resourceapi.SharedCounter{
+							"mem": {Value: mustParseQuantityPtr("1")},
 						},
 					}}).
 					Driver(driverName).
@@ -1308,8 +1315,8 @@ func testControllerSyncPool(tCtx ktesting.TContext) {
 							nodeNameField(ownerName),
 							resourceapi.DeviceCounterConsumption{
 								CounterSet: "gpu-0",
-								Counters: map[string]resourceapi.Counter{
-									"mem": {Value: resource.MustParse("1")},
+								Counters: map[string]resourceapi.ConsumeCounter{
+									"mem": {Value: mustParseQuantityPtr("1")},
 								},
 							},
 						),
@@ -1329,8 +1336,8 @@ func testControllerSyncPool(tCtx ktesting.TContext) {
 								PerDeviceNodeSelection: ptr.To(true),
 								SharedCounters: []resourceapi.CounterSet{{
 									Name: "gpu-0",
-									Counters: map[string]resourceapi.Counter{
-										"mem": {Value: resource.MustParse("1")},
+									Counters: map[string]resourceapi.SharedCounter{
+										"mem": {Value: mustParseQuantityPtr("1")},
 									},
 								}},
 							},
@@ -1342,8 +1349,8 @@ func testControllerSyncPool(tCtx ktesting.TContext) {
 										nodeNameField(ownerName),
 										resourceapi.DeviceCounterConsumption{
 											CounterSet: "gpu-0",
-											Counters: map[string]resourceapi.Counter{
-												"mem": {Value: resource.MustParse("1")},
+											Counters: map[string]resourceapi.ConsumeCounter{
+												"mem": {Value: mustParseQuantityPtr("1")},
 											},
 										},
 									),
@@ -1454,6 +1461,73 @@ func testControllerSyncPool(tCtx ktesting.TContext) {
 			},
 			expectedErrors: []string{`create ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRADeviceBindingConditions`},
 		},
+		"drop-shared-consumable-capacity": {
+			features: features{disableSharedConsumableCapacity: true},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{
+							{
+								SharedCounters: []resourceapi.CounterSet{{
+									Name: "gpu-0",
+									Counters: map[string]resourceapi.SharedCounter{
+										"mem": {
+											Value: mustParseQuantityPtr("8Gi"),
+											RequestPolicy: &resourceapi.CapacityRequestPolicy{
+												Default: func() *resource.Quantity {
+													quantity := resource.MustParse("1Gi")
+													return &quantity
+												}(),
+											},
+										},
+									},
+								}},
+							},
+							{
+								Devices: []resourceapi.Device{
+									newDevice(
+										deviceName,
+										resourceapi.DeviceCounterConsumption{
+											CounterSet: "gpu-0",
+											Counters: map[string]resourceapi.ConsumeCounter{
+												"mem": {
+													ValueFrom: &resourceapi.CounterValueFrom{CapacityName: "dra.example.com/memory"},
+												},
+											},
+										},
+									),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					ResourceVersion("1").
+					AppOwnerReferences(ownerName).
+					AllNodes(false).
+					NodeName("").
+					NodeSelector(nil).
+					Driver(driverName).
+					SharedCounters([]resourceapi.CounterSet{{
+						Name: "gpu-0",
+						Counters: map[string]resourceapi.SharedCounter{
+							"mem": {Value: mustParseQuantityPtr("8Gi")},
+						},
+					}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 2}).
+					Obj(),
+			},
+			expectedErrors: []string{
+				`create ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRASharedConsumableCapacity`,
+				`processing ResourceSlice objects: create resource slice: ResourceSlice.resource.k8s.io "` + resourceSlice2 + `" is invalid: spec.devices[0].consumesCounters[0].counters[mem]: Required value: exactly one of value or valueFrom must be set`,
+			},
+		},
 		"detect-resource-pools-with-duplicate-counter-sets": {
 			nodeUID: nodeUID,
 			inputDriverResources: &DriverResources{
@@ -1553,9 +1627,9 @@ func testControllerSyncPool(tCtx ktesting.TContext) {
 								SharedCounters: []resourceapi.CounterSet{
 									{
 										Name: "counterset",
-										Counters: map[string]resourceapi.Counter{
+										Counters: map[string]resourceapi.SharedCounter{
 											"memory": {
-												Value: resource.MustParse("8Gi"),
+												Value: mustParseQuantityPtr("8Gi"),
 											},
 										},
 									},
@@ -1568,9 +1642,9 @@ func testControllerSyncPool(tCtx ktesting.TContext) {
 										ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 											{
 												CounterSet: "counterset",
-												Counters: map[string]resourceapi.Counter{
+												Counters: map[string]resourceapi.ConsumeCounter{
 													"cpu": {
-														Value: resource.MustParse("4"),
+														Value: mustParseQuantityPtr("4"),
 													},
 												},
 											},
@@ -2012,6 +2086,80 @@ func testControllerUpdateErrorHandlerCanReplaceResources(tCtx ktesting.TContext)
 	tCtx.Assert(ctrl.GetStats()).To(g.Equal(Stats{NumCreates: 1}))
 }
 
+func TestControllerAPIErrors(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	for _, verb := range []string{"create", "update"} {
+		for _, mode := range []string{"transient", "invalid", "replace-invalid-in-handler", "replace-invalid-during-write"} {
+			tCtx.Run(verb+"/"+mode, func(tCtx ktesting.TContext) {
+				const poolName = "pool"
+				invalid := mode != "transient"
+				var objects []runtime.Object
+				if verb == "update" {
+					objects = append(objects, MakeResourceSlice().Name("00000-driver-existing").ResourceVersion("1").Driver("driver").
+						AllNodes(true).Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+						Devices([]resourceapi.Device{{Name: "old-device"}}).Obj())
+				}
+				kubeClient := createTestClient(features{}, metav1.Time{}, objects...)
+				apiError := apierrors.NewServiceUnavailable("temporarily unavailable")
+				if invalid {
+					apiError = apierrors.NewInvalid(resourceapi.SchemeGroupVersion.WithKind("ResourceSlice").GroupKind(), "slice", field.ErrorList{
+						field.Required(field.NewPath("spec", "devices"), "exactly one of value or valueFrom must be set"),
+					})
+				}
+				reject := true
+				resources := &DriverResources{Pools: map[string]Pool{
+					poolName: {AllNodes: true, Generation: 1, Slices: []Slice{{Devices: []resourceapi.Device{{Name: "new-device"}}}}},
+				}}
+				var queue workqueue.Mock[string]
+				var controllerErrors []error
+				var ctrl *Controller
+				kubeClient.PrependReactor(verb, "resourceslices", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					if reject {
+						if mode == "replace-invalid-during-write" {
+							reject = false
+							ctrl.Update(resources)
+						}
+						return true, nil, apiError
+					}
+					return false, nil, nil
+				})
+				ctrl, err := newController(tCtx, Options{
+					DriverName: "driver", KubeClient: kubeClient, Resources: resources, Queue: &queue,
+					ErrorHandler: func(_ context.Context, err error, _ string) {
+						controllerErrors = append(controllerErrors, err)
+						if mode == "replace-invalid-in-handler" {
+							reject = false
+							ctrl.Update(resources)
+						}
+					},
+				})
+				tCtx.ExpectNoError(err)
+				tCtx.Cleanup(ctrl.Stop)
+
+				ctrl.run(tCtx)
+				tCtx.Require(controllerErrors).To(g.HaveLen(1))
+				tCtx.Assert(errors.Is(controllerErrors[0], apiError)).To(g.BeTrueBecause("the API error must reach the driver's error handler"))
+				if invalid {
+					tCtx.Assert(queue.State().Failures).To(g.BeEmpty(), "invalid writes must wait for replacement resources")
+					queue.Add(poolName)
+					ctrl.run(tCtx)
+					tCtx.Assert(controllerErrors).To(g.HaveLen(1), "informer resyncs must not retry rejected resources")
+				} else {
+					tCtx.Assert(queue.State().Failures).To(g.Equal(map[string]int{poolName: 1}), "transient errors must still be retried")
+				}
+				reject = false
+				ctrl.Update(resources)
+				ctrl.run(tCtx)
+				slices, err := kubeClient.ResourceV1().ResourceSlices().List(tCtx, metav1.ListOptions{})
+				tCtx.ExpectNoError(err)
+				tCtx.Require(slices.Items).To(g.HaveLen(1))
+				tCtx.Assert(slices.Items[0].Spec.Devices).To(g.Equal(resources.Pools[poolName].Slices[0].Devices))
+				tCtx.Assert(queue.State().Failures).To(g.BeEmpty())
+			})
+		}
+	}
+}
+
 func TestControllerPoolNameFieldSelector(t *testing.T) {
 	testControllerPoolNameFieldSelector(ktesting.Init(t))
 }
@@ -2191,6 +2339,7 @@ type features struct {
 	disableDeviceTaints             bool
 	disablePartitionableDevices     bool
 	disableConsumableCapacity       bool
+	disableSharedConsumableCapacity bool
 	disableOptionalNodeOperations   bool
 	disableCompatibilityGroups      bool
 	disableNodeAllocatableResources bool
@@ -2219,8 +2368,10 @@ func createResourceSliceCreateReactor(features features, timeAdded metav1.Time) 
 		if resourceslice.Name == "" && resourceslice.GenerateName != "" {
 			resourceslice.Name = fmt.Sprintf("%s%d", resourceslice.GenerateName, nameCounter)
 		}
+		if err := dropDisabledFields(features, resourceslice); err != nil {
+			return true, nil, err
+		}
 		nameCounter++
-		dropDisabledFields(features, resourceslice)
 		addTimeAdded(timeAdded, resourceslice)
 		return false, nil, nil
 	}
@@ -2242,13 +2393,15 @@ func createResourceSliceUpdateReactor(features features, timeAdded metav1.Time) 
 		}
 		rev++
 		resourceslice.ResourceVersion = fmt.Sprintf("%d", rev)
-		dropDisabledFields(features, resourceslice)
+		if err := dropDisabledFields(features, resourceslice); err != nil {
+			return true, nil, err
+		}
 		addTimeAdded(timeAdded, resourceslice)
 		return false, nil, nil
 	}
 }
 
-func dropDisabledFields(features features, resourceslice *resourceapi.ResourceSlice) {
+func dropDisabledFields(features features, resourceslice *resourceapi.ResourceSlice) error {
 	if features.disableDeviceTaints {
 		for i := range resourceslice.Spec.Devices {
 			resourceslice.Spec.Devices[i].Taints = nil
@@ -2290,6 +2443,28 @@ func dropDisabledFields(features features, resourceslice *resourceapi.ResourceSl
 			resourceslice.Spec.Devices[i].NodeAllocatableResources = nil
 		}
 	}
+	if features.disableSharedConsumableCapacity {
+		for i := range resourceslice.Spec.SharedCounters {
+			for name, counter := range resourceslice.Spec.SharedCounters[i].Counters {
+				counter.RequestPolicy = nil
+				resourceslice.Spec.SharedCounters[i].Counters[name] = counter
+			}
+		}
+		for i := range resourceslice.Spec.Devices {
+			for j := range resourceslice.Spec.Devices[i].ConsumesCounters {
+				for name, counter := range resourceslice.Spec.Devices[i].ConsumesCounters[j].Counters {
+					counter.ValueFrom = nil
+					resourceslice.Spec.Devices[i].ConsumesCounters[j].Counters[name] = counter
+					if counter.Value == nil {
+						return apierrors.NewInvalid(resourceapi.SchemeGroupVersion.WithKind("ResourceSlice").GroupKind(), resourceslice.Name, field.ErrorList{
+							field.Required(field.NewPath("spec", "devices").Index(i).Child("consumesCounters").Index(j).Child("counters").Key(name), "exactly one of value or valueFrom must be set"),
+						})
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func addTimeAdded(timeAdded metav1.Time, resourceslice *resourceapi.ResourceSlice) {
