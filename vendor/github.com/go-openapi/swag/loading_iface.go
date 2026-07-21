@@ -80,11 +80,13 @@ func YAMLData(path string) (any, error) {
 // loadingOptionsWithDefaults bridges deprecated default settings that use package-level variables,
 // with the recommended use of loading.Option.
 func loadingOptionsWithDefaults(opts []loading.Option) []loading.Option {
-	o := []loading.Option{
+	const defaultOptions = 3
+	o := make([]loading.Option, 0, defaultOptions+len(opts))
+	o = append(o, []loading.Option{
 		loading.WithTimeout(LoadHTTPTimeout),
 		loading.WithBasicAuth(LoadHTTPBasicAuthUsername, LoadHTTPBasicAuthPassword),
 		loading.WithCustomHeaders(LoadHTTPCustomHeaders),
-	}
+	}...)
 	o = append(o, opts...)
 
 	return o

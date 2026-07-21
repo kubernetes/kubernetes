@@ -12,6 +12,7 @@ linters:
     - paralleltest
     - recvcheck
     - testpackage
+    - thelper
     - tparallel
     - varnamelen
     - whitespace

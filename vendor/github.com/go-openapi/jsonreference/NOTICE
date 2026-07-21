@@ -3,7 +3,7 @@ Copyright 2015-2025 go-swagger maintainers
 // SPDX-FileCopyrightText: Copyright 2015-2025 go-swagger maintainers
 // SPDX-License-Identifier: Apache-2.0
 
-This software library, github.com/go-openapi/jsonpointer, includes software developed
+This software library, github.com/go-openapi/jsonreference, includes software developed
 by the go-swagger and go-openapi maintainers ("go-swagger maintainers").
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +18,7 @@ It ships with copies of other software which license terms are recalled below.
 
 The original software was authored on 25-02-2013 by sigu-399 (https://github.com/sigu-399, sigu.399@gmail.com).
 
-github.com/sigh-399/jsonpointer
+github.com/sigh-399/jsonreference
 ===========================
 
 // SPDX-FileCopyrightText: Copyright 2013 sigu-399 ( https://github.com/sigu-399 )

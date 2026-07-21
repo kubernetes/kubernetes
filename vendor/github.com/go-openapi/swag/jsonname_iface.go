@@ -4,21 +4,21 @@
 package swag
 
 import (
-	"github.com/go-openapi/swag/jsonname"
+	"github.com/go-openapi/jsonpointer/jsonname"
 )
 
 // DefaultJSONNameProvider is the default cache for types
 //
-// Deprecated: use [jsonname.DefaultJSONNameProvider] instead.
+// Deprecated: use [github.com/go-openapi/jsonpointer/jsonname.DefaultJSONNameProvider] instead.
 var DefaultJSONNameProvider = jsonname.DefaultJSONNameProvider
 
 // NameProvider represents an object capable of translating from go property names
 // to json property names.
 //
-// Deprecated: use [jsonname.NameProvider] instead.
+// Deprecated: use [github.com/go-openapi/jsonpointer/jsonname.NameProvider] instead.
 type NameProvider = jsonname.NameProvider
 
 // NewNameProvider creates a new name provider
 //
-// Deprecated: use [jsonname.NewNameProvider] instead.
+// Deprecated: use [github.com/go-openapi/jsonpointer/jsonname.NewNameProvider] instead.
 func NewNameProvider() *NameProvider { return jsonname.NewNameProvider() }

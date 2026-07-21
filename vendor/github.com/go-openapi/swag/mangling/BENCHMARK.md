@@ -4,7 +4,7 @@
 go test -bench XXX -run XXX -benchtime 30s
 ```
 
-## Benchmarks at b3e7a5386f996177e4808f11acb2aa93a0f660df
+## Benchmarks at `b3e7a5386f996177e4808f11acb2aa93a0f660df`
 
 ```
 goos: linux
@@ -49,7 +49,7 @@ BenchmarkToXXXName/ToHumanNameLower-16 	18599661	      1946 ns/op	      92 B/op	
 BenchmarkToXXXName/ToHumanNameTitle-16 	17581353	      2054 ns/op	     105 B/op	       6 allocs/op
 ```
 
-## Benchmarks at d7d2d1b895f5b6747afaff312dd2a402e69e818b
+## Benchmarks at `d7d2d1b895f5b6747afaff312dd2a402e69e818b`
 
 go1.24
 
