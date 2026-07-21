@@ -39,6 +39,58 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/util"
 )
 
+// ApplyPodLevelMemoryHigh sets memory.high on the pod cgroup using the KEP-2570 formula.
+// Applies when PodLevelResources is enabled and the pod has memory limits declared
+// (either pod-level or all containers). Skips Guaranteed-like pods where request == limit.
+func ApplyPodLevelMemoryHigh(pod *v1.Pod, rc *ResourceConfig, throttlingFactor float64) {
+	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources)
+	if !podLevelResourcesEnabled || !resourcehelper.IsPodLevelResourcesSet(pod) {
+		return
+	}
+	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
+	limits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+	memoryLimitsDeclared := true
+	for c := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if c.Resources.Limits.Memory().IsZero() {
+			memoryLimitsDeclared = false
+		}
+	}
+	if !pod.Spec.Resources.Limits.Memory().IsZero() {
+		memoryLimitsDeclared = true
+	}
+	if !memoryLimitsDeclared {
+		return
+	}
+	memoryRequest := int64(0)
+	memoryLimit := int64(0)
+	if req, found := reqs[v1.ResourceMemory]; found {
+		memoryRequest = req.Value()
+	}
+	if lim, found := limits[v1.ResourceMemory]; found {
+		memoryLimit = lim.Value()
+	}
+	if val := memoryHighForPod(memoryRequest, memoryLimit, throttlingFactor); val != "" {
+		if rc.Unified == nil {
+			rc.Unified = map[string]string{}
+		}
+		rc.Unified[Cgroup2MemoryHigh] = val
+	}
+}
+
+func memoryHighForPod(memoryRequest, memoryLimit int64, throttlingFactor float64) string {
+	if (memoryRequest == memoryLimit && memoryRequest != 0) || memoryLimit == 0 {
+		return ""
+	}
+	pageSize := int64(os.Getpagesize())
+	memoryHigh := int64(math.Floor(
+		float64(memoryRequest)+
+			(float64(memoryLimit)-float64(memoryRequest))*throttlingFactor)/float64(pageSize)) * pageSize
+	if memoryHigh > 0 && memoryHigh > memoryRequest {
+		return strconv.FormatInt(memoryHigh, 10)
+	}
+	return ""
+}
+
 const (
 	// These limits are defined in the kernel:
 	// https://github.com/torvalds/linux/blob/0bddd227f3dc55975e2b8dfa7fc6f959b062a2c7/kernel/sched/sched.h#L427-L428

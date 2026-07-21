@@ -60,6 +60,8 @@ type podContainerManagerImpl struct {
 	podContainerManager ContainerManager
 	// memoryReservationPolicy controls memory reservation protection behavior
 	memoryReservationPolicy kubeletconfig.MemoryReservationPolicy
+	// memoryThrottlingFactor is used to compute pod-level memory.high
+	memoryThrottlingFactor *float64
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -98,6 +100,7 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
 		}
 		if enforceMemoryQoS {
+			m.applyPodLevelMemoryHigh(pod, containerConfig.ResourceParameters)
 			logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
 		}
 		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
@@ -106,6 +109,15 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 
 	}
 	return nil
+}
+
+// applyPodLevelMemoryHigh sets memory.high on the pod cgroup.
+// The kernel enforces memory.high hierarchically (try_charge_memcg walks ancestors),
+// so this throttles all containers in the pod without per-container memory.high.
+func (m *podContainerManagerImpl) applyPodLevelMemoryHigh(pod *v1.Pod, rc *ResourceConfig) {
+	if m.memoryThrottlingFactor != nil {
+		ApplyPodLevelMemoryHigh(pod, rc, *m.memoryThrottlingFactor)
+	}
 }
 
 // GetPodContainerName returns the CgroupName identifier, and its literal cgroupfs form on the host.

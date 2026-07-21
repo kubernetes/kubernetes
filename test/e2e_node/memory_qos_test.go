@@ -1197,4 +1197,60 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 				"container-level memory.low persists after rollback (CRI limitation)")
 		})
 	})
+
+	f.Describe("IPPR resize with memory protection", func() {
+		ginkgo.AfterEach(func(ctx context.Context) { restoreConfig(ctx) })
+
+		ginkgo.It("should update pod-level memory.low after Burstable pod resize", func(ctx context.Context) {
+			configureMemoryQoSWithPolicy(ctx, 0.9, kubeletconfig.TieredReservationMemoryReservationPolicy)
+
+			initialRequest := resource.MustParse("128Mi")
+			initialLimit := resource.MustParse("256Mi")
+			pod := memqosMakePod("memqos-resize-protection", f.Namespace.Name,
+				v1.ResourceList{
+					v1.ResourceMemory: initialRequest,
+					v1.ResourceCPU:    resource.MustParse("50m"),
+				},
+				v1.ResourceList{
+					v1.ResourceMemory: initialLimit,
+					v1.ResourceCPU:    resource.MustParse("100m"),
+				},
+			)
+			pod.Spec.Containers[0].ResizePolicy = []v1.ContainerResizePolicy{
+				{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired},
+				{ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired},
+			}
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
+			gomega.Expect(podCgroupPath).NotTo(gomega.BeEmpty())
+
+			ginkgo.By("Verifying initial memory.low matches request")
+			podMemLow, err := memqosReadCgroupInt64(podCgroupPath, cgroupMemoryLow)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod memory.low before resize: got=%d, expected=%d", podMemLow, initialRequest.Value())
+			gomega.Expect(podMemLow).To(gomega.Equal(initialRequest.Value()),
+				"pod memory.low should equal initial request before resize")
+
+			ginkgo.By("Resizing memory request and limit via IPPR")
+			pod, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			newRequest := resource.MustParse("192Mi")
+			newLimit := resource.MustParse("384Mi")
+			pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = newRequest
+			pod.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = newLimit
+			_, err = f.ClientSet.CoreV1().Pods(pod.Namespace).UpdateResize(ctx, pod.Name, pod, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verifying pod-level memory.low updated to new request")
+			gomega.Eventually(ctx, func() int64 {
+				val, _ := memqosReadCgroupInt64(podCgroupPath, cgroupMemoryLow)
+				framework.Logf("Pod memory.low after resize: got=%d, expected=%d", val, newRequest.Value())
+				return val
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(
+				gomega.Equal(newRequest.Value()),
+				"pod memory.low should update to new request after IPPR resize")
+		})
+	})
 })

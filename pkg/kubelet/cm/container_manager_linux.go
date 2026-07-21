@@ -410,6 +410,7 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			cpuCFSQuotaPeriod:       uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
 			podContainerManager:     cm,
 			memoryReservationPolicy: cm.MemoryReservationPolicy,
+			memoryThrottlingFactor:  cm.MemoryThrottlingFactor,
 		}
 	}
 	return &podContainerManagerNoop{

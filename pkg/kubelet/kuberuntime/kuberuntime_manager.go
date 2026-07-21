@@ -882,17 +882,19 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 
 	resizeResult := kubecontainer.NewSyncResult(kubecontainer.ResizePodInPlace, format.Pod(pod))
 	pcm := m.containerManager.NewPodContainerManager()
-	//TODO(vinaykul,InPlacePodVerticalScaling): Figure out best way to get enforceMemoryQoS value (parameter #4 below) in platform-agnostic way
 	enforceCPULimits := m.cpuCFSQuota
 	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.PodHasExclusiveCPUs(logger, pod) {
 		enforceCPULimits = false
 		logger.V(2).Info("Disabled CFS quota", "pod", klog.KObj(pod))
 	}
-	podResources := cm.ResourceConfigForPod(pod, enforceCPULimits, uint64((m.cpuCFSQuotaPeriod.Duration)/time.Microsecond), false, kubeletconfiginternal.NoneMemoryReservationPolicy)
+	podResources := cm.ResourceConfigForPod(pod, enforceCPULimits, uint64((m.cpuCFSQuotaPeriod.Duration)/time.Microsecond), m.isMemoryQoSEnforced(), m.memoryReservationPolicy)
 	if podResources == nil {
 		logger.Error(nil, "Unable to get resource configuration", "pod", klog.KObj(pod))
 		resizeResult.Fail(kubecontainer.ErrResizePodInPlace, fmt.Sprintf("unable to get resource configuration processing resize for pod %q", format.Pod(pod)))
 		return resizeResult
+	}
+	if m.isMemoryQoSEnforced() {
+		m.applyPodLevelMemoryHigh(pod, podResources)
 	}
 	currentPodMemoryConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceMemory)
 	if err != nil {
@@ -987,6 +989,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 				return nil
 			}
 			resizedResources.Memory = podResources.Memory
+			resizedResources.Unified = podResources.Unified
 		}
 
 		// Notify the runtime first. If this fails, the runtime has rejected the resize.
