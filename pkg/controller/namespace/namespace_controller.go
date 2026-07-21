@@ -34,7 +34,6 @@ import (
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/namespace/deletion"
 
 	"k8s.io/klog/v2"
@@ -68,7 +67,7 @@ func NewNamespaceController(
 	kubeClient clientset.Interface,
 	metadataClient metadata.Interface,
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
-	namespaceInformer coreinformers.NamespaceInformer,
+	namespaceInformer coreinformers.TypedNamespaceInformer,
 	resyncPeriod time.Duration,
 	finalizerToken v1.FinalizerName) *NamespaceController {
 
@@ -84,18 +83,16 @@ func NewNamespaceController(
 	}
 
 	// configure the namespace informer event handlers
-	namespaceInformer.Informer().AddEventHandlerWithResyncPeriod(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				namespace := obj.(*v1.Namespace)
-				namespaceController.enqueueNamespace(ctx, namespace)
+	_, _ = namespaceInformer.TypedInformer().AddTypedEventHandler(
+		coreinformers.NamespaceHandlerFuncs{
+			AddFunc: func(namespace *v1.Namespace) {
+				namespaceController.enqueueNamespace(namespace)
 			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				namespace := newObj.(*v1.Namespace)
-				namespaceController.enqueueNamespace(ctx, namespace)
+			UpdateFunc: func(_, namespace *v1.Namespace) {
+				namespaceController.enqueueNamespace(namespace)
 			},
 		},
-		resyncPeriod,
+		cache.HandlerOptions{ResyncPeriod: &resyncPeriod},
 	)
 	namespaceController.lister = namespaceInformer.Lister()
 	namespaceController.listerSynced = namespaceInformer.Informer().HasSynced
@@ -116,15 +113,7 @@ func nsControllerRateLimiter() workqueue.TypedRateLimiter[string] {
 }
 
 // enqueueNamespace adds an object to the controller work queue
-// obj could be an *v1.Namespace, or a DeletionFinalStateUnknown item.
-func (nm *NamespaceController) enqueueNamespace(ctx context.Context, obj interface{}) {
-	key, err := controller.KeyFunc(obj)
-	if err != nil {
-		utilruntime.HandleErrorWithContext(ctx, err, "Couldn't get key for object", "object", obj)
-		return
-	}
-
-	namespace := obj.(*v1.Namespace)
+func (nm *NamespaceController) enqueueNamespace(namespace *v1.Namespace) {
 	// don't queue if we aren't deleted
 	if namespace.DeletionTimestamp == nil || namespace.DeletionTimestamp.IsZero() {
 		return
@@ -132,7 +121,7 @@ func (nm *NamespaceController) enqueueNamespace(ctx context.Context, obj interfa
 
 	// delay processing namespace events to allow HA api servers to observe namespace deletion,
 	// and HA etcd servers to observe last minute object creations inside the namespace
-	nm.queue.AddAfter(key, namespaceDeletionGracePeriod)
+	nm.queue.AddAfter(namespace.Name, namespaceDeletionGracePeriod)
 }
 
 // worker processes the queue of namespace objects.

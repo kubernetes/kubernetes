@@ -100,7 +100,7 @@ type expandController struct {
 func NewExpandController(
 	ctx context.Context,
 	kubeClient clientset.Interface,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer,
+	pvcInformer coreinformers.TypedPersistentVolumeClaimInformer,
 	plugins []volume.VolumePlugin,
 	translator CSINameTranslator,
 	csiMigratedPluginManager csimigration.PluginManager) (ExpandController, error) {
@@ -133,30 +133,21 @@ func NewExpandController(
 		expc.recorder,
 		blkutil)
 
-	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: expc.enqueuePVC,
-		UpdateFunc: func(old, new interface{}) {
-			oldPVC, ok := old.(*v1.PersistentVolumeClaim)
-			if !ok {
-				return
-			}
-
+	_, _ = pvcInformer.TypedInformer().AddTypedEventHandler(coreinformers.PersistentVolumeClaimHandlerFuncs{
+		AddFunc: func(pvc *v1.PersistentVolumeClaim) { expc.enqueuePVC(pvc) },
+		UpdateFunc: func(oldPVC, newPVC *v1.PersistentVolumeClaim) {
 			oldReq := oldPVC.Spec.Resources.Requests[v1.ResourceStorage]
 			oldCap := oldPVC.Status.Capacity[v1.ResourceStorage]
-			newPVC, ok := new.(*v1.PersistentVolumeClaim)
-			if !ok {
-				return
-			}
 			newReq := newPVC.Spec.Resources.Requests[v1.ResourceStorage]
 			newCap := newPVC.Status.Capacity[v1.ResourceStorage]
 			// PVC will be enqueued under 2 circumstances
 			// 1. User has increased PVC's request capacity --> volume needs to be expanded
 			// 2. PVC status capacity has been expanded --> claim's bound PV has likely recently gone through filesystem resize, so remove AnnPreResizeCapacity annotation from PV
 			if newReq.Cmp(oldReq) > 0 || newCap.Cmp(oldCap) > 0 {
-				expc.enqueuePVC(new)
+				expc.enqueuePVC(newPVC)
 			}
 		},
-		DeleteFunc: expc.enqueuePVC,
+		DeleteFunc: func(pvc coreinformers.DeletedPersistentVolumeClaim) { expc.enqueuePVC(pvc.OptionalObj) },
 	})
 
 	return expc, nil

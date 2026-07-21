@@ -57,7 +57,7 @@ type Controller struct {
 }
 
 // NewStorageVersionGC creates a new Controller.
-func NewStorageVersionGC(ctx context.Context, clientset kubernetes.Interface, leaseInformer coordinformers.LeaseInformer, storageVersionInformer apiserverinternalinformers.StorageVersionInformer) *Controller {
+func NewStorageVersionGC(ctx context.Context, clientset kubernetes.Interface, leaseInformer coordinformers.TypedLeaseInformer, storageVersionInformer apiserverinternalinformers.TypedStorageVersionInformer) *Controller {
 	c := &Controller{
 		kubeclientset:        clientset,
 		leaseLister:          leaseInformer.Lister(),
@@ -73,18 +73,18 @@ func NewStorageVersionGC(ctx context.Context, clientset kubernetes.Interface, le
 		),
 	}
 	logger := klog.FromContext(ctx)
-	_, err := leaseInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		DeleteFunc: func(obj interface{}) {
-			c.onDeleteLease(logger, obj)
+	_, err := leaseInformer.TypedInformer().AddTypedEventHandler(coordinformers.LeaseHandlerFuncs{
+		DeleteFunc: func(deleted coordinformers.DeletedLease) {
+			c.onDeleteLease(logger, deleted)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
 	utilruntime.Must(err)
 	// use the default resync period from the informer
-	_, err = storageVersionInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, err = storageVersionInformer.TypedInformer().AddTypedEventHandler(apiserverinternalinformers.StorageVersionHandlerFuncs{
+		AddFunc: func(obj *apiserverinternalv1alpha1.StorageVersion) {
 			c.onAddStorageVersion(logger, obj)
 		},
-		UpdateFunc: func(old, newObj interface{}) {
+		UpdateFunc: func(old, newObj *apiserverinternalv1alpha1.StorageVersion) {
 			c.onUpdateStorageVersion(logger, old, newObj)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
@@ -240,14 +240,12 @@ func (c *Controller) syncStorageVersion(ctx context.Context, name string) error 
 	return c.updateOrDeleteStorageVersion(ctx, sv, serverStorageVersions)
 }
 
-func (c *Controller) onAddStorageVersion(logger klog.Logger, obj interface{}) {
-	castObj := obj.(*apiserverinternalv1alpha1.StorageVersion)
-	c.enqueueStorageVersion(logger, castObj)
+func (c *Controller) onAddStorageVersion(logger klog.Logger, obj *apiserverinternalv1alpha1.StorageVersion) {
+	c.enqueueStorageVersion(logger, obj)
 }
 
-func (c *Controller) onUpdateStorageVersion(logger klog.Logger, oldObj, newObj interface{}) {
-	castNewObj := newObj.(*apiserverinternalv1alpha1.StorageVersion)
-	c.enqueueStorageVersion(logger, castNewObj)
+func (c *Controller) onUpdateStorageVersion(logger klog.Logger, _, newObj *apiserverinternalv1alpha1.StorageVersion) {
+	c.enqueueStorageVersion(logger, newObj)
 }
 
 // enqueueStorageVersion enqueues the storage version if it has entry for invalid apiserver
@@ -264,26 +262,15 @@ func (c *Controller) enqueueStorageVersion(logger klog.Logger, obj *apiserverint
 	}
 }
 
-func (c *Controller) onDeleteLease(logger klog.Logger, obj interface{}) {
-	castObj, ok := obj.(*coordinationv1.Lease)
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-			return
-		}
-		castObj, ok = tombstone.Obj.(*coordinationv1.Lease)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Lease %#v", obj))
-			return
-		}
+func (c *Controller) onDeleteLease(logger klog.Logger, deleted coordinformers.DeletedLease) {
+	if deleted.OptionalObj == nil {
+		return
 	}
-
-	if castObj.Namespace == metav1.NamespaceSystem &&
-		castObj.Labels != nil &&
-		castObj.Labels[controlplane.IdentityLeaseComponentLabelKey] == apiserver.KubeAPIServer {
-		logger.V(4).Info("Observed lease deleted", "castObjName", castObj.Name)
-		c.enqueueLease(castObj)
+	if deleted.OptionalObj.Namespace == metav1.NamespaceSystem &&
+		deleted.OptionalObj.Labels != nil &&
+		deleted.OptionalObj.Labels[controlplane.IdentityLeaseComponentLabelKey] == apiserver.KubeAPIServer {
+		logger.V(4).Info("Observed lease deleted", "leaseName", deleted.GetName())
+		c.enqueueLease(deleted.OptionalObj)
 	}
 }
 

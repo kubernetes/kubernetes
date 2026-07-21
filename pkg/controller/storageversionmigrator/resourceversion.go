@@ -72,7 +72,7 @@ func NewResourceVersionController(
 	kubeClient clientset.Interface,
 	discoveryClient discovery.DiscoveryInterface,
 	metadataClient metadata.Interface,
-	svmInformer svminformers.StorageVersionMigrationInformer,
+	svmInformer svminformers.TypedStorageVersionMigrationInformer,
 	mapper meta.ResettableRESTMapper,
 ) *ResourceVersionController {
 	logger := klog.FromContext(ctx)
@@ -90,11 +90,11 @@ func NewResourceVersionController(
 		),
 	}
 
-	_, err := svmInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, err := svmInformer.TypedInformer().AddTypedEventHandler(svminformers.StorageVersionMigrationHandlerFuncs{
+		AddFunc: func(obj *svmv1.StorageVersionMigration) {
 			rvController.addSVM(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *svmv1.StorageVersionMigration) {
 			rvController.updateSVM(logger, oldObj, newObj)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
@@ -103,15 +103,12 @@ func NewResourceVersionController(
 	return rvController
 }
 
-func (rv *ResourceVersionController) addSVM(logger klog.Logger, obj interface{}) {
-	svm := obj.(*svmv1.StorageVersionMigration)
+func (rv *ResourceVersionController) addSVM(logger klog.Logger, svm *svmv1.StorageVersionMigration) {
 	logger.V(4).Info("Adding", "svm", klog.KObj(svm))
 	rv.enqueue(svm)
 }
 
-func (rv *ResourceVersionController) updateSVM(logger klog.Logger, oldObj, newObj interface{}) {
-	oldSVM := oldObj.(*svmv1.StorageVersionMigration)
-	newSVM := newObj.(*svmv1.StorageVersionMigration)
+func (rv *ResourceVersionController) updateSVM(logger klog.Logger, oldSVM, newSVM *svmv1.StorageVersionMigration) {
 	logger.V(4).Info("Updating", "svm", klog.KObj(oldSVM))
 	rv.enqueue(newSVM)
 }

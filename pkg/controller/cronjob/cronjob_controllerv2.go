@@ -86,7 +86,7 @@ type ControllerV2 struct {
 }
 
 // NewControllerV2 creates and initializes a new Controller.
-func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInformer, cronJobsInformer batchv1informers.CronJobInformer, kubeClient clientset.Interface) (*ControllerV2, error) {
+func NewControllerV2(ctx context.Context, jobInformer batchv1informers.TypedJobInformer, cronJobsInformer batchv1informers.TypedCronJobInformer, kubeClient clientset.Interface) (*ControllerV2, error) {
 	logger := klog.FromContext(ctx)
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 
@@ -114,30 +114,26 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 		now: time.Now,
 	}
 
-	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = jobInformer.TypedInformer().AddTypedEventHandler(batchv1informers.JobHandlerFuncs{
 		AddFunc:    jm.addJob,
 		UpdateFunc: jm.updateJob,
 		DeleteFunc: jm.deleteJob,
 	})
 
-	cronJobsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = cronJobsInformer.TypedInformer().AddTypedEventHandler(batchv1informers.CronJobHandlerFuncs{
+		AddFunc: func(obj *batchv1.CronJob) {
 			jm.enqueueController(obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *batchv1.CronJob) {
 			jm.updateCronJob(logger, oldObj, newObj)
 		},
-		DeleteFunc: func(obj interface{}) {
-			jm.enqueueController(obj)
+		DeleteFunc: func(obj batchv1informers.DeletedCronJob) {
+			jm.queue.Add(obj.GetKey())
 		},
 	})
 
-	err := jobInformer.Informer().AddIndexers(cache.Indexers{
-		jobControllerUIDIndex: func(obj interface{}) ([]string, error) {
-			job, ok := obj.(*batchv1.Job)
-			if !ok {
-				return nil, nil
-			}
+	err := jobInformer.TypedInformer().AddTypedIndexers(batchv1informers.JobIndexers{
+		jobControllerUIDIndex: func(job *batchv1.Job) ([]string, error) {
 			if controllerRef := metav1.GetControllerOf(job); controllerRef != nil {
 				return []string{string(controllerRef.UID)}, nil
 			}
@@ -298,12 +294,11 @@ func (jm *ControllerV2) resolveControllerRef(namespace string, controllerRef *me
 }
 
 // When a job is created, enqueue the controller that manages it and update it's expectations.
-func (jm *ControllerV2) addJob(obj interface{}) {
-	job := obj.(*batchv1.Job)
+func (jm *ControllerV2) addJob(job *batchv1.Job) {
 	if job.DeletionTimestamp != nil {
 		// on a restart of the controller, it's possible a new job shows up in a state that
 		// is already pending deletion. Prevent the job from being a creation observation.
-		jm.deleteJob(job)
+		jm.deleteJob(batchv1informers.DeletedJob{OptionalObj: job})
 		return
 	}
 
@@ -322,9 +317,7 @@ func (jm *ControllerV2) addJob(obj interface{}) {
 // is updated and wake them up. If the anything of the Job have changed, we need to
 // awaken both the old and new CronJob. old and cur must be *batchv1.Job
 // types.
-func (jm *ControllerV2) updateJob(old, cur interface{}) {
-	curJob := cur.(*batchv1.Job)
-	oldJob := old.(*batchv1.Job)
+func (jm *ControllerV2) updateJob(oldJob, curJob *batchv1.Job) {
 	if curJob.ResourceVersion == oldJob.ResourceVersion {
 		// Periodic resync will send update events for all known jobs.
 		// Two different versions of the same jobs will always have different RVs.
@@ -352,23 +345,11 @@ func (jm *ControllerV2) updateJob(old, cur interface{}) {
 	}
 }
 
-func (jm *ControllerV2) deleteJob(obj interface{}) {
-	job, ok := obj.(*batchv1.Job)
-
-	// When a delete is dropped, the relist will notice a job in the store not
-	// in the list, leading to the insertion of a tombstone object which contains
-	// the deleted key/value. Note that this value might be stale.
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
-			return
-		}
-		job, ok = tombstone.Obj.(*batchv1.Job)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Job %#v", obj))
-			return
-		}
+func (jm *ControllerV2) deleteJob(deleted batchv1informers.DeletedJob) {
+	job := deleted.OptionalObj
+	if job == nil {
+		utilruntime.HandleError(fmt.Errorf("deleted Job %q is unavailable", deleted.GetKey()))
+		return
 	}
 
 	controllerRef := metav1.GetControllerOf(job)
@@ -405,14 +386,7 @@ func (jm *ControllerV2) enqueueControllerAfter(obj interface{}, t time.Duration)
 
 // updateCronJob re-queues the CronJob for next scheduled time if there is a
 // change in spec.schedule otherwise it re-queues it now
-func (jm *ControllerV2) updateCronJob(logger klog.Logger, old interface{}, curr interface{}) {
-	oldCJ, okOld := old.(*batchv1.CronJob)
-	newCJ, okNew := curr.(*batchv1.CronJob)
-
-	if !okOld || !okNew {
-		// typecasting of one failed, handle this better, may be log entry
-		return
-	}
+func (jm *ControllerV2) updateCronJob(logger klog.Logger, oldCJ, newCJ *batchv1.CronJob) {
 	// if the change in schedule results in next requeue having to be sooner than it already was,
 	// it will be handled here by the queue. If the next requeue is further than previous schedule,
 	// the sync loop will essentially be a no-op for the already queued key with old schedule.
@@ -429,7 +403,7 @@ func (jm *ControllerV2) updateCronJob(logger klog.Logger, old interface{}, curr 
 		now := jm.now()
 		t := nextScheduleTimeDuration(newCJ, now, sched)
 
-		jm.enqueueControllerAfter(curr, *t)
+		jm.enqueueControllerAfter(newCJ, *t)
 		return
 	}
 
@@ -438,7 +412,7 @@ func (jm *ControllerV2) updateCronJob(logger klog.Logger, old interface{}, curr 
 	// during the next schedule
 	// TODO: need to handle the change of spec.JobTemplate.metadata.labels explicitly
 	//   to cleanup jobs with old labels
-	jm.enqueueController(curr)
+	jm.enqueueController(newCJ)
 }
 
 // syncCronJob reconciles a CronJob with a list of any Jobs that it created.

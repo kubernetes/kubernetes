@@ -57,7 +57,7 @@ type ControllerOptions struct {
 	// Must have authority to list all quotas, and update quota status
 	QuotaClient corev1client.ResourceQuotasGetter
 	// Shared informer for resource quotas
-	ResourceQuotaInformer coreinformers.ResourceQuotaInformer
+	ResourceQuotaInformer coreinformers.TypedResourceQuotaInformer
 	// Controls full recalculation of quota usage
 	ResyncPeriod controller.ResyncPeriodFunc
 	// Maintains evaluators that know how to calculate usage for group resource
@@ -125,12 +125,13 @@ func NewController(ctx context.Context, options *ControllerOptions) (*Controller
 
 	logger := klog.FromContext(ctx)
 
-	options.ResourceQuotaInformer.Informer().AddEventHandlerWithResyncPeriod(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
+	resyncPeriod := rq.resyncPeriod()
+	_, _ = options.ResourceQuotaInformer.TypedInformer().AddTypedEventHandler(
+		coreinformers.ResourceQuotaHandlerFuncs{
+			AddFunc: func(obj *v1.ResourceQuota) {
 				rq.addQuota(logger, obj)
 			},
-			UpdateFunc: func(old, cur interface{}) {
+			UpdateFunc: func(oldResourceQuota, curResourceQuota *v1.ResourceQuota) {
 				// We are only interested in observing updates to quota.spec to drive updates to quota.status.
 				// We ignore all updates to quota.Status because they are all driven by this controller.
 				// IMPORTANT:
@@ -139,8 +140,6 @@ func NewController(ctx context.Context, options *ControllerOptions) (*Controller
 				// that cannot be backed by a cache and result in a full query of a namespace's content, we do not
 				// want to pay the price on spurious status updates.  As a result, we have a separate routine that is
 				// responsible for enqueue of all resource quotas when doing a full resync (enqueueAll)
-				oldResourceQuota := old.(*v1.ResourceQuota)
-				curResourceQuota := cur.(*v1.ResourceQuota)
 				if quota.Equals(oldResourceQuota.Spec.Hard, curResourceQuota.Spec.Hard) {
 					return
 				}
@@ -149,11 +148,11 @@ func NewController(ctx context.Context, options *ControllerOptions) (*Controller
 			// This will enter the sync loop and no-op, because the controller has been deleted from the store.
 			// Note that deleting a controller immediately after scaling it to 0 will not work. The recommended
 			// way of achieving this is by performing a `stop` operation on the controller.
-			DeleteFunc: func(obj interface{}) {
-				rq.enqueueResourceQuota(logger, obj)
+			DeleteFunc: func(obj coreinformers.DeletedResourceQuota) {
+				rq.queue.Add(obj.GetKey())
 			},
 		},
-		rq.resyncPeriod(),
+		cache.HandlerOptions{ResyncPeriod: &resyncPeriod},
 	)
 
 	if options.DiscoveryFunc != nil {

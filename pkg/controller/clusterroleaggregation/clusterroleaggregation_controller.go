@@ -53,7 +53,7 @@ type ClusterRoleAggregationController struct {
 }
 
 // NewClusterRoleAggregation creates a new controller
-func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.ClusterRoleInformer, clusterRoleClient rbacclient.ClusterRolesGetter) *ClusterRoleAggregationController {
+func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.TypedClusterRoleInformer, clusterRoleClient rbacclient.ClusterRolesGetter) *ClusterRoleAggregationController {
 	c := &ClusterRoleAggregationController{
 		clusterRoleClient:  clusterRoleClient,
 		clusterRoleLister:  clusterRoleInformer.Lister(),
@@ -68,14 +68,14 @@ func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.ClusterRoleInfo
 	}
 	c.syncHandler = c.syncClusterRole
 
-	clusterRoleInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = clusterRoleInformer.TypedInformer().AddTypedEventHandler(rbacinformers.ClusterRoleHandlerFuncs{
+		AddFunc: func(_ *rbacv1.ClusterRole) {
 			c.enqueue()
 		},
-		UpdateFunc: func(old, cur interface{}) {
+		UpdateFunc: func(_, _ *rbacv1.ClusterRole) {
 			c.enqueue()
 		},
-		DeleteFunc: func(uncast interface{}) {
+		DeleteFunc: func(_ rbacinformers.DeletedClusterRole) {
 			c.enqueue()
 		},
 	})

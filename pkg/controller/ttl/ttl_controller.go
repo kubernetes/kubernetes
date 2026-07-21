@@ -28,7 +28,6 @@ package ttl
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"strconv"
 	"sync"
@@ -78,7 +77,7 @@ type Controller struct {
 }
 
 // NewTTLController creates a new TTLController
-func NewTTLController(ctx context.Context, nodeInformer informers.NodeInformer, kubeClient clientset.Interface) *Controller {
+func NewTTLController(ctx context.Context, nodeInformer informers.TypedNodeInformer, kubeClient clientset.Interface) *Controller {
 	ttlc := &Controller{
 		kubeClient: kubeClient,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -87,11 +86,11 @@ func NewTTLController(ctx context.Context, nodeInformer informers.NodeInformer, 
 		),
 	}
 	logger := klog.FromContext(ctx)
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = nodeInformer.TypedInformer().AddTypedEventHandler(informers.NodeHandlerFuncs{
+		AddFunc: func(obj *v1.Node) {
 			ttlc.addNode(logger, obj)
 		},
-		UpdateFunc: func(old, newObj interface{}) {
+		UpdateFunc: func(old, newObj *v1.Node) {
 			ttlc.updateNode(logger, old, newObj)
 		},
 		DeleteFunc: ttlc.deleteNode,
@@ -145,13 +144,7 @@ func (ttlc *Controller) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func (ttlc *Controller) addNode(logger klog.Logger, obj interface{}) {
-	node, ok := obj.(*v1.Node)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
-		return
-	}
-
+func (ttlc *Controller) addNode(logger klog.Logger, node *v1.Node) {
 	func() {
 		ttlc.lock.Lock()
 		defer ttlc.lock.Unlock()
@@ -164,12 +157,7 @@ func (ttlc *Controller) addNode(logger klog.Logger, obj interface{}) {
 	ttlc.enqueueNode(logger, node)
 }
 
-func (ttlc *Controller) updateNode(logger klog.Logger, _, newObj interface{}) {
-	node, ok := newObj.(*v1.Node)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
-		return
-	}
+func (ttlc *Controller) updateNode(logger klog.Logger, _, node *v1.Node) {
 	// Processing all updates of nodes guarantees that we will update
 	// the ttl annotation, when cluster size changes.
 	// We are relying on the fact that Kubelet is updating node status
@@ -178,21 +166,7 @@ func (ttlc *Controller) updateNode(logger klog.Logger, _, newObj interface{}) {
 	ttlc.enqueueNode(logger, node)
 }
 
-func (ttlc *Controller) deleteNode(obj interface{}) {
-	_, ok := obj.(*v1.Node)
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
-			return
-		}
-		_, ok = tombstone.Obj.(*v1.Node)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object types: %v", obj))
-			return
-		}
-	}
-
+func (ttlc *Controller) deleteNode(_ informers.DeletedNode) {
 	func() {
 		ttlc.lock.Lock()
 		defer ttlc.lock.Unlock()

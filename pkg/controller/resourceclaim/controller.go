@@ -196,10 +196,10 @@ type nonRetryableError struct {
 func NewController(
 	logger klog.Logger,
 	kubeClient clientset.Interface,
-	podInformer v1informers.PodInformer,
-	podGroupInformer schedulinginformers.PodGroupInformer,
-	claimInformer resourceinformers.ResourceClaimInformer,
-	templateInformer resourceinformers.ResourceClaimTemplateInformer) (*Controller, error) {
+	podInformer v1informers.TypedPodInformer,
+	podGroupInformer schedulinginformers.TypedPodGroupInformer,
+	claimInformer resourceinformers.TypedResourceClaimInformer,
+	templateInformer resourceinformers.TypedResourceClaimTemplateInformer) (*Controller, error) {
 	return newControllerWithFeatures(
 		logger,
 		kubeClient,
@@ -219,10 +219,10 @@ func NewController(
 func newControllerWithFeatures(
 	logger klog.Logger,
 	kubeClient clientset.Interface,
-	podInformer v1informers.PodInformer,
-	podGroupInformer schedulinginformers.PodGroupInformer,
-	claimInformer resourceinformers.ResourceClaimInformer,
-	templateInformer resourceinformers.ResourceClaimTemplateInformer,
+	podInformer v1informers.TypedPodInformer,
+	podGroupInformer schedulinginformers.TypedPodGroupInformer,
+	claimInformer resourceinformers.TypedResourceClaimInformer,
+	templateInformer resourceinformers.TypedResourceClaimTemplateInformer,
 	features controllerFeatures) (*Controller, error) {
 
 	ec := &Controller{
@@ -246,45 +246,45 @@ func newControllerWithFeatures(
 	resourceclaimmetrics.RegisterMetrics()
 	controllermetrics.RegisterMetrics(newCustomCollector(ec.claimLister, getAdminAccessMetricLabel, logger))
 
-	if _, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj any) {
+	if _, err := podInformer.TypedInformer().AddTypedEventHandler(v1informers.PodHandlerFuncs{
+		AddFunc: func(obj *v1.Pod) {
 			ec.enqueuePod(logger, obj, false)
 		},
-		UpdateFunc: func(old, updated any) {
+		UpdateFunc: func(old, updated *v1.Pod) {
 			ec.enqueuePod(logger, updated, false)
 		},
-		DeleteFunc: func(obj any) {
-			ec.enqueuePod(logger, obj, true)
+		DeleteFunc: func(obj v1informers.DeletedPod) {
+			ec.enqueuePod(logger, obj.OptionalObj, true)
 		},
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, err
 	}
-	if _, err := claimInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj any) {
+	if _, err := claimInformer.TypedInformer().AddTypedEventHandler(resourceinformers.ResourceClaimHandlerFuncs{
+		AddFunc: func(obj *resourceapi.ResourceClaim) {
 			logger.V(6).Info("New claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, nil, obj)
 		},
-		UpdateFunc: func(old, updated any) {
+		UpdateFunc: func(old, updated *resourceapi.ResourceClaim) {
 			logger.V(6).Info("Updated claim", "claimDump", updated)
 			ec.enqueueResourceClaim(logger, old, updated)
 		},
-		DeleteFunc: func(obj any) {
+		DeleteFunc: func(obj resourceinformers.DeletedResourceClaim) {
 			logger.V(6).Info("Deleted claim", "claimDump", obj)
-			ec.enqueueResourceClaim(logger, obj, nil)
+			ec.enqueueResourceClaim(logger, obj.OptionalObj, nil)
 		},
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, err
 	}
-	if _, err := templateInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj any) {
+	if _, err := templateInformer.TypedInformer().AddTypedEventHandler(resourceinformers.ResourceClaimTemplateHandlerFuncs{
+		AddFunc: func(obj *resourceapi.ResourceClaimTemplate) {
 			logger.V(6).Info("New claim template", "claimTemplateDump", obj)
 			ec.enqueueResourceClaimTemplate(logger, obj)
 		},
-		UpdateFunc: func(old, updated any) {
+		UpdateFunc: func(old, updated *resourceapi.ResourceClaimTemplate) {
 			logger.V(6).Info("Updated claim template", "claimTemplateDump", updated)
 			ec.enqueueResourceClaimTemplate(logger, updated)
 		},
-		DeleteFunc: func(obj any) {
+		DeleteFunc: func(obj resourceinformers.DeletedResourceClaimTemplate) {
 			logger.V(6).Info("Deleted claim template", "claimTemplateDump", obj)
 		},
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {
@@ -306,18 +306,18 @@ func newControllerWithFeatures(
 		ec.podGroupSynced = podGroupInformer.Informer().HasSynced
 		ec.podGroupIndexer = podGroupInformer.Informer().GetIndexer()
 
-		if _, err := podGroupInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj any) {
+		if _, err := podGroupInformer.TypedInformer().AddTypedEventHandler(schedulinginformers.PodGroupHandlerFuncs{
+			AddFunc: func(obj *schedulingapi.PodGroup) {
 				logger.V(6).Info("New PodGroup", "podGroupDump", obj)
 				ec.enqueuePodGroup(logger, obj, false)
 			},
-			UpdateFunc: func(old, updated any) {
+			UpdateFunc: func(old, updated *schedulingapi.PodGroup) {
 				logger.V(6).Info("Updated PodGroup", "podGroupDump", updated)
 				ec.enqueuePodGroup(logger, updated, false)
 			},
-			DeleteFunc: func(obj any) {
+			DeleteFunc: func(obj schedulinginformers.DeletedPodGroup) {
 				logger.V(6).Info("Deleted PodGroup", "podGroupDump", obj)
-				ec.enqueuePodGroup(logger, obj, true)
+				ec.enqueuePodGroup(logger, obj.OptionalObj, true)
 			},
 		}, cache.HandlerOptions{Logger: &logger}); err != nil {
 			return nil, err

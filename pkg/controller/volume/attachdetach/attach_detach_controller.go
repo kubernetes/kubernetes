@@ -103,10 +103,10 @@ type AttachDetachController interface {
 func NewAttachDetachController(
 	ctx context.Context,
 	kubeClient clientset.Interface,
-	podInformer coreinformers.PodInformer,
-	nodeInformer coreinformers.NodeInformer,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	pvInformer coreinformers.PersistentVolumeInformer,
+	podInformer coreinformers.TypedPodInformer,
+	nodeInformer coreinformers.TypedNodeInformer,
+	pvcInformer coreinformers.TypedPersistentVolumeClaimInformer,
+	pvInformer coreinformers.TypedPersistentVolumeInformer,
 	csiNodeInformer storageinformersv1.CSINodeInformer,
 	csiDriverInformer storageinformersv1.CSIDriverInformer,
 	volumeAttachmentInformer storageinformersv1.VolumeAttachmentInformer,
@@ -193,15 +193,15 @@ func NewAttachDetachController(
 		adc.csiMigratedPluginManager,
 		adc.intreeToCSITranslator)
 
-	podInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = podInformer.TypedInformer().AddTypedEventHandler(coreinformers.PodHandlerFuncs{
+		AddFunc: func(obj *v1.Pod) {
 			adc.podAdd(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *v1.Pod) {
 			adc.podUpdate(logger, oldObj, newObj)
 		},
-		DeleteFunc: func(obj interface{}) {
-			adc.podDelete(logger, obj)
+		DeleteFunc: func(obj coreinformers.DeletedPod) {
+			adc.podDelete(logger, obj.OptionalObj)
 		},
 	})
 
@@ -211,23 +211,23 @@ func NewAttachDetachController(
 		return nil, fmt.Errorf("could not initialize attach detach controller: %w", err)
 	}
 
-	nodeInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = nodeInformer.TypedInformer().AddTypedEventHandler(coreinformers.NodeHandlerFuncs{
+		AddFunc: func(obj *v1.Node) {
 			adc.nodeAdd(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *v1.Node) {
 			adc.nodeUpdate(logger, oldObj, newObj)
 		},
-		DeleteFunc: func(obj interface{}) {
-			adc.nodeDelete(logger, obj)
+		DeleteFunc: func(obj coreinformers.DeletedNode) {
+			adc.nodeDelete(logger, obj.OptionalObj)
 		},
 	})
 
-	pvcInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = pvcInformer.TypedInformer().AddTypedEventHandler(coreinformers.PersistentVolumeClaimHandlerFuncs{
+		AddFunc: func(obj *v1.PersistentVolumeClaim) {
 			adc.enqueuePVC(obj)
 		},
-		UpdateFunc: func(old, new interface{}) {
+		UpdateFunc: func(old, new *v1.PersistentVolumeClaim) {
 			adc.enqueuePVC(new)
 		},
 	})

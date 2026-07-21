@@ -112,10 +112,10 @@ var (
 // NewStatefulSetController creates a new statefulset controller.
 func NewStatefulSetController(
 	ctx context.Context,
-	podInformer coreinformers.PodInformer,
-	setInformer appsinformers.StatefulSetInformer,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	revInformer appsinformers.ControllerRevisionInformer,
+	podInformer coreinformers.TypedPodInformer,
+	setInformer appsinformers.TypedStatefulSetInformer,
+	pvcInformer coreinformers.TypedPersistentVolumeClaimInformer,
+	revInformer appsinformers.TypedControllerRevisionInformer,
 	kubeClient clientset.Interface,
 ) *StatefulSetController {
 	logger := klog.FromContext(ctx)
@@ -178,39 +178,37 @@ func NewStatefulSetController(
 		consistencyStore: consistencyStore,
 	}
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = podInformer.TypedInformer().AddTypedEventHandler(coreinformers.PodHandlerFuncs{
 		// lookup the statefulset and enqueue
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj *v1.Pod) {
 			ssc.addPod(logger, obj)
 		},
 		// lookup current and old statefulset if labels changed
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *v1.Pod) {
 			ssc.updatePod(logger, oldObj, newObj)
 		},
 		// lookup statefulset accounting for deletion tombstones
-		DeleteFunc: func(obj interface{}) {
-			ssc.deletePod(logger, obj)
+		DeleteFunc: func(obj coreinformers.DeletedPod) {
+			ssc.deletePod(logger, obj.OptionalObj)
 		},
 	})
 	ssc.podLister = podInformer.Lister()
 	ssc.podListerSynced = podInformer.Informer().HasSynced
 	controller.AddPodControllerIndexer(podInformer.Informer())
 	ssc.podIndexer = podInformer.Informer().GetIndexer()
-	setInformer.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
+	_, _ = setInformer.TypedInformer().AddTypedEventHandler(
+		appsinformers.StatefulSetHandlerFuncs{
+			AddFunc: func(obj *apps.StatefulSet) {
 				ssc.enqueueStatefulSet(logger, obj)
 			},
-			UpdateFunc: func(old, cur interface{}) {
-				oldPS := old.(*apps.StatefulSet)
-				curPS := cur.(*apps.StatefulSet)
+			UpdateFunc: func(oldPS, curPS *apps.StatefulSet) {
 				if oldPS.Status.Replicas != curPS.Status.Replicas {
 					logger.V(4).Info("Observed updated replica count for StatefulSet", "statefulSet", klog.KObj(curPS), "oldReplicas", oldPS.Status.Replicas, "newReplicas", curPS.Status.Replicas)
 				}
-				ssc.enqueueStatefulSet(logger, cur)
+				ssc.enqueueStatefulSet(logger, curPS)
 			},
-			DeleteFunc: func(obj interface{}) {
-				ssc.enqueueStatefulSet(logger, obj)
+			DeleteFunc: func(obj appsinformers.DeletedStatefulSet) {
+				ssc.queue.Add(obj.GetKey())
 			},
 		},
 	)

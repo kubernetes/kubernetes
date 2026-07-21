@@ -66,7 +66,7 @@ type MigrationRunnerController struct {
 func NewCustomResourceController(
 	ctx context.Context,
 	kubeClient clientset.Interface,
-	svmInformer svminformers.StorageVersionMigrationInformer,
+	svmInformer svminformers.TypedStorageVersionMigrationInformer,
 	crdClient apiextensionsclient.CustomResourceDefinitionInterface,
 ) *MigrationRunnerController {
 	logger := klog.FromContext(ctx)
@@ -82,15 +82,15 @@ func NewCustomResourceController(
 		),
 	}
 
-	_, err := svmInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, err := svmInformer.TypedInformer().AddTypedEventHandler(svminformers.StorageVersionMigrationHandlerFuncs{
+		AddFunc: func(obj *svmv1.StorageVersionMigration) {
 			crController.addSVM(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *svmv1.StorageVersionMigration) {
 			crController.updateSVM(logger, oldObj, newObj)
 		},
-		DeleteFunc: func(obj interface{}) {
-			crController.deleteSVM(logger, obj)
+		DeleteFunc: func(deleted svminformers.DeletedStorageVersionMigration) {
+			crController.deleteSVM(logger, deleted)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
 	utilruntime.Must(err)
@@ -98,35 +98,23 @@ func NewCustomResourceController(
 	return crController
 }
 
-func (crc *MigrationRunnerController) addSVM(logger klog.Logger, obj interface{}) {
-	svm := obj.(*svmv1.StorageVersionMigration)
+func (crc *MigrationRunnerController) addSVM(logger klog.Logger, svm *svmv1.StorageVersionMigration) {
 	logger.V(4).Info("Adding", "svm", klog.KObj(svm))
 	crc.enqueue(svm)
 }
 
-func (crc *MigrationRunnerController) updateSVM(logger klog.Logger, oldObj, newObj interface{}) {
-	oldSVM := oldObj.(*svmv1.StorageVersionMigration)
-	newSVM := newObj.(*svmv1.StorageVersionMigration)
+func (crc *MigrationRunnerController) updateSVM(logger klog.Logger, oldSVM, newSVM *svmv1.StorageVersionMigration) {
 	logger.V(4).Info("Updating", "svm", klog.KObj(oldSVM))
 	crc.enqueue(newSVM)
 }
 
-func (crc *MigrationRunnerController) deleteSVM(logger klog.Logger, obj interface{}) {
-	svm, ok := obj.(*svmv1.StorageVersionMigration)
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			logger.Info("could not cast obj to DeletedFinalStateUnknown", "object", obj)
-			return
-		}
-		svm, ok = tombstone.Obj.(*svmv1.StorageVersionMigration)
-		if !ok {
-			logger.Info("could not cast tombstone to SVM", "object", obj)
-			return
-		}
+func (crc *MigrationRunnerController) deleteSVM(logger klog.Logger, deleted svminformers.DeletedStorageVersionMigration) {
+	if deleted.OptionalObj == nil {
+		logger.Info("deleted StorageVersionMigration object is unavailable", "svm", deleted.GetKey())
+		return
 	}
-	logger.V(4).Info("Deleting", "svm", klog.KObj(svm))
-	crc.enqueue(svm)
+	logger.V(4).Info("Deleting", "svm", klog.KObj(deleted))
+	crc.enqueue(deleted.OptionalObj)
 }
 
 func (crc *MigrationRunnerController) enqueue(svm *svmv1.StorageVersionMigration) {

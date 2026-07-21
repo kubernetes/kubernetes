@@ -65,7 +65,7 @@ type Controller struct {
 // currently, this should be handled as a fatal error.
 func NewNodeIpamController(
 	ctx context.Context,
-	nodeInformer coreinformers.NodeInformer,
+	nodeInformer coreinformers.TypedNodeInformer,
 	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
 	clusterCIDRs []*net.IPNet,

@@ -30,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/informers"
+	appsinformers "k8s.io/client-go/informers/apps/v1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
@@ -425,7 +427,7 @@ func TestPodDeletionEnqueuesRecreateDeployment(t *testing.T) {
 				}
 			}
 
-			c.deletePod(logger, pod)
+			c.deletePod(logger, coreinformers.DeletedPod{OptionalObj: pod})
 
 			if !enqueued {
 				t.Errorf("expected deployment %q to be queued after pod deletion", foo.Name)
@@ -465,7 +467,7 @@ func TestPodDeletionPartialReplicaSetOwnershipEnqueueRecreateDeployment(t *testi
 		}
 	}
 
-	c.deletePod(logger, pod)
+	c.deletePod(logger, coreinformers.DeletedPod{OptionalObj: pod})
 
 	if !enqueued {
 		t.Errorf("expected deployment %q to be queued after pod deletion", foo.Name)
@@ -892,7 +894,7 @@ func TestDeleteReplicaSet(t *testing.T) {
 		t.Fatalf("error creating Deployment controller: %v", err)
 	}
 
-	dc.deleteReplicaSet(logger, rs1)
+	dc.deleteReplicaSet(logger, appsinformers.DeletedReplicaSet{OptionalObj: rs1})
 	if got, want := dc.queue.Len(), 1; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
@@ -905,7 +907,7 @@ func TestDeleteReplicaSet(t *testing.T) {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 
-	dc.deleteReplicaSet(logger, rs2)
+	dc.deleteReplicaSet(logger, appsinformers.DeletedReplicaSet{OptionalObj: rs2})
 	if got, want := dc.queue.Len(), 1; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
@@ -942,7 +944,7 @@ func TestDeleteReplicaSetOrphan(t *testing.T) {
 		t.Fatalf("error creating Deployment controller: %v", err)
 	}
 
-	dc.deleteReplicaSet(logger, rs)
+	dc.deleteReplicaSet(logger, appsinformers.DeletedReplicaSet{OptionalObj: rs})
 	if got, want := dc.queue.Len(), 0; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}

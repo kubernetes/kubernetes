@@ -86,10 +86,10 @@ type Controller struct {
 func NewController(
 	ctx context.Context,
 	kubeClient clientset.Interface,
-	podInformer coreinformers.PodInformer,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	pvInformer coreinformers.PersistentVolumeInformer,
-	csiDriverInformer storageinformersv1.CSIDriverInformer,
+	podInformer coreinformers.TypedPodInformer,
+	pvcInformer coreinformers.TypedPersistentVolumeClaimInformer,
+	pvInformer coreinformers.TypedPersistentVolumeInformer,
+	csiDriverInformer storageinformersv1.TypedCSIDriverInformer,
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber,
 ) (*Controller, error) {
@@ -139,35 +139,35 @@ func NewController(
 	}
 
 	logger := klog.FromContext(ctx)
-	_, err = podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(obj interface{}) { c.enqueuePod(logger, obj) },
-		UpdateFunc: func(oldObj, newObj interface{}) { c.updatePod(logger, oldObj, newObj) },
-		DeleteFunc: func(obj interface{}) { c.enqueuePod(logger, obj) },
+	_, err = podInformer.TypedInformer().AddTypedEventHandler(coreinformers.PodHandlerFuncs{
+		AddFunc:    func(obj *v1.Pod) { c.enqueuePod(logger, obj) },
+		UpdateFunc: func(oldObj, newObj *v1.Pod) { c.updatePod(logger, oldObj, newObj) },
+		DeleteFunc: func(obj coreinformers.DeletedPod) { c.enqueuePod(logger, obj.OptionalObj) },
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(obj interface{}) { c.addPVC(logger, obj) },
-		UpdateFunc: func(oldObj, newObj interface{}) { c.updatePVC(logger, oldObj, newObj) },
+	_, err = pvcInformer.TypedInformer().AddTypedEventHandler(coreinformers.PersistentVolumeClaimHandlerFuncs{
+		AddFunc:    func(obj *v1.PersistentVolumeClaim) { c.addPVC(logger, obj) },
+		UpdateFunc: func(oldObj, newObj *v1.PersistentVolumeClaim) { c.updatePVC(logger, oldObj, newObj) },
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(obj interface{}) { c.addPV(logger, obj) },
-		UpdateFunc: func(oldObj, newObj interface{}) { c.updatePV(logger, oldObj, newObj) },
+	_, err = pvInformer.TypedInformer().AddTypedEventHandler(coreinformers.PersistentVolumeHandlerFuncs{
+		AddFunc:    func(obj *v1.PersistentVolume) { c.addPV(logger, obj) },
+		UpdateFunc: func(oldObj, newObj *v1.PersistentVolume) { c.updatePV(logger, oldObj, newObj) },
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = csiDriverInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(obj interface{}) { c.addCSIDriver(logger, obj) },
-		UpdateFunc: func(oldObj, newObj interface{}) { c.updateCSIDriver(logger, oldObj, newObj) },
-		DeleteFunc: func(obj interface{}) { c.deleteCSIDriver(logger, obj) },
+	_, err = csiDriverInformer.TypedInformer().AddTypedEventHandler(storageinformersv1.CSIDriverHandlerFuncs{
+		AddFunc:    func(obj *storagev1.CSIDriver) { c.addCSIDriver(logger, obj) },
+		UpdateFunc: func(oldObj, newObj *storagev1.CSIDriver) { c.updateCSIDriver(logger, oldObj, newObj) },
+		DeleteFunc: func(obj storageinformersv1.DeletedCSIDriver) { c.deleteCSIDriver(logger, obj.OptionalObj) },
 	})
 	if err != nil {
 		return nil, err

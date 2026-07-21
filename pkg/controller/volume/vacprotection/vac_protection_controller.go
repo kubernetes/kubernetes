@@ -96,9 +96,9 @@ type Controller struct {
 // NewVACProtectionController returns a new *Controller.
 func NewVACProtectionController(logger klog.Logger,
 	client clientset.Interface,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	pvInformer coreinformers.PersistentVolumeInformer,
-	vacInformer storageinformers.VolumeAttributesClassInformer) (*Controller, error) {
+	pvcInformer coreinformers.TypedPersistentVolumeClaimInformer,
+	pvInformer coreinformers.TypedPersistentVolumeInformer,
+	vacInformer storageinformers.TypedVolumeAttributesClassInformer) (*Controller, error) {
 	c := &Controller{
 		client:    client,
 		pvcSynced: pvcInformer.Informer().HasSynced,
@@ -113,20 +113,16 @@ func NewVACProtectionController(logger klog.Logger,
 		),
 	}
 
-	_, _ = vacInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = vacInformer.TypedInformer().AddTypedEventHandler(storageinformers.VolumeAttributesClassHandlerFuncs{
+		AddFunc: func(obj *storagev1.VolumeAttributesClass) {
 			c.vacAddedUpdated(logger, obj)
 		},
-		UpdateFunc: func(old, new interface{}) {
+		UpdateFunc: func(old, new *storagev1.VolumeAttributesClass) {
 			c.vacAddedUpdated(logger, new)
 		},
 	})
 
-	err := pvInformer.Informer().AddIndexers(cache.Indexers{vacNameKeyIndex: func(obj interface{}) ([]string, error) {
-		pv, ok := obj.(*v1.PersistentVolume)
-		if !ok {
-			return []string{}, nil
-		}
+	err := pvInformer.TypedInformer().AddTypedIndexers(coreinformers.PersistentVolumeIndexers{vacNameKeyIndex: func(pv *v1.PersistentVolume) ([]string, error) {
 		return getPVReferencedVACNames(pv), nil
 	}})
 	if err != nil {
@@ -150,11 +146,7 @@ func NewVACProtectionController(logger klog.Logger,
 		return pvcs, nil
 	}
 
-	err = pvcInformer.Informer().AddIndexers(cache.Indexers{vacNameKeyIndex: func(obj interface{}) ([]string, error) {
-		pvc, ok := obj.(*v1.PersistentVolumeClaim)
-		if !ok {
-			return []string{}, nil
-		}
+	err = pvcInformer.TypedInformer().AddTypedIndexers(coreinformers.PersistentVolumeClaimIndexers{vacNameKeyIndex: func(pvc *v1.PersistentVolumeClaim) ([]string, error) {
 		return getPVCReferencedVACNames(pvc), nil
 	}})
 	if err != nil {
@@ -178,21 +170,21 @@ func NewVACProtectionController(logger klog.Logger,
 		return pvcs, nil
 	}
 
-	_, _ = pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		UpdateFunc: func(old, new interface{}) {
+	_, _ = pvcInformer.TypedInformer().AddTypedEventHandler(coreinformers.PersistentVolumeClaimHandlerFuncs{
+		UpdateFunc: func(old, new *v1.PersistentVolumeClaim) {
 			c.pvcUpdated(logger, old, new)
 		},
-		DeleteFunc: func(obj interface{}) {
-			c.pvcDeleted(logger, obj)
+		DeleteFunc: func(obj coreinformers.DeletedPersistentVolumeClaim) {
+			c.pvcDeleted(logger, obj.OptionalObj)
 		},
 	})
 
-	_, _ = pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		UpdateFunc: func(old, new interface{}) {
+	_, _ = pvInformer.TypedInformer().AddTypedEventHandler(coreinformers.PersistentVolumeHandlerFuncs{
+		UpdateFunc: func(old, new *v1.PersistentVolume) {
 			c.pvUpdated(logger, old, new)
 		},
-		DeleteFunc: func(obj interface{}) {
-			c.pvDeleted(logger, obj)
+		DeleteFunc: func(obj coreinformers.DeletedPersistentVolume) {
+			c.pvDeleted(logger, obj.OptionalObj)
 		},
 	})
 	return c, nil

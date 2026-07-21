@@ -82,10 +82,10 @@ const (
 )
 
 // NewController creates and initializes a new Controller
-func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
-	serviceInformer coreinformers.ServiceInformer,
-	nodeInformer coreinformers.NodeInformer,
-	endpointSliceInformer discoveryinformers.EndpointSliceInformer,
+func NewController(ctx context.Context, podInformer coreinformers.TypedPodInformer,
+	serviceInformer coreinformers.TypedServiceInformer,
+	nodeInformer coreinformers.TypedNodeInformer,
+	endpointSliceInformer discoveryinformers.TypedEndpointSliceInformer,
 	maxEndpointsPerSlice int32,
 	client clientset.Interface,
 	endpointUpdatesBatchPeriod time.Duration,
@@ -119,9 +119,9 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 		workerLoopPeriod: time.Second,
 	}
 
-	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = serviceInformer.TypedInformer().AddTypedEventHandler(coreinformers.ServiceHandlerFuncs{
 		AddFunc: c.onServiceUpdate,
-		UpdateFunc: func(old, cur interface{}) {
+		UpdateFunc: func(old, cur *v1.Service) {
 			c.onServiceUpdate(cur)
 		},
 		DeleteFunc: c.onServiceDelete,
@@ -129,10 +129,10 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 	c.serviceLister = serviceInformer.Lister()
 	c.servicesSynced = serviceInformer.Informer().HasSynced
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(obj interface{}) { c.onPodUpdate(nil, obj) },
+	_, _ = podInformer.TypedInformer().AddTypedEventHandler(coreinformers.PodHandlerFuncs{
+		AddFunc:    func(obj *v1.Pod) { c.onPodUpdate(nil, obj) },
 		UpdateFunc: c.onPodUpdate,
-		DeleteFunc: func(obj interface{}) { c.onPodUpdate(obj, nil) },
+		DeleteFunc: func(obj coreinformers.DeletedPod) { c.onPodUpdate(obj.OptionalObj, nil) },
 	})
 	c.podLister = podInformer.Lister()
 	c.podsSynced = podInformer.Informer().HasSynced
@@ -141,9 +141,9 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 	c.nodesSynced = nodeInformer.Informer().HasSynced
 
 	logger := klog.FromContext(ctx)
-	endpointSliceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = endpointSliceInformer.TypedInformer().AddTypedEventHandler(discoveryinformers.EndpointSliceHandlerFuncs{
 		AddFunc: c.onEndpointSliceAdd,
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *discovery.EndpointSlice) {
 			c.onEndpointSliceUpdate(logger, oldObj, newObj)
 		},
 		DeleteFunc: c.onEndpointSliceDelete,
@@ -162,14 +162,14 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 
 	c.endpointUpdatesBatchPeriod = endpointUpdatesBatchPeriod
 
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(_ interface{}) {
+	_, _ = nodeInformer.TypedInformer().AddTypedEventHandler(coreinformers.NodeHandlerFuncs{
+		AddFunc: func(_ *v1.Node) {
 			c.addNode()
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *v1.Node) {
 			c.updateNode(oldObj, newObj)
 		},
-		DeleteFunc: func(_ interface{}) {
+		DeleteFunc: func(_ coreinformers.DeletedNode) {
 			c.deleteNode()
 		},
 	})
@@ -504,7 +504,7 @@ func (c *Controller) syncPod(logger klog.Logger, key *endpointsliceutil.PodProje
 }
 
 // onServiceUpdate updates the Service Selector in the cache and queues the Service for processing.
-func (c *Controller) onServiceUpdate(obj interface{}) {
+func (c *Controller) onServiceUpdate(obj *v1.Service) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
@@ -515,18 +515,12 @@ func (c *Controller) onServiceUpdate(obj interface{}) {
 }
 
 // onServiceDelete removes the Service Selector from the cache and queues the Service for processing.
-func (c *Controller) onServiceDelete(obj interface{}) {
-	key, err := controller.KeyFunc(obj)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
-		return
-	}
-
-	c.serviceQueue.Add(key)
+func (c *Controller) onServiceDelete(obj coreinformers.DeletedService) {
+	c.serviceQueue.Add(obj.GetKey())
 }
 
 // onPodUpdate enqueues the pod's projection key on Add/Update/Delete events, to find matching services later.
-func (c *Controller) onPodUpdate(old, cur interface{}) {
+func (c *Controller) onPodUpdate(old, cur *v1.Pod) {
 	key := endpointsliceutil.GetPodUpdateProjectionKey(old, cur)
 	if key != nil {
 		c.podQueue.Add(key)
@@ -536,8 +530,7 @@ func (c *Controller) onPodUpdate(old, cur interface{}) {
 // onEndpointSliceAdd queues a sync for the relevant Service for a sync if the
 // EndpointSlice resource version does not match the expected version in the
 // endpointSliceTracker.
-func (c *Controller) onEndpointSliceAdd(obj interface{}) {
-	endpointSlice := obj.(*discovery.EndpointSlice)
+func (c *Controller) onEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) {
 	if endpointSlice == nil {
 		utilruntime.HandleError(fmt.Errorf("Invalid EndpointSlice provided to onEndpointSliceAdd()"))
 		return
@@ -551,9 +544,7 @@ func (c *Controller) onEndpointSliceAdd(obj interface{}) {
 // the EndpointSlice resource version does not match the expected version in the
 // endpointSliceTracker or the managed-by value of the EndpointSlice has changed
 // from or to this controller.
-func (c *Controller) onEndpointSliceUpdate(logger klog.Logger, prevObj, obj interface{}) {
-	prevEndpointSlice := prevObj.(*discovery.EndpointSlice)
-	endpointSlice := obj.(*discovery.EndpointSlice)
+func (c *Controller) onEndpointSliceUpdate(logger klog.Logger, prevEndpointSlice, endpointSlice *discovery.EndpointSlice) {
 	if endpointSlice == nil || prevEndpointSlice == nil {
 		utilruntime.HandleError(fmt.Errorf("Invalid EndpointSlice provided to onEndpointSliceUpdate()"))
 		return
@@ -577,8 +568,8 @@ func (c *Controller) onEndpointSliceUpdate(logger klog.Logger, prevObj, obj inte
 // onEndpointSliceDelete queues a sync for the relevant Service for a sync if the
 // EndpointSlice resource version does not match the expected version in the
 // endpointSliceTracker.
-func (c *Controller) onEndpointSliceDelete(obj interface{}) {
-	endpointSlice := getEndpointSliceFromDeleteAction(obj)
+func (c *Controller) onEndpointSliceDelete(obj discoveryinformers.DeletedEndpointSlice) {
+	endpointSlice := obj.OptionalObj
 	if endpointSlice != nil && c.reconciler.ManagedByController(endpointSlice) && c.endpointSliceTracker.Has(endpointSlice) {
 		// This returns false if we didn't expect the EndpointSlice to be
 		// deleted. If that is the case, we queue the Service for another sync.
@@ -610,10 +601,7 @@ func (c *Controller) addNode() {
 	c.topologyQueue.Add(topologyQueueItemKey)
 }
 
-func (c *Controller) updateNode(old, cur interface{}) {
-	oldNode := old.(*v1.Node)
-	curNode := cur.(*v1.Node)
-
+func (c *Controller) updateNode(oldNode, curNode *v1.Node) {
 	// LabelTopologyZone may be added by cloud provider asynchronously after the Node is created.
 	// The topology cache should be updated in this case.
 	if isNodeReady(oldNode) != isNodeReady(curNode) ||
@@ -667,27 +655,6 @@ func dropEndpointSlicesPendingDeletion(endpointSlices []*discovery.EndpointSlice
 		}
 	}
 	return endpointSlices[:n]
-}
-
-// getEndpointSliceFromDeleteAction parses an EndpointSlice from a delete action.
-func getEndpointSliceFromDeleteAction(obj interface{}) *discovery.EndpointSlice {
-	if endpointSlice, ok := obj.(*discovery.EndpointSlice); ok {
-		// Enqueue all the services that the pod used to be a member of.
-		// This is the same thing we do when we add a pod.
-		return endpointSlice
-	}
-	// If we reached here it means the pod was deleted but its final state is unrecorded.
-	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
-		return nil
-	}
-	endpointSlice, ok := tombstone.Obj.(*discovery.EndpointSlice)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a EndpointSlice: %#v", obj))
-		return nil
-	}
-	return endpointSlice
 }
 
 // isNodeReady returns true if a node is ready; false otherwise.

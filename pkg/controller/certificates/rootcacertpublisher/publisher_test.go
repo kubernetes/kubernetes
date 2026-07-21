@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	clienttesting "k8s.io/client-go/testing"
@@ -148,7 +149,7 @@ func TestConfigMapCreation(t *testing.T) {
 
 			if tc.DeletedConfigMap != nil {
 				cmStore.Delete(tc.DeletedConfigMap)
-				controller.configMapDeleted(tc.DeletedConfigMap)
+				controller.configMapDeleted(coreinformers.DeletedConfigMap{OptionalObj: tc.DeletedConfigMap})
 			}
 
 			if tc.UpdatedConfigMap != nil {

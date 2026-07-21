@@ -89,9 +89,9 @@ type Controller struct {
 func NewController(
 	ctx context.Context,
 	client clientset.Interface,
-	requestInformer resourcev1alpha3informers.ResourcePoolStatusRequestInformer,
-	sliceInformer resourcev1informers.ResourceSliceInformer,
-	claimInformer resourcev1informers.ResourceClaimInformer,
+	requestInformer resourcev1alpha3informers.TypedResourcePoolStatusRequestInformer,
+	sliceInformer resourcev1informers.TypedResourceSliceInformer,
+	claimInformer resourcev1informers.TypedResourceClaimInformer,
 ) (*Controller, error) {
 	logger := klog.FromContext(ctx)
 
@@ -110,12 +110,12 @@ func NewController(
 	metrics.Register()
 
 	// Set up event handlers for ResourcePoolStatusRequests
-	_, err := requestInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, err := requestInformer.TypedInformer().AddTypedEventHandler(resourcev1alpha3informers.ResourcePoolStatusRequestHandlerFuncs{
+		AddFunc: func(obj *resourcev1alpha3.ResourcePoolStatusRequest) {
 			c.enqueueRequest(logger, obj)
 		},
-		UpdateFunc: func(old, new interface{}) {
-			c.enqueueRequest(logger, new)
+		UpdateFunc: func(_, newObj *resourcev1alpha3.ResourcePoolStatusRequest) {
+			c.enqueueRequest(logger, newObj)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
@@ -496,13 +496,7 @@ func errorStatus(message string) resourcev1alpha3.ResourcePoolStatusRequestStatu
 }
 
 // enqueueRequest adds a request to the workqueue.
-func (c *Controller) enqueueRequest(logger klog.Logger, obj interface{}) {
-	request, ok := obj.(*resourcev1alpha3.ResourcePoolStatusRequest)
-	if !ok {
-		logger.Error(nil, "Failed to cast object to ResourcePoolStatusRequest")
-		return
-	}
-
+func (c *Controller) enqueueRequest(logger klog.Logger, request *resourcev1alpha3.ResourcePoolStatusRequest) {
 	// Skip if already processed (status is set)
 	if request.Status != nil {
 		return

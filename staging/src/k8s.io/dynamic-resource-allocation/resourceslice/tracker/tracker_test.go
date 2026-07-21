@@ -32,6 +32,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
+	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -109,7 +110,7 @@ func applyEventPair(tCtx *testContext, event any) {
 		case pair[0] != nil:
 			err := store.Delete(pair[0])
 			require.NoError(tCtx, err)
-			tCtx.resourceSliceDelete(tCtx.Context)(pair[0])
+			tCtx.resourceSliceDelete(tCtx.Context)(resourceinformers.DeletedResourceSlice{OptionalObj: pair[0]})
 		default:
 			err := store.Add(pair[1])
 			require.NoError(tCtx, err)
@@ -125,7 +126,7 @@ func applyEventPair(tCtx *testContext, event any) {
 		case pair[0] != nil:
 			err := store.Delete(pair[0])
 			require.NoError(tCtx, err)
-			tCtx.deviceTaintDelete(tCtx.Context)(pair[0])
+			tCtx.deviceTaintDelete(tCtx.Context)(resourceinformers.DeletedDeviceTaintRule{OptionalObj: pair[0]})
 		default:
 			err := store.Add(pair[1])
 			require.NoError(tCtx, err)

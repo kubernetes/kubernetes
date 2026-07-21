@@ -70,8 +70,8 @@ const (
 // NewController returns a new *Controller.
 func NewController(
 	ctx context.Context,
-	serviceCIDRInformer networkinginformers.ServiceCIDRInformer,
-	ipAddressInformer networkinginformers.IPAddressInformer,
+	serviceCIDRInformer networkinginformers.TypedServiceCIDRInformer,
+	ipAddressInformer networkinginformers.TypedIPAddressInformer,
 	client clientset.Interface,
 ) *Controller {
 	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
@@ -85,7 +85,7 @@ func NewController(
 		workerLoopPeriod: time.Second,
 	}
 
-	_, _ = serviceCIDRInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = serviceCIDRInformer.TypedInformer().AddTypedEventHandler(networkinginformers.ServiceCIDRHandlerFuncs{
 		AddFunc:    c.addServiceCIDR,
 		UpdateFunc: c.updateServiceCIDR,
 		DeleteFunc: c.deleteServiceCIDR,
@@ -93,7 +93,7 @@ func NewController(
 	c.serviceCIDRLister = serviceCIDRInformer.Lister()
 	c.serviceCIDRsSynced = serviceCIDRInformer.Informer().HasSynced
 
-	_, _ = ipAddressInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = ipAddressInformer.TypedInformer().AddTypedEventHandler(networkinginformers.IPAddressHandlerFuncs{
 		AddFunc:    c.addIPAddress,
 		DeleteFunc: c.deleteIPAddress,
 	})
@@ -155,59 +155,35 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func (c *Controller) addServiceCIDR(obj interface{}) {
-	cidr, ok := obj.(*networkingapiv1.ServiceCIDR)
-	if !ok {
-		return
-	}
+func (c *Controller) addServiceCIDR(cidr *networkingapiv1.ServiceCIDR) {
 	c.queue.Add(cidr.Name)
 	for _, key := range c.overlappingServiceCIDRs(cidr) {
 		c.queue.Add(key)
 	}
 }
 
-func (c *Controller) updateServiceCIDR(oldObj, obj interface{}) {
-	key, err := cache.MetaNamespaceKeyFunc(obj)
-	if err == nil {
-		c.queue.Add(key)
-	}
+func (c *Controller) updateServiceCIDR(_, cidr *networkingapiv1.ServiceCIDR) {
+	c.queue.Add(cidr.Name)
 }
 
 // deleteServiceCIDR
-func (c *Controller) deleteServiceCIDR(obj interface{}) {
-	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-	if err == nil {
-		c.queue.Add(key)
-	}
+func (c *Controller) deleteServiceCIDR(deleted networkinginformers.DeletedServiceCIDR) {
+	c.queue.Add(deleted.GetKey())
 }
 
 // addIPAddress may block a ServiceCIDR deletion
-func (c *Controller) addIPAddress(obj interface{}) {
-	ip, ok := obj.(*networkingapiv1.IPAddress)
-	if !ok {
-		return
-	}
-
+func (c *Controller) addIPAddress(ip *networkingapiv1.IPAddress) {
 	for _, cidr := range c.containingServiceCIDRs(ip) {
 		c.queue.Add(cidr)
 	}
 }
 
 // deleteIPAddress may unblock a ServiceCIDR deletion
-func (c *Controller) deleteIPAddress(obj interface{}) {
-	ip, ok := obj.(*networkingapiv1.IPAddress)
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			return
-		}
-		ip, ok = tombstone.Obj.(*networkingapiv1.IPAddress)
-		if !ok {
-			return
-		}
+func (c *Controller) deleteIPAddress(deleted networkinginformers.DeletedIPAddress) {
+	if deleted.OptionalObj == nil {
+		return
 	}
-
-	for _, cidr := range c.containingServiceCIDRs(ip) {
+	for _, cidr := range c.containingServiceCIDRs(deleted.OptionalObj) {
 		c.queue.Add(cidr)
 	}
 }

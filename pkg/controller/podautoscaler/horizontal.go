@@ -142,8 +142,8 @@ func NewHorizontalController(
 	hpaNamespacer autoscalingclient.HorizontalPodAutoscalersGetter,
 	mapper apimeta.RESTMapper,
 	metricsClient metricsclient.MetricsClient,
-	hpaInformer autoscalinginformers.HorizontalPodAutoscalerInformer,
-	podInformer coreinformers.PodInformer,
+	hpaInformer autoscalinginformers.TypedHorizontalPodAutoscalerInformer,
+	podInformer coreinformers.TypedPodInformer,
 	resyncPeriod time.Duration,
 	downscaleStabilisationWindow time.Duration,
 	tolerance float64,
@@ -193,13 +193,15 @@ func NewHorizontalController(
 		hpaController.selectorTracker = newBiMultimapSelectorTracker()
 	}
 
-	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    hpaController.enqueueHPA,
-			UpdateFunc: hpaController.updateHPA,
-			DeleteFunc: hpaController.deleteHPA,
+	_, _ = hpaInformer.TypedInformer().AddTypedEventHandler(
+		autoscalinginformers.HorizontalPodAutoscalerHandlerFuncs{
+			AddFunc:    func(hpa *autoscalingv2.HorizontalPodAutoscaler) { hpaController.enqueueHPA(hpa) },
+			UpdateFunc: func(oldHPA, newHPA *autoscalingv2.HorizontalPodAutoscaler) { hpaController.updateHPA(oldHPA, newHPA) },
+			DeleteFunc: func(hpa autoscalinginformers.DeletedHorizontalPodAutoscaler) {
+				hpaController.deleteHPA(hpa.OptionalObj)
+			},
 		},
-		resyncPeriod,
+		cache.HandlerOptions{ResyncPeriod: &resyncPeriod},
 	)
 	hpaController.hpaLister = hpaInformer.Lister()
 	hpaController.hpaListerSynced = hpaInformer.Informer().HasSynced

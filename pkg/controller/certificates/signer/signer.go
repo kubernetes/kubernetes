@@ -47,7 +47,7 @@ type CSRSigningController struct {
 func NewKubeletServingCSRSigningController(
 	ctx context.Context,
 	client clientset.Interface,
-	csrInformer certificatesinformers.CertificateSigningRequestInformer,
+	csrInformer certificatesinformers.TypedCertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
 ) (*CSRSigningController, error) {
@@ -57,7 +57,7 @@ func NewKubeletServingCSRSigningController(
 func NewKubeletClientCSRSigningController(
 	ctx context.Context,
 	client clientset.Interface,
-	csrInformer certificatesinformers.CertificateSigningRequestInformer,
+	csrInformer certificatesinformers.TypedCertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
 ) (*CSRSigningController, error) {
@@ -67,7 +67,7 @@ func NewKubeletClientCSRSigningController(
 func NewKubeAPIServerClientCSRSigningController(
 	ctx context.Context,
 	client clientset.Interface,
-	csrInformer certificatesinformers.CertificateSigningRequestInformer,
+	csrInformer certificatesinformers.TypedCertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
 ) (*CSRSigningController, error) {
@@ -77,7 +77,7 @@ func NewKubeAPIServerClientCSRSigningController(
 func NewLegacyUnknownCSRSigningController(
 	ctx context.Context,
 	client clientset.Interface,
-	csrInformer certificatesinformers.CertificateSigningRequestInformer,
+	csrInformer certificatesinformers.TypedCertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
 ) (*CSRSigningController, error) {
@@ -89,7 +89,7 @@ func NewCSRSigningController(
 	controllerName string,
 	signerName string,
 	client clientset.Interface,
-	csrInformer certificatesinformers.CertificateSigningRequestInformer,
+	csrInformer certificatesinformers.TypedCertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
 ) (*CSRSigningController, error) {

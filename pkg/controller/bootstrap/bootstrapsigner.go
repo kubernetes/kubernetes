@@ -24,8 +24,6 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"fmt"
-
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -93,7 +91,7 @@ type Signer struct {
 }
 
 // NewSigner returns a new *Signer.
-func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configMaps informers.ConfigMapInformer, options SignerOptions) (*Signer, error) {
+func NewSigner(cl clientset.Interface, secrets informers.TypedSecretInformer, configMaps informers.TypedConfigMapInformer, options SignerOptions) (*Signer, error) {
 	e := &Signer{
 		client:             cl,
 		configMapKey:       options.ConfigMapNamespace + "/" + options.ConfigMapName,
@@ -112,44 +110,42 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 		),
 	}
 
-	configMaps.Informer().AddEventHandlerWithResyncPeriod(
-		cache.FilteringResourceEventHandler{
-			FilterFunc: func(obj interface{}) bool {
-				switch t := obj.(type) {
-				case *v1.ConfigMap:
-					return t.Name == options.ConfigMapName && t.Namespace == options.ConfigMapNamespace
-				default:
-					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
-					return false
-				}
-			},
-			Handler: cache.ResourceEventHandlerFuncs{
-				AddFunc:    func(_ interface{}) { e.pokeConfigMapSync() },
-				UpdateFunc: func(_, _ interface{}) { e.pokeConfigMapSync() },
-			},
+	configMapMatches := func(cm *v1.ConfigMap) bool {
+		return cm.Name == options.ConfigMapName && cm.Namespace == options.ConfigMapNamespace
+	}
+	_, _ = configMaps.TypedInformer().AddTypedEventHandler(informers.ConfigMapHandlerFuncs{
+		AddFunc: func(cm *v1.ConfigMap) {
+			if configMapMatches(cm) {
+				e.pokeConfigMapSync()
+			}
 		},
-		options.ConfigMapResync,
-	)
+		UpdateFunc: func(_, cm *v1.ConfigMap) {
+			if configMapMatches(cm) {
+				e.pokeConfigMapSync()
+			}
+		},
+	}, cache.HandlerOptions{ResyncPeriod: &options.ConfigMapResync})
 
-	secrets.Informer().AddEventHandlerWithResyncPeriod(
-		cache.FilteringResourceEventHandler{
-			FilterFunc: func(obj interface{}) bool {
-				switch t := obj.(type) {
-				case *v1.Secret:
-					return t.Type == bootstrapapi.SecretTypeBootstrapToken && t.Namespace == e.secretNamespace
-				default:
-					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
-					return false
-				}
-			},
-			Handler: cache.ResourceEventHandlerFuncs{
-				AddFunc:    func(_ interface{}) { e.pokeConfigMapSync() },
-				UpdateFunc: func(_, _ interface{}) { e.pokeConfigMapSync() },
-				DeleteFunc: func(_ interface{}) { e.pokeConfigMapSync() },
-			},
+	secretMatches := func(secret *v1.Secret) bool {
+		return secret.Type == bootstrapapi.SecretTypeBootstrapToken && secret.Namespace == e.secretNamespace
+	}
+	_, _ = secrets.TypedInformer().AddTypedEventHandler(informers.SecretHandlerFuncs{
+		AddFunc: func(secret *v1.Secret) {
+			if secretMatches(secret) {
+				e.pokeConfigMapSync()
+			}
 		},
-		options.SecretResync,
-	)
+		UpdateFunc: func(oldSecret, newSecret *v1.Secret) {
+			if secretMatches(oldSecret) || secretMatches(newSecret) {
+				e.pokeConfigMapSync()
+			}
+		},
+		DeleteFunc: func(deleted informers.DeletedSecret) {
+			if deleted.OptionalObj != nil && secretMatches(deleted.OptionalObj) {
+				e.pokeConfigMapSync()
+			}
+		},
+	}, cache.HandlerOptions{ResyncPeriod: &options.SecretResync})
 
 	return e, nil
 }

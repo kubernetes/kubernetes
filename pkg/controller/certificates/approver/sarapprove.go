@@ -45,7 +45,7 @@ type sarApprover struct {
 }
 
 // NewCSRApprovingController creates a new CSRApprovingController.
-func NewCSRApprovingController(ctx context.Context, client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer) *certificates.CertificateController {
+func NewCSRApprovingController(ctx context.Context, client clientset.Interface, csrInformer certificatesinformers.TypedCertificateSigningRequestInformer) *certificates.CertificateController {
 	approver := &sarApprover{
 		client:      client,
 		recognizers: recognizers(),

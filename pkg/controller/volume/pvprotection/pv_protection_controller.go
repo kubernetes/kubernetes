@@ -50,7 +50,7 @@ type Controller struct {
 }
 
 // NewPVProtectionController returns a new *Controller.
-func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface) *Controller {
+func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.TypedPersistentVolumeInformer, cl clientset.Interface) *Controller {
 	e := &Controller{
 		client: cl,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -61,12 +61,12 @@ func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.Pers
 
 	e.pvLister = pvInformer.Lister()
 	e.pvListerSynced = pvInformer.Informer().HasSynced
-	pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = pvInformer.TypedInformer().AddTypedEventHandler(coreinformers.PersistentVolumeHandlerFuncs{
+		AddFunc: func(obj *v1.PersistentVolume) {
 			e.pvAddedUpdated(logger, obj)
 		},
-		UpdateFunc: func(old, new interface{}) {
-			e.pvAddedUpdated(logger, new)
+		UpdateFunc: func(_, newObj *v1.PersistentVolume) {
+			e.pvAddedUpdated(logger, newObj)
 		},
 	})
 
@@ -201,12 +201,7 @@ func (c *Controller) isBeingUsed(pv *v1.PersistentVolume) bool {
 }
 
 // pvAddedUpdated reacts to pv added/updated events
-func (c *Controller) pvAddedUpdated(logger klog.Logger, obj interface{}) {
-	pv, ok := obj.(*v1.PersistentVolume)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("PV informer returned non-PV object: %#v", obj))
-		return
-	}
+func (c *Controller) pvAddedUpdated(logger klog.Logger, pv *v1.PersistentVolume) {
 	logger.V(4).Info("Got event on PV", "PV", klog.KObj(pv))
 
 	if protectionutil.NeedToAddFinalizer(pv, volumeutil.PVProtectionFinalizer) || protectionutil.IsDeletionCandidate(pv, volumeutil.PVProtectionFinalizer) {

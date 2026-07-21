@@ -36,7 +36,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 type CertificateController struct {
@@ -57,7 +56,7 @@ func NewCertificateController(
 	ctx context.Context,
 	name string,
 	kubeClient clientset.Interface,
-	csrInformer certificatesinformers.CertificateSigningRequestInformer,
+	csrInformer certificatesinformers.TypedCertificateSigningRequestInformer,
 	handler func(context.Context, *certificates.CertificateSigningRequest) error,
 ) *CertificateController {
 	logger := klog.FromContext(ctx)
@@ -78,33 +77,18 @@ func NewCertificateController(
 	}
 
 	// Manage the addition/update of certificate requests
-	csrInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			csr := obj.(*certificates.CertificateSigningRequest)
+	_, _ = csrInformer.TypedInformer().AddTypedEventHandler(certificatesinformers.CertificateSigningRequestHandlerFuncs{
+		AddFunc: func(csr *certificates.CertificateSigningRequest) {
 			logger.V(4).Info("Adding certificate request", "csr", csr.Name)
-			cc.enqueueCertificateRequest(obj)
+			cc.enqueueCertificateRequest(csr.Name)
 		},
-		UpdateFunc: func(old, new interface{}) {
-			oldCSR := old.(*certificates.CertificateSigningRequest)
+		UpdateFunc: func(oldCSR, newCSR *certificates.CertificateSigningRequest) {
 			logger.V(4).Info("Updating certificate request", "old", oldCSR.Name)
-			cc.enqueueCertificateRequest(new)
+			cc.enqueueCertificateRequest(newCSR.Name)
 		},
-		DeleteFunc: func(obj interface{}) {
-			csr, ok := obj.(*certificates.CertificateSigningRequest)
-			if !ok {
-				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-				if !ok {
-					logger.V(2).Info("Couldn't get object from tombstone", "object", obj)
-					return
-				}
-				csr, ok = tombstone.Obj.(*certificates.CertificateSigningRequest)
-				if !ok {
-					logger.V(2).Info("Tombstone contained object that is not a CSR", "object", obj)
-					return
-				}
-			}
-			logger.V(4).Info("Deleting certificate request", "csr", csr.Name)
-			cc.enqueueCertificateRequest(obj)
+		DeleteFunc: func(deletedCSR certificatesinformers.DeletedCertificateSigningRequest) {
+			logger.V(4).Info("Deleting certificate request", "csr", deletedCSR.GetName())
+			cc.enqueueCertificateRequest(deletedCSR.GetKey())
 		},
 	})
 	cc.csrLister = csrInformer.Lister()
@@ -167,12 +151,7 @@ func (cc *CertificateController) processNextWorkItem(ctx context.Context) bool {
 
 }
 
-func (cc *CertificateController) enqueueCertificateRequest(obj interface{}) {
-	key, err := controller.KeyFunc(obj)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
-		return
-	}
+func (cc *CertificateController) enqueueCertificateRequest(key string) {
 	cc.queue.Add(key)
 }
 

@@ -67,7 +67,7 @@ type ephemeralController struct {
 
 	// podIndexer has the common PodPVC indexer indexer installed To
 	// limit iteration over pods to those of interest.
-	podIndexer cache.Indexer
+	podIndexer cache.TypedIndexer[*v1.Pod]
 
 	// recorder is used to record events in the API server
 	recorder record.EventRecorder
@@ -79,13 +79,13 @@ type ephemeralController struct {
 func NewController(
 	ctx context.Context,
 	kubeClient clientset.Interface,
-	podInformer coreinformers.PodInformer,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer) (Controller, error) {
+	podInformer coreinformers.TypedPodInformer,
+	pvcInformer coreinformers.TypedPersistentVolumeClaimInformer) (Controller, error) {
 
 	ec := &ephemeralController{
 		kubeClient: kubeClient,
 		podLister:  podInformer.Lister(),
-		podIndexer: podInformer.Informer().GetIndexer(),
+		podIndexer: podInformer.TypedInformer().GetTypedIndexer(),
 		podSynced:  podInformer.Informer().HasSynced,
 		pvcLister:  pvcInformer.Lister(),
 		pvcsSynced: pvcInformer.Informer().HasSynced,
@@ -102,7 +102,7 @@ func NewController(
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ephemeral_volume"})
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = podInformer.TypedInformer().AddTypedEventHandler(coreinformers.PodHandlerFuncs{
 		AddFunc: ec.enqueuePod,
 		// The pod spec is immutable. Therefore the controller can ignore pod updates
 		// because there cannot be any changes that have to be copied into the generated
@@ -110,22 +110,17 @@ func NewController(
 		// Deletion of the PVC is handled through the owner reference and garbage collection.
 		// Therefore pod deletions also can be ignored.
 	})
-	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = pvcInformer.TypedInformer().AddTypedEventHandler(coreinformers.PersistentVolumeClaimHandlerFuncs{
 		DeleteFunc: ec.onPVCDelete,
 	})
-	if err := common.AddPodPVCIndexerIfNotPresent(ec.podIndexer); err != nil {
+	if err := common.AddPodPVCIndexerIfNotPresent(podInformer.Informer().GetIndexer()); err != nil {
 		return nil, fmt.Errorf("could not initialize ephemeral volume controller: %w", err)
 	}
 
 	return ec, nil
 }
 
-func (ec *ephemeralController) enqueuePod(obj interface{}) {
-	pod, ok := obj.(*v1.Pod)
-	if !ok {
-		return
-	}
-
+func (ec *ephemeralController) enqueuePod(pod *v1.Pod) {
 	// Ignore pods which are already getting deleted.
 	if pod.DeletionTimestamp != nil {
 		return
@@ -134,36 +129,26 @@ func (ec *ephemeralController) enqueuePod(obj interface{}) {
 	for _, vol := range pod.Spec.Volumes {
 		if vol.Ephemeral != nil {
 			// It has at least one ephemeral inline volume, work on it.
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(pod)
-			if err != nil {
-				runtime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", pod, err))
-				return
-			}
-			ec.queue.Add(key)
+			ec.queue.Add(pod.Namespace + "/" + pod.Name)
 			break
 		}
 	}
 }
 
-func (ec *ephemeralController) onPVCDelete(obj interface{}) {
-	pvc, ok := obj.(*v1.PersistentVolumeClaim)
-	if !ok {
-		return
-	}
-
+func (ec *ephemeralController) onPVCDelete(deleted coreinformers.DeletedPersistentVolumeClaim) {
 	// Someone deleted a PVC, either intentionally or
 	// accidentally. If there is a pod referencing it because of
 	// an ephemeral volume, then we should re-create the PVC.
 	// The common indexer does some prefiltering for us by
 	// limiting the list to those pods which reference
 	// the PVC.
-	objs, err := ec.podIndexer.ByIndex(common.PodPVCIndex, fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name))
+	pods, err := ec.podIndexer.ByTypedIndex(common.PodPVCIndex, deleted.GetKey())
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("listing pods from cache: %v", err))
 		return
 	}
-	for _, obj := range objs {
-		ec.enqueuePod(obj)
+	for _, pod := range pods {
+		ec.enqueuePod(pod)
 	}
 }
 

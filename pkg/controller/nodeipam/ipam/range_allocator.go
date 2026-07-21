@@ -69,7 +69,7 @@ var _ CIDRAllocator = &rangeAllocator{}
 // Caller must always pass in a list of existing nodes so the new allocator.
 // Caller must ensure that ClusterCIDRs are semantically correct e.g (1 for non DualStack, 2 for DualStack etc..)
 // can initialize its CIDR map. NodeList is only nil in testing.
-func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, nodeInformer informers.NodeInformer, allocatorParams CIDRAllocatorParams, nodeList *v1.NodeList) (CIDRAllocator, error) {
+func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, nodeInformer informers.TypedNodeInformer, allocatorParams CIDRAllocatorParams, nodeList *v1.NodeList) (CIDRAllocator, error) {
 	logger := klog.FromContext(ctx)
 	if client == nil {
 		logger.Error(nil, "kubeClient is nil when starting CIDRRangeAllocator")
@@ -130,36 +130,21 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 		}
 	}
 
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			if err == nil {
-				ra.queue.Add(key)
-			}
+	_, _ = nodeInformer.TypedInformer().AddTypedEventHandler(informers.NodeHandlerFuncs{
+		AddFunc: func(node *v1.Node) {
+			ra.queue.Add(node.Name)
 		},
-		UpdateFunc: func(old, new interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(new)
-			if err == nil {
-				ra.queue.Add(key)
-			}
+		UpdateFunc: func(_, node *v1.Node) {
+			ra.queue.Add(node.Name)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(deleted informers.DeletedNode) {
 			// The informer cache no longer has the object, and since Node doesn't have a finalizer,
 			// we don't see the Update with DeletionTimestamp != 0.
-			node, ok := obj.(*v1.Node)
-			if !ok {
-				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-				if !ok {
-					utilruntime.HandleErrorWithContext(ctx, nil, "Could not get object from tombstone", "obj", obj)
-					return
-				}
-				node, ok = tombstone.Obj.(*v1.Node)
-				if !ok {
-					utilruntime.HandleErrorWithContext(ctx, nil, "Tombstone contained object that is not a node", "type", fmt.Sprintf("%T", obj))
-					return
-				}
+			if deleted.OptionalObj == nil {
+				utilruntime.HandleErrorWithContext(ctx, nil, "Deleted node object is unavailable", "node", deleted.GetName())
+				return
 			}
-			if err := ra.ReleaseCIDR(logger, node); err != nil {
+			if err := ra.ReleaseCIDR(logger, deleted.OptionalObj); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error while processing CIDR Release")
 			}
 		},

@@ -69,9 +69,9 @@ const (
 )
 
 // NewController creates and initializes a new Controller
-func NewController(ctx context.Context, endpointsInformer coreinformers.EndpointsInformer,
-	endpointSliceInformer discoveryinformers.EndpointSliceInformer,
-	serviceInformer coreinformers.ServiceInformer,
+func NewController(ctx context.Context, endpointsInformer coreinformers.TypedEndpointsInformer,
+	endpointSliceInformer discoveryinformers.TypedEndpointSliceInformer,
+	serviceInformer coreinformers.TypedServiceInformer,
 	maxEndpointsPerSubset int32,
 	client clientset.Interface,
 	endpointUpdatesBatchPeriod time.Duration,
@@ -102,26 +102,26 @@ func NewController(ctx context.Context, endpointsInformer coreinformers.Endpoint
 		workerLoopPeriod: time.Second,
 	}
 
-	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+	_, _ = endpointsInformer.TypedInformer().AddTypedEventHandler(coreinformers.EndpointsHandlerFuncs{
+		AddFunc: func(obj *v1.Endpoints) { //nolint:staticcheck // This controller intentionally mirrors the deprecated Endpoints API.
 			c.onEndpointsAdd(logger, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(oldObj, newObj *v1.Endpoints) { //nolint:staticcheck // This controller intentionally mirrors the deprecated Endpoints API.
 			c.onEndpointsUpdate(logger, oldObj, newObj)
 		},
-		DeleteFunc: func(obj interface{}) {
-			c.onEndpointsDelete(logger, obj)
+		DeleteFunc: func(obj coreinformers.DeletedEndpoints) {
+			c.onEndpointsDelete(logger, obj.OptionalObj)
 		},
 	})
 	c.endpointsLister = endpointsInformer.Lister()
 	c.endpointsSynced = endpointsInformer.Informer().HasSynced
 
-	endpointSliceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: c.onEndpointSliceAdd,
-		UpdateFunc: func(oldObj, newObj interface{}) {
+	_, _ = endpointSliceInformer.TypedInformer().AddTypedEventHandler(discoveryinformers.EndpointSliceHandlerFuncs{
+		AddFunc: func(obj *discovery.EndpointSlice) { c.onEndpointSliceAdd(obj) },
+		UpdateFunc: func(oldObj, newObj *discovery.EndpointSlice) {
 			c.onEndpointSliceUpdate(logger, oldObj, newObj)
 		},
-		DeleteFunc: c.onEndpointSliceDelete,
+		DeleteFunc: func(obj discoveryinformers.DeletedEndpointSlice) { c.onEndpointSliceDelete(obj.OptionalObj) },
 	})
 
 	c.endpointSliceLister = endpointSliceInformer.Lister()
@@ -130,10 +130,10 @@ func NewController(ctx context.Context, endpointsInformer coreinformers.Endpoint
 
 	c.serviceLister = serviceInformer.Lister()
 	c.servicesSynced = serviceInformer.Informer().HasSynced
-	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.onServiceAdd,
-		UpdateFunc: c.onServiceUpdate,
-		DeleteFunc: c.onServiceDelete,
+	_, _ = serviceInformer.TypedInformer().AddTypedEventHandler(coreinformers.ServiceHandlerFuncs{
+		AddFunc:    func(obj *v1.Service) { c.onServiceAdd(obj) },
+		UpdateFunc: func(oldObj, newObj *v1.Service) { c.onServiceUpdate(oldObj, newObj) },
+		DeleteFunc: func(obj coreinformers.DeletedService) { c.onServiceDelete(obj.OptionalObj) },
 	})
 
 	c.maxEndpointsPerSubset = maxEndpointsPerSubset
