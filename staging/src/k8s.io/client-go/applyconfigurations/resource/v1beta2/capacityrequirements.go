@@ -28,13 +28,19 @@ import (
 //
 // CapacityRequirements defines the capacity requirements for a specific device request.
 type CapacityRequirementsApplyConfiguration struct {
-	// requests represent individual device resource requests for distinct resources,
-	// all of which must be provided by the device.
+	// requests represent individual device capacity requests for distinct resources.
+	// Each requested name must be defined as a device capacity and/or a shared
+	// capacity (referenced by a device through consumesCounters).
 	//
-	// This value is used as an additional filtering condition against the available capacity on the device.
+	// For a per-device capacity, this value is used as an additional
+	// filtering condition against the available capacity on the device.
 	// This is semantically equivalent to a CEL selector with
 	// `device.capacity[<domain>].<name>.compareTo(quantity(<request quantity>)) >= 0`.
 	// For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0.
+	//
+	// With DRASharedConsumableCapacity enabled, a requested capacity may be
+	// provided as a shared capacity instead of a per-device capacity. If it is defined as both,
+	// the request must be satisfied by both independently.
 	//
 	// The domain prefix can be omitted, in which case it defaults to the driver of the
 	// device under evaluation. For example, "bandwidth: 1Gi" is equivalent to
