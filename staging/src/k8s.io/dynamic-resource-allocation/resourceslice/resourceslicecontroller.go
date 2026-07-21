@@ -1173,6 +1173,14 @@ func isUnsupportedPoolNameFieldSelector(err error) bool {
 func filterSliceWatchByPoolName(ctx context.Context, w watch.Interface, poolName string) watch.Interface {
 	return newWrapWatcher(ctx, w, func(event watch.Event) bool {
 		resourceSlice, ok := event.Object.(*resourceapi.ResourceSlice)
-		return ok && resourceSlice.Spec.Pool.Name == poolName
+		if !ok {
+			// things like error events
+			return true
+		}
+		if resourceSlice == nil || (resourceSlice.Name == "" && resourceSlice.Spec.Pool.Name == "") {
+			// things like bookmark events
+			return true
+		}
+		return resourceSlice.Spec.Pool.Name == poolName
 	})
 }
