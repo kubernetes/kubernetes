@@ -5151,7 +5151,7 @@
           },
           "status": {
             "default": "",
-            "description": "status is the machine-parseable health category. One of \"Inaccessible\", \"DataLoss\", \"Degraded\".",
+            "description": "status is the machine-parseable health category. Possible values: - \"Inaccessible\": the volume cannot be accessed. - \"DataLoss\": data loss has been detected on the volume. - \"Degraded\": the volume is functioning with reduced capability.",
             "type": "string"
           }
         },

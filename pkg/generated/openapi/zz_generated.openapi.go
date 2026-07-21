@@ -33242,7 +33242,7 @@ func schema_k8sio_api_core_v1_VolumeHealthCondition(ref common.ReferenceCallback
 				Properties: map[string]spec.Schema{
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "status is the machine-parseable health category. One of \"Inaccessible\", \"DataLoss\", \"Degraded\".\n\nPossible enum values:\n - `\"DataLoss\"` indicates data loss has been detected on the volume.\n - `\"Degraded\"` indicates the volume is functioning but with reduced capability.\n - `\"Inaccessible\"` indicates the volume cannot be accessed.",
+							Description: "status is the machine-parseable health category. Possible values: - \"Inaccessible\": the volume cannot be accessed. - \"DataLoss\": data loss has been detected on the volume. - \"Degraded\": the volume is functioning with reduced capability.\n\nPossible enum values:\n - `\"DataLoss\"` indicates data loss has been detected on the volume.\n - `\"Degraded\"` indicates the volume is functioning but with reduced capability.\n - `\"Inaccessible\"` indicates the volume cannot be accessed.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
