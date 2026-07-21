@@ -63,7 +63,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
-	metadatav1alpha1 "k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -398,7 +397,8 @@ type Driver struct {
 	// Run driver pods. If false, only set up slices and class.
 	WithRealNodes bool
 
-	EnableDeviceMetadata bool
+	EnableDeviceMetadata   bool
+	DeviceMetadataVersions []schema.GroupVersion // Must be non-empty when EnableDeviceMetadata is true.
 
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
@@ -717,12 +717,9 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 			kubeletplugin.RegistrarDirectoryPath(registrarDirectoryPath),
 			kubeletplugin.RegistrarListener(d.listen(tCtx, &pod, &listenerPort)),
 
-			kubeletplugin.EnableDeviceMetadata(d.EnableDeviceMetadata),
+			kubeletplugin.EnableDeviceMetadata(d.EnableDeviceMetadata, d.DeviceMetadataVersions),
 		}
 		if d.EnableDeviceMetadata {
-			pluginOpts = append(pluginOpts,
-				kubeletplugin.MetadataVersions(metadatav1alpha1.SchemeGroupVersion),
-			)
 			if !d.IsLocal {
 				pluginOpts = append(pluginOpts,
 					kubeletplugin.MetadataFileOps(d.buildRemoteMetadataFileOps(tCtx, &pod)),
