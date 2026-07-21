@@ -159,6 +159,79 @@ func TestNamespaceLabels(t *testing.T) {
 	}
 }
 
+// TestUpdateResourceInDeletedNamespace verifies that when a namespace has been
+// fully deleted from storage but child objects remain (orphaned), Update
+// operations on those objects succeed through the full API server admission
+// chain, while Create operations are correctly rejected.
+func TestUpdateResourceInDeletedNamespace(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	kubeClient, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nsName := "test-orphaned-ns"
+	ctx := context.Background()
+
+	// Create a namespace and a configmap inside it.
+	_, err = kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: nsName},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cm, err := kubeClient.CoreV1().ConfigMaps(nsName).Create(ctx, &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "orphaned-cm"},
+		Data:       map[string]string{"key": "original"},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Delete the namespace object directly from etcd, bypassing the API
+	// server and namespace controller. This leaves the configmap orphaned
+	// in storage with no parent namespace.
+	nsKey := "/" + server.EtcdStoragePrefix + "/namespaces/" + nsName
+	_, err = server.EtcdClient.Delete(ctx, nsKey)
+	if err != nil {
+		t.Fatalf("failed to delete namespace from etcd: %v", err)
+	}
+
+	// Verify the namespace is gone from the API.
+	_, err = kubeClient.CoreV1().Namespaces().Get(ctx, nsName, metav1.GetOptions{})
+	if err == nil {
+		t.Fatal("expected namespace to be gone from API after etcd deletion")
+	}
+
+	// Update the orphaned configmap. This should succeed because
+	// NamespaceLifecycle allows updates regardless of namespace state.
+	cm.Data["key"] = "updated"
+	_, err = kubeClient.CoreV1().ConfigMaps(nsName).Update(ctx, cm, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("expected update of orphaned configmap to succeed, got: %v", err)
+	}
+
+	// Create a new configmap in the deleted namespace. This should fail
+	// because NamespaceLifecycle rejects creates in non-existent namespaces.
+	_, err = kubeClient.CoreV1().ConfigMaps(nsName).Create(ctx, &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "new-cm"},
+		Data:       map[string]string{"key": "value"},
+	}, metav1.CreateOptions{})
+	if err == nil {
+		t.Fatal("expected create of new configmap in deleted namespace to be rejected")
+	}
+
+	// Delete the orphaned configmap. This should succeed because
+	// NamespaceLifecycle allows deletes regardless of namespace state.
+	err = kubeClient.CoreV1().ConfigMaps(nsName).Delete(ctx, "orphaned-cm", metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatalf("expected delete of orphaned configmap to succeed, got: %v", err)
+	}
+}
+
 // JSONToUnstructured converts a JSON stub to unstructured.Unstructured and
 // returns a dynamic resource client that can be used to interact with it
 func jsonToUnstructured(stub, version, kind string) (*unstructured.Unstructured, error) {
