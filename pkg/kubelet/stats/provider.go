@@ -54,10 +54,11 @@ func NewCRIStatsProvider(
 	imageService internalapi.ImageManagerService,
 	hostStatsProvider HostStatsProvider,
 	podAndContainerStatsFromCRI bool,
+	podSandboxStatsUnimplemented bool,
 	fallbackStatsProvider containerStatsProvider,
 ) *Provider {
 	return newStatsProvider(cadvisor, podManager, newCRIStatsProvider(cadvisor, resourceAnalyzer,
-		runtimeService, imageService, hostStatsProvider, podAndContainerStatsFromCRI, fallbackStatsProvider))
+		runtimeService, imageService, hostStatsProvider, podAndContainerStatsFromCRI, podSandboxStatsUnimplemented, fallbackStatsProvider))
 }
 
 // NewCadvisorStatsProvider returns a containerStatsProvider that provides both
