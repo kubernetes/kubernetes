@@ -4099,39 +4099,6 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: pod_errors_get_total
-  subsystem: kubelet
-  help: Cumulative number of errors returned by the GetPod endpoint. Broken down by
-    server api version.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - server_api_version
-  componentEndpoints:
-  - component: kubelet
-    endpoint: /metrics
-- name: pod_errors_list_total
-  subsystem: kubelet
-  help: Cumulative number of errors returned by the ListPods endpoint. Broken down
-    by server api version.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - server_api_version
-  componentEndpoints:
-  - component: kubelet
-    endpoint: /metrics
-- name: pod_errors_watch_total
-  subsystem: kubelet
-  help: Cumulative number of errors returned by the WatchPods endpoint. Broken down
-    by server api version.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - server_api_version
-  componentEndpoints:
-  - component: kubelet
-    endpoint: /metrics
 - name: pod_in_progress_resizes
   subsystem: kubelet
   help: Number of in-progress resizes for pods.
@@ -4163,44 +4130,48 @@
 - name: pod_requests_get_total
   subsystem: kubelet
   help: Number of requests to the PodsAPI Get endpoint. Broken down by server api
-    version.
+    version and status code.
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - server_api_version
+  - status_code
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
 - name: pod_requests_list_total
   subsystem: kubelet
   help: Number of requests to the PodsAPI List endpoint. Broken down by server api
-    version.
+    version and status code.
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - server_api_version
+  - status_code
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
 - name: pod_requests_total
   subsystem: kubelet
   help: Cumulative number of requests to the PodsAPI endpoint. Broken down by server
-    api version.
+    api version and status code.
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - server_api_version
+  - status_code
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
 - name: pod_requests_watch_total
   subsystem: kubelet
   help: Number of requests to the PodsAPI Watch endpoint. Broken down by server api
-    version.
+    version and status code.
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - server_api_version
+  - status_code
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics

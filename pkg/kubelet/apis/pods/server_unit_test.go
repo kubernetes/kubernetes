@@ -464,9 +464,6 @@ func TestInterceptorsAndMetrics(t *testing.T) {
 
 	// Reset metrics before test
 	metrics.PodRequestsTotal.Reset()
-	metrics.PodErrorsGet.Reset()
-	metrics.PodErrorsList.Reset()
-	metrics.PodErrorsWatch.Reset()
 	metrics.PodRequestsList.Reset()
 	metrics.PodRequestsGet.Reset()
 	metrics.PodRequestsWatch.Reset()
@@ -509,11 +506,11 @@ func TestInterceptorsAndMetrics(t *testing.T) {
 	defer func() { _ = conn.Close() }()
 	client := podsv1alpha1.NewPodsClient(conn)
 
-	// 1. Call ListPods (Success)
+	// 1. Call ListPods (Success -> OK)
 	_, err = client.ListPods(tCtx, &podsv1alpha1.ListPodsRequest{})
 	require.NoError(t, err)
 
-	// 1b. Call ListPods (Failure -> Error)
+	// 1b. Call ListPods (Failure -> FailedPrecondition)
 	fakeSources.ready = false
 	_, err = client.ListPods(tCtx, &podsv1alpha1.ListPodsRequest{})
 	require.Error(t, err)
@@ -523,11 +520,11 @@ func TestInterceptorsAndMetrics(t *testing.T) {
 	// Restore ready state
 	fakeSources.ready = true
 
-	// 2. Call GetPod (Success)
+	// 2. Call GetPod (Success -> OK)
 	_, err = client.GetPod(tCtx, &podsv1alpha1.GetPodRequest{PodUID: "pod1-uid"})
 	require.NoError(t, err)
 
-	// 3. Call GetPod (Failure -> Error)
+	// 3. Call GetPod (Failure -> NotFound)
 	_, err = client.GetPod(tCtx, &podsv1alpha1.GetPodRequest{PodUID: "non-existent"})
 	require.Error(t, err)
 
@@ -548,34 +545,33 @@ func TestInterceptorsAndMetrics(t *testing.T) {
 	_, err = watchClient.Recv()
 	require.Error(t, err)
 
-	// Wait a moment for the server-side interceptor to finish executing and record the metric
-	time.Sleep(50 * time.Millisecond)
+	// Verify metrics broken down by status_code
+	assertCounterEventually(t, metrics.PodRequestsTotal, []string{"v1alpha1", "OK"}, 2)
+	assertCounterEventually(t, metrics.PodRequestsTotal, []string{"v1alpha1", "FailedPrecondition"}, 1)
+	assertCounterEventually(t, metrics.PodRequestsTotal, []string{"v1alpha1", "NotFound"}, 1)
+	assertCounterEventually(t, metrics.PodRequestsTotal, []string{"v1alpha1", "Canceled"}, 1)
 
-	// Verify metrics
-	// We expect:
-	// - Total requests: 5 (ListPods-success, ListPods-error, GetPod-success, GetPod-error, WatchPods)
-	// - List requests: 2
-	// - Get requests: 2
-	// - Watch requests: 1
-	// - Get errors: 1
-	// - List errors: 1
-	// - Watch errors: 1
+	assertCounterEventually(t, metrics.PodRequestsList, []string{"v1alpha1", "OK"}, 1)
+	assertCounterEventually(t, metrics.PodRequestsList, []string{"v1alpha1", "FailedPrecondition"}, 1)
 
-	assertCounter(t, metrics.PodRequestsTotal, "v1alpha1", 5)
-	assertCounter(t, metrics.PodRequestsList, "v1alpha1", 2)
-	assertCounter(t, metrics.PodRequestsGet, "v1alpha1", 2)
-	assertCounter(t, metrics.PodRequestsWatch, "v1alpha1", 1)
-	assertCounter(t, metrics.PodErrorsGet, "v1alpha1", 1)
-	assertCounter(t, metrics.PodErrorsList, "v1alpha1", 1)
-	assertCounter(t, metrics.PodErrorsWatch, "v1alpha1", 1)
+	assertCounterEventually(t, metrics.PodRequestsGet, []string{"v1alpha1", "OK"}, 1)
+	assertCounterEventually(t, metrics.PodRequestsGet, []string{"v1alpha1", "NotFound"}, 1)
+
+	assertCounterEventually(t, metrics.PodRequestsWatch, []string{"v1alpha1", "Canceled"}, 1)
 }
 
-func assertCounter(t *testing.T, vec *compmetrics.CounterVec, labelVal string, expected float64) {
-	metric, err := vec.GetMetricWithLabelValues(labelVal)
-	require.NoError(t, err)
-	val, err := testutil.GetCounterMetricValue(metric)
-	require.NoError(t, err)
-	assert.InDelta(t, expected, val, 0.0, "Metric %v with label %v", vec, labelVal)
+func assertCounterEventually(t *testing.T, vec *compmetrics.CounterVec, labelVals []string, expected float64) {
+	require.Eventually(t, func() bool {
+		metric, err := vec.GetMetricWithLabelValues(labelVals...)
+		if err != nil {
+			return false
+		}
+		val, err := testutil.GetCounterMetricValue(metric)
+		if err != nil {
+			return false
+		}
+		return val == expected
+	}, 2*time.Second, 10*time.Millisecond, "Metric %v with labels %v expected %f", vec, labelVals, expected)
 }
 
 func TestInitializationCheck(t *testing.T) {
@@ -605,29 +601,53 @@ func TestInitializationCheck(t *testing.T) {
 	assertErrorWithCode(t, err, codes.FailedPrecondition, "Kubelet is initializing")
 }
 
-func TestFeatureGateDisabled(t *testing.T) {
+func TestUnverifiedReadyStatusOverride(t *testing.T) {
 	tCtx := ktesting.Init(t)
-
-	// Disable feature gate during test
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodsAPI, false)
 
 	broadcaster := podsapi.NewBroadcaster(tCtx)
 	mockManager := new(kubepodtest.MockManager)
 	mockStatus := new(statustest.MockPodStatusProvider)
 	server := podsapi.NewPodsServer(broadcaster, mockManager, mockStatus, nil)
 
-	// ListPods should return FAILED_PRECONDITION
-	_, err := server.ListPods(tCtx, &podsv1alpha1.ListPodsRequest{})
-	assertErrorWithCode(t, err, codes.FailedPrecondition, "PodsAPI feature gate is disabled")
+	// Pod in podManager has stale Ready=True from APIServer
+	stalePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "stale-pod",
+			Namespace: "default",
+			UID:       "stale-uid",
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			Conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+	}
 
-	// GetPod should return FAILED_PRECONDITION
-	_, err = server.GetPod(tCtx, &podsv1alpha1.GetPodRequest{PodUID: "pod1-uid"})
-	assertErrorWithCode(t, err, codes.FailedPrecondition, "PodsAPI feature gate is disabled")
+	mockManager.On("GetPodByUID", types.UID("stale-uid")).Return(stalePod, true)
+	// statusManager has not run yet for this pod
+	mockStatus.On("GetPodStatus", types.UID("stale-uid")).Return(v1.PodStatus{}, false)
 
-	// WatchPods should return FAILED_PRECONDITION
-	mockStream := &MockWatchPodsServer{Ctx: tCtx, EventCh: make(chan *podsv1alpha1.WatchPodsEvent)}
-	err = server.WatchPods(&podsv1alpha1.WatchPodsRequest{}, mockStream)
-	assertErrorWithCode(t, err, codes.FailedPrecondition, "PodsAPI feature gate is disabled")
+	resp, err := server.GetPod(tCtx, &podsv1alpha1.GetPodRequest{PodUID: "stale-uid"})
+	require.NoError(t, err)
+
+	podOut := &v1.Pod{}
+	err = podOut.Unmarshal(resp.Pod)
+	require.NoError(t, err)
+
+	// Verify PodReady condition was overridden to False (ContainersNotReady)
+	readyCondFound := false
+	for _, c := range podOut.Status.Conditions {
+		if c.Type == v1.PodReady {
+			readyCondFound = true
+			assert.Equal(t, v1.ConditionFalse, c.Status)
+			assert.Equal(t, "ContainersNotReady", c.Reason)
+		}
+	}
+	assert.True(t, readyCondFound, "PodReady condition should be present")
 }
 
 type FakeSourcesReady struct {

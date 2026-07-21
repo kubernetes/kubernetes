@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"sigs.k8s.io/yaml"
 )
@@ -110,7 +111,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 					Containers: []v1.Container{
 						{
 							Name:    "test-container",
-							Image:   "busybox:1.36",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"sleep", "3600"},
 						},
 					},
@@ -245,7 +246,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 					Containers: []v1.Container{
 						{
 							Name:    "test-container",
-							Image:   "busybox:1.36",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"sleep", "3600"},
 						},
 					},
@@ -360,7 +361,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 					Containers: []v1.Container{
 						{
 							Name:    "test-container",
-							Image:   "busybox:1.36",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"sleep", "3600"},
 						},
 					},
@@ -495,7 +496,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 					Containers: []v1.Container{
 						{
 							Name:    "test-container",
-							Image:   "busybox:1.36",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"sleep", "3600"},
 						},
 					},
@@ -645,7 +646,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 					Containers: []v1.Container{
 						{
 							Name:    "test-container",
-							Image:   "busybox:1.36",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"sleep", "3600"},
 						},
 					},
@@ -681,38 +682,31 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 			ginkgo.By("querying the API immediately post-restart")
 			var phases []string
 
-			endTime := time.Now().Add(30 * time.Second)
-			for time.Now().Before(endTime) {
+			gomega.Eventually(ctx, func(ctx context.Context) (bool, error) {
 				resp, err := client.GetPod(ctx, &podsv1alpha1.GetPodRequest{PodUID: string(testPod.UID)})
 				if err != nil {
 					st, ok := status.FromError(err)
 					if ok && st.Code() == codes.FailedPrecondition {
 						phases = append(phases, "Initializing")
-						time.Sleep(100 * time.Millisecond)
-						continue
+						return false, nil
 					}
-					framework.Failf("unexpected error from GetPod: %v", err)
+					return false, err
 				}
 
 				var p v1.Pod
-				err = p.Unmarshal(resp.Pod)
-				framework.ExpectNoError(err)
+				if err := p.Unmarshal(resp.Pod); err != nil {
+					return false, err
+				}
 
-				// Check if the pod is Ready
-				isReady := false
 				for _, c := range p.Status.Conditions {
 					if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
-						isReady = true
+						phases = append(phases, "Ready")
+						return true, nil
 					}
 				}
-				if isReady {
-					phases = append(phases, "Ready")
-					break
-				} else {
-					phases = append(phases, "NotReady")
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
+				phases = append(phases, "NotReady")
+				return false, nil
+			}).WithTimeout(30 * time.Second).WithPolling(100 * time.Millisecond).Should(gomega.BeTrueBecause("pod should become Ready in Pods API post-restart"))
 
 			framework.Logf("Observed phase transitions: %v", phases)
 
@@ -729,8 +723,8 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 			initialMetrics, err := e2emetrics.GetKubeletMetrics(ctx, f.ClientSet, framework.TestContext.NodeName)
 			framework.ExpectNoError(err)
 
-			initialTotal := getMetricValue(initialMetrics, "pod_requests_total", "server_api_version", "v1alpha1")
-			initialList := getMetricValue(initialMetrics, "pod_requests_list_total", "server_api_version", "v1alpha1")
+			initialTotal := getMetricValue(initialMetrics, "pod_requests_total", map[string]string{"server_api_version": "v1alpha1", "status_code": "OK"})
+			initialList := getMetricValue(initialMetrics, "pod_requests_list_total", map[string]string{"server_api_version": "v1alpha1", "status_code": "OK"})
 
 			ginkgo.By("performing API calls")
 			_, err = client.ListPods(ctx, &podsv1alpha1.ListPodsRequest{})
@@ -742,8 +736,8 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 				if err != nil {
 					return err
 				}
-				currentTotal := getMetricValue(currentMetrics, "pod_requests_total", "server_api_version", "v1alpha1")
-				currentList := getMetricValue(currentMetrics, "pod_requests_list_total", "server_api_version", "v1alpha1")
+				currentTotal := getMetricValue(currentMetrics, "pod_requests_total", map[string]string{"server_api_version": "v1alpha1", "status_code": "OK"})
+				currentList := getMetricValue(currentMetrics, "pod_requests_list_total", map[string]string{"server_api_version": "v1alpha1", "status_code": "OK"})
 
 				if currentTotal != initialTotal+1 {
 					return fmt.Errorf("expected total metrics to be %v, got %v", initialTotal+1, currentTotal)
@@ -765,7 +759,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 			initialConfig.FeatureGates[string(kubefeatures.PodsAPI)] = false
 		})
 
-		ginkgo.It("should return FAILED_PRECONDITION error for all requests", func(ctx context.Context) {
+		ginkgo.It("should not serve requests when feature gate is disabled", func(ctx context.Context) {
 			endpoint, err := util.LocalEndpoint("/var/lib/kubelet/pods-api", pods.Socket)
 			framework.ExpectNoError(err)
 
@@ -775,15 +769,10 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 			client := podsv1alpha1.NewPodsClient(conn)
 
 			_, err = client.ListPods(ctx, &podsv1alpha1.ListPodsRequest{})
-			assertGrpcErrorWithCode(err, codes.FailedPrecondition, "PodsAPI feature gate is disabled")
+			assertGrpcErrorWithCode(err, codes.Unavailable, "")
 
 			_, err = client.GetPod(ctx, &podsv1alpha1.GetPodRequest{PodUID: "some-uid"})
-			assertGrpcErrorWithCode(err, codes.FailedPrecondition, "PodsAPI feature gate is disabled")
-
-			watchClient, err := client.WatchPods(ctx, &podsv1alpha1.WatchPodsRequest{})
-			framework.ExpectNoError(err)
-			_, err = watchClient.Recv()
-			assertGrpcErrorWithCode(err, codes.FailedPrecondition, "PodsAPI feature gate is disabled")
+			assertGrpcErrorWithCode(err, codes.Unavailable, "")
 		})
 	})
 })
@@ -807,13 +796,20 @@ func verifyPodReadyInAPI(ctx context.Context, client podsv1alpha1.PodsClient, ui
 	}, "2m", "2s").Should(gomega.BeTrueBecause("pod should be Ready in Pods API"))
 }
 
-func getMetricValue(metrics e2emetrics.KubeletMetrics, metricName string, labelKey, labelVal string) float64 {
+func getMetricValue(metrics e2emetrics.KubeletMetrics, metricName string, labels map[string]string) float64 {
 	samples, ok := metrics[metricName]
 	if !ok {
 		return 0
 	}
 	for _, sample := range samples {
-		if string(sample.Metric[testutil.LabelName(labelKey)]) == labelVal {
+		match := true
+		for k, v := range labels {
+			if string(sample.Metric[testutil.LabelName(k)]) != v {
+				match = false
+				break
+			}
+		}
+		if match {
 			return float64(sample.Value)
 		}
 	}

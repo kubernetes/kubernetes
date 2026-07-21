@@ -3389,16 +3389,18 @@ func (kl *Kubelet) ListenAndServePodResources(ctx context.Context) {
 
 // ListenAndServePod initializes an HTTP server to serve the Pod API.
 func (kl *Kubelet) ListenAndServePods(ctx context.Context) {
-	endpoint, err := util.LocalEndpoint(kl.getPodsAPIDir(), pods.Socket)
-	if err != nil {
-		klog.FromContext(ctx).Error(err, "Failed to get local endpoint for pod api")
-		return
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
+		endpoint, err := util.LocalEndpoint(kl.getPodsAPIDir(), pods.Socket)
+		if err != nil {
+			klog.FromContext(ctx).Error(err, "Failed to get local endpoint for pod api")
+			return
+		}
+		server.ListenAndServePodsServer(
+			ctx,
+			endpoint,
+			kl.podsServer,
+		)
 	}
-	server.ListenAndServePodsServer(
-		ctx,
-		endpoint,
-		kl.podsServer,
-	)
 }
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
