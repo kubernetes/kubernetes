@@ -22,7 +22,6 @@ import (
 	goerrors "errors"
 	"fmt"
 	"io"
-	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -2248,27 +2247,23 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	}
 
 	if cpuRequest != nil {
-		// If both the allocated and actuated values are at or below MinShares,
+		// If both the allocated and actual values are at or below MinShares,
 		// preserve the allocated value in the API to avoid confusion and simplify
 		// comparisons at the cgroup minimum floor.
 		if cpuRequest.MilliValue() > cm.MinShares || resources.Requests.Cpu().MilliValue() > cm.MinShares {
 			allocatedMilliCPU := resources.Requests.Cpu().MilliValue()
-			actuatedMilliCPU := cpuRequest.MilliValue()
-			thresholdMilliCPU := actuatedMilliCPU
-			if thresholdMilliCPU == 0 {
-				thresholdMilliCPU = allocatedMilliCPU
-			}
-			// On cgroup v2, cpu.weight has coarse granularity and converting it back to
-			// millicores can be lossy. If the diff is more than 20% of the actuated
-			// value (falling back to the allocated value if actuated is 0), or more than
-			// 20m, then log a warning and preserve the allocated value. Otherwise, update
-			// status with the actuated value.
-			absDiff := math.Abs(float64(allocatedMilliCPU - actuatedMilliCPU))
-			if thresholdMilliCPU != 0 && (absDiff > float64(thresholdMilliCPU)*0.2 || absDiff > 20.0) {
-				logger.V(2).Info("CPU request mismatch", "allocated", allocatedMilliCPU, "actuated", actuatedMilliCPU)
+			allocatedShares := cm.MilliCPUToShares(allocatedMilliCPU)
+			// On cgroup v2, cpu.weight has coarse granularity and converting
+			// shares -> weight -> shares can be lossy. If the cgroup readback
+			// matches the round-tripped allocated shares, preserve the allocated
+			// milliCPU in the API. Otherwise treat it as a real change and use
+			// the actuated value.
+			if cpuConfig != nil && cpuConfig.CPUShares != nil &&
+				cm.CPUSharesEqualAfterV2RoundTrip(allocatedShares, *cpuConfig.CPUShares) {
+				logger.V(4).Info("Preserving allocated CPU request due to cgroup v2 round-trip",
+					"allocated", allocatedMilliCPU, "actuated", cpuRequest.MilliValue(),
+					"allocatedShares", allocatedShares, "readbackShares", *cpuConfig.CPUShares)
 			} else {
-				// Preserve actuated value when conversion loss is within expected bounds
-				// (or both values are 0 and there is no meaningful baseline).
 				resources.Requests[v1.ResourceCPU] = cpuRequest.DeepCopy()
 			}
 		}

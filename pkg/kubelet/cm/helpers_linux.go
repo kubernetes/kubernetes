@@ -417,6 +417,17 @@ func CPURequestsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
 	return cpuRequest
 }
 
+// CPUSharesEqualAfterV2RoundTrip reports whether readbackShares equals the result of
+// round-tripping allocatedShares through the cgroup v2 conversion path
+// (cpu.shares -> cpu.weight -> cpu.shares).
+//
+// On cgroup v2, cpu.weight has coarse granularity, so writing shares and reading
+// them back can be lossy. Callers can use this to treat the lossy readback as
+// equivalent to the originally allocated shares.
+func CPUSharesEqualAfterV2RoundTrip(allocatedShares, readbackShares uint64) bool {
+	return cpuWeightToCPUShares(getCPUWeight(&allocatedShares)) == readbackShares
+}
+
 func CPULimitsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
 	var cpuLimit *resource.Quantity
 
