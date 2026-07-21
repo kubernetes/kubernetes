@@ -1,6 +1,145 @@
 {
   "components": {
     "schemas": {
+      "io.k8s.api.authorization.v1.AuthorizationOptions": {
+        "description": "AuthorizationOptions contains options for specifying the client's authorization abilities.",
+        "properties": {
+          "handledDecisionTypes": {
+            "description": "handledDecisionTypes specifies what decision types the client can handle in the context it is in. Currently valid values are: - [Allow, Deny, NoOpinion] (for conditions-unaware clients) or - [Allow, Deny, NoOpinion, ConditionsMap, Union] (for conditions-aware clients) If the authorizer would like to return conditions, but the client does not opt in to handle those here,\n  the authorizer must fail closed to a safe unconditional decision using ConditionsAwareDecision.FailureDecision()\n  (Deny if any Deny conditions were present, otherwise NoOpinion).\nOrder does not matter in this slice; set semantics should be used. The server should not reject unrecognized decision types (hence the k8s:opaqueType), but focus on whether the client supports a mode that the server does. All clients must support \"classic\", conditions-unaware authorization.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "set"
+          }
+        },
+        "required": [
+          "handledDecisionTypes"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.authorization.v1.Condition": {
+        "description": "Condition represents a single authorization condition to be evaluated against data available later in the request chain, e.g. objects available in admission.",
+        "properties": {
+          "condition": {
+            "description": "condition returns a string encoding of the condition to be evaluated. It is a pure, deterministic function from ConditionsData to a boolean (or error). Might or might not be human-readable. Optional, if the ID alone is enough for the authorizer to know how to evaluate the condition.",
+            "type": "string"
+          },
+          "description": {
+            "description": "description is an optional human-friendly description that can be shown as an error message or for debugging. Optional.",
+            "type": "string"
+          },
+          "id": {
+            "default": "",
+            "description": "id uniquely identifies this condition within the scope of the authorizer that authored it and ConditionsMap it is part of. Validated as a Kubernetes label key. Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.",
+            "type": "string"
+          },
+          "type": {
+            "description": "type describes the type of the condition, if there are multiple possibilities. Should be formatted as a Kubernetes label key. Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use. Optional. Can be omitted if the authorizer already knows how to evaluate the condition.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.authorization.v1.ConditionsAwareDecision": {
+        "description": "ConditionsAwareDecision represents one authorizer's decision. It is an enum type, with variants described in ConditionsAwareDecisionType, plus a reason and error.",
+        "properties": {
+          "allow": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.UnconditionalDecision"
+              }
+            ],
+            "description": "allow represents an unconditional Allow decision. Must be non-null when type == \"Allow\", otherwise this field must be unset."
+          },
+          "conditionsMap": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.ConditionsMap"
+              }
+            ],
+            "description": "conditionsMap represents a conditional decision, modelled as a map of conditions. Must be non-null when type == \"ConditionsMap\", otherwise this field must be unset."
+          },
+          "deny": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.UnconditionalDecision"
+              }
+            ],
+            "description": "deny represents an unconditional Deny decision. Must be non-null when type == \"Deny\", otherwise this field must be unset."
+          },
+          "noOpinion": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.UnconditionalDecision"
+              }
+            ],
+            "description": "noOpinion represents an unconditional NoOpinion decision. Must be non-null when type == \"NoOpinion\", otherwise this field must be unset."
+          },
+          "type": {
+            "default": "",
+            "description": "type describes the type of the decision, and acts as an enum discriminator.",
+            "type": "string"
+          },
+          "union": {
+            "description": "union forms an ordered tree of decisions, where the union decision is represented by an internal node, and all other decision types are leaf nodes. During evaluation, the leaf decisions are evaluated in depth-first order, until an Allow or Deny decision is found. The order of the decisions must match exactly the order of the authorizers in the union authorizer. At least one of the leaves must be of type ConditionsMap, as otherwise the union could be trivially reduced to just a single Allow/Deny/NoOpinion.\n\nMust have at least one element when type == \"Union\", otherwise this field must be unset.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.authorization.v1.NamedConditionsAwareDecision"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "authorizerName"
+            ],
+            "x-kubernetes-list-type": "map"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.authorization.v1.ConditionsMap": {
+        "description": "ConditionsMap represents a map of conditions, keyed by ID across all conditions, across all effects. The ConditionsMap must have at least one Allow condition or at least one Deny condition. It cannot contain more than 128 conditions in total. The conditions are evaluated against data available later, to determine whether the authorizer that authored the conditions allows or denies the request. If all conditions in the map evaluate to false, the final decision must be NoOpinion.",
+        "properties": {
+          "allowConditions": {
+            "description": "allowConditions contains the conditions with Allow effect. If any such condition evaluates to true, the ConditionsMap as a whole must evaluate to Allow.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.authorization.v1.Condition"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "id"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "denyConditions": {
+            "description": "denyConditions contains the conditions with Deny effect. If any such condition evaluates to true or error, the ConditionsMap as a whole must evaluate to Deny.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.authorization.v1.Condition"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "id"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "noOpinionConditions": {
+            "description": "noOpinionConditions contains the conditions with NoOpinion effect. If any such condition evaluates to true or error, the ConditionsMap as a whole must evaluate to NoOpinion.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.authorization.v1.Condition"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "id"
+            ],
+            "x-kubernetes-list-type": "map"
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.authorization.v1.FieldSelectorAttributes": {
         "description": "FieldSelectorAttributes indicates a field limited access. Webhook authors are encouraged to * ensure rawSelector and requirements are not both set * consider the requirements field if set * not try to parse or consider the rawSelector field if set. This is to avoid another CVE-2022-2880 (i.e. getting different systems to agree on how exactly to parse a query is not something we want), see https://www.oxeye.io/resources/golang-parameter-smuggling-attack for more details. For the *SubjectAccessReview endpoints of the kube-apiserver: * If rawSelector is empty and requirements are empty, the request is not limited. * If rawSelector is present and requirements are empty, the rawSelector will be parsed and limited if the parsing succeeds. * If rawSelector is empty and requirements are present, the requirements should be honored * If rawSelector is present and requirements are present, the request is invalid.",
         "properties": {
@@ -87,6 +226,30 @@
             "version": "v1"
           }
         ]
+      },
+      "io.k8s.api.authorization.v1.NamedConditionsAwareDecision": {
+        "description": "NamedConditionsAwareDecision is a named ConditionsAwareDecision, returned by a unioned authorizer.",
+        "properties": {
+          "authorizerName": {
+            "default": "",
+            "description": "authorizerName details the name of the authorizer that authored the condition, such that the right Decision can be paired with the right authorizer when evaluating the conditions, even across API server replicas. The name must be stable over time. This name must be unique within a given union authorizer, not necessarily globally.",
+            "type": "string"
+          },
+          "decision": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.ConditionsAwareDecision"
+              }
+            ],
+            "default": {},
+            "description": "decision carries the inner decision returned from the authorizer."
+          }
+        },
+        "required": [
+          "authorizerName",
+          "decision"
+        ],
+        "type": "object"
       },
       "io.k8s.api.authorization.v1.NonResourceAttributes": {
         "description": "NonResourceAttributes includes the authorization attributes available for non-resource requests to the Authorizer interface",
@@ -272,6 +435,14 @@
       "io.k8s.api.authorization.v1.SelfSubjectAccessReviewSpec": {
         "description": "SelfSubjectAccessReviewSpec is a description of the access request.  Exactly one of resourceAttributes and nonResourceAttributes must be set",
         "properties": {
+          "authorizationOptions": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.AuthorizationOptions"
+              }
+            ],
+            "description": "authorizationOptions contains options for specifying the client's authorization abilities. Requires the ConditionalAuthorization feature to be enabled."
+          },
           "nonResourceAttributes": {
             "allOf": [
               {
@@ -406,6 +577,14 @@
       "io.k8s.api.authorization.v1.SubjectAccessReviewSpec": {
         "description": "SubjectAccessReviewSpec is a description of the access request.  Exactly one of resourceAttributes and nonResourceAttributes must be set",
         "properties": {
+          "authorizationOptions": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.AuthorizationOptions"
+              }
+            ],
+            "description": "authorizationOptions contains options for specifying the client's authorization abilities. Requires the ConditionalAuthorization feature to be enabled."
+          },
           "extra": {
             "additionalProperties": {
               "items": {
@@ -456,11 +635,19 @@
         "properties": {
           "allowed": {
             "default": false,
-            "description": "allowed is required. True if the action would be allowed, false otherwise.",
+            "description": "allowed is required. True if the action would be allowed, false otherwise. allowed=true is mutually exclusive with denied=true and conditionalDecision != nil.",
             "type": "boolean"
           },
+          "conditionalDecision": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.authorization.v1.ConditionsAwareDecision"
+              }
+            ],
+            "description": "conditionalDecision represents a conditional decision returned by the authorizer. Mutually exclusive with allowed=true and denied=true. The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone. May only be set if spec.conditionalAuthorization is non-null. Requires the ConditionalAuthorization feature to be enabled."
+          },
           "denied": {
-            "description": "denied is optional. True if the action would be denied, otherwise false. If both allowed is false and denied is false, then the authorizer has no opinion on whether to authorize the action. Denied may not be true if Allowed is true.",
+            "description": "denied is optional. True if the action would be denied, otherwise false If allowed is false, denied is false, and conditionalDecision is unset, then the authorizer has no opinion on whether to authorize the action. denied=true is mutually exclusive with allowed=true and conditionalDecision != nil.",
             "type": "boolean"
           },
           "evaluationError": {
@@ -511,6 +698,20 @@
           "nonResourceRules",
           "incomplete"
         ],
+        "type": "object"
+      },
+      "io.k8s.api.authorization.v1.UnconditionalDecision": {
+        "description": "UnconditionalDecision represents the data associated with an unconditional decision.",
+        "properties": {
+          "evaluationError": {
+            "description": "evaluationError is an indication that some error occurred during the authorization check. It is entirely possible to get an error and be able to continue determine authorization status in spite of it. For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.",
+            "type": "string"
+          },
+          "reason": {
+            "description": "reason is optional. It indicates why a request was allowed or denied.",
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.APIResource": {
