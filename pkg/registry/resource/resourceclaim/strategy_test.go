@@ -18,6 +18,7 @@ package resourceclaim
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -404,6 +405,48 @@ var objWithAllocationTimestamp = &resource.ResourceClaim{
 	},
 }
 
+var objWithSharedConsumableCapacityStatus = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					Exactly: &resource.ExactDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+					},
+				},
+			},
+		},
+	},
+	Status: resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{
+					{
+						Request: "req-0",
+						Driver:  "dra.example.com",
+						Pool:    "pool-0",
+						Device:  "device-0",
+						ConsumedCounters: &resource.CounterConsumption{PerDevice: []resource.CounterSetConsumption{
+							{
+								CounterSet: "pool-0",
+								Counters: map[string]apiresource.Quantity{
+									"memory": apiresource.MustParse("1"),
+								},
+							},
+						}},
+					},
+				},
+			},
+		},
+	},
+}
+
 var objWithCapacityRequests = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
@@ -756,6 +799,25 @@ func TestStrategyCreate(t *testing.T) {
 				}
 			},
 		},
+		"drop-fields-shared-consumable-capacity-status": {
+			obj:       objWithSharedConsumableCapacityStatus,
+			expectObj: obj,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-shared-consumable-capacity-status-enabled-feature": {
+			obj:              objWithSharedConsumableCapacityStatus,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: true, features.DRASharedConsumableCapacity: true},
+			expectObj:        obj,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
 	}
 
 	for name, tc := range testcases {
@@ -767,7 +829,6 @@ func TestStrategyCreate(t *testing.T) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(tc.emulatedVersion))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureOverrides)
-
 			strategy := NewStrategy(mockNSClient, nil)
 
 			obj := tc.obj.DeepCopy()
@@ -1916,6 +1977,39 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 		},
+		"keep-fields-shared-consumable-capacity-with-device-status": {
+			oldObj:           obj,
+			newObj:           objWithSharedConsumableCapacityStatus,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true, features.DRASharedConsumableCapacity: true},
+			expectObj:        objWithSharedConsumableCapacityStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"drop-fields-shared-consumable-capacity-disabled-feature-gate-with-device-status": {
+			oldObj:           obj,
+			newObj:           objWithSharedConsumableCapacityStatus,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true},
+			expectObj:        objWithStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-fields-shared-consumable-capacity-with-device-status-disabled-feature-gate": {
+			oldObj:           objWithSharedConsumableCapacityStatus,
+			newObj:           objWithSharedConsumableCapacityStatus,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true},
+			expectObj:        objWithSharedConsumableCapacityStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
 		"drop-fields-consumable-capacity-disabled-feature-gate": {
 			oldObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
@@ -2021,12 +2115,10 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				authz = &fakeAuthorizer{true}
 			}
 			strategy := NewStrategy(mockNSClient, authz)
-
 			if tc.emulatedVersion != "" {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(tc.emulatedVersion))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureOverrides)
-
 			statusStrategy := NewStatusStrategy(strategy)
 
 			ctx := ctx
@@ -2127,4 +2219,29 @@ func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes)
 		return authorizer.DecisionDeny, "denied", nil
 	}
 	return authorizer.DecisionAllow, "default accept", nil
+}
+
+func TestDropDisabledEmptyCounterSnapshot(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		for _, previouslyUsed := range []bool{false, true} {
+			t.Run(fmt.Sprintf("enabled=%t/previously-used=%t", enabled, previouslyUsed), func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.DRAConsumableCapacity:       true,
+					features.DRASharedConsumableCapacity: enabled,
+				})
+				newClaim := objWithSharedConsumableCapacityStatus.DeepCopy()
+				newClaim.Status.Allocation.Devices.Results[0].ConsumedCounters = &resource.CounterConsumption{}
+				oldClaim := obj.DeepCopy()
+				if previouslyUsed {
+					oldClaim = newClaim.DeepCopy()
+				}
+				dropDisabledDRASharedConsumableCapacityStatusFields(newClaim, oldClaim)
+				if enabled || previouslyUsed {
+					assert.NotNil(t, newClaim.Status.Allocation.Devices.Results[0].ConsumedCounters, "known zero consumption must survive")
+				} else {
+					assert.Nil(t, newClaim.Status.Allocation.Devices.Results[0].ConsumedCounters)
+				}
+			})
+		}
+	}
 }
