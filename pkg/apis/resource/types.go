@@ -595,7 +595,7 @@ type DeviceCounterConsumption struct {
 	// The maximum number of counters is 32.
 	//
 	// +required
-	Counters map[string]Counter
+	Counters map[string]CounterRequirement
 
 	// CompatibilityGroups is a list of opaque group names for
 	// this counter set consumption.
@@ -649,18 +649,71 @@ type DeviceCapacity struct {
 	RequestPolicy *CapacityRequestPolicy
 }
 
-// Counter describes a quantity associated with a device.
+// Counter describes a quantity that is available in a counter set.
 type Counter struct {
 	// Value defines how much of a certain device counter is available.
 	//
 	// +required
-	Value resource.Quantity
+	Value *resource.Quantity
+
+	// ConsumptionPolicy defines how devices consume this counter. The consumed
+	// amount is rounded up according to the policy and must satisfy its limits.
+	//
+	// If unset, devices can consume any amount up to the available counter value.
+	// If and only if the required amount is unspecified, then the policy default is used
+	// (if set) or the full counter value (if not set).
+	//
+	// +optional
+	// +featureGate=DRASharedConsumableCapacity
+	ConsumptionPolicy *CapacityRequestPolicy
+}
+
+// CounterRequirement describes how much of a counter a device consumes.
+type CounterRequirement struct {
+	// Value defines the statically consumed amount.
+	//
+	// Exactly one of Value or ValueFrom must be specified.
+	//
+	// +optional
+	Value *resource.Quantity
+
+	// ValueFrom looks up the requested capacity value in a ResourceClaim via
+	// the capacity name. That value is then consumed from the counter instead
+	// of using a static value defined by the driver.
+	//
+	// Exactly one of Value or ValueFrom must be specified.
+	//
+	// +optional
+	// +featureGate=DRASharedConsumableCapacity
+	ValueFrom *CounterValueFrom
+}
+
+// CounterValueFrom looks up the requested capacity value in a ResourceClaim
+// via the capacity name.
+type CounterValueFrom struct {
+	// CapacityName is the name of a device capacity.
+	// This is the same name that users set in capacity requests.
+	//
+	// If this name has no domain prefix, the driver
+	// name from the ResourceSlice is used as the domain when matching against
+	// capacity requests.
+	//
+	// +required
+	CapacityName QualifiedName
 }
 
 // CapacityRequestPolicyDiscreteMaxOptions limits the number of discrete capacity values allowed in a requestPolicy.
 const CapacityRequestPolicyDiscreteMaxOptions = 10
 
-// CapacityRequestPolicy defines how requests consume device capacity.
+// CapacityRequestPolicy defines how requests consume device capacity and
+// how devices consume counters.
+//
+// It is used by DeviceCapacity.RequestPolicy and Counter.ConsumptionPolicy.
+// For counter consumption, capacity means the available counter value,
+// and a request means the device's required counter amount.
+// Both uses share default selection, rounding and range arithmetic,
+// including the DRAFractionalCapacityRange feature gate and the rules
+// described by CapacityRequestPolicyRange.
 //
 // Must not set more than one ValidRequestValues.
 type CapacityRequestPolicy struct {
@@ -1893,6 +1946,11 @@ type DeviceAllocationResult struct {
 // entries in allocation.devices.results.
 const AllocationResultsMaxSize = 32
 
+// DeviceRequestAllocationResultMaxConsumedCounterSets is the maximum number of
+// counter sets in DeviceRequestAllocationResult.ConsumedCounters. It matches
+// the maximum number of counter sets that one device may consume.
+const DeviceRequestAllocationResultMaxConsumedCounterSets = ResourceSliceMaxDeviceCounterConsumptionsPerDevice
+
 // DeviceRequestAllocationResult contains the allocation result for one request.
 type DeviceRequestAllocationResult struct {
 	// Request is the name of the request in the claim which caused this
@@ -2013,6 +2071,78 @@ type DeviceRequestAllocationResult struct {
 	// +listType=set
 	// +featureGate=DRAOptionalNodeOperations
 	SkipNodeOperations []SkipNodeOperation
+
+	// ConsumedCounters records resolved ValueFrom consumption for the single device
+	// identified by this allocation result, grouped by counter set in that
+	// device's pool. Each result records only its own request-dependent amounts.
+	// The scheduler sums these amounts across non-admin allocation results,
+	// including multiple shares of the same device. Releasing one allocation
+	// releases its recorded amounts without changing those of other allocations.
+	//
+	// Quantities are resolved at allocation time from the matching claim capacity
+	// requests, including ConsumptionPolicy rounding. They may therefore be greater
+	// than the requested amounts. If the claim omits a mapped capacity request,
+	// consumption uses the shared counter's policy default, or its full value
+	// when no default is defined. All resolved ValueFrom counters are included,
+	// even when their quantity is zero.
+	//
+	// The recorded amounts and counter-set references remain authoritative if
+	// ResourceSlice mappings, defaults, or policies change. A mapping change does
+	// not move an existing allocation's consumption to a different counter set.
+	// DRA drivers can use these amounts without access to ResourceSlices.
+	//
+	// Fixed counter consumption is not recorded here. The scheduler determines
+	// fixed consumption from current ResourceSlices, including ConsumptionPolicy
+	// rounding, and counts it once per (driver, pool, device) while any non-admin
+	// allocation of that device remains.
+	// Current fixed consumption is added to the recorded request-dependent
+	// consumption; changing a counter from ValueFrom to Value does not replace
+	// the recorded amounts.
+	//
+	// Current shared-counter values still define the total budget. Reducing a
+	// counter below its recorded consumption prevents further counter consumption;
+	// existing allocation results are not changed. If an allocated device's
+	// definition is missing, or a recorded positive amount refers to a missing
+	// counter set or counter, further counter-consuming allocations from that
+	// pool are blocked. A recorded zero amount does not require a current
+	// counter-set or counter definition.
+	//
+	// This field is populated only for non-admin allocations when
+	// DRASharedConsumableCapacity is enabled. An absent field means that no
+	// request-dependent consumption was recorded, including for allocations
+	// made before the feature was enabled.
+	// If an existing allocation has no recorded consumption but its current
+	// device definition uses ValueFrom, further counter-consuming allocations
+	// from that pool are blocked because the allocation-time amount is unknown.
+	//
+	// The list contains at most 2 counter sets, keyed by counterSet. Its order
+	// has no correspondence to the order of counter sets or devices in ResourceSlices.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=counterSet
+	// +featureGate=DRASharedConsumableCapacity
+	ConsumedCounters []CounterSetConsumption
+}
+
+// CounterSetConsumption records one allocation's resolved ValueFrom consumption
+// from one counter set. The containing DeviceRequestAllocationResult identifies
+// the allocated device and its pool.
+//
+// For example, two allocations sharing a device may consume 2Gi and 3Gi from a
+// "memory" counter. Each result records only its own amount; together they
+// consume 5Gi. Releasing the first allocation leaves 3Gi charged. If the device
+// also consumes one fixed "slots" counter, that charge is accounted for
+// separately from current ResourceSlices. With unchanged slice definitions,
+// the fixed charge remains until the last non-admin allocation is released.
+type CounterSetConsumption struct {
+	// CounterSet identifies a counter set in the pool named by the containing
+	// allocation result.
+	CounterSet string
+
+	// Counters records this allocation's resolved quantity for each counter.
+	// The map contains at most 32 counters; each quantity must be non-negative.
+	Counters map[string]resource.Quantity
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.

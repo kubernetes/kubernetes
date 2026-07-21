@@ -247,13 +247,13 @@ func TestDeclarativeValidate(t *testing.T) {
 				},
 				// spec.sharedCounters.counters
 				"invalid: shared counter key with uppercase": {
-					input: mkResourceSliceWithSharedCounters(tweakSharedCounter(counters("InvalidKey"))),
+					input: mkResourceSliceWithSharedCounters(tweakSharedCounter(sharedCounters("InvalidKey"))),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), "InvalidKey", "").WithOrigin("format=k8s-short-name").MarkBeta(),
 					},
 				},
 				"valid: shared counter key": {
-					input: mkResourceSliceWithSharedCounters(tweakSharedCounter(counters("valid-key"))),
+					input: mkResourceSliceWithSharedCounters(tweakSharedCounter(sharedCounters("valid-key"))),
 				},
 				"invalid: shared counters empty": {
 					input: mkResourceSliceWithSharedCounters(tweakSharedCounter(nil)),
@@ -263,13 +263,24 @@ func TestDeclarativeValidate(t *testing.T) {
 				},
 				// spec.devices.consumesCounters.counters
 				"invalid: device counter key with uppercase": {
-					input: mkResourceSliceWithDevices(tweakDeviceCounter(counters("InvalidKey"))),
+					input: mkResourceSliceWithDevices(tweakDeviceCounter(consumeCounters("InvalidKey"))),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "InvalidKey", "").WithOrigin("format=k8s-short-name").MarkBeta(),
 					},
 				},
 				"valid: device counter key": {
-					input: mkResourceSliceWithDevices(tweakDeviceCounter(counters("valid-key"))),
+					input: mkResourceSliceWithDevices(tweakDeviceCounter(consumeCounters("valid-key"))),
+				},
+				"invalid: device counter value and valueFrom are mutually exclusive": {
+					input: mkResourceSliceWithDevices(tweakDeviceCounter(map[string]resource.CounterRequirement{
+						"valid-key": {
+							Value:     mustParseQuantityPtr("1"),
+							ValueFrom: &resource.CounterValueFrom{CapacityName: "test.driver.io/cap"},
+						},
+					})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters").Key("valid-key"), "{value, valueFrom}", "must specify at most one of: `value`, `valueFrom`").WithOrigin("zeroOrOneOf"),
+					},
 				},
 				"invalid: device counters empty": {
 					input: mkResourceSliceWithDevices(tweakDeviceCounter(nil)),
@@ -282,7 +293,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				// carry the named attribute as a string.
 				"valid: partitionTypeAttribute": {
 					input: mkResourceSliceWithDevices(
-						tweakDeviceCounter(counters("valid-key")),
+						tweakDeviceCounter(consumeCounters("valid-key")),
 						tweakDeviceAttribute("gpu.example.com/profile", resource.DeviceAttribute{StringValue: new("Full")}),
 						tweakPartitionTypeAttribute("gpu.example.com/profile"),
 					),
@@ -290,7 +301,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				},
 				"invalid: partitionTypeAttribute format": {
 					input: mkResourceSliceWithDevices(
-						tweakDeviceCounter(counters("valid-key")),
+						tweakDeviceCounter(consumeCounters("valid-key")),
 						tweakPartitionTypeAttribute("invalid attr!"),
 					),
 					enablePartitionTypeAttr: true,
@@ -300,7 +311,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				},
 				"invalid: partitionTypeAttribute name too long": {
 					input: mkResourceSliceWithDevices(
-						tweakDeviceCounter(counters("valid-key")),
+						tweakDeviceCounter(consumeCounters("valid-key")),
 						tweakPartitionTypeAttribute(resource.FullyQualifiedName("gpu.example.com/"+strings.Repeat("a", 33))),
 					),
 					enablePartitionTypeAttr: true,
@@ -312,7 +323,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				// the domain is required so the attribute is unambiguous.
 				"invalid: partitionTypeAttribute without domain": {
 					input: mkResourceSliceWithDevices(
-						tweakDeviceCounter(counters("valid-key")),
+						tweakDeviceCounter(consumeCounters("valid-key")),
 						tweakPartitionTypeAttribute("profile"),
 					),
 					enablePartitionTypeAttr: true,
@@ -322,7 +333,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				},
 				"invalid: partitionTypeAttribute with more than one slash": {
 					input: mkResourceSliceWithDevices(
-						tweakDeviceCounter(counters("valid-key")),
+						tweakDeviceCounter(consumeCounters("valid-key")),
 						tweakPartitionTypeAttribute("gpu.example.com/profile/full"),
 					),
 					enablePartitionTypeAttr: true,
@@ -332,7 +343,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				},
 				"invalid: partitionTypeAttribute with feature disabled": {
 					input: mkResourceSliceWithDevices(
-						tweakDeviceCounter(counters("valid-key")),
+						tweakDeviceCounter(consumeCounters("valid-key")),
 						tweakDeviceAttribute("gpu.example.com/profile", resource.DeviceAttribute{StringValue: new("Full")}),
 						tweakPartitionTypeAttribute("gpu.example.com/profile"),
 					),
@@ -789,7 +800,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				// spec.sharedCounters.counters
 				"invalid update: shared counter key with uppercase": {
 					old:    mkResourceSliceWithSharedCounters(),
-					update: mkResourceSliceWithSharedCounters(tweakSharedCounter(counters("InvalidKey"))),
+					update: mkResourceSliceWithSharedCounters(tweakSharedCounter(sharedCounters("InvalidKey"))),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), "InvalidKey", "").WithOrigin("format=k8s-short-name").MarkBeta(),
 					},
@@ -797,7 +808,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				// spec.sharedCounters.counters: nil -> invalid
 				"invalid update: shared counter key nil to invalid": {
 					old:    mkResourceSliceWithSharedCounters(tweakSharedCounter(nil)),
-					update: mkResourceSliceWithSharedCounters(tweakSharedCounter(counters("InvalidKey"))),
+					update: mkResourceSliceWithSharedCounters(tweakSharedCounter(sharedCounters("InvalidKey"))),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), "InvalidKey", "").WithOrigin("format=k8s-short-name").MarkBeta(),
 					},
@@ -805,7 +816,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				// spec.devices.consumesCounters.counters
 				"invalid update: device counter key with uppercase": {
 					old:    mkResourceSliceWithDevices(),
-					update: mkResourceSliceWithDevices(tweakDeviceCounter(counters("InvalidKey"))),
+					update: mkResourceSliceWithDevices(tweakDeviceCounter(consumeCounters("InvalidKey"))),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "InvalidKey", "").WithOrigin("format=k8s-short-name").MarkBeta(),
 					},
@@ -813,7 +824,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				// spec.devices.consumesCounters.counters: nil -> invalid
 				"invalid update: device counter key nil to invalid": {
 					old:    mkResourceSliceWithDevices(tweakDeviceCounter(nil)),
-					update: mkResourceSliceWithDevices(tweakDeviceCounter(counters("InvalidKey"))),
+					update: mkResourceSliceWithDevices(tweakDeviceCounter(consumeCounters("InvalidKey"))),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "InvalidKey", "").WithOrigin("format=k8s-short-name").MarkBeta(),
 					},
@@ -949,7 +960,7 @@ func mkResourceSliceWithSharedCounters(mutators ...func(*resource.ResourceSlice)
 				{
 					Name: "shared-counter-set",
 					Counters: map[string]resource.Counter{
-						"valid-key": {},
+						"valid-key": {Value: mustParseQuantityPtr("1")},
 					},
 				},
 			},
@@ -1031,7 +1042,7 @@ func tweakSharedCountersName(names ...string) func(*resource.ResourceSlice) {
 			sharedCounters = append(sharedCounters, resource.CounterSet{
 				Name: name,
 				Counters: map[string]resource.Counter{
-					"valid-key": {},
+					"valid-key": {Value: mustParseQuantityPtr("1")},
 				},
 			})
 		}
@@ -1046,7 +1057,7 @@ func tweakSharedCounters(count int) func(*resource.ResourceSlice) {
 			counterSets = append(counterSets, resource.CounterSet{
 				Name: fmt.Sprintf("shared-counter-set-%d", i),
 				Counters: map[string]resource.Counter{
-					"valid-key": {},
+					"valid-key": {Value: mustParseQuantityPtr("1")},
 				},
 			})
 		}
@@ -1060,8 +1071,8 @@ func tweakDeviceConsumesCounters(count int) func(*resource.ResourceSlice) {
 		for i := 0; i < count; i++ {
 			consumesCounters = append(consumesCounters, resource.DeviceCounterConsumption{
 				CounterSet: fmt.Sprintf("shared-counter-set-%d", i),
-				Counters: map[string]resource.Counter{
-					"valid-key": {},
+				Counters: map[string]resource.CounterRequirement{
+					"valid-key": {Value: mustParseQuantityPtr("1")},
 				},
 			})
 		}
@@ -1075,8 +1086,8 @@ func tweakDeviceConsumesCountersCounterSetName(counterSets ...string) func(*reso
 		for _, counterSet := range counterSets {
 			consumesCounters = append(consumesCounters, resource.DeviceCounterConsumption{
 				CounterSet: counterSet,
-				Counters: map[string]resource.Counter{
-					"valid-key": {},
+				Counters: map[string]resource.CounterRequirement{
+					"valid-key": {Value: mustParseQuantityPtr("1")},
 				},
 			})
 		}
@@ -1088,10 +1099,8 @@ func tweakDeviceConsumesCountersCompatibilityGroups(groups ...string) func(*reso
 	return func(rs *resource.ResourceSlice) {
 		rs.Spec.Devices[0].ConsumesCounters = []resource.DeviceCounterConsumption{
 			{
-				CounterSet: "shared-counter-set",
-				Counters: map[string]resource.Counter{
-					"valid-key": {},
-				},
+				CounterSet:          "shared-counter-set",
+				Counters:            consumeCounters("valid-key"),
 				CompatibilityGroups: groups,
 			},
 		}
@@ -1120,7 +1129,7 @@ func tweakSharedCounter(counters map[string]resource.Counter) func(*resource.Res
 	}
 }
 
-func tweakDeviceCounter(counters map[string]resource.Counter) func(*resource.ResourceSlice) {
+func tweakDeviceCounter(counters map[string]resource.CounterRequirement) func(*resource.ResourceSlice) {
 	return func(rs *resource.ResourceSlice) {
 		rs.Spec.Devices[0].ConsumesCounters = []resource.DeviceCounterConsumption{
 			{
@@ -1131,9 +1140,23 @@ func tweakDeviceCounter(counters map[string]resource.Counter) func(*resource.Res
 	}
 }
 
-func counters(key string) map[string]resource.Counter {
+// mustParseQuantityPtr parses a quantity string and returns a pointer to it.
+func mustParseQuantityPtr(value string) *apiresource.Quantity {
+	quantity := apiresource.MustParse(value)
+	return &quantity
+}
+
+// sharedCounters builds a shared counter map for declarative validation tests.
+func sharedCounters(key string) map[string]resource.Counter {
 	return map[string]resource.Counter{
-		key: {},
+		key: {Value: mustParseQuantityPtr("1")},
+	}
+}
+
+// consumeCounters builds a consumed counter map for declarative validation tests.
+func consumeCounters(key string) map[string]resource.CounterRequirement {
+	return map[string]resource.CounterRequirement{
+		key: {Value: mustParseQuantityPtr("1")},
 	}
 }
 
