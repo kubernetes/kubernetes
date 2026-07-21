@@ -71,6 +71,11 @@ type PodLifecycleEventGenerator interface {
 	RequestReinspect(podUID types.UID)
 	// RequestRelist queues up the pod for an on-demand relist.
 	RequestRelist(logger klog.Logger, podUID types.UID)
+	// SuspendPodRelist suspends on-demand relists for the pod.
+	SuspendPodRelist(podUID types.UID)
+	// ResumePodRelist resumes on-demand relists for the pod and triggers any queued relist.
+	// If alwaysRelist is true, it forces a relist even if none was queued.
+	ResumePodRelist(logger klog.Logger, podUID types.UID, alwaysRelist bool)
 }
 
 // podLifecycleEventGeneratorHandler contains functions that are useful for different PLEGs
