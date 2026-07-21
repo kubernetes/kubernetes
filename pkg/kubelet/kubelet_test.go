@@ -1906,6 +1906,10 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 		}},
 	}
 
+	// Set up allocation for the pod before HandlePodUpdates
+	err := kubelet.allocationManager.SetAllocatedResources(klog.FromContext(tCtx), pods[0])
+	require.NoError(t, err)
+
 	// Let the pod worker sets the status to fail after this sync.
 	kubelet.HandlePodUpdates(tCtx, pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
@@ -1958,6 +1962,11 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 	}
 
 	kubelet.podManager.SetPods(pods)
+
+	// Set up allocation for the pod before HandlePodUpdates
+	err := kubelet.allocationManager.SetAllocatedResources(klog.FromContext(tCtx), pods[0])
+	require.NoError(t, err)
+
 	kubelet.HandlePodUpdates(tCtx, pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
 	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
@@ -5287,34 +5296,49 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 		},
 	}
 
+	terminalPodNoAllocation := makePodWithResources("terminal-pod-no-alloc", v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem})
+	terminalPodNoAllocation.Status.Phase = v1.PodFailed
+
 	testCases := []struct {
 		name                     string
 		oldPod                   *v1.Pod
 		newPod                   *v1.Pod
+		setAllocation            bool
 		shouldRetryPendingResize bool
 	}{
 		{
 			name:                     "requests are increasing",
 			oldPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: highCPU, v1.ResourceMemory: highMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
 			newPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: enormousCPU, v1.ResourceMemory: enormousMem}, v1.ResourceList{v1.ResourceCPU: highCPU, v1.ResourceMemory: highMem}),
+			setAllocation:            true,
 			shouldRetryPendingResize: false,
 		},
 		{
 			name:                     "requests are unchanged",
 			oldPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
 			newPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: enormousCPU, v1.ResourceMemory: enormousMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
+			setAllocation:            true,
 			shouldRetryPendingResize: false,
 		},
 		{
 			name:                     "requests are decreasing",
 			oldPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}, v1.ResourceList{v1.ResourceCPU: highCPU, v1.ResourceMemory: highMem}),
 			newPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: enormousCPU, v1.ResourceMemory: enormousMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
+			setAllocation:            true,
 			shouldRetryPendingResize: true,
 		},
 		{
 			name:                     "pod is marked as terminal",
 			oldPod:                   makePodWithResources("terminal-pod", v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
 			newPod:                   terminalPod,
+			setAllocation:            true,
+			shouldRetryPendingResize: true,
+		},
+		{
+			name:                     "pod is marked as terminal with allocation already purged",
+			oldPod:                   makePodWithResources("terminal-pod-no-alloc", v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
+			newPod:                   terminalPodNoAllocation,
+			setAllocation:            false,
 			shouldRetryPendingResize: true,
 		},
 	}
@@ -5326,7 +5350,9 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 			kubelet.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 
 			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, pendingResizeAllocated))
-			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, tc.oldPod))
+			if tc.setAllocation {
+				require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, tc.oldPod))
+			}
 
 			// We only expect status resources to change in HandlePodReconcile.
 			tc.oldPod.Spec = tc.newPod.Spec
@@ -5338,6 +5364,11 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 			kubelet.statusManager.ClearPodResizePendingCondition(pendingResizeDesired.UID, metrics.DeferredResizeResolutionAccepted)
 			kubelet.HandlePodReconcile(tCtx, []*v1.Pod{tc.newPod})
 			require.Equal(t, tc.shouldRetryPendingResize, kubelet.statusManager.IsPodResizeDeferred(pendingResizeDesired.UID))
+
+			if !tc.setAllocation {
+				require.False(t, kubelet.allocationManager.HasPodAllocatedResources(tc.newPod.UID),
+					"non-allocated pod should not have allocation set after reconcile")
+			}
 
 			kubelet.allocationManager.RemovePod(logger, pendingResizeDesired.UID)
 			kubelet.podManager.RemovePod((pendingResizeDesired))
@@ -5493,6 +5524,7 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			}
 
 			kubelet.statusManager.SetPodStatus(logger, tc.newPod, v1.PodStatus{Phase: v1.PodRunning})
+			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, tc.newPod))
 			kubelet.HandlePodUpdates(tCtx, []*v1.Pod{tc.newPod})
 			if tc.expectEvent {
 				select {
