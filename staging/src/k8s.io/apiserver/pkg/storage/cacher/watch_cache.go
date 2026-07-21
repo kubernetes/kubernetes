@@ -206,6 +206,12 @@ func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Ob
 // processEvent is safe as long as there is at most one call to it in flight
 // at any point in time.
 func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) error {
+	recordTime := w.config.clock.Now()
+	if withRecordTime, ok := event.Object.(storage.WatchEventWithRecordTime); ok {
+		recordTime = withRecordTime.RecordTime()
+		event.Object = withRecordTime.Unwrap()
+	}
+
 	metrics.EventsReceivedCounter.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Inc()
 
 	key, err := w.config.keyFunc(event.Object)
@@ -225,7 +231,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		ObjFields:       elem.Fields,
 		Key:             key,
 		ResourceVersion: resourceVersion,
-		RecordTime:      w.config.clock.Now(),
+		RecordTime:      recordTime,
 	}
 
 	// We can call w.storage.Get() outside of a critical section,
