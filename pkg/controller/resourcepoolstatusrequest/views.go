@@ -358,7 +358,7 @@ func deviceFits(cost []resourcev1.DeviceCounterConsumption, avail map[string]map
 			if !ok {
 				return false
 			}
-			if have.Cmp(c.Value) < 0 {
+			if have.Cmp(*c.Value) < 0 {
 				return false
 			}
 		}
@@ -378,7 +378,7 @@ func deductCounters(cost []resourcev1.DeviceCounterConsumption, avail map[string
 			if !ok {
 				continue
 			}
-			have.Sub(c.Value)
+			have.Sub(*c.Value)
 			set[name] = have
 		}
 	}

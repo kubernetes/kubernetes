@@ -629,14 +629,14 @@ func (in wrapDevice) withCapacityRequestPolicyValidValues(defaultValue resource.
 func deviceCounterConsumption(counterSet string, counters map[string]resource.Quantity) resourceapi.DeviceCounterConsumption {
 	return resourceapi.DeviceCounterConsumption{
 		CounterSet: counterSet,
-		Counters:   toCounters(counters),
+		Counters:   toConsumeCounters(counters),
 	}
 }
 
 func deviceCounterConsumptionWithGroups(counterSet string, counters map[string]resource.Quantity, compatibilityGroups ...string) resourceapi.DeviceCounterConsumption {
 	return resourceapi.DeviceCounterConsumption{
 		CounterSet:          counterSet,
-		Counters:            toCounters(counters),
+		Counters:            toConsumeCounters(counters),
 		CompatibilityGroups: compatibilityGroups,
 	}
 }
@@ -11184,4 +11184,13 @@ func (l informerLister[T]) Get(name string) (*T, error) {
 		}
 	}
 	return nil, apierrors.NewNotFound(schema.GroupResource{}, "not found")
+}
+
+// toConsumeCounters adapts fixed quantities to device counter requirements.
+func toConsumeCounters(counters map[string]resource.Quantity) map[string]resourceapi.CounterRequirement {
+	out := make(map[string]resourceapi.CounterRequirement, len(counters))
+	for name, quantity := range counters {
+		out[string(name)] = resourceapi.CounterRequirement{Value: &quantity}
+	}
+	return out
 }
