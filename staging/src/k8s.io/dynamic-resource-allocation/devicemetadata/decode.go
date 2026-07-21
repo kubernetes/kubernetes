@@ -61,14 +61,13 @@ var (
 // code does not need to be updated when new API versions get added or (at
 // some point) removed.
 //
-// By default, the input data gets validated befored converting it to the
-// desired type. This can be disabled with [DecodeMetadataWithValidation].
+// By default, the input data does not get validated before converting it to the
+// desired type. Validation can be enabled with [DecodeMetadataWithValidationResult]
+// which will store a validation error separately, if there is any.
 // Callers which want to know what was decoded can request to get
-// the GVK stored via [DecodeMetadataStoreGVK].
+// the GVK stored via [DecodeMetadataStoreGVKResult].
 func DecodeMetadataFromStream(decoder *json.Decoder, dest runtime.Object, opts ...DecodeMetadataOption) error {
-	options := decodeMetadataOptions{
-		validation: true,
-	}
+	var options decodeMetadataOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -98,18 +97,20 @@ func DecodeMetadataFromStream(decoder *json.Decoder, dest runtime.Object, opts .
 			return fmt.Errorf("decode %s: %w", gvk.GroupVersion(), err)
 		}
 
-		if options.validation {
+		if options.validationResult != nil {
+			// Error wrapping is left to the caller, they know that a validation error
+			// is because of a failed validation and can add the GKV if they want to.
 			switch obj := obj.(type) {
 			case *metadatav1alpha1.DeviceMetadata:
 				if err := metadatav1alpha1.Validate_DeviceMetadata(context.Background(), operation.Operation{Type: operation.Create}, nil, obj, nil).ToAggregate(); err != nil {
-					return fmt.Errorf("validation of %s failed: %w", gvk, err)
+					*options.validationResult = err
 				}
 			case *metadatav1beta1.DeviceMetadata:
 				if err := metadatav1beta1.Validate_DeviceMetadata(context.Background(), operation.Operation{Type: operation.Create}, nil, obj, nil).ToAggregate(); err != nil {
-					return fmt.Errorf("validation of %s failed: %w", gvk, err)
+					*options.validationResult = err
 				}
 			default:
-				return fmt.Errorf("cannot validate object of type %T", obj)
+				*options.validationResult = fmt.Errorf("cannot validate object of type %T", obj)
 			}
 		}
 
@@ -141,8 +142,8 @@ func DecodeMetadataFromStream(decoder *json.Decoder, dest runtime.Object, opts .
 			dest.GetObjectKind().SetGroupVersionKind(gvks[0])
 		}
 
-		if options.gvk != nil {
-			*options.gvk = *gvk
+		if options.gvkResult != nil {
+			*options.gvkResult = *gvk
 		}
 		return nil
 	}
@@ -154,24 +155,28 @@ func DecodeMetadataFromStream(decoder *json.Decoder, dest runtime.Object, opts .
 
 type DecodeMetadataOption func(*decodeMetadataOptions)
 
-// DecodeMetadataWithValidation enables or disables validation in [DecodeMetadataFromStream].
-func DecodeMetadataWithValidation(enabled bool) DecodeMetadataOption {
+// DecodeMetadataWithValidationResult enables or disables validation in [DecodeMetadataFromStream].
+// In case of a validation error, it'll be stored where requested here.
+// Providing a nil pointer disables validation.
+// The error comes straight from the underlying declarative validation with no wrapping
+// or explains why validation is not possible.
+func DecodeMetadataWithValidationResult(err *error) DecodeMetadataOption {
 	return func(options *decodeMetadataOptions) {
-		options.validation = enabled
+		options.validationResult = err
 	}
 }
 
-// DecodeMetadataStoreGVK tells [DecodeMetadataFromStream] where to store
+// DecodeMetadataStoreGVKResult tells [DecodeMetadataFromStream] where to store
 // the group/version/kind that was decoded from the input in case of success.
-func DecodeMetadataStoreGVK(gvk *schema.GroupVersionKind) DecodeMetadataOption {
+func DecodeMetadataStoreGVKResult(gvk *schema.GroupVersionKind) DecodeMetadataOption {
 	return func(options *decodeMetadataOptions) {
-		options.gvk = gvk
+		options.gvkResult = gvk
 	}
 }
 
 type decodeMetadataOptions struct {
-	validation bool
-	gvk        *schema.GroupVersionKind
+	validationResult *error
+	gvkResult        *schema.GroupVersionKind
 }
 
 // ReadResourceClaimMetadataWithDriverName reads and decodes the metadata file

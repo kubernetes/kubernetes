@@ -766,11 +766,14 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 		var md metadata.DeviceMetadata
 		var gvk schema.GroupVersionKind
+		var validationResult error
 		tCtx.ExpectNoError(devicemetadata.DecodeMetadataFromStream(
 			json.NewDecoder(strings.NewReader(stdout)), &md,
-			devicemetadata.DecodeMetadataStoreGVK(&gvk),
+			devicemetadata.DecodeMetadataWithValidationResult(&validationResult),
+			devicemetadata.DecodeMetadataStoreGVKResult(&gvk),
 			// Validation is on by default.
 		), "decode metadata file %s", filePath)
+		tCtx.ExpectNoError(validationResult, "validation of metadata file %s", filePath)
 
 		tCtx.Expect(gvk).To(gomega.HaveField("GroupVersion()", gomega.Equal(expected.version)))
 		if expected.claimName != "" {

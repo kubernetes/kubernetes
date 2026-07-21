@@ -213,7 +213,7 @@ func testMetadataFixture(t *testing.T, path string, expected *metadata.DeviceMet
 
 	// Decode without validation because metadata.managedFields[0].operation: "operationValue" is not valid.
 	var decoded metadata.DeviceMetadata
-	if err := devicemetadata.DecodeMetadataFromStream(json.NewDecoder(bytes.NewReader(data)), &decoded, devicemetadata.DecodeMetadataWithValidation(false)); err != nil {
+	if err := devicemetadata.DecodeMetadataFromStream(json.NewDecoder(bytes.NewReader(data)), &decoded); err != nil {
 		t.Fatalf("decode %s: %v", path, err)
 	}
 	if expected != nil && !apiequality.Semantic.DeepEqual(expected, &decoded) {

@@ -19,6 +19,7 @@ package devicemetadata
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -134,8 +135,8 @@ func TestDecodeMetadataFromStream(t *testing.T) {
 	}
 
 	testcases := map[string]struct {
+		isInvalid   bool
 		streamInput []byte
-		opts        []DecodeMetadataOption
 		dest        runtime.Object
 		expected    runtime.Object
 		expectError string
@@ -203,23 +204,13 @@ func TestDecodeMetadataFromStream(t *testing.T) {
 			expectError: "determine target type",
 		},
 		"invalid-v1alpha1": {
-			streamInput: []byte(invalidV1Alpha1JSON),
-			dest:        &metadata.DeviceMetadata{},
-			expectError: "validation of metadata.resource.k8s.io/v1alpha1, Kind=DeviceMetadata failed",
-		},
-		"ignore-invalid-v1alpha1": {
-			opts:        []DecodeMetadataOption{DecodeMetadataWithValidation(false)},
+			isInvalid:   true,
 			streamInput: []byte(invalidV1Alpha1JSON),
 			dest:        &metadata.DeviceMetadata{},
 			expected:    invalidInternal,
 		},
-		"invalid-v1beta11": {
-			streamInput: []byte(invalidV1Beta1JSON),
-			dest:        &metadata.DeviceMetadata{},
-			expectError: "validation of metadata.resource.k8s.io/v1beta1, Kind=DeviceMetadata failed",
-		},
-		"ignore-invalid-v1beta1": {
-			opts:        []DecodeMetadataOption{DecodeMetadataWithValidation(false)},
+		"invalid-v1beta1": {
+			isInvalid:   true,
 			streamInput: []byte(invalidV1Beta1JSON),
 			dest:        &metadata.DeviceMetadata{},
 			expected:    invalidInternal,
@@ -303,36 +294,51 @@ func TestDecodeMetadataFromStream(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			dest := tc.dest.DeepCopyObject()
-			err := DecodeMetadataFromStream(json.NewDecoder(bytes.NewReader(tc.streamInput)), dest, tc.opts...)
+			for _, withValidation := range []bool{true, false} {
+				t.Run(fmt.Sprintf("with-validation-%v", withValidation), func(t *testing.T) {
+					var opts []DecodeMetadataOption
+					var validationResult error
+					if withValidation {
+						opts = append(opts, DecodeMetadataWithValidationResult(&validationResult))
+					}
+					dest := tc.dest.DeepCopyObject()
+					err := DecodeMetadataFromStream(json.NewDecoder(bytes.NewReader(tc.streamInput)), dest, opts...)
+					if tc.expectError != "" {
+						if err == nil {
+							t.Fatalf("expected error containing %q, got nil", tc.expectError)
+						}
+						if !strings.Contains(err.Error(), tc.expectError) {
+							t.Fatalf("expected error containing %q, got: %v", tc.expectError, err)
+						}
+						return
+					}
+					if err != nil {
+						t.Fatalf("DecodeMetadataFromStream: %v", err)
+					}
 
-			if tc.expectError != "" {
-				if err == nil {
-					t.Fatalf("expected error containing %q, got nil", tc.expectError)
-				}
-				if !strings.Contains(err.Error(), tc.expectError) {
-					t.Fatalf("expected error containing %q, got: %v", tc.expectError, err)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("DecodeMetadataFromStream: %v", err)
-			}
+					if diff := cmp.Diff(tc.expected, dest); diff != "" {
+						t.Errorf("metadata mismatch (-want +got):\n%s", diff)
+					}
 
-			if diff := cmp.Diff(tc.expected, dest); diff != "" {
-				t.Errorf("metadata mismatch (-want +got):\n%s", diff)
-			}
+					if withValidation && tc.isInvalid && validationResult == nil {
+						t.Errorf("validation did not fail as expected")
+					}
+					if validationResult != nil && (!withValidation || !tc.isInvalid) {
+						t.Errorf("unexpected validation error: %v", validationResult)
+					}
 
-			if tc.expectGVK != nil {
-				var gvk schema.GroupVersionKind
-				dest := tc.dest.DeepCopyObject()
-				err := DecodeMetadataFromStream(json.NewDecoder(bytes.NewReader(tc.streamInput)), dest, append(tc.opts, DecodeMetadataStoreGVK(&gvk))...)
-				if err != nil {
-					t.Fatalf("DecodeMetadataFromStream with GVK: %v", err)
-				}
-				if gvk != *tc.expectGVK {
-					t.Errorf("expected %s, got %s", tc.expectGVK, gvk)
-				}
+					if tc.expectGVK != nil {
+						var gvk schema.GroupVersionKind
+						dest := tc.dest.DeepCopyObject()
+						err := DecodeMetadataFromStream(json.NewDecoder(bytes.NewReader(tc.streamInput)), dest, append(opts, DecodeMetadataStoreGVKResult(&gvk))...)
+						if err != nil {
+							t.Fatalf("DecodeMetadataFromStream with GVK: %v", err)
+						}
+						if gvk != *tc.expectGVK {
+							t.Errorf("expected %s, got %s", tc.expectGVK, gvk)
+						}
+					}
+				})
 			}
 		})
 	}
