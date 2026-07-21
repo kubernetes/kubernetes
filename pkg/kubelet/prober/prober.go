@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -80,7 +81,7 @@ func (pb *prober) recordContainerEvent(ctx context.Context, pod *v1.Pod, contain
 }
 
 // probe probes the container.
-func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (results.Result, error) {
+func (pb *prober) probe(ctx context.Context, action ProberAction, probeType probeType, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (results.Result, error) {
 	var probeSpec *v1.Probe
 	switch probeType {
 	case readiness:
@@ -99,7 +100,7 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 		return results.Success, nil
 	}
 
-	result, output, err := pb.runProbeWithRetries(ctx, probeType, probeSpec, pod, status, container, containerID, maxProbeRetries)
+	result, output, err := pb.runProbeWithRetries(ctx, action, status, containerID, maxProbeRetries)
 
 	if err != nil {
 		// Handle probe error
@@ -133,73 +134,148 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 	}
 }
 
+// ProberAction encapsulates the logic of a probe operation.
+type ProberAction interface {
+	Run(ctx context.Context, status v1.PodStatus, containerID kubecontainer.ContainerID) (probe.Result, string, error)
+}
+
+func (pb *prober) newProberAction(probeType probeType, p *v1.Probe, pod *v1.Pod, container v1.Container) ProberAction {
+	if p == nil {
+		return nil
+	}
+	switch {
+	case p.Exec != nil:
+		return &execProberAction{pb: pb, pod: pod, container: container, p: p}
+	case p.HTTPGet != nil:
+		return &httpProberAction{pb: pb, probeType: probeType, pod: pod, container: container, p: p}
+	case p.TCPSocket != nil:
+		return &tcpProberAction{pb: pb, container: container, p: p}
+	case p.GRPC != nil:
+		return &grpcProberAction{pb: pb, p: p}
+	default:
+		return &unknownProberAction{pod: pod, container: container}
+	}
+}
+
+type execProberAction struct {
+	pb        *prober
+	pod       *v1.Pod
+	container v1.Container
+	p         *v1.Probe
+}
+
+func (a *execProberAction) Run(ctx context.Context, _ v1.PodStatus, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
+	logger := klog.FromContext(ctx)
+	timeout := time.Duration(a.p.TimeoutSeconds) * time.Second
+	logger.V(4).Info("Exec-Probe runProbe", "pod", klog.KObj(a.pod), "containerName", a.container.Name, "execCommand", a.p.Exec.Command)
+	command := kubecontainer.ExpandContainerCommandOnlyStatic(a.p.Exec.Command, a.container.Env)
+	return a.pb.exec.Probe(a.pb.newExecInContainer(ctx, a.pod, a.container, containerID, command, timeout))
+}
+
+type httpProberAction struct {
+	pb        *prober
+	probeType probeType
+	pod       *v1.Pod
+	container v1.Container
+	p         *v1.Probe
+
+	req *http.Request
+}
+
+func (a *httpProberAction) Run(ctx context.Context, status v1.PodStatus, _ kubecontainer.ContainerID) (probe.Result, string, error) {
+	logger := klog.FromContext(ctx)
+	timeout := time.Duration(a.p.TimeoutSeconds) * time.Second
+
+	req := a.req
+	hostFromProbe := a.p.HTTPGet.Host
+	if req == nil || (hostFromProbe == "" && req.URL.Hostname() != status.PodIP) {
+		var err error
+		req, err = httpprobe.NewRequestForHTTPGetAction(a.p.HTTPGet, &a.container, status.PodIP, "probe")
+		if err != nil {
+			logger.V(4).Info("HTTP-Probe failed to create request", "error", err)
+			return probe.Unknown, "", err
+		}
+		if status.PodIP != "" {
+			a.req = req
+		}
+	}
+
+	if loggerV4 := logger.V(4); loggerV4.Enabled() {
+		port := req.URL.Port()
+		host := req.URL.Hostname()
+		path := req.URL.Path
+		scheme := req.URL.Scheme
+		headers := a.p.HTTPGet.HTTPHeaders
+		loggerV4.Info("HTTP-Probe", "scheme", scheme, "host", host, "port", port, "path", path, "timeout", timeout, "headers", headers, "probeType", a.probeType)
+	}
+
+	reqWithCtx := req.WithContext(ctx)
+	return a.pb.http.Probe(reqWithCtx, timeout)
+}
+
+type tcpProberAction struct {
+	pb        *prober
+	container v1.Container
+	p         *v1.Probe
+}
+
+func (a *tcpProberAction) Run(ctx context.Context, status v1.PodStatus, _ kubecontainer.ContainerID) (probe.Result, string, error) {
+	logger := klog.FromContext(ctx)
+	timeout := time.Duration(a.p.TimeoutSeconds) * time.Second
+	port, err := probe.ResolveContainerPort(a.p.TCPSocket.Port, &a.container)
+	if err != nil {
+		logger.V(4).Info("TCP-Probe failed to resolve port", "error", err)
+		return probe.Unknown, "", err
+	}
+	host := a.p.TCPSocket.Host
+	if host == "" {
+		host = status.PodIP
+	}
+	logger.V(4).Info("TCP-Probe", "host", host, "port", port, "timeout", timeout)
+	return a.pb.tcp.Probe(host, port, timeout)
+}
+
+type grpcProberAction struct {
+	pb *prober
+	p  *v1.Probe
+}
+
+func (a *grpcProberAction) Run(ctx context.Context, status v1.PodStatus, _ kubecontainer.ContainerID) (probe.Result, string, error) {
+	logger := klog.FromContext(ctx)
+	timeout := time.Duration(a.p.TimeoutSeconds) * time.Second
+	host := status.PodIP
+	service := ""
+	if a.p.GRPC.Service != nil {
+		service = *a.p.GRPC.Service
+	}
+	logger.V(4).Info("GRPC-Probe", "host", host, "service", service, "port", a.p.GRPC.Port, "timeout", timeout)
+	return a.pb.grpc.Probe(host, service, int(a.p.GRPC.Port), timeout)
+}
+
+type unknownProberAction struct {
+	pod       *v1.Pod
+	container v1.Container
+}
+
+func (a *unknownProberAction) Run(ctx context.Context, _ v1.PodStatus, _ kubecontainer.ContainerID) (probe.Result, string, error) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Failed to find probe builder for container", "containerName", a.container.Name)
+	return probe.Unknown, "", fmt.Errorf("missing probe handler for %s:%s", format.Pod(a.pod), a.container.Name)
+}
+
 // runProbeWithRetries tries to probe the container in a finite loop, it returns the last result
 // if it never succeeds.
-func (pb *prober) runProbeWithRetries(ctx context.Context, probeType probeType, p *v1.Probe, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID, retries int) (probe.Result, string, error) {
+func (pb *prober) runProbeWithRetries(ctx context.Context, action ProberAction, status v1.PodStatus, containerID kubecontainer.ContainerID, retries int) (probe.Result, string, error) {
 	var err error
 	var result probe.Result
 	var output string
-	for i := 0; i < retries; i++ {
-		result, output, err = pb.runProbe(ctx, probeType, p, pod, status, container, containerID)
+	for range retries {
+		result, output, err = action.Run(ctx, status, containerID)
 		if err == nil {
 			return result, output, nil
 		}
 	}
 	return result, output, err
-}
-
-func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
-	logger := klog.FromContext(ctx)
-	timeout := time.Duration(p.TimeoutSeconds) * time.Second
-	switch {
-	case p.Exec != nil:
-		logger.V(4).Info("Exec-Probe runProbe", "pod", klog.KObj(pod), "containerName", container.Name, "execCommand", p.Exec.Command)
-		command := kubecontainer.ExpandContainerCommandOnlyStatic(p.Exec.Command, container.Env)
-		return pb.exec.Probe(pb.newExecInContainer(ctx, pod, container, containerID, command, timeout))
-
-	case p.HTTPGet != nil:
-		req, err := httpprobe.NewRequestForHTTPGetAction(p.HTTPGet, &container, status.PodIP, "probe")
-		if err != nil {
-			// Log and record event for Unknown result
-			logger.V(4).Info("HTTP-Probe failed to create request", "error", err)
-			return probe.Unknown, "", err
-		}
-		if loggerV4 := logger.V(4); logger.Enabled() {
-			port := req.URL.Port()
-			host := req.URL.Hostname()
-			path := req.URL.Path
-			scheme := req.URL.Scheme
-			headers := p.HTTPGet.HTTPHeaders
-			loggerV4.Info("HTTP-Probe", "scheme", scheme, "host", host, "port", port, "path", path, "timeout", timeout, "headers", headers, "probeType", probeType)
-		}
-		return pb.http.Probe(req, timeout)
-
-	case p.TCPSocket != nil:
-		port, err := probe.ResolveContainerPort(p.TCPSocket.Port, &container)
-		if err != nil {
-			logger.V(4).Info("TCP-Probe failed to resolve port", "error", err)
-			return probe.Unknown, "", err
-		}
-		host := p.TCPSocket.Host
-		if host == "" {
-			host = status.PodIP
-		}
-		logger.V(4).Info("TCP-Probe", "host", host, "port", port, "timeout", timeout)
-		return pb.tcp.Probe(host, port, timeout)
-
-	case p.GRPC != nil:
-		host := status.PodIP
-		service := ""
-		if p.GRPC.Service != nil {
-			service = *p.GRPC.Service
-		}
-		logger.V(4).Info("GRPC-Probe", "host", host, "service", service, "port", p.GRPC.Port, "timeout", timeout)
-		return pb.grpc.Probe(host, service, int(p.GRPC.Port), timeout)
-
-	default:
-		logger.V(4).Info("Failed to find probe builder for container", "containerName", container.Name)
-		return probe.Unknown, "", fmt.Errorf("missing probe handler for %s:%s", format.Pod(pod), container.Name)
-	}
 }
 
 type execInContainer struct {
