@@ -1430,3 +1430,133 @@ func waitForPodDeferred(ctx context.Context, f *framework.Framework, testPod *v1
 		return helpers.IsPodResizeDeferred(pod), nil
 	}))
 }
+
+func doPodResizeMemoryVolumeDeferredTests(f *framework.Framework) {
+	ginkgo.It("should isolate volume updates when container resource resize is deferred", func(ctx context.Context) {
+		podClient := e2epod.NewPodClient(f)
+		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
+		framework.ExpectNoError(err, "failed to get running nodes")
+		gomega.Expect(nodes.Items).ShouldNot(gomega.BeEmpty())
+		node := nodes.Items[0]
+
+		_, nodeAvailableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
+		framework.ExpectNoError(err, "failed to get available CPU")
+
+		// Conceptually divide the available CPU into 10 parts.
+		onePartCPU := nodeAvailableCPU.MilliValue() / 10
+		framework.Logf("Node '%s' currently available MilliCPUs = %dm (1 part = %dm)", node.Name, nodeAvailableCPU.MilliValue(), onePartCPU)
+
+		// Pod A (filler pod): 5 parts
+		podACPU := resource.NewMilliQuantity(onePartCPU*5, resource.DecimalSI)
+		// Pod B (test pod): 3 parts
+		podBCPU := resource.NewMilliQuantity(onePartCPU*3, resource.DecimalSI)
+
+		cA := []podresize.ResizableContainerInfo{
+			{Name: "ca", Resources: &cgroups.ContainerResources{CPUReq: podACPU.String(), CPULim: podACPU.String()}},
+		}
+		original := []podresize.ResizableContainerInfo{{
+			Name:      "c1",
+			Resources: &cgroups.ContainerResources{CPUReq: podBCPU.String(), CPULim: podBCPU.String()},
+		}}
+
+		tStamp := strconv.Itoa(time.Now().Nanosecond())
+		podA := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod-a", tStamp, cA, nil)
+		podA = e2epod.MustMixinRestrictedPodSecurity(podA)
+		e2epod.SetNodeAffinity(&podA.Spec, node.Name)
+
+		qty64Mi := resource.MustParse("64Mi")
+		qty128Mi := resource.MustParse("128Mi")
+		testPod := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod-b", tStamp, original, nil)
+		testPod.Spec.Volumes = []v1.Volume{
+			{
+				Name: "mem-vol",
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{
+						Medium:    v1.StorageMediumMemory,
+						SizeLimit: &qty64Mi,
+					},
+				},
+			},
+		}
+		testPod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+			{
+				Name:      "mem-vol",
+				MountPath: "/cache",
+			},
+		}
+		testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+		e2epod.SetNodeAffinity(&testPod.Spec, node.Name)
+
+		ginkgo.By(fmt.Sprintf("Create Pod A '%s' and Pod B '%s'", podA.Name, testPod.Name))
+		podA = podClient.CreateSync(ctx, podA)
+		gomega.Expect(podA.Status.Phase).To(gomega.Equal(v1.PodRunning))
+
+		podB := podClient.CreateSync(ctx, testPod)
+		gomega.Expect(podB.Status.Phase).To(gomega.Equal(v1.PodRunning))
+
+		ginkgo.By("verifying initial mounted emptyDir volume size via df inside container")
+		stdout, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, podB.Name, "c1", "df", "-m", "/cache")
+		framework.ExpectNoError(err, "failed to run df")
+		gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(qty64Mi.Value()/(1024*1024), 10)))
+
+		initialRestarts := podB.Status.ContainerStatuses[0].RestartCount
+
+		// Pod B: Resize request to 6 parts (needs 3 more parts, which exceeds remaining available CPU)
+		podBResizedCPU := resource.NewMilliQuantity(onePartCPU*6, resource.DecimalSI)
+
+		ginkgo.By(fmt.Sprintf("patching Pod B CPU request to %dm (exceeds remaining available, will be deferred) and sizeLimit to %s", podBResizedCPU.MilliValue(), qty128Mi.String()))
+		patchBytes := fmt.Appendf(nil, `{
+			"spec": {
+				"containers": [
+					{
+						"name": "c1",
+						"resources": {
+							"requests": {"cpu": "%dm"},
+							"limits": {"cpu": "%dm"}
+						}
+					}
+				],
+				"volumes": [
+					{
+						"name": "mem-vol",
+						"emptyDir": {
+							"sizeLimit": "%s"
+						}
+					}
+				]
+			}
+		}`, podBResizedCPU.MilliValue(), podBResizedCPU.MilliValue(), qty128Mi.String())
+
+		patchedPod, pErr := f.ClientSet.CoreV1().Pods(podB.Namespace).Patch(ctx, podB.Name,
+			types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(pErr, "failed to patch pod for resize and sizeLimit")
+
+		ginkgo.By("waiting for pod resize to be marked as deferred")
+		waitForPodDeferred(ctx, f, patchedPod)
+
+		ginkgo.By("verifying that the volume mount inside the container remains at 64Mi (atomic isolation)")
+		stdout, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, patchedPod.Name, "c1", "df", "-m", "/cache")
+		framework.ExpectNoError(err, "failed to run df inside container")
+		gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(qty64Mi.Value()/(1024*1024), 10)))
+		gomega.Expect(stdout).ToNot(gomega.ContainSubstring(strconv.FormatInt(qty128Mi.Value()/(1024*1024), 10)))
+
+		gotPod, getErr := podClient.Get(ctx, patchedPod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(getErr)
+		gomega.Expect(gotPod.Status.ContainerStatuses[0].RestartCount).To(gomega.Equal(initialRestarts))
+
+		ginkgo.By("deleting pods")
+		e2epod.DeletePodsWithWait(ctx, f.ClientSet, []*v1.Pod{podA, patchedPod})
+	})
+}
+
+var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Memory-Backed Volume (deferred-resizes)", framework.WithFeatureGate(features.InPlacePodVerticalScalingMemoryBackedVolumes), func() {
+	f := framework.NewDefaultFramework("pod-resize-memory-vol-deferred-tests")
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+		framework.ExpectNoError(err)
+		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
+			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
+		}
+	})
+	doPodResizeMemoryVolumeDeferredTests(f)
+})

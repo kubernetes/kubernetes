@@ -1075,10 +1075,16 @@ func NewMainKubelet(ctx context.Context,
 	}
 
 	// setup volumeManager
+	var vmPodManager volumemanager.PodManager = klet.podManager
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		// The volume manager should only ever be aware of the 'allocated' pod.
+		vmPodManager = &allocatedPodManager{baseManager: klet.podManager, allocationManager: klet.allocationManager}
+	}
+
 	klet.volumeManager = volumemanager.NewVolumeManager(
 		kubeCfg.EnableControllerAttachDetach,
 		nodeName,
-		klet.podManager,
+		vmPodManager,
 		klet.podWorkers,
 		klet.kubeClient,
 		klet.volumePluginMgr,
@@ -2242,6 +2248,8 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 		return false, nil, err
 	}
+	// Volumes are finished mounting. Make sure actuated state (container resources and volume limits) is initialized.
+	kl.containerRuntime.InitializeActuatedPod(logger, pod)
 
 	// Fetch the pull secrets for the pod
 	pullSecrets, missingPullSecretNames := kl.getPullSecretsForPod(logger, pod)
@@ -3029,8 +3037,10 @@ func recordResizeOperations(oldPod, newPod *v1.Pod) bool {
 		return true
 	}
 
-	hasResize := recordContainerResizeOperations(oldPod, newPod) || recordPodLevelResourceResizeOperations(oldPod, newPod)
-	return hasResize
+	hasContainerResize := recordContainerResizeOperations(oldPod, newPod)
+	hasPodLevelResourceResize := recordPodLevelResourceResizeOperations(oldPod, newPod)
+	hasVolumeResize := recordVolumeResizeOperations(oldPod, newPod)
+	return hasContainerResize || hasPodLevelResourceResize || hasVolumeResize
 }
 
 // recordPodLevelResourceResizeOperations records if any of the pod level resources need to be resized, and returns
@@ -3087,6 +3097,14 @@ func recordContainerResizeOperations(oldPod, newPod *v1.Pod) bool {
 	}
 
 	return hasResize
+}
+
+// recordVolumeResizeOperations records if any of the pod's memory-backed emptyDir volumes needs to be resized, and returns true if so
+func recordVolumeResizeOperations(oldPod, newPod *v1.Pod) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		return false
+	}
+	return allocation.IsMemoryBackedVolumeResizeRequested(oldPod, newPod)
 }
 
 func resizeOperationForResources(new, old *resource.Quantity) string {
@@ -3626,4 +3644,47 @@ func (kl *Kubelet) OnPodSandboxReady(ctx context.Context, pod *v1.Pod) error {
 	}()
 
 	return nil
+}
+
+// allocatedPodManager decorates the base volumemanager.PodManager to intercept pod lookups
+// and return their active allocated state as computed by the allocationManager.
+//
+// This should be used as the pod manager for any components that need to be aware only of the
+// allocated pod.
+type allocatedPodManager struct {
+	baseManager       volumemanager.PodManager
+	allocationManager allocation.Manager
+}
+
+func (a *allocatedPodManager) getAllocatedPod(pod *v1.Pod) (*v1.Pod, bool) {
+	// TODO: Should this be a public method on the allocation manager?
+	if pod == nil {
+		return nil, false
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if allocatedPod, ok := a.allocationManager.UpdatePodFromAllocation(pod); ok {
+			return allocatedPod, true
+		}
+	}
+	// When the feature gate is disabled or there is no allocation stored for this pod, return the pod as-is.
+	return pod, true
+}
+
+func (a *allocatedPodManager) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
+	pod, found := a.baseManager.GetPodByUID(uid)
+	if !found || pod == nil {
+		return pod, found
+	}
+	return a.getAllocatedPod(pod)
+}
+
+func (a *allocatedPodManager) GetPods() []*v1.Pod {
+	pods := a.baseManager.GetPods()
+	var allocatedPods []*v1.Pod
+	for _, pod := range pods {
+		if allocatedPod, podFound := a.getAllocatedPod(pod); podFound {
+			allocatedPods = append(allocatedPods, allocatedPod)
+		}
+	}
+	return allocatedPods
 }

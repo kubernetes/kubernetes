@@ -424,6 +424,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowMatchLabelKeysInPodTopologySpread:              utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
 		AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge),
 		InPlacePodLevelResourcesVerticalScalingEnabled:      utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
+		InPlacePodVerticalScalingMemoryBackedVolumesEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes),
 		OldPodViolatesMatchLabelKeysValidation:              false,
 		OldPodViolatesLegacyMatchLabelKeysValidation:        false,
 		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),

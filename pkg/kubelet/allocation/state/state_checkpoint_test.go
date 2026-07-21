@@ -59,11 +59,46 @@ func getTestDir(t *testing.T) string {
 }
 
 func verifyPodResourceAllocation(t *testing.T, expected, actual *PodResourceInfoMap, msgAndArgs string) {
-	for podUID, podResourceInfo := range *expected {
-		require.Equal(t, len(podResourceInfo.ContainerResources), len((*actual)[podUID].ContainerResources), msgAndArgs)
-		for containerName, resourceList := range podResourceInfo.ContainerResources {
-			for name, quantity := range resourceList.Requests {
-				require.True(t, quantity.Equal((*actual)[podUID].ContainerResources[containerName].Requests[name]), msgAndArgs)
+	for podUID, expectedPodInfo := range *expected {
+		actualPodInfo, exists := (*actual)[podUID]
+		require.True(t, exists, "actual state missing pod %s", podUID)
+
+		// ContainerResources validation
+		require.Len(t, actualPodInfo.ContainerResources, len(expectedPodInfo.ContainerResources), msgAndArgs)
+		for containerName, expectedCtrReq := range expectedPodInfo.ContainerResources {
+			actualCtrReq, exists := actualPodInfo.ContainerResources[containerName]
+			require.True(t, exists, "actual container %s missing", containerName)
+			for name, expectedQty := range expectedCtrReq.Requests {
+				require.True(t, expectedQty.Equal(actualCtrReq.Requests[name]), msgAndArgs)
+			}
+			for name, expectedQty := range expectedCtrReq.Limits {
+				require.True(t, expectedQty.Equal(actualCtrReq.Limits[name]), msgAndArgs)
+			}
+		}
+
+		// PodLevelResources validation
+		if expectedPodInfo.PodLevelResources == nil {
+			require.Nil(t, actualPodInfo.PodLevelResources, msgAndArgs)
+		} else {
+			require.NotNil(t, actualPodInfo.PodLevelResources, msgAndArgs)
+			for name, expectedQty := range expectedPodInfo.PodLevelResources.Requests {
+				require.True(t, expectedQty.Equal(actualPodInfo.PodLevelResources.Requests[name]), msgAndArgs)
+			}
+			for name, expectedQty := range expectedPodInfo.PodLevelResources.Limits {
+				require.True(t, expectedQty.Equal(actualPodInfo.PodLevelResources.Limits[name]), msgAndArgs)
+			}
+		}
+
+		// EmptyDirVolumeLimits validation
+		if expectedPodInfo.EmptyDirVolumeLimits == nil {
+			require.Nil(t, actualPodInfo.EmptyDirVolumeLimits, msgAndArgs)
+		} else {
+			require.NotNil(t, actualPodInfo.EmptyDirVolumeLimits, msgAndArgs)
+			require.Len(t, actualPodInfo.EmptyDirVolumeLimits, len(expectedPodInfo.EmptyDirVolumeLimits), msgAndArgs)
+			for volName, expectedQty := range expectedPodInfo.EmptyDirVolumeLimits {
+				actualQty, exists := actualPodInfo.EmptyDirVolumeLimits[volName]
+				require.True(t, exists, "actual emptyDir volume %s missing", volName)
+				require.True(t, expectedQty.Equal(*actualQty), msgAndArgs)
 			}
 		}
 	}
@@ -73,11 +108,12 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 	type args struct {
 		resInfoMap PodResourceInfoMap
 	}
-
-	tests := []struct {
+	type testCase struct {
 		name string
 		args args
-	}{}
+	}
+
+	var tests []testCase
 	suffix := []string{"Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "n", "u", "m", "k", "M", "G", "T", "P", "E", ""}
 	factor := []string{"1", "0.1", "0.03", "10", "100", "512", "1000", "1024", "700", "10000"}
 	for _, fact := range factor {
@@ -87,34 +123,114 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 				// see detail https://github.com/kubernetes/apimachinery/blob/95b78024e3feada7739b40426690b4f287933fd8/pkg/api/resource/quantity.go#L301
 				continue
 			}
-			tests = append(tests, struct {
-				name string
-				args args
-			}{
-				name: fmt.Sprintf("resource - %s%s", fact, suf),
+			qStr := fmt.Sprintf("%s%s", fact, suf)
+
+			// Test case 1: All fields populated
+			tests = append(tests, testCase{
+				name: fmt.Sprintf("resource - %s - all fields populated", qStr),
 				args: args{
 					resInfoMap: PodResourceInfoMap{
 						"pod1": {
 							ContainerResources: map[string]v1.ResourceRequirements{
 								"container1": {
 									Requests: v1.ResourceList{
-										v1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%s%s", fact, suf)),
-										v1.ResourceMemory: resource.MustParse(fmt.Sprintf("%s%s", fact, suf)),
+										v1.ResourceCPU:    resource.MustParse(qStr),
+										v1.ResourceMemory: resource.MustParse(qStr),
 									},
 								},
 							},
 							PodLevelResources: &v1.ResourceRequirements{
 								Requests: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%s%s", fact, suf)),
-									v1.ResourceMemory: resource.MustParse(fmt.Sprintf("%s%s", fact, suf)),
+									v1.ResourceCPU:    resource.MustParse(qStr),
+									v1.ResourceMemory: resource.MustParse(qStr),
 								},
 							},
+							EmptyDirVolumeLimits: map[string]*resource.Quantity{
+								"volume1": func() *resource.Quantity {
+									q := resource.MustParse(qStr)
+									return &q
+								}(),
+							},
+						},
+					},
+				},
+			})
+
+			// Test case 2: Only container resources populated (pod level and volume limits are nil)
+			tests = append(tests, testCase{
+				name: fmt.Sprintf("resource - %s - only container", qStr),
+				args: args{
+					resInfoMap: PodResourceInfoMap{
+						"pod1": {
+							ContainerResources: map[string]v1.ResourceRequirements{
+								"container1": {
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    resource.MustParse(qStr),
+										v1.ResourceMemory: resource.MustParse(qStr),
+									},
+								},
+							},
+							PodLevelResources:    nil,
+							EmptyDirVolumeLimits: nil,
+						},
+					},
+				},
+			})
+
+			// Test case 3: Container resources and volume limits populated (pod level resources is nil)
+			tests = append(tests, testCase{
+				name: fmt.Sprintf("resource - %s - container and volume limits", qStr),
+				args: args{
+					resInfoMap: PodResourceInfoMap{
+						"pod1": {
+							ContainerResources: map[string]v1.ResourceRequirements{
+								"container1": {
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    resource.MustParse(qStr),
+										v1.ResourceMemory: resource.MustParse(qStr),
+									},
+								},
+							},
+							PodLevelResources: nil,
+							EmptyDirVolumeLimits: map[string]*resource.Quantity{
+								"volume1": func() *resource.Quantity {
+									q := resource.MustParse(qStr)
+									return &q
+								}(),
+							},
+						},
+					},
+				},
+			})
+
+			// Test case 4: Container resources and pod level resources populated (volume limits is nil)
+			tests = append(tests, testCase{
+				name: fmt.Sprintf("resource - %s - container and pod-level", qStr),
+				args: args{
+					resInfoMap: PodResourceInfoMap{
+						"pod1": {
+							ContainerResources: map[string]v1.ResourceRequirements{
+								"container1": {
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    resource.MustParse(qStr),
+										v1.ResourceMemory: resource.MustParse(qStr),
+									},
+								},
+							},
+							PodLevelResources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse(qStr),
+									v1.ResourceMemory: resource.MustParse(qStr),
+								},
+							},
+							EmptyDirVolumeLimits: nil,
 						},
 					},
 				},
 			})
 		}
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
@@ -152,6 +268,9 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 					"container1": {Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}},
 				},
 				PodLevelResources: &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}},
+				EmptyDirVolumeLimits: map[string]*resource.Quantity{
+					"volume1": resource.NewQuantity(1, resource.BinarySI),
+				},
 			}))
 			require.FileExists(t, checkpointPath, "checkpoint should be re-written")
 		})

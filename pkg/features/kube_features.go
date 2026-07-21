@@ -493,6 +493,12 @@ const (
 	InPlacePodVerticalScalingInitContainers featuregate.Feature = "InPlacePodVerticalScalingInitContainers"
 
 	// owner: @natasha41575
+	// kep: https://kep.k8s.io/6030
+	//
+	// Allow in-place pod update of memory-backed volume size limit.
+	InPlacePodVerticalScalingMemoryBackedVolumes featuregate.Feature = "InPlacePodVerticalScalingMemoryBackedVolumes"
+
+	// owner: @natasha41575
 	// kep: https://kep.k8s.io/5836
 	//
 	// Enables scheduler-triggered preemption for deferred in-place pod vertical scaling pods.
@@ -1564,6 +1570,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.40
 	},
 
+	InPlacePodVerticalScalingMemoryBackedVolumes: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	InPlacePodVerticalScalingSchedulerPreemption: {
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2477,6 +2487,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	InPlacePodVerticalScalingExclusiveMemory: {InPlacePodVerticalScaling},
 
 	InPlacePodVerticalScalingInitContainers: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
+
+	InPlacePodVerticalScalingMemoryBackedVolumes: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
 
 	InPlacePodVerticalScalingSchedulerPreemption: {InPlacePodVerticalScaling},
 

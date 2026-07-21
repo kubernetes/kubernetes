@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -29,6 +30,9 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/swap"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1203,6 +1207,141 @@ func TestTmpfsMountOptions(t *testing.T) {
 			}
 			if expectedOption := fmt.Sprintf("size=%d", testCase.sizeLimit.Value()); !testCase.sizeLimit.IsZero() && !doesStringArrayContainSubstring(options, expectedOption) {
 				t.Errorf("size option is not expected when is zero. options: %v", options)
+			}
+		})
+	}
+}
+
+func TestResizeEphemeralVolume(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("only supported on linux")
+	}
+
+	tmpDir, err := os.MkdirTemp("", "emptydir_resize_test")
+	require.NoError(t, err, "failed to create temp dir")
+	defer os.RemoveAll(tmpDir) //nolint:errcheck
+
+	quantity200Mi := resource.MustParse("200Mi")
+	quantity0 := resource.MustParse("0")
+
+	tests := []struct {
+		name                 string
+		medium               v1.StorageMedium
+		isMountPoint         bool
+		currentMountSizeOpts []string
+		newSize              *resource.Quantity
+		expectError          bool
+		expectedMountAction  string
+		expectedMountOpts    []string
+	}{
+		{
+			name:                 "resize memory volume when mount point does not exist yet",
+			medium:               v1.StorageMediumMemory,
+			isMountPoint:         false,
+			currentMountSizeOpts: nil,
+			newSize:              &quantity200Mi,
+			expectError:          true,
+			expectedMountAction:  "",
+			expectedMountOpts:    nil,
+		},
+		{
+			name:                 "resize memory volume when mount already exists (remount/resize)",
+			medium:               v1.StorageMediumMemory,
+			isMountPoint:         true,
+			currentMountSizeOpts: []string{"size=104857600"}, // 100Mi
+			newSize:              &quantity200Mi,
+			expectError:          false,
+			expectedMountAction:  "mount",
+			expectedMountOpts:    []string{"remount", "size=209715200"},
+		},
+		{
+			name:                 "resize disk-backed volume should return error",
+			medium:               v1.StorageMediumDefault,
+			isMountPoint:         false,
+			currentMountSizeOpts: nil,
+			newSize:              &quantity200Mi,
+			expectError:          true,
+			expectedMountAction:  "",
+			expectedMountOpts:    nil,
+		},
+		{
+			name:                 "resize memory volume with nil newSize (error path)",
+			medium:               v1.StorageMediumMemory,
+			isMountPoint:         true,
+			currentMountSizeOpts: []string{"size=104857600"},
+			newSize:              nil,
+			expectError:          true,
+		},
+		{
+			name:                 "resize memory volume with zero newSize (error path)",
+			medium:               v1.StorageMediumMemory,
+			isMountPoint:         true,
+			currentMountSizeOpts: []string{"size=104857600"},
+			newSize:              &quantity0,
+			expectError:          true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
+			spec := &v1.Volume{
+				Name: "test-volume",
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{
+						Medium:    tt.medium,
+						SizeLimit: tt.newSize,
+					},
+				},
+			}
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: types.UID("poduid"),
+				},
+			}
+
+			volumeSpec := volume.NewSpecFromVolume(spec)
+			mounterInstance, err := plug.NewMounter(volumeSpec, pod)
+			require.NoError(t, err)
+			volPath := mounterInstance.GetPath()
+
+			physicalMounter := plug.(*emptyDirPlugin).host.GetMounter().(*mount.FakeMounter)
+
+			if tt.isMountPoint {
+				physicalMounter.MountPoints = []mount.MountPoint{{Path: volPath, Opts: tt.currentMountSizeOpts}}
+				require.NoError(t, os.MkdirAll(volPath, 0750), "failed to create directory")
+			} else {
+				os.RemoveAll(volPath) //nolint:errcheck
+			}
+
+			resizablePlugin, ok := plug.(volume.ResizableEphemeralVolumePlugin)
+			require.True(t, ok, "plugin does not implement ResizableEphemeralVolumePlugin")
+
+			err = resizablePlugin.ResizeEphemeralVolume(volumeSpec, pod, tt.newSize)
+			if tt.expectError {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			log := physicalMounter.GetLog()
+			if tt.expectedMountAction == "" {
+				require.Empty(t, log, "expected no mount actions")
+				return
+			}
+			require.Len(t, log, 1)
+			require.Equal(t, "mount", log[0].Action)
+
+			var targetMp *mount.MountPoint
+			for i := len(physicalMounter.MountPoints) - 1; i >= 0; i-- {
+				if physicalMounter.MountPoints[i].Path == volPath {
+					targetMp = &physicalMounter.MountPoints[i]
+					break
+				}
+			}
+			require.NotNil(t, targetMp, "expected a mount point at %s, but got none", volPath)
+			for _, expectedOpt := range tt.expectedMountOpts {
+				assert.Contains(t, targetMp.Opts, expectedOpt)
 			}
 		})
 	}
