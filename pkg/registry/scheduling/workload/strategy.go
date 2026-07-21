@@ -86,7 +86,7 @@ func (workloadStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.O
 }
 
 func (workloadStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
-	return true
+	return false
 }
 
 // dropDisabledWorkloadFields removes fields which are covered by a feature gate.

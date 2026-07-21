@@ -19,24 +19,24 @@ package workloadbuilder
 import (
 	"testing"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
 
-func gangWorkload() *schedulingv1alpha3.Workload {
-	return &schedulingv1alpha3.Workload{
+func gangWorkload() *schedulingv1beta1.Workload {
+	return &schedulingv1beta1.Workload{
 		ObjectMeta: metav1.ObjectMeta{Name: "job-abc", Namespace: "training"},
-		Spec: schedulingv1alpha3.WorkloadSpec{
-			PodGroupTemplates: []schedulingv1alpha3.PodGroupTemplate{
+		Spec: schedulingv1beta1.WorkloadSpec{
+			PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{
 				{
 					Name:             "workers",
-					SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: 4}},
-					SchedulingConstraints: &schedulingv1alpha3.PodGroupSchedulingConstraints{
-						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
+					SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 4}},
+					SchedulingConstraints: &schedulingv1beta1.PodGroupSchedulingConstraints{
+						Topology: []schedulingv1beta1.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
 					},
-					DisruptionMode:    &schedulingv1alpha3.DisruptionMode{All: &schedulingv1alpha3.AllDisruptionMode{}},
-					ResourceClaims:    []schedulingv1alpha3.PodGroupResourceClaim{{Name: "gpu", ResourceClaimName: new("shared-gpu")}},
+					DisruptionMode:    &schedulingv1beta1.DisruptionMode{All: &schedulingv1beta1.AllDisruptionMode{}},
+					ResourceClaims:    []schedulingv1beta1.PodGroupResourceClaim{{Name: "gpu", ResourceClaimName: new("shared-gpu")}},
 					PriorityClassName: "high",
 					Priority:          ptr.To[int32](1000),
 				},
@@ -49,7 +49,7 @@ func TestNewPodGroup(t *testing.T) {
 	wl := gangWorkload()
 	owners := []metav1.OwnerReference{
 		{APIVersion: "batch/v1", Kind: "Job", Name: "job", Controller: new(true)},
-		{APIVersion: "scheduling.k8s.io/v1alpha3", Kind: "Workload", Name: wl.Name},
+		{APIVersion: "scheduling.k8s.io/v1beta1", Kind: "Workload", Name: wl.Name},
 	}
 
 	pg, err := newPodGroup(wl, "workers", "job-abc-workers-xyz", owners)

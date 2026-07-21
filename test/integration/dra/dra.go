@@ -30,7 +30,7 @@ import (
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -647,7 +647,7 @@ func (claimController *claimControllerSingleton) start(tCtx ktesting.TContext) {
 		klog.FromContext(claimControllerCtx),
 		claimControllerCtx.Client(),
 		claimController.informerFactory.Core().V1().Pods(),
-		claimController.informerFactory.Scheduling().V1alpha3().PodGroups(),
+		claimController.informerFactory.Scheduling().V1beta1().PodGroups(),
 		claimController.informerFactory.Resource().V1().ResourceClaims(),
 		claimController.informerFactory.Resource().V1().ResourceClaimTemplates(),
 	)

@@ -81,6 +81,15 @@ func (CompositePodGroupList) SwaggerDoc() map[string]string {
 	return map_CompositePodGroupList
 }
 
+var map_CompositePodGroupSchedulingConstraints = map[string]string{
+	"":         "CompositePodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a CompositePodGroup.",
+	"topology": "topology defines the topology constraints for the composite pod group. Currently only a single topology constraint can be specified. This may change in the future.",
+}
+
+func (CompositePodGroupSchedulingConstraints) SwaggerDoc() map[string]string {
+	return map_CompositePodGroupSchedulingConstraints
+}
+
 var map_CompositePodGroupSchedulingPolicy = map[string]string{
 	"":      "CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set.",
 	"basic": "basic specifies that the groups of this composite group should be scheduled independently. This field is immutable.",
@@ -98,6 +107,7 @@ var map_CompositePodGroupSpec = map[string]string{
 	"schedulingPolicy":            "schedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable.",
 	"priorityClassName":           "priorityClassName defines the priority that should be considered when scheduling this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the composite pod group's priority will be zero). This field is immutable.",
 	"priority":                    "priority is the value of priority of this composite pod group. Various system components use this field to find the priority of the composite pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
+	"schedulingConstraints":       "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable.",
 }
 
 func (CompositePodGroupSpec) SwaggerDoc() map[string]string {
@@ -121,6 +131,7 @@ var map_CompositePodGroupTemplate = map[string]string{
 	"priority":                   "priority is the value of priority of composite pod groups created from this template. Various system components use this field to find the priority of the composite pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
 	"podGroupTemplates":          "podGroupTemplates is the list of templates for children PodGroups. The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates or PodGroupTemplates must be set.",
 	"compositePodGroupTemplates": "compositePodGroupTemplates is the list of templates for children CompositePodGroups. The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates or PodGroupTemplates must be set.",
+	"schedulingConstraints":      "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate. This field is immutable.",
 }
 
 func (CompositePodGroupTemplate) SwaggerDoc() map[string]string {

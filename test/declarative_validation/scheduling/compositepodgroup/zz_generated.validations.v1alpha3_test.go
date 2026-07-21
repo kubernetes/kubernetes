@@ -73,6 +73,16 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.schedulingConstraints": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.schedulingConstraints.topology": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.schedulingConstraints.topology[*].key": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"spec.schedulingPolicy": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueInvalid", Origin: "union"},

@@ -709,6 +709,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.35"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: GitRepoVolumeDriver
   versionedSpecs:
   - default: true

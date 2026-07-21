@@ -17,10 +17,11 @@ limitations under the License.
 package topologyawarescheduling
 
 import (
+	"fmt"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -656,9 +657,11 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			runTestScenario(t, tt)
-		})
+		for _, cpgEnabled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s (CPG: %v)", tt.name, cpgEnabled), func(t *testing.T) {
+				runTestScenario(t, tt, cpgEnabled)
+			})
+		}
 	}
 }
 
@@ -1318,14 +1321,17 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			runTestScenario(t, tt)
-		})
+		for _, cpgEnabled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s (CPG: %v)", tt.name, cpgEnabled), func(t *testing.T) {
+				runTestScenario(t, tt, cpgEnabled)
+			})
+		}
 	}
 }
 
-func runTestScenario(t *testing.T, tt scenario) {
+func runTestScenario(t *testing.T, tt scenario, cpgEnabled bool) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.CompositePodGroup:               cpgEnabled,
 		features.GenericWorkload:                 true,
 		features.TopologyAwareWorkloadScheduling: true,
 	})

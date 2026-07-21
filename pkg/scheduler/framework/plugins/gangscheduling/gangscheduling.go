@@ -22,7 +22,8 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
@@ -160,7 +161,7 @@ func (pl *GangScheduling) isSchedulableAfterPodGroupAdded(logger klog.Logger, po
 }
 
 func (pl *GangScheduling) isSchedulableAfterCompositePodGroupAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	_, addedCPG, err := util.As[*schedulingapi.CompositePodGroup](oldObj, newObj)
+	_, addedCPG, err := util.As[*schedulingv1alpha3.CompositePodGroup](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
 	}
@@ -487,14 +488,6 @@ func (pl *GangScheduling) allowAssumedPodsInHierarchy(snapshot fwk.PodGroupManag
 // The function will only return success once the gang's MinCount is satisfied or if the pod group is not using gang scheduling policy.
 // In case there are not enough remaining pods to satisfy the gang's MinCount, it returns Unschedulable which will terminate the pod group scheduling cycle early.
 func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, args framework.PlacementProgress) *fwk.Status {
-	// When CompositePodGroup feature gate is disabled, we return nil immediately for non-gang pod groups.
-	if !pl.isCompositePodGroupEnabled {
-		pg := podGroupInfo.GetPodGroup()
-		if pg == nil || pg.Spec.SchedulingPolicy.Gang == nil {
-			return nil
-		}
-	}
-
 	minCount := getMinCount(podGroupInfo)
 	remaining := args.Remaining
 	scheduled := args.Scheduled

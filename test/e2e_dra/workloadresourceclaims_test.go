@@ -21,7 +21,7 @@ import (
 
 	"github.com/onsi/gomega"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
@@ -51,7 +51,7 @@ func workloadResourceClaimsGateCycle(tCtx ktesting.TContext, b *drautils.Builder
 	b.TestPod(tCtx, pod)
 	b.TestPod(tCtx, podToDelete)
 
-	podGroup, err := tCtx.Client().SchedulingV1alpha3().PodGroups(namespace).Get(tCtx, podGroup.Name, metav1.GetOptions{})
+	podGroup, err := tCtx.Client().SchedulingV1beta1().PodGroups(namespace).Get(tCtx, podGroup.Name, metav1.GetOptions{})
 	tCtx.ExpectNoError(err, "get PodGroup")
 	tCtx.Expect(podGroup.Status.ResourceClaimStatuses).To(gomega.HaveExactElements(
 		gomega.SatisfyAll(

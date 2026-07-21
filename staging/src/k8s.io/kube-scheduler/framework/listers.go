@@ -19,7 +19,8 @@ package framework
 import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -97,7 +98,7 @@ type PodGroupStateLister interface {
 // CompositePodGroupLister provides read access to cached composite pod group objects.
 type CompositePodGroupLister interface {
 	// Get returns the CompositePodGroup with the given namespace and name.
-	Get(namespace, name string) (*schedulingapi.CompositePodGroup, error)
+	Get(namespace, name string) (*schedulingv1alpha3.CompositePodGroup, error)
 }
 
 // CompositePodGroupStateLister provides read access to composite pod group states.

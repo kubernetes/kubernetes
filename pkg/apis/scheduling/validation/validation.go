@@ -75,7 +75,13 @@ func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.Erro
 
 // ValidatePodGroup tests if all fields in a PodGroup are set correctly.
 func ValidatePodGroup(podGroup *scheduling.PodGroup) field.ErrorList {
-	return apivalidation.ValidateObjectMeta(&podGroup.ObjectMeta, true, apivalidation.ValidatePodGroupName, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMeta(&podGroup.ObjectMeta, true, apivalidation.ValidatePodGroupName, field.NewPath("metadata"))
+	// This manual validation is required until the +k8s:dependentRequired tag
+	// for workloadRef graduates from Alpha to Standard and is fully enforced declaratively.
+	if podGroup.Spec.ParentCompositePodGroupName != nil && podGroup.Spec.WorkloadRef == nil {
+		allErrs = append(allErrs, field.Required(field.NewPath("spec", "workloadRef"), "must be set when parentCompositePodGroupName is set").WithOrigin("dependentRequired").MarkCoveredByDeclarative())
+	}
+	return allErrs
 }
 
 // ValidatePodGroupUpdate tests if an update to PodGroup is valid.

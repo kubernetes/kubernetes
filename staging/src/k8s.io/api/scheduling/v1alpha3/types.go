@@ -306,6 +306,14 @@ type CompositePodGroupTemplate struct {
 	// +k8s:update=NoAddItem
 	// +k8s:update=NoRemoveItem
 	CompositePodGroupTemplates []CompositePodGroupTemplate `json:"compositePodGroupTemplates,omitempty" protobuf:"bytes,6,rep,name=compositePodGroupTemplates"`
+
+	// schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate.
+	// This field is immutable.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	SchedulingConstraints *CompositePodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,7,opt,name=schedulingConstraints"`
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
@@ -517,7 +525,7 @@ type PodGroupSpec struct {
 	// +k8s:ifEnabled(CompositePodGroup)=+k8s:optional
 	// +k8s:immutable
 	// +k8s:format=k8s-long-name
-	// +k8s:dependentRequired("workloadRef")
+	// +k8s:alpha(since: "1.37")=+k8s:dependentRequired("workloadRef")
 	ParentCompositePodGroupName *string `json:"parentCompositePodGroupName,omitempty" protobuf:"bytes,1,opt,name=parentCompositePodGroupName"`
 
 	// workloadRef references an optional PodGroup template within the Workload
@@ -1078,6 +1086,15 @@ type CompositePodGroupSpec struct {
 	// +k8s:immutable
 	// +k8s:maximum=1000000000 # HighestUserDefinablePriority
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,5,opt,name=priority"`
+
+	// schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// This field is immutable.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	SchedulingConstraints *CompositePodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,6,opt,name=schedulingConstraints"`
 }
 
 // CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup.
@@ -1161,4 +1178,17 @@ type CompositePodGroupStatus struct {
 	// +k8s:alpha(since: "1.37")=+k8s:listType=map
 	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+}
+
+// CompositePodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a CompositePodGroup.
+type CompositePodGroupSchedulingConstraints struct {
+	// topology defines the topology constraints for the composite pod group.
+	// Currently only a single topology constraint can be specified. This may change in the future.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:maxItems=1
+	// +listType=atomic
+	// +k8s:listType=atomic
+	Topology []TopologyConstraint `json:"topology,omitempty" protobuf:"bytes,1,rep,name=topology"`
 }

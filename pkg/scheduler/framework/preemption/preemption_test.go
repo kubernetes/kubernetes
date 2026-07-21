@@ -28,7 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -893,7 +893,7 @@ func TestGetVictimsOnNode(t *testing.T) {
 				podGroupSnapshot: fwk.MutableSnapshotSharedLister().PodGroups(),
 			}
 
-			_ = informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
+			_ = informerFactory.Scheduling().V1beta1().PodGroups().Informer()
 
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())

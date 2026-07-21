@@ -39,6 +39,186 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.AllDisruptionMode)(nil), (*scheduling.AllDisruptionMode)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_AllDisruptionMode_To_scheduling_AllDisruptionMode(a.(*schedulingv1beta1.AllDisruptionMode), b.(*scheduling.AllDisruptionMode), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.AllDisruptionMode)(nil), (*schedulingv1beta1.AllDisruptionMode)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_AllDisruptionMode_To_v1beta1_AllDisruptionMode(a.(*scheduling.AllDisruptionMode), b.(*schedulingv1beta1.AllDisruptionMode), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.BasicSchedulingPolicy)(nil), (*scheduling.BasicSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_BasicSchedulingPolicy_To_scheduling_BasicSchedulingPolicy(a.(*schedulingv1beta1.BasicSchedulingPolicy), b.(*scheduling.BasicSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.BasicSchedulingPolicy)(nil), (*schedulingv1beta1.BasicSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_BasicSchedulingPolicy_To_v1beta1_BasicSchedulingPolicy(a.(*scheduling.BasicSchedulingPolicy), b.(*schedulingv1beta1.BasicSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.CompositeBasicSchedulingPolicy)(nil), (*scheduling.CompositeBasicSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CompositeBasicSchedulingPolicy_To_scheduling_CompositeBasicSchedulingPolicy(a.(*schedulingv1beta1.CompositeBasicSchedulingPolicy), b.(*scheduling.CompositeBasicSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.CompositeBasicSchedulingPolicy)(nil), (*schedulingv1beta1.CompositeBasicSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_CompositeBasicSchedulingPolicy_To_v1beta1_CompositeBasicSchedulingPolicy(a.(*scheduling.CompositeBasicSchedulingPolicy), b.(*schedulingv1beta1.CompositeBasicSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.CompositeGangSchedulingPolicy)(nil), (*scheduling.CompositeGangSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CompositeGangSchedulingPolicy_To_scheduling_CompositeGangSchedulingPolicy(a.(*schedulingv1beta1.CompositeGangSchedulingPolicy), b.(*scheduling.CompositeGangSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.CompositeGangSchedulingPolicy)(nil), (*schedulingv1beta1.CompositeGangSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_CompositeGangSchedulingPolicy_To_v1beta1_CompositeGangSchedulingPolicy(a.(*scheduling.CompositeGangSchedulingPolicy), b.(*schedulingv1beta1.CompositeGangSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.CompositePodGroupSchedulingConstraints)(nil), (*scheduling.CompositePodGroupSchedulingConstraints)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CompositePodGroupSchedulingConstraints_To_scheduling_CompositePodGroupSchedulingConstraints(a.(*schedulingv1beta1.CompositePodGroupSchedulingConstraints), b.(*scheduling.CompositePodGroupSchedulingConstraints), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.CompositePodGroupSchedulingConstraints)(nil), (*schedulingv1beta1.CompositePodGroupSchedulingConstraints)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_CompositePodGroupSchedulingConstraints_To_v1beta1_CompositePodGroupSchedulingConstraints(a.(*scheduling.CompositePodGroupSchedulingConstraints), b.(*schedulingv1beta1.CompositePodGroupSchedulingConstraints), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.CompositePodGroupSchedulingPolicy)(nil), (*scheduling.CompositePodGroupSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CompositePodGroupSchedulingPolicy_To_scheduling_CompositePodGroupSchedulingPolicy(a.(*schedulingv1beta1.CompositePodGroupSchedulingPolicy), b.(*scheduling.CompositePodGroupSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.CompositePodGroupSchedulingPolicy)(nil), (*schedulingv1beta1.CompositePodGroupSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_CompositePodGroupSchedulingPolicy_To_v1beta1_CompositePodGroupSchedulingPolicy(a.(*scheduling.CompositePodGroupSchedulingPolicy), b.(*schedulingv1beta1.CompositePodGroupSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.CompositePodGroupTemplate)(nil), (*scheduling.CompositePodGroupTemplate)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CompositePodGroupTemplate_To_scheduling_CompositePodGroupTemplate(a.(*schedulingv1beta1.CompositePodGroupTemplate), b.(*scheduling.CompositePodGroupTemplate), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.CompositePodGroupTemplate)(nil), (*schedulingv1beta1.CompositePodGroupTemplate)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_CompositePodGroupTemplate_To_v1beta1_CompositePodGroupTemplate(a.(*scheduling.CompositePodGroupTemplate), b.(*schedulingv1beta1.CompositePodGroupTemplate), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.DisruptionMode)(nil), (*scheduling.DisruptionMode)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DisruptionMode_To_scheduling_DisruptionMode(a.(*schedulingv1beta1.DisruptionMode), b.(*scheduling.DisruptionMode), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.DisruptionMode)(nil), (*schedulingv1beta1.DisruptionMode)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_DisruptionMode_To_v1beta1_DisruptionMode(a.(*scheduling.DisruptionMode), b.(*schedulingv1beta1.DisruptionMode), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.GangSchedulingPolicy)(nil), (*scheduling.GangSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_GangSchedulingPolicy_To_scheduling_GangSchedulingPolicy(a.(*schedulingv1beta1.GangSchedulingPolicy), b.(*scheduling.GangSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.GangSchedulingPolicy)(nil), (*schedulingv1beta1.GangSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_GangSchedulingPolicy_To_v1beta1_GangSchedulingPolicy(a.(*scheduling.GangSchedulingPolicy), b.(*schedulingv1beta1.GangSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.PodGroup)(nil), (*scheduling.PodGroup)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PodGroup_To_scheduling_PodGroup(a.(*schedulingv1beta1.PodGroup), b.(*scheduling.PodGroup), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.PodGroup)(nil), (*schedulingv1beta1.PodGroup)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_PodGroup_To_v1beta1_PodGroup(a.(*scheduling.PodGroup), b.(*schedulingv1beta1.PodGroup), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.PodGroupList)(nil), (*scheduling.PodGroupList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PodGroupList_To_scheduling_PodGroupList(a.(*schedulingv1beta1.PodGroupList), b.(*scheduling.PodGroupList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.PodGroupList)(nil), (*schedulingv1beta1.PodGroupList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_PodGroupList_To_v1beta1_PodGroupList(a.(*scheduling.PodGroupList), b.(*schedulingv1beta1.PodGroupList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.PodGroupResourceClaim)(nil), (*scheduling.PodGroupResourceClaim)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PodGroupResourceClaim_To_scheduling_PodGroupResourceClaim(a.(*schedulingv1beta1.PodGroupResourceClaim), b.(*scheduling.PodGroupResourceClaim), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.PodGroupResourceClaim)(nil), (*schedulingv1beta1.PodGroupResourceClaim)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_PodGroupResourceClaim_To_v1beta1_PodGroupResourceClaim(a.(*scheduling.PodGroupResourceClaim), b.(*schedulingv1beta1.PodGroupResourceClaim), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.PodGroupResourceClaimStatus)(nil), (*scheduling.PodGroupResourceClaimStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PodGroupResourceClaimStatus_To_scheduling_PodGroupResourceClaimStatus(a.(*schedulingv1beta1.PodGroupResourceClaimStatus), b.(*scheduling.PodGroupResourceClaimStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.PodGroupResourceClaimStatus)(nil), (*schedulingv1beta1.PodGroupResourceClaimStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_PodGroupResourceClaimStatus_To_v1beta1_PodGroupResourceClaimStatus(a.(*scheduling.PodGroupResourceClaimStatus), b.(*schedulingv1beta1.PodGroupResourceClaimStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.PodGroupSchedulingConstraints)(nil), (*scheduling.PodGroupSchedulingConstraints)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PodGroupSchedulingConstraints_To_scheduling_PodGroupSchedulingConstraints(a.(*schedulingv1beta1.PodGroupSchedulingConstraints), b.(*scheduling.PodGroupSchedulingConstraints), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.PodGroupSchedulingConstraints)(nil), (*schedulingv1beta1.PodGroupSchedulingConstraints)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_PodGroupSchedulingConstraints_To_v1beta1_PodGroupSchedulingConstraints(a.(*scheduling.PodGroupSchedulingConstraints), b.(*schedulingv1beta1.PodGroupSchedulingConstraints), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.PodGroupSchedulingPolicy)(nil), (*scheduling.PodGroupSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PodGroupSchedulingPolicy_To_scheduling_PodGroupSchedulingPolicy(a.(*schedulingv1beta1.PodGroupSchedulingPolicy), b.(*scheduling.PodGroupSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.PodGroupSchedulingPolicy)(nil), (*schedulingv1beta1.PodGroupSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_PodGroupSchedulingPolicy_To_v1beta1_PodGroupSchedulingPolicy(a.(*scheduling.PodGroupSchedulingPolicy), b.(*schedulingv1beta1.PodGroupSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.PodGroupSpec)(nil), (*scheduling.PodGroupSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PodGroupSpec_To_scheduling_PodGroupSpec(a.(*schedulingv1beta1.PodGroupSpec), b.(*scheduling.PodGroupSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.PodGroupSpec)(nil), (*schedulingv1beta1.PodGroupSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_PodGroupSpec_To_v1beta1_PodGroupSpec(a.(*scheduling.PodGroupSpec), b.(*schedulingv1beta1.PodGroupSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.PodGroupStatus)(nil), (*scheduling.PodGroupStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PodGroupStatus_To_scheduling_PodGroupStatus(a.(*schedulingv1beta1.PodGroupStatus), b.(*scheduling.PodGroupStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.PodGroupStatus)(nil), (*schedulingv1beta1.PodGroupStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_PodGroupStatus_To_v1beta1_PodGroupStatus(a.(*scheduling.PodGroupStatus), b.(*schedulingv1beta1.PodGroupStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.PodGroupTemplate)(nil), (*scheduling.PodGroupTemplate)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PodGroupTemplate_To_scheduling_PodGroupTemplate(a.(*schedulingv1beta1.PodGroupTemplate), b.(*scheduling.PodGroupTemplate), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.PodGroupTemplate)(nil), (*schedulingv1beta1.PodGroupTemplate)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_PodGroupTemplate_To_v1beta1_PodGroupTemplate(a.(*scheduling.PodGroupTemplate), b.(*schedulingv1beta1.PodGroupTemplate), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.PriorityClass)(nil), (*scheduling.PriorityClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_PriorityClass_To_scheduling_PriorityClass(a.(*schedulingv1beta1.PriorityClass), b.(*scheduling.PriorityClass), scope)
 	}); err != nil {
@@ -59,7 +239,451 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.SingleDisruptionMode)(nil), (*scheduling.SingleDisruptionMode)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_SingleDisruptionMode_To_scheduling_SingleDisruptionMode(a.(*schedulingv1beta1.SingleDisruptionMode), b.(*scheduling.SingleDisruptionMode), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.SingleDisruptionMode)(nil), (*schedulingv1beta1.SingleDisruptionMode)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_SingleDisruptionMode_To_v1beta1_SingleDisruptionMode(a.(*scheduling.SingleDisruptionMode), b.(*schedulingv1beta1.SingleDisruptionMode), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.TopologyConstraint)(nil), (*scheduling.TopologyConstraint)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_TopologyConstraint_To_scheduling_TopologyConstraint(a.(*schedulingv1beta1.TopologyConstraint), b.(*scheduling.TopologyConstraint), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.TopologyConstraint)(nil), (*schedulingv1beta1.TopologyConstraint)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_TopologyConstraint_To_v1beta1_TopologyConstraint(a.(*scheduling.TopologyConstraint), b.(*schedulingv1beta1.TopologyConstraint), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.TypedLocalObjectReference)(nil), (*scheduling.TypedLocalObjectReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_TypedLocalObjectReference_To_scheduling_TypedLocalObjectReference(a.(*schedulingv1beta1.TypedLocalObjectReference), b.(*scheduling.TypedLocalObjectReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.TypedLocalObjectReference)(nil), (*schedulingv1beta1.TypedLocalObjectReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_TypedLocalObjectReference_To_v1beta1_TypedLocalObjectReference(a.(*scheduling.TypedLocalObjectReference), b.(*schedulingv1beta1.TypedLocalObjectReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.Workload)(nil), (*scheduling.Workload)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Workload_To_scheduling_Workload(a.(*schedulingv1beta1.Workload), b.(*scheduling.Workload), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.Workload)(nil), (*schedulingv1beta1.Workload)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_Workload_To_v1beta1_Workload(a.(*scheduling.Workload), b.(*schedulingv1beta1.Workload), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.WorkloadList)(nil), (*scheduling.WorkloadList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_WorkloadList_To_scheduling_WorkloadList(a.(*schedulingv1beta1.WorkloadList), b.(*scheduling.WorkloadList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.WorkloadList)(nil), (*schedulingv1beta1.WorkloadList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_WorkloadList_To_v1beta1_WorkloadList(a.(*scheduling.WorkloadList), b.(*schedulingv1beta1.WorkloadList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.WorkloadReference)(nil), (*scheduling.WorkloadReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_WorkloadReference_To_scheduling_WorkloadReference(a.(*schedulingv1beta1.WorkloadReference), b.(*scheduling.WorkloadReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.WorkloadReference)(nil), (*schedulingv1beta1.WorkloadReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_WorkloadReference_To_v1beta1_WorkloadReference(a.(*scheduling.WorkloadReference), b.(*schedulingv1beta1.WorkloadReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.WorkloadSpec)(nil), (*scheduling.WorkloadSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_WorkloadSpec_To_scheduling_WorkloadSpec(a.(*schedulingv1beta1.WorkloadSpec), b.(*scheduling.WorkloadSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.WorkloadSpec)(nil), (*schedulingv1beta1.WorkloadSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_WorkloadSpec_To_v1beta1_WorkloadSpec(a.(*scheduling.WorkloadSpec), b.(*schedulingv1beta1.WorkloadSpec), scope)
+	}); err != nil {
+		return err
+	}
 	return nil
+}
+
+func autoConvert_v1beta1_AllDisruptionMode_To_scheduling_AllDisruptionMode(in *schedulingv1beta1.AllDisruptionMode, out *scheduling.AllDisruptionMode, s conversion.Scope) error {
+	*out = *(*scheduling.AllDisruptionMode)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_AllDisruptionMode_To_scheduling_AllDisruptionMode is an autogenerated conversion function.
+func Convert_v1beta1_AllDisruptionMode_To_scheduling_AllDisruptionMode(in *schedulingv1beta1.AllDisruptionMode, out *scheduling.AllDisruptionMode, s conversion.Scope) error {
+	return autoConvert_v1beta1_AllDisruptionMode_To_scheduling_AllDisruptionMode(in, out, s)
+}
+
+func autoConvert_scheduling_AllDisruptionMode_To_v1beta1_AllDisruptionMode(in *scheduling.AllDisruptionMode, out *schedulingv1beta1.AllDisruptionMode, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.AllDisruptionMode)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_AllDisruptionMode_To_v1beta1_AllDisruptionMode is an autogenerated conversion function.
+func Convert_scheduling_AllDisruptionMode_To_v1beta1_AllDisruptionMode(in *scheduling.AllDisruptionMode, out *schedulingv1beta1.AllDisruptionMode, s conversion.Scope) error {
+	return autoConvert_scheduling_AllDisruptionMode_To_v1beta1_AllDisruptionMode(in, out, s)
+}
+
+func autoConvert_v1beta1_BasicSchedulingPolicy_To_scheduling_BasicSchedulingPolicy(in *schedulingv1beta1.BasicSchedulingPolicy, out *scheduling.BasicSchedulingPolicy, s conversion.Scope) error {
+	*out = *(*scheduling.BasicSchedulingPolicy)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_BasicSchedulingPolicy_To_scheduling_BasicSchedulingPolicy is an autogenerated conversion function.
+func Convert_v1beta1_BasicSchedulingPolicy_To_scheduling_BasicSchedulingPolicy(in *schedulingv1beta1.BasicSchedulingPolicy, out *scheduling.BasicSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_v1beta1_BasicSchedulingPolicy_To_scheduling_BasicSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_scheduling_BasicSchedulingPolicy_To_v1beta1_BasicSchedulingPolicy(in *scheduling.BasicSchedulingPolicy, out *schedulingv1beta1.BasicSchedulingPolicy, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.BasicSchedulingPolicy)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_BasicSchedulingPolicy_To_v1beta1_BasicSchedulingPolicy is an autogenerated conversion function.
+func Convert_scheduling_BasicSchedulingPolicy_To_v1beta1_BasicSchedulingPolicy(in *scheduling.BasicSchedulingPolicy, out *schedulingv1beta1.BasicSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_scheduling_BasicSchedulingPolicy_To_v1beta1_BasicSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_v1beta1_CompositeBasicSchedulingPolicy_To_scheduling_CompositeBasicSchedulingPolicy(in *schedulingv1beta1.CompositeBasicSchedulingPolicy, out *scheduling.CompositeBasicSchedulingPolicy, s conversion.Scope) error {
+	*out = *(*scheduling.CompositeBasicSchedulingPolicy)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_CompositeBasicSchedulingPolicy_To_scheduling_CompositeBasicSchedulingPolicy is an autogenerated conversion function.
+func Convert_v1beta1_CompositeBasicSchedulingPolicy_To_scheduling_CompositeBasicSchedulingPolicy(in *schedulingv1beta1.CompositeBasicSchedulingPolicy, out *scheduling.CompositeBasicSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_v1beta1_CompositeBasicSchedulingPolicy_To_scheduling_CompositeBasicSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_scheduling_CompositeBasicSchedulingPolicy_To_v1beta1_CompositeBasicSchedulingPolicy(in *scheduling.CompositeBasicSchedulingPolicy, out *schedulingv1beta1.CompositeBasicSchedulingPolicy, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.CompositeBasicSchedulingPolicy)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_CompositeBasicSchedulingPolicy_To_v1beta1_CompositeBasicSchedulingPolicy is an autogenerated conversion function.
+func Convert_scheduling_CompositeBasicSchedulingPolicy_To_v1beta1_CompositeBasicSchedulingPolicy(in *scheduling.CompositeBasicSchedulingPolicy, out *schedulingv1beta1.CompositeBasicSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_scheduling_CompositeBasicSchedulingPolicy_To_v1beta1_CompositeBasicSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_v1beta1_CompositeGangSchedulingPolicy_To_scheduling_CompositeGangSchedulingPolicy(in *schedulingv1beta1.CompositeGangSchedulingPolicy, out *scheduling.CompositeGangSchedulingPolicy, s conversion.Scope) error {
+	*out = *(*scheduling.CompositeGangSchedulingPolicy)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_CompositeGangSchedulingPolicy_To_scheduling_CompositeGangSchedulingPolicy is an autogenerated conversion function.
+func Convert_v1beta1_CompositeGangSchedulingPolicy_To_scheduling_CompositeGangSchedulingPolicy(in *schedulingv1beta1.CompositeGangSchedulingPolicy, out *scheduling.CompositeGangSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_v1beta1_CompositeGangSchedulingPolicy_To_scheduling_CompositeGangSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_scheduling_CompositeGangSchedulingPolicy_To_v1beta1_CompositeGangSchedulingPolicy(in *scheduling.CompositeGangSchedulingPolicy, out *schedulingv1beta1.CompositeGangSchedulingPolicy, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.CompositeGangSchedulingPolicy)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_CompositeGangSchedulingPolicy_To_v1beta1_CompositeGangSchedulingPolicy is an autogenerated conversion function.
+func Convert_scheduling_CompositeGangSchedulingPolicy_To_v1beta1_CompositeGangSchedulingPolicy(in *scheduling.CompositeGangSchedulingPolicy, out *schedulingv1beta1.CompositeGangSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_scheduling_CompositeGangSchedulingPolicy_To_v1beta1_CompositeGangSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_v1beta1_CompositePodGroupSchedulingConstraints_To_scheduling_CompositePodGroupSchedulingConstraints(in *schedulingv1beta1.CompositePodGroupSchedulingConstraints, out *scheduling.CompositePodGroupSchedulingConstraints, s conversion.Scope) error {
+	*out = *(*scheduling.CompositePodGroupSchedulingConstraints)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_CompositePodGroupSchedulingConstraints_To_scheduling_CompositePodGroupSchedulingConstraints is an autogenerated conversion function.
+func Convert_v1beta1_CompositePodGroupSchedulingConstraints_To_scheduling_CompositePodGroupSchedulingConstraints(in *schedulingv1beta1.CompositePodGroupSchedulingConstraints, out *scheduling.CompositePodGroupSchedulingConstraints, s conversion.Scope) error {
+	return autoConvert_v1beta1_CompositePodGroupSchedulingConstraints_To_scheduling_CompositePodGroupSchedulingConstraints(in, out, s)
+}
+
+func autoConvert_scheduling_CompositePodGroupSchedulingConstraints_To_v1beta1_CompositePodGroupSchedulingConstraints(in *scheduling.CompositePodGroupSchedulingConstraints, out *schedulingv1beta1.CompositePodGroupSchedulingConstraints, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.CompositePodGroupSchedulingConstraints)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_CompositePodGroupSchedulingConstraints_To_v1beta1_CompositePodGroupSchedulingConstraints is an autogenerated conversion function.
+func Convert_scheduling_CompositePodGroupSchedulingConstraints_To_v1beta1_CompositePodGroupSchedulingConstraints(in *scheduling.CompositePodGroupSchedulingConstraints, out *schedulingv1beta1.CompositePodGroupSchedulingConstraints, s conversion.Scope) error {
+	return autoConvert_scheduling_CompositePodGroupSchedulingConstraints_To_v1beta1_CompositePodGroupSchedulingConstraints(in, out, s)
+}
+
+func autoConvert_v1beta1_CompositePodGroupSchedulingPolicy_To_scheduling_CompositePodGroupSchedulingPolicy(in *schedulingv1beta1.CompositePodGroupSchedulingPolicy, out *scheduling.CompositePodGroupSchedulingPolicy, s conversion.Scope) error {
+	*out = *(*scheduling.CompositePodGroupSchedulingPolicy)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_CompositePodGroupSchedulingPolicy_To_scheduling_CompositePodGroupSchedulingPolicy is an autogenerated conversion function.
+func Convert_v1beta1_CompositePodGroupSchedulingPolicy_To_scheduling_CompositePodGroupSchedulingPolicy(in *schedulingv1beta1.CompositePodGroupSchedulingPolicy, out *scheduling.CompositePodGroupSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_v1beta1_CompositePodGroupSchedulingPolicy_To_scheduling_CompositePodGroupSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_scheduling_CompositePodGroupSchedulingPolicy_To_v1beta1_CompositePodGroupSchedulingPolicy(in *scheduling.CompositePodGroupSchedulingPolicy, out *schedulingv1beta1.CompositePodGroupSchedulingPolicy, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.CompositePodGroupSchedulingPolicy)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_CompositePodGroupSchedulingPolicy_To_v1beta1_CompositePodGroupSchedulingPolicy is an autogenerated conversion function.
+func Convert_scheduling_CompositePodGroupSchedulingPolicy_To_v1beta1_CompositePodGroupSchedulingPolicy(in *scheduling.CompositePodGroupSchedulingPolicy, out *schedulingv1beta1.CompositePodGroupSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_scheduling_CompositePodGroupSchedulingPolicy_To_v1beta1_CompositePodGroupSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_v1beta1_CompositePodGroupTemplate_To_scheduling_CompositePodGroupTemplate(in *schedulingv1beta1.CompositePodGroupTemplate, out *scheduling.CompositePodGroupTemplate, s conversion.Scope) error {
+	*out = *(*scheduling.CompositePodGroupTemplate)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_CompositePodGroupTemplate_To_scheduling_CompositePodGroupTemplate is an autogenerated conversion function.
+func Convert_v1beta1_CompositePodGroupTemplate_To_scheduling_CompositePodGroupTemplate(in *schedulingv1beta1.CompositePodGroupTemplate, out *scheduling.CompositePodGroupTemplate, s conversion.Scope) error {
+	return autoConvert_v1beta1_CompositePodGroupTemplate_To_scheduling_CompositePodGroupTemplate(in, out, s)
+}
+
+func autoConvert_scheduling_CompositePodGroupTemplate_To_v1beta1_CompositePodGroupTemplate(in *scheduling.CompositePodGroupTemplate, out *schedulingv1beta1.CompositePodGroupTemplate, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.CompositePodGroupTemplate)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_CompositePodGroupTemplate_To_v1beta1_CompositePodGroupTemplate is an autogenerated conversion function.
+func Convert_scheduling_CompositePodGroupTemplate_To_v1beta1_CompositePodGroupTemplate(in *scheduling.CompositePodGroupTemplate, out *schedulingv1beta1.CompositePodGroupTemplate, s conversion.Scope) error {
+	return autoConvert_scheduling_CompositePodGroupTemplate_To_v1beta1_CompositePodGroupTemplate(in, out, s)
+}
+
+func autoConvert_v1beta1_DisruptionMode_To_scheduling_DisruptionMode(in *schedulingv1beta1.DisruptionMode, out *scheduling.DisruptionMode, s conversion.Scope) error {
+	*out = *(*scheduling.DisruptionMode)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_DisruptionMode_To_scheduling_DisruptionMode is an autogenerated conversion function.
+func Convert_v1beta1_DisruptionMode_To_scheduling_DisruptionMode(in *schedulingv1beta1.DisruptionMode, out *scheduling.DisruptionMode, s conversion.Scope) error {
+	return autoConvert_v1beta1_DisruptionMode_To_scheduling_DisruptionMode(in, out, s)
+}
+
+func autoConvert_scheduling_DisruptionMode_To_v1beta1_DisruptionMode(in *scheduling.DisruptionMode, out *schedulingv1beta1.DisruptionMode, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.DisruptionMode)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_DisruptionMode_To_v1beta1_DisruptionMode is an autogenerated conversion function.
+func Convert_scheduling_DisruptionMode_To_v1beta1_DisruptionMode(in *scheduling.DisruptionMode, out *schedulingv1beta1.DisruptionMode, s conversion.Scope) error {
+	return autoConvert_scheduling_DisruptionMode_To_v1beta1_DisruptionMode(in, out, s)
+}
+
+func autoConvert_v1beta1_GangSchedulingPolicy_To_scheduling_GangSchedulingPolicy(in *schedulingv1beta1.GangSchedulingPolicy, out *scheduling.GangSchedulingPolicy, s conversion.Scope) error {
+	*out = *(*scheduling.GangSchedulingPolicy)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_GangSchedulingPolicy_To_scheduling_GangSchedulingPolicy is an autogenerated conversion function.
+func Convert_v1beta1_GangSchedulingPolicy_To_scheduling_GangSchedulingPolicy(in *schedulingv1beta1.GangSchedulingPolicy, out *scheduling.GangSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_v1beta1_GangSchedulingPolicy_To_scheduling_GangSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_scheduling_GangSchedulingPolicy_To_v1beta1_GangSchedulingPolicy(in *scheduling.GangSchedulingPolicy, out *schedulingv1beta1.GangSchedulingPolicy, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.GangSchedulingPolicy)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_GangSchedulingPolicy_To_v1beta1_GangSchedulingPolicy is an autogenerated conversion function.
+func Convert_scheduling_GangSchedulingPolicy_To_v1beta1_GangSchedulingPolicy(in *scheduling.GangSchedulingPolicy, out *schedulingv1beta1.GangSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_scheduling_GangSchedulingPolicy_To_v1beta1_GangSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_v1beta1_PodGroup_To_scheduling_PodGroup(in *schedulingv1beta1.PodGroup, out *scheduling.PodGroup, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1beta1_PodGroupSpec_To_scheduling_PodGroupSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_PodGroupStatus_To_scheduling_PodGroupStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1beta1_PodGroup_To_scheduling_PodGroup is an autogenerated conversion function.
+func Convert_v1beta1_PodGroup_To_scheduling_PodGroup(in *schedulingv1beta1.PodGroup, out *scheduling.PodGroup, s conversion.Scope) error {
+	return autoConvert_v1beta1_PodGroup_To_scheduling_PodGroup(in, out, s)
+}
+
+func autoConvert_scheduling_PodGroup_To_v1beta1_PodGroup(in *scheduling.PodGroup, out *schedulingv1beta1.PodGroup, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_scheduling_PodGroupSpec_To_v1beta1_PodGroupSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_scheduling_PodGroupStatus_To_v1beta1_PodGroupStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_scheduling_PodGroup_To_v1beta1_PodGroup is an autogenerated conversion function.
+func Convert_scheduling_PodGroup_To_v1beta1_PodGroup(in *scheduling.PodGroup, out *schedulingv1beta1.PodGroup, s conversion.Scope) error {
+	return autoConvert_scheduling_PodGroup_To_v1beta1_PodGroup(in, out, s)
+}
+
+func autoConvert_v1beta1_PodGroupList_To_scheduling_PodGroupList(in *schedulingv1beta1.PodGroupList, out *scheduling.PodGroupList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]scheduling.PodGroup)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1beta1_PodGroupList_To_scheduling_PodGroupList is an autogenerated conversion function.
+func Convert_v1beta1_PodGroupList_To_scheduling_PodGroupList(in *schedulingv1beta1.PodGroupList, out *scheduling.PodGroupList, s conversion.Scope) error {
+	return autoConvert_v1beta1_PodGroupList_To_scheduling_PodGroupList(in, out, s)
+}
+
+func autoConvert_scheduling_PodGroupList_To_v1beta1_PodGroupList(in *scheduling.PodGroupList, out *schedulingv1beta1.PodGroupList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]schedulingv1beta1.PodGroup)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_scheduling_PodGroupList_To_v1beta1_PodGroupList is an autogenerated conversion function.
+func Convert_scheduling_PodGroupList_To_v1beta1_PodGroupList(in *scheduling.PodGroupList, out *schedulingv1beta1.PodGroupList, s conversion.Scope) error {
+	return autoConvert_scheduling_PodGroupList_To_v1beta1_PodGroupList(in, out, s)
+}
+
+func autoConvert_v1beta1_PodGroupResourceClaim_To_scheduling_PodGroupResourceClaim(in *schedulingv1beta1.PodGroupResourceClaim, out *scheduling.PodGroupResourceClaim, s conversion.Scope) error {
+	*out = *(*scheduling.PodGroupResourceClaim)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_PodGroupResourceClaim_To_scheduling_PodGroupResourceClaim is an autogenerated conversion function.
+func Convert_v1beta1_PodGroupResourceClaim_To_scheduling_PodGroupResourceClaim(in *schedulingv1beta1.PodGroupResourceClaim, out *scheduling.PodGroupResourceClaim, s conversion.Scope) error {
+	return autoConvert_v1beta1_PodGroupResourceClaim_To_scheduling_PodGroupResourceClaim(in, out, s)
+}
+
+func autoConvert_scheduling_PodGroupResourceClaim_To_v1beta1_PodGroupResourceClaim(in *scheduling.PodGroupResourceClaim, out *schedulingv1beta1.PodGroupResourceClaim, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.PodGroupResourceClaim)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_PodGroupResourceClaim_To_v1beta1_PodGroupResourceClaim is an autogenerated conversion function.
+func Convert_scheduling_PodGroupResourceClaim_To_v1beta1_PodGroupResourceClaim(in *scheduling.PodGroupResourceClaim, out *schedulingv1beta1.PodGroupResourceClaim, s conversion.Scope) error {
+	return autoConvert_scheduling_PodGroupResourceClaim_To_v1beta1_PodGroupResourceClaim(in, out, s)
+}
+
+func autoConvert_v1beta1_PodGroupResourceClaimStatus_To_scheduling_PodGroupResourceClaimStatus(in *schedulingv1beta1.PodGroupResourceClaimStatus, out *scheduling.PodGroupResourceClaimStatus, s conversion.Scope) error {
+	*out = *(*scheduling.PodGroupResourceClaimStatus)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_PodGroupResourceClaimStatus_To_scheduling_PodGroupResourceClaimStatus is an autogenerated conversion function.
+func Convert_v1beta1_PodGroupResourceClaimStatus_To_scheduling_PodGroupResourceClaimStatus(in *schedulingv1beta1.PodGroupResourceClaimStatus, out *scheduling.PodGroupResourceClaimStatus, s conversion.Scope) error {
+	return autoConvert_v1beta1_PodGroupResourceClaimStatus_To_scheduling_PodGroupResourceClaimStatus(in, out, s)
+}
+
+func autoConvert_scheduling_PodGroupResourceClaimStatus_To_v1beta1_PodGroupResourceClaimStatus(in *scheduling.PodGroupResourceClaimStatus, out *schedulingv1beta1.PodGroupResourceClaimStatus, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.PodGroupResourceClaimStatus)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_PodGroupResourceClaimStatus_To_v1beta1_PodGroupResourceClaimStatus is an autogenerated conversion function.
+func Convert_scheduling_PodGroupResourceClaimStatus_To_v1beta1_PodGroupResourceClaimStatus(in *scheduling.PodGroupResourceClaimStatus, out *schedulingv1beta1.PodGroupResourceClaimStatus, s conversion.Scope) error {
+	return autoConvert_scheduling_PodGroupResourceClaimStatus_To_v1beta1_PodGroupResourceClaimStatus(in, out, s)
+}
+
+func autoConvert_v1beta1_PodGroupSchedulingConstraints_To_scheduling_PodGroupSchedulingConstraints(in *schedulingv1beta1.PodGroupSchedulingConstraints, out *scheduling.PodGroupSchedulingConstraints, s conversion.Scope) error {
+	*out = *(*scheduling.PodGroupSchedulingConstraints)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_PodGroupSchedulingConstraints_To_scheduling_PodGroupSchedulingConstraints is an autogenerated conversion function.
+func Convert_v1beta1_PodGroupSchedulingConstraints_To_scheduling_PodGroupSchedulingConstraints(in *schedulingv1beta1.PodGroupSchedulingConstraints, out *scheduling.PodGroupSchedulingConstraints, s conversion.Scope) error {
+	return autoConvert_v1beta1_PodGroupSchedulingConstraints_To_scheduling_PodGroupSchedulingConstraints(in, out, s)
+}
+
+func autoConvert_scheduling_PodGroupSchedulingConstraints_To_v1beta1_PodGroupSchedulingConstraints(in *scheduling.PodGroupSchedulingConstraints, out *schedulingv1beta1.PodGroupSchedulingConstraints, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.PodGroupSchedulingConstraints)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_PodGroupSchedulingConstraints_To_v1beta1_PodGroupSchedulingConstraints is an autogenerated conversion function.
+func Convert_scheduling_PodGroupSchedulingConstraints_To_v1beta1_PodGroupSchedulingConstraints(in *scheduling.PodGroupSchedulingConstraints, out *schedulingv1beta1.PodGroupSchedulingConstraints, s conversion.Scope) error {
+	return autoConvert_scheduling_PodGroupSchedulingConstraints_To_v1beta1_PodGroupSchedulingConstraints(in, out, s)
+}
+
+func autoConvert_v1beta1_PodGroupSchedulingPolicy_To_scheduling_PodGroupSchedulingPolicy(in *schedulingv1beta1.PodGroupSchedulingPolicy, out *scheduling.PodGroupSchedulingPolicy, s conversion.Scope) error {
+	*out = *(*scheduling.PodGroupSchedulingPolicy)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_PodGroupSchedulingPolicy_To_scheduling_PodGroupSchedulingPolicy is an autogenerated conversion function.
+func Convert_v1beta1_PodGroupSchedulingPolicy_To_scheduling_PodGroupSchedulingPolicy(in *schedulingv1beta1.PodGroupSchedulingPolicy, out *scheduling.PodGroupSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_v1beta1_PodGroupSchedulingPolicy_To_scheduling_PodGroupSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_scheduling_PodGroupSchedulingPolicy_To_v1beta1_PodGroupSchedulingPolicy(in *scheduling.PodGroupSchedulingPolicy, out *schedulingv1beta1.PodGroupSchedulingPolicy, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.PodGroupSchedulingPolicy)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_PodGroupSchedulingPolicy_To_v1beta1_PodGroupSchedulingPolicy is an autogenerated conversion function.
+func Convert_scheduling_PodGroupSchedulingPolicy_To_v1beta1_PodGroupSchedulingPolicy(in *scheduling.PodGroupSchedulingPolicy, out *schedulingv1beta1.PodGroupSchedulingPolicy, s conversion.Scope) error {
+	return autoConvert_scheduling_PodGroupSchedulingPolicy_To_v1beta1_PodGroupSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_v1beta1_PodGroupSpec_To_scheduling_PodGroupSpec(in *schedulingv1beta1.PodGroupSpec, out *scheduling.PodGroupSpec, s conversion.Scope) error {
+	*out = *(*scheduling.PodGroupSpec)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_PodGroupSpec_To_scheduling_PodGroupSpec is an autogenerated conversion function.
+func Convert_v1beta1_PodGroupSpec_To_scheduling_PodGroupSpec(in *schedulingv1beta1.PodGroupSpec, out *scheduling.PodGroupSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_PodGroupSpec_To_scheduling_PodGroupSpec(in, out, s)
+}
+
+func autoConvert_scheduling_PodGroupSpec_To_v1beta1_PodGroupSpec(in *scheduling.PodGroupSpec, out *schedulingv1beta1.PodGroupSpec, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.PodGroupSpec)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_PodGroupSpec_To_v1beta1_PodGroupSpec is an autogenerated conversion function.
+func Convert_scheduling_PodGroupSpec_To_v1beta1_PodGroupSpec(in *scheduling.PodGroupSpec, out *schedulingv1beta1.PodGroupSpec, s conversion.Scope) error {
+	return autoConvert_scheduling_PodGroupSpec_To_v1beta1_PodGroupSpec(in, out, s)
+}
+
+func autoConvert_v1beta1_PodGroupStatus_To_scheduling_PodGroupStatus(in *schedulingv1beta1.PodGroupStatus, out *scheduling.PodGroupStatus, s conversion.Scope) error {
+	*out = *(*scheduling.PodGroupStatus)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_PodGroupStatus_To_scheduling_PodGroupStatus is an autogenerated conversion function.
+func Convert_v1beta1_PodGroupStatus_To_scheduling_PodGroupStatus(in *schedulingv1beta1.PodGroupStatus, out *scheduling.PodGroupStatus, s conversion.Scope) error {
+	return autoConvert_v1beta1_PodGroupStatus_To_scheduling_PodGroupStatus(in, out, s)
+}
+
+func autoConvert_scheduling_PodGroupStatus_To_v1beta1_PodGroupStatus(in *scheduling.PodGroupStatus, out *schedulingv1beta1.PodGroupStatus, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.PodGroupStatus)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_PodGroupStatus_To_v1beta1_PodGroupStatus is an autogenerated conversion function.
+func Convert_scheduling_PodGroupStatus_To_v1beta1_PodGroupStatus(in *scheduling.PodGroupStatus, out *schedulingv1beta1.PodGroupStatus, s conversion.Scope) error {
+	return autoConvert_scheduling_PodGroupStatus_To_v1beta1_PodGroupStatus(in, out, s)
+}
+
+func autoConvert_v1beta1_PodGroupTemplate_To_scheduling_PodGroupTemplate(in *schedulingv1beta1.PodGroupTemplate, out *scheduling.PodGroupTemplate, s conversion.Scope) error {
+	*out = *(*scheduling.PodGroupTemplate)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_PodGroupTemplate_To_scheduling_PodGroupTemplate is an autogenerated conversion function.
+func Convert_v1beta1_PodGroupTemplate_To_scheduling_PodGroupTemplate(in *schedulingv1beta1.PodGroupTemplate, out *scheduling.PodGroupTemplate, s conversion.Scope) error {
+	return autoConvert_v1beta1_PodGroupTemplate_To_scheduling_PodGroupTemplate(in, out, s)
+}
+
+func autoConvert_scheduling_PodGroupTemplate_To_v1beta1_PodGroupTemplate(in *scheduling.PodGroupTemplate, out *schedulingv1beta1.PodGroupTemplate, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.PodGroupTemplate)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_PodGroupTemplate_To_v1beta1_PodGroupTemplate is an autogenerated conversion function.
+func Convert_scheduling_PodGroupTemplate_To_v1beta1_PodGroupTemplate(in *scheduling.PodGroupTemplate, out *schedulingv1beta1.PodGroupTemplate, s conversion.Scope) error {
+	return autoConvert_scheduling_PodGroupTemplate_To_v1beta1_PodGroupTemplate(in, out, s)
 }
 
 func autoConvert_v1beta1_PriorityClass_To_scheduling_PriorityClass(in *schedulingv1beta1.PriorityClass, out *scheduling.PriorityClass, s conversion.Scope) error {
@@ -110,4 +734,152 @@ func autoConvert_scheduling_PriorityClassList_To_v1beta1_PriorityClassList(in *s
 // Convert_scheduling_PriorityClassList_To_v1beta1_PriorityClassList is an autogenerated conversion function.
 func Convert_scheduling_PriorityClassList_To_v1beta1_PriorityClassList(in *scheduling.PriorityClassList, out *schedulingv1beta1.PriorityClassList, s conversion.Scope) error {
 	return autoConvert_scheduling_PriorityClassList_To_v1beta1_PriorityClassList(in, out, s)
+}
+
+func autoConvert_v1beta1_SingleDisruptionMode_To_scheduling_SingleDisruptionMode(in *schedulingv1beta1.SingleDisruptionMode, out *scheduling.SingleDisruptionMode, s conversion.Scope) error {
+	*out = *(*scheduling.SingleDisruptionMode)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_SingleDisruptionMode_To_scheduling_SingleDisruptionMode is an autogenerated conversion function.
+func Convert_v1beta1_SingleDisruptionMode_To_scheduling_SingleDisruptionMode(in *schedulingv1beta1.SingleDisruptionMode, out *scheduling.SingleDisruptionMode, s conversion.Scope) error {
+	return autoConvert_v1beta1_SingleDisruptionMode_To_scheduling_SingleDisruptionMode(in, out, s)
+}
+
+func autoConvert_scheduling_SingleDisruptionMode_To_v1beta1_SingleDisruptionMode(in *scheduling.SingleDisruptionMode, out *schedulingv1beta1.SingleDisruptionMode, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.SingleDisruptionMode)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_SingleDisruptionMode_To_v1beta1_SingleDisruptionMode is an autogenerated conversion function.
+func Convert_scheduling_SingleDisruptionMode_To_v1beta1_SingleDisruptionMode(in *scheduling.SingleDisruptionMode, out *schedulingv1beta1.SingleDisruptionMode, s conversion.Scope) error {
+	return autoConvert_scheduling_SingleDisruptionMode_To_v1beta1_SingleDisruptionMode(in, out, s)
+}
+
+func autoConvert_v1beta1_TopologyConstraint_To_scheduling_TopologyConstraint(in *schedulingv1beta1.TopologyConstraint, out *scheduling.TopologyConstraint, s conversion.Scope) error {
+	*out = *(*scheduling.TopologyConstraint)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_TopologyConstraint_To_scheduling_TopologyConstraint is an autogenerated conversion function.
+func Convert_v1beta1_TopologyConstraint_To_scheduling_TopologyConstraint(in *schedulingv1beta1.TopologyConstraint, out *scheduling.TopologyConstraint, s conversion.Scope) error {
+	return autoConvert_v1beta1_TopologyConstraint_To_scheduling_TopologyConstraint(in, out, s)
+}
+
+func autoConvert_scheduling_TopologyConstraint_To_v1beta1_TopologyConstraint(in *scheduling.TopologyConstraint, out *schedulingv1beta1.TopologyConstraint, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.TopologyConstraint)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_TopologyConstraint_To_v1beta1_TopologyConstraint is an autogenerated conversion function.
+func Convert_scheduling_TopologyConstraint_To_v1beta1_TopologyConstraint(in *scheduling.TopologyConstraint, out *schedulingv1beta1.TopologyConstraint, s conversion.Scope) error {
+	return autoConvert_scheduling_TopologyConstraint_To_v1beta1_TopologyConstraint(in, out, s)
+}
+
+func autoConvert_v1beta1_TypedLocalObjectReference_To_scheduling_TypedLocalObjectReference(in *schedulingv1beta1.TypedLocalObjectReference, out *scheduling.TypedLocalObjectReference, s conversion.Scope) error {
+	*out = *(*scheduling.TypedLocalObjectReference)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_TypedLocalObjectReference_To_scheduling_TypedLocalObjectReference is an autogenerated conversion function.
+func Convert_v1beta1_TypedLocalObjectReference_To_scheduling_TypedLocalObjectReference(in *schedulingv1beta1.TypedLocalObjectReference, out *scheduling.TypedLocalObjectReference, s conversion.Scope) error {
+	return autoConvert_v1beta1_TypedLocalObjectReference_To_scheduling_TypedLocalObjectReference(in, out, s)
+}
+
+func autoConvert_scheduling_TypedLocalObjectReference_To_v1beta1_TypedLocalObjectReference(in *scheduling.TypedLocalObjectReference, out *schedulingv1beta1.TypedLocalObjectReference, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.TypedLocalObjectReference)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_TypedLocalObjectReference_To_v1beta1_TypedLocalObjectReference is an autogenerated conversion function.
+func Convert_scheduling_TypedLocalObjectReference_To_v1beta1_TypedLocalObjectReference(in *scheduling.TypedLocalObjectReference, out *schedulingv1beta1.TypedLocalObjectReference, s conversion.Scope) error {
+	return autoConvert_scheduling_TypedLocalObjectReference_To_v1beta1_TypedLocalObjectReference(in, out, s)
+}
+
+func autoConvert_v1beta1_Workload_To_scheduling_Workload(in *schedulingv1beta1.Workload, out *scheduling.Workload, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1beta1_WorkloadSpec_To_scheduling_WorkloadSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1beta1_Workload_To_scheduling_Workload is an autogenerated conversion function.
+func Convert_v1beta1_Workload_To_scheduling_Workload(in *schedulingv1beta1.Workload, out *scheduling.Workload, s conversion.Scope) error {
+	return autoConvert_v1beta1_Workload_To_scheduling_Workload(in, out, s)
+}
+
+func autoConvert_scheduling_Workload_To_v1beta1_Workload(in *scheduling.Workload, out *schedulingv1beta1.Workload, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_scheduling_WorkloadSpec_To_v1beta1_WorkloadSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_scheduling_Workload_To_v1beta1_Workload is an autogenerated conversion function.
+func Convert_scheduling_Workload_To_v1beta1_Workload(in *scheduling.Workload, out *schedulingv1beta1.Workload, s conversion.Scope) error {
+	return autoConvert_scheduling_Workload_To_v1beta1_Workload(in, out, s)
+}
+
+func autoConvert_v1beta1_WorkloadList_To_scheduling_WorkloadList(in *schedulingv1beta1.WorkloadList, out *scheduling.WorkloadList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]scheduling.Workload)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1beta1_WorkloadList_To_scheduling_WorkloadList is an autogenerated conversion function.
+func Convert_v1beta1_WorkloadList_To_scheduling_WorkloadList(in *schedulingv1beta1.WorkloadList, out *scheduling.WorkloadList, s conversion.Scope) error {
+	return autoConvert_v1beta1_WorkloadList_To_scheduling_WorkloadList(in, out, s)
+}
+
+func autoConvert_scheduling_WorkloadList_To_v1beta1_WorkloadList(in *scheduling.WorkloadList, out *schedulingv1beta1.WorkloadList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]schedulingv1beta1.Workload)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_scheduling_WorkloadList_To_v1beta1_WorkloadList is an autogenerated conversion function.
+func Convert_scheduling_WorkloadList_To_v1beta1_WorkloadList(in *scheduling.WorkloadList, out *schedulingv1beta1.WorkloadList, s conversion.Scope) error {
+	return autoConvert_scheduling_WorkloadList_To_v1beta1_WorkloadList(in, out, s)
+}
+
+func autoConvert_v1beta1_WorkloadReference_To_scheduling_WorkloadReference(in *schedulingv1beta1.WorkloadReference, out *scheduling.WorkloadReference, s conversion.Scope) error {
+	*out = *(*scheduling.WorkloadReference)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_WorkloadReference_To_scheduling_WorkloadReference is an autogenerated conversion function.
+func Convert_v1beta1_WorkloadReference_To_scheduling_WorkloadReference(in *schedulingv1beta1.WorkloadReference, out *scheduling.WorkloadReference, s conversion.Scope) error {
+	return autoConvert_v1beta1_WorkloadReference_To_scheduling_WorkloadReference(in, out, s)
+}
+
+func autoConvert_scheduling_WorkloadReference_To_v1beta1_WorkloadReference(in *scheduling.WorkloadReference, out *schedulingv1beta1.WorkloadReference, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.WorkloadReference)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_WorkloadReference_To_v1beta1_WorkloadReference is an autogenerated conversion function.
+func Convert_scheduling_WorkloadReference_To_v1beta1_WorkloadReference(in *scheduling.WorkloadReference, out *schedulingv1beta1.WorkloadReference, s conversion.Scope) error {
+	return autoConvert_scheduling_WorkloadReference_To_v1beta1_WorkloadReference(in, out, s)
+}
+
+func autoConvert_v1beta1_WorkloadSpec_To_scheduling_WorkloadSpec(in *schedulingv1beta1.WorkloadSpec, out *scheduling.WorkloadSpec, s conversion.Scope) error {
+	*out = *(*scheduling.WorkloadSpec)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_WorkloadSpec_To_scheduling_WorkloadSpec is an autogenerated conversion function.
+func Convert_v1beta1_WorkloadSpec_To_scheduling_WorkloadSpec(in *schedulingv1beta1.WorkloadSpec, out *scheduling.WorkloadSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_WorkloadSpec_To_scheduling_WorkloadSpec(in, out, s)
+}
+
+func autoConvert_scheduling_WorkloadSpec_To_v1beta1_WorkloadSpec(in *scheduling.WorkloadSpec, out *schedulingv1beta1.WorkloadSpec, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.WorkloadSpec)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_WorkloadSpec_To_v1beta1_WorkloadSpec is an autogenerated conversion function.
+func Convert_scheduling_WorkloadSpec_To_v1beta1_WorkloadSpec(in *scheduling.WorkloadSpec, out *schedulingv1beta1.WorkloadSpec, s conversion.Scope) error {
+	return autoConvert_scheduling_WorkloadSpec_To_v1beta1_WorkloadSpec(in, out, s)
 }

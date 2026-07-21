@@ -30,7 +30,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1008,7 +1008,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			})
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
-			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
+			podGroupInformer := informerFactory.Scheduling().V1beta1().PodGroups()
 			claimInformer := informerFactory.Resource().V1().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 			setupMetrics()
@@ -1092,7 +1092,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			}
 			assert.Equal(tCtx, tc.expectedStatuses, actualStatuses, "pod resource claim statuses")
 
-			podGroups, err := fakeKubeClient.SchedulingV1alpha3().PodGroups("").List(tCtx, metav1.ListOptions{})
+			podGroups, err := fakeKubeClient.SchedulingV1beta1().PodGroups("").List(tCtx, metav1.ListOptions{})
 			if err != nil {
 				tCtx.Fatalf("unexpected error while listing podgroups: %v", err)
 			}
@@ -1138,7 +1138,7 @@ func testControllerCreateDeleteRecreate(tCtx ktesting.TContext) {
 	fakeKubeClient := createTestClient(testPodWithResource, template)
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
-	podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
+	podGroupInformer := informerFactory.Scheduling().V1beta1().PodGroups()
 	claimInformer := informerFactory.Resource().V1().ResourceClaims()
 	templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 
@@ -1259,7 +1259,7 @@ func testClaimExists(tCtx ktesting.TContext) {
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			ec, err := newControllerWithFeatures(tCtx.Logger(), fakeKubeClient,
 				informerFactory.Core().V1().Pods(),
-				informerFactory.Scheduling().V1alpha3().PodGroups(),
+				informerFactory.Scheduling().V1beta1().PodGroups(),
 				informerFactory.Resource().V1().ResourceClaims(),
 				informerFactory.Resource().V1().ResourceClaimTemplates(),
 				controllerFeatures{})
@@ -1628,7 +1628,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			fakeKubeClient := createTestClient(test.initialObjects...)
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
-			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
+			podGroupInformer := informerFactory.Scheduling().V1beta1().PodGroups()
 			claimInformer := informerFactory.Resource().V1().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 			setupMetrics()

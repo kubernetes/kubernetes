@@ -56,7 +56,14 @@
       }
     },
     "priorityClassName": "priorityClassNameValue",
-    "priority": 5
+    "priority": 5,
+    "schedulingConstraints": {
+      "topology": [
+        {
+          "key": "keyValue"
+        }
+      ]
+    }
   },
   "status": {
     "conditions": [

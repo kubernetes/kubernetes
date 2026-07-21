@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	workloadbuilder "k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
@@ -183,13 +184,13 @@ func ExampleJobControllerE2E() {
 // over. This mirrors the Job controller's delegated PodGroup mode.
 func ExampleDelegatedPodGroupFromExistingWorkload() {
 	// A parent controller already compiled and persisted this Workload.
-	parentWorkload := &schedulingv1alpha3.Workload{
+	parentWorkload := &schedulingv1beta1.Workload{
 		ObjectMeta: metav1.ObjectMeta{Name: "trainer-wl", Namespace: "ml", UID: "wl-uid"},
-		Spec: schedulingv1alpha3.WorkloadSpec{
-			PodGroupTemplates: []schedulingv1alpha3.PodGroupTemplate{{
+		Spec: schedulingv1beta1.WorkloadSpec{
+			PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{{
 				Name:              "trainer-pgt-0",
 				PriorityClassName: "high-priority",
-				SchedulingPolicy:  schedulingv1alpha3.PodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: 4}},
+				SchedulingPolicy:  schedulingv1beta1.PodGroupSchedulingPolicy{Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 4}},
 			}},
 		},
 	}

@@ -51,6 +51,10 @@ type CompositePodGroupSpecApplyConfiguration struct {
 	// The higher the value, the higher the priority.
 	// This field is immutable.
 	Priority *int32 `json:"priority,omitempty"`
+	// schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// This field is immutable.
+	SchedulingConstraints *CompositePodGroupSchedulingConstraintsApplyConfiguration `json:"schedulingConstraints,omitempty"`
 }
 
 // CompositePodGroupSpecApplyConfiguration constructs a declarative configuration of the CompositePodGroupSpec type for use with
@@ -96,5 +100,13 @@ func (b *CompositePodGroupSpecApplyConfiguration) WithPriorityClassName(value st
 // If called multiple times, the Priority field is set to the value of the last call.
 func (b *CompositePodGroupSpecApplyConfiguration) WithPriority(value int32) *CompositePodGroupSpecApplyConfiguration {
 	b.Priority = &value
+	return b
+}
+
+// WithSchedulingConstraints sets the SchedulingConstraints field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SchedulingConstraints field is set to the value of the last call.
+func (b *CompositePodGroupSpecApplyConfiguration) WithSchedulingConstraints(value *CompositePodGroupSchedulingConstraintsApplyConfiguration) *CompositePodGroupSpecApplyConfiguration {
+	b.SchedulingConstraints = value
 	return b
 }

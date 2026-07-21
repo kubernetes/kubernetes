@@ -22,7 +22,7 @@ import (
 
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
@@ -122,7 +122,7 @@ func testPodGroup(tCtx ktesting.TContext) {
 
 			claim := createClaim(tCtx, namespace, "", class, claim)
 
-			podGroup, err := tCtx.Client().SchedulingV1alpha3().PodGroups(namespace).Create(tCtx, test.podGroup, metav1.CreateOptions{})
+			podGroup, err := tCtx.Client().SchedulingV1beta1().PodGroups(namespace).Create(tCtx, test.podGroup, metav1.CreateOptions{})
 			tCtx.ExpectNoError(err, "create PodGroup")
 			schedGroup := &v1.PodSchedulingGroup{
 				PodGroupName: &podGroup.Name,
@@ -191,7 +191,7 @@ func testPodGroup(tCtx ktesting.TContext) {
 				},
 			},
 		}
-		podGroup, err := tCtx.Client().SchedulingV1alpha3().PodGroups(namespace).Create(tCtx, podGroup, metav1.CreateOptions{})
+		podGroup, err := tCtx.Client().SchedulingV1beta1().PodGroups(namespace).Create(tCtx, podGroup, metav1.CreateOptions{})
 		tCtx.ExpectNoError(err, "create PodGroup")
 
 		schedGroup := &v1.PodSchedulingGroup{

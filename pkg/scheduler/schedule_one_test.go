@@ -38,7 +38,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1041,7 +1041,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		var gotNominatingInfo *fwk.NominatingInfo
 
 		var clientObjs []runtime.Object
-		var podGroup *schedulingv1alpha3.PodGroup
+		var podGroup *schedulingv1beta1.PodGroup
 		if scheduleAsPodGroup {
 			group := &v1.PodSchedulingGroup{
 				PodGroupName: new("pg"),
@@ -1056,7 +1056,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				item.expectPodInUnschedulable = nil
 			}
 
-			podGroup = &schedulingv1alpha3.PodGroup{
+			podGroup = &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: item.sendPod.Namespace},
 			}
 			clientObjs = []runtime.Object{item.sendPod, podGroup}

@@ -35,7 +35,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +46,7 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha3"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
@@ -247,7 +247,7 @@ func (e *WorkloadExecutor) createPodGroupWithRetry(tCtx ktesting.TContext, obj *
 
 	defer cancel()
 	for {
-		_, err := tCtx.Client().SchedulingV1alpha3().PodGroups(namespace).Create(ctx, obj, metav1.CreateOptions{
+		_, err := tCtx.Client().SchedulingV1beta1().PodGroups(namespace).Create(ctx, obj, metav1.CreateOptions{
 			FieldValidation: "Strict",
 		})
 

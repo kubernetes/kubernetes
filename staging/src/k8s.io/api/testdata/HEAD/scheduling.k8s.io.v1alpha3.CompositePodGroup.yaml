@@ -36,6 +36,9 @@ spec:
   parentCompositePodGroupName: parentCompositePodGroupNameValue
   priority: 5
   priorityClassName: priorityClassNameValue
+  schedulingConstraints:
+    topology:
+    - key: keyValue
   schedulingPolicy:
     basic: {}
     gang:

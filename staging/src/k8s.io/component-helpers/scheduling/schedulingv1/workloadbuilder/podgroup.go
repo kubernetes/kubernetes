@@ -19,7 +19,7 @@ package workloadbuilder
 import (
 	"fmt"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,7 +28,7 @@ import (
 // deep-copied into the spec, workloadRef points back at the template,
 // and the PodGroup lands in the workload's namespace. Owners are
 // caller-supplied because they differ by case.
-func newPodGroup(workload *schedulingv1alpha3.Workload, templateName, podGroupName string, owners []metav1.OwnerReference) (*schedulingv1alpha3.PodGroup, error) {
+func newPodGroup(workload *schedulingv1beta1.Workload, templateName, podGroupName string, owners []metav1.OwnerReference) (*schedulingv1beta1.PodGroup, error) {
 	if workload == nil {
 		return nil, fmt.Errorf("workload must not be nil")
 	}
@@ -38,8 +38,8 @@ func newPodGroup(workload *schedulingv1alpha3.Workload, templateName, podGroupNa
 		return nil, fmt.Errorf("podGroupTemplate %q not found in workload %q (have %v)", templateName, workload.Name, podGroupTemplateNames(workload))
 	}
 
-	spec := schedulingv1alpha3.PodGroupSpec{
-		WorkloadRef: &schedulingv1alpha3.WorkloadReference{
+	spec := schedulingv1beta1.PodGroupSpec{
+		WorkloadRef: &schedulingv1beta1.WorkloadReference{
 			WorkloadName: workload.Name,
 			TemplateName: tmpl.Name,
 		},
@@ -49,7 +49,7 @@ func newPodGroup(workload *schedulingv1alpha3.Workload, templateName, podGroupNa
 		PriorityClassName:     tmpl.PriorityClassName,
 	}
 	if len(tmpl.ResourceClaims) > 0 {
-		spec.ResourceClaims = make([]schedulingv1alpha3.PodGroupResourceClaim, len(tmpl.ResourceClaims))
+		spec.ResourceClaims = make([]schedulingv1beta1.PodGroupResourceClaim, len(tmpl.ResourceClaims))
 		for i := range tmpl.ResourceClaims {
 			tmpl.ResourceClaims[i].DeepCopyInto(&spec.ResourceClaims[i])
 		}
@@ -59,7 +59,7 @@ func newPodGroup(workload *schedulingv1alpha3.Workload, templateName, podGroupNa
 		spec.Priority = &p
 	}
 
-	return &schedulingv1alpha3.PodGroup{
+	return &schedulingv1beta1.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            podGroupName,
 			Namespace:       workload.Namespace,
@@ -69,7 +69,7 @@ func newPodGroup(workload *schedulingv1alpha3.Workload, templateName, podGroupNa
 	}, nil
 }
 
-func findPodGroupTemplate(workload *schedulingv1alpha3.Workload, name string) *schedulingv1alpha3.PodGroupTemplate {
+func findPodGroupTemplate(workload *schedulingv1beta1.Workload, name string) *schedulingv1beta1.PodGroupTemplate {
 	for i := range workload.Spec.PodGroupTemplates {
 		if workload.Spec.PodGroupTemplates[i].Name == name {
 			return &workload.Spec.PodGroupTemplates[i]
@@ -78,7 +78,7 @@ func findPodGroupTemplate(workload *schedulingv1alpha3.Workload, name string) *s
 	return nil
 }
 
-func podGroupTemplateNames(workload *schedulingv1alpha3.Workload) []string {
+func podGroupTemplateNames(workload *schedulingv1beta1.Workload) []string {
 	names := make([]string, len(workload.Spec.PodGroupTemplates))
 	for i := range workload.Spec.PodGroupTemplates {
 		names[i] = workload.Spec.PodGroupTemplates[i].Name

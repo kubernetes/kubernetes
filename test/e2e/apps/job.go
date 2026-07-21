@@ -28,6 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -118,9 +119,9 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Waiting for a gang Workload owned by the Job")
-		var workload *schedulingv1alpha3.Workload
-		gomega.Eventually(ctx, func(ctx context.Context) (*schedulingv1alpha3.Workload, error) {
-			list, err := f.ClientSet.SchedulingV1alpha3().Workloads(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		var workload *schedulingv1beta1.Workload
+		gomega.Eventually(ctx, func(ctx context.Context) (*schedulingv1beta1.Workload, error) {
+			list, err := f.ClientSet.SchedulingV1beta1().Workloads(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return nil, err
 			}
@@ -138,9 +139,9 @@ var _ = SIGDescribe("Job", func() {
 		gomega.Expect(workload.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount).To(gomega.Equal(parallelism), "unexpected gang minCount")
 
 		ginkgo.By("Waiting for the runtime PodGroup referencing the Workload")
-		var podGroup *schedulingv1alpha3.PodGroup
-		gomega.Eventually(ctx, func(ctx context.Context) (*schedulingv1alpha3.PodGroup, error) {
-			list, err := f.ClientSet.SchedulingV1alpha3().PodGroups(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		var podGroup *schedulingv1beta1.PodGroup
+		gomega.Eventually(ctx, func(ctx context.Context) (*schedulingv1beta1.PodGroup, error) {
+			list, err := f.ClientSet.SchedulingV1beta1().PodGroups(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return nil, err
 			}
@@ -190,7 +191,7 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By("Waiting for a gang Workload owned by the Job with the initial minCount")
 		var workloadName string
 		gomega.Eventually(ctx, func(ctx context.Context) (*int32, error) {
-			list, err := f.ClientSet.SchedulingV1alpha3().Workloads(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+			list, err := f.ClientSet.SchedulingV1beta1().Workloads(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return nil, err
 			}
@@ -222,7 +223,7 @@ var _ = SIGDescribe("Job", func() {
 
 		ginkgo.By("Waiting for the new minCount to propagate to the Workload template")
 		gomega.Eventually(ctx, func(ctx context.Context) (*int32, error) {
-			wl, err := f.ClientSet.SchedulingV1alpha3().Workloads(f.Namespace.Name).Get(ctx, workloadName, metav1.GetOptions{})
+			wl, err := f.ClientSet.SchedulingV1beta1().Workloads(f.Namespace.Name).Get(ctx, workloadName, metav1.GetOptions{})
 			if err != nil {
 				return nil, err
 			}
@@ -234,7 +235,7 @@ var _ = SIGDescribe("Job", func() {
 
 		ginkgo.By("Waiting for the new minCount to propagate to the runtime PodGroup")
 		gomega.Eventually(ctx, func(ctx context.Context) (*int32, error) {
-			list, err := f.ClientSet.SchedulingV1alpha3().PodGroups(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+			list, err := f.ClientSet.SchedulingV1beta1().PodGroups(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return nil, err
 			}
@@ -1545,9 +1546,9 @@ done`}
 			framework.ExpectNoError(err, "failed to create job in namespace: %s/%s", job.Namespace, job.Name)
 
 			ginkgo.By("Waiting for Workload to be created")
-			var workload *schedulingv1alpha3.Workload
+			var workload *schedulingv1beta1.Workload
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				workloads, listErr := f.ClientSet.SchedulingV1alpha3().Workloads(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+				workloads, listErr := f.ClientSet.SchedulingV1beta1().Workloads(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 				if listErr != nil {
 					return listErr
 				}
@@ -1563,9 +1564,9 @@ done`}
 			}).WithTimeout(30 * time.Second).WithPolling(time.Second).Should(gomega.Succeed())
 
 			ginkgo.By("Waiting for PodGroup to be created")
-			var podGroup *schedulingv1alpha3.PodGroup
+			var podGroup *schedulingv1beta1.PodGroup
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				podGroups, listErr := f.ClientSet.SchedulingV1alpha3().PodGroups(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+				podGroups, listErr := f.ClientSet.SchedulingV1beta1().PodGroups(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 				if listErr != nil {
 					return listErr
 				}

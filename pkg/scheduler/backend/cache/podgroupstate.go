@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -56,7 +57,7 @@ type podGroupStateData struct {
 	// assignedPods tracks all pods belonging to the group that are assigned (bound).
 	assignedPods sets.Set[types.UID]
 	// podGroup is the cached API object of the PodGroup.
-	podGroup *schedulingv1alpha3.PodGroup
+	podGroup *schedulingv1beta1.PodGroup
 }
 
 func newPodGroupStateData() podGroupStateData {
@@ -193,7 +194,7 @@ func (d *podGroupStateData) clone() podGroupStateData {
 }
 
 // setPodGroup sets the PodGroup object.
-func (d *podGroupStateData) setPodGroup(podGroup *schedulingv1alpha3.PodGroup) {
+func (d *podGroupStateData) setPodGroup(podGroup *schedulingv1beta1.PodGroup) {
 	d.generation = nextPodGroupGeneration()
 	d.podGroup = podGroup
 }
@@ -358,7 +359,7 @@ func (pgs *podGroupState) forgetPod(podUID types.UID) {
 
 // setPodGroup sets the PodGroup object.
 // It must be called under the cache lock.
-func (pgs *podGroupState) setPodGroup(podGroup *schedulingv1alpha3.PodGroup) {
+func (pgs *podGroupState) setPodGroup(podGroup *schedulingv1beta1.PodGroup) {
 	pgs.lock.Lock()
 	defer pgs.lock.Unlock()
 
@@ -436,7 +437,7 @@ func (pgs *podGroupState) ScheduledPodsCount() int {
 }
 
 // PodGroup returns the PodGroup API object.
-func (pgs *podGroupState) PodGroup() *schedulingv1alpha3.PodGroup {
+func (pgs *podGroupState) PodGroup() *schedulingv1beta1.PodGroup {
 	pgs.lock.RLock()
 	defer pgs.lock.RUnlock()
 

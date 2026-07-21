@@ -1466,6 +1466,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	GenericWorkload: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	GitRepoVolumeDriver: {
