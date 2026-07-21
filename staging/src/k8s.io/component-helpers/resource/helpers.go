@@ -419,11 +419,11 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 	limits := reuseOrClearResourceList(opts.Reuse)
 	if !opts.UseStatusResources {
 		addResourceList(limits, aggregateContainerResourcesByFn(pod, opts, containerSpecLimits))
-		addDRANodeAllocatableClaimResources(limits, pod, opts)
+		limits = addDRANodeAllocatableLimits(limits, pod, opts)
 	} else {
 		isResizeInfeasible := IsPodResizeInfeasible(pod)
 		specLimits := aggregateContainerResourcesByFn(pod, opts, containerSpecLimits)
-		addDRANodeAllocatableClaimResources(specLimits, pod, opts)
+		specLimits = addDRANodeAllocatableLimits(specLimits, pod, opts)
 		var actuatedLimits v1.ResourceList
 		// When pod-level status maps are populated, they already contain the aggregate values across all containers.
 		// When unpopulated (e.g., at creation time or when feature gates are disabled), we fall back to container status aggregation.
@@ -525,6 +525,22 @@ func GetContainerDRAAllocations(pod *v1.Pod, containerName string) v1.ResourceLi
 		}
 	}
 	return draAllocations
+}
+
+func addDRANodeAllocatableLimits(specLimits v1.ResourceList, pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
+	draResources := v1.ResourceList{}
+	addDRANodeAllocatableClaimResources(draResources, pod, opts)
+	for name, quantity := range draResources {
+		val, declared := specLimits[name]
+		// Only add DRA values if limits are explicitly declared in the spec. kubelet skips setting limits (unlimited) if not defined in spec.
+		// Hugepages is an exception as they are strictly non-overcommitable so DRA values are always added.
+		if declared || strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix) {
+			q := val
+			q.Add(quantity)
+			specLimits[name] = q
+		}
+	}
+	return specLimits
 }
 
 func addDRANodeAllocatableClaimResources(resources v1.ResourceList, pod *v1.Pod, opts PodResourcesOptions) {

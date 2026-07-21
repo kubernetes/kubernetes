@@ -5782,16 +5782,14 @@ func Test_generateAPIPodStatus(t *testing.T) {
 						Ready: true,
 					},
 				},
-				// Resources field should reflect total allocated pod level requests/limits (standard + DRA)
+				// Resources field should reflect total allocated pod level requests (standard + DRA).
+				// Limits stay empty: DRA is not added to limits the containers do not declare.
 				Resources: &v1.ResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceCPU:    resource.MustParse("150m"),
 						v1.ResourceMemory: resource.MustParse("150Mi"),
 					},
-					Limits: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse("50m"),
-						v1.ResourceMemory: resource.MustParse("50Mi"),
-					},
+					Limits: v1.ResourceList{},
 				},
 				// AllocatedResources should sum standard requests (100m, 100Mi) + DRA allocations (50m, 50Mi)
 				AllocatedResources: v1.ResourceList{

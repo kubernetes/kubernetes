@@ -213,6 +213,46 @@ func TestApplySandboxResources(t *testing.T) {
 			cgroupVersion:    cgroupV2,
 		},
 		{
+			description: "pod with DRA direct claims and no container limits",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("128Mi"),
+									v1.ResourceCPU:    resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "direct-claim",
+							Containers:        []string{"c1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("200m"))},
+								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
+							},
+						},
+					},
+				},
+			},
+			draEnabled: true,
+			expectedResource: &runtimeapi.LinuxContainerResources{
+				MemoryLimitInBytes: 0, // no container limits declared, DRA is not added to limits and the sandbox stays unlimited
+				CpuPeriod:          100000,
+				CpuQuota:           0,
+				CpuShares:          2252, // 2 CPUs spec + 0.2 CPU DRA = 2.2 CPUs
+				Unified:            map[string]string{"memory.oom.group": "1"},
+			},
+			expectedOverhead: &runtimeapi.LinuxContainerResources{},
+			cgroupVersion:    cgroupV2,
+		},
+		{
 			description: "pod with DRA memory direct claims and feature disabled",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{

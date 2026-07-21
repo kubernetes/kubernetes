@@ -3404,6 +3404,96 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 				v1.ResourceMemory: resource.MustParse("8Gi"), // c1 max(spec: 4Gi, allocated: 4Gi, actuated: 2Gi) = 4Gi + c2 2Gi = 6Gi + 2 containers * 1Gi DRA = 8Gi
 			},
 		},
+		{
+			description: "DRA cpu/memory not added to limits when container limits are omitted",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+								Claims: []v1.ResourceClaim{
+									{Name: "claim-1"},
+								},
+							},
+						},
+					},
+					ResourceClaims: []v1.PodResourceClaim{
+						{
+							Name:              "claim-1",
+							ResourceClaimName: new("node-allocatable-claim-1"),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim-1",
+							Containers:        []string{"c1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("50m"))},
+								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("512Mi"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("150m"),   // 100m + 50m DRA
+				v1.ResourceMemory: resource.MustParse("1536Mi"), // 1Gi + 512Mi DRA
+			},
+			expectedLimits: v1.ResourceList{}, // no container limits declared, DRA is not added to limits
+		},
+		{
+			description: "DRA hugepages added to limits even when container limits are omitted",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("100m"),
+								},
+								Claims: []v1.ResourceClaim{
+									{Name: "claim-1"},
+								},
+							},
+						},
+					},
+					ResourceClaims: []v1.PodResourceClaim{
+						{
+							Name:              "claim-1",
+							ResourceClaimName: new("node-allocatable-claim-1"),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim-1",
+							Containers:        []string{"c1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: hugePageResource1Gi, Quantity: new(resource.MustParse("1"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:      resource.MustParse("100m"),
+				hugePageResource1Gi: resource.MustParse("1"),
+			},
+			expectedLimits: v1.ResourceList{
+				hugePageResource1Gi: resource.MustParse("1"), // hugepages are added even without declared limits
+			},
+		},
 	}
 
 	for _, tc := range testCases {
