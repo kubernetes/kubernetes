@@ -16,6 +16,7 @@ const (
 	fragmentRune = `#`
 )
 
+// ErrChildURL is raised when there is no child.
 var ErrChildURL = errors.New("child url is nil")
 
 // Ref represents a json reference object.

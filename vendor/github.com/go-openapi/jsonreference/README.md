@@ -8,11 +8,16 @@
 [![Release][release-badge]][release-url] [![Go Report Card][gocard-badge]][gocard-url] [![CodeFactor Grade][codefactor-badge]][codefactor-url] [![License][license-badge]][license-url]
 <!-- Badges: documentation & support -->
 <!-- Badges: others & stats -->
-[![GoDoc][godoc-badge]][godoc-url] [![Slack Channel][slack-logo]![slack-badge]][slack-url] [![go version][goversion-badge]][goversion-url] ![Top language][top-badge] ![Commits since latest release][commits-badge]
+[![GoDoc][godoc-badge]][godoc-url] [![Discord Channel][discord-badge]][discord-url] [![go version][goversion-badge]][goversion-url] ![Top language][top-badge] ![Commits since latest release][commits-badge]
 
 ---
 
 An implementation of JSON Reference for golang.
+
+## Announcements
+
+* **2026-07-07** : landing v1.0.0
+  * stable API pledge
 
 ## Status
 
@@ -26,9 +31,24 @@ go get github.com/go-openapi/jsonreference
 
 ## Dependencies
 
-* https://github.com/go-openapi/jsonpointer
+* <https://github.com/go-openapi/jsonpointer>
 
 ## Basic usage
+
+```go
+// Creating a new reference
+ref, err := jsonreference.New("http://example.com/doc.json#/definitions/Pet")
+
+// Fragment-only reference
+fragRef := jsonreference.MustCreateRef("#/definitions/Pet")
+
+// Resolving references
+parent, _ := jsonreference.New("http://example.com/base.json")
+child, _ := jsonreference.New("#/definitions/Pet")
+resolved, _ := parent.Inherits(child)
+// Result: "http://example.com/base.json#/definitions/Pet"
+```
+
 
 ## Change log
 
@@ -36,8 +56,8 @@ See <https://github.com/go-openapi/jsonreference/releases>
 
 ## References
 
-* http://tools.ietf.org/html/draft-ietf-appsawg-json-pointer-07
-* http://tools.ietf.org/html/draft-pbryan-zyp-json-ref-03
+* <http://tools.ietf.org/html/draft-ietf-appsawg-json-pointer-07>
+* <http://tools.ietf.org/html/draft-pbryan-zyp-json-ref-03>
 
 ## Licensing
 
@@ -49,9 +69,9 @@ on top of which it has been built.
 ## Other documentation
 
 * [All-time contributors](./CONTRIBUTORS.md)
-* [Contributing guidelines](.github/CONTRIBUTING.md)
-* [Maintainers documentation](docs/MAINTAINERS.md)
-* [Code style](docs/STYLE.md)
+* [Contributing guidelines][contributing-doc-site]
+* [Maintainers documentation][maintainers-doc-site]
+* [Code style][style-doc-site]
 
 ## Cutting a new release
 
@@ -86,9 +106,9 @@ Maintainers can cut a new release by either:
 [doc-url]: https://goswagger.io/go-openapi
 [godoc-badge]: https://pkg.go.dev/badge/github.com/go-openapi/jsonreference
 [godoc-url]: http://pkg.go.dev/github.com/go-openapi/jsonreference
-[slack-logo]: https://a.slack-edge.com/e6a93c1/img/icons/favicon-32.png
-[slack-badge]: https://img.shields.io/badge/slack-blue?link=https%3A%2F%2Fgoswagger.slack.com%2Farchives%2FC04R30YM
-[slack-url]: https://goswagger.slack.com/archives/C04R30YMU
+[discord-badge]: https://img.shields.io/discord/1446918742398341256?logo=discord&label=discord&color=blue
+[discord-url]: https://discord.gg/FfnFYaC3k5
+
 <!-- Badges: license & compliance -->
 [license-badge]: http://img.shields.io/badge/license-Apache%20v2-orange.svg
 [license-url]: https://github.com/go-openapi/jsonreference/?tab=Apache-2.0-1-ov-file#readme
@@ -97,3 +117,7 @@ Maintainers can cut a new release by either:
 [goversion-url]: https://github.com/go-openapi/jsonreference/blob/master/go.mod
 [top-badge]: https://img.shields.io/github/languages/top/go-openapi/jsonreference
 [commits-badge]: https://img.shields.io/github/commits-since/go-openapi/jsonreference/latest
+<!-- Organization docs -->
+[contributing-doc-site]: https://go-openapi.github.io/doc-site/contributing/contributing/index.html
+[maintainers-doc-site]: https://go-openapi.github.io/doc-site/maintainers/index.html
+[style-doc-site]: https://go-openapi.github.io/doc-site/contributing/style/index.html

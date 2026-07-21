@@ -14,7 +14,10 @@ linters:
     - gocognit
     - godot
     - godox
+    - goconst
     - gomoddirectives
+    - gomodguard
+    - gomodguard_v2
     - gosmopolitan
     - inamedparam
     - intrange
