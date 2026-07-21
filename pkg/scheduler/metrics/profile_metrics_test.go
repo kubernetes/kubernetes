@@ -34,7 +34,7 @@ func TestRecordGeneratedPlacements(t *testing.T) {
 	RecordGeneratedPlacements("test-profile-2", 4)
 
 	want := `
-		# HELP scheduler_generated_placements_total [ALPHA] Number of candidate placements generated when scheduling pod groups.
+		# HELP scheduler_generated_placements_total [ALPHA] Number of candidate placements generated when scheduling pod groups, by scheduler profile.
 		# TYPE scheduler_generated_placements_total counter
 		scheduler_generated_placements_total{profile="test-profile"} 5
 		scheduler_generated_placements_total{profile="test-profile-2"} 4
@@ -57,7 +57,7 @@ func TestObservePlacementEvaluation(t *testing.T) {
 	ObservePlacementEvaluation(InfeasibleResult, "test-profile-2", 0.3)
 
 	wantCounter := `
-		# HELP scheduler_placement_evaluations_total [ALPHA] Number of candidate placements evaluated when scheduling pod groups, by result. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not.
+		# HELP scheduler_placement_evaluations_total [ALPHA] Number of candidate placements evaluated when scheduling pod groups, by result and scheduler profile. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not.
 		# TYPE scheduler_placement_evaluations_total counter
 		scheduler_placement_evaluations_total{profile="test-profile",result="feasible"} 2
 		scheduler_placement_evaluations_total{profile="test-profile",result="infeasible"} 1
