@@ -1166,6 +1166,8 @@ const (
 
 	// owner: @gnufied
 	// kep: https://kep.k8s.io/5030
+	// alpha: v1.35
+	// beta: v1.37
 	//
 	// Enables volume limit scaling for CSI drivers. This allows scheduler to
 	// co-ordinate better with cluster-autoscaler for storage limits.
@@ -2067,6 +2069,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	VolumeLimitScaling: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	WinDSR: {

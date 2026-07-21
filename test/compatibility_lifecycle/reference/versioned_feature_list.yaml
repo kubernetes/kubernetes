@@ -2107,6 +2107,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.35"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: WatchCacheInitializationPostStartHook
   versionedSpecs:
   - default: false
