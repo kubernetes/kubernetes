@@ -516,6 +516,7 @@ func TestStrategyCreate(t *testing.T) {
 		"drop-fields-prioritized-list": {
 			obj:                   objWithPrioritizedList,
 			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: false},
+			emulatedVersion:       "1.36",
 			expectValidationError: deviceRequestError,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -749,6 +750,7 @@ func TestStrategyUpdate(t *testing.T) {
 			oldObj:                obj,
 			newObj:                objWithPrioritizedList,
 			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: false},
+			emulatedVersion:       "1.36",
 			expectValidationError: fieldImmutableError,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -782,6 +784,7 @@ func TestStrategyUpdate(t *testing.T) {
 			oldObj:           objWithPrioritizedList,
 			newObj:           objWithPrioritizedList,
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: false},
+			emulatedVersion:  "1.36",
 			expectObj:        objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -1465,6 +1468,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				return obj
 			}(),
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true, features.DRAPrioritizedList: false},
+			emulatedVersion:  "1.36",
 			expectObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
@@ -1557,6 +1561,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				return obj
 			}(),
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true, features.DRAPrioritizedList: false},
+			emulatedVersion:  "1.36",
 			expectObj: func() *resource.ResourceClaim {
 				obj := objWithPrioritizedList.DeepCopy()
 				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, true)
