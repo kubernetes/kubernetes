@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	critesting "k8s.io/cri-api/pkg/apis/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -785,4 +786,19 @@ func TestSortContainerStatusesByCreationTime(t *testing.T) {
 	// Test Less
 	assert.True(t, statuses.Less(1, 0), "Less(1, 0) should be true")
 	assert.False(t, statuses.Less(0, 1), "Less(0, 1) should be false")
+}
+
+func TestNewCommandRunner(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime := critesting.NewFakeRuntimeService()
+	runner := NewCommandRunner(fakeRuntime)
+
+	output, err := runner.RunInContainer(tCtx, ContainerID{ID: "test-container-id"}, []string{"echo", "hello"}, time.Second)
+	require.NoError(t, err)
+	assert.Empty(t, output)
+	assert.Contains(t, fakeRuntime.Called, "ExecSync")
+
+	fakeRuntime.InjectError("ExecSync", assert.AnError)
+	_, err = runner.RunInContainer(tCtx, ContainerID{ID: "test-container-id"}, []string{"echo", "hello"}, time.Second)
+	assert.ErrorIs(t, err, assert.AnError)
 }
