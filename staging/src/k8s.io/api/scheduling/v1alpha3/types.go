@@ -686,7 +686,7 @@ const (
 	// during scheduling, for example due to nodeAffinity parsing errors.
 	PodGroupReasonSchedulerError string = "SchedulerError"
 	// PreemptionByScheduler reason in the DisruptionTarget condition indicates the PodGroup was preempted
-	// to make room for higher-priority PodGroups or Pods.
+	// to make room for higher-priority CompositePodGroups, PodGroups or Pods.
 	PodGroupReasonPreemptionByScheduler string = "PreemptionByScheduler"
 )
 
@@ -1162,3 +1162,25 @@ type CompositePodGroupStatus struct {
 	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
+
+// Well-known condition types for CompositePodGroups.
+const (
+	// CompositePodGroupInitiallyScheduled represents status of the scheduling process for this CompositePodGroup till first success.
+	CompositePodGroupInitiallyScheduled string = "CompositePodGroupInitiallyScheduled"
+)
+
+// Well-known condition reasons for CompositePodGroups.
+const (
+	// CompositePodGroupReasonUnschedulable reason in the CompositePodGroupInitiallyScheduled condition indicates that the CompositePodGroup cannot be scheduled
+	// due to resource constraints, affinity/anti-affinity rules, or insufficient capacity for the CompositePodGroup.
+	CompositePodGroupReasonUnschedulable string = "Unschedulable"
+	// CompositePodGroupReasonSchedulerError reason in the CompositePodGroupInitiallyScheduled condition means that some internal error happens
+	// during scheduling, for example due to nodeAffinity parsing errors.
+	CompositePodGroupReasonSchedulerError string = "SchedulerError"
+	// CompositePodGroupReasonInvalid reason in the CompositePodGroupInitiallyScheduled condition indicates that
+	// kube-scheduler detected an invalid group layout during runtime validation.
+	CompositePodGroupReasonInvalid string = "Invalid"
+	// PreemptionByScheduler reason in the DisruptionTarget condition indicates the CompositePodGroup was preempted
+	// to make room for higher-priority CompositePodGroups, PodGroups or Pods.
+	CompositePodGroupReasonPreemptionByScheduler string = "PreemptionByScheduler"
+)
