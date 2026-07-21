@@ -1038,7 +1038,7 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	if len(successfulResults) == 0 {
 		// We need to send events and set the status for pods in case all simulations were infeasible.
 		// The selection of which simulation we report is arbitrary for now, but may change in the future.
-		anyResult.status = fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("0/%d placements are available, first placement status: %v", len(placements), anyResult.status.AsError()))
+		anyResult.status = fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("0/%d placements are available, first placement status: %v", len(placements), anyResult.status.AsError())).WithError(errPodGroupUnschedulable)
 		return anyResult, nil
 	}
 
@@ -1093,7 +1093,7 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 		}, nil
 	}
 
-	var anyResult *podGroupAlgorithmResult
+	var anyResultSubtree map[fwk.EntityKey]*podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]map[fwk.EntityKey]*podGroupAlgorithmResult)
 
 	parentPlacement := sched.nodeInfoSnapshot.GetPlacement()
@@ -1125,8 +1125,8 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 			return result, nil
 		}
 
-		if anyResult == nil {
-			anyResult = result
+		if anyResultSubtree == nil {
+			anyResultSubtree = subtreeResult
 		}
 
 		if result.status.IsSuccess() {
@@ -1137,8 +1137,15 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 	if len(successfulResults) == 0 {
 		// We need to send events and set the status for pods in case all simulations were infeasible.
 		// The selection of which simulation we report is arbitrary for now, but may change in the future.
-		anyResult.status = fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("0/%d placements are available, first placement status: %v", len(placements), anyResult.status.AsError()))
-		return anyResult, nil
+		anyResultRoot := anyResultSubtree[pgKey(podGroupInfo)]
+		anyResultRoot.status = fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("0/%d placements are available, first placement status: %v", len(placements), anyResultRoot.status.AsError())).WithError(errPodGroupUnschedulable)
+		// It is critical to copy the entire anyResultSubtree into results.
+		// If omitted, the pod results are reconstructed later using the generic parent error
+		// (errPodGroupUnschedulable) rather than their original *framework.FitError.
+		// Losing the FitError means we lose the UnschedulablePlugins for each pod,
+		// which breaks the QueueingHints.
+		maps.Copy(results, anyResultSubtree)
+		return anyResultRoot, nil
 	}
 
 	bestPlacement, status := sched.findBestCompositePodGroupPlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, successfulResults)

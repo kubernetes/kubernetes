@@ -2611,7 +2611,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 						status: fwk.NewStatus(fwk.Unschedulable, "0/1 nodes are available:"),
 					},
 				},
-				status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status"),
+				status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status").WithError(errPodGroupUnschedulable),
 			},
 		},
 		"when all placements are infeasible, but pods are feasible, returns unschedulable": {
@@ -2651,7 +2651,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 						status: nil,
 					},
 				},
-				status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status"),
+				status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status").WithError(errPodGroupUnschedulable),
 			},
 		},
 		"filters out infeasible placements": {
