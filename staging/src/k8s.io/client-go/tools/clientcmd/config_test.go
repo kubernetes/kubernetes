@@ -31,11 +31,11 @@ func TestModifyConfigWritesToFirstKubeconfigFile(t *testing.T) {
 	)
 
 	tempdir := t.TempDir()
-	configFile1, _ := os.Create(filepath.Join(tempdir, "kubeconfig-a"))
-	configFile2, _ := os.Create(filepath.Join(tempdir, "kubeconfig-b"))
+	configFile1 := filepath.Join(tempdir, "kubeconfig-a")
+	configFile2 := filepath.Join(tempdir, "kubeconfig-b")
 
 	// The first kubeconfig has everything.
-	err := os.WriteFile(configFile1.Name(), []byte(`
+	err := os.WriteFile(configFile1, []byte(`
 kind: Config
 apiVersion: v1
 clusters:
@@ -62,7 +62,7 @@ users:
 	}
 
 	// The second kubeconfig declares a new context and activates it.
-	err = os.WriteFile(configFile2.Name(), []byte(`
+	err = os.WriteFile(configFile2, []byte(`
 kind: Config
 apiVersion: v1
 contexts:
@@ -80,7 +80,7 @@ current-context: `+contextNameB+`
 
 	// Set KUBECONFIG to the files, in descending alphabetical order.
 	// This will be used to check that they don't get sorted.
-	envVarValue := fmt.Sprintf("%s%c%s", configFile2.Name(), filepath.ListSeparator, configFile1.Name())
+	envVarValue := fmt.Sprintf("%s%c%s", configFile2, filepath.ListSeparator, configFile1)
 	t.Setenv(RecommendedConfigPathEnvVar, envVarValue)
 
 	// Load the kubeconfigs, change the active context, and call ModifyConfig.
@@ -99,7 +99,7 @@ current-context: `+contextNameB+`
 	}
 
 	// Load the files again and check that only configFile2 was changed.
-	config1, err := LoadFromFile(configFile1.Name()) // file sorts first, but was specified last
+	config1, err := LoadFromFile(configFile1) // file sorts first, but was specified last
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -108,7 +108,7 @@ current-context: `+contextNameB+`
 		t.Errorf("Config should not be modified, but was. Expected %q, got %q", contextNameA, config1.CurrentContext)
 	}
 
-	config2, err := LoadFromFile(configFile2.Name()) // file sorts last, but was specified first
+	config2, err := LoadFromFile(configFile2) // file sorts last, but was specified first
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
