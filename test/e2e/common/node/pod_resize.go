@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
@@ -750,14 +751,20 @@ func doPodResizeInitContainerResizeTest(f *framework.Framework) {
 		testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
 		podClient := e2epod.NewPodClient(f)
 		newPod := podClient.Create(ctx, testPod)
-		verifyInitContainerResources(ctx, f, newPod, originalContainers, originalInitCtr)
+
+		// TODO improve test coverage to test HasExclusiveCPUs set to true
+		disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) &&
+			originalContainers[0].HasExclusiveCPUs
+		verifyInitContainerResources(ctx, f, newPod, originalContainers, originalInitCtr, disableCPUQuota)
 
 		ginkgo.By("patching and verifying pod for resize")
 		patch := podresize.MakeResizePatch(originalContainers, resizedContainers, nil, nil)
 		patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
 			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
 		framework.ExpectNoError(pErr, "failed to patch pod for resize")
-		verifyInitContainerResources(ctx, f, patchedPod, resizedContainers, resizedInitCtr)
+		disableCPUQuota = utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) &&
+			resizedContainers[1].HasExclusiveCPUs
+		verifyInitContainerResources(ctx, f, patchedPod, resizedContainers, resizedInitCtr, disableCPUQuota)
 
 		// Resize has been actuated, test the reverse operation.
 		ginkgo.By("patching and verifying pod to revert to original resources")
@@ -765,7 +772,9 @@ func doPodResizeInitContainerResizeTest(f *framework.Framework) {
 		patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
 			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
 		framework.ExpectNoError(pErr, "failed to patch pod for resize")
-		verifyInitContainerResources(ctx, f, patchedPod, originalContainers, originalInitCtr)
+		disableCPUQuota = utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) &&
+			originalContainers[0].HasExclusiveCPUs
+		verifyInitContainerResources(ctx, f, patchedPod, originalContainers, originalInitCtr, disableCPUQuota)
 
 		ginkgo.By("deleting pod")
 		podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
@@ -1370,7 +1379,7 @@ func createRollbackContainers(originalContainers, expectedContainers []podresize
 	return rollbackContainers
 }
 
-func verifyInitContainerResources(ctx context.Context, f *framework.Framework, pod *v1.Pod, expectedContainers []podresize.ResizableContainerInfo, expectedInitCtr v1.Container) {
+func verifyInitContainerResources(ctx context.Context, f *framework.Framework, pod *v1.Pod, expectedContainers []podresize.ResizableContainerInfo, expectedInitCtr v1.Container, disableCPUQuota bool) {
 	ginkgo.GinkgoHelper()
 
 	podresize.VerifyPodResizePolicy(pod, expectedContainers)
@@ -1391,7 +1400,7 @@ func verifyInitContainerResources(ctx context.Context, f *framework.Framework, p
 				}, nil
 			}
 			onCgroupv2 := cgroups.IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.InitContainers[0].Name)
-			if err := cgroups.VerifyContainerCgroupValues(ctx, f, pod, &expectedInitCtr, onCgroupv2); err != nil {
+			if err := cgroups.VerifyContainerCgroupValues(ctx, f, pod, &expectedInitCtr, onCgroupv2, disableCPUQuota); err != nil {
 				return func() string {
 					return fmt.Sprintf("cgroup values for init container don't match expected: %v", err)
 				}, nil

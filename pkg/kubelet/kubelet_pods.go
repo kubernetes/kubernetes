@@ -2456,7 +2456,25 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 					resources.Limits[v1.ResourceCPU] = cStatus.Resources.CPULimit.DeepCopy()
 				}
 			} else {
-				preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Limits, resources.Limits)
+				// To support InPlacePodVerticalScaling of container with exclusive CPUs, CPULimit need to
+				// be in sync with CPURequests, otherwise the resize operation fails.
+				// for that case, and for those containers we update CPULimit equal to CPURequests,
+				// when CPURequest changes, to stay in sync.
+				hasCPURequest := cStatus.Resources != nil &&
+					cStatus.Resources.CPULimit == nil &&
+					cStatus.Resources.CPURequest != nil &&
+					kl.containerManager.ContainerHasExclusiveCPUs(logger, pod, allocatedContainer)
+
+				didCPURequestChange := false
+				if oldStatus.Resources != nil && oldStatus.Resources.Requests != nil && cStatus.Resources != nil && cStatus.Resources.CPURequest != nil {
+					oldCPURequest := oldStatus.Resources.Requests[v1.ResourceCPU]
+					didCPURequestChange = !oldCPURequest.Equal(*cStatus.Resources.CPURequest)
+				}
+				if hasCPURequest && didCPURequestChange {
+					resources.Limits[v1.ResourceCPU] = cStatus.Resources.CPURequest.DeepCopy()
+				} else {
+					preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Limits, resources.Limits)
+				}
 			}
 			if cStatus.Resources != nil && cStatus.Resources.MemoryLimit != nil {
 				resources.Limits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
