@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/klog/v2"
+	controllerutil "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/util/protectionutil"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/features"
@@ -504,7 +505,7 @@ func podIsShutDown(pod *v1.Pod) bool {
 	//
 	// Therefore it is better to proceed with PVC removal,
 	// which is safe (case a) and/or desirable (case b).
-	return pod.DeletionTimestamp != nil && pod.DeletionGracePeriodSeconds != nil && *pod.DeletionGracePeriodSeconds == 0
+	return pod.DeletionTimestamp != nil && pod.DeletionGracePeriodSeconds != nil && *pod.DeletionGracePeriodSeconds == 0 || controllerutil.PodIsRejectedFinished(pod)
 }
 
 // pvcAddedUpdated reacts to pvc added/updated events
