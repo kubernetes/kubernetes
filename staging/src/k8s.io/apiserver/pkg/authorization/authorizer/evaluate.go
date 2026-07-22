@@ -244,9 +244,11 @@ func PartiallyEvaluateConditionsAwareDecision(ctx context.Context, unevaluatedDe
 
 		collectTailAfterConditionalDecision := false
 		for authorizerName, unevaluatedSubDecision := range unevaluatedDecision.UnionedDecisions() {
-			// If collectAndShortcircuitOnly == true, a conditional decision that couldn't
-			// be evaluated to Allow/Deny/NoOpinion was encountered during a previous
-			// loop iteration. Then all latter decisions stay unevaluated.
+			// If collectTailAfterConditionalDecision == true, a conditional decision that could
+			// not be reduced to Allow/Deny/NoOpinion was encountered during a previous
+			// loop iteration. All later decisions stay unevaluated to preserve the lazy
+			// chain semantics (a later leaf must not be evaluated before the still-conditional
+			// leaf above it has resolved).
 			if collectTailAfterConditionalDecision {
 				newDecisionChain.Add(authorizerName, unevaluatedSubDecision)
 				continue
@@ -274,7 +276,7 @@ func PartiallyEvaluateConditionsAwareDecision(ctx context.Context, unevaluatedDe
 		// If all decisions were NoOpinions, the constructor folds into a single NoOpinion decision.
 		return newDecisionChain.ToDecision()
 	default:
-		// No simplification possible
+		// Already fully evaluated (Allow/Deny/NoOpinion leaf); nothing to reduce.
 		return unevaluatedDecision
 	}
 }
