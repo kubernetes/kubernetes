@@ -2468,7 +2468,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	EnvFiles: {},
 
-	EventedPLEG: {},
+	EventedPLEG: {PLEGOnDemandRelist},
 
 	ExecProbeTimeout: {},
 
