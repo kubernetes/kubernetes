@@ -1029,65 +1029,6 @@ func (pl *DynamicResources) deallocateOrDeletePodClaims(ctx context.Context, pod
 	return false, fwk.NewStatus(fwk.Unschedulable)
 }
 
-func (pl *DynamicResources) deallocatePodGroupClaims(ctx context.Context, state *podGroupStateData, pod *v1.Pod) *fwk.Status {
-	if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil {
-		return nil
-	}
-
-	logger := klog.FromContext(ctx)
-
-	// The podGroupState lister is based on the live cache and does not consider
-	// pods assumed within the PodGroup scheduling cycle, but the ones that
-	// happened before or outside the scheduling cycle. We use it to check
-	// whether there were no assumed or assigned pods that would use the
-	// ResourceClaim.
-	podGroupState, err := pl.fh.PodGroupManager().PodGroupStates().Get(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
-	if err != nil {
-		return statusError(logger, err)
-	}
-	// Since this is part of the synchronous PodGroup scheduling cycle, we
-	// know that if the PodGroup is inactive, then it will stay inactive, so
-	// it is safe to deallocate its claims.
-	//
-	// If this state is not updated yet and says the PodGroup is active when
-	// it actually isn't, then a future scheduling cycle will eventually
-	// read the updated state and deallocate a claim.
-	if podGroupState.ScheduledPodsCount() > 0 {
-		return nil
-	}
-	podGroup, err := pl.getPodGroupSnapshot(pod)
-	if err != nil {
-		return statusError(logger, err)
-	}
-
-	// Iterating over a map is random. This is intentional here, we want to
-	// pick one claim randomly because there is no better heuristic.
-	for _, podState := range state.podsStateData {
-		for index := range podState.unavailableClaims {
-			claim := podState.claims.get(index)
-
-			reservedForNobody := len(claim.Status.ReservedFor) == 0
-			reservedForOnlyThisPodGroup := podGroup != nil &&
-				len(claim.Status.ReservedFor) == 1 &&
-				claim.Status.ReservedFor[0].UID == podGroup.UID
-
-			if reservedForNobody || reservedForOnlyThisPodGroup {
-				claim := claim.DeepCopy()
-				claim.Status.ReservedFor = nil
-				claim.Status.Allocation = nil
-				claim.Status.Devices = nil
-				logger.V(5).Info("Deallocation of PodGroup ResourceClaim", "pod", klog.KObj(pod), "podgroup", klog.KObj(podGroup), "resourceclaim", klog.KObj(claim))
-				if _, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
-					return statusError(logger, err)
-				}
-				return fwk.NewStatus(fwk.Unschedulable, "deallocation of PodGroup ResourceClaim completed")
-			}
-		}
-	}
-
-	return nil
-}
-
 // PodGroupPostFilter checks whether there are allocated claims that could get
 // deallocated/deleted/unreserved to help get the PodGroup schedulable.
 // This only gets called when pod group cycle could not find a placement for PodGroup.
@@ -1153,6 +1094,65 @@ func (pl *DynamicResources) PodGroupPostFilter(
 	}
 
 	return nil, fwk.NewStatus(fwk.Unschedulable, "deallocation and deletion of ResourceClaims completed")
+}
+
+func (pl *DynamicResources) deallocatePodGroupClaims(ctx context.Context, state *podGroupStateData, pod *v1.Pod) *fwk.Status {
+	if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil {
+		return nil
+	}
+
+	logger := klog.FromContext(ctx)
+
+	// The podGroupState lister is based on the live cache and does not consider
+	// pods assumed within the PodGroup scheduling cycle, but the ones that
+	// happened before or outside the scheduling cycle. We use it to check
+	// whether there were no assumed or assigned pods that would use the
+	// ResourceClaim.
+	podGroupState, err := pl.fh.PodGroupManager().PodGroupStates().Get(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+	if err != nil {
+		return statusError(logger, err)
+	}
+	// Since this is part of the synchronous PodGroup scheduling cycle, we
+	// know that if the PodGroup is inactive, then it will stay inactive, so
+	// it is safe to deallocate its claims.
+	//
+	// If this state is not updated yet and says the PodGroup is active when
+	// it actually isn't, then a future scheduling cycle will eventually
+	// read the updated state and deallocate a claim.
+	if podGroupState.ScheduledPodsCount() > 0 {
+		return nil
+	}
+	podGroup, err := pl.getPodGroupSnapshot(pod)
+	if err != nil {
+		return statusError(logger, err)
+	}
+
+	// Iterating over a map is random. This is intentional here, we want to
+	// pick one claim randomly because there is no better heuristic.
+	for _, podState := range state.podsStateData {
+		for index := range podState.unavailableClaims {
+			claim := podState.claims.get(index)
+
+			reservedForNobody := len(claim.Status.ReservedFor) == 0
+			reservedForOnlyThisPodGroup := podGroup != nil &&
+				len(claim.Status.ReservedFor) == 1 &&
+				claim.Status.ReservedFor[0].UID == podGroup.UID
+
+			if reservedForNobody || reservedForOnlyThisPodGroup {
+				claim := claim.DeepCopy()
+				claim.Status.ReservedFor = nil
+				claim.Status.Allocation = nil
+				claim.Status.Devices = nil
+				logger.V(5).Info("Deallocation of PodGroup ResourceClaim", "pod", klog.KObj(pod), "podgroup", klog.KObj(podGroup), "resourceclaim", klog.KObj(claim))
+				if _, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
+					return statusError(logger, err)
+				}
+				return fwk.NewStatus(fwk.Unschedulable, "deallocation of PodGroup ResourceClaim completed")
+			}
+		}
+	}
+
+	return nil
 }
 
 func (pl *DynamicResources) Score(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
