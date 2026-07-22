@@ -128,6 +128,9 @@ func calculateConsumedCapacity(requestedVal *resource.Quantity, capacity resourc
 	if requestedVal == nil {
 		return fillEmptyRequest(capacity), nil
 	}
+	if requestedVal.Sign() < 0 {
+		return resource.Quantity{} // defense-in-depth: a validated request should never be negative
+	}
 	if capacity.RequestPolicy == nil {
 		return requestedVal.DeepCopy(), nil
 	}
