@@ -1888,14 +1888,14 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 		// No need to distinguish empty and nil maps for the test.
 		expected.ContainersToUpdate = map[v1.ResourceName][]containerToUpdateInfo{}
 	}
+	if expected.ContainersToUpdate != nil && len(expected.ContainersToUpdate) == 0 && actual.ContainersToUpdate == nil {
+		// No need to distinguish empty and nil maps for the test.
+		actual.ContainersToUpdate = map[v1.ResourceName][]containerToUpdateInfo{}
+	}
 	assert.Equal(t, expected, actual, desc)
 }
 
 func TestComputePodActionsWithInitContainers(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	_, _, m, err := createTestRuntimeManager(tCtx)
-	require.NoError(t, err)
-
 	cpu400m := resource.MustParse("400m")
 	memory400Mi := resource.MustParse("400Mi")
 	cpu800m := resource.MustParse("800m")
@@ -1915,7 +1915,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 		mutateStatusFn       func(*kubecontainer.PodStatus)
 		actions              podActions
 		disableIPPRInitCtrFG bool
-		skipWindows          bool
+		skipNonLinux         bool
 	}{
 		"initialization completed; start all containers": {
 			actions: podActions{
@@ -2166,7 +2166,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 					},
 				},
 			},
-			skipWindows: true, // Windows does not support resize.
+			skipNonLinux: true,
 		},
 		"resize of a running non-sidecar init container with FG disabled": {
 			mutatePodFn: func(pod *v1.Pod) {
@@ -2187,20 +2187,27 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 				ContainersToUpdate:    map[v1.ResourceName][]containerToUpdateInfo{},
 			},
-			skipWindows:          true, // Windows does not support resize.
+			skipNonLinux:         true,
 			disableIPPRInitCtrFG: true,
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			if test.skipWindows && goruntime.GOOS == "windows" {
-				t.Skip("Skipping test since Windows does not support resize")
+			if test.skipNonLinux && goruntime.GOOS != "linux" {
+				t.Skip("Skipping test since in-place resize is only supported on Linux")
 			}
 			tCtx := ktesting.Init(t)
 
 			if test.disableIPPRInitCtrFG {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingInitContainers, false)
+			} else {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingInitContainers, true)
 			}
+
+			_, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
 
 			pod, status := makeBasePodAndStatusWithInitContainers()
 
@@ -2850,8 +2857,6 @@ func TestComputePodActionsWithContainerRestartRules(t *testing.T) {
 		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
 		containerRestartPolicyNever     = v1.ContainerRestartPolicyNever
 	)
-	_, _, m, err := createTestRuntimeManager(tCtx)
-	require.NoError(t, err)
 
 	// Creating a pair reference pod and status for the test cases to refer
 	// the specific fields.
@@ -2965,6 +2970,9 @@ func TestComputePodActionsWithContainerRestartRules(t *testing.T) {
 			},
 		},
 	} {
+		_, _, m, err := createTestRuntimeManager(tCtx)
+		require.NoError(t, err)
+
 		pod, status := makeBasePodAndStatus()
 		if test.mutatePodFn != nil {
 			test.mutatePodFn(pod)
