@@ -5359,6 +5359,22 @@ func TestPodGroupPostFilter(t *testing.T) {
 				assert.Nil(tCtx, claim.Status.ReservedFor)
 			},
 		},
+		"deallocate-podgroup-level-claim": {
+			pluginEnabled:                   true,
+			enableDRAWorkloadResourceClaims: true,
+			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
+			unscheduledPods:                 []*v1.Pod{groupedPodWithClaimName},
+			claims:                          []*resourceapi.ResourceClaim{inUseClaimByPodGroup},
+			objs:                            []apiruntime.Object{groupedPodWithClaimName},
+			unavailableClaimNames:           []string{inUseClaimByPodGroup.Name},
+			wantStatus:                      fwk.NewStatus(fwk.Unschedulable, "deallocation of PodGroup ResourceClaim completed"),
+			verifyClaims: func(tCtx ktesting.TContext, testCtx *testContext) {
+				claim, err := testCtx.client.ResourceV1().ResourceClaims(inUseClaimByPodGroup.Namespace).Get(tCtx, inUseClaimByPodGroup.Name, metav1.GetOptions{})
+				require.NoError(tCtx, err)
+				assert.Nil(tCtx, claim.Status.Allocation)
+				assert.Nil(tCtx, claim.Status.ReservedFor)
+			},
+		},
 		"delete-pod-level-extended-claim": {
 			pluginEnabled:             true,
 			enableDRAExtendedResource: true,
@@ -5391,34 +5407,6 @@ func TestPodGroupPostFilter(t *testing.T) {
 				assert.Error(tCtx, err) // Should be deleted!
 			},
 		},
-		"unreserve-podgroup-claim": {
-			pluginEnabled:                   true,
-			enableDRAWorkloadResourceClaims: true,
-			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
-			unscheduledPods:                 []*v1.Pod{groupedPodWithClaimName},
-			claims:                          []*resourceapi.ResourceClaim{inUseClaimByPodGroup},
-			objs:                            []apiruntime.Object{groupedPodWithClaimName},
-			wantStatus:                      fwk.NewStatus(fwk.Unschedulable, "ResourceClaim unreserved for PodGroup"),
-			verifyClaims: func(tCtx ktesting.TContext, testCtx *testContext) {
-				claim, err := testCtx.client.ResourceV1().ResourceClaims(inUseClaimByPodGroup.Namespace).Get(tCtx, inUseClaimByPodGroup.Name, metav1.GetOptions{})
-				require.NoError(tCtx, err)
-				assert.Empty(tCtx, claim.Status.ReservedFor)
-			},
-		},
-		"unreserve-podgroup-multiple-unscheduled-pods": {
-			pluginEnabled:                   true,
-			enableDRAWorkloadResourceClaims: true,
-			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
-			unscheduledPods:                 []*v1.Pod{groupedPodWithClaimName, groupedPodWithClaimName2},
-			claims:                          []*resourceapi.ResourceClaim{inUseClaimByPodGroup},
-			objs:                            []apiruntime.Object{groupedPodWithClaimName, groupedPodWithClaimName2},
-			wantStatus:                      fwk.NewStatus(fwk.Unschedulable, "ResourceClaim unreserved for PodGroup"),
-			verifyClaims: func(tCtx ktesting.TContext, testCtx *testContext) {
-				claim, err := testCtx.client.ResourceV1().ResourceClaims(inUseClaimByPodGroup.Namespace).Get(tCtx, inUseClaimByPodGroup.Name, metav1.GetOptions{})
-				require.NoError(tCtx, err)
-				assert.Empty(tCtx, claim.Status.ReservedFor)
-			},
-		},
 		"mixed-pod-level-and-podgroup-claims": {
 			pluginEnabled:                   true,
 			enableDRAWorkloadResourceClaims: true,
@@ -5427,11 +5415,12 @@ func TestPodGroupPostFilter(t *testing.T) {
 			claims:                          []*resourceapi.ResourceClaim{inUseClaimByPodGroup, inUseClaimForPodLevel},
 			objs:                            []apiruntime.Object{groupedPodWithClaimName, groupedPodWithPodLevelClaim},
 			unavailableClaimNames:           []string{inUseClaimForPodLevel.Name},
-			wantStatus:                      fwk.NewStatus(fwk.Unschedulable, "ResourceClaim unreserved for PodGroup"),
+			wantStatus:                      fwk.NewStatus(fwk.Unschedulable, "deallocation and deletion of ResourceClaims completed"),
 			verifyClaims: func(tCtx ktesting.TContext, testCtx *testContext) {
 				claimByPG, err := testCtx.client.ResourceV1().ResourceClaims(inUseClaimByPodGroup.Namespace).Get(tCtx, inUseClaimByPodGroup.Name, metav1.GetOptions{})
 				require.NoError(tCtx, err)
-				assert.Empty(tCtx, claimByPG.Status.ReservedFor)
+				assert.NotEmpty(tCtx, claimByPG.Status.Allocation)
+				assert.NotEmpty(tCtx, claimByPG.Status.ReservedFor)
 
 				claim2, err := testCtx.client.ResourceV1().ResourceClaims(inUseClaimForPodLevel.Namespace).Get(tCtx, inUseClaimForPodLevel.Name, metav1.GetOptions{})
 				require.NoError(tCtx, err)
@@ -5439,7 +5428,7 @@ func TestPodGroupPostFilter(t *testing.T) {
 				assert.Nil(tCtx, claim2.Status.ReservedFor)
 			},
 		},
-		"skip-unreserve-feature-disabled": {
+		"skip-deallocate-feature-disabled": {
 			pluginEnabled:                   true,
 			enableDRAWorkloadResourceClaims: false,
 			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
@@ -5453,7 +5442,7 @@ func TestPodGroupPostFilter(t *testing.T) {
 				assert.NotEmpty(tCtx, claim.Status.ReservedFor)
 			},
 		},
-		"skip-unreserve-topology-aware-podgroup": {
+		"skip-deallocate-topology-aware-podgroup": {
 			pluginEnabled:                         true,
 			enableDRAWorkloadResourceClaims:       true,
 			enableTopologyAwareWorkloadScheduling: true,
