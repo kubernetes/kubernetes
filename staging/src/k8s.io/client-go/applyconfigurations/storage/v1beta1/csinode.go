@@ -48,6 +48,8 @@ type CSINodeApplyConfiguration struct {
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec is the specification of CSINode
 	Spec *CSINodeSpecApplyConfiguration `json:"spec,omitempty"`
+	// status contains health and status information for the node's storage.
+	Status *CSINodeStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // CSINode constructs a declarative configuration of the CSINode type for use with
@@ -92,6 +94,12 @@ func ExtractCSINodeFrom(cSINode *storagev1beta1.CSINode, fieldManager string, su
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 func ExtractCSINode(cSINode *storagev1beta1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
 	return ExtractCSINodeFrom(cSINode, fieldManager, "")
+}
+
+// ExtractCSINodeStatus extracts the applied configuration owned by fieldManager from
+// cSINode for the status subresource.
+func ExtractCSINodeStatus(cSINode *storagev1beta1.CSINode, fieldManager string) (*CSINodeApplyConfiguration, error) {
+	return ExtractCSINodeFrom(cSINode, fieldManager, "status")
 }
 
 func (b CSINodeApplyConfiguration) IsApplyConfiguration() {}
@@ -259,6 +267,14 @@ func (b *CSINodeApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 // If called multiple times, the Spec field is set to the value of the last call.
 func (b *CSINodeApplyConfiguration) WithSpec(value *CSINodeSpecApplyConfiguration) *CSINodeApplyConfiguration {
 	b.Spec = value
+	return b
+}
+
+// WithStatus sets the Status field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Status field is set to the value of the last call.
+func (b *CSINodeApplyConfiguration) WithStatus(value *CSINodeStatusApplyConfiguration) *CSINodeApplyConfiguration {
+	b.Status = value
 	return b
 }
 

@@ -70,6 +70,7 @@ var map_CSINode = map[string]string{
 	"":         "DEPRECATED - This group version of CSINode is deprecated by storage/v1/CSINode. See the release notes for more information. CSINode holds information about all CSI drivers installed on a node. CSI drivers do not need to create the CSINode object directly. As long as they use the node-driver-registrar sidecar container, the kubelet will automatically populate the CSINode object for the CSI driver as part of kubelet plugin registration. CSINode has the same name as a node. If the object is missing, it means either there are no CSI Drivers available on the node, or the Kubelet version is low enough that it doesn't create this object. CSINode has an OwnerReference that points to the corresponding node object.",
 	"metadata": "metadata is the standard object metadata. metadata.name must be the Kubernetes node name.",
 	"spec":     "spec is the specification of CSINode",
+	"status":   "status contains health and status information for the node's storage.",
 }
 
 func (CSINode) SwaggerDoc() map[string]string {
@@ -105,6 +106,15 @@ var map_CSINodeSpec = map[string]string{
 
 func (CSINodeSpec) SwaggerDoc() map[string]string {
 	return map_CSINodeSpec
+}
+
+var map_CSINodeStatus = map[string]string{
+	"":              "CSINodeStatus contains health and status information for storage on a node.",
+	"storageHealth": "storageHealth contains backend health reports for CSI drivers registered on the node.",
+}
+
+func (CSINodeStatus) SwaggerDoc() map[string]string {
+	return map_CSINodeStatus
 }
 
 var map_CSIStorageCapacity = map[string]string{
@@ -154,6 +164,30 @@ var map_StorageClassList = map[string]string{
 
 func (StorageClassList) SwaggerDoc() map[string]string {
 	return map_StorageClassList
+}
+
+var map_StorageHealth = map[string]string{
+	"":                 "StorageHealth contains storage backend health reported by a CSI driver on a node.",
+	"name":             "name is the CSI driver name, matching CSINodeDriver.name.",
+	"healthConditions": "healthConditions are the adverse storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
+}
+
+func (StorageHealth) SwaggerDoc() map[string]string {
+	return map_StorageHealth
+}
+
+var map_StorageHealthCondition = map[string]string{
+	"":                   "StorageHealthCondition represents an adverse health condition reported by a CSI driver for its storage backend on a node.",
+	"status":             "status is the health status category. One of \"StorageUnreachable\", \"StorageDegraded\".",
+	"reason":             "reason is a brief CamelCase machine-parseable reason. Maximum permitted length of a reason is 256 characters.",
+	"message":            "message is a human-readable description. Maximum permitted length of a message is 1024 characters.",
+	"accessMode":         "accessMode is the access mode affected. Nil means all access modes are affected.",
+	"volumeMode":         "volumeMode is the volume mode affected. Nil means both are affected.",
+	"lastTransitionTime": "lastTransitionTime is when this condition first appeared at its current state.",
+}
+
+func (StorageHealthCondition) SwaggerDoc() map[string]string {
+	return map_StorageHealthCondition
 }
 
 var map_TokenRequest = map[string]string{

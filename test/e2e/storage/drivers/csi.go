@@ -403,6 +403,7 @@ type mockCSIDriver struct {
 	fsGroupPolicy                        *storagev1.FSGroupPolicy
 	enableVolumeMountGroup               bool
 	enableNodeVolumeCondition            bool
+	enableNodeStorageHealth              bool
 	embedded                             bool
 	calls                                MockCSICalls
 	embeddedCSIDriver                    *mockdriver.CSIDriver
@@ -454,6 +455,7 @@ type CSIMockDriverOpts struct {
 	EnableSnapshot                       bool
 	EnableVolumeMountGroup               bool
 	EnableNodeVolumeCondition            bool
+	EnableNodeStorageHealth              bool
 	TokenRequests                        []storagev1.TokenRequest
 	ServiceAccountTokenInSecrets         *bool
 	RequiresRepublish                    *bool
@@ -609,6 +611,7 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 		attachLimit:                          driverOpts.AttachLimit,
 		enableNodeExpansion:                  driverOpts.EnableNodeExpansion,
 		enableNodeVolumeCondition:            driverOpts.EnableNodeVolumeCondition,
+		enableNodeStorageHealth:              driverOpts.EnableNodeStorageHealth,
 		disableControllerExpansion:           driverOpts.DisableControllerExpansion,
 		tokenRequests:                        driverOpts.TokenRequests,
 		requiresRepublish:                    driverOpts.RequiresRepublish,
@@ -690,6 +693,7 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 			NodeExpansionRequired:       m.enableNodeExpansion,
 			DisableControllerExpansion:  m.disableControllerExpansion,
 			NodeVolumeConditionRequired: m.enableNodeVolumeCondition,
+			NodeStorageHealthRequired:   m.enableNodeStorageHealth,
 			VolumeMountGroupRequired:    m.enableVolumeMountGroup,
 			EnableTopology:              m.enableTopology,
 			IO: proxy.PodDirIO{

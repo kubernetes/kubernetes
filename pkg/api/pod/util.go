@@ -1062,6 +1062,9 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 
 	dropPodNodeAllocatableResourceStatus(podStatus, oldPodStatus)
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) && !volumeHealthInUse(oldPodStatus) {
+		podStatus.VolumeHealth = nil
+	}
 }
 
 // dropDisabledDynamicResourceAllocationFields removes pod claim references from
@@ -1095,6 +1098,13 @@ func draNodeAllocatableResourceStatusInUse(podStatus *api.PodStatus) bool {
 		return false
 	}
 	return len(podStatus.NodeAllocatableResourceClaimStatuses) > 0
+}
+
+func volumeHealthInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+	return len(podStatus.VolumeHealth) > 0
 }
 
 func resourceHealthStatusInUse(podStatus *api.PodStatus) bool {

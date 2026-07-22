@@ -904,6 +904,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PodTemplateApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodTemplateSpec"):
 		return &applyconfigurationscorev1.PodTemplateSpecApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodVolumeHealth"):
+		return &applyconfigurationscorev1.PodVolumeHealthApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PortStatus"):
 		return &applyconfigurationscorev1.PortStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PortworxVolumeSource"):
@@ -1014,6 +1016,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.VolumeApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("VolumeDevice"):
 		return &applyconfigurationscorev1.VolumeDeviceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("VolumeHealthCondition"):
+		return &applyconfigurationscorev1.VolumeHealthConditionApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("VolumeHealthStatus"):
+		return &applyconfigurationscorev1.VolumeHealthStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("VolumeMount"):
 		return &applyconfigurationscorev1.VolumeMountApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("VolumeMountStatus"):
@@ -1984,10 +1990,16 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsstoragev1.CSINodeDriverApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("CSINodeSpec"):
 		return &applyconfigurationsstoragev1.CSINodeSpecApplyConfiguration{}
+	case storagev1.SchemeGroupVersion.WithKind("CSINodeStatus"):
+		return &applyconfigurationsstoragev1.CSINodeStatusApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("CSIStorageCapacity"):
 		return &applyconfigurationsstoragev1.CSIStorageCapacityApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("StorageClass"):
 		return &applyconfigurationsstoragev1.StorageClassApplyConfiguration{}
+	case storagev1.SchemeGroupVersion.WithKind("StorageHealth"):
+		return &applyconfigurationsstoragev1.StorageHealthApplyConfiguration{}
+	case storagev1.SchemeGroupVersion.WithKind("StorageHealthCondition"):
+		return &applyconfigurationsstoragev1.StorageHealthConditionApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("TokenRequest"):
 		return &applyconfigurationsstoragev1.TokenRequestApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("VolumeAttachment"):
@@ -2032,10 +2044,16 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsstoragev1beta1.CSINodeDriverApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("CSINodeSpec"):
 		return &applyconfigurationsstoragev1beta1.CSINodeSpecApplyConfiguration{}
+	case storagev1beta1.SchemeGroupVersion.WithKind("CSINodeStatus"):
+		return &applyconfigurationsstoragev1beta1.CSINodeStatusApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("CSIStorageCapacity"):
 		return &applyconfigurationsstoragev1beta1.CSIStorageCapacityApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("StorageClass"):
 		return &applyconfigurationsstoragev1beta1.StorageClassApplyConfiguration{}
+	case storagev1beta1.SchemeGroupVersion.WithKind("StorageHealth"):
+		return &applyconfigurationsstoragev1beta1.StorageHealthApplyConfiguration{}
+	case storagev1beta1.SchemeGroupVersion.WithKind("StorageHealthCondition"):
+		return &applyconfigurationsstoragev1beta1.StorageHealthConditionApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("TokenRequest"):
 		return &applyconfigurationsstoragev1beta1.TokenRequestApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("VolumeAttachment"):

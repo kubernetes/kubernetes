@@ -3477,6 +3477,13 @@ message PersistentVolumeClaimStatus {
   // +featureGate=VolumeAttributesClass
   // +optional
   optional ModifyVolumeStatus modifyVolumeStatus = 9;
+
+  // healthStatus contains the latest controller-reported health information
+  // for the volume bound to this claim.
+  // +featureGate=CSIVolumeHealth
+  // +optional
+  // +k8s:optional
+  optional VolumeHealthStatus healthStatus = 10;
 }
 
 // PersistentVolumeClaimTemplate is used to produce
@@ -5079,6 +5086,17 @@ message PodStatus {
   // +optional
   // +listType=atomic
   repeated NodeAllocatableResourceClaimStatus nodeAllocatableResourceClaimStatuses = 21;
+
+  // volumeHealth contains node-reported health for each volume the pod is using.
+  // Populated by the kubelet on the pod's node.
+  // +featureGate=CSIVolumeHealth
+  // +optional
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  repeated PodVolumeHealth volumeHealth = 22;
 }
 
 // PodTemplate describes a template for creating copies of a predefined pod.
@@ -5117,6 +5135,35 @@ message PodTemplateSpec {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional PodSpec spec = 2;
+}
+
+// PodVolumeHealth contains health information for a volume used by a pod,
+// reported by the CSI node plugin via the kubelet.
+message PodVolumeHealth {
+  // name matches an entry in pod.spec.volumes.
+  // +required
+  // +k8s:required
+  optional string name = 1;
+
+  // conditions is the set of adverse conditions reported by
+  // the CSI node plugin for this volume on this node.
+  // At most 16 conditions may be reported.
+  // +optional
+  // +listType=map
+  // +listMapKey=status
+  // +patchMergeKey=status
+  // +patchStrategy=merge
+  // +listMapKey=reason
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=status
+  // +k8s:listMapKey=reason
+  // +k8s:maxItems=16
+  repeated VolumeHealthCondition healthConditions = 2;
+
+  // lastTransitionTime is when the current set of conditions first appeared.
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 }
 
 // PortStatus represents the error condition of a service port
@@ -6988,6 +7035,57 @@ message VolumeDevice {
 
   // devicePath is the path inside of the container that the device will be mapped to.
   optional string devicePath = 2;
+}
+
+// VolumeHealthCondition represents an adverse health condition reported for a volume.
+message VolumeHealthCondition {
+  // status is the machine-parseable health category.
+  // Possible values:
+  // - "Inaccessible": the volume cannot be accessed.
+  // - "DataLoss": data loss has been detected on the volume.
+  // - "Degraded": the volume is functioning with reduced capability.
+  // +required
+  // +k8s:required
+  optional string status = 1;
+
+  // reason is a brief CamelCase machine-parseable reason.
+  // Together with status it forms the unique identity of a condition entry.
+  // Maximum permitted length of a reason is 256 bytes.
+  // +required
+  // +k8s:required
+  // +k8s:maxBytes=256
+  optional string reason = 2;
+
+  // message is a human-readable description.
+  // Maximum permitted length of a message is 1024 bytes.
+  // +optional
+  // +k8s:optional
+  // +k8s:maxBytes=1024
+  optional string message = 3;
+}
+
+// VolumeHealthStatus contains health information for a volume reported
+// by the CSI controller plugin.
+message VolumeHealthStatus {
+  // conditions is the set of adverse conditions reported by
+  // the CSI controller plugin. An empty list means no adverse condition.
+  // At most 16 conditions may be reported.
+  // +optional
+  // +listType=map
+  // +listMapKey=status
+  // +patchMergeKey=status
+  // +patchStrategy=merge
+  // +listMapKey=reason
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=status
+  // +k8s:listMapKey=reason
+  // +k8s:maxItems=16
+  repeated VolumeHealthCondition healthConditions = 1;
+
+  // lastTransitionTime is when the current set of conditions first appeared.
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 2;
 }
 
 // VolumeMount describes a mounting of a Volume within a container.

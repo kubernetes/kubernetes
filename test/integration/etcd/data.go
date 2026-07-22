@@ -862,6 +862,8 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			Stub:              `{"metadata": {"name": "csini2"}, "spec": {"drivers": [{"name": "test-driver", "nodeID": "localhost", "topologyKeys": ["company.com/zone1", "company.com/zone2"]}]}}`,
 			ExpectedEtcdPath:  "/registry/csinodes/csini2",
 			IntroducedVersion: "1.17",
+			StatusStub:        `{"status": {"storageHealth": [{"name": "test-driver", "healthConditions": [{"status": "StorageUnreachable", "reason": "ConnectionLost", "message": "lost connection", "lastTransitionTime": "2025-01-01T00:00:00Z"}]}]}}`,
+			MutatedStatusStub: `{"status": {"storageHealth": [{"name": "test-driver", "healthConditions": [{"status": "StorageDegraded", "reason": "HighLatency", "message": "high latency", "lastTransitionTime": "2025-01-01T00:00:00Z"}]}]}}`,
 		},
 		// --
 

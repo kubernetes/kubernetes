@@ -2742,3 +2742,150 @@ func TestValidateVolumeAttributesClassUpdate(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateCSINodeStatusUpdate(t *testing.T) {
+	old := storage.CSINode{
+		ObjectMeta: metav1.ObjectMeta{Name: "node1", ResourceVersion: "1"},
+		Spec: storage.CSINodeSpec{
+			Drivers: []storage.CSINodeDriver{
+				{Name: "driver1", NodeID: "node1"},
+			},
+		},
+	}
+	newNode := func(health ...storage.StorageHealth) storage.CSINode {
+		return storage.CSINode{
+			ObjectMeta: metav1.ObjectMeta{Name: "node1", ResourceVersion: "2"},
+			Spec:       old.Spec,
+			Status:     storage.CSINodeStatus{StorageHealth: health},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		new         storage.CSINode
+		isErr       bool
+		expectedErr string
+	}{
+		{
+			name: "valid status with StorageUnreachable",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageUnreachable, Reason: "BackendDown"},
+			}}),
+		},
+		{
+			name: "valid status with StorageDegraded",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageDegraded, Reason: "HighLatency"},
+			}}),
+		},
+		{
+			name: "empty status is valid",
+			new:  newNode(),
+		},
+		{
+			name: "invalid status type",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: "InvalidType", Reason: "SomeReason"},
+			}}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].healthConditions[0].status",
+		},
+		{
+			name: "empty driver name",
+			new: newNode(storage.StorageHealth{HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageUnreachable, Reason: "BackendDown"},
+			}}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].name",
+		},
+		{
+			name: "empty reason",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageUnreachable},
+			}}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].healthConditions[0].reason",
+		},
+		{
+			name: "invalid reason format",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageUnreachable, Reason: "invalid;val"},
+			}}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].healthConditions[0].reason",
+		},
+		{
+			name: "duplicate driver",
+			new: newNode(
+				storage.StorageHealth{Name: "driver1"},
+				storage.StorageHealth{Name: "driver1"},
+			),
+			isErr:       true,
+			expectedErr: "status.storageHealth[1]",
+		},
+		{
+			name: "duplicate conditions are allowed within the bound",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageUnreachable, Reason: "BackendDown"},
+				{Status: storage.StorageUnreachable, Reason: "BackendDown"},
+			}}),
+		},
+		{
+			name: "reason too long",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageUnreachable, Reason: strings.Repeat("a", 257)},
+			}}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].healthConditions[0].reason",
+		},
+		{
+			name: "too many conditions",
+			new: newNode(storage.StorageHealth{
+				Name:             "driver1",
+				HealthConditions: make([]storage.StorageHealthCondition, maxStorageHealthConditions+1),
+			}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].healthConditions",
+		},
+		{
+			name: "invalid access mode",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{{
+				Status: storage.StorageUnreachable, Reason: "BackendDown", AccessMode: ptr.To(api.PersistentVolumeAccessMode("invalid")),
+			}}}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].healthConditions[0].accessMode",
+		},
+		{
+			name: "invalid volume mode",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{{
+				Status: storage.StorageUnreachable, Reason: "BackendDown", VolumeMode: ptr.To(api.PersistentVolumeMode("invalid")),
+			}}}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].healthConditions[0].volumeMode",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := ValidateCSINodeStatusUpdate(&tt.new, &old)
+			if tt.isErr && len(errs) == 0 {
+				t.Errorf("expected error but got none")
+			}
+			if !tt.isErr && len(errs) > 0 {
+				t.Errorf("unexpected errors: %v", errs)
+			}
+			if tt.isErr && len(errs) > 0 && tt.expectedErr != "" {
+				found := false
+				for _, err := range errs {
+					if strings.Contains(err.Field, tt.expectedErr) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected error containing %q but got: %v", tt.expectedErr, errs)
+				}
+			}
+		})
+	}
+}

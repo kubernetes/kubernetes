@@ -582,6 +582,7 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.17
+// +k8s:supportsSubresource="/status"
 
 // CSINode holds information about all CSI drivers installed on a node.
 // CSI drivers do not need to create the CSINode object directly. As long as
@@ -601,6 +602,10 @@ type CSINode struct {
 
 	// spec is the specification of CSINode
 	Spec CSINodeSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
+
+	// status contains health and status information for the node's storage.
+	// +optional
+	Status CSINodeStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // CSINodeSpec holds information about the specification of all CSI drivers installed on a node
@@ -660,6 +665,67 @@ type VolumeNodeResources struct {
 	// If this field is not specified, then the supported number of volumes on this node is unbounded.
 	// +optional
 	Count *int32 `json:"count,omitempty" protobuf:"varint,1,opt,name=count"`
+}
+
+// StorageHealthStatusType describes the health status category of a storage backend.
+// +enum
+type StorageHealthStatusType string
+
+const (
+	// StorageUnreachable indicates the storage backend is unreachable.
+	StorageUnreachable StorageHealthStatusType = "StorageUnreachable"
+	// StorageDegraded indicates the storage backend is functioning with reduced capability.
+	StorageDegraded StorageHealthStatusType = "StorageDegraded"
+)
+
+// StorageHealthCondition represents an adverse health condition reported
+// by a CSI driver for its storage backend on a node.
+type StorageHealthCondition struct {
+	// status is the health status category.
+	// One of "StorageUnreachable", "StorageDegraded".
+	// +required
+	Status StorageHealthStatusType `json:"status" protobuf:"bytes,1,opt,name=status,casttype=StorageHealthStatusType"`
+	// reason is a brief CamelCase machine-parseable reason.
+	// Maximum permitted length of a reason is 256 characters.
+	// +required
+	Reason string `json:"reason" protobuf:"bytes,2,opt,name=reason"`
+	// message is a human-readable description.
+	// +optional
+	// Maximum permitted length of a message is 1024 characters.
+	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
+	// accessMode is the access mode affected. Nil means all access modes are affected.
+	// +optional
+	AccessMode *v1.PersistentVolumeAccessMode `json:"accessMode,omitempty" protobuf:"bytes,4,opt,name=accessMode,casttype=k8s.io/api/core/v1.PersistentVolumeAccessMode"`
+	// volumeMode is the volume mode affected. Nil means both are affected.
+	// +optional
+	VolumeMode *v1.PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,5,opt,name=volumeMode,casttype=k8s.io/api/core/v1.PersistentVolumeMode"`
+	// lastTransitionTime is when this condition first appeared at its current state.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,6,opt,name=lastTransitionTime"`
+}
+
+// StorageHealth contains storage backend health reported by a CSI driver on a node.
+type StorageHealth struct {
+	// name is the CSI driver name, matching CSINodeDriver.name.
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// healthConditions are the adverse storage backend conditions reported by the CSI driver.
+	// At most 16 conditions may be reported.
+	// +optional
+	// +listType=atomic
+	HealthConditions []StorageHealthCondition `json:"healthConditions,omitempty" protobuf:"bytes,2,rep,name=healthConditions"`
+}
+
+// CSINodeStatus contains health and status information for storage on a node.
+type CSINodeStatus struct {
+	// storageHealth contains backend health reports for CSI drivers registered on the node.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +featureGate=CSIVolumeHealth
+	StorageHealth []StorageHealth `json:"storageHealth,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,1,rep,name=storageHealth"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

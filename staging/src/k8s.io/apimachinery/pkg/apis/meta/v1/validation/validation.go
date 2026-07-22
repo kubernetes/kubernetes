@@ -367,7 +367,7 @@ func ValidateCondition(condition metav1.Condition, fldPath *field.Path) field.Er
 	if len(condition.Reason) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), "").MarkCoveredByDeclarative())
 	} else {
-		for _, currErr := range isValidConditionReason(condition.Reason) {
+		for _, currErr := range IsValidConditionReason(condition.Reason) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("reason"), condition.Reason, currErr))
 		}
 		if len(condition.Reason) > maxReasonLen {
@@ -387,8 +387,9 @@ const conditionReasonErrMsg string = "a condition reason must start with alphabe
 
 var conditionReasonRegexp = regexp.MustCompile("^" + conditionReasonFmt + "$")
 
-// isValidConditionReason tests for a string that conforms to rules for condition reasons. This checks the format, but not the length.
-func isValidConditionReason(value string) []string {
+// IsValidConditionReason tests for a string that conforms to rules for condition
+// reasons. This checks the format, but not the length.
+func IsValidConditionReason(value string) []string {
 	if !conditionReasonRegexp.MatchString(value) {
 		return []string{validation.RegexError(conditionReasonErrMsg, conditionReasonFmt, "my_name", "MY_NAME", "MyName", "ReasonA,ReasonB", "ReasonA:ReasonB")}
 	}

@@ -1291,6 +1291,14 @@ items:
     - patch
     - update
   - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csinodes/status
+    verbs:
+    - get
+    - patch
+    - update
+  - apiGroups:
     - node.k8s.io
     resources:
     - runtimeclasses
