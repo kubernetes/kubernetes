@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,21 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package plugin
-
-import (
-	"context"
-
-	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
-)
-
-// mockStreamHandler is a mock implementation of the StreamHandler interface,
-// shared across all tests in this package.
-type mockStreamHandler struct{}
-
-var _ StreamHandler = &mockStreamHandler{}
-
-func (m *mockStreamHandler) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1.DRAResourceHealth_NodeWatchResourcesClient, resourceName string) error {
-	<-ctx.Done()
-	return nil
-}
+// Package v1 contains the stable implementation of the DRA health gRPC
+// interface. It supersedes v1alpha1.
+package v1

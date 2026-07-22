@@ -31,6 +31,17 @@ import (
 const (
 	// DefaultHealthTimeout is the default timeout for device health checks when not specified by the plugin
 	DefaultHealthTimeout = 30 * time.Second
+
+	// maxDevicesPerDriver caps how many device health entries the cache keeps
+	// per driver. Health reports are not validated against ResourceSlices, so
+	// without a cap a misbehaving plugin could grow the cache (and the
+	// checkpoint file written on every change) without bound by inventing
+	// ever-new device names. The value is far above realistic per-node device
+	// counts, which stay in the low thousands even for large SR-IOV or
+	// partitioned GPU setups. New devices reported beyond the cap are ignored
+	// with an error in the log; entries for already known devices are always
+	// updated.
+	maxDevicesPerDriver = 16384
 )
 
 // healthInfoCache is a cache of known device health.
@@ -176,12 +187,20 @@ func (cache *healthInfoCache) updateHealthInfo(logger klog.Logger, driverName st
 		// Phase 1: Process the incoming report from the plugin.
 		// Update existing devices, add new ones, and record all devices
 		// present in this report.
+		ignoredDevices := 0
 		for _, reportedDevice := range devices {
 			reportedDevice.LastUpdated = now
 			key := reportedDevice.PoolName + "/" + reportedDevice.DeviceName
 			reportedKeys[key] = struct{}{}
 
 			existingDevice, ok := currentDriver.Devices[key]
+
+			// Ignore new devices beyond the per-driver cap. Updates for
+			// already known devices are always accepted.
+			if !ok && len(currentDriver.Devices) >= maxDevicesPerDriver {
+				ignoredDevices++
+				continue
+			}
 
 			// Consider health status, message, and timeout changes as updates
 			if !ok || existingDevice.Health != reportedDevice.Health || existingDevice.Message != reportedDevice.Message || existingDevice.HealthCheckTimeout != reportedDevice.HealthCheckTimeout {
@@ -190,10 +209,18 @@ func (cache *healthInfoCache) updateHealthInfo(logger klog.Logger, driverName st
 
 			currentDriver.Devices[key] = reportedDevice
 		}
+		if ignoredDevices > 0 {
+			logger.Error(nil, "Health report contains more devices than the cache keeps per driver, ignoring new devices beyond the limit", "driverName", driverName, "limit", maxDevicesPerDriver, "ignoredDevices", ignoredDevices)
+		}
 
 		// Phase 2: Handle devices that are in the cache but were not in the report.
-		// These devices may have been removed or the plugin may have stopped monitoring
-		// them. Mark them as "Unknown" if their status has timed out.
+		// These devices may have been removed or the plugin may have stopped
+		// monitoring them. Once their status has timed out, notify about the
+		// transition to "Unknown" and remove them. A device which is absent
+		// from the cache reads as "Unknown" (see getHealthInfo), so removing
+		// the entry is equivalent to keeping it as "Unknown" forever and
+		// bounds the cache by what the driver keeps reporting.
+		deletedDevices := false
 		for key, existingDevice := range currentDriver.Devices {
 			if _, wasReported := reportedKeys[key]; !wasReported {
 				// Use device-specific timeout if set, otherwise use default
@@ -202,20 +229,23 @@ func (cache *healthInfoCache) updateHealthInfo(logger klog.Logger, driverName st
 					timeout = DefaultHealthTimeout
 				}
 
-				// Mark as unknown if the device health has timed out
-				if existingDevice.Health != state.DeviceHealthStatusUnknown && now.Sub(existingDevice.LastUpdated) > timeout {
-					existingDevice.Health = state.DeviceHealthStatusUnknown
-					existingDevice.Message = ""
-					existingDevice.LastUpdated = now
-					currentDriver.Devices[key] = existingDevice
-
-					changedDevices = append(changedDevices, existingDevice)
+				if now.Sub(existingDevice.LastUpdated) > timeout {
+					// Entries which were already "Unknown" are removed
+					// without a notification, nothing changes for readers.
+					if existingDevice.Health != state.DeviceHealthStatusUnknown {
+						existingDevice.Health = state.DeviceHealthStatusUnknown
+						existingDevice.Message = ""
+						existingDevice.LastUpdated = now
+						changedDevices = append(changedDevices, existingDevice)
+					}
+					delete(currentDriver.Devices, key)
+					deletedDevices = true
 				}
 			}
 		}
 
 		// Phase 3: Persist changes to the checkpoint file if any state changed.
-		if len(changedDevices) > 0 {
+		if len(changedDevices) > 0 || deletedDevices {
 			if err := cache.saveToCheckpointInternal(logger); err != nil {
 				logger.Error(err, "Failed to save health checkpoint after update. Kubelet restart may lose the device health information.")
 			}

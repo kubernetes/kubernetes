@@ -22,8 +22,47 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
+
+func TestPickHealthService(t *testing.T) {
+	for name, tc := range map[string]struct {
+		supportedServices []string
+		want              string
+	}{
+		"none": {
+			supportedServices: []string{"v1beta1.DRAPlugin"},
+			want:              "",
+		},
+		"empty": {
+			supportedServices: nil,
+			want:              "",
+		},
+		// Drivers which shipped before v1 existed only serve v1alpha1.
+		// The kubelet keeps consuming it for three releases of transition,
+		// see healthServicesSupportedByKubelet.
+		"only-v1alpha1": {
+			supportedServices: []string{"v1beta1.DRAPlugin", drahealthv1alpha1.DRAResourceHealthService},
+			want:              drahealthv1alpha1.DRAResourceHealthService,
+		},
+		"only-v1": {
+			supportedServices: []string{"v1beta1.DRAPlugin", drahealthv1.DRAResourceHealthService},
+			want:              drahealthv1.DRAResourceHealthService,
+		},
+		"both-picks-v1": {
+			supportedServices: []string{drahealthv1alpha1.DRAResourceHealthService, drahealthv1.DRAResourceHealthService},
+			want:              drahealthv1.DRAResourceHealthService,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := pickHealthService(tc.supportedServices); got != tc.want {
+				t.Errorf("pickHealthService(%v) = %q, want %q", tc.supportedServices, got, tc.want)
+			}
+		})
+	}
+}
 
 func TestAddSameName(t *testing.T) {
 	tCtx := ktesting.Init(t)
@@ -32,14 +71,14 @@ func TestAddSameName(t *testing.T) {
 
 	// ensure the plugin we are using is registered
 	draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
-	tCtx.ExpectNoError(draPlugins.add(driverName, "old.sock", "", defaultClientCallTimeout), "add first plugin")
+	tCtx.ExpectNoError(draPlugins.add(driverName, "old.sock", "", "", defaultClientCallTimeout), "add first plugin")
 	p, err := draPlugins.GetPlugin(driverName)
 	tCtx.ExpectNoError(err, "get first plugin")
 
 	// Same name, same endpoint -> error.
-	require.Error(tCtx, draPlugins.add(driverName, "old.sock", "", defaultClientCallTimeout))
+	require.Error(tCtx, draPlugins.add(driverName, "old.sock", "", "", defaultClientCallTimeout))
 
-	tCtx.ExpectNoError(draPlugins.add(driverName, "new.sock", "", defaultClientCallTimeout), "add second plugin")
+	tCtx.ExpectNoError(draPlugins.add(driverName, "new.sock", "", "", defaultClientCallTimeout), "add second plugin")
 	p2, err := draPlugins.GetPlugin(driverName)
 	tCtx.ExpectNoError(err, "get second plugin")
 	if p == p2 {
@@ -64,7 +103,7 @@ func TestDelete(t *testing.T) {
 
 	// ensure the plugin we are using is registered
 	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
-	tCtx.ExpectNoError(draPlugins.add(driverName, "dra.sock", "", defaultClientCallTimeout), "add plugin")
+	tCtx.ExpectNoError(draPlugins.add(driverName, "dra.sock", "", "", defaultClientCallTimeout), "add plugin")
 
 	draPlugins.remove(driverName, socketFile)
 

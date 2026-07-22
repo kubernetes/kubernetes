@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,21 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package plugin
+package v1
 
-import (
-	"context"
-
-	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
+const (
+	// DRAResourceHealthService needs to be listed in the "supported versions"
+	// array during plugin registration by a DRA plugin which provides
+	// an implementation of the v1 DRAResourceHealth service.
+	//
+	// It must be exactly [DRAResourceHealth_ServiceDesc.ServiceName], which
+	// is enforced by TestServiceNameConstants.
+	DRAResourceHealthService = "v1.DRAResourceHealth"
 )
-
-// mockStreamHandler is a mock implementation of the StreamHandler interface,
-// shared across all tests in this package.
-type mockStreamHandler struct{}
-
-var _ StreamHandler = &mockStreamHandler{}
-
-func (m *mockStreamHandler) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1.DRAResourceHealth_NodeWatchResourcesClient, resourceName string) error {
-	<-ctx.Done()
-	return nil
-}
