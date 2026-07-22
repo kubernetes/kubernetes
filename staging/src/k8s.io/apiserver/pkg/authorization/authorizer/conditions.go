@@ -51,10 +51,10 @@ const (
 // - Allow: unconditional Allow.
 // - Deny: unconditional Deny.
 // - NoOpinion: unconditional NoOpinion.
-// - Conditional: conditional on some previously-unseen data.
+// - ConditionsMap: conditional, expressed as a map of conditions to be evaluated later.
 // - Union: an ordered list of sub-decisions, which forms a tree of decisions.
 //
-// The zero value (ConditionsAwareDecision{}) is equivalent to ConditionsAwareDecisionDeny().
+// The zero value (ConditionsAwareDecision{}) is equivalent to ConditionsAwareDecisionDeny("", nil).
 // A ConditionsAwareDecision is passed by value.
 // Important: A ConditionsAwareDecision is immutable after construction.
 type ConditionsAwareDecision struct {
@@ -215,8 +215,8 @@ func (d ConditionsAwareDecision) FailureDecision() Decision {
 	return DecisionNoOpinion
 }
 
-// ContainsUnconditionalAllowOrDeny returns true whether there union contains at least one
-// Allow or Deny decision within the tree of decisions.
+// ContainsUnconditionalAllowOrDeny returns true if this decision's tree contains at least
+// one unconditional Allow or Deny leaf.
 func (d ConditionsAwareDecision) ContainsUnconditionalAllowOrDeny() bool {
 	if d.IsAllow() || d.IsDeny() {
 		return true
@@ -303,6 +303,6 @@ func (d ConditionsAwareDecision) String() string {
 		return fmt.Sprintf("ConditionsMap%s", paramsStr())
 	}
 	// Deny is written such that if none of the other modes apply,
-	// IsDenied() is true.
+	// IsDeny() is true.
 	return fmt.Sprintf("Deny%s", paramsStr())
 }
