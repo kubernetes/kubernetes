@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package authorization
+package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
+	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -25,12 +25,7 @@ import (
 const GroupName = "authorization.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
-
-// Kind takes an unqualified kind and returns a Group qualified GroupKind
-func Kind(kind string) schema.GroupKind {
-	return SchemeGroupVersion.WithKind(kind).GroupKind()
-}
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
 
 // Resource takes an unqualified resource and returns a Group qualified GroupResource
 func Resource(resource string) schema.GroupResource {
@@ -38,19 +33,16 @@ func Resource(resource string) schema.GroupResource {
 }
 
 var (
-	// SchemeBuilder points to a list of functions added to Scheme.
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	// AddToScheme applies all the stored functions to the scheme.
-	AddToScheme = SchemeBuilder.AddToScheme
+	// localSchemeBuilder extends the SchemeBuilder instance with the external types. In this package,
+	// defaulting and conversion init funcs are registered as well.
+	localSchemeBuilder = &authorizationv1alpha1.SchemeBuilder
+	// AddToScheme is a global function that registers this API group & version to a scheme
+	AddToScheme = localSchemeBuilder.AddToScheme
 )
 
-func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(SchemeGroupVersion,
-		&SelfSubjectRulesReview{},
-		&SelfSubjectAccessReview{},
-		&SubjectAccessReview{},
-		&LocalSubjectAccessReview{},
-		&AuthorizationConditionsReview{},
-	)
-	return nil
+func init() {
+	// We only register manually written functions here. The registration of the
+	// generated functions takes place in the generated files. The separation
+	// makes the code compile even when the generated files are missing.
+	localSchemeBuilder.Register(addDefaultingFuncs)
 }
