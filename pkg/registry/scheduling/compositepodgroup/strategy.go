@@ -62,6 +62,7 @@ func (*compositePodGroupStrategy) PrepareForCreate(ctx context.Context, obj runt
 	cpg := obj.(*scheduling.CompositePodGroup)
 	// Status must not be set by user on create.
 	cpg.Status = scheduling.CompositePodGroupStatus{}
+	dropDisabledCompositePodGroupFields(cpg, nil)
 }
 
 func (*compositePodGroupStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -73,7 +74,8 @@ func (*compositePodGroupStrategy) Validate(ctx context.Context, obj runtime.Obje
 // mapped to whether each is enabled.
 func (*compositePodGroupStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
 	return rest.DeclarativeValidationConfig{Options: map[string]bool{
-		string(features.CompositePodGroup): utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup),
+		string(features.CompositePodGroup):        utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup),
+		string(features.PodGroupPreemptionPolicy): utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy),
 	}}
 }
 
@@ -91,6 +93,7 @@ func (*compositePodGroupStrategy) PrepareForUpdate(ctx context.Context, obj, old
 	newCPG := obj.(*scheduling.CompositePodGroup)
 	oldCPG := old.(*scheduling.CompositePodGroup)
 	newCPG.Status = oldCPG.Status
+	dropDisabledCompositePodGroupFields(newCPG, oldCPG)
 }
 
 func (*compositePodGroupStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -140,4 +143,34 @@ func (r *compositePodGroupStatusStrategy) ValidateUpdate(ctx context.Context, ob
 
 func (*compositePodGroupStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+// dropDisabledCompositePodGroupFields removes fields which are covered by a feature gate.
+func dropDisabledCompositePodGroupFields(newCPG, oldCPG *scheduling.CompositePodGroup) {
+	var newCPGSpec, oldCPGSpec *scheduling.CompositePodGroupSpec
+	if newCPG != nil {
+		newCPGSpec = &newCPG.Spec
+	}
+	if oldCPG != nil {
+		oldCPGSpec = &oldCPG.Spec
+	}
+	dropDisabledCompositePodGroupSpecFields(newCPGSpec, oldCPGSpec)
+}
+
+func dropDisabledCompositePodGroupSpecFields(newCPGSpec, oldCPGSpec *scheduling.CompositePodGroupSpec) {
+	dropDisabledPreemptionPolicyField(newCPGSpec, oldCPGSpec)
+}
+
+// dropDisabledPreemptionPolicyField removes the PreemptionPolicy field unless it is
+// already used in the old CompositePodGroup spec.
+func dropDisabledPreemptionPolicyField(newCPGSpec, oldCPGSpec *scheduling.CompositePodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) || preemptionPolicyInUse(oldCPGSpec) {
+		// No need to drop anything.
+		return
+	}
+	newCPGSpec.PreemptionPolicy = nil
+}
+
+func preemptionPolicyInUse(cpgSpec *scheduling.CompositePodGroupSpec) bool {
+	return cpgSpec != nil && cpgSpec.PreemptionPolicy != nil
 }

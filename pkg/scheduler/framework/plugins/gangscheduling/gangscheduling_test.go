@@ -1858,6 +1858,9 @@ func (t *testPodGroupInfo) GetKey() string {
 func (t *testPodGroupInfo) GetCompositePodGroup() *schedulingv1alpha3.CompositePodGroup {
 	return t.cpg
 }
+func (t *testPodGroupInfo) GetChildren() []fwk.PodGroupInfo {
+	return nil
+}
 
 type mockPodGroupManager struct {
 	fwk.PodGroupManager

@@ -227,6 +227,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "scheduling.k8s.io", Version: "v1alpha3", Kind: "PodGroupList"}:                                    {},
 		{Group: "scheduling.k8s.io", Version: "v1beta1", Kind: "PodGroup"}:                                         {},
 		{Group: "scheduling.k8s.io", Version: "v1beta1", Kind: "PodGroupList"}:                                     {},
+		{Group: "scheduling.k8s.io", Version: "v1alpha3", Kind: "CompositePodGroup"}:                               {},
+		{Group: "scheduling.k8s.io", Version: "v1alpha3", Kind: "CompositePodGroupList"}:                           {},
 		{Group: "scheduling.k8s.io", Version: "v1beta1", Kind: "PriorityClass"}:                                    {},
 		{Group: "scheduling.k8s.io", Version: "v1", Kind: "PriorityClass"}:                                         {},
 		{Group: "scheduling.k8s.io", Version: "v1beta1", Kind: "PriorityClassList"}:                                {},

@@ -29,6 +29,11 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/scheduling/v1beta1";
 
+// AllCompositeDisruptionMode means that children of a CompositePodGroup can only be
+// disrupted or preempted together.
+message AllCompositeDisruptionMode {
+}
+
 // AllDisruptionMode specifies that children can only be disrupted together.
 message AllDisruptionMode {
 }
@@ -41,6 +46,26 @@ message BasicSchedulingPolicy {
 // CompositeBasicSchedulingPolicy indicates that the groups belonging to the composite group
 // should be scheduled independently.
 message CompositeBasicSchedulingPolicy {
+}
+
+// CompositeDisruptionMode defines how individual entities within a composite pod group can be disrupted.
+// Exactly one mode must be set.
+//
+// +union
+message CompositeDisruptionMode {
+  // single specifies that children groups can be disrupted independently from each other.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional SingleCompositeDisruptionMode single = 1;
+
+  // all specifies that all children groups can only be disrupted together.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional AllCompositeDisruptionMode all = 2;
 }
 
 // CompositeGangSchedulingPolicy indicates that the groups belonging to the composite group
@@ -109,6 +134,23 @@ message CompositePodGroupTemplate {
   // +required
   optional CompositePodGroupSchedulingPolicy schedulingPolicy = 2;
 
+  // schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate.
+  // This field is immutable.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:immutable
+  optional CompositePodGroupSchedulingConstraints schedulingConstraints = 3;
+
+  // disruptionMode defines the mode in which a given CompositePodGroup can be disrupted.
+  // One of Single, All.
+  // This field is immutable.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:immutable
+  optional CompositeDisruptionMode disruptionMode = 4;
+
   // priorityClassName indicates the priority that should be considered when scheduling
   // a composite pod group created from this template. If no priority class is specified,
   // admission control can set this to the global default priority class if it exists.
@@ -120,7 +162,7 @@ message CompositePodGroupTemplate {
   // +k8s:optional
   // +k8s:format=k8s-long-name
   // +k8s:immutable
-  optional string priorityClassName = 3;
+  optional string priorityClassName = 5;
 
   // priority is the value of priority of composite pod groups created from this template.
   // Various system components use this field to find the priority of the composite pod group.
@@ -133,7 +175,19 @@ message CompositePodGroupTemplate {
   // +k8s:optional
   // +k8s:maximum=1000000000 # HighestUserDefinablePriority
   // +k8s:immutable
-  optional int32 priority = 4;
+  optional int32 priority = 6;
+
+  // preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+  // One of Never, PreemptLowerPriority.
+  // This field is immutable.
+  // This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
+  //
+  // +featureGate=PodGroupPreemptionPolicy
+  // +optional
+  // +k8s:immutable
+  // +k8s:ifDisabled("PodGroupPreemptionPolicy")=+k8s:forbidden
+  // +k8s:ifEnabled("PodGroupPreemptionPolicy")=+k8s:optional
+  optional string preemptionPolicy = 7;
 
   // podGroupTemplates is the list of templates for children PodGroups.
   // The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates
@@ -148,7 +202,7 @@ message CompositePodGroupTemplate {
   // +k8s:maxItems=8
   // +k8s:update=NoAddItem
   // +k8s:update=NoRemoveItem
-  repeated PodGroupTemplate podGroupTemplates = 5;
+  repeated PodGroupTemplate podGroupTemplates = 8;
 
   // compositePodGroupTemplates is the list of templates for children CompositePodGroups.
   // The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates
@@ -163,15 +217,7 @@ message CompositePodGroupTemplate {
   // +k8s:maxItems=8
   // +k8s:update=NoAddItem
   // +k8s:update=NoRemoveItem
-  repeated CompositePodGroupTemplate compositePodGroupTemplates = 6;
-
-  // schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate.
-  // This field is immutable.
-  //
-  // +optional
-  // +k8s:optional
-  // +k8s:immutable
-  optional CompositePodGroupSchedulingConstraints schedulingConstraints = 7;
+  repeated CompositePodGroupTemplate compositePodGroupTemplates = 9;
 }
 
 // DisruptionMode defines how individual entities within a group can be disrupted.
@@ -666,6 +712,11 @@ message PriorityClassList {
 
   // items is the list of PriorityClasses
   repeated PriorityClass items = 2;
+}
+
+// SingleCompositeDisruptionMode means that individual children of a CompositePodGroup
+// can be disrupted or preempted independently.
+message SingleCompositeDisruptionMode {
 }
 
 // SingleDisruptionMode specifies that children can be disrupted independently.

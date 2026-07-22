@@ -34,7 +34,10 @@ metadata:
   uid: uidValue
 spec:
   compositePodGroupTemplates:
-  - name: nameValue
+  - disruptionMode:
+      all: {}
+      single: {}
+    name: nameValue
     podGroupTemplates:
     - disruptionMode:
         all: {}
@@ -54,7 +57,8 @@ spec:
         basic: {}
         gang:
           minCount: 1
-    priority: 4
+    preemptionPolicy: preemptionPolicyValue
+    priority: 6
     priorityClassName: priorityClassNameValue
     schedulingConstraints:
       topology:

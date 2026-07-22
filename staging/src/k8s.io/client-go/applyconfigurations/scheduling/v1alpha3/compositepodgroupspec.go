@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1alpha3
 
+import (
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+)
+
 // CompositePodGroupSpecApplyConfiguration represents a declarative configuration of the CompositePodGroupSpec type for use
 // with apply.
 //
@@ -37,6 +41,15 @@ type CompositePodGroupSpecApplyConfiguration struct {
 	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
 	// This field is immutable.
 	SchedulingPolicy *CompositePodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
+	// schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// This field is immutable.
+	SchedulingConstraints *CompositePodGroupSchedulingConstraintsApplyConfiguration `json:"schedulingConstraints,omitempty"`
+	// disruptionMode defines the mode in which a given CompositePodGroup can be disrupted.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// One of Single, All. Defaults to Single if unset.
+	// This field is immutable.
+	DisruptionMode *CompositeDisruptionModeApplyConfiguration `json:"disruptionMode,omitempty"`
 	// priorityClassName defines the priority that should be considered when scheduling this CompositePodGroup.
 	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
 	// If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods
@@ -51,10 +64,13 @@ type CompositePodGroupSpecApplyConfiguration struct {
 	// The higher the value, the higher the priority.
 	// This field is immutable.
 	Priority *int32 `json:"priority,omitempty"`
-	// schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup.
-	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+	// One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset.
+	// When Priority Admission Controller is enabled, it populates this field from PriorityClassName,
+	// and defaults to PreemptLowerPriority if value is unset in PriorityClass.
 	// This field is immutable.
-	SchedulingConstraints *CompositePodGroupSchedulingConstraintsApplyConfiguration `json:"schedulingConstraints,omitempty"`
+	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
+	PreemptionPolicy *schedulingv1alpha3.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
 }
 
 // CompositePodGroupSpecApplyConfiguration constructs a declarative configuration of the CompositePodGroupSpec type for use with
@@ -87,6 +103,22 @@ func (b *CompositePodGroupSpecApplyConfiguration) WithSchedulingPolicy(value *Co
 	return b
 }
 
+// WithSchedulingConstraints sets the SchedulingConstraints field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SchedulingConstraints field is set to the value of the last call.
+func (b *CompositePodGroupSpecApplyConfiguration) WithSchedulingConstraints(value *CompositePodGroupSchedulingConstraintsApplyConfiguration) *CompositePodGroupSpecApplyConfiguration {
+	b.SchedulingConstraints = value
+	return b
+}
+
+// WithDisruptionMode sets the DisruptionMode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DisruptionMode field is set to the value of the last call.
+func (b *CompositePodGroupSpecApplyConfiguration) WithDisruptionMode(value *CompositeDisruptionModeApplyConfiguration) *CompositePodGroupSpecApplyConfiguration {
+	b.DisruptionMode = value
+	return b
+}
+
 // WithPriorityClassName sets the PriorityClassName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PriorityClassName field is set to the value of the last call.
@@ -103,10 +135,10 @@ func (b *CompositePodGroupSpecApplyConfiguration) WithPriority(value int32) *Com
 	return b
 }
 
-// WithSchedulingConstraints sets the SchedulingConstraints field in the declarative configuration to the given value
+// WithPreemptionPolicy sets the PreemptionPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the SchedulingConstraints field is set to the value of the last call.
-func (b *CompositePodGroupSpecApplyConfiguration) WithSchedulingConstraints(value *CompositePodGroupSchedulingConstraintsApplyConfiguration) *CompositePodGroupSpecApplyConfiguration {
-	b.SchedulingConstraints = value
+// If called multiple times, the PreemptionPolicy field is set to the value of the last call.
+func (b *CompositePodGroupSpecApplyConfiguration) WithPreemptionPolicy(value schedulingv1alpha3.PreemptionPolicy) *CompositePodGroupSpecApplyConfiguration {
+	b.PreemptionPolicy = &value
 	return b
 }

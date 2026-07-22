@@ -429,6 +429,28 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec"), nil, "detected multiple priority configurations").MarkFromImperative(),
 			},
 		},
+		"cpg disruption mode single": {
+			input:                         mkValidWorkload(setCPGDisruptionModeSingle(0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+		},
+		"cpg disruption mode all": {
+			input:                         mkValidWorkload(setCPGDisruptionModeAll(0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+		},
+		"cpg disruption mode with neither single nor all": {
+			input:                         mkValidWorkload(setCPGDisruptionModeNeither(0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs:                  field.ErrorList{field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("disruptionMode"), nil, "").WithOrigin("union")},
+		},
+		"cpg disruption mode with both single and all": {
+			input:                         mkValidWorkload(setCPGDisruptionModeBoth(0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs:                  field.ErrorList{field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("disruptionMode"), nil, "").WithOrigin("union")},
+		},
 		"cpg policy missing gang": {
 			input:                         mkValidWorkload(setCPGPolicyEmpty(0)),
 			enableCompositePodGroup:       true,
@@ -733,6 +755,30 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			enableTopologyAwareScheduling: true,
 			enableCompositePodGroup:       true,
 			expectedErrs:                  field.ErrorList{field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("schedulingConstraints", "topology").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key")},
+		},
+		"valid cpg PreemptionPolicy": {
+			input:                          mkValidWorkload(setCPGPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
+			enableTopologyAwareScheduling:  true,
+			enableCompositePodGroup:        true,
+			enablePodGroupPreemptionPolicy: true,
+		},
+		"invalid cpg PreemptionPolicy": {
+			input:                          mkValidWorkload(setCPGPreemptionPolicy(0, scheduling.PreemptionPolicy("Invalid"))),
+			enableTopologyAwareScheduling:  true,
+			enableCompositePodGroup:        true,
+			enablePodGroupPreemptionPolicy: true,
+			expectedErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("preemptionPolicy"), scheduling.PreemptionPolicy("Invalid"), []string{"Never", "PreemptLowerPriority"}),
+			},
+		},
+		"forbidden cpg PreemptionPolicy when PodGroupPreemptionPolicy is disabled": {
+			input:                          mkValidWorkload(setCPGPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
+			enableTopologyAwareScheduling:  true,
+			enableCompositePodGroup:        true,
+			enablePodGroupPreemptionPolicy: false,
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("preemptionPolicy"), ""),
+			},
 		},
 	}
 	for k, tc := range testCases {
@@ -1137,6 +1183,15 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Forbidden(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(1), "").WithOrigin("update"),
 			},
 		},
+		"invalid update immutable cpg disruptionMode": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), setCPGDisruptionModeSingle(0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), setCPGDisruptionModeAll(0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("disruptionMode"), nil, "field is immutable").WithOrigin("immutable"),
+			},
+		},
 		"invalid update immutable nested pg disruptionMode": {
 			oldObj:                        mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGDisruptionModeSingle(0, 0)),
 			updateObj:                     mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGDisruptionModeAll(0, 0)),
@@ -1291,6 +1346,41 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			enableCompositePodGroup:       true,
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("schedulingConstraints"), nil, "field is immutable").WithOrigin("immutable"),
+			},
+		},
+		"valid update with unchanged cpg PreemptionPolicy": {
+			oldObj:                         mkValidWorkload(setResourceVersion("1"), setCPGPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
+			updateObj:                      mkValidWorkload(setResourceVersion("1"), setCPGPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
+			enableTopologyAwareScheduling:  true,
+			enableCompositePodGroup:        true,
+			enablePodGroupPreemptionPolicy: true,
+		},
+		"invalid update of cpg PreemptionPolicy": {
+			oldObj:                         mkValidWorkload(setResourceVersion("1"), setCPGPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
+			updateObj:                      mkValidWorkload(setResourceVersion("1"), setCPGPreemptionPolicy(0, scheduling.PreemptNever)),
+			enableTopologyAwareScheduling:  true,
+			enableCompositePodGroup:        true,
+			enablePodGroupPreemptionPolicy: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("preemptionPolicy"), nil, "").WithOrigin("immutable"),
+			},
+		},
+		"valid update with unchanged cpg PreemptionPolicy when PodGroupPreemptionPolicy is disabled": {
+			oldObj:                         mkValidWorkload(setResourceVersion("1"), setCPGPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
+			updateObj:                      mkValidWorkload(setResourceVersion("1"), setCPGPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
+			enableTopologyAwareScheduling:  true,
+			enableCompositePodGroup:        true,
+			enablePodGroupPreemptionPolicy: false,
+		},
+		"invalid update of cpg PreemptionPolicy when PodGroupPreemptionPolicy is disabled": {
+			oldObj:                         mkValidWorkload(setResourceVersion("1"), setCPGPreemptionPolicy(0, scheduling.PreemptLowerPriority)),
+			updateObj:                      mkValidWorkload(setResourceVersion("1"), setCPGPreemptionPolicy(0, scheduling.PreemptNever)),
+			enableTopologyAwareScheduling:  true,
+			enableCompositePodGroup:        true,
+			enablePodGroupPreemptionPolicy: false,
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("preemptionPolicy"), ""),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("preemptionPolicy"), nil, "").WithOrigin("immutable"),
 			},
 		},
 	}
@@ -1625,6 +1715,41 @@ func addNestedCompositePodGroupTemplate(idx int, names ...string) func(obj *sche
 					}},
 				},
 			)
+		}
+	}
+}
+
+func setCPGDisruptionModeSingle(idx int) func(obj *scheduling.Workload) {
+	return func(obj *scheduling.Workload) {
+		addCompositePodGroupTemplate()(obj)
+		obj.Spec.CompositePodGroupTemplates[idx].DisruptionMode = &scheduling.CompositeDisruptionMode{
+			Single: &scheduling.SingleCompositeDisruptionMode{},
+		}
+	}
+}
+
+func setCPGDisruptionModeAll(idx int) func(obj *scheduling.Workload) {
+	return func(obj *scheduling.Workload) {
+		addCompositePodGroupTemplate()(obj)
+		obj.Spec.CompositePodGroupTemplates[idx].DisruptionMode = &scheduling.CompositeDisruptionMode{
+			All: &scheduling.AllCompositeDisruptionMode{},
+		}
+	}
+}
+
+func setCPGDisruptionModeNeither(idx int) func(obj *scheduling.Workload) {
+	return func(obj *scheduling.Workload) {
+		addCompositePodGroupTemplate()(obj)
+		obj.Spec.CompositePodGroupTemplates[idx].DisruptionMode = &scheduling.CompositeDisruptionMode{}
+	}
+}
+
+func setCPGDisruptionModeBoth(idx int) func(obj *scheduling.Workload) {
+	return func(obj *scheduling.Workload) {
+		addCompositePodGroupTemplate()(obj)
+		obj.Spec.CompositePodGroupTemplates[idx].DisruptionMode = &scheduling.CompositeDisruptionMode{
+			Single: &scheduling.SingleCompositeDisruptionMode{},
+			All:    &scheduling.AllCompositeDisruptionMode{},
 		}
 	}
 }
@@ -1964,5 +2089,12 @@ func addCPGTopologyConstraint(cpgIdx int, topologyKey string) func(obj *scheduli
 		}
 		obj.Spec.CompositePodGroupTemplates[cpgIdx].SchedulingConstraints.Topology = append(obj.Spec.CompositePodGroupTemplates[cpgIdx].SchedulingConstraints.Topology,
 			scheduling.TopologyConstraint{Key: topologyKey})
+	}
+}
+
+func setCPGPreemptionPolicy(cidx int, policy scheduling.PreemptionPolicy) func(obj *scheduling.Workload) {
+	return func(obj *scheduling.Workload) {
+		addCompositePodGroupTemplate()(obj)
+		obj.Spec.CompositePodGroupTemplates[cidx].PreemptionPolicy = &policy
 	}
 }

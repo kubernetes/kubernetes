@@ -251,6 +251,23 @@ type CompositePodGroupTemplate struct {
 	// +required
 	SchedulingPolicy CompositePodGroupSchedulingPolicy `json:"schedulingPolicy" protobuf:"bytes,2,opt,name=schedulingPolicy"`
 
+	// schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate.
+	// This field is immutable.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	SchedulingConstraints *CompositePodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,3,opt,name=schedulingConstraints"`
+
+	// disruptionMode defines the mode in which a given CompositePodGroup can be disrupted.
+	// One of Single, All.
+	// This field is immutable.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	DisruptionMode *CompositeDisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,4,opt,name=disruptionMode"`
+
 	// priorityClassName indicates the priority that should be considered when scheduling
 	// a composite pod group created from this template. If no priority class is specified,
 	// admission control can set this to the global default priority class if it exists.
@@ -262,7 +279,7 @@ type CompositePodGroupTemplate struct {
 	// +k8s:optional
 	// +k8s:format=k8s-long-name
 	// +k8s:immutable
-	PriorityClassName string `json:"priorityClassName,omitempty" protobuf:"bytes,3,opt,name=priorityClassName"`
+	PriorityClassName string `json:"priorityClassName,omitempty" protobuf:"bytes,5,opt,name=priorityClassName"`
 
 	// priority is the value of priority of composite pod groups created from this template.
 	// Various system components use this field to find the priority of the composite pod group.
@@ -275,7 +292,19 @@ type CompositePodGroupTemplate struct {
 	// +k8s:optional
 	// +k8s:maximum=1000000000 # HighestUserDefinablePriority
 	// +k8s:immutable
-	Priority *int32 `json:"priority,omitempty" protobuf:"varint,4,opt,name=priority"`
+	Priority *int32 `json:"priority,omitempty" protobuf:"varint,6,opt,name=priority"`
+
+	// preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// This field is immutable.
+	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
+	//
+	// +featureGate=PodGroupPreemptionPolicy
+	// +optional
+	// +k8s:immutable
+	// +k8s:ifDisabled("PodGroupPreemptionPolicy")=+k8s:forbidden
+	// +k8s:ifEnabled("PodGroupPreemptionPolicy")=+k8s:optional
+	PreemptionPolicy *PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,7,opt,name=preemptionPolicy"`
 
 	// podGroupTemplates is the list of templates for children PodGroups.
 	// The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates
@@ -290,7 +319,7 @@ type CompositePodGroupTemplate struct {
 	// +k8s:maxItems=8
 	// +k8s:update=NoAddItem
 	// +k8s:update=NoRemoveItem
-	PodGroupTemplates []PodGroupTemplate `json:"podGroupTemplates,omitempty" protobuf:"bytes,5,rep,name=podGroupTemplates"`
+	PodGroupTemplates []PodGroupTemplate `json:"podGroupTemplates,omitempty" protobuf:"bytes,8,rep,name=podGroupTemplates"`
 
 	// compositePodGroupTemplates is the list of templates for children CompositePodGroups.
 	// The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates
@@ -305,15 +334,7 @@ type CompositePodGroupTemplate struct {
 	// +k8s:maxItems=8
 	// +k8s:update=NoAddItem
 	// +k8s:update=NoRemoveItem
-	CompositePodGroupTemplates []CompositePodGroupTemplate `json:"compositePodGroupTemplates,omitempty" protobuf:"bytes,6,rep,name=compositePodGroupTemplates"`
-
-	// schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate.
-	// This field is immutable.
-	//
-	// +optional
-	// +k8s:optional
-	// +k8s:immutable
-	SchedulingConstraints *CompositePodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,7,opt,name=schedulingConstraints"`
+	CompositePodGroupTemplates []CompositePodGroupTemplate `json:"compositePodGroupTemplates,omitempty" protobuf:"bytes,9,rep,name=compositePodGroupTemplates"`
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
@@ -1061,6 +1082,26 @@ type CompositePodGroupSpec struct {
 	// +k8s:immutable
 	SchedulingPolicy CompositePodGroupSchedulingPolicy `json:"schedulingPolicy" protobuf:"bytes,3,opt,name=schedulingPolicy"`
 
+	// schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// This field is immutable.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	SchedulingConstraints *CompositePodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,4,opt,name=schedulingConstraints"`
+
+	// disruptionMode defines the mode in which a given CompositePodGroup can be disrupted.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// One of Single, All. Defaults to Single if unset.
+	// This field is immutable.
+	//
+	// +default={"single": {}}
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	DisruptionMode *CompositeDisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,5,opt,name=disruptionMode"`
+
 	// priorityClassName defines the priority that should be considered when scheduling this CompositePodGroup.
 	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
 	// If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods
@@ -1072,7 +1113,7 @@ type CompositePodGroupSpec struct {
 	// +k8s:optional
 	// +k8s:format=k8s-long-name
 	// +k8s:immutable
-	PriorityClassName string `json:"priorityClassName,omitempty" protobuf:"bytes,4,opt,name=priorityClassName"`
+	PriorityClassName string `json:"priorityClassName,omitempty" protobuf:"bytes,6,opt,name=priorityClassName"`
 
 	// priority is the value of priority of this composite pod group. Various system components
 	// use this field to find the priority of the composite pod group. When Priority Admission
@@ -1085,16 +1126,21 @@ type CompositePodGroupSpec struct {
 	// +k8s:optional
 	// +k8s:immutable
 	// +k8s:maximum=1000000000 # HighestUserDefinablePriority
-	Priority *int32 `json:"priority,omitempty" protobuf:"varint,5,opt,name=priority"`
+	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
 
-	// schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup.
-	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+	// One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset.
+	// When Priority Admission Controller is enabled, it populates this field from PriorityClassName,
+	// and defaults to PreemptLowerPriority if value is unset in PriorityClass.
 	// This field is immutable.
+	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
 	//
+	// +featureGate=PodGroupPreemptionPolicy
 	// +optional
-	// +k8s:optional
 	// +k8s:immutable
-	SchedulingConstraints *CompositePodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,6,opt,name=schedulingConstraints"`
+	// +k8s:ifDisabled("PodGroupPreemptionPolicy")=+k8s:forbidden
+	// +k8s:ifEnabled("PodGroupPreemptionPolicy")=+k8s:optional
+	PreemptionPolicy *PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,8,opt,name=preemptionPolicy"`
 }
 
 // CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup.
@@ -1142,6 +1188,38 @@ type CompositeGangSchedulingPolicy struct {
 	// +k8s:required
 	// +k8s:minimum=1
 	MinGroupCount int32 `json:"minGroupCount" protobuf:"varint,1,req,name=minGroupCount"`
+}
+
+// CompositeDisruptionMode defines how individual entities within a composite pod group can be disrupted.
+// Exactly one mode must be set.
+//
+// +union
+type CompositeDisruptionMode struct {
+	// single specifies that children groups can be disrupted independently from each other.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	Single *SingleCompositeDisruptionMode `json:"single,omitempty" protobuf:"bytes,1,opt,name=single"`
+
+	// all specifies that all children groups can only be disrupted together.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	All *AllCompositeDisruptionMode `json:"all,omitempty" protobuf:"bytes,2,opt,name=all"`
+}
+
+// SingleCompositeDisruptionMode means that individual children of a CompositePodGroup
+// can be disrupted or preempted independently.
+type SingleCompositeDisruptionMode struct {
+	// This is intentionally empty.
+}
+
+// AllCompositeDisruptionMode means that children of a CompositePodGroup can only be
+// disrupted or preempted together.
+type AllCompositeDisruptionMode struct {
+	// This is intentionally empty.
 }
 
 // CompositePodGroupStatus represents information about the status of a composite pod group.

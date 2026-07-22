@@ -33,8 +33,12 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
+  disruptionMode:
+    all: {}
+    single: {}
   parentCompositePodGroupName: parentCompositePodGroupNameValue
-  priority: 5
+  preemptionPolicy: preemptionPolicyValue
+  priority: 7
   priorityClassName: priorityClassNameValue
   schedulingConstraints:
     topology:

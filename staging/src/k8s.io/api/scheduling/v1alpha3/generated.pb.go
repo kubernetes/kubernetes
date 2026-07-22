@@ -31,11 +31,15 @@ import (
 	strings "strings"
 )
 
+func (m *AllCompositeDisruptionMode) Reset() { *m = AllCompositeDisruptionMode{} }
+
 func (m *AllDisruptionMode) Reset() { *m = AllDisruptionMode{} }
 
 func (m *BasicSchedulingPolicy) Reset() { *m = BasicSchedulingPolicy{} }
 
 func (m *CompositeBasicSchedulingPolicy) Reset() { *m = CompositeBasicSchedulingPolicy{} }
+
+func (m *CompositeDisruptionMode) Reset() { *m = CompositeDisruptionMode{} }
 
 func (m *CompositeGangSchedulingPolicy) Reset() { *m = CompositeGangSchedulingPolicy{} }
 
@@ -77,6 +81,8 @@ func (m *PodGroupStatus) Reset() { *m = PodGroupStatus{} }
 
 func (m *PodGroupTemplate) Reset() { *m = PodGroupTemplate{} }
 
+func (m *SingleCompositeDisruptionMode) Reset() { *m = SingleCompositeDisruptionMode{} }
+
 func (m *SingleDisruptionMode) Reset() { *m = SingleDisruptionMode{} }
 
 func (m *TopologyConstraint) Reset() { *m = TopologyConstraint{} }
@@ -106,6 +112,29 @@ func (m *WorkloadPodGroupSingleDisruptionMode) Reset() { *m = WorkloadPodGroupSi
 func (m *WorkloadReference) Reset() { *m = WorkloadReference{} }
 
 func (m *WorkloadSpec) Reset() { *m = WorkloadSpec{} }
+
+func (m *AllCompositeDisruptionMode) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *AllCompositeDisruptionMode) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *AllCompositeDisruptionMode) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
 
 func (m *AllDisruptionMode) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -173,6 +202,53 @@ func (m *CompositeBasicSchedulingPolicy) MarshalToSizedBuffer(dAtA []byte) (int,
 	_ = i
 	var l int
 	_ = l
+	return len(dAtA) - i, nil
+}
+
+func (m *CompositeDisruptionMode) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CompositeDisruptionMode) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CompositeDisruptionMode) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.All != nil {
+		{
+			size, err := m.All.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.Single != nil {
+		{
+			size, err := m.Single.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
 	return len(dAtA) - i, nil
 }
 
@@ -406,6 +482,35 @@ func (m *CompositePodGroupSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.PreemptionPolicy != nil {
+		i -= len(*m.PreemptionPolicy)
+		copy(dAtA[i:], *m.PreemptionPolicy)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.PreemptionPolicy)))
+		i--
+		dAtA[i] = 0x42
+	}
+	if m.Priority != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.Priority))
+		i--
+		dAtA[i] = 0x38
+	}
+	i -= len(m.PriorityClassName)
+	copy(dAtA[i:], m.PriorityClassName)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.PriorityClassName)))
+	i--
+	dAtA[i] = 0x32
+	if m.DisruptionMode != nil {
+		{
+			size, err := m.DisruptionMode.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x2a
+	}
 	if m.SchedulingConstraints != nil {
 		{
 			size, err := m.SchedulingConstraints.MarshalToSizedBuffer(dAtA[:i])
@@ -416,18 +521,8 @@ func (m *CompositePodGroupSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 			i = encodeVarintGenerated(dAtA, i, uint64(size))
 		}
 		i--
-		dAtA[i] = 0x32
+		dAtA[i] = 0x22
 	}
-	if m.Priority != nil {
-		i = encodeVarintGenerated(dAtA, i, uint64(*m.Priority))
-		i--
-		dAtA[i] = 0x28
-	}
-	i -= len(m.PriorityClassName)
-	copy(dAtA[i:], m.PriorityClassName)
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.PriorityClassName)))
-	i--
-	dAtA[i] = 0x22
 	{
 		size, err := m.SchedulingPolicy.MarshalToSizedBuffer(dAtA[:i])
 		if err != nil {
@@ -517,18 +612,6 @@ func (m *CompositePodGroupTemplate) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	_ = i
 	var l int
 	_ = l
-	if m.SchedulingConstraints != nil {
-		{
-			size, err := m.SchedulingConstraints.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = encodeVarintGenerated(dAtA, i, uint64(size))
-		}
-		i--
-		dAtA[i] = 0x3a
-	}
 	if len(m.CompositePodGroupTemplates) > 0 {
 		for iNdEx := len(m.CompositePodGroupTemplates) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -540,7 +623,7 @@ func (m *CompositePodGroupTemplate) MarshalToSizedBuffer(dAtA []byte) (int, erro
 				i = encodeVarintGenerated(dAtA, i, uint64(size))
 			}
 			i--
-			dAtA[i] = 0x32
+			dAtA[i] = 0x4a
 		}
 	}
 	if len(m.PodGroupTemplates) > 0 {
@@ -554,19 +637,50 @@ func (m *CompositePodGroupTemplate) MarshalToSizedBuffer(dAtA []byte) (int, erro
 				i = encodeVarintGenerated(dAtA, i, uint64(size))
 			}
 			i--
-			dAtA[i] = 0x2a
+			dAtA[i] = 0x42
 		}
+	}
+	if m.PreemptionPolicy != nil {
+		i -= len(*m.PreemptionPolicy)
+		copy(dAtA[i:], *m.PreemptionPolicy)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.PreemptionPolicy)))
+		i--
+		dAtA[i] = 0x3a
 	}
 	if m.Priority != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.Priority))
 		i--
-		dAtA[i] = 0x20
+		dAtA[i] = 0x30
 	}
 	i -= len(m.PriorityClassName)
 	copy(dAtA[i:], m.PriorityClassName)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.PriorityClassName)))
 	i--
-	dAtA[i] = 0x1a
+	dAtA[i] = 0x2a
+	if m.DisruptionMode != nil {
+		{
+			size, err := m.DisruptionMode.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x22
+	}
+	if m.SchedulingConstraints != nil {
+		{
+			size, err := m.SchedulingConstraints.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
 	{
 		size, err := m.SchedulingPolicy.MarshalToSizedBuffer(dAtA[:i])
 		if err != nil {
@@ -1170,6 +1284,29 @@ func (m *PodGroupTemplate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *SingleCompositeDisruptionMode) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *SingleCompositeDisruptionMode) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SingleCompositeDisruptionMode) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
 func (m *SingleDisruptionMode) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -1726,6 +1863,15 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+func (m *AllCompositeDisruptionMode) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
 func (m *AllDisruptionMode) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1750,6 +1896,23 @@ func (m *CompositeBasicSchedulingPolicy) Size() (n int) {
 	}
 	var l int
 	_ = l
+	return n
+}
+
+func (m *CompositeDisruptionMode) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Single != nil {
+		l = m.Single.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.All != nil {
+		l = m.All.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -1843,13 +2006,21 @@ func (m *CompositePodGroupSpec) Size() (n int) {
 	}
 	l = m.SchedulingPolicy.Size()
 	n += 1 + l + sovGenerated(uint64(l))
+	if m.SchedulingConstraints != nil {
+		l = m.SchedulingConstraints.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.DisruptionMode != nil {
+		l = m.DisruptionMode.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	l = len(m.PriorityClassName)
 	n += 1 + l + sovGenerated(uint64(l))
 	if m.Priority != nil {
 		n += 1 + sovGenerated(uint64(*m.Priority))
 	}
-	if m.SchedulingConstraints != nil {
-		l = m.SchedulingConstraints.Size()
+	if m.PreemptionPolicy != nil {
+		l = len(*m.PreemptionPolicy)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
@@ -1880,10 +2051,22 @@ func (m *CompositePodGroupTemplate) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = m.SchedulingPolicy.Size()
 	n += 1 + l + sovGenerated(uint64(l))
+	if m.SchedulingConstraints != nil {
+		l = m.SchedulingConstraints.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.DisruptionMode != nil {
+		l = m.DisruptionMode.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	l = len(m.PriorityClassName)
 	n += 1 + l + sovGenerated(uint64(l))
 	if m.Priority != nil {
 		n += 1 + sovGenerated(uint64(*m.Priority))
+	}
+	if m.PreemptionPolicy != nil {
+		l = len(*m.PreemptionPolicy)
+		n += 1 + l + sovGenerated(uint64(l))
 	}
 	if len(m.PodGroupTemplates) > 0 {
 		for _, e := range m.PodGroupTemplates {
@@ -1896,10 +2079,6 @@ func (m *CompositePodGroupTemplate) Size() (n int) {
 			l = e.Size()
 			n += 1 + l + sovGenerated(uint64(l))
 		}
-	}
-	if m.SchedulingConstraints != nil {
-		l = m.SchedulingConstraints.Size()
-		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
 }
@@ -2128,6 +2307,15 @@ func (m *PodGroupTemplate) Size() (n int) {
 	return n
 }
 
+func (m *SingleCompositeDisruptionMode) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
 func (m *SingleDisruptionMode) Size() (n int) {
 	if m == nil {
 		return 0
@@ -2344,6 +2532,15 @@ func sovGenerated(x uint64) (n int) {
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+func (this *AllCompositeDisruptionMode) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&AllCompositeDisruptionMode{`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *AllDisruptionMode) String() string {
 	if this == nil {
 		return "nil"
@@ -2367,6 +2564,17 @@ func (this *CompositeBasicSchedulingPolicy) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&CompositeBasicSchedulingPolicy{`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CompositeDisruptionMode) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CompositeDisruptionMode{`,
+		`Single:` + strings.Replace(this.Single.String(), "SingleCompositeDisruptionMode", "SingleCompositeDisruptionMode", 1) + `,`,
+		`All:` + strings.Replace(this.All.String(), "AllCompositeDisruptionMode", "AllCompositeDisruptionMode", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2443,9 +2651,11 @@ func (this *CompositePodGroupSpec) String() string {
 		`ParentCompositePodGroupName:` + valueToStringGenerated(this.ParentCompositePodGroupName) + `,`,
 		`WorkloadRef:` + strings.Replace(this.WorkloadRef.String(), "WorkloadReference", "WorkloadReference", 1) + `,`,
 		`SchedulingPolicy:` + strings.Replace(strings.Replace(this.SchedulingPolicy.String(), "CompositePodGroupSchedulingPolicy", "CompositePodGroupSchedulingPolicy", 1), `&`, ``, 1) + `,`,
+		`SchedulingConstraints:` + strings.Replace(this.SchedulingConstraints.String(), "CompositePodGroupSchedulingConstraints", "CompositePodGroupSchedulingConstraints", 1) + `,`,
+		`DisruptionMode:` + strings.Replace(this.DisruptionMode.String(), "CompositeDisruptionMode", "CompositeDisruptionMode", 1) + `,`,
 		`PriorityClassName:` + fmt.Sprintf("%v", this.PriorityClassName) + `,`,
 		`Priority:` + valueToStringGenerated(this.Priority) + `,`,
-		`SchedulingConstraints:` + strings.Replace(this.SchedulingConstraints.String(), "CompositePodGroupSchedulingConstraints", "CompositePodGroupSchedulingConstraints", 1) + `,`,
+		`PreemptionPolicy:` + valueToStringGenerated(this.PreemptionPolicy) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2482,11 +2692,13 @@ func (this *CompositePodGroupTemplate) String() string {
 	s := strings.Join([]string{`&CompositePodGroupTemplate{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`SchedulingPolicy:` + strings.Replace(strings.Replace(this.SchedulingPolicy.String(), "CompositePodGroupSchedulingPolicy", "CompositePodGroupSchedulingPolicy", 1), `&`, ``, 1) + `,`,
+		`SchedulingConstraints:` + strings.Replace(this.SchedulingConstraints.String(), "CompositePodGroupSchedulingConstraints", "CompositePodGroupSchedulingConstraints", 1) + `,`,
+		`DisruptionMode:` + strings.Replace(this.DisruptionMode.String(), "CompositeDisruptionMode", "CompositeDisruptionMode", 1) + `,`,
 		`PriorityClassName:` + fmt.Sprintf("%v", this.PriorityClassName) + `,`,
 		`Priority:` + valueToStringGenerated(this.Priority) + `,`,
+		`PreemptionPolicy:` + valueToStringGenerated(this.PreemptionPolicy) + `,`,
 		`PodGroupTemplates:` + repeatedStringForPodGroupTemplates + `,`,
 		`CompositePodGroupTemplates:` + repeatedStringForCompositePodGroupTemplates + `,`,
-		`SchedulingConstraints:` + strings.Replace(this.SchedulingConstraints.String(), "CompositePodGroupSchedulingConstraints", "CompositePodGroupSchedulingConstraints", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2651,6 +2863,15 @@ func (this *PodGroupTemplate) String() string {
 		`PriorityClassName:` + fmt.Sprintf("%v", this.PriorityClassName) + `,`,
 		`Priority:` + valueToStringGenerated(this.Priority) + `,`,
 		`PreemptionPolicy:` + valueToStringGenerated(this.PreemptionPolicy) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *SingleCompositeDisruptionMode) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&SingleCompositeDisruptionMode{`,
 		`}`,
 	}, "")
 	return s
@@ -2840,6 +3061,56 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
+func (m *AllCompositeDisruptionMode) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AllCompositeDisruptionMode: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AllCompositeDisruptionMode: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *AllDisruptionMode) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2969,6 +3240,128 @@ func (m *CompositeBasicSchedulingPolicy) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: CompositeBasicSchedulingPolicy: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CompositeDisruptionMode) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CompositeDisruptionMode: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CompositeDisruptionMode: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Single", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Single == nil {
+				m.Single = &SingleCompositeDisruptionMode{}
+			}
+			if err := m.Single.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field All", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.All == nil {
+				m.All = &AllCompositeDisruptionMode{}
+			}
+			if err := m.All.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -3664,58 +4057,6 @@ func (m *CompositePodGroupSpec) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 4:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PriorityClassName", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.PriorityClassName = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 5:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Priority", wireType)
-			}
-			var v int32
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				v |= int32(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Priority = &v
-		case 6:
-			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field SchedulingConstraints", wireType)
 			}
 			var msglen int
@@ -3749,6 +4090,127 @@ func (m *CompositePodGroupSpec) Unmarshal(dAtA []byte) error {
 			if err := m.SchedulingConstraints.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DisruptionMode", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.DisruptionMode == nil {
+				m.DisruptionMode = &CompositeDisruptionMode{}
+			}
+			if err := m.DisruptionMode.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PriorityClassName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.PriorityClassName = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Priority", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Priority = &v
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PreemptionPolicy", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := PreemptionPolicy(dAtA[iNdEx:postIndex])
+			m.PreemptionPolicy = &s
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -3951,6 +4413,78 @@ func (m *CompositePodGroupTemplate) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SchedulingConstraints", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SchedulingConstraints == nil {
+				m.SchedulingConstraints = &CompositePodGroupSchedulingConstraints{}
+			}
+			if err := m.SchedulingConstraints.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DisruptionMode", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.DisruptionMode == nil {
+				m.DisruptionMode = &CompositeDisruptionMode{}
+			}
+			if err := m.DisruptionMode.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field PriorityClassName", wireType)
 			}
 			var stringLen uint64
@@ -3981,7 +4515,7 @@ func (m *CompositePodGroupTemplate) Unmarshal(dAtA []byte) error {
 			}
 			m.PriorityClassName = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 4:
+		case 6:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Priority", wireType)
 			}
@@ -4001,7 +4535,40 @@ func (m *CompositePodGroupTemplate) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Priority = &v
-		case 5:
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PreemptionPolicy", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := PreemptionPolicy(dAtA[iNdEx:postIndex])
+			m.PreemptionPolicy = &s
+			iNdEx = postIndex
+		case 8:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field PodGroupTemplates", wireType)
 			}
@@ -4035,7 +4602,7 @@ func (m *CompositePodGroupTemplate) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 6:
+		case 9:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field CompositePodGroupTemplates", wireType)
 			}
@@ -4066,42 +4633,6 @@ func (m *CompositePodGroupTemplate) Unmarshal(dAtA []byte) error {
 			}
 			m.CompositePodGroupTemplates = append(m.CompositePodGroupTemplates, CompositePodGroupTemplate{})
 			if err := m.CompositePodGroupTemplates[len(m.CompositePodGroupTemplates)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 7:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field SchedulingConstraints", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.SchedulingConstraints == nil {
-				m.SchedulingConstraints = &CompositePodGroupSchedulingConstraints{}
-			}
-			if err := m.SchedulingConstraints.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -5798,6 +6329,56 @@ func (m *PodGroupTemplate) Unmarshal(dAtA []byte) error {
 			s := PreemptionPolicy(dAtA[iNdEx:postIndex])
 			m.PreemptionPolicy = &s
 			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *SingleCompositeDisruptionMode) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: SingleCompositeDisruptionMode: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: SingleCompositeDisruptionMode: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

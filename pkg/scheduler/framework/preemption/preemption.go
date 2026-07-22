@@ -64,11 +64,12 @@ type Interface interface {
 
 // Evaluator is a preemption evaluator. It runs preemption logic with a given Interface.
 type Evaluator struct {
-	PluginName       string
-	Handler          fwk.Handle
-	PodLister        corelisters.PodLister
-	PdbLister        policylisters.PodDisruptionBudgetLister
-	podGroupSnapshot fwk.PodGroupLister
+	PluginName                string
+	Handler                   fwk.Handle
+	PodLister                 corelisters.PodLister
+	PdbLister                 policylisters.PodDisruptionBudgetLister
+	podGroupSnapshot          fwk.PodGroupLister
+	compositePodGroupSnapshot fwk.CompositePodGroupLister
 
 	Interface
 	executor *Executor
@@ -86,6 +87,9 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, executor *Execu
 	}
 	if executor.fts.EnableGenericWorkload {
 		ev.podGroupSnapshot = fh.MutableSnapshotSharedLister().PodGroups()
+	}
+	if executor.fts.EnableCompositePodGroup {
+		ev.compositePodGroupSnapshot = fh.MutableSnapshotSharedLister().CompositePodGroups()
 	}
 	return ev
 }
@@ -510,11 +514,11 @@ func (ev *Evaluator) GetVictimsOnNode(ctx context.Context, nodeInfo fwk.NodeInfo
 	if !ev.executor.fts.EnableGenericWorkload {
 		var victims []Victim
 		for _, podInfo := range nodeInfo.GetPods() {
-			victims = append(victims, NewPodVictim(podInfo, nil))
+			victims = append(victims, NewPodVictim(podInfo, nil, nil))
 		}
 		return createDomainVictims(fh.MutableSnapshotSharedLister(), victims)
 	}
 
-	return getCrossNodesVictims(fh.MutableSnapshotSharedLister(), ev.podGroupSnapshot, []fwk.NodeInfo{nodeInfo})
-
+	logger := klog.FromContext(ctx)
+	return getCrossNodesVictims(logger, fh.MutableSnapshotSharedLister(), ev.podGroupSnapshot, ev.compositePodGroupSnapshot, []fwk.NodeInfo{nodeInfo})
 }
