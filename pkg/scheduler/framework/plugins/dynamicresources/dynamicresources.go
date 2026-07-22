@@ -1493,12 +1493,9 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 			}
 			// During the asynchronous binding cycle, this Pod is the only one allowed
 			// to have been scheduled before unreserving the claim for the PodGroup.
+			// This is unreachable during the synchronous scheduling cycle since
+			// the claim has not yet been reserved.
 			maxPodGroupPodsToUnreserve := 1
-			if cs.IsPodGroupSchedulingCycle() {
-				// During the synchronous scheduling cycle, even this Pod has not yet
-				// been scheduled.
-				maxPodGroupPodsToUnreserve = 0
-			}
 			// If ScheduledPodsCount has not caught up to reality and there
 			// actually are not any other scheduled Pods, then PostFilter will
 			// check later if the PodGroup can be removed from status.reservedFor.
