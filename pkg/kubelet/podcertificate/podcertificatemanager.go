@@ -126,6 +126,9 @@ type IssuingManager struct {
 	// lock covers credStore
 	lock      sync.Mutex
 	credStore map[projectionKey]*projectionRecord
+
+	// wg tracks all background goroutines started by Run()
+	wg sync.WaitGroup
 }
 
 type projectionKey struct {
@@ -342,17 +345,33 @@ func (m *IssuingManager) Run(ctx context.Context) {
 		return
 	}
 
-	go wait.JitterUntilWithContext(ctx, m.runRefreshPass, 1*time.Minute, 1.0, false)
-	go wait.UntilWithContext(ctx, m.runProjectionProcessor, time.Second)
+	m.wg.Add(2)
+	go func() {
+		defer m.wg.Done()
+		wait.JitterUntilWithContext(ctx, m.runRefreshPass, 1*time.Minute, 1.0, false)
+	}()
+	go func() {
+		defer m.wg.Done()
+		m.runProjectionProcessor(ctx)
+	}()
 	<-ctx.Done()
 
 	m.projectionQueue.ShutDown()
+	m.wg.Wait()
 
 	logger.Info("podcertificate.IssuingManager shut down")
 }
 
 func (m *IssuingManager) runProjectionProcessor(ctx context.Context) {
-	for m.processNextProjection(ctx) {
+	for {
+		if !m.processNextProjection(ctx) {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
 	}
 }
 
@@ -703,6 +722,11 @@ func jitterDuration() time.Duration {
 func (m *IssuingManager) runRefreshPass(ctx context.Context) {
 	allPods := m.podManager.GetPods()
 	for _, pod := range allPods {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
 		m.queueAllProjectionsForPod(pod.ObjectMeta.UID)
 	}
 }
