@@ -4526,6 +4526,7 @@ func withMetricsRecorder(recorder *metrics.MetricAsyncRecorder) Option {
 
 func TestRecordingMetrics(t *testing.T) {
 	state.SetRecordPluginMetrics(true)
+	state.SetRecordFrameworkExtensionPointMetrics(true)
 	tests := []struct {
 		name               string
 		action             func(ctx context.Context, f framework.Framework)
@@ -4791,6 +4792,73 @@ func TestRecordingMetrics(t *testing.T) {
 
 			collectAndCompareFrameworkMetrics(t, tt.wantExtensionPoint, tt.wantStatus)
 			collectAndComparePluginMetrics(t, tt.wantExtensionPoint, testPlugin, tt.wantStatus)
+		})
+	}
+}
+
+func TestRecordFrameworkExtensionPointMetricsGating(t *testing.T) {
+	tests := []struct {
+		name       string
+		recordFlag bool
+		wantCount  uint64
+	}{
+		{
+			name:       "disabled flag does not record metrics",
+			recordFlag: false,
+			wantCount:  0,
+		},
+		{
+			name:       "enabled flag records metrics",
+			recordFlag: true,
+			wantCount:  1,
+		},
+	}
+
+	_, ctx := ktesting.NewTestContext(t)
+	plugin := &TestPlugin{name: testPlugin}
+	r := make(Registry)
+	err := r.Register(testPlugin, func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+		return plugin, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to register plugin: %v", err)
+	}
+	plugins := &config.Plugins{
+		PreFilter: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+	}
+	profile := config.KubeSchedulerProfile{
+		SchedulerName: testProfileName,
+		Plugins:       plugins,
+	}
+	f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
+		WithWaitingPods(NewWaitingPodsMap()),
+		WithSnapshotSharedLister(cache.NewEmptySnapshot()),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create framework: %v", err)
+	}
+	defer func() {
+		_ = f.Close()
+	}()
+
+	pod := &v1.Pod{}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			metrics.FrameworkExtensionPointDuration.Reset()
+			cycleState := framework.NewCycleState()
+			cycleState.SetRecordFrameworkExtensionPointMetrics(tt.recordFlag)
+
+			f.RunPreFilterPlugins(ctx, cycleState, pod)
+
+			m := metrics.FrameworkExtensionPointDuration.WithLabelValues("PreFilter", fwk.Success.String(), testProfileName)
+			count, err := testutil.GetHistogramMetricCount(m)
+			if err != nil {
+				t.Fatalf("Failed to get metric count: %v", err)
+			}
+			if count != tt.wantCount {
+				t.Errorf("Expected %d samples when flag is %v, got: %v", tt.wantCount, tt.recordFlag, count)
+			}
 		})
 	}
 }

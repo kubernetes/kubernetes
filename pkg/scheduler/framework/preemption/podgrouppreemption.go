@@ -245,6 +245,8 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	// Prepare podInfos for each of the assigned preemptor pods
 	for _, assignment := range podGroupAssignments.ProposedAssignments {
 		if assignment.GetNodeName() != "" {
+			assignment.GetCycleState().SetRecordPluginMetrics(false)
+			assignment.GetCycleState().SetRecordFrameworkExtensionPointMetrics(false)
 			validAssignment = append(validAssignment, assignment)
 		}
 	}
