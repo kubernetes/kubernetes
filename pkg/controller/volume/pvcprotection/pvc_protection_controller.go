@@ -134,14 +134,17 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 
 	e.pvcLister = pvcInformer.Lister()
 	e.pvcListerSynced = pvcInformer.Informer().HasSynced
-	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := pvcInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			e.pvcAddedUpdated(logger, obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			e.pvcAddedUpdated(logger, new)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("could not add PVC event handler: %w", err)
+	}
 
 	e.podLister = podInformer.Lister()
 	e.podListerSynced = podInformer.Informer().HasSynced
@@ -149,7 +152,7 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 	if err := common.AddIndexerIfNotPresent(e.podIndexer, common.PodPVCIndex, common.PodPVCIndexFunc()); err != nil {
 		return nil, fmt.Errorf("could not initialize pvc protection controller: %w", err)
 	}
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			e.podAddedDeletedUpdated(logger, nil, obj, false)
 		},
@@ -159,7 +162,10 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 		UpdateFunc: func(old, new interface{}) {
 			e.podAddedDeletedUpdated(logger, old, new, false)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("could not add Pod event handler: %w", err)
+	}
 
 	return e, nil
 }
