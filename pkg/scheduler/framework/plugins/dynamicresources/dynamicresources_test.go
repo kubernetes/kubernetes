@@ -4321,9 +4321,42 @@ func testIsSchedulableAfterClaimChange(tCtx ktesting.TContext) {
 	}{
 		"skip-deletes": {
 			pod:      podWithClaimTemplate,
-			oldObj:   allocatedClaim,
+			oldObj:   pendingClaim,
 			newObj:   nil,
 			wantHint: fwk.QueueSkip,
+		},
+		"queue-on-delete-with-allocation": {
+			pod:      podWithClaimTemplate,
+			oldObj:   allocatedClaim,
+			newObj:   nil,
+			wantHint: fwk.Queue,
+		},
+		"queue-on-delete-final-state-unknown": {
+			pod: podWithClaimTemplate,
+			oldObj: cache.DeletedFinalStateUnknown{
+				Key: allocatedClaim.Namespace + "/" + allocatedClaim.Name,
+				Obj: allocatedClaim,
+			},
+			newObj:   nil,
+			wantHint: fwk.Queue,
+		},
+		"queue-on-delete-final-state-unknown-with-object": {
+			pod: podWithClaimTemplate,
+			oldObj: cache.DeletedFinalStateUnknown{
+				Key: allocatedClaim.Namespace + "/" + allocatedClaim.Name,
+				Obj: allocatedClaim,
+			},
+			newObj:   nil,
+			wantHint: fwk.Queue,
+		},
+		"queue-on-delete-final-state-unknown-without-object": {
+			pod: podWithClaimTemplate,
+			oldObj: cache.DeletedFinalStateUnknown{
+				Key: allocatedClaim.Namespace + "/" + allocatedClaim.Name,
+				Obj: nil,
+			},
+			newObj:   nil,
+			wantHint: fwk.Queue,
 		},
 		"backoff-wrong-new-object": {
 			pod:     podWithClaimTemplate,
