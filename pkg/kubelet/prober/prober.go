@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -36,8 +37,6 @@ import (
 	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 	tcpprobe "k8s.io/kubernetes/pkg/probe/tcp"
 	"k8s.io/utils/exec"
-
-	"k8s.io/klog/v2"
 )
 
 const maxProbeRetries = 3
@@ -199,8 +198,10 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 		if p.GRPC.Service != nil {
 			service = *p.GRPC.Service
 		}
-		logger.V(4).Info("GRPC-Probe", "host", host, "service", service, "port", p.GRPC.Port, "timeout", timeout)
-		return pb.grpc.Probe(host, service, int(p.GRPC.Port), timeout)
+		useTLS := utilfeature.DefaultFeatureGate.Enabled(features.GRPCContainerProbeTLS) &&
+			p.GRPC.Mode != nil && *p.GRPC.Mode == v1.GRPCProbeModeTLS
+		logger.V(4).Info("GRPC-Probe", "host", host, "service", service, "port", p.GRPC.Port, "timeout", timeout, "tls", useTLS)
+		return pb.grpc.Probe(host, service, int(p.GRPC.Port), timeout, grpcprobe.ProbeOptions{UseTLS: useTLS})
 
 	default:
 		logger.V(4).Info("Failed to find probe builder for container", "containerName", container.Name)
