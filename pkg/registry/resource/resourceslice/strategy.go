@@ -65,7 +65,12 @@ func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) f
 // DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
 // validation options to the generic BeforeCreate/BeforeUpdate code path.
 func (resourceSliceStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
-	return rest.DeclarativeValidationConfig{NormalizationRules: validation.ResourceNormalizationRules}
+	return rest.DeclarativeValidationConfig{
+		NormalizationRules: validation.ResourceNormalizationRules,
+		Options: map[string]bool{
+			string(features.DRAPartitionableDevicesType): utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevicesType),
+		},
+	}
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -201,6 +206,22 @@ func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice)
 	dropDisabledDRANodeAllocatableResourcesFields(newSlice, oldSlice)
 	dropDisableDRAListTypeAttributesFields(newSlice, oldSlice)
+	dropDisabledDRAPartitionableDevicesTypeFields(newSlice, oldSlice)
+}
+
+func dropDisabledDRAPartitionableDevicesTypeFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevicesType) || draPartitionableDevicesTypeFeatureInUse(oldSlice) {
+		return
+	}
+
+	newSlice.Spec.PartitionTypeAttribute = nil
+}
+
+func draPartitionableDevicesTypeFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+	return slice.Spec.PartitionTypeAttribute != nil
 }
 
 func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {

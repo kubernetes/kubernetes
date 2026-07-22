@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha3
 
 import (
+	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -424,6 +425,26 @@ type ResourcePoolStatusRequestSpec struct {
 	// +k8s:minimum=1
 	// +k8s:maximum=1000
 	Limit *int32 `json:"limit,omitempty" protobuf:"varint,3,opt,name=limit"`
+
+	// DefaultPartitionTypeAttribute optionally names a device attribute (by its
+	// fully qualified name, e.g. "gpu.example.com/profile") to use as the default
+	// grouping attribute for partitionable devices whose slice has not declared
+	// one themselves.
+	//
+	// A slice's own PartitionTypeAttribute always takes precedence. This default
+	// applies only to devices whose slice does not declare one, so that a request
+	// can still get an accurate partitionSummary from a driver that has not
+	// been updated to declare it. When neither the slice nor this default names
+	// an attribute, a partitionable pool reports no partitionSummary.
+	//
+	// Must include the domain qualifier.
+	//
+	// +optional
+	// +featureGate=DRAPartitionableDevicesType
+	// +k8s:ifDisabled(DRAPartitionableDevicesType)=+k8s:forbidden
+	// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:optional
+	// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:format=k8s-resource-fully-qualified-name
+	DefaultPartitionTypeAttribute *string `json:"defaultPartitionTypeAttribute,omitempty" protobuf:"bytes,4,opt,name=defaultPartitionTypeAttribute"`
 }
 
 // ResourcePoolStatusRequestLimitDefault is the default value for spec.limit.
@@ -566,6 +587,124 @@ type PoolStatus struct {
 	// +k8s:optional
 	// +k8s:maxBytes=256
 	ValidationError *string `json:"validationError,omitempty" protobuf:"bytes,10,opt,name=validationError"`
+
+	// PartitionSummary reports allocatability per (attribute, partition type)
+	// for a partitionable pool that publishes SharedCounters. Each entry names
+	// the grouping attribute it was resolved from: the PartitionTypeAttribute
+	// declared by a device's own slice, or for devices whose slice declares
+	// none, the default named in the request. A pool that mixes partitions
+	// declared under different attributes reports each independently. When no
+	// slice declares an attribute and the request names no default, the pool
+	// reports no partition summary.
+	//
+	// +optional
+	// +k8s:optional
+	// +listType=atomic
+	// +k8s:listType=atomic
+	// +k8s:unique=map
+	// +k8s:listMapKey=attribute
+	// +k8s:listMapKey=type
+	// +k8s:maxItems=32
+	PartitionSummary []PartitionTypeStatus `json:"partitionSummary,omitempty" protobuf:"bytes,11,rep,name=partitionSummary"`
+
+	// ShareableSummary reports aggregate capacity for a pool that contains
+	// devices with AllowMultipleAllocations. It is populated only when at
+	// least one device in the pool is shareable.
+	//
+	// +optional
+	// +k8s:optional
+	ShareableSummary *ShareableSummaryStatus `json:"shareableSummary,omitempty" protobuf:"bytes,13,opt,name=shareableSummary"`
+}
+
+// PartitionTypeStatus reports allocatability for a single partition type,
+// identified by the value of a grouping attribute.
+type PartitionTypeStatus struct {
+	// Attribute is the fully qualified name of the device attribute whose value
+	// groups this entry. It is the PartitionTypeAttribute declared by the
+	// devices' own slice, or the default named in the request when their slice
+	// declares none.
+	//
+	// +required
+	// +k8s:required
+	Attribute string `json:"attribute,omitempty" protobuf:"bytes,4,name=attribute"`
+
+	// Type is the partition type value (e.g. "Full" or "Half").
+	//
+	// +required
+	// +k8s:required
+	Type string `json:"type,omitempty" protobuf:"bytes,1,name=type"`
+
+	// Total is the number of devices of this partition type in the pool.
+	//
+	// +required
+	// +k8s:required
+	// +k8s:minimum=0
+	Total *int32 `json:"total,omitempty" protobuf:"varint,2,opt,name=total"`
+
+	// Allocatable is the number of additional devices of this partition type
+	// that could still be allocated given current shared-counter consumption.
+	//
+	// +required
+	// +k8s:required
+	// +k8s:minimum=0
+	Allocatable *int32 `json:"allocatable,omitempty" protobuf:"varint,3,opt,name=allocatable"`
+}
+
+// ShareableSummaryStatus reports aggregate capacity for a pool that contains
+// devices with AllowMultipleAllocations.
+type ShareableSummaryStatus struct {
+	// FullyAvailableDevices is the number of shareable devices with no
+	// capacity consumed.
+	//
+	// +required
+	// +k8s:required
+	// +k8s:minimum=0
+	FullyAvailableDevices *int32 `json:"fullyAvailableDevices,omitempty" protobuf:"varint,1,opt,name=fullyAvailableDevices"`
+
+	// PartiallyAvailableDevices is the number of shareable devices with some
+	// but not all capacity consumed.
+	//
+	// +required
+	// +k8s:required
+	// +k8s:minimum=0
+	PartiallyAvailableDevices *int32 `json:"partiallyAvailableDevices,omitempty" protobuf:"varint,2,opt,name=partiallyAvailableDevices"`
+
+	// Capacity reports aggregate total, consumed, and available amounts per
+	// shareable capacity key across the pool.
+	//
+	// +optional
+	// +k8s:optional
+	// +listType=atomic
+	// +k8s:maxItems=32
+	Capacity []ShareableCapacityStatus `json:"capacity,omitempty" protobuf:"bytes,3,rep,name=capacity"`
+}
+
+// ShareableCapacityStatus reports aggregate amounts for a single shareable
+// capacity key.
+type ShareableCapacityStatus struct {
+	// Name is the capacity name.
+	//
+	// +required
+	// +k8s:required
+	Name string `json:"name,omitempty" protobuf:"bytes,1,name=name"`
+
+	// Total is the sum of this capacity across shareable devices in the pool.
+	//
+	// +required
+	// +k8s:required
+	Total *resource.Quantity `json:"total,omitempty" protobuf:"bytes,2,opt,name=total"`
+
+	// Consumed is the amount drawn by current allocations.
+	//
+	// +required
+	// +k8s:required
+	Consumed *resource.Quantity `json:"consumed,omitempty" protobuf:"bytes,3,opt,name=consumed"`
+
+	// Available is Total minus Consumed, never negative.
+	//
+	// +required
+	// +k8s:required
+	Available *resource.Quantity `json:"available,omitempty" protobuf:"bytes,4,opt,name=available"`
 }
 
 // ResourcePoolStatusRequestConditionComplete is the condition type for completed requests.

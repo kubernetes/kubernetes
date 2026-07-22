@@ -20,11 +20,15 @@ import (
 	"strings"
 	"testing"
 
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/resource/resourcepoolstatusrequest"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
@@ -43,8 +47,9 @@ func TestDeclarativeValidate(t *testing.T) {
 	})
 
 	testCases := map[string]struct {
-		input        resource.ResourcePoolStatusRequest
-		expectedErrs field.ErrorList
+		input                   resource.ResourcePoolStatusRequest
+		enablePartitionTypeAttr bool
+		expectedErrs            field.ErrorList
 	}{
 		"valid": {
 			input: mkValidRPSR(),
@@ -68,6 +73,37 @@ func TestDeclarativeValidate(t *testing.T) {
 			// +k8s:format=k8s-resource-pool-name (standard DV)
 			input:        mkValidRPSR(setPoolName("invalid pool!")),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "poolName"), nil, "").WithOrigin("format=k8s-resource-pool-name")},
+		},
+		"valid partitionTypeAttribute": {
+			// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:optional
+			input: mkValidRPSR(func(r *resource.ResourcePoolStatusRequest) {
+				r.Spec.DefaultPartitionTypeAttribute = new("gpu.example.com/profile")
+			}),
+			enablePartitionTypeAttr: true,
+		},
+		"invalid partitionTypeAttribute format": {
+			// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:format=k8s-resource-fully-qualified-name
+			input: mkValidRPSR(func(r *resource.ResourcePoolStatusRequest) {
+				r.Spec.DefaultPartitionTypeAttribute = new("invalid attr!")
+			}),
+			enablePartitionTypeAttr: true,
+			expectedErrs:            field.ErrorList{field.Invalid(field.NewPath("spec", "defaultPartitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name")},
+		},
+		"partitionTypeAttribute without domain": {
+			// A bare name is a valid attribute key but not a valid reference:
+			// the domain is required so the attribute is unambiguous.
+			input: mkValidRPSR(func(r *resource.ResourcePoolStatusRequest) {
+				r.Spec.DefaultPartitionTypeAttribute = new("profile")
+			}),
+			enablePartitionTypeAttr: true,
+			expectedErrs:            field.ErrorList{field.Invalid(field.NewPath("spec", "defaultPartitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name")},
+		},
+		"partitionTypeAttribute with feature disabled": {
+			// +k8s:ifDisabled(DRAPartitionableDevicesType)=+k8s:forbidden
+			input: mkValidRPSR(func(r *resource.ResourcePoolStatusRequest) {
+				r.Spec.DefaultPartitionTypeAttribute = new("gpu.example.com/profile")
+			}),
+			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "defaultPartitionTypeAttribute"), "")},
 		},
 		"limit zero": {
 			// +k8s:minimum=1 (standard DV)
@@ -101,6 +137,10 @@ func TestDeclarativeValidate(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			// DRAPartitionableDevicesType depends on DRAResourcePoolStatus, so it
+			// cannot be enabled on its own.
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourcePoolStatus, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPartitionableDevicesType, tc.enablePartitionTypeAttr)
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
@@ -370,6 +410,192 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 			})),
 			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("generation"), "")},
 		},
+		"partitionSummary maxItems exceeded": {
+			// +k8s:maxItems=32
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				summary := make([]resource.PartitionTypeStatus, 33)
+				for i := range summary {
+					summary[i] = resource.PartitionTypeStatus{Attribute: "gpu.example.com/profile", Type: "Full" + strings.Repeat("x", i), Total: ptr.To[int32](0), Allocatable: ptr.To[int32](0)}
+				}
+				pool.PartitionSummary = summary
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.TooMany(field.NewPath("status", "pools").Index(0).Child("partitionSummary"), 33, 32).WithOrigin("maxItems")},
+		},
+		"partitionSummary empty type": {
+			// +k8s:required (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.PartitionSummary = []resource.PartitionTypeStatus{{Attribute: "gpu.example.com/profile", Type: "", Total: ptr.To[int32](0), Allocatable: ptr.To[int32](0)}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(0).Child("type"), "")},
+		},
+		"partitionSummary negative total": {
+			// +k8s:minimum=0 (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.PartitionSummary = []resource.PartitionTypeStatus{{Attribute: "gpu.example.com/profile", Type: "Full", Total: ptr.To[int32](-1), Allocatable: ptr.To[int32](0)}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(0).Child("total"), nil, "").WithOrigin("minimum")},
+		},
+		"partitionSummary negative allocatable": {
+			// +k8s:minimum=0 (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.PartitionSummary = []resource.PartitionTypeStatus{{Attribute: "gpu.example.com/profile", Type: "Full", Total: ptr.To[int32](0), Allocatable: ptr.To[int32](-1)}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(0).Child("allocatable"), nil, "").WithOrigin("minimum")},
+		},
+		"partitionSummary total required": {
+			// +k8s:required (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.PartitionSummary = []resource.PartitionTypeStatus{{Attribute: "gpu.example.com/profile", Type: "Full", Allocatable: ptr.To[int32](0)}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(0).Child("total"), "")},
+		},
+		"partitionSummary allocatable required": {
+			// +k8s:required (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.PartitionSummary = []resource.PartitionTypeStatus{{Attribute: "gpu.example.com/profile", Type: "Full", Total: ptr.To[int32](0)}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(0).Child("allocatable"), "")},
+		},
+		"partitionSummary empty attribute": {
+			// +k8s:required (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.PartitionSummary = []resource.PartitionTypeStatus{{Type: "Full", Total: ptr.To[int32](0), Allocatable: ptr.To[int32](0)}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(0).Child("attribute"), "")},
+		},
+		"partitionSummary duplicate attribute and type": {
+			// +k8s:unique=map on (attribute, type)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				entry := resource.PartitionTypeStatus{Attribute: "gpu.example.com/profile", Type: "Full", Total: ptr.To[int32](0), Allocatable: ptr.To[int32](0)}
+				pool.PartitionSummary = []resource.PartitionTypeStatus{entry, entry}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Duplicate(field.NewPath("status", "pools").Index(0).Child("partitionSummary").Index(1), map[string]interface{}{"attribute": "gpu.example.com/profile", "type": "Full"})},
+		},
+		"shareableSummary capacity maxItems exceeded": {
+			// +k8s:maxItems=32
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				caps := make([]resource.ShareableCapacityStatus, 33)
+				for i := range caps {
+					caps[i] = validShareableCapacity("mem")
+				}
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{FullyAvailableDevices: ptr.To[int32](0), PartiallyAvailableDevices: ptr.To[int32](0), Capacity: caps}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.TooMany(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("capacity"), 33, 32).WithOrigin("maxItems")},
+		},
+		"shareableSummary capacity empty name": {
+			// +k8s:required (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				cap := validShareableCapacity("")
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{FullyAvailableDevices: ptr.To[int32](0), PartiallyAvailableDevices: ptr.To[int32](0), Capacity: []resource.ShareableCapacityStatus{cap}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("capacity").Index(0).Child("name"), "")},
+		},
+		"shareableSummary capacity total required": {
+			// +k8s:required
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				cap := validShareableCapacity("mem")
+				cap.Total = nil
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{FullyAvailableDevices: ptr.To[int32](0), PartiallyAvailableDevices: ptr.To[int32](0), Capacity: []resource.ShareableCapacityStatus{cap}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("capacity").Index(0).Child("total"), "")},
+		},
+		"shareableSummary capacity consumed required": {
+			// +k8s:required
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				cap := validShareableCapacity("mem")
+				cap.Consumed = nil
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{FullyAvailableDevices: ptr.To[int32](0), PartiallyAvailableDevices: ptr.To[int32](0), Capacity: []resource.ShareableCapacityStatus{cap}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("capacity").Index(0).Child("consumed"), "")},
+		},
+		"shareableSummary capacity available required": {
+			// +k8s:required
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				cap := validShareableCapacity("mem")
+				cap.Available = nil
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{FullyAvailableDevices: ptr.To[int32](0), PartiallyAvailableDevices: ptr.To[int32](0), Capacity: []resource.ShareableCapacityStatus{cap}}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("capacity").Index(0).Child("available"), "")},
+		},
+		"shareableSummary negative fullyAvailableDevices": {
+			// +k8s:minimum=0 (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{FullyAvailableDevices: ptr.To[int32](-1), PartiallyAvailableDevices: ptr.To[int32](0)}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("fullyAvailableDevices"), nil, "").WithOrigin("minimum")},
+		},
+		"shareableSummary negative partiallyAvailableDevices": {
+			// +k8s:minimum=0 (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{FullyAvailableDevices: ptr.To[int32](0), PartiallyAvailableDevices: ptr.To[int32](-1)}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("partiallyAvailableDevices"), nil, "").WithOrigin("minimum")},
+		},
+		"shareableSummary fullyAvailableDevices required": {
+			// +k8s:required (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{PartiallyAvailableDevices: ptr.To[int32](0)}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("fullyAvailableDevices"), "")},
+		},
+		"shareableSummary partiallyAvailableDevices required": {
+			// +k8s:required (standard DV)
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.ShareableSummary = &resource.ShareableSummaryStatus{FullyAvailableDevices: ptr.To[int32](0)}
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("shareableSummary").Child("partiallyAvailableDevices"), "")},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -409,6 +635,15 @@ func mkValidRPSRForUpdate(tweaks ...func(*resource.ResourcePoolStatusRequest)) r
 	obj := mkValidRPSR(tweaks...)
 	obj.ResourceVersion = "1"
 	return obj
+}
+
+func qty(s string) *apiresource.Quantity {
+	q := apiresource.MustParse(s)
+	return &q
+}
+
+func validShareableCapacity(name string) resource.ShareableCapacityStatus {
+	return resource.ShareableCapacityStatus{Name: name, Total: qty("1"), Consumed: qty("0"), Available: qty("1")}
 }
 
 func mkValidPoolStatus() resource.PoolStatus {

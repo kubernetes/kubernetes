@@ -491,8 +491,11 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 							Generation:         pool.Generation,
 							ResourceSliceCount: int64(len(pool.Slices)),
 						},
-						NodeSelector: pool.NodeSelector,
-						Devices:      slice.Devices,
+						NodeSelector:           pool.NodeSelector,
+						Devices:                slice.Devices,
+						SharedCounters:         slice.SharedCounters,
+						PerDeviceNodeSelection: slice.PerDeviceNodeSelection,
+						PartitionTypeAttribute: slice.PartitionTypeAttribute,
 					},
 				}
 				_, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, resourceSlice, metav1.CreateOptions{})

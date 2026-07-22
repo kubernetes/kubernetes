@@ -1472,6 +1472,7 @@ func autoConvert_v1_ResourceSliceSpec_To_v1beta1_ResourceSliceSpec(in *v1.Resour
 	}
 	out.PerDeviceNodeSelection = (*bool)(unsafe.Pointer(in.PerDeviceNodeSelection))
 	out.SharedCounters = *(*[]resourcev1beta1.CounterSet)(unsafe.Pointer(&in.SharedCounters))
+	out.PartitionTypeAttribute = (*resourcev1beta1.FullyQualifiedName)(unsafe.Pointer(in.PartitionTypeAttribute))
 	return nil
 }
 
@@ -1500,5 +1501,6 @@ func autoConvert_v1beta1_ResourceSliceSpec_To_v1_ResourceSliceSpec(in *resourcev
 	}
 	out.PerDeviceNodeSelection = (*bool)(unsafe.Pointer(in.PerDeviceNodeSelection))
 	out.SharedCounters = *(*[]v1.CounterSet)(unsafe.Pointer(&in.SharedCounters))
+	out.PartitionTypeAttribute = (*v1.FullyQualifiedName)(unsafe.Pointer(in.PartitionTypeAttribute))
 	return nil
 }

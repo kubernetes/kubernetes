@@ -213,6 +213,15 @@ var sliceWithListTypeAttributes = func() *resource.ResourceSlice {
 	return obj
 }()
 
+// The attribute is only permitted on a slice whose devices consume counters,
+// and each of them must carry it as a string. The bare "version" key qualifies
+// with the driver's own domain.
+var sliceWithPartitionTypeAttribute = func() *resource.ResourceSlice {
+	obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+	obj.Spec.PartitionTypeAttribute = ptr.To(resource.FullyQualifiedName("testdriver.example.com/version"))
+	return obj
+}()
+
 func TestResourceSliceStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("ResourceSlice must not be namespace scoped")
@@ -405,6 +414,24 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 			featureOverrides:        featuregatetesting.FeatureOverrides{features.DRAListTypeAttributes: false},
 			expectedValidationError: true,
 		},
+		"keep-fields-partition-type-attribute": {
+			obj:              sliceWithPartitionTypeAttribute,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAResourcePoolStatus: true, features.DRAPartitionableDevicesType: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionTypeAttribute.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-partition-type-attribute": {
+			obj:              sliceWithPartitionTypeAttribute,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAResourcePoolStatus: true, features.DRAPartitionableDevicesType: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
 	}
 
 	for name, tc := range testCases {
@@ -521,6 +548,20 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			emulatedVersion:  "1.35",
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithDeviceTaints.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"keep-existing-fields-partition-type-attribute-disabled-feature": {
+			oldObj: sliceWithPartitionTypeAttribute,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionTypeAttribute.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAResourcePoolStatus: true, features.DRAPartitionableDevicesType: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionTypeAttribute.DeepCopy()
 				obj.ResourceVersion = "4"
 				return obj
 			}(),

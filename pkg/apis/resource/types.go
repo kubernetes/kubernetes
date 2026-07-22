@@ -189,6 +189,18 @@ type ResourceSliceSpec struct {
 	// +featureGate=DRAPartitionableDevices
 	// +zeroOrOneOf=ResourceSliceType
 	SharedCounters []CounterSet
+
+	// PartitionTypeAttribute names a string device attribute (by fully
+	// qualified name, e.g. "gpu.example.com/profile") whose value labels
+	// each device with its partition type, such as "Full" or "Half" for a
+	// MIG-style GPU.
+	//
+	// When set, every partitionable device in the slice must carry the attribute
+	// and devices sharing a value must share the same ConsumesCounters cost.
+	//
+	// +optional
+	// +featureGate=DRAPartitionableDevicesType
+	PartitionTypeAttribute *FullyQualifiedName
 }
 
 // CounterSet defines a named set of counters
@@ -2183,6 +2195,15 @@ type ResourcePoolStatusRequestSpec struct {
 	//
 	// +optional
 	Limit *int32
+
+	// DefaultPartitionTypeAttribute optionally names a device attribute (by its
+	// fully qualified name) to use as the default grouping attribute for
+	// partitionable devices whose slice has not declared one themselves. A
+	// slice's own PartitionTypeAttribute always takes precedence. When neither
+	// the slice nor this default names an attribute, a partitionable pool
+	// reports no partitionSummary.
+	// +optional
+	DefaultPartitionTypeAttribute *string
 }
 
 // ResourcePoolStatusRequestLimitDefault is the default value for spec.limit.
@@ -2253,6 +2274,81 @@ type PoolStatus struct {
 	// When set, device count fields and ResourceSliceCount may be unset.
 	// +optional
 	ValidationError *string
+
+	// PartitionSummary reports allocatability per (attribute, partition type)
+	// for a partitionable pool. Each entry names the grouping attribute it was
+	// resolved from: the one declared by a device's own slice, or for devices
+	// whose slice declares none, the default named in the request.
+	// +optional
+	PartitionSummary []PartitionTypeStatus
+
+	// ShareableSummary reports aggregate capacity for a pool that contains
+	// devices with AllowMultipleAllocations.
+	// +optional
+	ShareableSummary *ShareableSummaryStatus
+}
+
+// PartitionTypeStatus reports allocatability for a single partition type,
+// identified by the value of a grouping attribute.
+type PartitionTypeStatus struct {
+	// Attribute is the fully qualified name of the device attribute whose value
+	// groups this entry. It is the PartitionTypeAttribute declared by the
+	// devices' own slice, or the default named in the request when their slice
+	// declares none.
+	// +required
+	Attribute string
+
+	// Type is the partition type value (e.g. "Full" or "Half").
+	// +required
+	Type string
+
+	// Total is the number of devices of this partition type in the pool.
+	// +required
+	Total *int32
+
+	// Allocatable is the number of additional devices of this partition type
+	// that could still be allocated given current shared-counter consumption.
+	// +required
+	Allocatable *int32
+}
+
+// ShareableSummaryStatus reports aggregate capacity for a pool that contains
+// devices with AllowMultipleAllocations.
+type ShareableSummaryStatus struct {
+	// FullyAvailableDevices is the number of shareable devices with no
+	// capacity consumed.
+	// +required
+	FullyAvailableDevices *int32
+
+	// PartiallyAvailableDevices is the number of shareable devices with some
+	// but not all capacity consumed.
+	// +required
+	PartiallyAvailableDevices *int32
+
+	// Capacity reports aggregate total, consumed, and available amounts per
+	// shareable capacity key across the pool.
+	// +optional
+	Capacity []ShareableCapacityStatus
+}
+
+// ShareableCapacityStatus reports aggregate amounts for a single shareable
+// capacity key.
+type ShareableCapacityStatus struct {
+	// Name is the capacity name.
+	// +required
+	Name string
+
+	// Total is the sum of this capacity across shareable devices in the pool.
+	// +required
+	Total *resource.Quantity
+
+	// Consumed is the amount drawn by current allocations.
+	// +required
+	Consumed *resource.Quantity
+
+	// Available is Total minus Consumed, never negative.
+	// +required
+	Available *resource.Quantity
 }
 
 // ResourcePoolStatusRequestConditionComplete is the condition type for completed requests.

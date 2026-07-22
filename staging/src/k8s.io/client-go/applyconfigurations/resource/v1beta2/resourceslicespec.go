@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta2
 
 import (
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
@@ -82,6 +83,14 @@ type ResourceSliceSpecApplyConfiguration struct {
 	//
 	// The maximum number of counter sets is 8.
 	SharedCounters []CounterSetApplyConfiguration `json:"sharedCounters,omitempty"`
+	// PartitionTypeAttribute names a string device attribute (by fully
+	// qualified name, e.g. "gpu.example.com/profile") whose value labels
+	// each device with its partition type, such as "Full" or "Half" for a
+	// MIG-style GPU.
+	//
+	// When set, every partitionable device in the slice must carry the attribute
+	// and devices sharing a value must share the same ConsumesCounters cost.
+	PartitionTypeAttribute *resourcev1beta2.FullyQualifiedName `json:"partitionTypeAttribute,omitempty"`
 }
 
 // ResourceSliceSpecApplyConfiguration constructs a declarative configuration of the ResourceSliceSpec type for use with
@@ -161,5 +170,13 @@ func (b *ResourceSliceSpecApplyConfiguration) WithSharedCounters(values ...*Coun
 		}
 		b.SharedCounters = append(b.SharedCounters, *values[i])
 	}
+	return b
+}
+
+// WithPartitionTypeAttribute sets the PartitionTypeAttribute field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PartitionTypeAttribute field is set to the value of the last call.
+func (b *ResourceSliceSpecApplyConfiguration) WithPartitionTypeAttribute(value resourcev1beta2.FullyQualifiedName) *ResourceSliceSpecApplyConfiguration {
+	b.PartitionTypeAttribute = &value
 	return b
 }

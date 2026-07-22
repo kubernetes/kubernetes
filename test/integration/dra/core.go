@@ -468,6 +468,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 				}()...),
 				"PerDeviceNodeSelection": matchPointer(spec.PerDeviceNodeSelection),
 				"SharedCounters":         gomega.Equal(spec.SharedCounters),
+				"PartitionTypeAttribute": matchPointer(spec.PartitionTypeAttribute),
 			})))
 		}
 		return expectedSlices

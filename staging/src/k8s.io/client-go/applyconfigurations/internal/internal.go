@@ -13265,6 +13265,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: nodeSelector
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
+    - name: partitionTypeAttribute
+      type:
+        scalar: string
     - name: perDeviceNodeSelection
       type:
         scalar: boolean
@@ -13349,6 +13352,21 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: pool
       type:
         scalar: string
+- name: io.k8s.api.resource.v1alpha3.PartitionTypeStatus
+  map:
+    fields:
+    - name: allocatable
+      type:
+        scalar: numeric
+    - name: attribute
+      type:
+        scalar: string
+    - name: total
+      type:
+        scalar: numeric
+    - name: type
+      type:
+        scalar: string
 - name: io.k8s.api.resource.v1alpha3.PoolStatus
   map:
     fields:
@@ -13368,12 +13386,21 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: nodeName
       type:
         scalar: string
+    - name: partitionSummary
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.PartitionTypeStatus
+          elementRelationship: atomic
     - name: poolName
       type:
         scalar: string
     - name: resourceSliceCount
       type:
         scalar: numeric
+    - name: shareableSummary
+      type:
+        namedType: io.k8s.api.resource.v1alpha3.ShareableSummaryStatus
     - name: totalDevices
       type:
         scalar: numeric
@@ -13406,6 +13433,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1alpha3.ResourcePoolStatusRequestSpec
   map:
     fields:
+    - name: defaultPartitionTypeAttribute
+      type:
+        scalar: string
     - name: driver
       type:
         scalar: string
@@ -13437,6 +13467,36 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1alpha3.PoolStatus
           elementRelationship: atomic
+- name: io.k8s.api.resource.v1alpha3.ShareableCapacityStatus
+  map:
+    fields:
+    - name: available
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: consumed
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: name
+      type:
+        scalar: string
+    - name: total
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.resource.v1alpha3.ShareableSummaryStatus
+  map:
+    fields:
+    - name: capacity
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.ShareableCapacityStatus
+          elementRelationship: atomic
+    - name: fullyAvailableDevices
+      type:
+        scalar: numeric
+    - name: partiallyAvailableDevices
+      type:
+        scalar: numeric
 - name: io.k8s.api.resource.v1beta1.AllocatedDeviceStatus
   map:
     fields:
@@ -14139,6 +14199,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: nodeSelector
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
+    - name: partitionTypeAttribute
+      type:
+        scalar: string
     - name: perDeviceNodeSelection
       type:
         scalar: boolean
@@ -14908,6 +14971,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: nodeSelector
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
+    - name: partitionTypeAttribute
+      type:
+        scalar: string
     - name: perDeviceNodeSelection
       type:
         scalar: boolean

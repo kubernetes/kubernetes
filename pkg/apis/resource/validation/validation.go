@@ -740,7 +740,73 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 			return counterSet.Name
 		}, fldPath.Child("sharedCounters"), sizeCovered, uniquenessCovered)...)
 
+	// The name format is validated declaratively; see the field's tags.
+	if spec.PartitionTypeAttribute != nil {
+		allErrs = append(allErrs, validatePartitionTypeAttribute(spec, fldPath)...)
+	}
+
 	return allErrs
+}
+
+// validatePartitionTypeAttribute checks that a slice naming a partition type
+// attribute declares devices which consume counters, and that each of those
+// devices carries the attribute as a string. Devices which consume no counters
+// are exempt and may appear alongside them.
+func validatePartitionTypeAttribute(spec *resource.ResourceSliceSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	name := string(*spec.PartitionTypeAttribute)
+
+	if !haveConsumesCounters(spec) {
+		return append(allErrs, field.Invalid(fldPath.Child("partitionTypeAttribute"), name,
+			"may only be set on a slice which declares devices that consume counters"))
+	}
+
+	// A malformed name is reported declaratively; no device can carry it, so
+	// checking each of them would only bury that one error.
+	if len(validateFullyQualifiedName(*spec.PartitionTypeAttribute, nil)) > 0 {
+		return allErrs
+	}
+
+	// A name in the driver's own domain may also be declared bare. Strip the
+	// prefix once here rather than allocating driver+"/" per device below.
+	bareName, _ := strings.CutPrefix(name, spec.Driver+"/")
+
+	for i, device := range spec.Devices {
+		if len(device.ConsumesCounters) == 0 {
+			continue
+		}
+		attrPath := fldPath.Child("devices").Index(i).Child("attributes").Key(name)
+		attribute, ok := lookupQualifiedAttribute(device.Attributes, name, bareName)
+		if !ok {
+			allErrs = append(allErrs, field.Required(attrPath,
+				"device consumes counters and `partitionTypeAttribute` names this attribute, so it must be set"))
+			continue
+		}
+		if attribute.StringValue == nil {
+			allErrs = append(allErrs, field.Invalid(attrPath, attribute,
+				"must be a string value because `partitionTypeAttribute` names this attribute"))
+		}
+	}
+
+	return allErrs
+}
+
+// lookupQualifiedAttribute finds a device attribute by its fully qualified
+// name. A key that carries no domain defaults to the driver's own domain, so an
+// attribute in the driver's domain may be declared either explicitly or bare.
+// The explicit form wins, keeping the result deterministic when a device
+// declares both; bareName (the name with the driver's domain stripped, empty
+// when the name is in another domain) is consulted only when non-empty.
+func lookupQualifiedAttribute(attributes map[resource.QualifiedName]resource.DeviceAttribute, name, bareName string) (resource.DeviceAttribute, bool) {
+	if attribute, ok := attributes[resource.QualifiedName(name)]; ok {
+		return attribute, true
+	}
+	if bareName != "" {
+		if attribute, ok := attributes[resource.QualifiedName(bareName)]; ok {
+			return attribute, true
+		}
+	}
+	return resource.DeviceAttribute{}, false
 }
 
 func haveListAttributes(spec *resource.ResourceSliceSpec) bool {

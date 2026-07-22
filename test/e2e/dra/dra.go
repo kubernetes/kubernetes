@@ -667,6 +667,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 									"UnavailableDevices": gomega.Equal(ptr.To[int32](0)),
 									"NodeName":           gomega.BeNil(),
 									"ValidationError":    gomega.BeNil(),
+									"PartitionSummary":   gomega.BeEmpty(),
+									"ShareableSummary":   gomega.BeNil(),
 								}),
 							),
 							"Conditions": gomega.ContainElement(
@@ -714,6 +716,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 									"UnavailableDevices": gomega.Equal(ptr.To[int32](0)),
 									"NodeName":           gomega.BeNil(),
 									"ValidationError":    gomega.BeNil(),
+									"PartitionSummary":   gomega.BeEmpty(),
+									"ShareableSummary":   gomega.BeNil(),
 								}),
 							),
 							"Conditions": gomega.ContainElement(
@@ -725,6 +729,87 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 						})),
 					})))
 			}).WithTimeout(60 * time.Second).WithPolling(2 * time.Second).Should(gomega.Succeed())
+		})
+	})
+
+	// ResourcePoolStatusRequest advanced views. Own driver-less context so each
+	// sub-context's driver is the only one that sets up.
+	framework.Context("control plane views", f.WithFeatureGate(features.DRAResourcePoolStatus), func() {
+		expectPool := func(ctx context.Context, driverName string, poolMatcher any) {
+			client := f.ClientSet.ResourceV1alpha3().ResourcePoolStatusRequests()
+			gomega.Eventually(ctx, func(g gomega.Gomega, ctx context.Context) {
+				request, err := client.Create(ctx, &resourcealphaapi.ResourcePoolStatusRequest{
+					ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-views-"},
+					Spec:       resourcealphaapi.ResourcePoolStatusRequestSpec{Driver: driverName},
+				}, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
+				defer func() { _ = client.Delete(ctx, request.Name, metav1.DeleteOptions{}) }()
+
+				g.Eventually(ctx, framework.GetObject(client.Get, request.Name, metav1.GetOptions{})).
+					WithTimeout(15 * time.Second).
+					Should(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"Status": gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+							"Pools": gomega.ContainElement(poolMatcher),
+							"Conditions": gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+								"Type":   gomega.Equal("Complete"),
+								"Status": gomega.Equal(metav1.ConditionTrue),
+							})),
+						})),
+					})))
+			}).WithTimeout(60 * time.Second).WithPolling(2 * time.Second).Should(gomega.Succeed())
+		}
+
+		framework.Context("partitionable typed view", f.WithFeatureGate(features.DRAPartitionableDevices), f.WithFeatureGate(features.DRAPartitionableDevicesType), func() {
+			pnodes := drautils.NewNodes(f, 1, 1)
+			pdriver := drautils.NewDriver(f, pnodes, drautils.PartitionableResources(true))
+			pdriver.WithKubelet = false
+
+			f.It("should report partitionSummary for a partitionable pool", func(ctx context.Context) {
+				expectPool(ctx, pdriver.Name, gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"PoolName":        gomega.Equal("partitioned"),
+					"ValidationError": gomega.BeNil(),
+					"PartitionSummary": gomega.ConsistOf(
+						gomega.Equal(resourcealphaapi.PartitionTypeStatus{Attribute: string(drautils.PartitionProfileAttribute), Type: "Full", Total: ptr.To[int32](1), Allocatable: ptr.To[int32](1)}),
+						gomega.Equal(resourcealphaapi.PartitionTypeStatus{Attribute: string(drautils.PartitionProfileAttribute), Type: "Half", Total: ptr.To[int32](2), Allocatable: ptr.To[int32](2)}),
+					),
+				}))
+			})
+		})
+
+		framework.Context("partitionable pool without a partition type", f.WithFeatureGate(features.DRAPartitionableDevices), func() {
+			cnodes := drautils.NewNodes(f, 1, 1)
+			cdriver := drautils.NewDriver(f, cnodes, drautils.PartitionableResources(false))
+			cdriver.WithKubelet = false
+
+			f.It("should report no partition summary when no partition type is declared", func(ctx context.Context) {
+				expectPool(ctx, cdriver.Name, gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"PoolName":         gomega.Equal("partitioned"),
+					"ValidationError":  gomega.BeNil(),
+					"PartitionSummary": gomega.BeEmpty(),
+				}))
+			})
+		})
+
+		framework.Context("shareable view", f.WithFeatureGate(features.DRAConsumableCapacity), func() {
+			snodes := drautils.NewNodes(f, 1, 1)
+			sdriver := drautils.NewDriver(f, snodes, drautils.ShareableResources(2))
+			sdriver.WithKubelet = false
+
+			f.It("should report shareableSummary for a pool with shareable devices", func(ctx context.Context) {
+				expectPool(ctx, sdriver.Name, gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"PoolName":        gomega.Equal("shareable"),
+					"ValidationError": gomega.BeNil(),
+					"ShareableSummary": gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"FullyAvailableDevices":     gstruct.PointTo(gomega.BeEquivalentTo(2)),
+						"PartiallyAvailableDevices": gstruct.PointTo(gomega.BeEquivalentTo(0)),
+						"Capacity": gomega.ConsistOf(
+							gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+								"Name": gomega.Equal("memory"),
+							}),
+						),
+					})),
+				}))
+			})
 		})
 	})
 
