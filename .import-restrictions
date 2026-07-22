@@ -4,3 +4,7 @@ rules:
   - selectorRegexp: github[.]com/google/cadvisor
     forbiddenPrefixes:
       - github.com/google/cadvisor
+  # Forbid k8s.io/utils/integer
+  - selectorRegexp: k8s[.]io/utils/integer
+    forbiddenPrefixes:
+      - k8s.io/utils/integer
