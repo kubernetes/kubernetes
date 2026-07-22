@@ -86,7 +86,7 @@ type webhookPrivateClaims struct {
 }
 
 // AuthenticateToken verifies rawToken via go-oidc and returns its
-// allowedAPIGroup values.
+// admissionReviewAPIGroups values.
 func (a *oidcAuthenticator) AuthenticateToken(ctx context.Context, rawToken string) ([]string, error) {
 	// Fail closed until an audience is bound.
 	verifier := a.verifier.Load()
@@ -98,7 +98,7 @@ func (a *oidcAuthenticator) AuthenticateToken(ctx context.Context, rawToken stri
 
 // verifyTokenGroups performs the cheap unverified issuer pre-check, verifies
 // rawToken with the supplied go-oidc verifier (signature, audience, expiry), and
-// returns the token's allowedAPIGroup values. It is shared by the deferred
+// returns the token's admissionReviewAPIGroups values. It is shared by the deferred
 // (in-cluster) and eagerly-bound (out-of-cluster) authenticators so both decode
 // the KEP-6060 attestation claims identically.
 func verifyTokenGroups(ctx context.Context, verifier *coreosoidc.IDTokenVerifier, issuer, rawToken string) ([]string, error) {
@@ -165,7 +165,7 @@ type boundAuthenticator struct {
 }
 
 // AuthenticateToken verifies rawToken via the pre-built go-oidc verifier and
-// returns its allowedAPIGroup values.
+// returns its admissionReviewAPIGroups values.
 func (b *boundAuthenticator) AuthenticateToken(ctx context.Context, rawToken string) ([]string, error) {
 	return verifyTokenGroups(ctx, b.verifier, b.issuer, rawToken)
 }

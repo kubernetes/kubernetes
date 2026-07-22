@@ -26,12 +26,12 @@ import (
 const testGroup = "apps"
 
 // TODO(kep-6060): rebuild after review. The claims-decode tests (namespaced vs.
-// bare allowedAPIGroup key) moved to the oidc package along with the claim
+// bare admissionReviewAPIGroups key) moved to the oidc package along with the claim
 // decoding and should be rebuilt there. The removed policy cases (bound-object,
 // len>1 reject) do not apply. See kep-6060-review-2.2-actions.md.
 
 // fakeAuthenticator is a stand-in TokenAuthenticator returning a fixed set of
-// allowedAPIGroups (or an error), so the policy layer is tested without crypto.
+// admissionReviewAPIGroups (or an error), so the policy layer is tested without crypto.
 // It knows its audience at construction, so BindAudience and HealthCheck are the
 // trivial always-ready implementations an out-of-cluster authenticator provides.
 type fakeAuthenticator struct {
@@ -70,7 +70,7 @@ func TestNewVerifier_Validation(t *testing.T) {
 	}
 }
 
-// TestVerify covers the policy: the authenticator's allowedAPIGroup list must
+// TestVerify covers the policy: the authenticator's admissionReviewAPIGroups list must
 // contain the review group or "*"; any failure returns ErrVerificationFailed.
 func TestVerify(t *testing.T) {
 	tests := []struct {
@@ -84,6 +84,10 @@ func TestVerify(t *testing.T) {
 		{name: "multi-value list containing the group -> accepted", groups: []string{"extensions", testGroup}},
 		{name: "empty list -> rejected", groups: []string{}, wantErr: true},
 		{name: "group not authorized -> rejected", groups: []string{"extensions"}, wantErr: true},
+		// The server guarantees admissionReviewAPIGroups is a slice of length 1 (a
+		// DNS group or "*"). A malformed multi-element value that authorizes neither
+		// the review group nor "*" must fail closed, never silently allow.
+		{name: "malformed multi-element value not authorizing the group -> rejected (fail-closed)", groups: []string{"extensions", "batch"}, wantErr: true},
 	}
 
 	for _, tc := range tests {

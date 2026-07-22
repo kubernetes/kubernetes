@@ -24,7 +24,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// wildcardAPIGroup is the allowedAPIGroup value that authorizes every API group.
+// wildcardAPIGroup is the admissionReviewAPIGroups value that authorizes every API group.
 const wildcardAPIGroup = "*"
 
 // ErrVerificationFailed is the single generic error every verification failure
@@ -35,11 +35,11 @@ const wildcardAPIGroup = "*"
 var ErrVerificationFailed = errors.New("webhook token verification failed")
 
 // TokenAuthenticator verifies a token's signature and standard claims and returns
-// the allowedAPIGroup values it carries. It is the seam through which the core
-// verifier gets a verified token's authorized groups without importing any
+// the admissionReviewAPIGroups values it carries. It is the seam through which the
+// core verifier gets a verified token's authorized groups without importing any
 // JOSE/OIDC library: an implementation (see the oidc package) does OIDC
 // discovery, signature and iss/aud/exp verification, then decodes the
-// "kubernetes.io" claims and returns the allowedAPIGroup list.
+// "kubernetes.io" claims and returns the admissionReviewAPIGroups list.
 //
 // Audience binding and readiness are part of the interface rather than optional
 // runtime type assertions: the Verifier delegates BindAudience and HealthCheck
@@ -49,10 +49,10 @@ var ErrVerificationFailed = errors.New("webhook token verification failed")
 // implements BindAudience as an idempotent check and HealthCheck as always-ready.
 type TokenAuthenticator interface {
 	// AuthenticateToken verifies rawToken (signature, issuer, audience, expiry)
-	// and returns its allowedAPIGroup values, or a non-nil error. The groups MUST
-	// NOT be trusted unless err is nil. The error text is used only as a log
+	// and returns its admissionReviewAPIGroups values, or a non-nil error. The groups
+	// MUST NOT be trusted unless err is nil. The error text is used only as a log
 	// reason; the Verifier collapses every failure into ErrVerificationFailed.
-	AuthenticateToken(ctx context.Context, rawToken string) (allowedAPIGroups []string, err error)
+	AuthenticateToken(ctx context.Context, rawToken string) (admissionReviewAPIGroups []string, err error)
 
 	// BindAudience sets the single expected audience. It is idempotent: the first
 	// successful bind wins and later calls with the same audience are no-ops; a
@@ -73,7 +73,7 @@ type TokenAuthenticator interface {
 
 // Verifier applies the KEP-6060 policy on top of a TokenAuthenticator: signature
 // and standard-claim verification are delegated to the authenticator, and this
-// type adds only the allowedAPIGroup match go-oidc has no concept of.
+// type adds only the admissionReviewAPIGroups match go-oidc has no concept of.
 type Verifier struct {
 	authenticator TokenAuthenticator
 }
@@ -92,14 +92,14 @@ func NewVerifier(authenticator TokenAuthenticator) (*Verifier, error) {
 }
 
 // Verify authenticates rawToken and applies the KEP-6060 policy: the token's
-// allowedAPIGroup must authorize reviewAPIGroup (an exact match or "*"). It
+// admissionReviewAPIGroups must authorize reviewAPIGroup (an exact match or "*"). It
 // returns nil on success or ErrVerificationFailed on any failure; the reason is
 // logged via klog.FromContext(ctx), never returned (anti-enumeration).
 func (v *Verifier) Verify(ctx context.Context, rawToken string, reviewAPIGroup string) error {
 	logger := klog.FromContext(ctx)
 
 	// The authenticator owns what go-oidc verifies (signature, iss/aud/exp) and
-	// returns the allowedAPIGroup values; its error text is log-only.
+	// returns the admissionReviewAPIGroups values; its error text is log-only.
 	groups, err := v.authenticator.AuthenticateToken(ctx, rawToken)
 	if err != nil {
 		logger.V(2).Info("Webhook token verification denied",
@@ -108,11 +108,11 @@ func (v *Verifier) Verify(ctx context.Context, rawToken string, reviewAPIGroup s
 		return ErrVerificationFailed
 	}
 
-	// The webhook only checks membership: the allowedAPIGroup list must contain
+	// The webhook only checks membership: the admissionReviewAPIGroups list must contain
 	// the review's group or "*" (an empty list authorizes nothing).
 	if !slices.Contains(groups, reviewAPIGroup) && !slices.Contains(groups, wildcardAPIGroup) {
 		logger.V(2).Info("Webhook token verification denied",
-			"reason", "token allowedAPIGroup does not authorize the review's API group")
+			"reason", "token admissionReviewAPIGroups does not authorize the review's API group")
 		return ErrVerificationFailed
 	}
 

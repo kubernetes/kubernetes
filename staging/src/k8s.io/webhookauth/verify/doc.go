@@ -25,11 +25,11 @@ limitations under the License.
 //     This is delegated to a [TokenAuthenticator] (see the oidc package, built on
 //     OIDC discovery and go-oidc), so the core policy carries no JOSE/OIDC
 //     dependency.
-//  2. The namespaced allowedAPIGroup attestation claim authorizes the API group
+//  2. The namespaced admissionReviewAPIGroups attestation claim authorizes the API group
 //     of the resource under admission — its list contains that group or "*".
 //
 // The policy this package owns is exactly the part go-oidc has no concept of: the
-// allowedAPIGroup match.
+// admissionReviewAPIGroups match.
 //
 // Anti-enumeration: every failure surfaces the single generic
 // [ErrVerificationFailed] and never echoes webhook names, UIDs, subjects, or

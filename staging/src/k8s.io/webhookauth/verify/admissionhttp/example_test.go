@@ -61,7 +61,7 @@ const (
 // exampleSignedToken mints a real RS256 JWT signed by the throwaway issuer,
 // carrying the KEP-6060 claim shape: standard iss/aud/exp plus a kubernetes.io
 // block with the bound webhook configuration and the fully-namespaced
-// allowedAPIGroup attestation claim. In production the API server issues this
+// admissionReviewAPIGroups attestation claim. In production the API server issues this
 // token to the webhook's service account.
 func exampleSignedToken(issuer *oidcTestServer, group string) string {
 	claims := map[string]any{
@@ -76,7 +76,7 @@ func exampleSignedToken(issuer *oidcTestServer, group string) string {
 				"name": "my-webhook",
 				"uid":  "webhook-uid",
 			},
-			// The namespaced key is required; the bare "allowedAPIGroup" form is a
+			// The namespaced key is required; the bare "admissionReviewAPIGroups" form is a
 			// known issuer bug and is rejected.
 			"attestations": map[string]any{
 				admissionReviewAPIGroupsClaimKey: []string{group},

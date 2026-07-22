@@ -346,7 +346,7 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 			wantAllowed:     false,
 		},
 		{
-			name: "allowedAPIGroup mismatch vs review group -> 200 deny, next not reached",
+			name: "admissionReviewAPIGroups mismatch vs review group -> 200 deny, next not reached",
 			token: func() string {
 				// Token authorizes testGroup, but the review is for another group.
 				return ts.sign(t, ts.baseClaims())
@@ -357,7 +357,7 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 			wantAllowed:     false,
 		},
 		{
-			name: "wildcard allowedAPIGroup -> allowed for any review group",
+			name: "wildcard admissionReviewAPIGroups -> allowed for any review group",
 			token: func() string {
 				c := ts.baseClaims()
 				k8s := c["kubernetes.io"].(map[string]any)
