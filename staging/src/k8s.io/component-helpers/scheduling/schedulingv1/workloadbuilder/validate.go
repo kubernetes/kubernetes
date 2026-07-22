@@ -36,8 +36,8 @@ type ValidationInput struct {
 	// update-time declarative checks run exactly when OldRoot is set.
 	//
 	// Only OldRoot.Name (to correlate it with the new root) and OldRoot.Input
-	// (the previous versioned data) are consulted. DefaultConfig, Callbacks, and
-	// Input.*.PathElements are ignored on the old root because the resolved
+	// (the previous versioned data) are consulted. Path, DefaultConfig, Callbacks,
+	// and Input.*.PathElements are ignored on the old root because the resolved
 	// config and error paths always come from the new root. Callers may therefore
 	// leave those fields unset on the old root.
 	OldRoot *WorkloadItem
@@ -47,22 +47,22 @@ type ValidationInput struct {
 // and controller-policy checks that declarative validation cannot express.
 // For create operations, pass the zero ValidationInput. For update operations,
 // set OldRoot to the previous WorkloadItem. Validate infers create vs update
-// from whether OldRoot is nil.
-func (b *Builder) Validate(ctx context.Context, rootPath *field.Path, input ValidationInput) field.ErrorList {
+// from whether OldRoot is nil. Each item's building-block errors are reported
+// relative to that item's Path.
+func (b *Builder) Validate(ctx context.Context, input ValidationInput) field.ErrorList {
 	// A Builder created from an existing, persisted Workload has no WorkloadItem
 	// tree to check, so calling Validate on it is an invocation error rather than
 	// a success: the object already passed apiserver validation and this builder
 	// is only meant to materialize PodGroups.
 	if b.existingWorkload != nil {
-		return field.ErrorList{field.InternalError(rootPath,
+		return field.ErrorList{field.InternalError(nil,
 			fmt.Errorf("cannot validate a builder constructed from an existing workload"))}
 	}
 	if b.root == nil {
-		return field.ErrorList{field.Invalid(rootPath, nil, "invalid builder: missing root WorkloadItem")}
+		return field.ErrorList{field.Invalid(nil, nil, "invalid builder: missing root WorkloadItem")}
 	}
-	if rootPath == nil {
-		rootPath = field.NewPath("")
-	}
+
+	rootPath := b.root.Path
 
 	// Old and new roots are correlated by name. A root name mismatch means the
 	// caller paired unrelated trees, which is an invocation-contract bug rather
@@ -81,7 +81,7 @@ func (b *Builder) Validate(ctx context.Context, rootPath *field.Path, input Vali
 		op = operation.Operation{Type: operation.Update}
 	}
 
-	return b.validateItem(ctx, op, b.root, input.OldRoot, rootPath)
+	return b.validateItem(ctx, op, b.root, input.OldRoot)
 }
 
 // validateWorkloadItemTree does a full traversal of the tree.
@@ -152,21 +152,20 @@ func validateItemInputUnion(item *WorkloadItem) error {
 }
 
 // validateItem runs declarative and controller-policy validation on a single
-// WorkloadItem and recurses into its children. Per-child field-path mapping is
-// deferred. Every node reports at rootPath and controllers map the errors onto
-// their own API fields.
-func (b *Builder) validateItem(ctx context.Context, op operation.Operation, item,
-	oldItem *WorkloadItem, path *field.Path) field.ErrorList {
+// WorkloadItem and recurses into its children. Each node reports its
+// building-block errors relative to its own Path, and controllers map the errors
+// onto their own API fields.
+func (b *Builder) validateItem(ctx context.Context, op operation.Operation, item, oldItem *WorkloadItem) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if !b.opts.DisableDeclarativeValidation {
-		allErrs = append(allErrs, b.validateItemDeclarative(ctx, op, item, oldItem, path)...)
+		allErrs = append(allErrs, b.validateItemDeclarative(ctx, op, item, oldItem)...)
 	}
 
 	resolvedConfig := resolveSchedulingConfig(item)
-	allErrs = append(allErrs, b.validateAllowedSchedulingPolicies(item, resolvedConfig, path)...)
-	allErrs = append(allErrs, b.validateAllowedDisruptionModes(item, resolvedConfig, path)...)
-	allErrs = append(allErrs, b.validateDisruptionModeCompatibleWithSchedulingPolicy(item, resolvedConfig, path)...)
+	allErrs = append(allErrs, b.validateAllowedSchedulingPolicies(item, resolvedConfig)...)
+	allErrs = append(allErrs, b.validateAllowedDisruptionModes(item, resolvedConfig)...)
+	allErrs = append(allErrs, b.validateDisruptionModeCompatibleWithSchedulingPolicy(item, resolvedConfig)...)
 
 	// oldItem is the previous counterpart of item (or nil for a create or a node
 	// that is new in this update). Children are correlated with their previous
@@ -181,7 +180,7 @@ func (b *Builder) validateItem(ctx context.Context, op operation.Operation, item
 	}
 
 	for _, child := range item.Children {
-		allErrs = append(allErrs, b.validateItem(ctx, op, child, oldChildrenByName[child.Name], path)...)
+		allErrs = append(allErrs, b.validateItem(ctx, op, child, oldChildrenByName[child.Name])...)
 	}
 	return allErrs
 }
@@ -199,20 +198,21 @@ func appendPathElements(rootPath *field.Path, elements []string) *field.Path {
 // validateItemDeclarative runs declarative validation on a single node's input
 // building blocks, dispatching to the leaf or composite block set based on
 // whether the node is a composite group.
-func (b *Builder) validateItemDeclarative(ctx context.Context, op operation.Operation, item, oldItem *WorkloadItem, path *field.Path) field.ErrorList {
+func (b *Builder) validateItemDeclarative(ctx context.Context, op operation.Operation, item, oldItem *WorkloadItem) field.ErrorList {
 	if isComposite(item) {
-		return b.validateCompositePodGroupItemDeclarative(ctx, op, item, oldItem, path)
+		return b.validateCompositePodGroupItemDeclarative(ctx, op, item, oldItem)
 	}
-	return b.validatePodGroupItemDeclarative(ctx, op, item, oldItem, path)
+	return b.validatePodGroupItemDeclarative(ctx, op, item, oldItem)
 }
 
 // validatePodGroupItemDeclarative runs declarative validation on a leaf node's
 // building blocks.
-func (b *Builder) validatePodGroupItemDeclarative(ctx context.Context, op operation.Operation, item, oldItem *WorkloadItem, rootPath *field.Path) field.ErrorList {
+func (b *Builder) validatePodGroupItemDeclarative(ctx context.Context, op operation.Operation,
+	item, oldItem *WorkloadItem) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if item.Input.Policy.PodGroupData != nil {
-		path := appendPathElements(rootPath, item.Input.Policy.PathElements)
+		path := appendPathElements(item.Path, item.Input.Policy.PathElements)
 		var oldData *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy
 		if oldItem != nil && oldItem.Input.Policy.PodGroupData != nil {
 			oldData = oldItem.Input.Policy.PodGroupData
@@ -220,7 +220,7 @@ func (b *Builder) validatePodGroupItemDeclarative(ctx context.Context, op operat
 		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadPodGroupSchedulingPolicy(ctx, op, path, item.Input.Policy.PodGroupData, oldData)...)
 	}
 	if item.Input.Constraints.PodGroupData != nil {
-		path := appendPathElements(rootPath, item.Input.Constraints.PathElements)
+		path := appendPathElements(item.Path, item.Input.Constraints.PathElements)
 		var oldData *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints
 		if oldItem != nil && oldItem.Input.Constraints.PodGroupData != nil {
 			oldData = oldItem.Input.Constraints.PodGroupData
@@ -228,7 +228,7 @@ func (b *Builder) validatePodGroupItemDeclarative(ctx context.Context, op operat
 		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadPodGroupSchedulingConstraints(ctx, op, path, item.Input.Constraints.PodGroupData, oldData)...)
 	}
 	if item.Input.DisruptionMode.PodGroupData != nil {
-		path := appendPathElements(rootPath, item.Input.DisruptionMode.PathElements)
+		path := appendPathElements(item.Path, item.Input.DisruptionMode.PathElements)
 		var oldData *schedulingv1alpha3.WorkloadPodGroupDisruptionMode
 		if oldItem != nil && oldItem.Input.DisruptionMode.PodGroupData != nil {
 			oldData = oldItem.Input.DisruptionMode.PodGroupData
@@ -236,18 +236,18 @@ func (b *Builder) validatePodGroupItemDeclarative(ctx context.Context, op operat
 		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadPodGroupDisruptionMode(ctx, op, path, item.Input.DisruptionMode.PodGroupData, oldData)...)
 	}
 
-	allErrs = append(allErrs, b.validateResourceClaims(ctx, op, item, oldItem, rootPath)...)
+	allErrs = append(allErrs, b.validateResourceClaims(ctx, op, item, oldItem)...)
 
 	return allErrs
 }
 
 // validateCompositePodGroupItemDeclarative runs declarative validation on a
 // composite node's building blocks.
-func (b *Builder) validateCompositePodGroupItemDeclarative(ctx context.Context, op operation.Operation, item, oldItem *WorkloadItem, rootPath *field.Path) field.ErrorList {
+func (b *Builder) validateCompositePodGroupItemDeclarative(ctx context.Context, op operation.Operation, item, oldItem *WorkloadItem) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if item.Input.Policy.CompositePodGroupData != nil {
-		path := appendPathElements(rootPath, item.Input.Policy.PathElements)
+		path := appendPathElements(item.Path, item.Input.Policy.PathElements)
 		var oldData *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy
 		if oldItem != nil && oldItem.Input.Policy.CompositePodGroupData != nil {
 			oldData = oldItem.Input.Policy.CompositePodGroupData
@@ -255,7 +255,7 @@ func (b *Builder) validateCompositePodGroupItemDeclarative(ctx context.Context, 
 		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadCompositePodGroupSchedulingPolicy(ctx, op, path, item.Input.Policy.CompositePodGroupData, oldData)...)
 	}
 	if item.Input.Constraints.CompositePodGroupData != nil {
-		path := appendPathElements(rootPath, item.Input.Constraints.PathElements)
+		path := appendPathElements(item.Path, item.Input.Constraints.PathElements)
 		var oldData *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints
 		if oldItem != nil && oldItem.Input.Constraints.CompositePodGroupData != nil {
 			oldData = oldItem.Input.Constraints.CompositePodGroupData
@@ -263,7 +263,7 @@ func (b *Builder) validateCompositePodGroupItemDeclarative(ctx context.Context, 
 		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadCompositePodGroupSchedulingConstraints(ctx, op, path, item.Input.Constraints.CompositePodGroupData, oldData)...)
 	}
 	if item.Input.DisruptionMode.CompositePodGroupData != nil {
-		path := appendPathElements(rootPath, item.Input.DisruptionMode.PathElements)
+		path := appendPathElements(item.Path, item.Input.DisruptionMode.PathElements)
 		var oldData *schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode
 		if oldItem != nil && oldItem.Input.DisruptionMode.CompositePodGroupData != nil {
 			oldData = oldItem.Input.DisruptionMode.CompositePodGroupData
@@ -278,7 +278,7 @@ func (b *Builder) validateCompositePodGroupItemDeclarative(ctx context.Context, 
 // building block. Resource claims are keyed by name rather than position, so an
 // old claim is matched to its new counterpart by name for the update-time
 // checks; a new claim with no old match validates as an addition.
-func (b *Builder) validateResourceClaims(ctx context.Context, op operation.Operation, item, oldItem *WorkloadItem, rootPath *field.Path) field.ErrorList {
+func (b *Builder) validateResourceClaims(ctx context.Context, op operation.Operation, item, oldItem *WorkloadItem) field.ErrorList {
 	newClaims := item.Input.ResourceClaims.PodGroupData
 	var oldClaims []schedulingv1alpha3.WorkloadPodGroupResourceClaim
 	if oldItem != nil {
@@ -288,7 +288,7 @@ func (b *Builder) validateResourceClaims(ctx context.Context, op operation.Opera
 		return nil
 	}
 
-	path := appendPathElements(rootPath, item.Input.ResourceClaims.PathElements)
+	path := appendPathElements(item.Path, item.Input.ResourceClaims.PathElements)
 
 	oldByName := make(map[string]*schedulingv1alpha3.WorkloadPodGroupResourceClaim, len(oldClaims))
 	for i := range oldClaims {
@@ -306,12 +306,12 @@ func (b *Builder) validateResourceClaims(ctx context.Context, op operation.Opera
 
 // validateAllowedSchedulingPolicies rejects a resolved scheduling policy that is
 // outside the controller's allow-list, reporting at the policy block's path.
-func (b *Builder) validateAllowedSchedulingPolicies(item *WorkloadItem, resolvedConfig *SchedulingConfig, rootPath *field.Path) field.ErrorList {
+func (b *Builder) validateAllowedSchedulingPolicies(item *WorkloadItem, resolvedConfig *SchedulingConfig) field.ErrorList {
 	if resolvedConfig == nil || resolvedConfig.Policy == nil {
 		return nil
 	}
 
-	path := appendPathElements(rootPath, item.Input.Policy.PathElements)
+	path := appendPathElements(item.Path, item.Input.Policy.PathElements)
 
 	var allErrs field.ErrorList
 	policy := resolvedConfig.Policy
@@ -328,12 +328,12 @@ func (b *Builder) validateAllowedSchedulingPolicies(item *WorkloadItem, resolved
 
 // validateAllowedDisruptionModes rejects a resolved disruption mode that is
 // outside the controller's allow-list, reporting at the disruptionMode block's path.
-func (b *Builder) validateAllowedDisruptionModes(item *WorkloadItem, resolvedConfig *SchedulingConfig, rootPath *field.Path) field.ErrorList {
+func (b *Builder) validateAllowedDisruptionModes(item *WorkloadItem, resolvedConfig *SchedulingConfig) field.ErrorList {
 	if resolvedConfig == nil || resolvedConfig.DisruptionMode == nil {
 		return nil
 	}
 
-	path := appendPathElements(rootPath, item.Input.DisruptionMode.PathElements)
+	path := appendPathElements(item.Path, item.Input.DisruptionMode.PathElements)
 
 	var allErrs field.ErrorList
 	dm := resolvedConfig.DisruptionMode
@@ -351,14 +351,14 @@ func (b *Builder) validateAllowedDisruptionModes(item *WorkloadItem, resolvedCon
 // validateDisruptionModeCompatibleWithSchedulingPolicy enforces the cross-field
 // rule declarative validation cannot express: a Basic group is scheduled
 // independently, so all-or-nothing disruption is meaningless for it.
-func (b *Builder) validateDisruptionModeCompatibleWithSchedulingPolicy(item *WorkloadItem, resolvedConfig *SchedulingConfig, rootPath *field.Path) field.ErrorList {
+func (b *Builder) validateDisruptionModeCompatibleWithSchedulingPolicy(item *WorkloadItem, resolvedConfig *SchedulingConfig) field.ErrorList {
 	if resolvedConfig == nil ||
 		resolvedConfig.Policy == nil || resolvedConfig.Policy.Basic == nil ||
 		resolvedConfig.DisruptionMode == nil || resolvedConfig.DisruptionMode.All == nil {
 		return nil
 	}
 
-	path := appendPathElements(rootPath, item.Input.DisruptionMode.PathElements)
+	path := appendPathElements(item.Path, item.Input.DisruptionMode.PathElements)
 	return field.ErrorList{field.Invalid(
 		path, "", "the disruptionMode `all` is not supported with the Basic scheduling policy")}
 }

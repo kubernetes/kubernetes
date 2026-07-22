@@ -19,6 +19,7 @@ package job
 import (
 	batchv1 "k8s.io/api/batch/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	workloadbuilder "k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -88,10 +89,14 @@ func WorkloadInput(
 
 // WorkloadItemForJob assembles the single-node logical workload tree for a Job.
 // It is shared by the Job registry validation and the Job controller so the two
-// never drift.
-func WorkloadItemForJob(name, priorityClassName string, parallelism *int32, input workloadbuilder.WorkloadInput) *workloadbuilder.WorkloadItem {
+// never drift. The path argument is the field path of the Job's spec.scheduling.
+// It is used exclusively for validation error reporting, so the controller may
+// pass nil.
+func WorkloadItemForJob(name, priorityClassName string, parallelism *int32,
+	input workloadbuilder.WorkloadInput, path *field.Path) *workloadbuilder.WorkloadItem {
 	return &workloadbuilder.WorkloadItem{
 		Name: name,
+		Path: path,
 		DefaultConfig: &workloadbuilder.SchedulingConfig{
 			Policy: &workloadbuilder.SchedulingPolicy{
 				Basic: &workloadbuilder.BasicSchedulingPolicy{},

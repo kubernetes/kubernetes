@@ -883,7 +883,7 @@ func TestNewBuilderFromExistingWorkload(t *testing.T) {
 
 	t.Run("Validate is refused in existing mode", func(t *testing.T) {
 		b := NewBuilderFromExistingWorkload(existingWorkload(), BuildOptions{Owner: jobOwner()})
-		errs := b.Validate(ctx, field.NewPath("spec", "scheduling"), ValidationInput{})
+		errs := b.Validate(ctx, ValidationInput{})
 		if len(errs) != 1 {
 			t.Fatalf("expected exactly one validation error, got %v", errs)
 		}
