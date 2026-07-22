@@ -1369,10 +1369,21 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 	// PodGroup snapshots are more likely out of date during asynchronous binding, so the
 	// shared PodGroupManager is used to look up the PodGroup instead.
 	var podGroup *schedulingapi.PodGroup
+	var podGroupState fwk.PodGroupState
 	if pl.fts.EnableDRAWorkloadResourceClaims &&
 		pod.Spec.SchedulingGroup != nil &&
 		pod.Spec.SchedulingGroup.PodGroupName != nil {
 		podGroup, err = pl.fh.PodGroupManager().PodGroups().Get(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+		if err != nil {
+			return
+		}
+
+		// The podGroupState lister is based on the live cache and does not consider
+		// pods assumed within the PodGroup scheduling cycle, but the ones that
+		// happened before or outside the scheduling cycle. We use it to check
+		// whether there were no assumed or assigned pods that would use the
+		// ResourceClaim.
+		podGroupState, err = pl.fh.PodGroupManager().PodGroupStates().Get(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 		if err != nil {
 			return
 		}
@@ -1412,16 +1423,6 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 			reservedUID = pod.UID
 			unreservedLogValues = append(unreservedLogValues, "pod", klog.KObj(pod))
 		} else if pl.fts.EnableDRAWorkloadResourceClaims && resourceclaim.IsReservedForPod(pod, claim, true /* acceptPodGroupReservation */) {
-			// The podGroupState lister is based on the live cache and does not consider
-			// pods assumed within the PodGroup scheduling cycle, but the ones that
-			// happened before or outside the scheduling cycle. We use it to check
-			// whether there were no assumed or assigned pods that would use the
-			// ResourceClaim.
-			podGroupState, err := pl.fh.PodGroupManager().PodGroupStates().Get(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
-			if err != nil {
-				logger.V(5).Info("Error getting scheduler state for PodGroup, not unreserving claim for PodGroup", "err", err, "resourceclaim", klog.KObj(claim), "podgroup", klog.KObj(podGroup))
-				continue
-			}
 			// During the asynchronous binding cycle, this Pod is the only one allowed
 			// to have been scheduled before unreserving the claim for the PodGroup.
 			// This is unreachable during the synchronous scheduling cycle since
