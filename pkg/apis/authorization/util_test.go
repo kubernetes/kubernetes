@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package authorization
 
-// NOTE: This file MUST be kept in sync with pkg/apis/authorization/util_test.go
+// NOTE: This file MUST be kept in sync with staging/src/k8s.io/api/authorization/v1/util_test.go
 import (
 	"testing"
 
