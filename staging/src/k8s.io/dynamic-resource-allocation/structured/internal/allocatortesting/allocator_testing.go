@@ -5926,13 +5926,8 @@ func TestAllocator(t *testing.T,
 					device(device2, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}, nil).withAllowMultipleAllocations(),
 				),
 			),
-			node: node(node1, region1),
-			expectResults: []any{
-				allocationResult(
-					localNodeSelector(node1),
-					deviceRequestAllocationResult(req0, driverA, pool1, device2).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
-				),
-			},
+			node:          node(node1, region1),
+			expectResults: []any{}, // device-1 capacity-exhausted but still matches; All fails, not device-2 only
 		},
 		"consumable-capacity-dedicated-device-with-consumable-capacity-request": {
 			features: Features{
