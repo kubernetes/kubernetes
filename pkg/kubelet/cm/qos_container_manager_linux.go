@@ -307,7 +307,8 @@ func (m *qosContainerManagerImpl) setMemoryQoS(logger klog.Logger, configs map[v
 		logger.V(4).Info("MemoryQoS config for qos", "qos", qos, "key", key, "value", value)
 	}
 
-	if m.memoryReservationPolicy != kubeletconfig.TieredReservationMemoryReservationPolicy {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) ||
+		m.memoryReservationPolicy != kubeletconfig.TieredReservationMemoryReservationPolicy {
 		setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryMin, 0)
 		setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryLow, 0)
 		setUnified(v1.PodQOSBurstable, Cgroup2MemoryLow, 0)
@@ -361,9 +362,13 @@ func (m *qosContainerManagerImpl) UpdateCgroups(logger klog.Logger) error {
 		return err
 	}
 
-	// Update cgroup v2 memory.min settings. Called only when MemoryQoS is
-	// enabled and cgroups v2 is the unified mode.
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) && libcontainercgroups.IsCgroup2UnifiedMode() {
+	// Update cgroup v2 memory.min / memory.low settings. Called on every
+	// UpdateCgroups cycle when cgroups v2 is the unified mode so that
+	// previously written values are reset to zero when the MemoryQoS feature
+	// gate or the tiered reservation policy is disabled. The feature-gate
+	// check lives inside setMemoryQoS so only the populating branch is gated;
+	// the zero-out branch remains reachable and clears stale kernel values.
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
 		m.setMemoryQoS(logger, qosConfigs)
 	}
 
