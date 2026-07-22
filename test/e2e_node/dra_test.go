@@ -64,8 +64,6 @@ import (
 
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
-	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
-	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	testdriver "k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	testdrivergomega "k8s.io/kubernetes/test/e2e/dra/test-driver/gomega"
 )
@@ -898,64 +896,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 	f.Context("Resource Health", framework.WithFeatureGate(features.ResourceHealthStatus), f.WithSerial(), func() {
 
-		// testHealthTransitions verifies that device health transitions
-		// (Healthy -> Unhealthy -> Healthy) reported by a DRA plugin are
-		// correctly reflected in the Pod's status, and that the kubelet
-		// consumed them through the expected DRAResourceHealth gRPC API
-		// version.
-		testHealthTransitions := func(ctx context.Context, prefix string, expectedHealthMethod string, opts ...pluginOption) {
-			ginkgo.By("Starting the test driver with channel-based control")
-			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, f.Namespace.Name, getNodeName(ctx, f), driverName, opts...)
-
-			pod, claimName, poolNameForTest, deviceNameForTest := setupAndVerifyHealthyPod(
-				ctx, f, kubeletPlugin, driverName,
-				prefix+"-class", prefix+"-claim", prefix+"-pod", "pool-a", "dev-0",
-			)
-
-			ginkgo.By("Verifying the negotiated health API version")
-			gomega.Expect(kubeletPlugin.GetGRPCCalls()).To(gomega.ContainElement(gomega.HaveField("FullMethod", expectedHealthMethod)), "expected health stream on %s", expectedHealthMethod)
-
-			ginkgo.By("Setting device health to Unhealthy via control channel")
-			kubeletPlugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
-				PoolName:   poolNameForTest,
-				DeviceName: deviceNameForTest,
-				Health:     "Unhealthy",
-			}
-
-			ginkgo.By("Verifying device health is now Unhealthy")
-			gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
-				return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolNameForTest, deviceNameForTest)
-			}).WithTimeout(60*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Unhealthy"), "Device health should update to Unhealthy")
-
-			ginkgo.By("Setting device health back to Healthy via control channel")
-			kubeletPlugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
-				PoolName:   poolNameForTest,
-				DeviceName: deviceNameForTest,
-				Health:     "Healthy",
-			}
-
-			ginkgo.By("Verifying device health has recovered to Healthy")
-			gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
-				return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolNameForTest, deviceNameForTest)
-			}).WithTimeout(60*time.Second).WithPolling(2*time.Second).Should(gomega.Equal("Healthy"), "Device health should recover and update to Healthy")
-		}
-
-		ginkgo.It("should reflect device health changes in the Pod's status", func(ctx context.Context) {
-			// The kubelet picks the most recent version when the plugin
-			// serves several, which is the default.
-			testHealthTransitions(ctx, "health-test", nodeWatchResourcesV1Method)
-		})
-
-		ginkgo.It("should reflect device health changes for a plugin which only supports the v1alpha1 health API", func(ctx context.Context) {
-			// Like a driver which shipped before the v1 API existed.
-			// TODO(harche): remove in 1.40 together with the kubelet's
-			// v1alpha1 client support.
-			testHealthTransitions(ctx, "health-v1alpha1", nodeWatchResourcesV1Alpha1Method, withoutHealthV1())
-		})
-
-		ginkgo.It("should reflect device health changes for a plugin which only supports the v1 health API", func(ctx context.Context) {
-			testHealthTransitions(ctx, "health-v1", nodeWatchResourcesV1Method, withoutHealthV1alpha1())
-		})
+		// The device health transition tests, including negotiation of the
+		// DRAResourceHealth API version, are in test/e2e/dra.
 
 		// This test verifies that the Kubelet establishes only a single gRPC connection
 		// with the DRA plugin throughout the plugin lifecycle.
@@ -1366,30 +1308,6 @@ func withHealthService(enabled bool) pluginOption {
 		o.EnableHealthService = enabled
 	}
 }
-
-// withoutHealthV1 restricts the driver to the v1alpha1 DRAResourceHealth
-// gRPC API, like a driver which shipped before the v1 API existed. The
-// kubelet keeps consuming v1alpha1 for three releases of transition.
-func withoutHealthV1() pluginOption {
-	return func(o *testdriver.Options) {
-		o.DisableHealthV1 = true
-	}
-}
-
-// withoutHealthV1alpha1 restricts the driver to the v1 DRAResourceHealth
-// gRPC API, like a driver which has dropped v1alpha1 support.
-func withoutHealthV1alpha1() pluginOption {
-	return func(o *testdriver.Options) {
-		o.DisableHealthV1alpha1 = true
-	}
-}
-
-// The gRPC methods on which the kubelet subscribes to device health updates,
-// depending on the negotiated DRAResourceHealth API version.
-const (
-	nodeWatchResourcesV1Alpha1Method = "/" + drahealthv1alpha1.DRAResourceHealthService + "/NodeWatchResources"
-	nodeWatchResourcesV1Method       = "/" + drahealthv1.DRAResourceHealthService + "/NodeWatchResources"
-)
 
 // Run Kubelet plugin and wait until it's registered
 func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, testNamespace string, nodeName, driverName string, options ...pluginOption) *testdriver.ExamplePlugin {

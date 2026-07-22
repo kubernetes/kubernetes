@@ -316,8 +316,10 @@ func NewDriverInstance(tCtx ktesting.TContext) *Driver {
 		callCounts: map[MethodInstance]int64{},
 		// By default, test with all gRPC APIs.
 		// TODO: should setting this be optional to test the actual helper defaults?
-		NodeV1:      true,
-		NodeV1beta1: true,
+		NodeV1:         true,
+		NodeV1beta1:    true,
+		HealthV1:       true,
+		HealthV1alpha1: true,
 		// By default, assume that the kubelet supports DRA and that
 		// the driver's removal causes ResourceSlice cleanup.
 		WithKubelet:                true,
@@ -390,6 +392,12 @@ type Driver struct {
 
 	NodeV1      bool
 	NodeV1beta1 bool
+
+	// HealthV1 and HealthV1alpha1 select which DRAResourceHealth gRPC API
+	// versions the plugin serves. Disabling one mimics drivers which only
+	// support the other version.
+	HealthV1       bool
+	HealthV1alpha1 bool
 
 	// Register the DRA test driver with the kubelet and expect DRA to work (= feature.DynamicResourceAllocation).
 	WithKubelet bool
@@ -713,7 +721,11 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 		}
 
 		pluginOpts := []any{
-			app.Options{EnableHealthService: true},
+			app.Options{
+				EnableHealthService:   true,
+				DisableHealthV1:       !d.HealthV1,
+				DisableHealthV1alpha1: !d.HealthV1alpha1,
+			},
 			kubeletplugin.GRPCVerbosity(0),
 			kubeletplugin.GRPCInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 				return d.interceptor(nodename, ctx, req, info, handler)
