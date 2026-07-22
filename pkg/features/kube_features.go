@@ -913,6 +913,12 @@ const (
 	// containers (aka containers in CrashLoopBackOff)
 	ReduceDefaultCrashLoopBackOffDecay featuregate.Feature = "ReduceDefaultCrashLoopBackOffDecay"
 
+	// owner: @Divya063 @chrishenzie
+	// kep: https://kep.k8s.io/5474
+	//
+	// Allows unprivileged containers to have writable cgroup access on cgroup v2 systems.
+	CgroupOptions featuregate.Feature = "CgroupOptions"
+
 	// owner: @HirazawaUi
 	// kep: https://kep.k8s.io/4369
 	//
@@ -1292,6 +1298,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.12"), Default: false, PreRelease: featuregate.Alpha},
 		// see https://github.com/kubernetes/kubernetes/pull/136339 for full context
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA}, // LockToDefault in 1.37, remove in 1.40
+	},
+
+	CgroupOptions: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	CPUManagerPolicyAlphaOptions: {
@@ -2406,6 +2416,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	AuthorizePodWebsocketUpgradeCreatePermission: {},
 
 	CPUCFSQuotaPeriod: {},
+
+	CgroupOptions: {},
 
 	CPUManagerPolicyAlphaOptions: {},
 

@@ -8676,7 +8676,32 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, host
 	allErrs = append(allErrs, validateWindowsSecurityContextOptions(sc.WindowsOptions, fldPath.Child("windowsOptions"))...)
 	allErrs = append(allErrs, ValidateAppArmorProfileField(sc.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
 
+	if sc.CgroupOptions != nil {
+		// CgroupOptions is Linux-only, cannot be used with WindowsOptions
+		if sc.WindowsOptions != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("cgroupOptions"),
+				sc.CgroupOptions, "cannot be set when windowsOptions is specified"))
+		}
+		if sc.CgroupOptions.MountMode != nil {
+			validModes := []core.CgroupMountMode{core.CgroupMountModeReadOnly, core.CgroupMountModeWritable}
+			if !cgroupMountModeValid(*sc.CgroupOptions.MountMode, validModes) {
+				allErrs = append(allErrs, field.NotSupported(fldPath.Child("cgroupOptions", "mountMode"),
+					*sc.CgroupOptions.MountMode, []string{string(core.CgroupMountModeReadOnly), string(core.CgroupMountModeWritable)}))
+			}
+		}
+	}
+
 	return allErrs
+}
+
+// cgroupMountModeValid checks if the given mode is one of the valid CgroupMountMode values.
+func cgroupMountModeValid(mode core.CgroupMountMode, validModes []core.CgroupMountMode) bool {
+	for _, valid := range validModes {
+		if mode == valid {
+			return true
+		}
+	}
+	return false
 }
 
 // maxGMSACredentialSpecLength is the max length, in bytes, for the actual contents

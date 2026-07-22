@@ -670,6 +670,10 @@ func (c *RuntimeCondition) String() string {
 type RuntimeFeatures struct {
 	SupplementalGroupsPolicy  bool
 	UserNamespacesHostNetwork bool
+	// SupportsCgroupOptions is true if the CRI implementation supports
+	// cgroup options (writable cgroups). This is a node-level (CRI
+	// implementation) property, independent of the runtime handler.
+	SupportsCgroupOptions bool
 }
 
 // String formats the runtime condition into a human readable string.
@@ -677,7 +681,7 @@ func (f *RuntimeFeatures) String() string {
 	if f == nil {
 		return "nil"
 	}
-	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork)
+	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v SupportsCgroupOptions: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork, f.SupportsCgroupOptions)
 }
 
 // Pods represents the list of pods
