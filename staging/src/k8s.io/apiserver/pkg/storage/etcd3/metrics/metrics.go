@@ -207,41 +207,6 @@ func DeleteStoreStats(groupResource schema.GroupResource) {
 	}
 }
 
-// RecordEtcdRequest updates and sets the etcd_request_duration_seconds,
-// etcd_request_total, etcd_request_errors_total metrics.
-func RecordEtcdRequest(verb string, groupResource schema.GroupResource, err error, startTime time.Time) {
-	etcdRequestLatency.WithLabelValues(verb, groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
-	etcdRequestCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource).Inc()
-	if err != nil {
-		etcdRequestErrorCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource).Inc()
-	}
-}
-
-// RecordListLatency sets the storage_list_duration_seconds metric.
-func RecordListLatency(groupResource schema.GroupResource, streamed bool, startTime time.Time) {
-	streamedLabel := "false"
-	if streamed {
-		streamedLabel = "true"
-	}
-	listLatency.WithLabelValues(streamedLabel, groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
-}
-
-// RecordEtcdEvent updated the etcd_events_received_total metric.
-func RecordEtcdEvent(groupResource schema.GroupResource) {
-	etcdEventsReceivedCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
-}
-
-// RecordEtcdBookmark updates the etcd_bookmark_total metric.
-func RecordEtcdBookmark(groupResource schema.GroupResource) {
-	etcdBookmarkCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
-	etcdBookmarkTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
-}
-
-// RecordDecodeError sets the storage_decode_errors metrics.
-func RecordDecodeError(groupResource schema.GroupResource) {
-	decodeErrorCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
-}
-
 // Reset resets the etcd_request_duration_seconds metric.
 func Reset() {
 	etcdRequestLatency.Reset()
@@ -264,11 +229,6 @@ func UpdateLeaseObjectCount(count int64) {
 	// Currently we only store one previous lease, since all the events have the same ttl.
 	// See pkg/storage/etcd3/lease_manager.go
 	etcdLeaseObjectCounts.WithLabelValues().Observe(float64(count))
-}
-
-// RecordStorageListMetrics notes various metrics of the cost to serve a LIST request.
-func RecordStorageListMetrics(groupResource schema.GroupResource, index string, numFetched, numEvald, numReturned int) {
-	storagemetrics.RecordStorageListMetrics(groupResource, storagemetrics.StorageBackendEtcd, index, numFetched, numEvald, numReturned)
 }
 
 type Monitor interface {
@@ -329,4 +289,157 @@ func (c *monitorCollector) CollectWithStability(ch chan<- compbasemetrics.Metric
 		}
 		ch <- metric
 	}
+}
+
+// RequestLatencyTracker is a helper to record etcd call metrics
+// using pre-materialized Prometheus counters and histograms to avoid WithLabelValues dynamic lookup locks.
+type RequestLatencyTracker struct {
+	etcdRequestLatency     compbasemetrics.ObserverMetric
+	etcdRequestCounts      compbasemetrics.CounterMetric
+	etcdRequestErrorCounts compbasemetrics.CounterMetric
+}
+
+// NewRequestLatencyTracker returns a pre-materialized tracker for a specific verb and resource.
+func NewRequestLatencyTracker(verb string, groupResource schema.GroupResource) *RequestLatencyTracker {
+	return &RequestLatencyTracker{
+		etcdRequestLatency:     etcdRequestLatency.WithLabelValues(verb, groupResource.Group, groupResource.Resource),
+		etcdRequestCounts:      etcdRequestCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource),
+		etcdRequestErrorCounts: etcdRequestErrorCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource),
+	}
+}
+
+// Record observes request duration and updates metrics.
+func (t *RequestLatencyTracker) Record(err error, startTime time.Time) {
+	t.etcdRequestLatency.Observe(sinceInSeconds(startTime))
+	t.etcdRequestCounts.Inc()
+	if err != nil {
+		t.etcdRequestErrorCounts.Inc()
+	}
+}
+
+// RequestLatencyTrackers holds pre-materialized trackers for all common storage operations.
+type RequestLatencyTrackers struct {
+	Get                       *RequestLatencyTracker
+	Create                    *RequestLatencyTracker
+	Delete                    *RequestLatencyTracker
+	Update                    *RequestLatencyTracker
+	List                      *RequestLatencyTracker
+	ListWithCount             *RequestLatencyTracker
+	ListOnlyKeys              *RequestLatencyTracker
+	GetCurrentResourceVersion *RequestLatencyTracker
+	ListStream                *RequestLatencyTracker
+
+	StorageList *ListMetricsTracker
+	DecodeError *DecodeErrorTracker
+}
+
+// NewRequestLatencyTrackers returns RequestLatencyTrackers initialized with pre-materialized metrics.
+func NewRequestLatencyTrackers(groupResource schema.GroupResource) RequestLatencyTrackers {
+	return RequestLatencyTrackers{
+		Get:                       NewRequestLatencyTracker("get", groupResource),
+		Create:                    NewRequestLatencyTracker("create", groupResource),
+		Delete:                    NewRequestLatencyTracker("delete", groupResource),
+		Update:                    NewRequestLatencyTracker("update", groupResource),
+		List:                      NewRequestLatencyTracker("list", groupResource),
+		ListWithCount:             NewRequestLatencyTracker("listWithCount", groupResource),
+		ListOnlyKeys:              NewRequestLatencyTracker("listOnlyKeys", groupResource),
+		GetCurrentResourceVersion: NewRequestLatencyTracker("getCurrentResourceVersion", groupResource),
+		ListStream:                NewRequestLatencyTracker("listStream", groupResource),
+
+		StorageList: NewListMetricsTracker(groupResource),
+		DecodeError: NewDecodeErrorTracker(groupResource),
+	}
+}
+
+// ListMetricsTracker is a helper to record LIST operation performance metrics.
+type ListMetricsTracker struct {
+	storageTracker         *storagemetrics.ListMetricsTracker
+	listLatencyStreamed    compbasemetrics.ObserverMetric
+	listLatencyNotStreamed compbasemetrics.ObserverMetric
+}
+
+// NewListMetricsTracker returns a pre-materialized tracker for LIST performance metrics.
+func NewListMetricsTracker(groupResource schema.GroupResource) *ListMetricsTracker {
+	return &ListMetricsTracker{
+		storageTracker:         storagemetrics.NewListMetricsTracker(groupResource, storagemetrics.StorageBackendEtcd, ""),
+		listLatencyStreamed:    listLatency.WithLabelValues("true", groupResource.Group, groupResource.Resource),
+		listLatencyNotStreamed: listLatency.WithLabelValues("false", groupResource.Group, groupResource.Resource),
+	}
+}
+
+// Record updates the list performance metrics.
+func (t *ListMetricsTracker) Record(streamed bool, numFetched, numEvald, numReturned int, startTime time.Time) {
+	t.storageTracker.Record(numFetched, numEvald, numReturned)
+	if streamed {
+		t.listLatencyStreamed.Observe(sinceInSeconds(startTime))
+	} else {
+		t.listLatencyNotStreamed.Observe(sinceInSeconds(startTime))
+	}
+}
+
+// DecodeErrorTracker is a helper to record decode errors.
+type DecodeErrorTracker struct {
+	decodeErrorCounts compbasemetrics.CounterMetric
+}
+
+// NewDecodeErrorTracker returns a pre-materialized tracker for decode errors.
+func NewDecodeErrorTracker(groupResource schema.GroupResource) *DecodeErrorTracker {
+	return &DecodeErrorTracker{
+		decodeErrorCounts: decodeErrorCounts.WithLabelValues(groupResource.Group, groupResource.Resource),
+	}
+}
+
+// Record increments the decode errors metric.
+func (t *DecodeErrorTracker) Record() {
+	t.decodeErrorCounts.Inc()
+}
+
+// LeaseMetricsTracker is a helper to record lease metrics using pre-materialized vectors.
+type LeaseMetricsTracker struct {
+	etcdLeaseObjectCounts compbasemetrics.ObserverMetric
+}
+
+// NewLeaseMetricsTracker returns a pre-materialized tracker for lease metrics.
+func NewLeaseMetricsTracker() *LeaseMetricsTracker {
+	return &LeaseMetricsTracker{
+		etcdLeaseObjectCounts: etcdLeaseObjectCounts.WithLabelValues(),
+	}
+}
+
+// Record updates the lease object count metric.
+func (t *LeaseMetricsTracker) Record(count int64) {
+	t.etcdLeaseObjectCounts.Observe(float64(count))
+}
+
+// WatcherMetricsTracker is a helper to record watcher performance metrics.
+type WatcherMetricsTracker struct {
+	Get                      *RequestLatencyTracker
+	List                     *RequestLatencyTracker
+	ListStream               *RequestLatencyTracker
+	etcdEventsReceivedCounts compbasemetrics.CounterMetric
+	etcdBookmarkCounts       compbasemetrics.GaugeMetric
+	etcdBookmarkTotal        compbasemetrics.CounterMetric
+}
+
+// NewWatcherMetricsTracker returns a pre-materialized tracker for watcher metrics.
+func NewWatcherMetricsTracker(groupResource schema.GroupResource) *WatcherMetricsTracker {
+	return &WatcherMetricsTracker{
+		Get:                      NewRequestLatencyTracker("get", groupResource),
+		List:                     NewRequestLatencyTracker("list", groupResource),
+		ListStream:               NewRequestLatencyTracker("listStream", groupResource),
+		etcdEventsReceivedCounts: etcdEventsReceivedCounts.WithLabelValues(groupResource.Group, groupResource.Resource),
+		etcdBookmarkCounts:       etcdBookmarkCounts.WithLabelValues(groupResource.Group, groupResource.Resource),
+		etcdBookmarkTotal:        etcdBookmarkTotal.WithLabelValues(groupResource.Group, groupResource.Resource),
+	}
+}
+
+// RecordEvent increments the events received count metric.
+func (t *WatcherMetricsTracker) RecordEvent() {
+	t.etcdEventsReceivedCounts.Inc()
+}
+
+// RecordBookmark increments the bookmark count metric.
+func (t *WatcherMetricsTracker) RecordBookmark() {
+	t.etcdBookmarkCounts.Inc()
+	t.etcdBookmarkTotal.Inc()
 }

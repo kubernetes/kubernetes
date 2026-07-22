@@ -82,3 +82,30 @@ func RecordStorageListMetrics(groupResource schema.GroupResource, storageBackend
 	listStorageNumSelectorEvals.WithLabelValues(groupResource.Group, groupResource.Resource, storageBackend).Add(float64(numEvald))
 	listStorageNumReturned.WithLabelValues(groupResource.Group, groupResource.Resource, storageBackend).Add(float64(numReturned))
 }
+
+// ListMetricsTracker is a helper to record LIST operation metrics using pre-materialized vectors.
+type ListMetricsTracker struct {
+	listStorageCount            compbasemetrics.CounterMetric
+	listStorageNumFetched       compbasemetrics.CounterMetric
+	listStorageNumSelectorEvals compbasemetrics.CounterMetric
+	listStorageNumReturned      compbasemetrics.CounterMetric
+}
+
+// NewListMetricsTracker returns a pre-materialized tracker for LIST metrics.
+func NewListMetricsTracker(groupResource schema.GroupResource, storageBackend, index string) *ListMetricsTracker {
+	return &ListMetricsTracker{
+		listStorageCount:            listStorageCount.WithLabelValues(groupResource.Group, groupResource.Resource, storageBackend, index),
+		listStorageNumFetched:       listStorageNumFetched.WithLabelValues(groupResource.Group, groupResource.Resource, storageBackend, index),
+		listStorageNumSelectorEvals: listStorageNumSelectorEvals.WithLabelValues(groupResource.Group, groupResource.Resource, storageBackend),
+		listStorageNumReturned:      listStorageNumReturned.WithLabelValues(groupResource.Group, groupResource.Resource, storageBackend),
+	}
+}
+
+// Record updates the list metrics.
+func (t *ListMetricsTracker) Record(numFetched, numEvald, numReturned int) {
+	t.listStorageCount.Inc()
+	t.listStorageNumFetched.Add(float64(numFetched))
+	t.listStorageNumSelectorEvals.Add(float64(numEvald))
+	t.listStorageNumReturned.Add(float64(numReturned))
+}
+

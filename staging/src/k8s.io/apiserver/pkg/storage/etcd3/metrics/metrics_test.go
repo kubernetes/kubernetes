@@ -52,7 +52,7 @@ func TestRecordDecodeError(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
-			RecordDecodeError(test.resource)
+			NewDecodeErrorTracker(test.resource).Record()
 			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), testedMetrics); err != nil {
 				t.Fatal(err)
 			}
@@ -82,7 +82,7 @@ apiserver_storage_events_received_total{group="apps",resource="deployments"} 1
 
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
-			RecordEtcdEvent(test.resource)
+			NewWatcherMetricsTracker(test.resource).RecordEvent()
 			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), testedMetrics); err != nil {
 				t.Fatal(err)
 			}
@@ -114,7 +114,7 @@ etcd_bookmark_total{group="apps",resource="deployments"} 1
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
 			for i := 0; i < test.callCount; i++ {
-				RecordEtcdBookmark(test.groupResource)
+				NewWatcherMetricsTracker(test.groupResource).RecordBookmark()
 			}
 			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), "etcd_bookmark_total"); err != nil {
 				t.Fatal(err)
@@ -237,7 +237,7 @@ etcd_request_errors_total{group="bar",operation="foo",resource="baz"} 1
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
 			defer registry.Reset()
-			RecordEtcdRequest(test.operation, test.groupResource, test.err, test.startTime)
+			NewRequestLatencyTracker(test.operation, test.groupResource).Record(test.err, test.startTime)
 			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), testedMetricsName...); err != nil {
 				t.Fatal(err)
 			}

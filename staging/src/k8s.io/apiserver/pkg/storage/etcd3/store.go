@@ -95,6 +95,7 @@ type store struct {
 
 	collectorMux          sync.RWMutex
 	resourceSizeEstimator *resourceSizeEstimator
+	latencyTrackers       metrics.RequestLatencyTrackers
 }
 
 var _ storage.Interface = (*store)(nil)
@@ -169,12 +170,13 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 	}
 
 	w := &watcher{
-		client:        c.Client,
-		codec:         codec,
-		newFunc:       newFunc,
-		groupResource: groupResource,
-		versioner:     versioner,
-		transformer:   transformer,
+		client:                c.Client,
+		codec:                 codec,
+		newFunc:               newFunc,
+		groupResource:         groupResource,
+		versioner:             versioner,
+		transformer:           transformer,
+		watcherMetricsTracker: metrics.NewWatcherMetricsTracker(groupResource),
 	}
 	if newFunc == nil {
 		w.objectType = "<unknown>"
@@ -197,6 +199,8 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 		newListFunc:    newListFunc,
 		compactor:      compactor,
 	}
+
+	s.latencyTrackers = metrics.NewRequestLatencyTrackers(groupResource)
 
 	w.getResourceSizeEstimator = s.getResourceSizeEstimator
 	w.getCurrentStorageRV = func(ctx context.Context) (uint64, error) {
@@ -246,7 +250,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	defer span.End(500 * time.Millisecond)
 	startTime := time.Now()
 	getResp, err := s.client.Kubernetes.Get(ctx, preparedKey, kubernetes.GetOptions{})
-	metrics.RecordEtcdRequest("get", s.groupResource, err, startTime)
+	s.latencyTrackers.Get.Record(err, startTime)
 	if err != nil {
 		span.AddEvent("Get call failed", attribute.String("err", err.Error()))
 		return err
@@ -273,7 +277,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	err = s.decoder.Decode(data, out, getResp.KV.ModRevision)
 	if err != nil {
 		span.AddEvent("Decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
-		recordDecodeError(s.groupResource, preparedKey)
+		s.recordDecodeError(preparedKey)
 		return err
 	}
 	span.AddEvent("Decode succeeded", attribute.Int("len", len(data)))
@@ -325,7 +329,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 
 	startTime := time.Now()
 	txnResp, err := s.client.Kubernetes.OptimisticPut(ctx, preparedKey, newData, 0, kubernetes.PutOptions{LeaseID: lease})
-	metrics.RecordEtcdRequest("create", s.groupResource, err, startTime)
+	s.latencyTrackers.Create.Record(err, startTime)
 	if err != nil {
 		span.AddEvent("Txn call failed", attribute.String("err", err.Error()))
 		return err
@@ -340,7 +344,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 		err = s.decoder.Decode(data, out, txnResp.Revision)
 		if err != nil {
 			span.AddEvent("Decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
-			recordDecodeError(s.groupResource, preparedKey)
+			s.recordDecodeError(preparedKey)
 			return err
 		}
 		span.AddEvent("Decode succeeded", attribute.Int("len", len(data)))
@@ -444,7 +448,7 @@ func (s *store) conditionalDelete(
 		txnResp, err := s.client.Kubernetes.OptimisticDelete(ctx, key, origState.rev, kubernetes.DeleteOptions{
 			GetOnFailure: true,
 		})
-		metrics.RecordEtcdRequest("delete", s.groupResource, err, startTime)
+		s.latencyTrackers.Delete.Record(err, startTime)
 		if err != nil {
 			return err
 		}
@@ -461,7 +465,7 @@ func (s *store) conditionalDelete(
 		if !expectTransformOrDecodeError {
 			err = s.decoder.Decode(origState.data, out, txnResp.Revision)
 			if err != nil {
-				recordDecodeError(s.groupResource, key)
+				s.recordDecodeError(key)
 				return err
 			}
 		}
@@ -578,7 +582,7 @@ func (s *store) GuaranteedUpdate(
 			if !origState.stale {
 				err = s.decoder.Decode(origState.data, destination, origState.rev)
 				if err != nil {
-					recordDecodeError(s.groupResource, preparedKey)
+					s.recordDecodeError(preparedKey)
 					return err
 				}
 				return nil
@@ -607,7 +611,7 @@ func (s *store) GuaranteedUpdate(
 			GetOnFailure: true,
 			LeaseID:      lease,
 		})
-		metrics.RecordEtcdRequest("update", s.groupResource, err, startTime)
+		s.latencyTrackers.Update.Record(err, startTime)
 		if err != nil {
 			span.AddEvent("Txn call failed", attribute.String("err", err.Error()))
 			return err
@@ -628,7 +632,7 @@ func (s *store) GuaranteedUpdate(
 		err = s.decoder.Decode(data, destination, txnResp.Revision)
 		if err != nil {
 			span.AddEvent("Decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
-			recordDecodeError(s.groupResource, preparedKey)
+			s.recordDecodeError(preparedKey)
 			return err
 		}
 		span.AddEvent("Decode succeeded", attribute.Int("len", len(data)))
@@ -665,7 +669,7 @@ func (s *store) Stats(ctx context.Context) (storage.Stats, error) {
 		return storage.Stats{}, err
 	}
 	count, err := s.client.Kubernetes.Count(ctx, prefix, kubernetes.CountOptions{})
-	metrics.RecordEtcdRequest("listWithCount", s.groupResource, err, startTime)
+	s.latencyTrackers.ListWithCount.Record(err, startTime)
 	if err != nil {
 		return storage.Stats{}, err
 	}
@@ -709,7 +713,7 @@ func (s *store) getKeys(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 	resp, err := s.client.KV.Get(ctx, prefix, clientv3.WithPrefix(), clientv3.WithKeysOnly())
-	metrics.RecordEtcdRequest("listOnlyKeys", s.groupResource, err, startTime)
+	s.latencyTrackers.ListOnlyKeys.Record(err, startTime)
 	if err != nil {
 		return nil, err
 	}
@@ -733,7 +737,7 @@ func (s *store) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
 
 	startTime := time.Now()
 	getResp, err := s.client.Kubernetes.Get(ctx, preparedKey, kubernetes.GetOptions{})
-	metrics.RecordEtcdRequest("getCurrentResourceVersion", s.groupResource, err, startTime)
+	s.latencyTrackers.GetCurrentResourceVersion.Record(err, startTime)
 	if err != nil {
 		return 0, err
 	}
@@ -804,8 +808,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	// get them recorded even in error cases.
 	defer func() {
 		numReturn := v.Len()
-		metrics.RecordStorageListMetrics(s.groupResource, "", numFetched, numEvald, numReturn)
-		metrics.RecordListLatency(s.groupResource, streamed, startTime)
+		s.latencyTrackers.StorageList.Record(streamed, numFetched, numEvald, numReturn, startTime)
 	}()
 
 	aggregator := s.listErrAggrFactory()
@@ -962,7 +965,7 @@ func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev, lim
 	return func(yield func(listChunk, error) bool) {
 		var err error
 		defer func() {
-			metrics.RecordEtcdRequest("listStream", s.groupResource, err, startTime)
+			s.latencyTrackers.ListStream.Record(err, startTime)
 		}()
 		if err = streamErr; err != nil {
 			yield(listChunk{}, s.listReadError(ctx, err, withRev, paging, continueKey, keyPrefix))
@@ -1038,7 +1041,7 @@ func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred s
 
 	obj, err := s.decoder.DecodeListItem(ctx, data, uint64(kv.ModRevision), newItemFunc)
 	if err != nil {
-		recordDecodeError(s.groupResource, string(kv.Key))
+		s.recordDecodeError(string(kv.Key))
 		if done := aggregator.Append(string(kv.Key), err); done {
 			return false, aggregator.Aggregate()
 		}
@@ -1084,13 +1087,13 @@ func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, o
 	startTime := time.Now()
 	if recursive {
 		resp, err = s.client.Kubernetes.List(ctx, keyPrefix, options)
-		metrics.RecordEtcdRequest("list", s.groupResource, err, startTime)
+		s.latencyTrackers.List.Record(err, startTime)
 	} else {
 		var getResp kubernetes.GetResponse
 		getResp, err = s.client.Kubernetes.Get(ctx, keyPrefix, kubernetes.GetOptions{
 			Revision: options.Revision,
 		})
-		metrics.RecordEtcdRequest("get", s.groupResource, err, startTime)
+		s.latencyTrackers.Get.Record(err, startTime)
 		if getResp.KV != nil {
 			resp.Kvs = []*mvccpb.KeyValue{getResp.KV}
 			resp.Count = 1
@@ -1168,7 +1171,7 @@ func (s *store) getCurrentState(ctx context.Context, key string, v reflect.Value
 	return func() (*objState, error) {
 		startTime := time.Now()
 		getResp, err := s.client.Kubernetes.Get(ctx, key, kubernetes.GetOptions{})
-		metrics.RecordEtcdRequest("get", s.groupResource, err, startTime)
+		s.latencyTrackers.Get.Record(err, startTime)
 		if err != nil {
 			return nil, err
 		}
@@ -1221,7 +1224,7 @@ func (s *store) getState(ctx context.Context, kv *mvccpb.KeyValue, key string, v
 
 	if err := s.decoder.Decode(state.data, state.obj, state.rev); err != nil {
 		if !expectTransformOrDecodeError {
-			recordDecodeError(s.groupResource, key)
+			s.recordDecodeError(key)
 			return nil, err
 		}
 
@@ -1313,9 +1316,9 @@ func (s *store) prepareKey(key string, recursive bool) (string, error) {
 }
 
 // recordDecodeError record decode error split by object type.
-func recordDecodeError(groupResource schema.GroupResource, key string) {
-	metrics.RecordDecodeError(groupResource)
-	klog.V(4).Infof("Decoding %s \"%s\" failed", groupResource, key)
+func (s *store) recordDecodeError(key string) {
+	s.latencyTrackers.DecodeError.Record()
+	klog.V(4).Infof("Decoding %s \"%s\" failed", s.groupResource, key)
 }
 
 // getTypeName returns type name of an object for reporting purposes.

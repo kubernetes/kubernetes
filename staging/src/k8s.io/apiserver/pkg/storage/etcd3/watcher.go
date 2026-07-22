@@ -95,6 +95,7 @@ type watcher struct {
 	transformer              value.Transformer
 	getCurrentStorageRV      func(context.Context) (uint64, error)
 	getResourceSizeEstimator func() *resourceSizeEstimator
+	watcherMetricsTracker    *metrics.WatcherMetricsTracker
 }
 
 // watchChan implements watch.Interface.
@@ -330,7 +331,11 @@ func (wc *watchChan) syncPaginated() error {
 	for {
 		startTime := time.Now()
 		getResp, err = wc.watcher.client.KV.Get(wc.ctx, preparedKey, opts...)
-		metrics.RecordEtcdRequest(metricsOp, wc.watcher.groupResource, err, startTime)
+		if metricsOp == "list" {
+			wc.watcher.watcherMetricsTracker.List.Record(err, startTime)
+		} else {
+			wc.watcher.watcherMetricsTracker.Get.Record(err, startTime)
+		}
 		if err != nil {
 			return interpretListError(err, true, preparedKey, wc.key)
 		}
@@ -382,7 +387,7 @@ func (wc *watchChan) syncStreamRecursive() error {
 		if grpcstatus.Code(err) == grpccodes.Unimplemented {
 			return
 		}
-		metrics.RecordEtcdRequest("listStream", wc.watcher.groupResource, err, startTime)
+		wc.watcher.watcherMetricsTracker.ListStream.Record(err, startTime)
 	}()
 
 	var initialRev int64
@@ -487,7 +492,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 		}
 		if wres.IsProgressNotify() {
 			wc.queueEvent(progressNotifyEvent(wres.Header.GetRevision()))
-			metrics.RecordEtcdBookmark(wc.watcher.groupResource)
+			wc.watcher.watcherMetricsTracker.RecordBookmark()
 			continue
 		}
 
@@ -500,7 +505,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 					estimator.DeleteKey(e.Kv)
 				}
 			}
-			metrics.RecordEtcdEvent(wc.watcher.groupResource)
+			wc.watcher.watcherMetricsTracker.RecordEvent()
 			parsedEvent, err := parseEvent(e)
 			if err != nil {
 				logWatchChannelErr(err)

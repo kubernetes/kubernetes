@@ -63,6 +63,7 @@ type leaseManager struct {
 	leaseReuseDurationPercent   float64
 	leaseMaxAttachedObjectCount int64
 	leaseAttachedObjectCount    int64
+	leaseMetricsTracker         *metrics.LeaseMetricsTracker
 }
 
 // newDefaultLeaseManager creates a new lease manager using default setting.
@@ -82,6 +83,7 @@ func newLeaseManager(client *clientv3.Client, leaseReuseDurationSeconds int64, l
 		leaseReuseDurationSeconds:   leaseReuseDurationSeconds,
 		leaseReuseDurationPercent:   leaseReuseDurationPercent,
 		leaseMaxAttachedObjectCount: maxObjectCount,
+		leaseMetricsTracker:         metrics.NewLeaseMetricsTracker(),
 	}
 }
 
@@ -114,7 +116,7 @@ func (l *leaseManager) GetLease(ctx context.Context, ttl int64) (clientv3.LeaseI
 	l.prevLeaseID = lcr.ID
 	l.prevLeaseExpirationTime = now.Add(time.Duration(ttl) * time.Second)
 	// refresh count
-	metrics.UpdateLeaseObjectCount(l.leaseAttachedObjectCount)
+	l.leaseMetricsTracker.Record(l.leaseAttachedObjectCount)
 	l.leaseAttachedObjectCount = 1
 	return lcr.ID, nil
 }

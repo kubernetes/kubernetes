@@ -378,6 +378,7 @@ func TestGetListStreamFallsBackToPaginated(t *testing.T) {
 	metrics.Register()
 	legacyregistry.Reset()
 	t.Cleanup(legacyregistry.Reset)
+	store.latencyTrackers = metrics.NewRequestLatencyTrackers(store.groupResource)
 
 	out := &example.PodList{}
 	if err := store.GetList(ctx, "/pods/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, out); err != nil {
@@ -388,9 +389,28 @@ func TestGetListStreamFallsBackToPaginated(t *testing.T) {
 		t.Errorf("expected GetStream to be called once, got %d", kvWrapper.getStreamCallCounter)
 	}
 	// The Unimplemented probe is not recorded, only the unary request serving the list.
-	expected := `# HELP etcd_requests_total [ALPHA] Etcd request counts for each operation and object type.
+	expected := `# HELP etcd_request_errors_total [ALPHA] Etcd failed request counts for each operation and object type.
+# TYPE etcd_request_errors_total counter
+etcd_request_errors_total{group="",operation="create",resource="pods"} 0
+etcd_request_errors_total{group="",operation="delete",resource="pods"} 0
+etcd_request_errors_total{group="",operation="get",resource="pods"} 0
+etcd_request_errors_total{group="",operation="getCurrentResourceVersion",resource="pods"} 0
+etcd_request_errors_total{group="",operation="list",resource="pods"} 0
+etcd_request_errors_total{group="",operation="listOnlyKeys",resource="pods"} 0
+etcd_request_errors_total{group="",operation="listStream",resource="pods"} 0
+etcd_request_errors_total{group="",operation="listWithCount",resource="pods"} 0
+etcd_request_errors_total{group="",operation="update",resource="pods"} 0
+# HELP etcd_requests_total [ALPHA] Etcd request counts for each operation and object type.
 # TYPE etcd_requests_total counter
+etcd_requests_total{group="",operation="create",resource="pods"} 0
+etcd_requests_total{group="",operation="delete",resource="pods"} 0
+etcd_requests_total{group="",operation="get",resource="pods"} 0
+etcd_requests_total{group="",operation="getCurrentResourceVersion",resource="pods"} 0
 etcd_requests_total{group="",operation="list",resource="pods"} 1
+etcd_requests_total{group="",operation="listOnlyKeys",resource="pods"} 0
+etcd_requests_total{group="",operation="listStream",resource="pods"} 0
+etcd_requests_total{group="",operation="listWithCount",resource="pods"} 0
+etcd_requests_total{group="",operation="update",resource="pods"} 0
 `
 	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "etcd_requests_total", "etcd_request_errors_total"); err != nil {
 		t.Error(err)
@@ -488,6 +508,7 @@ func testListMetrics(t *testing.T) {
 	storagemetrics.Register()
 	legacyregistry.Reset()
 	t.Cleanup(legacyregistry.Reset)
+	store.latencyTrackers = metrics.NewRequestLatencyTrackers(store.groupResource)
 
 	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "ns"}}
 	if err := store.Create(ctx, computePodKey(pod), pod, &example.Pod{}, 0); err != nil {
