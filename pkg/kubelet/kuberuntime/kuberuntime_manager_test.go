@@ -1892,10 +1892,6 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 }
 
 func TestComputePodActionsWithInitContainers(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	_, _, m, err := createTestRuntimeManager(tCtx)
-	require.NoError(t, err)
-
 	cpu400m := resource.MustParse("400m")
 	memory400Mi := resource.MustParse("400Mi")
 	cpu800m := resource.MustParse("800m")
@@ -2201,6 +2197,9 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingInitContainers, false)
 			}
+
+			_, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
 
 			pod, status := makeBasePodAndStatusWithInitContainers()
 
@@ -2850,8 +2849,6 @@ func TestComputePodActionsWithContainerRestartRules(t *testing.T) {
 		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
 		containerRestartPolicyNever     = v1.ContainerRestartPolicyNever
 	)
-	_, _, m, err := createTestRuntimeManager(tCtx)
-	require.NoError(t, err)
 
 	// Creating a pair reference pod and status for the test cases to refer
 	// the specific fields.
@@ -2965,6 +2962,8 @@ func TestComputePodActionsWithContainerRestartRules(t *testing.T) {
 			},
 		},
 	} {
+		_, _, m, err := createTestRuntimeManager(tCtx)
+		require.NoError(t, err)
 		pod, status := makeBasePodAndStatus()
 		if test.mutatePodFn != nil {
 			test.mutatePodFn(pod)
