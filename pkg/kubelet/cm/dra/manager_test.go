@@ -2007,7 +2007,7 @@ func TestHandleWatchResourcesStreamOwnership(t *testing.T) {
 		t.Fatal("superseded health stream did not stop")
 	}
 	require.Equal(t, state.DeviceHealthStatusUnhealthy, manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName).Health)
-	require.Zero(t, len(manager.update), "superseded health stream triggered an unexpected pod update")
+	require.Empty(t, manager.update, "superseded health stream triggered an unexpected pod update")
 
 	close(newResponses)
 	expectPodUpdate()
