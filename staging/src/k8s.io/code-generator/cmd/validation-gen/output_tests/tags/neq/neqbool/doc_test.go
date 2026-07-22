@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -28,7 +27,7 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		NeqTrueField:          false,
-		NeqFalsePtrField:      ptr.To(true),
+		NeqFalsePtrField:      new(true),
 		ValidatedTypedefField: false,
 	}).ExpectValid()
 
@@ -40,7 +39,7 @@ func Test(t *testing.T) {
 
 	invalid := &Struct{
 		NeqTrueField:          true,
-		NeqFalsePtrField:      ptr.To(false),
+		NeqFalsePtrField:      new(false),
 		ValidatedTypedefField: true,
 	}
 
