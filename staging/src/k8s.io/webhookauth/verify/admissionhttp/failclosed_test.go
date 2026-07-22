@@ -78,7 +78,7 @@ func TestWithTokenVerification_NilRequestBody(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
 	spy := newSpyHandler()
-	adapter := admissionhttp.WithTokenVerification(v, spy.serve)
+	adapter := admissionhttp.NewHandlerForTest(v, spy.serve, nil)
 
 	r := httptest.NewRequest(http.MethodPost, "/validate", nil)
 	r.Body = nil // an explicitly bodyless request
@@ -105,7 +105,7 @@ func TestWithTokenVerification_ValidJSONNoRequest(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
 	spy := newSpyHandler()
-	adapter := admissionhttp.WithTokenVerification(v, spy.serve)
+	adapter := admissionhttp.NewHandlerForTest(v, spy.serve, nil)
 
 	// A syntactically valid AdmissionReview envelope with Request omitted.
 	body := []byte(`{"apiVersion":"admission.k8s.io/v1","kind":"AdmissionReview"}`)
@@ -131,7 +131,7 @@ func TestWithTokenVerification_HugeBodyDefaultLimit(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
 	spy := newSpyHandler()
-	adapter := admissionhttp.WithTokenVerification(v, spy.serve) // default limit
+	adapter := admissionhttp.NewHandlerForTest(v, spy.serve, nil) // default limit
 
 	// Comfortably larger than the adapter's default maximum body size.
 	huge := bytes.Repeat([]byte("a"), 8<<20) // 8 MiB
@@ -156,7 +156,7 @@ func TestWithTokenVerification_EmptyBearerRejected(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
 	spy := newSpyHandler()
-	adapter := admissionhttp.WithTokenVerification(v, spy.serve)
+	adapter := admissionhttp.NewHandlerForTest(v, spy.serve, nil)
 
 	r := newRequest(t, admissionReviewBody(t, testGroup), "")
 	r.Header.Set("Authorization", "Bearer ") // present but empty
@@ -193,7 +193,7 @@ func TestWithTokenVerification_BodyReadErrorFailsClosed(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
 	spy := newSpyHandler()
-	adapter := admissionhttp.WithTokenVerification(v, spy.serve)
+	adapter := admissionhttp.NewHandlerForTest(v, spy.serve, nil)
 
 	r := httptest.NewRequest(http.MethodPost, "/validate", http.NoBody)
 	r.Body = erroringBody{}
@@ -274,7 +274,7 @@ func TestWithTokenVerification_DecodeOnce_BodyConsumedExactlyOnce(t *testing.T) 
 		gotRequest = req
 		return &admissionv1.AdmissionResponse{Allowed: true}
 	}
-	adapter := admissionhttp.WithTokenVerification(v, next)
+	adapter := admissionhttp.NewHandlerForTest(v, next, nil)
 
 	body := admissionReviewBody(t, testGroup)
 	cb := newCloseOnceBody(body)

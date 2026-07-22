@@ -21,8 +21,10 @@ import (
 	"testing"
 )
 
-// fakeBinder is a TokenAuthenticator that also implements AudienceBinder and
-// HealthChecker, so the Verifier's delegation can be tested without crypto.
+// fakeBinder is a TokenAuthenticator that records BindAudience calls and reports
+// a configurable health, so the Verifier's direct delegation of BindAudience and
+// HealthCheck can be tested without crypto. It overrides the always-ready
+// implementations promoted from the embedded fakeAuthenticator.
 type fakeBinder struct {
 	fakeAuthenticator
 	bound     string
@@ -40,10 +42,13 @@ func (f *fakeBinder) BindAudience(audience string) error {
 
 func (f *fakeBinder) HealthCheck() error { return f.healthErr }
 
-// TestVerifier_BindAudience_NoopForPlainAuthenticator confirms that binding an
-// audience to an authenticator that does not support late binding is a no-op, not
-// an error, so out-of-cluster callers are unaffected.
-func TestVerifier_BindAudience_NoopForPlainAuthenticator(t *testing.T) {
+// TestVerifier_BindAudience_NoopForFixedAudienceAuthenticator confirms that
+// BindAudience and HealthCheck on an authenticator whose audience is fixed at
+// construction (the out-of-cluster case, modelled by the plain fakeAuthenticator)
+// are no-ops that report ready, so out-of-cluster callers are unaffected. The
+// delegation is now direct (BindAudience/HealthCheck are part of
+// TokenAuthenticator), not an optional-interface type assertion.
+func TestVerifier_BindAudience_NoopForFixedAudienceAuthenticator(t *testing.T) {
 	v := mustVerifier(t, fakeAuthenticator{groups: []string{testGroup}})
 	if err := v.BindAudience("https://webhook.example/validate"); err != nil {
 		t.Fatalf("BindAudience on a non-binder should be a no-op, got %v", err)
@@ -54,7 +59,7 @@ func TestVerifier_BindAudience_NoopForPlainAuthenticator(t *testing.T) {
 }
 
 // TestVerifier_BindAudience_Delegates confirms BindAudience and HealthCheck are
-// forwarded to an authenticator that implements the optional interfaces.
+// forwarded to the backing authenticator's implementations.
 func TestVerifier_BindAudience_Delegates(t *testing.T) {
 	binder := &fakeBinder{}
 	v := mustVerifier(t, binder)

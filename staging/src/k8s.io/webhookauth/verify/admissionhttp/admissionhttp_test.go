@@ -376,7 +376,7 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			spy := newSpyHandler()
-			adapter := admissionhttp.WithTokenVerification(v, spy.serve)
+			adapter := admissionhttp.NewHandlerForTest(v, spy.serve, nil)
 
 			var token string
 			if tc.token != nil {
@@ -431,7 +431,7 @@ func TestWithTokenVerification_ForwardsRequestAndEchoesUID(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
 	spy := newSpyHandler()
-	adapter := admissionhttp.WithTokenVerification(v, spy.serve)
+	adapter := admissionhttp.NewHandlerForTest(v, spy.serve, nil)
 
 	body := admissionReviewBody(t, testGroup)
 	token := ts.sign(t, ts.baseClaims())
@@ -473,7 +473,7 @@ func TestWithTokenVerification_OverHTTPServer(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
 	spy := newSpyHandler()
-	srv := httptest.NewServer(admissionhttp.WithTokenVerification(v, spy.serve))
+	srv := httptest.NewServer(admissionhttp.NewHandlerForTest(v, spy.serve, nil))
 	defer srv.Close()
 
 	body := admissionReviewBody(t, testGroup)
@@ -521,7 +521,7 @@ func TestWithTokenVerification_UndecodableBodyFailsClosed(t *testing.T) {
 
 	v := ts.verifier(t)
 	spy := newSpyHandler()
-	adapter := admissionhttp.WithTokenVerification(v, spy.serve)
+	adapter := admissionhttp.NewHandlerForTest(v, spy.serve, nil)
 
 	rec := httptest.NewRecorder()
 	adapter.ServeHTTP(rec, newRequest(t, undecodable, token))
@@ -544,7 +544,7 @@ func TestWithTokenVerification_OverLimitBodyRejected(t *testing.T) {
 	v := ts.verifier(t)
 	spy := newSpyHandler()
 	// A tiny limit guarantees the AdmissionReview body exceeds it.
-	adapter := admissionhttp.WithTokenVerification(v, spy.serve, admissionhttp.WithMaxBodyBytes(16))
+	adapter := admissionhttp.NewHandlerForTest(v, spy.serve, nil, admissionhttp.WithMaxBodyBytes(16))
 
 	body := admissionReviewBody(t, testGroup)
 	if int64(len(body)) <= 16 {
@@ -628,7 +628,7 @@ func TestWithTokenVerification_InnerObjectGroupChecked(t *testing.T) {
 
 	t.Run("object group matches resource group -> allowed", func(t *testing.T) {
 		spy := newSpyHandler()
-		adapter := admissionhttp.WithTokenVerification(v, spy.serve)
+		adapter := admissionhttp.NewHandlerForTest(v, spy.serve, nil)
 		rec := httptest.NewRecorder()
 		adapter.ServeHTTP(rec, newRequest(t, reviewWithObject(testGroup, "apps/v1"), token))
 		if !spy.wasReached() {
@@ -638,7 +638,7 @@ func TestWithTokenVerification_InnerObjectGroupChecked(t *testing.T) {
 
 	t.Run("object group differs from resource group -> denied", func(t *testing.T) {
 		spy := newSpyHandler()
-		adapter := admissionhttp.WithTokenVerification(v, spy.serve)
+		adapter := admissionhttp.NewHandlerForTest(v, spy.serve, nil)
 		rec := httptest.NewRecorder()
 		adapter.ServeHTTP(rec, newRequest(t, reviewWithObject(testGroup, "batch/v1"), token))
 		if spy.wasReached() {
@@ -650,6 +650,83 @@ func TestWithTokenVerification_InnerObjectGroupChecked(t *testing.T) {
 		}
 		if review.Response == nil || review.Response.Allowed {
 			t.Errorf("expected a deny, got %+v", review.Response)
+		}
+	})
+}
+
+// TestWithTokenVerification_InnerObjectGroupChecksBothObjects proves the
+// hardened D1.B defense: checkObjectGroup inspects BOTH req.Object and
+// req.OldObject, not just the first non-empty slot. On an UPDATE both are
+// populated, so a mismatched group hidden in the slot that used to be ignored
+// must still be denied.
+func TestWithTokenVerification_InnerObjectGroupChecksBothObjects(t *testing.T) {
+	ts := newOIDCTestServer(t)
+	v := ts.verifier(t)
+	token := ts.sign(t, ts.baseClaims())
+
+	rawObj := func(apiVersion string) []byte {
+		b, err := json.Marshal(map[string]any{"apiVersion": apiVersion, "kind": "Deployment"})
+		if err != nil {
+			t.Fatalf("marshal object: %v", err)
+		}
+		return b
+	}
+	// An UPDATE review carrying both Object (the new object) and OldObject (the
+	// prior object), each with an independently chosen apiVersion group.
+	updateReview := func(objectAPIVersion, oldObjectAPIVersion string) []byte {
+		review := &admissionv1.AdmissionReview{
+			TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
+			Request: &admissionv1.AdmissionRequest{
+				UID:       types.UID(reviewUID),
+				Resource:  metav1.GroupVersionResource{Group: testGroup, Version: "v1", Resource: "deployments"},
+				Object:    runtime.RawExtension{Raw: rawObj(objectAPIVersion)},
+				OldObject: runtime.RawExtension{Raw: rawObj(oldObjectAPIVersion)},
+			},
+		}
+		body, err := json.Marshal(review)
+		if err != nil {
+			t.Fatalf("marshal review: %v", err)
+		}
+		return body
+	}
+
+	// The load-bearing case: Object matches the authorized group but the
+	// mismatched group is hidden in OldObject. The pre-hardening code checked only
+	// the first non-empty slot (Object) and would have ALLOWED this.
+	t.Run("oldObject group mismatch is denied even when object matches", func(t *testing.T) {
+		spy := newSpyHandler()
+		adapter := admissionhttp.NewHandlerForTest(v, spy.serve, nil)
+		rec := httptest.NewRecorder()
+		adapter.ServeHTTP(rec, newRequest(t, updateReview("apps/v1", "batch/v1"), token))
+		if spy.wasReached() {
+			t.Error("downstream must not be reached when the oldObject group mismatches")
+		}
+		var review admissionv1.AdmissionReview
+		if err := json.Unmarshal(rec.Body.Bytes(), &review); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if review.Response == nil || review.Response.Allowed {
+			t.Errorf("expected a deny, got %+v", review.Response)
+		}
+	})
+
+	t.Run("object group mismatch is denied even when oldObject matches", func(t *testing.T) {
+		spy := newSpyHandler()
+		adapter := admissionhttp.NewHandlerForTest(v, spy.serve, nil)
+		rec := httptest.NewRecorder()
+		adapter.ServeHTTP(rec, newRequest(t, updateReview("batch/v1", "apps/v1"), token))
+		if spy.wasReached() {
+			t.Error("downstream must not be reached when the object group mismatches")
+		}
+	})
+
+	t.Run("both objects matching is allowed", func(t *testing.T) {
+		spy := newSpyHandler()
+		adapter := admissionhttp.NewHandlerForTest(v, spy.serve, nil)
+		rec := httptest.NewRecorder()
+		adapter.ServeHTTP(rec, newRequest(t, updateReview("apps/v1", "apps/v1"), token))
+		if !spy.wasReached() {
+			t.Error("downstream should be reached when both object groups match")
 		}
 	})
 }

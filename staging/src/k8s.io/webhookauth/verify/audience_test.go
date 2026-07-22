@@ -44,12 +44,20 @@ func TestAudienceForService(t *testing.T) {
 			want:      "https://my-webhook.kube-system.svc:443/validate",
 		},
 		{
-			name:      "no path",
+			name:      "empty path normalized to single slash",
 			svcName:   "my-webhook",
 			namespace: "default",
 			port:      443,
 			path:      "",
-			want:      "https://my-webhook.default.svc:443",
+			want:      "https://my-webhook.default.svc:443/",
+		},
+		{
+			name:      "path without leading slash is normalized",
+			svcName:   "my-webhook",
+			namespace: "default",
+			port:      443,
+			path:      "validate",
+			want:      "https://my-webhook.default.svc:443/validate",
 		},
 	}
 	for _, tc := range tests {

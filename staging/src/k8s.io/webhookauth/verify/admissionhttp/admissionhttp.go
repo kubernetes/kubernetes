@@ -15,24 +15,29 @@ limitations under the License.
 */
 
 // Package admissionhttp adapts the core token verifier to a plain net/http
-// admission webhook. WithTokenVerification returns an http.Handler that decodes
-// the incoming AdmissionReview once, enforces KEP-6060 token verification, and —
-// only on success — hands the decoded AdmissionRequest to a downstream handler.
+// admission webhook. WithTokenVerification builds the verifier and returns an
+// http.Handler that decodes the incoming AdmissionReview once, enforces KEP-6060
+// token verification, and — only on success — hands the decoded AdmissionRequest
+// to a downstream handler.
 //
 // Enforcement is unconditional: a verification failure never reaches the
 // downstream handler. Whether a webhook adopts verification at all is a
 // deployment-time concern that defaults off, not a runtime knob here.
 //
-// Callers that have already decoded the review (for example controller-runtime)
-// should use [VerifyAdmissionRequest] directly. The adapter imports only the
-// core verify package plus k8s.io/api/admission/v1 and k8s.io/apimachinery, so
-// JOSE/JWT dependencies stay confined to the authenticator the verifier uses.
+// WithTokenVerification chooses the verifier from its RemoteConfig argument: a
+// non-nil config builds an out-of-cluster verifier bound to a fixed issuer and
+// audience; a nil config builds the in-cluster verifier, which discovers the
+// issuer over the in-cluster network and derives the audience from the first
+// request. Until the in-cluster audience can be bound the handler denies
+// fail-closed and reports not-ready via [Handler.HealthCheck] — the seam to wire
+// into a controller-runtime health check.
 //
-// For an in-cluster verifier whose audience is derived at runtime, pass
-// [WithAudienceResolver] (see [InClusterAudienceResolver]): the handler binds the
-// audience from the first request and, until it can, denies fail-closed and
-// reports not-ready via [Handler.HealthCheck] — the seam to wire into a
-// controller-runtime health check.
+// Callers that have already decoded the review (for example controller-runtime)
+// should build a verifier with oidc.NewRemoteVerifier and use
+// [VerifyAdmissionRequest] directly. Because WithTokenVerification constructs the
+// verifier, this package imports verify/oidc and therefore its JOSE/JWT
+// dependency tree; a consumer that only needs [VerifyAdmissionRequest] and
+// [BearerToken] still pulls that tree transitively.
 package admissionhttp // import "k8s.io/webhookauth/verify/admissionhttp"
 
 import (
@@ -47,6 +52,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,6 +62,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 	"k8s.io/webhookauth/verify"
+	"k8s.io/webhookauth/verify/oidc"
 )
 
 // scheme and codecs decode incoming AdmissionReview bodies through the codec
@@ -108,22 +115,10 @@ func WithMaxBodyBytes(n int64) Option {
 }
 
 // AudienceResolver derives the expected token audience from the first admission
-// request. It is used by an in-cluster verifier whose audience is not known at
-// startup (see [InClusterAudienceResolver]). A non-nil error denies the request
-// fail-closed and leaves the verifier not-ready.
+// request. It is used internally by the in-cluster handler, whose audience is not
+// known at startup (see [InClusterAudienceResolver]). A non-nil error denies the
+// request fail-closed and leaves the verifier not-ready.
 type AudienceResolver func(r *http.Request) (audience string, err error)
-
-// WithAudienceResolver makes the handler derive and bind the expected audience
-// from the first request via resolve (see [InClusterAudienceResolver]). Until the
-// bind succeeds every request is denied fail-closed and [Handler.HealthCheck]
-// reports not-ready. A nil resolve is ignored.
-func WithAudienceResolver(resolve AudienceResolver) Option {
-	return func(h *Handler) {
-		if resolve != nil {
-			h.resolve = resolve
-		}
-	}
-}
 
 // Handler is the http.Handler returned by WithTokenVerification. Beyond serving
 // admission requests it exposes [Handler.HealthCheck] for readiness wiring.
@@ -136,15 +131,47 @@ type Handler struct {
 	// and binds it (the in-cluster deferred-audience path); nil means the
 	// verifier's audience is already bound.
 	resolve AudienceResolver
-	// bindMu guards the one-time bind; bound records that it has happened.
+	// bound is the lock-free steady-state fast path: once the audience has been
+	// bound successfully it flips false→true and every later request observes it
+	// without taking bindMu. bindMu serializes bind attempts while still unbound.
+	//
+	// The bind is committed (bound set true) ONLY on a successful resolve+bind; a
+	// failed attempt leaves bound false so the NEXT request retries under the lock.
+	// This matters because the resolver's inputs are not fixed for the pod's
+	// lifetime — the request Host is per-request and attacker-influenceable — so
+	// caching a failure would let a single poisoned or misdirected request wedge
+	// the handler deny-all forever (a fail-closed crash-loop). A genuinely
+	// permanent misconfiguration (for example a missing Service port env var)
+	// still fails identically on every retry and surfaces via HealthCheck (an
+	// unhealthy pod is restarted).
+	bound  atomic.Bool
 	bindMu sync.Mutex
-	bound  bool
 }
 
-// WithTokenVerification returns an http.Handler that checks the bearer token
-// before reading the body, decodes the AdmissionReview once, verifies the token,
-// and — only on success — invokes next with the decoded AdmissionRequest and
-// writes next's AdmissionResponse.
+// RemoteConfig configures an out-of-cluster verifier for WithTokenVerification.
+// Issuer and Audience are required; the token must be issued by Issuer and
+// carry Audience. HTTPClient, when non-nil, is used for OIDC discovery and key
+// refreshes (for example to trust a private CA); a nil HTTPClient uses the
+// default transport.
+type RemoteConfig struct {
+	Issuer     string
+	Audience   string
+	HTTPClient *http.Client
+}
+
+// WithTokenVerification builds a verifier and returns an http.Handler that checks
+// the bearer token before reading the body, decodes the AdmissionReview once,
+// verifies the token, and — only on success — invokes next with the decoded
+// AdmissionRequest and writes next's AdmissionResponse.
+//
+// cfg selects the verifier:
+//   - cfg != nil builds an out-of-cluster verifier bound to cfg.Issuer and
+//     cfg.Audience (see oidc.NewRemoteVerifier).
+//   - cfg == nil builds the in-cluster verifier (see oidc.NewLocalKeySetVerifier):
+//     the issuer is discovered over the in-cluster network and the audience is
+//     derived from the first request via [InClusterAudienceResolver]. Until the
+//     audience binds, requests are denied fail-closed and [Handler.HealthCheck]
+//     reports not-ready.
 //
 // A failure before decoding (missing token, undecodable or over-limit body) is a
 // bare 401. A verification failure after decoding is a denied AdmissionResponse
@@ -152,20 +179,56 @@ type Handler struct {
 // non-2xx status, failurePolicy: Ignore cannot turn into an allow.
 //
 // next is required and performs the real admission logic; a nil next panics so a
-// misconfiguration fails fast instead of becoming a no-op auth gate.
-func WithTokenVerification(v *verify.Verifier, next AdmissionHandler, opts ...Option) *Handler {
+// misconfiguration fails fast instead of becoming a no-op auth gate. ctx governs
+// the verifier's discovery and background key refreshes, so pass a
+// process-lifetime context. It returns an error if the verifier cannot be built.
+func WithTokenVerification(ctx context.Context, next AdmissionHandler, cfg *RemoteConfig, opts ...Option) (*Handler, error) {
 	if next == nil {
 		panic("admissionhttp: next AdmissionHandler must not be nil")
 	}
+	if cfg == nil {
+		return newInClusterHandler(ctx, next, opts...)
+	}
+	return newRemoteHandler(ctx, next, cfg, opts...)
+}
+
+// newHandler assembles a Handler around an already-built verifier. resolve is nil
+// for the out-of-cluster path (audience fixed at construction) and non-nil for
+// the in-cluster path (audience derived from the first request). It is the shared
+// seam the exported constructor and tests build through.
+func newHandler(v *verify.Verifier, next AdmissionHandler, resolve AudienceResolver, opts ...Option) *Handler {
 	h := &Handler{
 		verifier: v,
 		next:     next,
 		maxBody:  defaultMaxBodyBytes,
+		resolve:  resolve,
 	}
 	for _, opt := range opts {
 		opt(h)
 	}
 	return h
+}
+
+// newRemoteHandler builds the out-of-cluster handler: an eagerly-bound verifier
+// for cfg.Issuer/cfg.Audience with no audience resolver.
+func newRemoteHandler(ctx context.Context, next AdmissionHandler, cfg *RemoteConfig, opts ...Option) (*Handler, error) {
+	v, err := oidc.NewRemoteVerifier(ctx, cfg.Issuer, cfg.Audience, oidc.WithHTTPClient(cfg.HTTPClient))
+	if err != nil {
+		return nil, err
+	}
+	return newHandler(v, next, nil, opts...), nil
+}
+
+// newInClusterHandler builds the in-cluster handler: a deferred verifier that
+// discovers its issuer over the in-cluster network (trusting the projected
+// service account CA) and derives its audience from the first request via
+// [InClusterAudienceResolver].
+func newInClusterHandler(ctx context.Context, next AdmissionHandler, opts ...Option) (*Handler, error) {
+	v, err := oidc.NewLocalKeySetVerifier(ctx, oidc.InClusterAPIServerURL)
+	if err != nil {
+		return nil, err
+	}
+	return newHandler(v, next, InClusterAudienceResolver(), opts...), nil
 }
 
 // ServeHTTP implements http.Handler.
@@ -298,28 +361,37 @@ func (h *Handler) decodeReview(r *http.Request) (review *admissionv1.AdmissionRe
 
 // checkObjectGroup enforces that the admitted object's own API group matches the
 // request's Resource.Group (the group the token was authorized for), so an
-// authorized-group envelope cannot carry a different-group payload. It reads the
-// apiVersion from req.Object, falling back to req.OldObject (populated on
-// DELETE). A request with no embedded object (for example CONNECT) has no inner
-// group to check and passes; an undecodable object fails closed.
+// authorized-group envelope cannot carry a different-group payload.
+//
+// It checks BOTH req.Object (the incoming object on CREATE/UPDATE) AND
+// req.OldObject (the prior object on UPDATE/DELETE) rather than only the first
+// non-empty one: on an UPDATE both are populated, and checking only one would let
+// a mismatched group slip through in the unchecked slot. An empty slot is skipped
+// (for example CONNECT populates neither), a request with no embedded object at
+// all passes, and an undecodable or mismatched object in either slot fails
+// closed.
 func checkObjectGroup(req *admissionv1.AdmissionRequest) error {
-	raw := req.Object.Raw
-	if len(raw) == 0 {
-		raw = req.OldObject.Raw
-	}
-	if len(raw) == 0 {
-		return nil
-	}
-	var tm metav1.TypeMeta
-	if err := json.Unmarshal(raw, &tm); err != nil {
-		return fmt.Errorf("object is undecodable: %w", err)
-	}
-	gv, err := schema.ParseGroupVersion(tm.APIVersion)
-	if err != nil {
-		return fmt.Errorf("object apiVersion %q is invalid: %w", tm.APIVersion, err)
-	}
-	if gv.Group != req.Resource.Group {
-		return fmt.Errorf("object group %q != resource group %q", gv.Group, req.Resource.Group)
+	for _, obj := range []struct {
+		name string
+		raw  []byte
+	}{
+		{"object", req.Object.Raw},
+		{"oldObject", req.OldObject.Raw},
+	} {
+		if len(obj.raw) == 0 {
+			continue
+		}
+		var tm metav1.TypeMeta
+		if err := json.Unmarshal(obj.raw, &tm); err != nil {
+			return fmt.Errorf("%s is undecodable: %w", obj.name, err)
+		}
+		gv, err := schema.ParseGroupVersion(tm.APIVersion)
+		if err != nil {
+			return fmt.Errorf("%s apiVersion %q is invalid: %w", obj.name, tm.APIVersion, err)
+		}
+		if gv.Group != req.Resource.Group {
+			return fmt.Errorf("%s group %q != resource group %q", obj.name, gv.Group, req.Resource.Group)
+		}
 	}
 	return nil
 }
@@ -371,26 +443,54 @@ func BearerToken(r *http.Request) (token string, ok bool) {
 }
 
 // ensureAudience binds the expected audience from the first request when the
-// handler was given a resolver (the in-cluster deferred path). It binds at most
-// once; later calls are no-ops. With no resolver it does nothing, so the
-// out-of-cluster path (audience already bound) is unaffected.
+// handler was given a resolver (the in-cluster deferred path). Once the audience
+// is bound it is a lock-free read; while still unbound it serializes bind
+// attempts under bindMu and commits ONLY on a successful resolve+bind. A failed
+// attempt is NOT cached: the next request retries (see the bound/bindMu field
+// comment), so a transient failure or a poisoned first request cannot
+// permanently wedge the handler, while a permanent misconfiguration keeps
+// failing every attempt and surfaces through HealthCheck.
+//
+// With no resolver (the out-of-cluster path, audience already bound at
+// construction) it does not bind, but it still verifies the backing verifier is
+// ready via HealthCheck and fails closed if it is not, so a not-ready verifier
+// can never silently serve.
 func (h *Handler) ensureAudience(r *http.Request) error {
 	if h.resolve == nil {
+		if err := h.verifier.HealthCheck(); err != nil {
+			return fmt.Errorf("verifier is not ready: %w", err)
+		}
 		return nil
 	}
+	// Fast path: once bound, every request observes it without taking the lock.
+	if h.bound.Load() {
+		return nil
+	}
+	// Slow path: still unbound. Serialize bind attempts so concurrent first
+	// requests do not resolve/bind in parallel.
 	h.bindMu.Lock()
 	defer h.bindMu.Unlock()
-	if h.bound {
+	// Re-check under the lock: another goroutine may have bound while we waited.
+	if h.bound.Load() {
 		return nil
 	}
 	audience, err := h.resolve(r)
 	if err != nil {
+		// Fail closed WITHOUT committing: bound stays false so a later request
+		// retries rather than caching this (possibly attacker-induced) failure.
 		return err
 	}
 	if err := h.verifier.BindAudience(audience); err != nil {
 		return err
 	}
-	h.bound = true
+	// TODO(kep-6060, possible GA hardening): discuss committing the bind only
+	// after a token in THIS same request verifies against the resolved audience,
+	// so trust-critical state is gated on a valid token rather than a merely
+	// resolvable (and potentially unauthenticated) request. Deferred for Alpha;
+	// the <NAME>_SERVICE_PORT env var is the interim trust anchor. This may not
+	// be the right direction, but it should be raised for discussion.
+	// Commit only on success: from here the fast path serves lock-free.
+	h.bound.Store(true)
 	return nil
 }
 

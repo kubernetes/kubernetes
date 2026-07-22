@@ -28,8 +28,9 @@ limitations under the License.
 //     token in HTTP middleware, then call VerifyAdmissionRequest on the request
 //     the framework already decoded).
 //
-// The ONLY production change is pointing oidc.NewRemoteVerifier at the
-// cluster's real OIDC issuer instead of the throwaway TLS issuer these examples
+// The ONLY production change is pointing the verifier at the cluster's real OIDC
+// issuer (RemoteConfig.Issuer for the raw-HTTP path, oidc.NewRemoteVerifier for
+// the controller-runtime path) instead of the throwaway TLS issuer these examples
 // stand up. Signatures are verified for real; there is no insecure path.
 package admissionhttp_test
 
@@ -106,7 +107,7 @@ func exampleReview(group string) *admissionv1.AdmissionReview {
 // admission logic. The handler decodes the body once, enforces the token, and —
 // only on success — calls the downstream AdmissionHandler with the decoded request.
 func Example_rawHTTPWebhook() {
-	// PRODUCTION: point NewRemoteVerifier at the cluster's OIDC issuer. The
+	// PRODUCTION: point RemoteConfig.Issuer at the cluster's OIDC issuer. The
 	// example stands up a throwaway TLS issuer so it verifies REAL signatures.
 	issuer, err := startOIDCServer()
 	if err != nil {
@@ -114,23 +115,29 @@ func Example_rawHTTPWebhook() {
 	}
 	defer issuer.close()
 
-	// 1. Build the verifier from the trusted issuer and the audience minted for
-	//    this webhook. WithHTTPClient supplies a client that trusts the issuer's
-	//    serving CA (in-cluster: the mounted apiserver CA bundle).
-	v, err := oidc.NewRemoteVerifier(context.Background(), issuer.issuer, exampleAudience, oidc.WithHTTPClient(issuer.client()))
-	if err != nil {
-		panic(err) // misconfiguration (empty issuer/audience) or discovery failure
-	}
-
-	// 2. Your existing admission logic, unchanged, as an AdmissionHandler. It runs
+	// 1. Your existing admission logic, unchanged, as an AdmissionHandler. It runs
 	//    ONLY after the token is verified, receives the already-decoded request,
 	//    and returns the response (the adapter wraps and writes it).
 	admit := func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 		return &admissionv1.AdmissionResponse{UID: req.UID, Allowed: true}
 	}
 
-	// 3. Mount the verification handler in front of it. That is the whole wiring.
-	srv := httptest.NewServer(admissionhttp.WithTokenVerification(v, admit))
+	// 2. Build the verification handler in one call: it constructs the verifier
+	//    from the trusted issuer and the audience minted for this webhook, and
+	//    wraps admit. RemoteConfig.HTTPClient supplies a client that trusts the
+	//    issuer's serving CA (in-cluster: the mounted apiserver CA bundle). Pass a
+	//    nil *RemoteConfig instead for the zero-config in-cluster path.
+	h, err := admissionhttp.WithTokenVerification(context.Background(), admit, &admissionhttp.RemoteConfig{
+		Issuer:     issuer.issuer,
+		Audience:   exampleAudience,
+		HTTPClient: issuer.client(),
+	})
+	if err != nil {
+		panic(err) // misconfiguration (empty issuer/audience) or discovery failure
+	}
+
+	// 3. Mount it. That is the whole wiring.
+	srv := httptest.NewServer(h)
 	defer srv.Close()
 
 	// --- below is just a client driving the example so it produces output ---
@@ -195,17 +202,21 @@ func Example_controllerRuntimeStyle() {
 // behind Example_rawHTTPWebhook.
 func TestExampleEndToEnd_MinimalWebhook(t *testing.T) {
 	ts := newOIDCTestServer(t)
-	v, err := oidc.NewRemoteVerifier(context.Background(), ts.issuer, exampleAudience, oidc.WithHTTPClient(ts.client()))
-	if err != nil {
-		t.Fatalf("NewRemoteVerifier: %v", err)
-	}
 
 	var reached bool
 	admit := func(_ context.Context, _ *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 		reached = true
 		return &admissionv1.AdmissionResponse{Allowed: true}
 	}
-	srv := httptest.NewServer(admissionhttp.WithTokenVerification(v, admit))
+	h, err := admissionhttp.WithTokenVerification(context.Background(), admit, &admissionhttp.RemoteConfig{
+		Issuer:     ts.issuer,
+		Audience:   exampleAudience,
+		HTTPClient: ts.client(),
+	})
+	if err != nil {
+		t.Fatalf("WithTokenVerification: %v", err)
+	}
+	srv := httptest.NewServer(h)
 	defer srv.Close()
 
 	validToken := exampleSignedToken(ts, exampleAPIGroup)
@@ -309,11 +320,12 @@ func TestExampleEndToEnd_InClusterDeferredWebhook(t *testing.T) {
 		return &admissionv1.AdmissionResponse{UID: req.UID, Allowed: true}
 	}
 
-	// The whole in-cluster wiring: the deferred verifier plus the resolver. The
-	// only production difference is incluster.InCluster supplying the verifier
-	// from rest.InClusterConfig instead of a test double.
-	h := admissionhttp.WithTokenVerification(v, admit,
-		admissionhttp.WithAudienceResolver(admissionhttp.InClusterAudienceResolver()))
+	// The whole in-cluster wiring: the deferred verifier plus the resolver. In
+	// production admissionhttp.WithTokenVerification(ctx, admit, nil) builds this
+	// same shape, constructing the verifier from oidc.InClusterAPIServerURL; here
+	// the test injects a verifier backed by the throwaway apiserver double via the
+	// NewHandlerForTest seam so it can run offline.
+	h := admissionhttp.NewHandlerForTest(v, admit, admissionhttp.InClusterAudienceResolver())
 	srv := httptest.NewServer(h)
 	defer srv.Close()
 

@@ -40,34 +40,34 @@ var ErrVerificationFailed = errors.New("webhook token verification failed")
 // JOSE/OIDC library: an implementation (see the oidc package) does OIDC
 // discovery, signature and iss/aud/exp verification, then decodes the
 // "kubernetes.io" claims and returns the allowedAPIGroup list.
+//
+// Audience binding and readiness are part of the interface rather than optional
+// runtime type assertions: the Verifier delegates BindAudience and HealthCheck
+// directly, so an authenticator's audience-binding and health behavior is
+// explicit at compile time instead of a silent no-op when a method is absent. An
+// authenticator that knows its audience at construction (the out-of-cluster case)
+// implements BindAudience as an idempotent check and HealthCheck as always-ready.
 type TokenAuthenticator interface {
 	// AuthenticateToken verifies rawToken (signature, issuer, audience, expiry)
 	// and returns its allowedAPIGroup values, or a non-nil error. The groups MUST
 	// NOT be trusted unless err is nil. The error text is used only as a log
 	// reason; the Verifier collapses every failure into ErrVerificationFailed.
 	AuthenticateToken(ctx context.Context, rawToken string) (allowedAPIGroups []string, err error)
-}
 
-// AudienceBinder is optionally implemented by a TokenAuthenticator whose expected
-// audience is not known at construction and must be supplied once at runtime (the
-// in-cluster case, where the audience is derived from the first admission
-// request). Until an audience is bound such an authenticator denies every token.
-type AudienceBinder interface {
 	// BindAudience sets the single expected audience. It is idempotent: the first
 	// successful bind wins and later calls with the same audience are no-ops; a
 	// call with a different audience is an error, so the audience cannot be
-	// silently repointed after it is frozen.
+	// silently repointed after it is frozen. An authenticator whose audience is
+	// fixed at construction accepts a matching audience and rejects a conflicting
+	// one; a deferred (in-cluster) authenticator denies every token until an
+	// audience is bound.
 	BindAudience(audience string) error
-}
 
-// HealthChecker is optionally implemented by a TokenAuthenticator to report
-// readiness — for an AudienceBinder, whether an audience has been bound. It maps
-// onto a controller-runtime health/readiness check so an authenticator that can
-// never become ready (for example a scheduling race that leaves the audience
-// underivable) surfaces as an unhealthy pod rather than a silent deny-all.
-type HealthChecker interface {
-	// HealthCheck returns nil when the authenticator is ready to verify tokens,
-	// or a non-nil error describing why it is not.
+	// HealthCheck returns nil when the authenticator is ready to verify tokens, or
+	// a non-nil error describing why it is not. It maps onto a controller-runtime
+	// health/readiness check so a deferred authenticator that can never become
+	// ready (for example a scheduling race that leaves the audience underivable)
+	// surfaces as an unhealthy pod rather than a silent deny-all.
 	HealthCheck() error
 }
 
@@ -78,12 +78,16 @@ type Verifier struct {
 	authenticator TokenAuthenticator
 }
 
-// NewVerifier returns a Verifier backed by authenticator, or an error if
-// authenticator is nil so callers fail fast at startup.
+// NewVerifier returns a Verifier backed by authenticator.
+//
+// It performs no nil check: the audience-binding and health methods are now part
+// of TokenAuthenticator, so the in-module constructors (oidc.NewRemoteVerifier,
+// oidc.NewLocalKeySetVerifier) can only pass a concrete authenticator, and an
+// external caller passing an explicit nil is a programming error caught at the
+// first call. The (*Verifier, error) signature is retained for API stability
+// across the staging module boundary and so a future validation can be added
+// without a breaking change; the error is currently always nil.
 func NewVerifier(authenticator TokenAuthenticator) (*Verifier, error) {
-	if authenticator == nil {
-		return nil, errors.New("verify: TokenAuthenticator must not be nil")
-	}
 	return &Verifier{authenticator: authenticator}, nil
 }
 
@@ -115,28 +119,19 @@ func (v *Verifier) Verify(ctx context.Context, rawToken string, reviewAPIGroup s
 	return nil
 }
 
-// BindAudience supplies the expected audience to an authenticator that derives it
-// at runtime (see [AudienceBinder]). It returns nil for an authenticator that
-// already knows its audience (nothing to bind), and an error only if the backing
-// authenticator supports late binding and rejects this audience (for example a
-// second, conflicting bind). Callers that never use the in-cluster deferred path
-// can ignore it.
+// BindAudience supplies the expected audience to the backing authenticator. For
+// an authenticator that derives its audience at runtime (the in-cluster deferred
+// path) this is the one-time bind; for one whose audience is fixed at
+// construction it is an idempotent check that rejects a conflicting audience. The
+// call is delegated directly — there is no optional-interface type assertion —
+// so the behavior is explicit rather than a silent no-op.
 func (v *Verifier) BindAudience(audience string) error {
-	binder, ok := v.authenticator.(AudienceBinder)
-	if !ok {
-		return nil
-	}
-	return binder.BindAudience(audience)
+	return v.authenticator.BindAudience(audience)
 }
 
-// HealthCheck reports whether the backing authenticator is ready to verify tokens
-// (see [HealthChecker]). An authenticator that does not implement HealthChecker is
-// always considered ready. This is the seam a webhook wires into a
-// controller-runtime health/readiness check.
+// HealthCheck reports whether the backing authenticator is ready to verify
+// tokens. The call is delegated directly to the authenticator. This is the seam a
+// webhook wires into a controller-runtime health/readiness check.
 func (v *Verifier) HealthCheck() error {
-	checker, ok := v.authenticator.(HealthChecker)
-	if !ok {
-		return nil
-	}
-	return checker.HealthCheck()
+	return v.authenticator.HealthCheck()
 }

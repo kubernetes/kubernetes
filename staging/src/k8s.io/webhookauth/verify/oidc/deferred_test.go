@@ -23,25 +23,30 @@ import (
 	"k8s.io/webhookauth/verify/oidc"
 )
 
-// TestDeferredVerifier_BindsAudienceAndReportsHealth exercises the in-cluster
-// verifier shape: the key set is fetched at construction, but until an audience
-// is bound the verifier denies every token and reports unhealthy. Once bound, it
-// verifies real tokens and reports ready. Rebinding the same audience is a no-op;
-// rebinding a different audience is rejected so the frozen audience cannot be
-// repointed.
-func TestDeferredVerifier_BindsAudienceAndReportsHealth(t *testing.T) {
-	ts := newOIDCTestServer(t)
+// TestLocalKeySetVerifier_BindsAudienceAndReportsHealth exercises the in-cluster
+// deferred verifier lifecycle via the public NewLocalKeySetVerifier constructor
+// against the local apiserver double: the key set is fetched at construction from
+// the local /openid/v1/jwks endpoint, but until an audience is bound the verifier
+// denies every token and reports unhealthy. Once bound, it verifies real tokens
+// and reports ready. Rebinding the same audience is a no-op; rebinding a different
+// audience is rejected so the frozen audience cannot be repointed.
+//
+// The happy path and deferred-until-bind behavior are also covered by
+// TestNewLocalKeySetVerifier_* in local_test.go; this test additionally pins the
+// rebind idempotency and conflicting-rebind rejection.
+func TestLocalKeySetVerifier_BindsAudienceAndReportsHealth(t *testing.T) {
+	s := newLocalAPIServer(t)
 
-	v, err := oidc.NewDeferredVerifierForTest(context.Background(), ts.issuer, oidc.WithHTTPClient(ts.client()))
+	v, err := oidc.NewLocalKeySetVerifier(context.Background(), s.URL, oidc.WithHTTPClient(s.Client()))
 	if err != nil {
-		t.Fatalf("NewDeferredVerifierForTest: %v", err)
+		t.Fatalf("NewLocalKeySetVerifier: %v", err)
 	}
 
 	// Before binding: not ready, and every token is denied.
 	if err := v.HealthCheck(); err == nil {
 		t.Fatal("expected HealthCheck to report not-ready before an audience is bound")
 	}
-	if err := v.Verify(context.Background(), ts.sign(t, ts.baseClaims()), testAPIGroup); err == nil {
+	if err := v.Verify(context.Background(), signWith(t, s.signer, localClaims(s.URL)), testAPIGroup); err == nil {
 		t.Fatal("expected verification to be denied before an audience is bound")
 	}
 
@@ -52,7 +57,7 @@ func TestDeferredVerifier_BindsAudienceAndReportsHealth(t *testing.T) {
 	if err := v.HealthCheck(); err != nil {
 		t.Fatalf("expected ready after binding, got %v", err)
 	}
-	if err := v.Verify(context.Background(), ts.sign(t, ts.baseClaims()), testAPIGroup); err != nil {
+	if err := v.Verify(context.Background(), signWith(t, s.signer, localClaims(s.URL)), testAPIGroup); err != nil {
 		t.Fatalf("expected verification to succeed after binding, got %v", err)
 	}
 

@@ -93,11 +93,19 @@ func (a *oidcAuthenticator) AuthenticateToken(ctx context.Context, rawToken stri
 	if verifier == nil {
 		return nil, errors.New("oidc: no audience bound yet; verifier not ready")
 	}
+	return verifyTokenGroups(ctx, verifier, a.issuer, rawToken)
+}
 
+// verifyTokenGroups performs the cheap unverified issuer pre-check, verifies
+// rawToken with the supplied go-oidc verifier (signature, audience, expiry), and
+// returns the token's allowedAPIGroup values. It is shared by the deferred
+// (in-cluster) and eagerly-bound (out-of-cluster) authenticators so both decode
+// the KEP-6060 attestation claims identically.
+func verifyTokenGroups(ctx context.Context, verifier *coreosoidc.IDTokenVerifier, issuer, rawToken string) ([]string, error) {
 	// Cheap unverified issuer pre-check before the expensive signature work.
 	if parsed, err := parseUnverifiedClaims(rawToken); err != nil {
 		return nil, fmt.Errorf("oidc: parsing token issuer: %w", err)
-	} else if parsed.Issuer != a.issuer {
+	} else if parsed.Issuer != issuer {
 		return nil, fmt.Errorf("oidc: token issuer %q is not the expected issuer", parsed.Issuer)
 	}
 
@@ -145,76 +153,71 @@ func (a *oidcAuthenticator) HealthCheck() error {
 	return nil
 }
 
-// keySetFromDiscovery performs OIDC discovery for issuer and returns a rotating
-// remote key set built from the discovery document's jwks_uri. ctx governs both
-// discovery and the key set's background refreshes, so pass a process-lifetime
-// context.
-func keySetFromDiscovery(ctx context.Context, issuer string) (coreosoidc.KeySet, error) {
-	// NewProvider verifies the discovered issuer matches (issuer-confusion guard).
-	provider, err := coreosoidc.NewProvider(ctx, issuer)
-	if err != nil {
-		return nil, fmt.Errorf("oidc: OIDC discovery for issuer %q failed: %w", issuer, err)
-	}
-	var meta struct {
-		JWKSURL string `json:"jwks_uri"`
-	}
-	if err := provider.Claims(&meta); err != nil {
-		return nil, fmt.Errorf("oidc: reading discovery metadata for issuer %q: %w", issuer, err)
-	}
-	if meta.JWKSURL == "" {
-		return nil, fmt.Errorf("oidc: discovery document for issuer %q has no jwks_uri", issuer)
-	}
-	return coreosoidc.NewRemoteKeySet(ctx, meta.JWKSURL), nil
+// boundAuthenticator implements [verify.TokenAuthenticator] for the
+// out-of-cluster path, where the audience is known at construction. Unlike
+// oidcAuthenticator it holds a go-oidc verifier built eagerly from the standard
+// provider.Verifier, so it is ready immediately and never denies for a missing
+// audience.
+type boundAuthenticator struct {
+	issuer   string
+	audience string
+	verifier *coreosoidc.IDTokenVerifier
 }
 
-// newAuthenticator fetches the key set for issuer and returns an authenticator
-// whose audience is not yet bound.
-func newAuthenticator(ctx context.Context, issuer string, opts ...Option) (*oidcAuthenticator, error) {
+// AuthenticateToken verifies rawToken via the pre-built go-oidc verifier and
+// returns its allowedAPIGroup values.
+func (b *boundAuthenticator) AuthenticateToken(ctx context.Context, rawToken string) ([]string, error) {
+	return verifyTokenGroups(ctx, b.verifier, b.issuer, rawToken)
+}
+
+// BindAudience is an idempotent check: the audience is fixed at construction, so
+// a matching audience is a no-op and a conflicting one is rejected. It never
+// rebuilds the verifier.
+func (b *boundAuthenticator) BindAudience(audience string) error {
+	if audience == "" {
+		return errors.New("oidc: audience must not be empty")
+	}
+	if audience != b.audience {
+		return fmt.Errorf("oidc: audience already bound to %q, refusing to rebind to %q", b.audience, audience)
+	}
+	return nil
+}
+
+// HealthCheck always reports ready: the verifier is built at construction.
+func (b *boundAuthenticator) HealthCheck() error { return nil }
+
+// NewRemoteVerifier returns a [verify.Verifier] that checks tokens against
+// issuer's OIDC discovery document and requires the token audience to equal
+// audience (the out-of-cluster path). The verifier is built eagerly via the
+// standard go-oidc provider.Verifier, which discovers the issuer's jwks_uri,
+// maintains a rotating remote key set, and enforces the audience natively as the
+// ClientID.
+//
+// The verifier is long-lived and concurrency-safe. ctx governs discovery and the
+// key set's background refreshes, so pass a process-lifetime context.
+func NewRemoteVerifier(ctx context.Context, issuer, audience string, opts ...Option) (*verify.Verifier, error) {
 	if issuer == "" {
 		return nil, errors.New("oidc: issuer must not be empty")
+	}
+	if audience == "" {
+		return nil, errors.New("oidc: audience must not be empty")
 	}
 	cfg := &config{}
 	for _, opt := range opts {
 		opt(cfg)
 	}
-	// go-oidc reads the HTTP client from the context.
+	// go-oidc reads the HTTP client from the context for discovery and background
+	// key refreshes.
 	if cfg.httpClient != nil {
 		ctx = coreosoidc.ClientContext(ctx, cfg.httpClient)
 	}
-	keySet, err := keySetFromDiscovery(ctx, issuer)
+	// NewProvider performs discovery and verifies the discovered issuer matches
+	// (issuer-confusion guard).
+	provider, err := coreosoidc.NewProvider(ctx, issuer)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("oidc: OIDC discovery for issuer %q failed: %w", issuer, err)
 	}
-	return &oidcAuthenticator{issuer: issuer, keySet: keySet}, nil
-}
-
-// NewRemoteVerifier returns a [verify.Verifier] that checks tokens against
-// issuer's OIDC discovery document and requires the token audience to equal
-// audience. It binds the audience immediately (the out-of-cluster path).
-//
-// The verifier is long-lived and concurrency-safe. ctx governs discovery and the
-// key set's background refreshes, so pass a process-lifetime context.
-func NewRemoteVerifier(ctx context.Context, issuer, audience string, opts ...Option) (*verify.Verifier, error) {
-	if audience == "" {
-		return nil, errors.New("oidc: audience must not be empty")
-	}
-	auth, err := newAuthenticator(ctx, issuer, opts...)
-	if err != nil {
-		return nil, err
-	}
-	if err := auth.BindAudience(audience); err != nil {
-		return nil, err
-	}
-	return verify.NewVerifier(auth)
-}
-
-// newDeferredVerifier returns a [verify.Verifier] whose key set is fetched now
-// but whose audience is bound later (the in-cluster path). Until then it denies
-// every token and reports unhealthy.
-func newDeferredVerifier(ctx context.Context, issuer string, opts ...Option) (*verify.Verifier, error) {
-	auth, err := newAuthenticator(ctx, issuer, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return verify.NewVerifier(auth)
+	// The audience is the go-oidc ClientID (enforced natively).
+	verifier := provider.Verifier(&coreosoidc.Config{ClientID: audience})
+	return verify.NewVerifier(&boundAuthenticator{issuer: issuer, audience: audience, verifier: verifier})
 }

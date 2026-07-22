@@ -14,17 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package oidc
+package admissionhttp
 
-import (
-	"context"
+import "k8s.io/webhookauth/verify"
 
-	"k8s.io/webhookauth/verify"
-)
-
-// NewDeferredVerifierForTest exposes the unexported deferred constructor (key set
-// fetched now, audience bound later via verify.Verifier.BindAudience) so tests can
-// exercise the in-cluster verifier shape.
-func NewDeferredVerifierForTest(ctx context.Context, issuer string, opts ...Option) (*verify.Verifier, error) {
-	return newDeferredVerifier(ctx, issuer, opts...)
+// NewHandlerForTest exposes the internal newHandler seam so tests can assemble a
+// Handler around an already-built verify.Verifier without going through
+// WithTokenVerification (which constructs its own verifier via OIDC discovery).
+// resolve is nil for the out-of-cluster path and an AudienceResolver for the
+// in-cluster deferred path.
+func NewHandlerForTest(v *verify.Verifier, next AdmissionHandler, resolve AudienceResolver, opts ...Option) *Handler {
+	return newHandler(v, next, resolve, opts...)
 }

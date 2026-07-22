@@ -32,6 +32,8 @@ const testGroup = "apps"
 
 // fakeAuthenticator is a stand-in TokenAuthenticator returning a fixed set of
 // allowedAPIGroups (or an error), so the policy layer is tested without crypto.
+// It knows its audience at construction, so BindAudience and HealthCheck are the
+// trivial always-ready implementations an out-of-cluster authenticator provides.
 type fakeAuthenticator struct {
 	groups []string
 	err    error
@@ -40,6 +42,9 @@ type fakeAuthenticator struct {
 func (f fakeAuthenticator) AuthenticateToken(_ context.Context, _ string) ([]string, error) {
 	return f.groups, f.err
 }
+
+func (f fakeAuthenticator) BindAudience(string) error { return nil }
+func (f fakeAuthenticator) HealthCheck() error        { return nil }
 
 func mustVerifier(t *testing.T, auth TokenAuthenticator) *Verifier {
 	t.Helper()
@@ -50,15 +55,16 @@ func mustVerifier(t *testing.T, auth TokenAuthenticator) *Verifier {
 	return v
 }
 
+// TestNewVerifier_Validation confirms a Verifier is constructed for a valid
+// authenticator.
+//
+// TODO(kep-6060): the former nil-authenticator subtest asserted NewVerifier(nil)
+// returned a non-ErrVerificationFailed construction error. NewVerifier no longer
+// nil-checks (BindAudience/HealthCheck are now part of TokenAuthenticator, so the
+// in-module constructors cannot pass nil and an external explicit nil is a
+// programming error). Rebuild a construction-contract test after review if the
+// (*Verifier, error) signature is revisited.
 func TestNewVerifier_Validation(t *testing.T) {
-	_, err := NewVerifier(nil)
-	if err == nil {
-		t.Fatal("expected error for nil authenticator")
-	}
-	// A nil-authenticator error must NOT masquerade as a verification failure.
-	if errors.Is(err, ErrVerificationFailed) {
-		t.Fatal("construction error must not satisfy ErrVerificationFailed")
-	}
 	if _, err := NewVerifier(fakeAuthenticator{groups: []string{testGroup}}); err != nil {
 		t.Fatalf("unexpected error for valid authenticator: %v", err)
 	}

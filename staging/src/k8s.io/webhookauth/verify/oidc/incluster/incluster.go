@@ -48,5 +48,8 @@ func InCluster(ctx context.Context) (*verify.Verifier, error) {
 	if err != nil {
 		return nil, fmt.Errorf("incluster: building in-cluster HTTP client: %w", err)
 	}
-	return oidc.NewLocalKeySetVerifier(ctx, cfg.Host, oidc.WithHTTPClient(httpClient))
+	// Reach the apiserver at the canonical in-cluster FQDN rather than cfg.Host:
+	// the FQDN resolves on both Linux and Windows nodes, and the client-go
+	// transport already trusts the cluster CA for that name.
+	return oidc.NewLocalKeySetVerifier(ctx, oidc.InClusterAPIServerURL, oidc.WithHTTPClient(httpClient))
 }

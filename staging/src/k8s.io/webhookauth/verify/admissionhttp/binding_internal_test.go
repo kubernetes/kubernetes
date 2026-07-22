@@ -74,10 +74,16 @@ func TestEnsureAudience_BindsOnce(t *testing.T) {
 }
 
 // TestEnsureAudience_ResolverErrorIsFailClosed confirms a resolver error is
-// returned (so the request is denied) and nothing is bound.
+// returned (so the request is denied) and nothing is bound. The failure is NOT
+// cached: because the resolver's inputs are per-request (the request Host is
+// attacker-influenceable), a failed attempt is retried on the next request
+// rather than permanently wedging the handler deny-all. A genuinely permanent
+// misconfiguration keeps failing every attempt and surfaces via HealthCheck.
 func TestEnsureAudience_ResolverErrorIsFailClosed(t *testing.T) {
 	spy := &bindSpy{}
+	calls := 0
 	h := newSpyHandler(t, spy, func(*http.Request) (string, error) {
+		calls++
 		return "", errors.New("no service env var")
 	})
 
@@ -85,11 +91,53 @@ func TestEnsureAudience_ResolverErrorIsFailClosed(t *testing.T) {
 	if err := h.ensureAudience(r); err == nil {
 		t.Fatal("expected ensureAudience to return the resolver error")
 	}
+	// A second call retries the resolver (the failure is not cached) and still
+	// fails closed.
+	if err := h.ensureAudience(r); err == nil {
+		t.Fatal("expected the resolver error again on the second call")
+	}
+	if calls != 2 {
+		t.Fatalf("resolver should be retried on each failure (no caching), got %d calls", calls)
+	}
 	if len(spy.binds) != 0 {
 		t.Fatalf("nothing should be bound on resolver failure, got %v", spy.binds)
 	}
-	if h.bound {
-		t.Fatal("handler must not be marked bound after a resolver failure")
+}
+
+// TestEnsureAudience_RetriesAfterFailureThenBinds confirms a first request whose
+// resolve fails does NOT permanently wedge the handler: a subsequent request with
+// a resolvable audience binds successfully and is served. This is the fail-closed
+// DoS fix — an unverified caller with a bogus Host can no longer poison the bind
+// for the pod's lifetime (Edie review-3 blocker #1).
+func TestEnsureAudience_RetriesAfterFailureThenBinds(t *testing.T) {
+	spy := &bindSpy{}
+	fail := true
+	h := newSpyHandler(t, spy, func(*http.Request) (string, error) {
+		if fail {
+			return "", errors.New("bogus host / no service env var")
+		}
+		return "aud-1", nil
+	})
+
+	r := httptest.NewRequest("POST", "https://my-webhook.ns.svc:443/validate", nil)
+	// First request: resolve fails, deny fail-closed, nothing bound.
+	if err := h.ensureAudience(r); err == nil {
+		t.Fatal("expected the first (failing) resolve to return an error")
+	}
+	if len(spy.binds) != 0 {
+		t.Fatalf("nothing should be bound after a failed resolve, got %v", spy.binds)
+	}
+	// A later request can resolve: the handler retries, binds, and is served.
+	fail = false
+	if err := h.ensureAudience(r); err != nil {
+		t.Fatalf("expected a successful bind after the resolver recovers, got %v", err)
+	}
+	// Once bound it stays bound and is not rebound on subsequent requests.
+	if err := h.ensureAudience(r); err != nil {
+		t.Fatalf("expected the bound audience to keep serving, got %v", err)
+	}
+	if len(spy.binds) != 1 || spy.binds[0] != "aud-1" {
+		t.Fatalf("expected a single successful bind of %q, got %v", "aud-1", spy.binds)
 	}
 }
 
@@ -102,6 +150,23 @@ func TestEnsureAudience_NoResolverIsNoop(t *testing.T) {
 	r := httptest.NewRequest("POST", "https://my-webhook.ns.svc:443/validate", nil)
 	if err := h.ensureAudience(r); err != nil {
 		t.Fatalf("ensureAudience with no resolver should be a no-op, got %v", err)
+	}
+	if len(spy.binds) != 0 {
+		t.Fatalf("no resolver should bind nothing, got %v", spy.binds)
+	}
+}
+
+// TestEnsureAudience_NoResolverFailsClosedWhenNotReady confirms the out-of-cluster
+// path still fails closed: with no resolver, ensureAudience consults the backing
+// verifier's readiness and returns an error (denying the request) when the
+// verifier is not ready, so a not-ready verifier can never silently serve.
+func TestEnsureAudience_NoResolverFailsClosedWhenNotReady(t *testing.T) {
+	spy := &bindSpy{healthErr: errors.New("verifier not ready")}
+	h := newSpyHandler(t, spy, nil)
+
+	r := httptest.NewRequest("POST", "https://my-webhook.ns.svc:443/validate", nil)
+	if err := h.ensureAudience(r); err == nil {
+		t.Fatal("expected ensureAudience to fail closed when the verifier is not ready")
 	}
 	if len(spy.binds) != 0 {
 		t.Fatalf("no resolver should bind nothing, got %v", spy.binds)
