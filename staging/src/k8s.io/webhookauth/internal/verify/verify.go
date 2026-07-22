@@ -1,0 +1,121 @@
+/*
+Copyright The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package verify
+
+import (
+	"context"
+	"errors"
+	"slices"
+
+	"k8s.io/klog/v2"
+)
+
+// wildcardAPIGroup is the admissionReviewAPIGroups value that authorizes every API group.
+const wildcardAPIGroup = "*"
+
+// ErrVerificationFailed is the single generic error every verification failure
+// returns. Callers check errors.Is(err, ErrVerificationFailed) (or just
+// err != nil) and MUST NOT branch on any finer taxonomy: the reason is logged,
+// never surfaced, so a rejection cannot be used to enumerate objects or claim
+// values.
+var ErrVerificationFailed = errors.New("webhook token verification failed")
+
+// TokenAuthenticator verifies a token (signature, iss/aud/exp) and returns the
+// admissionReviewAPIGroups values it carries, letting the Verifier obtain a
+// verified token's authorized groups without importing a JOSE/OIDC library (see
+// the oidc package). Audience binding and readiness are interface methods rather
+// than optional type assertions, so BindAudience and HealthCheck behavior is
+// explicit at compile time instead of a silent no-op.
+type TokenAuthenticator interface {
+	// AuthenticateToken verifies rawToken and returns its admissionReviewAPIGroups
+	// values, or a non-nil error. The groups MUST NOT be trusted unless err is nil.
+	// The error text is a log reason only; the Verifier collapses every failure
+	// into ErrVerificationFailed.
+	AuthenticateToken(ctx context.Context, rawToken string) (admissionReviewAPIGroups []string, err error)
+
+	// BindAudience sets the single expected audience. It is idempotent: the first
+	// successful bind wins, a later matching bind is a no-op, and a conflicting
+	// bind is an error, so the audience cannot be silently repointed once frozen.
+	// A deferred (in-cluster) authenticator denies every token until an audience
+	// is bound.
+	BindAudience(audience string) error
+
+	// HealthCheck returns nil when the authenticator is ready to verify tokens, or
+	// a non-nil error describing why it is not. It maps onto a controller-runtime
+	// health/readiness check so a deferred authenticator that can never become
+	// ready (for example a scheduling race that leaves the audience underivable)
+	// surfaces as an unhealthy pod rather than a silent deny-all.
+	HealthCheck() error
+}
+
+// Verifier applies the KEP-6060 policy on top of a TokenAuthenticator: signature
+// and standard-claim verification are delegated to the authenticator, and this
+// type adds only the admissionReviewAPIGroups match go-oidc has no concept of.
+type Verifier struct {
+	authenticator TokenAuthenticator
+}
+
+// NewVerifier returns a Verifier backed by authenticator.
+//
+// It performs no nil check: an explicit nil is a programming error caught at the
+// first call. The (*Verifier, error) signature is retained for API stability and
+// to allow future validation without a breaking change; the error is currently
+// always nil.
+func NewVerifier(authenticator TokenAuthenticator) (*Verifier, error) {
+	return &Verifier{authenticator: authenticator}, nil
+}
+
+// Verify authenticates rawToken and applies the KEP-6060 policy: the token's
+// admissionReviewAPIGroups must authorize reviewAPIGroup (an exact match or "*"). It
+// returns nil on success or ErrVerificationFailed on any failure; the reason is
+// logged via klog.FromContext(ctx), never returned (anti-enumeration).
+func (v *Verifier) Verify(ctx context.Context, rawToken string, reviewAPIGroup string) error {
+	logger := klog.FromContext(ctx)
+
+	// The authenticator verifies the token; its error text is log-only.
+	groups, err := v.authenticator.AuthenticateToken(ctx, rawToken)
+	if err != nil {
+		logger.V(2).Info("Webhook token verification denied",
+			"reason", "token authentication failed",
+			"detail", err.Error())
+		return ErrVerificationFailed
+	}
+
+	// The webhook only checks membership: the admissionReviewAPIGroups list must contain
+	// the review's group or "*" (an empty list authorizes nothing).
+	if !slices.Contains(groups, reviewAPIGroup) && !slices.Contains(groups, wildcardAPIGroup) {
+		logger.V(2).Info("Webhook token verification denied",
+			"reason", "token admissionReviewAPIGroups does not authorize the review's API group")
+		return ErrVerificationFailed
+	}
+
+	return nil
+}
+
+// BindAudience supplies the expected audience to the backing authenticator (see
+// TokenAuthenticator.BindAudience). The call is delegated directly, so the
+// behavior is explicit rather than a silent no-op.
+func (v *Verifier) BindAudience(audience string) error {
+	return v.authenticator.BindAudience(audience)
+}
+
+// HealthCheck reports whether the backing authenticator is ready to verify
+// tokens. The call is delegated directly to the authenticator. This is the seam a
+// webhook wires into a controller-runtime health/readiness check.
+func (v *Verifier) HealthCheck() error {
+	return v.authenticator.HealthCheck()
+}

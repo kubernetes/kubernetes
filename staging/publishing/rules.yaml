@@ -2499,6 +2499,21 @@ rules:
       branch: release-1.36
       dirs:
       - staging/src/k8s.io/externaljwt
+- destination: webhookauth
+  branches:
+  - name: master
+    dependencies:
+    - repository: apimachinery
+      branch: master
+    - repository: api
+      branch: master
+    - repository: streaming
+      branch: master
+    source:
+      branch: master
+      dirs:
+      - staging/src/k8s.io/webhookauth
+  library: true
 recursive-delete-patterns:
 - '*/.gitattributes'
 # minimum version with GOTOOLCHAIN support

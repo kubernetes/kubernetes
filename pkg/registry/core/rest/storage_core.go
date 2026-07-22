@@ -75,6 +75,7 @@ type Config struct {
 	Services ServicesConfig
 
 	EndpointSliceGetter proxy.EndpointSliceGetter
+	Authorizer          authorizer.Authorizer
 }
 
 type ProxyConfig struct {
@@ -222,6 +223,12 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		storage = map[string]rest.Storage{}
 	}
 
+	// client for getting service account token bound objects
+	client, err := kubernetes.NewForConfig(p.LoopbackClientConfig)
+	if err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	}
+
 	// potentially override the generic serviceaccount storage with one that supports pods
 	var serviceAccountStorage *serviceaccountstore.REST
 	if p.ServiceAccountIssuer != nil {
@@ -230,7 +237,8 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 			utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
 			nodeGetter = nodeStorage.Node.Store
 		}
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeGetter, p.ExtendExpiration, p.MaxExtendedExpiration)
+		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.Authorizer, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeGetter,
+			client.AdmissionregistrationV1().ValidatingWebhookConfigurations(), client.AdmissionregistrationV1().MutatingWebhookConfigurations(), p.ExtendExpiration, p.MaxExtendedExpiration)
 		if err != nil {
 			return genericapiserver.APIGroupInfo{}, err
 		}

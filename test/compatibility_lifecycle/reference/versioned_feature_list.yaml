@@ -91,6 +91,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.26"
+- name: APIServerWebhookAuthenticationToken
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: APIServingWithRoutine
   versionedSpecs:
   - default: false

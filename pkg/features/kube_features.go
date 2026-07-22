@@ -2223,6 +2223,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	genericfeatures.APIServerWebhookAuthenticationToken: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	genericfeatures.APIServingWithRoutine: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2794,6 +2798,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	genericfeatures.APIResponseCompression: {},
 
 	genericfeatures.APIServerIdentity: {},
+
+	genericfeatures.APIServerWebhookAuthenticationToken: {},
 
 	genericfeatures.APIServingWithRoutine: {},
 
