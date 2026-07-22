@@ -458,12 +458,12 @@ func (p *staticPolicy) allocateCPUs(logger logr.Logger, s state.State, numCPUs i
 	// If there are aligned CPUs in numaAffinity, attempt to take those first.
 	result := topology.EmptyAllocation()
 	if numaAffinity != nil {
-		if p.options.AlignBySocket {
+		if p.options.AlignBySocket && !p.options.DistributeCPUsAcrossNUMA {
 			if p.topology.NumNUMANodes >= p.topology.NumSockets {
 				// Multiple NUMA nodes per socket: first try to allocate from
 				// the exact NUMA nodes in the hint.
 				preferredCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs, alignHintNUMAOnly)
-				allocated, err := p.allocateFromCPUSet(klog.LoggerWithValues(logger, "pool", "preferred NUMA nodes"), preferredCPUs, numCPUs)
+				allocated, err := p.allocateFromCPUSet(klog.LoggerWithValues(logger, "pool", "preferredNUMANodes"), preferredCPUs, numCPUs)
 				if err != nil {
 					return topology.EmptyAllocation(), err
 				}
@@ -474,7 +474,7 @@ func (p *staticPolicy) allocateCPUs(logger logr.Logger, s state.State, numCPUs i
 			if result.CPUs.Size() < numCPUs {
 				alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs, alignHintNUMAToSocket)
 				remainingAlignedCPUs := alignedCPUs.Difference(result.CPUs)
-				allocated, err := p.allocateFromCPUSet(klog.LoggerWithValues(logger, "pool", "socket-aligned NUMA nodes"), remainingAlignedCPUs, numCPUs-result.CPUs.Size())
+				allocated, err := p.allocateFromCPUSet(klog.LoggerWithValues(logger, "pool", "sameSocketNUMANodes"), remainingAlignedCPUs, numCPUs-result.CPUs.Size())
 				if err != nil {
 					return topology.EmptyAllocation(), err
 				}
@@ -482,7 +482,7 @@ func (p *staticPolicy) allocateCPUs(logger logr.Logger, s state.State, numCPUs i
 			}
 		} else {
 			alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs, alignHintNUMAOnly)
-			allocated, err := p.allocateFromCPUSet(klog.LoggerWithValues(logger, "pool", "NUMA-aligned CPUs"), alignedCPUs, numCPUs)
+			allocated, err := p.allocateFromCPUSet(klog.LoggerWithValues(logger, "pool", "NUMAAlignedCPUs"), alignedCPUs, numCPUs)
 			if err != nil {
 				return topology.EmptyAllocation(), err
 			}
