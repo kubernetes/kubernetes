@@ -52,6 +52,9 @@ func ValidateListOptions(options *internalversion.ListOptions, isWatchListFeatur
 
 func validateWatchOptions(options *internalversion.ListOptions, isWatchListFeatureEnabled bool) field.ErrorList {
 	allErrs := field.ErrorList{}
+	if options.Limit != 0 {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("limit"), "limit is forbidden for watch"))
+	}
 	match := options.ResourceVersionMatch
 	if options.SendInitialEvents != nil {
 		if match != metav1.ResourceVersionMatchNotOlderThan {
