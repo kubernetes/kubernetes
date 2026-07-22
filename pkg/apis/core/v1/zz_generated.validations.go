@@ -339,6 +339,43 @@ func Validate_Endpoints(
 	return errs
 }
 
+// Validate_EphemeralVolumeSource validates an instance of EphemeralVolumeSource according
+// to declarative validation rules in the API schema.
+func Validate_EphemeralVolumeSource(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.EphemeralVolumeSource) (errs field.ErrorList) {
+
+	{ // field corev1.EphemeralVolumeSource.VolumeClaimTemplate
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PersistentVolumeClaimTemplate,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.EphemeralVolumeSource) *corev1.PersistentVolumeClaimTemplate {
+				return oldObj.VolumeClaimTemplate
+			})
+		errs = append(errs, fn(fldPath.Child("volumeClaimTemplate"), obj.VolumeClaimTemplate, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
 // Validate_Event validates an instance of Event according
 // to declarative validation rules in the API schema.
 func Validate_Event(
@@ -777,7 +814,38 @@ func Validate_PodSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.PodSpec) (errs field.ErrorList) {
 
-	// field corev1.PodSpec.Volumes has no validation
+	{ // field corev1.PodSpec.Volumes
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []corev1.Volume,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Volume); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodSpec) []corev1.Volume {
+				return oldObj.Volumes
+			})
+		errs = append(errs, fn(fldPath.Child("volumes"), obj.Volumes, oldVal, oldObj != nil)...)
+	}
+
 	// field corev1.PodSpec.InitContainers has no validation
 	// field corev1.PodSpec.Containers has no validation
 	// field corev1.PodSpec.EphemeralContainers has no validation
@@ -1328,5 +1396,107 @@ func Validate_Toleration(
 	// field corev1.Toleration.Value has no validation
 	// field corev1.Toleration.Effect has no validation
 	// field corev1.Toleration.TolerationSeconds has no validation
+	return errs
+}
+
+// Validate_Volume validates an instance of Volume according
+// to declarative validation rules in the API schema.
+func Validate_Volume(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.Volume) (errs field.ErrorList) {
+
+	// field corev1.Volume.Name has no validation
+
+	{ // field corev1.Volume.VolumeSource
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.VolumeSource,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_VolumeSource(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.Volume) *corev1.VolumeSource {
+				return &oldObj.VolumeSource
+			})
+		errs = append(errs, fn(safe.Value(fldPath, func() *field.Path { return fldPath.Child("corev1.VolumeSource") }), &obj.VolumeSource, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_VolumeSource validates an instance of VolumeSource according
+// to declarative validation rules in the API schema.
+func Validate_VolumeSource(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.VolumeSource) (errs field.ErrorList) {
+
+	// field corev1.VolumeSource.HostPath has no validation
+	// field corev1.VolumeSource.EmptyDir has no validation
+	// field corev1.VolumeSource.GCEPersistentDisk has no validation
+	// field corev1.VolumeSource.AWSElasticBlockStore has no validation
+	// field corev1.VolumeSource.GitRepo has no validation
+	// field corev1.VolumeSource.Secret has no validation
+	// field corev1.VolumeSource.NFS has no validation
+	// field corev1.VolumeSource.ISCSI has no validation
+	// field corev1.VolumeSource.Glusterfs has no validation
+	// field corev1.VolumeSource.PersistentVolumeClaim has no validation
+	// field corev1.VolumeSource.RBD has no validation
+	// field corev1.VolumeSource.FlexVolume has no validation
+	// field corev1.VolumeSource.Cinder has no validation
+	// field corev1.VolumeSource.CephFS has no validation
+	// field corev1.VolumeSource.Flocker has no validation
+	// field corev1.VolumeSource.DownwardAPI has no validation
+	// field corev1.VolumeSource.FC has no validation
+	// field corev1.VolumeSource.AzureFile has no validation
+	// field corev1.VolumeSource.ConfigMap has no validation
+	// field corev1.VolumeSource.VsphereVolume has no validation
+	// field corev1.VolumeSource.Quobyte has no validation
+	// field corev1.VolumeSource.AzureDisk has no validation
+	// field corev1.VolumeSource.PhotonPersistentDisk has no validation
+	// field corev1.VolumeSource.Projected has no validation
+	// field corev1.VolumeSource.PortworxVolume has no validation
+	// field corev1.VolumeSource.ScaleIO has no validation
+	// field corev1.VolumeSource.StorageOS has no validation
+	// field corev1.VolumeSource.CSI has no validation
+
+	{ // field corev1.VolumeSource.Ephemeral
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.EphemeralVolumeSource,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_EphemeralVolumeSource(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.VolumeSource) *corev1.EphemeralVolumeSource {
+				return oldObj.Ephemeral
+			})
+		errs = append(errs, fn(fldPath.Child("ephemeral"), obj.Ephemeral, oldVal, oldObj != nil)...)
+	}
+
+	// field corev1.VolumeSource.Image has no validation
 	return errs
 }

@@ -2909,8 +2909,7 @@
         },
         "required": [
           "targetPortal",
-          "iqn",
-          "lun"
+          "iqn"
         ],
         "type": "object"
       },
@@ -2977,8 +2976,7 @@
         },
         "required": [
           "targetPortal",
-          "iqn",
-          "lun"
+          "iqn"
         ],
         "type": "object"
       },
@@ -3362,9 +3360,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "status"
-        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.NFSVolumeSource": {
@@ -4595,9 +4590,6 @@
             "description": "The specification for the PersistentVolumeClaim. The entire content is copied unchanged into the PVC that gets created from this template. The same fields as in a PersistentVolumeClaim are also valid here."
           }
         },
-        "required": [
-          "spec"
-        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.PersistentVolumeClaimVolumeSource": {
@@ -6898,7 +6890,7 @@
         "required": [
           "gateway",
           "system",
-          "secretRef"
+          "volumeName"
         ],
         "type": "object"
       },
@@ -6957,7 +6949,7 @@
         "required": [
           "gateway",
           "system",
-          "secretRef"
+          "volumeName"
         ],
         "type": "object"
       },
@@ -7766,6 +7758,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "volumeName"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.StorageOSVolumeSource": {
@@ -7796,6 +7791,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "volumeName"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.Sysctl": {
@@ -8286,7 +8284,7 @@
         "properties": {
           "mountPath": {
             "default": "",
-            "description": "Path within the container at which the volume should be mounted.",
+            "description": "Path within the container at which the volume should be mounted.  Must not contain ':'.",
             "type": "string"
           },
           "mountPropagation": {
@@ -8369,6 +8367,9 @@
             "description": "required specifies hard node constraints that must be met."
           }
         },
+        "required": [
+          "required"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.VolumeProjection": {

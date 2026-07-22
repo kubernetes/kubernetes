@@ -49,7 +49,8 @@ type VolumeMountApplyConfiguration struct {
 	//
 	// If this field is not specified, it is treated as an equivalent of Disabled.
 	RecursiveReadOnly *corev1.RecursiveReadOnlyMode `json:"recursiveReadOnly,omitempty"`
-	// Path within the container at which the volume should be mounted.
+	// Path within the container at which the volume should be mounted.  Must
+	// not contain ':'.
 	MountPath *string `json:"mountPath,omitempty"`
 	// Path within the volume from which the container's volume should be mounted.
 	// Defaults to "" (volume's root).
