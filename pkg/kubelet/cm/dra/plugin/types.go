@@ -27,5 +27,5 @@ import (
 // package from the manager package, breaking the import cycle.
 type StreamHandler interface {
 	// HandleWatchResourcesStream processes health updates from a specific DRA plugin stream.
-	HandleWatchResourcesStream(ctx context.Context, stream drahealthv1.DRAResourceHealth_NodeWatchResourcesClient, resourceName string) error
+	HandleWatchResourcesStream(ctx context.Context, stream drahealthv1.DRAResourceHealth_NodeWatchResourcesClient, driverName string, generation uint64) error
 }

@@ -28,7 +28,7 @@ type mockStreamHandler struct{}
 
 var _ StreamHandler = &mockStreamHandler{}
 
-func (m *mockStreamHandler) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1.DRAResourceHealth_NodeWatchResourcesClient, resourceName string) error {
+func (m *mockStreamHandler) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1.DRAResourceHealth_NodeWatchResourcesClient, driverName string, generation uint64) error {
 	<-ctx.Done()
 	return nil
 }

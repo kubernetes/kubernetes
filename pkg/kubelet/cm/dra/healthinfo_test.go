@@ -539,7 +539,9 @@ func TestClearDriver(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, state.DeviceHealthStatusHealthy, cache.getHealthInfo(testDriver, testPool, testDevice).Health)
 
-	err = cache.clearDriver(logger, testDriver)
+	changedDevices, err := cache.clearDriver(logger, testDriver)
 	require.NoError(t, err)
+	require.Len(t, changedDevices, 1)
+	assert.Equal(t, state.DeviceHealthStatusUnknown, changedDevices[0].Health)
 	assert.Equal(t, state.DeviceHealthStatusUnknown, cache.getHealthInfo(testDriver, testPool, testDevice).Health)
 }

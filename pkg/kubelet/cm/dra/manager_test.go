@@ -1944,6 +1944,83 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 	wgSync.Wait()  // Wait for all goroutines to finish
 }
 
+func TestHandleWatchResourcesStreamOwnership(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	manager, err := NewManager(tCtx.Logger(), nil, t.TempDir())
+	require.NoError(t, err)
+	defer manager.Stop()
+	manager.cache.add(genTestClaimInfo(claimUID, []string{string(podUID)}, true, nil))
+
+	startStream := func(generation uint64) (chan struct {
+		Resp *drahealthv1.NodeWatchResourcesResponse
+		Err  error
+	}, <-chan error) {
+		responses := make(chan struct {
+			Resp *drahealthv1.NodeWatchResourcesResponse
+			Err  error
+		}, 1)
+		stream := &mockWatchResourcesClient{RecvChan: responses, Ctx: tCtx}
+		done := make(chan error, 1)
+		go func() {
+			done <- manager.HandleWatchResourcesStream(tCtx, stream, driverName, generation)
+		}()
+		return responses, done
+	}
+	response := func(health drahealthv1.HealthStatus) struct {
+		Resp *drahealthv1.NodeWatchResourcesResponse
+		Err  error
+	} {
+		return struct {
+			Resp *drahealthv1.NodeWatchResourcesResponse
+			Err  error
+		}{Resp: &drahealthv1.NodeWatchResourcesResponse{Devices: []*drahealthv1.DeviceHealth{{
+			Device: &drahealthv1.DeviceIdentifier{
+				PoolName:   poolName,
+				DeviceName: deviceName,
+			},
+			Health:          health,
+			LastUpdatedTime: time.Now().Unix(),
+		}}}}
+	}
+	expectPodUpdate := func() {
+		select {
+		case update := <-manager.update:
+			require.ElementsMatch(t, []string{string(podUID)}, update.PodUIDs)
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for pod health update")
+		}
+	}
+
+	oldResponses, oldDone := startStream(1)
+	oldResponses <- response(drahealthv1.HealthStatus_HEALTHY)
+	expectPodUpdate()
+
+	newResponses, newDone := startStream(2)
+	newResponses <- response(drahealthv1.HealthStatus_UNHEALTHY)
+	expectPodUpdate()
+
+	oldResponses <- response(drahealthv1.HealthStatus_HEALTHY)
+	select {
+	case err := <-oldDone:
+		require.ErrorContains(t, err, "was superseded")
+	case <-time.After(time.Second):
+		t.Fatal("superseded health stream did not stop")
+	}
+	require.Equal(t, state.DeviceHealthStatusUnhealthy, manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName).Health)
+	require.Zero(t, len(manager.update), "superseded health stream triggered an unexpected pod update")
+
+	close(newResponses)
+	expectPodUpdate()
+	select {
+	case err := <-newDone:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("active health stream did not stop")
+	}
+	require.Equal(t, state.DeviceHealthStatusUnknown, manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName).Health)
+	close(oldResponses)
+}
+
 // TestHandleWatchResourcesStream verifies the manager's ability to process health updates
 // received from a DRA plugin's WatchResources stream. It checks if the internal health cache
 // is updated correctly, if affected pods are identified, and if update notifications are sent
@@ -1997,7 +2074,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 				logger := klog.FromContext(streamCtx).WithName(st.Name())
 				hdlCtx := klog.NewContext(streamCtx, logger)
 
-				err := managerInstance.HandleWatchResourcesStream(hdlCtx, mockStream, driverName)
+				err := managerInstance.HandleWatchResourcesStream(hdlCtx, mockStream, driverName, 1)
 				if err != nil {
 					if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, io.EOF) {
 						logger.V(4).Info("HandleWatchResourcesStream (test goroutine) exited as expected", "error", err)

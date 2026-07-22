@@ -96,6 +96,41 @@ func TestAddSameName(t *testing.T) {
 	}
 }
 
+func TestHealthStreamUsesLatestPlugin(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
+	manager := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
+	defer manager.Stop()
+
+	activeStreams := func() map[string]uint64 {
+		manager.mutex.RLock()
+		defer manager.mutex.RUnlock()
+		streams := make(map[string]uint64)
+		for _, plugin := range manager.store[driverName] {
+			if plugin.healthStreamCancel != nil {
+				streams[plugin.endpoint] = plugin.healthStreamGeneration
+			}
+		}
+		return streams
+	}
+
+	tCtx.ExpectNoError(manager.add(driverName, "old.sock", "", drahealthv1.DRAResourceHealthService, defaultClientCallTimeout), "add old plugin")
+	oldStreams := activeStreams()
+	require.Len(t, oldStreams, 1)
+	oldGeneration := oldStreams["old.sock"]
+	require.NotZero(t, oldGeneration)
+
+	tCtx.ExpectNoError(manager.add(driverName, "new.sock", "", drahealthv1.DRAResourceHealthService, defaultClientCallTimeout), "add new plugin")
+	newStreams := activeStreams()
+	require.Equal(t, map[string]uint64{"new.sock": oldGeneration + 1}, newStreams)
+
+	manager.remove(driverName, "old.sock")
+	require.Equal(t, newStreams, activeStreams(), "removing the old endpoint must not replace the active stream")
+
+	manager.remove(driverName, "new.sock")
+	require.Empty(t, activeStreams())
+}
+
 func TestDelete(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
