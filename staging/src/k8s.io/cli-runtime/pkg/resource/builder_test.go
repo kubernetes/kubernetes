@@ -46,7 +46,6 @@ import (
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/utils/dump"
-
 	// TODO we need to remove this linkage and create our own scheme
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -1362,7 +1361,6 @@ func TestNoSelectorUnknowResourceType(t *testing.T) {
 		}
 	}
 }
-
 func TestSingleResourceType(t *testing.T) {
 	b := newDefaultBuilder().
 		LabelSelectorParam("a=b").
