@@ -44,7 +44,7 @@ import (
 
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/util/compatibility"
 )
 
@@ -211,7 +211,7 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 		nativeClient,
 		dynamicClient,
 		fakeInformerFactory,
-		fakeAuthorizer{},
+		authorizerfactory.NewAlwaysAllowAuthorizer(),
 		featureGate,
 		effectiveVersion,
 		testContext.Done(),
@@ -637,10 +637,4 @@ func (fl *FakeList[P]) DeepCopyObject() runtime.Object {
 		ListMeta: fl.ListMeta,
 		Items:    copiedItems,
 	}
-}
-
-type fakeAuthorizer struct{}
-
-func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-	return authorizer.DecisionAllow, "", nil
 }
