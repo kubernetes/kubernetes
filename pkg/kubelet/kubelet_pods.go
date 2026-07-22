@@ -1309,6 +1309,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	logger.V(3).Info("Clean up orphaned pod statuses")
 	kl.removeOrphanedPodStatuses(logger, allPods, mirrorPods)
 	kl.allocationManager.RemoveOrphanedPods(allPodsByUID)
+	kl.allocationManager.RemoveOrphanedDeferredAdmissions(allPodsByUID)
 
 	// Remove orphaned pod user namespace allocations (if any).
 	logger.V(3).Info("Clean up orphaned pod user namespace allocations")
@@ -1368,6 +1369,16 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	var restartCount, restartCountStatic int
 	for _, desiredPod := range activePods {
 		if _, knownPod := workingPods[desiredPod.UID]; knownPod {
+			continue
+		}
+
+		// A pod whose admission has been deferred (e.g. it requests a device
+		// plugin resource that is not yet registered) is intentionally not known
+		// to the pod workers: HandlePodAdditions kept it Pending without
+		// dispatching it. Such a pod is not admitted, so it must not be started
+		// here. The allocation manager retries its admission and will dispatch it
+		// once it is admitted, or reject it if the deferral times out.
+		if kl.allocationManager.IsPodAdmissionDeferred(desiredPod.UID) {
 			continue
 		}
 

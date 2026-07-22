@@ -51,6 +51,12 @@ type PodAdmitResult struct {
 	Reason string
 	// a brief message explaining why the pod could not be admitted.
 	Message string
+	// if true, admission failed but should be retried later rather than
+	// permanently rejected. This is only meaningful when Admit is false.
+	// For example, a pod requesting a device plugin resource that has not
+	// yet registered with the kubelet should be deferred (kept Pending)
+	// instead of rejected, since the device plugin may register shortly.
+	Defer bool
 }
 
 // PodAdmitHandler is notified during pod admission.
