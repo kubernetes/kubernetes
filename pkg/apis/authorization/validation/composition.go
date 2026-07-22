@@ -21,12 +21,15 @@ import (
 	"fmt"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
+	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 
 	apiservervalidation "k8s.io/apiserver/pkg/apis/authorization/validation"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 )
 
@@ -42,7 +45,7 @@ func ValidateSubjectAccessReviewCreate(ctx context.Context, scheme *runtime.Sche
 
 	errs := apiservervalidation.ValidateSubjectAccessReview(sarV1)
 	dv := rest.DeclarativeValidation{Scheme: scheme}
-	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, rest.DeclarativeValidationConfig{})
+	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, sarValidationConfig())
 }
 
 // ValidateSelfSubjectAccessReviewCreate is the single composition of handwritten and declarative
@@ -57,7 +60,7 @@ func ValidateSelfSubjectAccessReviewCreate(ctx context.Context, scheme *runtime.
 
 	errs := apiservervalidation.ValidateSelfSubjectAccessReview(sarV1)
 	dv := rest.DeclarativeValidation{Scheme: scheme}
-	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, rest.DeclarativeValidationConfig{})
+	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, sarValidationConfig())
 }
 
 // ValidateLocalSubjectAccessReviewCreate is the single composition of handwritten and declarative
@@ -72,5 +75,33 @@ func ValidateLocalSubjectAccessReviewCreate(ctx context.Context, scheme *runtime
 
 	errs := apiservervalidation.ValidateLocalSubjectAccessReview(sarV1)
 	dv := rest.DeclarativeValidation{Scheme: scheme}
-	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, rest.DeclarativeValidationConfig{})
+	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, sarValidationConfig())
+}
+
+// ValidateAuthorizationConditionsReviewCreate is the single composition of handwritten and declarative
+// AuthorizationConditionsReview validation.
+func ValidateAuthorizationConditionsReviewCreate(ctx context.Context, scheme *runtime.Scheme, acr *authorizationapi.AuthorizationConditionsReview) field.ErrorList {
+	// The hand-written validations are written only once, for the most recent external API version, so that also k8s.io/apiserver
+	// importers can make use of the validations.
+	acrV1 := &authorizationv1alpha1.AuthorizationConditionsReview{}
+	if err := scheme.Convert(acr, acrV1, nil); err != nil {
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected, could not convert internal AuthorizationConditionsReview to v1alpha1: %w", err))}
+	}
+
+	errs := apiservervalidation.ValidateAuthorizationConditionsReview(acrV1)
+	dv := rest.DeclarativeValidation{Scheme: scheme}
+	return dv.ValidateDeclaratively(ctx, acr, nil, errs, operation.Create, sarValidationConfig())
+}
+
+// sarValidationConfig returns the declarative validation config to use for
+// SubjectAccessReview-family create validation. It enables the
+// "ConditionalAuthorization" option when the corresponding feature gate is
+// enabled, so that the +k8s:ifDisabled("ConditionalAuthorization")=+k8s:forbidden
+// tag on spec.conditionalAuthorization does not reject the field.
+func sarValidationConfig() rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{
+		Options: map[string]bool{
+			string(genericfeatures.ConditionalAuthorization): utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization),
+		},
+	}
 }
