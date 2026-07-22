@@ -24,13 +24,9 @@ limitations under the License.
 // downstream handler. Whether a webhook adopts verification at all is a
 // deployment-time concern that defaults off, not a runtime knob here.
 //
-// WithTokenVerification chooses the verifier from its RemoteConfig argument: a
-// non-nil config builds an out-of-cluster verifier bound to a fixed issuer and
-// audience; a nil config builds the in-cluster verifier, which discovers the
-// issuer over the in-cluster network and derives the audience from the first
-// request. Until the in-cluster audience can be bound the handler denies
-// fail-closed and reports not-ready via [Handler.HealthCheck] — the seam to wire
-// into a controller-runtime health check.
+// WithTokenVerification selects an out-of-cluster or in-cluster verifier from its
+// config argument; see its doc for the two modes and the fail-closed/not-ready
+// behavior until an in-cluster audience binds.
 //
 // Callers that have already decoded the review (for example controller-runtime)
 // should build a verifier with oidc.NewRemoteVerifier and use
@@ -94,11 +90,11 @@ const (
 	reasonBodyTooLarge    = "request body exceeds the configured limit"
 )
 
-// AdmissionHandler performs the admission decision for a request that has already
-// been verified and decoded. It takes the AdmissionRequest and returns the
-// AdmissionResponse — the shape of controller-runtime's Handle(ctx, Request)
-// Response. The adapter echoes the request UID onto the response and wraps it in
-// an AdmissionReview, so the downstream never touches the raw body.
+// AdmissionHandler performs the admission decision for an already-verified,
+// already-decoded request, mirroring the shape of controller-runtime's
+// Handle(ctx, Request) Response. The adapter echoes the request UID onto the
+// response and wraps it in an AdmissionReview, so the downstream never touches
+// the raw body.
 type AdmissionHandler func(ctx context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse
 
 // Option configures the handler.
