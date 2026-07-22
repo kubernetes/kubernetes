@@ -281,6 +281,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })
 				runSubTest(tCtx, "Convert", testConvert)
 				runSubTest(tCtx, "ControllerManagerMetrics", testControllerManagerMetrics)
+				runSubTest(tCtx, "ResourceSliceFieldSelectors", testResourceSliceFieldSelectors)
 				runSubTest(tCtx, "DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, true) })
 				runSubTest(tCtx, "PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, true) })
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })

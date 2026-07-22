@@ -34,11 +34,14 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/dynamic-resource-allocation/internal/workqueue"
@@ -1633,6 +1636,130 @@ func TestControllerUpdateReconcilePoolWithNameValidation(t *testing.T) {
 			ctrl.Update(tc.resources)
 		})
 	}
+}
+
+func TestControllerPoolNameFieldSelector(t *testing.T) {
+	const (
+		driverName = "test-driver"
+		poolName   = "pool-a"
+	)
+
+	testCases := map[string]struct {
+		rejectList                  bool
+		rejectWatch                 bool
+		initialObjects              []runtime.Object
+		expectedListSelectors       []bool
+		expectedWatchSelectors      []bool
+		checkListFallbackFiltering  bool
+		checkWatchFallbackFiltering bool
+	}{
+		"field-selector-supported": {
+			expectedListSelectors:  []bool{true},
+			expectedWatchSelectors: []bool{true},
+		},
+		"field-selector-unsupported-for-list": {
+			rejectList: true,
+			initialObjects: []runtime.Object{
+				resourceSliceForPool(poolName, "matching"),
+				resourceSliceForPool("other-pool", "other"),
+			},
+			expectedListSelectors:      []bool{true, false},
+			expectedWatchSelectors:     []bool{false},
+			checkListFallbackFiltering: true,
+		},
+		"field-selector-unsupported-for-watch": {
+			rejectWatch:                 true,
+			expectedListSelectors:       []bool{true},
+			expectedWatchSelectors:      []bool{true, false},
+			checkWatchFallbackFiltering: true,
+		},
+	}
+
+	badRequestError := apierrors.NewBadRequest(fmt.Sprintf("field label not supported for %s: %s", resourceapi.SchemeGroupVersion.WithKind("ResourceSlice"), resourceapi.ResourceSliceSelectorPoolName))
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			ctx := t.Context()
+			kubeClient := fake.NewSimpleClientset(testCase.initialObjects...)
+			kubeClient.PrependReactor("list", "resourceslices", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				if testCase.rejectList && hasPoolNameFieldSelector(action, poolName) {
+					return true, nil, badRequestError
+				}
+				return false, nil, nil
+			})
+			kubeClient.PrependWatchReactor("resourceslices", func(action k8stesting.Action) (handled bool, ret watch.Interface, err error) {
+				if testCase.rejectWatch && hasPoolNameFieldSelector(action, poolName) {
+					return true, nil, badRequestError
+				}
+				return false, nil, nil
+			})
+
+			ctrl, err := newController(ctx, Options{
+				DriverName:            driverName,
+				KubeClient:            kubeClient,
+				ReconcilePoolWithName: poolName,
+				SyncDelay:             new(time.Hour),
+			})
+			require.NoError(t, err)
+			t.Cleanup(ctrl.Stop)
+
+			require.Eventually(t, func() bool {
+				return len(resourceSliceSelectorRequests(kubeClient.Actions(), "watch", poolName)) == len(testCase.expectedWatchSelectors)
+			}, 5*time.Second, 10*time.Millisecond, "wait for ResourceSlice watch requests")
+			assert.Equal(t, testCase.expectedListSelectors, resourceSliceSelectorRequests(kubeClient.Actions(), "list", poolName))
+			assert.Equal(t, testCase.expectedWatchSelectors, resourceSliceSelectorRequests(kubeClient.Actions(), "watch", poolName))
+			assert.Equal(t, !testCase.rejectList && !testCase.rejectWatch, ctrl.usePoolNameFieldSelector.Load())
+
+			if testCase.checkListFallbackFiltering {
+				matching, err := ctrl.sliceStore.ByIndex(poolNameIndex, poolName)
+				require.NoError(t, err)
+				assert.Len(t, matching, 1)
+				other, err := ctrl.sliceStore.ByIndex(poolNameIndex, "other-pool")
+				require.NoError(t, err)
+				assert.Empty(t, other)
+			}
+
+			if testCase.checkWatchFallbackFiltering {
+				_, err := kubeClient.ResourceV1().ResourceSlices().Create(ctx, resourceSliceForPool(poolName, "matching"), metav1.CreateOptions{})
+				require.NoError(t, err)
+				_, err = kubeClient.ResourceV1().ResourceSlices().Create(ctx, resourceSliceForPool("other-pool", "other"), metav1.CreateOptions{})
+				require.NoError(t, err)
+				require.Eventually(t, func() bool {
+					matching, err := ctrl.sliceStore.ByIndex(poolNameIndex, poolName)
+					if err != nil || len(matching) != 1 {
+						return false
+					}
+					other, err := ctrl.sliceStore.ByIndex(poolNameIndex, "other-pool")
+					return err == nil && len(other) == 0
+				}, 5*time.Second, 10*time.Millisecond, "wait for the fallback watcher to filter ResourceSlices")
+			}
+		})
+	}
+}
+
+func hasPoolNameFieldSelector(action k8stesting.Action, poolName string) bool {
+	var fieldSelector fields.Selector
+	switch action := action.(type) {
+	case k8stesting.ListAction:
+		fieldSelector = action.GetListRestrictions().Fields
+	case k8stesting.WatchAction:
+		fieldSelector = action.GetWatchRestrictions().Fields
+	default:
+		return false
+	}
+
+	value, found := fieldSelector.RequiresExactMatch(resourceapi.ResourceSliceSelectorPoolName)
+	return found && value == poolName
+}
+
+func resourceSliceSelectorRequests(actions []k8stesting.Action, verb, poolName string) []bool {
+	var requests []bool
+	for _, action := range actions {
+		if action.Matches(verb, "resourceslices") {
+			requests = append(requests, hasPoolNameFieldSelector(action, poolName))
+		}
+	}
+	return requests
 }
 
 func joinErrors(errors []string) string {

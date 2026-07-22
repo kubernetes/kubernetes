@@ -97,6 +97,9 @@ const (
 	// ResourceSliceSelectorDriver can be used in a [metav1.ListOptions]
 	// field selector to filter based on [ResourceSliceSpec.Driver].
 	ResourceSliceSelectorDriver = "spec.driver"
+	// ResourceSliceSelectorPoolName can be used in a [metav1.ListOptions]
+	// field selector to filter based on [ResourceSliceSpec.Pool.Name].
+	ResourceSliceSelectorPoolName = "spec.pool.name"
 )
 
 // ResourceSliceSpec contains the information published by the driver in one ResourceSlice.
@@ -241,6 +244,8 @@ const DriverNameMaxLength = 63
 type ResourcePool struct {
 	// Name is used to identify the pool. For node-local devices, this
 	// is often the node name, but this is not required.
+	// A field selector can be used to list only ResourceSlice objects
+	// belonging to a certain pool.
 	//
 	// It must not be longer than 253 characters and must consist of one or more DNS sub-domains
 	// separated by slashes. This field is immutable.

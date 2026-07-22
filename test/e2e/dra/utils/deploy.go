@@ -394,11 +394,20 @@ type Driver struct {
 	// Register the DRA test driver with the kubelet and expect DRA to work (= feature.DynamicResourceAllocation).
 	WithKubelet bool
 
+	// UsePrivilegedClient lets the test driver publish cluster-wide ResourceSlices.
+	// The default node-scoped client is intentionally restricted by admission to
+	// ResourceSlices for its own node.
+	UsePrivilegedClient bool
+
 	// Run driver pods. If false, only set up slices and class.
 	WithRealNodes bool
 
 	EnableDeviceMetadata   bool
 	DeviceMetadataVersions []schema.GroupVersion // Must be non-empty when EnableDeviceMetadata is true.
+
+	// ReconcilePoolWithName configures the ResourceSlice controller in each
+	// test driver plugin to reconcile only the pool with this name.
+	ReconcilePoolWithName string
 
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
@@ -454,9 +463,11 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 	}
 
 	driverResource, useMultiHostDriverResources := driverResources[multiHostDriverResources]
-	if useMultiHostDriverResources || !d.WithKubelet {
+	if useMultiHostDriverResources || !d.WithKubelet || d.UsePrivilegedClient {
 		// We have to remove ResourceSlices ourselves.
-		// Otherwise the kubelet does it after unregistering the driver.
+		// Otherwise the kubelet does it after unregistering the driver. A
+		// privileged client can create cluster-wide slices which the kubelet
+		// does not own and therefore cannot remove.
 		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
 			err := tCtx.Client().ResourceV1().ResourceSlices().DeleteCollection(tCtx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
 			tCtx.ExpectNoError(err, "delete ResourceSlices of the driver")
@@ -631,6 +642,9 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 		//
 		// Here we merely use impersonation, which is faster.
 		driverClient := d.ImpersonateKubeletPlugin(tCtx, &pod)
+		if d.UsePrivilegedClient {
+			driverClient = tCtx.Client()
+		}
 
 		logger := klog.LoggerWithValues(klog.LoggerWithName(logger, "kubelet-plugin"), "node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
 		loggerCtx := klog.NewContext(tCtx, logger)
@@ -718,6 +732,9 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 			kubeletplugin.RegistrarListener(d.listen(tCtx, &pod, &listenerPort)),
 
 			kubeletplugin.EnableDeviceMetadata(d.EnableDeviceMetadata, d.DeviceMetadataVersions),
+		}
+		if d.ReconcilePoolWithName != "" {
+			pluginOpts = append(pluginOpts, kubeletplugin.ReconcilePoolWithName(d.ReconcilePoolWithName))
 		}
 		if d.EnableDeviceMetadata {
 			if !d.IsLocal {
