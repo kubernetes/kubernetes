@@ -259,4 +259,5 @@ replace (
 	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
 	k8s.io/streaming => ./staging/src/k8s.io/streaming
+	sigs.k8s.io/knftables => github.com/skitt/knftables v0.0.0-20260722121410-c36b94045a46
 )

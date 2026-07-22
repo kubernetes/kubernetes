@@ -1234,7 +1234,7 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
 ## explicit; go 1.23
 sigs.k8s.io/json
 sigs.k8s.io/json/internal/golang/encoding/json
-# sigs.k8s.io/knftables v0.0.22
+# sigs.k8s.io/knftables v0.0.22 => github.com/skitt/knftables v0.0.0-20260722121410-c36b94045a46
 ## explicit; go 1.25.0
 sigs.k8s.io/knftables
 # sigs.k8s.io/kustomize/api v0.21.1
@@ -1336,3 +1336,4 @@ sigs.k8s.io/yaml/kyaml
 # tags.cncf.io/container-device-interface/specs-go v1.1.0
 ## explicit; go 1.19
 tags.cncf.io/container-device-interface/specs-go
+# sigs.k8s.io/knftables => github.com/skitt/knftables v0.0.0-20260722121410-c36b94045a46

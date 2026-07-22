@@ -1,3 +1,5 @@
+//go:build !linux
+
 /*
 Copyright The Kubernetes Authors.
 
@@ -17,10 +19,9 @@ limitations under the License.
 package knftables
 
 import (
-	"context"
+	"errors"
 )
 
-type netlink interface {
-	List(ctx context.Context, objectType string) ([]string, error)
-	ListAll(ctx context.Context) (map[string][]string, error)
+func newNetlinkAdapter(_ Family, _ string) (netlink, error) {
+	return nil, errors.New("netlink is not supported on non-Linux platforms")
 }
