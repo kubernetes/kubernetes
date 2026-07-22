@@ -1892,10 +1892,6 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 }
 
 func TestComputePodActionsWithInitContainers(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	_, _, m, err := createTestRuntimeManager(tCtx)
-	require.NoError(t, err)
-
 	cpu400m := resource.MustParse("400m")
 	memory400Mi := resource.MustParse("400Mi")
 	cpu800m := resource.MustParse("800m")
@@ -2196,6 +2192,8 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				t.Skip("Skipping test since Windows does not support resize")
 			}
 			tCtx := ktesting.Init(t)
+			_, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
 
 			if test.disableIPPRInitCtrFG {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
