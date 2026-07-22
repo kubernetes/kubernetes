@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -45,7 +44,7 @@ func Test(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			st.Value(&Struct{
 				LabelValueField:        tc.value,
-				LabelValuePtrField:     ptr.To(tc.value),
+				LabelValuePtrField:     new(tc.value),
 				LabelValueTypedefField: LabelValueStringType(tc.value),
 			}).ExpectValid()
 		})
@@ -70,7 +69,7 @@ func Test(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			invalidStruct := &Struct{
 				LabelValueField:        tc.value,
-				LabelValuePtrField:     ptr.To(tc.value),
+				LabelValuePtrField:     new(tc.value),
 				LabelValueTypedefField: LabelValueStringType(tc.value),
 			}
 			st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{

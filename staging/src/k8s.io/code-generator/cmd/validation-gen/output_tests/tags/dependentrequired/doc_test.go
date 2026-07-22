@@ -20,18 +20,17 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func TestStruct(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	// One-directional: dependent alone is fine.
-	st.Value(&Struct{Dependent: ptr.To("d")}).ExpectValid()
+	st.Value(&Struct{Dependent: new("d")}).ExpectValid()
 
-	st.Value(&Struct{Trigger: ptr.To("t"), Dependent: ptr.To("d")}).ExpectValid()
+	st.Value(&Struct{Trigger: new("t"), Dependent: new("d")}).ExpectValid()
 
-	st.Value(&Struct{Trigger: ptr.To("t")}).ExpectMatches(
+	st.Value(&Struct{Trigger: new("t")}).ExpectMatches(
 		field.ErrorMatcher{}.ByType().ByField().ByOrigin(),
 		field.ErrorList{
 			field.Required(field.NewPath("dependent"), "").WithOrigin("dependentRequired"),
@@ -39,18 +38,18 @@ func TestStruct(t *testing.T) {
 	)
 
 	// Ratchet: unrelated field changed, trigger and dependent set-ness unchanged → skip.
-	st.Value(&Struct{Trigger: ptr.To("t"), OtherField: ptr.To("new")}).
-		OldValue(&Struct{Trigger: ptr.To("t"), OtherField: ptr.To("old")}).
+	st.Value(&Struct{Trigger: new("t"), OtherField: new("new")}).
+		OldValue(&Struct{Trigger: new("t"), OtherField: new("old")}).
 		ExpectValid()
 
 	// Ratchet: trigger value changed but set-ness unchanged → skip (same rationale as union).
-	st.Value(&Struct{Trigger: ptr.To("t")}).
-		OldValue(&Struct{Trigger: ptr.To("old")}).
+	st.Value(&Struct{Trigger: new("t")}).
+		OldValue(&Struct{Trigger: new("old")}).
 		ExpectValid()
 
 	// Newly cleared dependent → fire.
-	st.Value(&Struct{Trigger: ptr.To("t")}).
-		OldValue(&Struct{Trigger: ptr.To("t"), Dependent: ptr.To("d")}).
+	st.Value(&Struct{Trigger: new("t")}).
+		OldValue(&Struct{Trigger: new("t"), Dependent: new("d")}).
 		ExpectMatches(
 			field.ErrorMatcher{}.ByType().ByField().ByOrigin(),
 			field.ErrorList{
@@ -63,7 +62,7 @@ func TestMultiDependent(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	// Repeated tags → independent implications, each at its own dependent path.
-	st.Value(&MultiDependent{Trigger: ptr.To("t")}).ExpectMatches(
+	st.Value(&MultiDependent{Trigger: new("t")}).ExpectMatches(
 		field.ErrorMatcher{}.ByType().ByField().ByOrigin(),
 		field.ErrorList{
 			field.Required(field.NewPath("dependentA"), "").WithOrigin("dependentRequired"),
@@ -77,7 +76,7 @@ func TestMultiTrigger(t *testing.T) {
 
 	// Distinct triggers → independent implications at the same path.
 	// ByOrigin absorbs both actuals.
-	st.Value(&MultiTrigger{TriggerA: ptr.To("a"), TriggerB: ptr.To("b")}).ExpectMatches(
+	st.Value(&MultiTrigger{TriggerA: new("a"), TriggerB: new("b")}).ExpectMatches(
 		field.ErrorMatcher{}.ByType().ByField().ByOrigin(),
 		field.ErrorList{
 			field.Required(field.NewPath("dependent"), "").WithOrigin("dependentRequired"),
@@ -90,7 +89,7 @@ func TestAllKinds(t *testing.T) {
 
 	// Each kind's extractor fires.
 	st.Value(&AllKinds{
-		PtrTrigger:   ptr.To("t"),
+		PtrTrigger:   new("t"),
 		SliceTrigger: []string{"x"},
 		MapTrigger:   map[string]string{"k": "v"},
 		IntTrigger:   1,

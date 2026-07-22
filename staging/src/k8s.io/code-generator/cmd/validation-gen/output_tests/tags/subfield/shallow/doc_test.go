@@ -18,8 +18,6 @@ package shallow
 
 import (
 	"testing"
-
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -28,14 +26,14 @@ func Test(t *testing.T) {
 	st.Value(&Struct{
 		StructField: OtherStruct{
 			StringField:  "",
-			PointerField: ptr.To(""),
+			PointerField: new(""),
 			StructField:  SmallStruct{},
 			SliceField:   []string{},
 			MapField:     map[string]string{},
 		},
 		StructPtrField: &OtherStruct{
 			StringField:  "",
-			PointerField: ptr.To(""),
+			PointerField: new(""),
 			StructField:  SmallStruct{},
 			SliceField:   []string{},
 			MapField:     map[string]string{},
