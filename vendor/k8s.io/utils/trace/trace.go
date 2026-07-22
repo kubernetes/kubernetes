@@ -104,6 +104,7 @@ func (s traceStep) writeItem(b *bytes.Buffer, formatter string, startTime time.T
 // step if it took longer than its share of the total allowed time
 type Trace struct {
 	// constant fields
+	traceNum    int32
 	name        string
 	fields      []Field
 	startTime   time.Time
@@ -152,7 +153,11 @@ func (t *Trace) writeItem(b *bytes.Buffer, formatter string, startTime time.Time
 // New creates a Trace with the specified name. The name identifies the operation to be traced. The
 // Fields add key value pairs to provide additional details about the trace, such as operation inputs.
 func New(name string, fields ...Field) *Trace {
-	return &Trace{name: name, startTime: time.Now(), fields: fields}
+	return &Trace{name: name, startTime: time.Now(), fields: fields, traceNum: rand.Int31()}
+}
+
+func (t *Trace) Num() int32 {
+	return t.traceNum
 }
 
 // Step adds a new step with a specific message. Call this at the end of an execution step to record
@@ -176,6 +181,7 @@ func (t *Trace) Nest(msg string, fields ...Field) *Trace {
 	newTrace := New(msg, fields...)
 	if t != nil {
 		newTrace.parentTrace = t
+		newTrace.traceNum = t.traceNum
 		t.lock.Lock()
 		t.traceItems = append(t.traceItems, newTrace)
 		t.lock.Unlock()
@@ -218,10 +224,12 @@ func (t *Trace) logTrace() {
 	defer t.lock.RUnlock()
 	if t.durationIsWithinThreshold() {
 		var buffer bytes.Buffer
-		traceNum := rand.Int31()
+		if t.traceNum == 0 {
+			t.traceNum = rand.Int31()
+		}
 
 		totalTime := t.endTime.Sub(t.startTime)
-		buffer.WriteString(fmt.Sprintf("Trace[%d]: %q ", traceNum, t.name))
+		buffer.WriteString(fmt.Sprintf("Trace[%d]: %q ", t.traceNum, t.name))
 		if len(t.fields) > 0 {
 			writeFields(&buffer, t.fields)
 			buffer.WriteString(" ")
@@ -230,8 +238,8 @@ func (t *Trace) logTrace() {
 		// if any step took more than it's share of the total allowed time, it deserves a higher log level
 		buffer.WriteString(fmt.Sprintf("(%v) (total time: %vms):", t.startTime.Format("02-Jan-2006 15:04:05.000"), totalTime.Milliseconds()))
 		stepThreshold := t.calculateStepThreshold()
-		t.writeTraceSteps(&buffer, fmt.Sprintf("\nTrace[%d]: ", traceNum), stepThreshold)
-		buffer.WriteString(fmt.Sprintf("\nTrace[%d]: [%v] [%v] END\n", traceNum, t.endTime.Sub(t.startTime), totalTime))
+		t.writeTraceSteps(&buffer, fmt.Sprintf("\nTrace[%d]: ", t.traceNum), stepThreshold)
+		buffer.WriteString(fmt.Sprintf("\nTrace[%d]: [%v] [%v] END\n", t.traceNum, t.endTime.Sub(t.startTime), totalTime))
 
 		klog.Info(buffer.String())
 		return

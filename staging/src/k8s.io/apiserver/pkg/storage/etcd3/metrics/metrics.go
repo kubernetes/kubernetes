@@ -153,6 +153,24 @@ var (
 		},
 		[]string{"streamed", "group", "resource"},
 	)
+	locklessTraceWriteDuration = compbasemetrics.NewCounter(
+		&compbasemetrics.CounterOpts{
+			Namespace:      "apiserver",
+			Subsystem:      "storage",
+			Name:           "lockless_trace_write_duration_seconds_total",
+			Help:           "Total time spent writing lockless traces to klog in seconds.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+	)
+	locklessTraceWrites = compbasemetrics.NewCounter(
+		&compbasemetrics.CounterOpts{
+			Namespace:      "apiserver",
+			Subsystem:      "storage",
+			Name:           "lockless_trace_writes_total",
+			Help:           "Total number of lockless trace writes.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -174,6 +192,8 @@ func Register() {
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
 		legacyregistry.MustRegister(decodeErrorCounts)
 		legacyregistry.MustRegister(listLatency)
+		legacyregistry.MustRegister(locklessTraceWriteDuration)
+		legacyregistry.MustRegister(locklessTraceWrites)
 	})
 }
 
@@ -442,4 +462,10 @@ func (t *WatcherMetricsTracker) RecordEvent() {
 func (t *WatcherMetricsTracker) RecordBookmark() {
 	t.etcdBookmarkCounts.Inc()
 	t.etcdBookmarkTotal.Inc()
+}
+
+// RecordLocklessTraceWriteDuration records the duration of writing lockless trace to klog.
+func RecordLocklessTraceWriteDuration(duration time.Duration) {
+	locklessTraceWriteDuration.Add(duration.Seconds())
+	locklessTraceWrites.Inc()
 }

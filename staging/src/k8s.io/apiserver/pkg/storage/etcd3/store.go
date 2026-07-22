@@ -241,7 +241,8 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	if err != nil {
 		return err
 	}
-	ctx, span := tracing.Start(ctx, "Get etcd3",
+
+	span := newLocklessTraceLog(ctx, "Get etcd3",
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.String("key", key),
 		attribute.String("group", s.groupResource.Group),
