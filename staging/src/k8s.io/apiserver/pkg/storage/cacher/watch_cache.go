@@ -68,6 +68,8 @@ type watchCacheEvent struct {
 	Key             string
 	ResourceVersion uint64
 	RecordTime      time.Time
+	// CacheReceived is the time the event was received by the cacher.
+	CacheReceived time.Time
 }
 
 // watchCache implements a Store interface.
@@ -207,7 +209,8 @@ func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Ob
 // processEvent is safe as long as there is at most one call to it in flight
 // at any point in time.
 func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) error {
-	recordTime := w.config.clock.Now()
+	cacheReceived := w.config.clock.Now()
+	recordTime := cacheReceived
 	if withRecordTime, ok := event.Object.(storage.WatchEventWithRecordTime); ok {
 		recordTime = withRecordTime.RecordTime()
 		event.Object = withRecordTime.Unwrap()
@@ -233,6 +236,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		Key:             key,
 		ResourceVersion: resourceVersion,
 		RecordTime:      recordTime,
+		CacheReceived:   cacheReceived,
 	}
 
 	// We can call w.storage.Get() outside of a critical section,
