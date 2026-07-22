@@ -1901,8 +1901,28 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 			initial:  resources{pReq, nil, nil, nil},
 			expected: resources{pReq, nil, nil, nil},
 		}, {
+			name:             "PodLevelResourcesFixDefaulting disabled: pod limits not defaulted from container limits (1 container)",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			initial:          resources{pReq, nil, nil, cLim},
+			expected:         resources{pReq, nil, cLim, cLim},
+		}, {
+			name:             "PodLevelResourcesFixDefaulting enabled: pod limits defaulted from container limits (1 container)",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			initial:          resources{pReq, nil, nil, cLim},
+			expected:         resources{pReq, pReq, cLim, cLim},
+		}, {
 			initial:  resources{pReq, nil, cReq, nil},
 			expected: resources{pReq, nil, cReq, nil},
+		}, {
+			name:             "PodLevelResourcesFixDefaulting disabled: pod limits not defaulted when container requests specified",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			initial:          resources{pReq, nil, cReq, cLim},
+			expected:         resources{pReq, nil, cReq, cLim},
+		}, {
+			name:             "PodLevelResourcesFixDefaulting enabled: pod limits defaulted when container requests specified",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			initial:          resources{pReq, nil, cReq, cLim},
+			expected:         resources{pReq, pReq, cReq, cLim},
 		}, {
 			initial:  resources{pReq, pLim, nil, nil},
 			expected: resources{pReq, pLim, nil, nil},
@@ -1955,9 +1975,33 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 			initial:         resources{pReq, nil, nil, nil},
 			expected:        resources{pReq, nil, nil, nil},
 		}, {
+			name:             "PodLevelResourcesFixDefaulting disabled: pod limits not defaulted with 2 containers",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			secondContainer:  true,
+			initial:          resources{aggLim, nil, nil, cLim},
+			expected:         resources{aggLim, nil, cLim, cLim},
+		}, {
+			name:             "PodLevelResourcesFixDefaulting enabled: pod limits defaulted with 2 containers",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			secondContainer:  true,
+			initial:          resources{aggLim, nil, nil, cLim},
+			expected:         resources{aggLim, aggLim, cLim, cLim},
+		}, {
 			secondContainer: true,
 			initial:         resources{pReq, nil, cReq, nil},
 			expected:        resources{pReq, nil, cReq, nil},
+		}, {
+			name:             "PodLevelResourcesFixDefaulting disabled: pod limits not defaulted with 2 containers and container requests",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			secondContainer:  true,
+			initial:          resources{pReq, nil, cReq, cLim},
+			expected:         resources{pReq, nil, cReq, cLim},
+		}, {
+			name:             "PodLevelResourcesFixDefaulting enabled: pod limits defaulted with 2 containers and container requests",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			secondContainer:  true,
+			initial:          resources{pReq, nil, cReq, cLim},
+			expected:         resources{pReq, aggLim, cReq, cLim},
 		}, {
 			secondContainer: true,
 			initial:         resources{pReq, pLim, nil, nil},
@@ -2007,6 +2051,73 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 			expected:        resources{aggReq, cLim, cReq, cLim}, // aggReq == cLim
 		},
 		{
+			name:             "CPU + memory at container level, only CPU at pod level (fix disabled)",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			initial: resources{
+				podReqs: cpu("2"),
+				podLims: cpu("2"),
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			expected: resources{
+				podReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				podLims: cpu("2"),
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			expectedQOS: v1.PodQOSBurstable,
+		},
+		{
+			name:             "CPU + memory at container level, only CPU at pod level (fix enabled)",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			initial: resources{
+				podReqs: cpu("2"),
+				podLims: cpu("2"),
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			expected: resources{
+				podReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				podLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			expectedQOS: v1.PodQOSBurstable,
+		},
+		{
 			name: "Ephemeral storage at pod level, cpu + mem at container level",
 			initial: resources{
 				podReqs: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
@@ -2047,6 +2158,37 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 			expectedQOS: v1.PodQOSBurstable,
 		},
 		{
+			name:             "Combining propagation: pod requests cpu, container requests memory (fix disabled)",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			initial: resources{
+				podReqs:       cpu("1"),
+				containerReqs: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+			},
+			expected: resources{
+				podReqs: cpu("1"),
+				containerReqs: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+		},
+		{
+			name:             "Combining propagation: pod requests cpu, container requests memory (fix enabled)",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			initial: resources{
+				podReqs:       cpu("1"),
+				containerReqs: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+			},
+			expected: resources{
+				podReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerReqs: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+		},
+		{
 			name:             "Empty map pod resources (Requests: {}, Limits: {}) - fix disabled",
 			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: false},
 			initial: resources{
@@ -2075,6 +2217,18 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 			initial:     resources{v1.ResourceList{}, pLim, cReq, cLim},
 			expected:    resources{cReq, pLim, cReq, cLim},
 			expectedQOS: v1.PodQOSBurstable,
+		},
+		{
+			name:             "Empty limits map (Requests: pReq, Limits: {}) - fix disabled",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			initial:          resources{pReq, v1.ResourceList{}, cReq, cLim},
+			expected:         resources{pReq, v1.ResourceList{}, cReq, cLim},
+		},
+		{
+			name:             "Empty limits map (Requests: pReq, Limits: {}) - fix enabled",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			initial:          resources{pReq, v1.ResourceList{}, cReq, cLim},
+			expected:         resources{pReq, pReq, cReq, cLim},
 		},
 		{
 			name:             "Empty requests map with container limits (Requests: {}, Limits: nil) - fix disabled",
@@ -2147,6 +2301,37 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 			initial: resources{
 				podReqs:       cpu("0"),
 				podLims:       cpu("1"),
+				containerReqs: cpu("0"),
+				containerLims: cpu("1"),
+			},
+			expected: resources{
+				podReqs:       cpu("0"),
+				podLims:       cpu("1"),
+				containerReqs: cpu("0"),
+				containerLims: cpu("1"),
+			},
+			expectedQOS: v1.PodQOSBurstable,
+		},
+		{
+			name:             "Zero variant (fix disabled): pod requests cpu 0, container requests cpu 0, container limits cpu 1",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			initial: resources{
+				podReqs:       cpu("0"),
+				containerReqs: cpu("0"),
+				containerLims: cpu("1"),
+			},
+			expected: resources{
+				podReqs:       cpu("0"),
+				containerReqs: cpu("0"),
+				containerLims: cpu("1"),
+			},
+			expectedQOS: v1.PodQOSBestEffort,
+		},
+		{
+			name:             "Zero variant (fix enabled): pod requests cpu 0, container requests cpu 0, container limits cpu 1",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			initial: resources{
+				podReqs:       cpu("0"),
 				containerReqs: cpu("0"),
 				containerLims: cpu("1"),
 			},
@@ -2242,6 +2427,68 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 				},
 			},
 			expectedQOS: v1.PodQOSGuaranteed,
+		},
+
+		// 2. PR #140514: Pod limits defaulted from container aggregate limits
+		{
+			name:             "PodLevelResourcesFixDefaulting disabled: pod limits not defaulted from container limits",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			secondContainer:  true,
+			initial:          resources{aggLim, nil, nil, cLim},
+			expected:         resources{aggLim, nil, cLim, cLim},
+		},
+		{
+			name:             "PodLevelResourcesFixDefaulting enabled: pod limits defaulted from container limits",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			secondContainer:  true,
+			initial:          resources{aggLim, nil, nil, cLim},
+			expected:         resources{aggLim, aggLim, cLim, cLim},
+		},
+
+		// 3. PR #140514: Pod requests defaulted from containers when pod limits empty
+		{
+			name:             "PodLevelResourcesFixDefaulting disabled: pod requests not defaulted from containers when pod limits empty",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			initial:          resources{nil, nil, cReq, nil},
+			expected:         resources{nil, nil, cReq, nil},
+		},
+		{
+			name:             "PodLevelResourcesFixDefaulting enabled: pod requests defaulted from containers when pod limits empty",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			initial:          resources{nil, nil, cReq, nil},
+			expected:         resources{nil, nil, cReq, nil},
+		},
+
+		// 4. PR #140514: Pod limits raised to pod request when aggregate container limit < pod request
+		{
+			name:             "PodLevelResourcesFixDefaulting disabled: pod limit not defaulted when aggregate limit less than pod request",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			secondContainer:  true,
+			initial:          resources{pReq, nil, cReq, cReq},
+			expected:         resources{pReq, nil, cReq, cReq},
+		},
+		{
+			name:             "PodLevelResourcesFixDefaulting enabled: pod limit raised to pod request when aggregate limit less than pod request",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			secondContainer:  true,
+			initial:          resources{pReq, nil, cReq, cReq},
+			expected:         resources{pReq, pReq, cReq, cReq},
+		},
+
+		// 5. PR #140514: Pod requests and limits defaulted from 2 containers when pod limits empty
+		{
+			name:             "PodLevelResourcesFixDefaulting disabled: pod requests and limits not defaulted from 2 containers when pod limits empty",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			secondContainer:  true,
+			initial:          resources{nil, nil, cReq, cLim},
+			expected:         resources{nil, nil, cReq, cLim},
+		},
+		{
+			name:             "PodLevelResourcesFixDefaulting enabled: pod requests and limits defaulted from 2 containers when pod limits empty",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			secondContainer:  true,
+			initial:          resources{nil, nil, cReq, cLim},
+			expected:         resources{nil, nil, cReq, cLim},
 		},
 	}
 

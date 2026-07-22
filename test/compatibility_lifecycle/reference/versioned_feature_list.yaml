@@ -1457,6 +1457,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+- name: PodLevelResourcesFixDefaulting
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: PodLevelResourcesFixKubeletQOSClass
   versionedSpecs:
   - default: true

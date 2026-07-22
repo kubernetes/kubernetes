@@ -799,6 +799,11 @@ const (
 	// Enables specifying resources at pod-level.
 	PodLevelResources featuregate.Feature = "PodLevelResources"
 
+	// owner: @ndixita
+	//
+	// Enables PodLevelResourcesFixDefaulting.
+	PodLevelResourcesFixDefaulting featuregate.Feature = "PodLevelResourcesFixDefaulting"
+
 	// owner: @KevinTMtz
 	// key: https://kep.k8s.io/2837
 	//
@@ -1808,6 +1813,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	PodLevelResourcesFixDefaulting: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	PodLevelResourcesFixKubeletQOSClass: {
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2582,6 +2591,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodLevelResourceManagers: {PodLevelResources},
 
 	PodLevelResources: {},
+
+	PodLevelResourcesFixDefaulting: {PodLevelResources},
 
 	PodLevelResourcesFixKubeletQOSClass: {PodLevelResources},
 
