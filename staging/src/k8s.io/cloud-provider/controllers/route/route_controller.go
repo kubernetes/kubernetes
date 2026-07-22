@@ -208,13 +208,13 @@ func (rc *RouteController) Run(ctx context.Context, syncPeriod time.Duration, co
 	} else {
 		go wait.NonSlidingUntil(func() {
 			routesChanged, err := rc.reconcileNodeRoutes(ctx)
+			// Without the workqueue, reconciles are only driven by the
+			// syncPeriod timer, so the trigger is always periodic.
+			recordRouteSync(routesChanged, err, "periodic")
 			if err != nil {
 				klog.Errorf("Couldn't reconcile node routes: %v", err)
 				return
 			}
-			// Without the workqueue, reconciles are only driven by the
-			// syncPeriod timer, so the trigger is always periodic.
-			recordRouteSync(routesChanged, "periodic")
 		}, syncPeriod, ctx.Done())
 	}
 
@@ -250,14 +250,13 @@ func (rc *RouteController) processNextWorkItem(ctx context.Context) bool {
 
 		// Run the route reconciliation
 		routesChanged, err := rc.reconcileNodeRoutes(ctx)
+		recordRouteSync(routesChanged, err, key)
 		if err != nil {
 			// Put the item back on the workqueue to handle any transient errors.
 			rc.workqueue.AddRateLimited(key)
 			klog.Infof("Couldn't reconcile node routes: %v, requeuing", err)
 			return fmt.Errorf("couldn't reconcile node routes: %w, requeuing", err)
 		}
-
-		recordRouteSync(routesChanged, key)
 
 		return nil
 	}(obj)

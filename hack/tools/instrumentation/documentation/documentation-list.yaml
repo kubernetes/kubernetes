@@ -6270,8 +6270,9 @@
 - name: route_sync_total
   subsystem: route_controller
   help: A metric counting the number of route reconciles with the cloud provider,
-    labeled by the trigger (periodic or node_change) and the outcome (changed if at
-    least one route was created or deleted, otherwise noop).
+    labeled by the trigger (periodic or node_change) and the outcome (error if the
+    reconcile failed, changed if at least one route was created or deleted, otherwise
+    noop).
   type: Counter
   stabilityLevel: ALPHA
   labels:
