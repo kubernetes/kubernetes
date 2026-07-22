@@ -848,9 +848,16 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 	}
 
 	allErrs = append(allErrs, validateMap(device.Attributes, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
-	// If the entire capacity is the same as before then validation can be skipped.
-	// We could also do the DeepEqual on the entire spec, but here it is a bit cheaper.
-	if oldDevice == nil || !apiequality.Semantic.DeepEqual(oldDevice.Capacity, device.Capacity) {
+	// Capacity validation depends on the effective allowMultipleAllocations value (it selects the
+	// multi- vs single-allocatable validator), so it must re-run when that value changes even if
+	// the capacity map itself is unchanged. Otherwise, when both are unchanged, validation can be
+	// skipped (cheaper than a full spec DeepEqual).
+	oldAllowMultipleAllocations := oldDevice != nil &&
+		oldDevice.AllowMultipleAllocations != nil &&
+		*oldDevice.AllowMultipleAllocations
+	if oldDevice == nil ||
+		allowMultipleAllocations != oldAllowMultipleAllocations ||
+		!apiequality.Semantic.DeepEqual(oldDevice.Capacity, device.Capacity) {
 		if allowMultipleAllocations {
 			allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateMultiAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
 		} else {
@@ -1076,7 +1083,7 @@ func validateDeviceAttributeVersionValue(value *string, fldPath *field.Path) fie
 }
 
 // validateMultiAllocatableDeviceCapacity must check requestPolicy in consumable capacity.
-// It only gets called for new or modified capacity.
+// It gets called for new or modified capacity, or when allowMultipleAllocations changes.
 func validateMultiAllocatableDeviceCapacity(capacity resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if capacity.RequestPolicy != nil {
@@ -1098,7 +1105,7 @@ func validateSingleAllocatableDeviceCapacity(capacity resource.DeviceCapacity, f
 
 // validateRequestPolicy validates at most one of ValidRequestValues can be defined.
 // If any ValidRequestValues are defined, Default must also be defined and valid.
-// Only gets called for new or modified policy.
+// Gets called for new or modified policy, or when allowMultipleAllocations changes.
 func validateRequestPolicy(maxCapacity apiresource.Quantity, policy *resource.CapacityRequestPolicy, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(policy.ValidValues) > 0 && policy.ValidRange != nil {
@@ -1168,7 +1175,7 @@ func validateRequestPolicyValidValues(defaultValue apiresource.Quantity, maxCapa
 }
 
 // validateRequestPolicyRange validates a CapacityRequestPolicyRange.
-// Only gets called for a new or modified range.
+// Gets called for a new or modified range, or when allowMultipleAllocations changes.
 func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity apiresource.Quantity, valueRange resource.CapacityRequestPolicyRange, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if valueRange.Min == nil {
