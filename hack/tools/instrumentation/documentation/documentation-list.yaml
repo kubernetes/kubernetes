@@ -4669,6 +4669,15 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: sidecar_restarts_during_termination_total
+  subsystem: kubelet
+  help: Cumulative number of times a restartable init container (sidecar) was restarted
+    during pod termination because it exited before its ordered termination turn.
+  type: Counter
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: sleep_action_terminated_early_total
   subsystem: kubelet
   help: The number of times lifecycle sleep handler got terminated before it finishes

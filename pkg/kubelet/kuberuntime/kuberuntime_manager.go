@@ -178,6 +178,11 @@ type kubeGenericRuntimeManager struct {
 	// PodState provider instance
 	podStateProvider podStateProvider
 
+	// podCache is the PLEG-maintained pod status cache. It is used to drive
+	// restartable init container (sidecar) restart during pod termination in an
+	// event-driven way (via GetNewerThan) rather than polling the runtime.
+	podCache kubecontainer.ROCache
+
 	// Use RuntimeDefault as the default seccomp profile for all workloads.
 	seccompDefault bool
 
@@ -221,6 +226,7 @@ func NewKubeGenericRuntimeManager(
 	podLogsDirectory string,
 	machineInfo *cadvisorapi.MachineInfo,
 	podStateProvider podStateProvider,
+	podCache kubecontainer.ROCache,
 	maxPods int32,
 	osInterface kubecontainer.OSInterface,
 	runtimeHelper kubecontainer.RuntimeHelper,
@@ -364,6 +370,7 @@ func NewKubeGenericRuntimeManager(
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(insecureContainerLifecycleHTTPClient, kubeRuntimeManager, kubeRuntimeManager, recorder)
 	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager, tracer)
 	kubeRuntimeManager.podStateProvider = podStateProvider
+	kubeRuntimeManager.podCache = podCache
 
 	kubeRuntimeManager.versionCache = cache.NewObjectCache(
 		func() (interface{}, error) {
@@ -1598,7 +1605,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			logger.V(4).Info("Stopping PodSandbox for pod, because all other containers are dead", "pod", klog.KObj(pod))
 		}
 
-		killResult := m.killPodWithSyncResult(ctx, pod, kubecontainer.ConvertPodStatusToRunningPod(m.runtimeName, podStatus), nil)
+		killResult := m.killPodWithSyncResult(ctx, pod, kubecontainer.ConvertPodStatusToRunningPod(m.runtimeName, podStatus), nil, false)
 		result.AddPodSyncResult(killResult)
 		if killResult.Error() != nil {
 			logger.Error(killResult.Error(), "killPodWithSyncResult failed")
@@ -2106,15 +2113,18 @@ func (m *kubeGenericRuntimeManager) doBackOff(ctx context.Context, pod *v1.Pod, 
 // only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
 // it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
 func (m *kubeGenericRuntimeManager) KillPod(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
-	err := m.killPodWithSyncResult(ctx, pod, runningPod, gracePeriodOverride)
+	err := m.killPodWithSyncResult(ctx, pod, runningPod, gracePeriodOverride, true)
 	return err.Error()
 }
 
 // killPodWithSyncResult kills a runningPod and returns SyncResult.
 // Note: The pod passed in could be *nil* when kubelet restarted.
-func (m *kubeGenericRuntimeManager) killPodWithSyncResult(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
+// terminating indicates whether the pod is genuinely being terminated (true) vs
+// undergoing sandbox replacement during SyncPod (false). Only terminating pods
+// should have the sidecar-restart-during-termination watcher active.
+func (m *kubeGenericRuntimeManager) killPodWithSyncResult(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64, terminating bool) (result kubecontainer.PodSyncResult) {
 	logger := klog.FromContext(ctx)
-	killContainerResults := m.killContainersWithSyncResult(ctx, pod, runningPod, gracePeriodOverride)
+	killContainerResults := m.killContainersWithSyncResult(ctx, pod, runningPod, gracePeriodOverride, terminating)
 	for _, containerResult := range killContainerResults {
 		result.AddSyncResult(containerResult)
 	}

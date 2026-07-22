@@ -1043,6 +1043,19 @@ const (
 	// When enabled, the apiserver ignores changes to status fields in writes to the ServiceCIDR root resource.
 	ServiceCIDRStatusFieldWiping featuregate.Feature = "ServiceCIDRStatusFieldWiping"
 
+	// owner: @matthyx
+	// kep: https://kep.k8s.io/4438
+	//
+	// Restarts restartable init containers (sidecars) that exit during pod
+	// termination before their ordered termination turn has arrived, so they keep
+	// running for the duration of the pod's graceful shutdown, preserving the
+	// KEP-753 lifetime guarantee within the grace period. When the sidecar's turn
+	// arrives, the live instance is gracefully terminated in order.
+	// Alpha limitations: for a restarted instance, probes are not re-attached and
+	// pull secrets / image volumes are not re-resolved.
+	// Pods with terminationGracePeriodSeconds <= 1 are excluded.
+	SidecarsRestartableDuringPodTermination featuregate.Feature = "SidecarsRestartableDuringPodTermination"
+
 	// owner: @michaelasp
 	// kep: http://kep.k8s.io/5647
 	//
@@ -2016,6 +2029,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Deprecated},
 	},
 
+	SidecarsRestartableDuringPodTermination: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	StaleControllerConsistencyDaemonSet: {
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2682,6 +2699,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	ServiceAccountTokenPodNodeInfo: {},
 
 	ServiceCIDRStatusFieldWiping: {},
+
+	SidecarsRestartableDuringPodTermination: {},
 
 	StaleControllerConsistencyDaemonSet: {featuregate.Feature(clientfeatures.AtomicFIFO)},
 

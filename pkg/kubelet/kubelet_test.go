@@ -523,6 +523,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		kubelet.podLogsDirectory,
 		kubelet.machineInfo,
 		kubelet.podWorkers,
+		kubelet.podCache,
 		kubeCfg.MaxPods,
 		kubelet.os,
 		kubelet,
