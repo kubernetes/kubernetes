@@ -1685,7 +1685,7 @@ type Condition struct {
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Pattern=`^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$`
 	// +k8s:alpha(since: "1.37")=+k8s:required
-	// +k8s:alpha(since: "1.37")=+k8s:maxBytes=1024
+	// +k8s:alpha(since: "1.38")=+k8s:maxBytes=1024
 	Reason string `json:"reason" protobuf:"bytes,5,opt,name=reason"`
 	// message is a human readable message indicating details about the transition.
 	// This may be an empty string.
