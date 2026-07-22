@@ -97,6 +97,10 @@ type Allocator struct {
 	slicesShared   []*resourceapi.ResourceSlice
 	allSlices      []*resourceapi.ResourceSlice
 	celCache       *cel.Cache
+	// persistedShares holds the base device of every AllocatedSharedDeviceIDs
+	// entry. The set is cluster-wide and the membership test runs per candidate,
+	// so it is derived once here and nothing writes it after construction.
+	persistedShares sets.Set[DeviceID]
 	// availableCounters contains the available counters for each
 	// resource pool. It acts as a cache that is updated the first time
 	// the available counters are needed for each pool. The information
@@ -145,9 +149,14 @@ func NewAllocator(ctx context.Context,
 			slicesOnNode[nodeName] = append(slicesOnNode[nodeName], slice)
 		}
 	}
+	persistedShares := sets.New[DeviceID]()
+	for sharedDeviceID := range allocatedState.AllocatedSharedDeviceIDs {
+		persistedShares.Insert(sharedDeviceID.GetDeviceID())
+	}
 	a := &Allocator{
 		features:          features,
 		allocatedState:    allocatedState,
+		persistedShares:   persistedShares,
 		classLister:       classLister,
 		slicesOnNode:      slicesOnNode,
 		slicesShared:      slicesShared,
@@ -1592,6 +1601,13 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		alloc.logger.V(7).Info("Device in use", "device", device.id)
 		return false, nil, nil
 	}
+	// A device that is not allow-multiple must not be handed out dedicated while a
+	// persisted share of it is still live (e.g. after an allowMultipleAllocations
+	// true->false slice update). deviceInUse only tracks exclusive allocations.
+	if !request.adminAccess() && !allowMultipleAllocations && alloc.deviceCapacityInUse(device.id) {
+		alloc.logger.V(7).Info("Device has an active shared allocation, cannot be allocated exclusively", "device", device.id)
+		return false, nil, nil
+	}
 
 	if len(device.slice.Spec.SkipNodeOperations) > 0 {
 		if !alloc.features.OptionalNodeOperations {
@@ -1975,10 +1991,8 @@ func (alloc *allocator) deviceCapacityInUse(deviceID DeviceID) bool {
 	}
 	// A persisted allow-multiple allocation with no per-share capacity is recorded
 	// only in AllocatedSharedDeviceIDs (with no AggregatedCapacity entry).
-	for sharedDeviceID := range alloc.allocatedState.AllocatedSharedDeviceIDs {
-		if sharedDeviceID.GetDeviceID() == deviceID {
-			return true
-		}
+	if alloc.persistedShares.Has(deviceID) {
+		return true
 	}
 	return alloc.allocatingCapacityForAnyClaim(deviceID)
 }
