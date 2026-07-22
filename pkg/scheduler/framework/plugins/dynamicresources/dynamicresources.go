@@ -1078,6 +1078,13 @@ func (pl *DynamicResources) deallocatePodGroupClaims(ctx context.Context, state 
 	if err != nil {
 		return statusError(logger, err)
 	}
+	// Since this is part of the synchronous PodGroup scheduling cycle, we
+	// know that if the PodGroup is inactive, then it will stay inactive, so
+	// it is safe to deallocate its claims.
+	//
+	// If this state is not updated yet and says the PodGroup is active when
+	// it actually isn't, then a future scheduling cycle will eventually
+	// read the updated state and deallocate a claim.
 	if podGroupState.ScheduledPodsCount() > 0 {
 		return nil
 	}
@@ -1086,36 +1093,24 @@ func (pl *DynamicResources) deallocatePodGroupClaims(ctx context.Context, state 
 		return statusError(logger, err)
 	}
 
-	if pl.fts.EnableDRAWorkloadResourceClaims {
-		// Since this is part of the synchronous PodGroup scheduling cycle, we
-		// know that if the PodGroup is inactive, then it will stay inactive, so
-		// it is safe to deallocate its claims.
-		//
-		// If this state is not updated yet and says the PodGroup is active when
-		// it actually isn't, then a future scheduling cycle will eventually
-		// read the updated state and deallocate a claim.
-		podGroupInactive := podGroupState.ScheduledPodsCount() == 0
+	// Iterating over a map is random. This is intentional here, we want to
+	// pick one claim randomly because there is no better heuristic.
+	for claim := range state.unavailableClaims {
+		reservedForNobody := len(claim.Status.ReservedFor) == 0
+		reservedForOnlyThisPodGroup := podGroup != nil &&
+			len(claim.Status.ReservedFor) == 1 &&
+			claim.Status.ReservedFor[0].UID == podGroup.UID
 
-		// Iterating over a map is random. This is intentional here, we want to
-		// pick one claim randomly because there is no better heuristic.
-		for claim := range state.unavailableClaims {
-			reservedForNobody := len(claim.Status.ReservedFor) == 0
-			reservedForOnlyThisPodGroup := podGroup != nil &&
-				podGroupInactive &&
-				len(claim.Status.ReservedFor) == 1 &&
-				claim.Status.ReservedFor[0].UID == podGroup.UID
-
-			if reservedForNobody || reservedForOnlyThisPodGroup {
-				claim := claim.DeepCopy()
-				claim.Status.ReservedFor = nil
-				claim.Status.Allocation = nil
-				claim.Status.Devices = nil
-				logger.V(5).Info("Deallocation of PodGroup ResourceClaim", "pod", klog.KObj(pod), "podgroup", klog.KObj(podGroup), "resourceclaim", klog.KObj(claim))
-				if _, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
-					return statusError(logger, err)
-				}
-				return fwk.NewStatus(fwk.Unschedulable, "deallocation of PodGroup ResourceClaim completed")
+		if reservedForNobody || reservedForOnlyThisPodGroup {
+			claim := claim.DeepCopy()
+			claim.Status.ReservedFor = nil
+			claim.Status.Allocation = nil
+			claim.Status.Devices = nil
+			logger.V(5).Info("Deallocation of PodGroup ResourceClaim", "pod", klog.KObj(pod), "podgroup", klog.KObj(podGroup), "resourceclaim", klog.KObj(claim))
+			if _, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
+				return statusError(logger, err)
 			}
+			return fwk.NewStatus(fwk.Unschedulable, "deallocation of PodGroup ResourceClaim completed")
 		}
 	}
 
