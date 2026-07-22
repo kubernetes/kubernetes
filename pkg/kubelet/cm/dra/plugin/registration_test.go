@@ -222,7 +222,7 @@ func TestRegistrationHandler(t *testing.T) {
 			}
 
 			// The DRAPluginManager wipes all slices at startup.
-			draPlugins := NewDRAPluginManager(tCtx, client, getFakeNode, &mockStreamHandler{}, time.Second /* very short wiping delay for testing */)
+			draPlugins := NewDRAPluginManager(tCtx, client, getFakeNode, &mockStreamHandler{}, time.Second /* very short wiping delay for testing */, tmp)
 			tCtx.Cleanup(draPlugins.Stop)
 			if test.withClient {
 				requireNoSlices(tCtx)
@@ -309,13 +309,15 @@ func TestConnectionHandling(t *testing.T) {
 			client := getFakeClient(t, nodeName, driverName, slice)
 			tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
 
+			tmp := t.TempDir()
+
 			// The handler wipes all slices at startup.
-			draPlugins := NewDRAPluginManager(tCtx, client, getFakeNode, &mockStreamHandler{}, test.delay)
+			draPlugins := NewDRAPluginManager(tCtx, client, getFakeNode, &mockStreamHandler{}, test.delay, tmp)
 			tCtx.Cleanup(draPlugins.Stop)
 			requireNoSlices(tCtx)
 
 			// Run GRPC service.
-			endpoint := path.Join(t.TempDir(), "dra.sock")
+			endpoint := path.Join(tmp, "dra.sock")
 			teardown, err := setupFakeGRPCServer(tCtx, service, endpoint)
 			require.NoError(t, err)
 			defer teardown()

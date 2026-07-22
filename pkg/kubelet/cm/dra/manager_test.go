@@ -235,16 +235,11 @@ type fakeDRAServerInfo struct {
 	teardownFn tearDown
 }
 
-func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, pluginClientTimeout *time.Duration, prepareResourcesResponse *drapb.NodePrepareResourcesResponse, unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse, watchResourcesError error) (fakeDRAServerInfo, error) {
-	socketDir, err := os.MkdirTemp("", "dra")
-	if err != nil {
-		return fakeDRAServerInfo{
-			server:     nil,
-			socketName: "",
-			teardownFn: nil,
-		}, err
-	}
-
+// setupFakeDRADriverGRPCServer starts a fake DRA gRPC server. socketDir
+// must be an absolute directory that the caller owns cleanup for — pass
+// t.TempDir() so the socket lives under the same root the DRA manager is
+// constructed with (endpoint validation requires it).
+func setupFakeDRADriverGRPCServer(ctx context.Context, socketDir string, shouldTimeout bool, pluginClientTimeout *time.Duration, prepareResourcesResponse *drapb.NodePrepareResourcesResponse, unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse, watchResourcesError error) (fakeDRAServerInfo, error) {
 	socketName := filepath.Join(socketDir, "server.sock")
 	stopCh := make(chan struct{})
 
@@ -907,6 +902,7 @@ dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareRes
 		},
 		{
 			description:    "unknown driver",
+			driverName:     driverName,
 			pod:            genTestPod(),
 			claim:          genTestClaim(claimName, "unknown driver", deviceName, podUID),
 			expectedErrMsg: "prepare dynamic resources: DRA driver unknown driver is not registered",
@@ -1245,7 +1241,8 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 
 			backgroundCtx = klog.NewContext(backgroundCtx, tCtx.Logger())
 
-			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
+			rootDir := t.TempDir()
+			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, rootDir)
 			require.NoError(t, err, "create DRA manager")
 			defer manager.Stop()
 			manager.initDRAPluginManager(backgroundCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
@@ -1265,7 +1262,7 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 				pluginClientTimeout = &timeout
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(backgroundCtx, test.wantTimeout, pluginClientTimeout, test.resp, nil, nil)
+			draServerInfo, err := setupFakeDRADriverGRPCServer(backgroundCtx, rootDir, test.wantTimeout, pluginClientTimeout, test.resp, nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1332,7 +1329,8 @@ func TestPrepareResourcesWithPreparedAndNewClaim(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	fakeKubeClient := fake.NewClientset()
 
-	manager, err := NewManager(logger, fakeKubeClient, t.TempDir())
+	rootDir := t.TempDir()
+	manager, err := NewManager(logger, fakeKubeClient, rootDir)
 	require.NoError(t, err)
 	defer manager.Stop()
 	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second)
@@ -1359,7 +1357,7 @@ func TestPrepareResourcesWithPreparedAndNewClaim(t *testing.T) {
 	require.NoError(t, err)
 
 	respFirst := genPrepareResourcesResponse(firstClaim.UID)
-	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, false, nil, respFirst, nil, nil)
+	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, rootDir, false, nil, respFirst, nil, nil)
 	require.NoError(t, err)
 	defer draServerInfo.teardownFn()
 
@@ -1403,7 +1401,8 @@ func TestPrepareResourcesWithUnpreparingClaim(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	fakeKubeClient := fake.NewClientset()
 
-	manager, err := NewManager(logger, fakeKubeClient, t.TempDir())
+	rootDir := t.TempDir()
+	manager, err := NewManager(logger, fakeKubeClient, rootDir)
 	require.NoError(t, err)
 	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second)
 
@@ -1412,7 +1411,7 @@ func TestPrepareResourcesWithUnpreparingClaim(t *testing.T) {
 	_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, false, nil, genPrepareResourcesResponse(claim.UID), nil, nil)
+	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, rootDir, false, nil, genPrepareResourcesResponse(claim.UID), nil, nil)
 	require.NoError(t, err)
 	defer draServerInfo.teardownFn()
 
@@ -1669,13 +1668,14 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 				pluginClientTimeout = &timeout
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, nil, test.resp, nil)
+			rootDir := t.TempDir()
+			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, rootDir, test.wantTimeout, pluginClientTimeout, nil, test.resp, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer draServerInfo.teardownFn()
 
-			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
+			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, rootDir)
 			require.NoError(t, err, "create DRA manager")
 			defer manager.Stop()
 			manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
@@ -1856,7 +1856,8 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
 	// Setup and register fake DRA driver
-	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, false, nil, nil, nil, nil)
+	rootDir := t.TempDir()
+	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, rootDir, false, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1864,7 +1865,7 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 
 	// Create fake Kube client and DRA manager
 	fakeKubeClient := fake.NewSimpleClientset()
-	manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
+	manager, err := NewManager(tCtx.Logger(), fakeKubeClient, rootDir)
 	require.NoError(t, err, "create DRA manager")
 	defer manager.Stop()
 	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
