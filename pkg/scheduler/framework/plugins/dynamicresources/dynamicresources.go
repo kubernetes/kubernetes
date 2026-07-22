@@ -1172,6 +1172,11 @@ func (pl *DynamicResources) PodGroupPostFilter(
 		return nil, fwk.NewStatus(fwk.Unschedulable)
 	}
 
+	if pgInfo.GetType() == fwk.CompositePodGroupKeyType {
+		logger.V(5).Info("Nothing to do in DRA PodGroupPostFilter for CompositePodGroup", "podGroup", pgInfo.GetName())
+		return nil, fwk.NewStatus(fwk.Unschedulable)
+	}
+
 	if pl.fts.EnableTopologyAwareWorkloadScheduling && pgInfo.GetPodGroup() != nil && pgInfo.GetPodGroup().Spec.SchedulingConstraints != nil {
 		logger.V(5).Info("DRA PodGroupPostFilter is not supporting topology-aware workloads", "podGroup", pgInfo.GetName())
 		return nil, fwk.NewStatus(fwk.Unschedulable)
