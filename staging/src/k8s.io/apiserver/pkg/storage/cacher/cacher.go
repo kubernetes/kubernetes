@@ -689,6 +689,10 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 }
 
 func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+	ctx, span := tracing.Start(ctx, "cacher.Get",
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+		attribute.String("key", key),
+		attribute.String("resource-version", opts.ResourceVersion))
 	key, err := c.prepareKey(key, false)
 	if err != nil {
 		return err
@@ -707,6 +711,8 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	if err != nil {
 		return err
 	}
+	// Get long processing is >500ms, however wait for fresh cache timeout is 3s so want to avoid traces just showing waits.
+	defer span.End(500 * time.Millisecond)
 
 	if exists {
 		elem, ok := obj.(*store.Element)
@@ -1328,10 +1334,17 @@ func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, 
 		//
 		// In this very rare scenario, the worst case will be that this
 		// request will wait for 3 seconds before it fails.
+		span := tracing.SpanFromContext(ctx)
 		consistentReadSupported := delegator.ConsistentReadSupported()
 		c.watchCache.RLock()
+		span.AddEvent("watchCache locked acquired")
 		defer c.watchCache.RUnlock()
-		return c.watchCache.waitUntilFreshLocked(ctx, consistentReadSupported, requestedWatchRV)
+		err := c.watchCache.waitUntilFreshLocked(ctx, consistentReadSupported, requestedWatchRV)
+		if err != nil {
+			return err
+		}
+		span.AddEvent("watchCache fresh enough")
+		return nil
 	}
 	return nil
 }
@@ -1362,10 +1375,14 @@ func (c *Cacher) setInitialEventsEndBookmarkIfRequested(cacheInterval *watchCach
 }
 
 func (c *Cacher) getKeys(ctx context.Context) ([]string, error) {
+	ctx, span := tracing.Start(ctx, "cacher.getKeys",
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)))
+	defer span.End(500 * time.Millisecond)
 	rev, err := c.storage.GetCurrentResourceVersion(ctx)
 	if err != nil {
 		return nil, err
 	}
+	span.AddEvent("GetCurrentResourceVersion succeed", attribute.Int64("resource-version", int64(rev)))
 	return c.watchCache.WaitUntilFreshAndGetKeys(ctx, rev)
 }
 

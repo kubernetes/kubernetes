@@ -237,12 +237,21 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	if err != nil {
 		return err
 	}
+	ctx, span := tracing.Start(ctx, "Get etcd3",
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+		attribute.String("key", key),
+		attribute.String("group", s.groupResource.Group),
+		attribute.String("resource", s.groupResource.Resource),
+	)
+	defer span.End(500 * time.Millisecond)
 	startTime := time.Now()
 	getResp, err := s.client.Kubernetes.Get(ctx, preparedKey, kubernetes.GetOptions{})
 	metrics.RecordEtcdRequest("get", s.groupResource, err, startTime)
 	if err != nil {
+		span.AddEvent("Get call failed", attribute.String("err", err.Error()))
 		return err
 	}
+	span.AddEvent("Get call succeeded")
 	if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Revision)); err != nil {
 		return err
 	}
@@ -256,14 +265,18 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 
 	data, _, err := s.transformer.TransformFromStorage(ctx, getResp.KV.Value, authenticatedDataString(preparedKey))
 	if err != nil {
+		span.AddEvent("TransformFromStorage failed", attribute.String("err", err.Error()))
 		return storage.NewInternalError(err)
 	}
+	span.AddEvent("TransformFromStorage succeeded")
 
 	err = s.decoder.Decode(data, out, getResp.KV.ModRevision)
 	if err != nil {
+		span.AddEvent("Decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
 		recordDecodeError(s.groupResource, preparedKey)
 		return err
 	}
+	span.AddEvent("Decode succeeded", attribute.Int("len", len(data)))
 	return nil
 }
 
@@ -326,11 +339,11 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	if out != nil {
 		err = s.decoder.Decode(data, out, txnResp.Revision)
 		if err != nil {
-			span.AddEvent("decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
+			span.AddEvent("Decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
 			recordDecodeError(s.groupResource, preparedKey)
 			return err
 		}
-		span.AddEvent("decode succeeded", attribute.Int("len", len(data)))
+		span.AddEvent("Decode succeeded", attribute.Int("len", len(data)))
 	}
 	return nil
 }
@@ -614,11 +627,11 @@ func (s *store) GuaranteedUpdate(
 
 		err = s.decoder.Decode(data, destination, txnResp.Revision)
 		if err != nil {
-			span.AddEvent("decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
+			span.AddEvent("Decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
 			recordDecodeError(s.groupResource, preparedKey)
 			return err
 		}
-		span.AddEvent("decode succeeded", attribute.Int("len", len(data)))
+		span.AddEvent("Decode succeeded", attribute.Int("len", len(data)))
 		return nil
 	}
 }
