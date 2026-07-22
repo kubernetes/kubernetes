@@ -172,7 +172,7 @@ func TestConnCloseWhileReceivingDoesNotLogError(t *testing.T) {
 
 	s, addr := newServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		req = req.WithContext(klog.NewContext(req.Context(), logger))
-		conn.Open(w, req)
+		_, _, _ = conn.Open(w, req)
 	}))
 	defer s.Close()
 
@@ -180,7 +180,7 @@ func TestConnCloseWhileReceivingDoesNotLogError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	<-conn.ready
 
