@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -10319,3 +10320,91 @@ func TestPreQueueingHint_WildcardSkipsNarrowing(t *testing.T) {
 		t.Errorf("expected 0 pods in unschedulable after wildcard event, got %d", len(unschedPods))
 	}
 }
+
+// TestPreQueueingHint_PerPluginNarrowing verifies that when two plugins register PreQueueingHintFn,
+// each plugin's QueueingHintFn is only called for the pods its PreQueueingHintFn identified.
+func TestPreQueueingHint_PerPluginNarrowing(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.SchedulerPreQueueingHints: true,
+	})
+	logger, ctx := ktesting.NewTestContext(t)
+
+	var pluginAQueueingHintCalled []string
+	var pluginBQueueingHintCalled []string
+
+	m := makeEmptyQueueingHintMapPerProfile()
+	m[""][nodeAdd] = []*QueueingHintFunction{
+		{
+			PluginName: "pluginA",
+			QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+				pluginAQueueingHintCalled = append(pluginAQueueingHintCalled, pod.Name)
+				return fwk.Queue, nil
+			},
+			PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
+				return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{{Name: "pod1", Namespace: "ns1"}}}, nil
+			},
+		},
+		{
+			PluginName: "pluginB",
+			QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+				pluginBQueueingHintCalled = append(pluginBQueueingHintCalled, pod.Name)
+				return fwk.Queue, nil
+			},
+			PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
+				return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{{Name: "pod2", Namespace: "ns1"}}}, nil
+			},
+		},
+	}
+
+	q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m))
+
+	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()
+	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj()
+
+	for _, pod := range []*v1.Pod{pod1, pod2} {
+		q.Add(ctx, pod)
+		entity, err := q.Pop(logger)
+		if err != nil {
+			t.Fatalf("Pop failed: %v", err)
+		}
+		pInfo := entity.(*framework.QueuedPodInfo)
+		pInfo.UnschedulablePlugins = sets.New[string]("pluginA", "pluginB")
+		if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
+			t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
+		}
+	}
+
+	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, st.MakeNode().Name("node1").Obj(), nil)
+
+	// pluginA's QueueingHintFn should only be called for pod1.
+	if slices.Contains(pluginAQueueingHintCalled, "pod2") {
+		t.Errorf("pluginA QueueingHintFn should NOT be called for pod2, called for: %v", pluginAQueueingHintCalled)
+	}
+	if !slices.Contains(pluginAQueueingHintCalled, "pod1") {
+		t.Errorf("pluginA QueueingHintFn should be called for pod1, called for: %v", pluginAQueueingHintCalled)
+	}
+
+	// pluginB's QueueingHintFn should only be called for pod2.
+	if slices.Contains(pluginBQueueingHintCalled, "pod1") {
+		t.Errorf("pluginB QueueingHintFn should NOT be called for pod1, called for: %v", pluginBQueueingHintCalled)
+	}
+	if !slices.Contains(pluginBQueueingHintCalled, "pod2") {
+		t.Errorf("pluginB QueueingHintFn should be called for pod2, called for: %v", pluginBQueueingHintCalled)
+	}
+}
+
+/*
+Copyright 2017 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
