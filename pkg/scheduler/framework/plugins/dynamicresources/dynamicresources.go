@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
@@ -257,7 +258,7 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		// A new or updated node may make pods schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeAllocatable}},
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
-		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterClaimChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update | fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterClaimChange},
 		// Adding the ResourceClaim name to the pod status makes pods waiting for their ResourceClaim schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate},
 		// A pod might be waiting for a class to get created or modified.
@@ -283,15 +284,49 @@ func (pl *DynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status
 	return nil
 }
 
-// isSchedulableAfterClaimChange is invoked for add and update claim events reported by
+// isSchedulableAfterClaimChange is invoked for add/update/delete claim events reported by
 // an informer. It checks whether that change made a previously unschedulable
 // pod schedulable. It errs on the side of letting a pod scheduling attempt
-// happen. The delete claim event will not invoke it, so newObj will never be nil.
+// happen.
 func (pl *DynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	if newObj == nil {
+		if _, ok := (oldObj).(cache.DeletedFinalStateUnknown); ok {
+			// Normally we should have seen an update event where the allocation got removed.
+			// In that case, the deleted object will have no allocation and we could skip queuing. However,
+			// here we are told that the final state of the deleted ResourceClaim is unknown, so
+			// the content of the ResourceClaim is unknown. It might not even be available at all.
+			// We could have missed the updates which add and remove the allocation, so play it safe
+			// and check pending pods.
+			logger.V(6).Info("claim with structured parameters got deleted, final state unknown")
+			return fwk.Queue, nil
+		}
+	}
+
 	originalClaim, modifiedClaim, err := schedutil.As[*resourceapi.ResourceClaim](oldObj, newObj)
 	if err != nil {
 		// Shouldn't happen.
 		return fwk.Queue, fmt.Errorf("unexpected object in isSchedulableAfterClaimChange: %w", err)
+	}
+
+	if modifiedClaim == nil {
+		// ResourceClaim deleted, final state is known (checked above)
+		// In this case we expect the allocation to be nil, but checking is cheap,
+		// so let's make sure.
+		//
+		// Note that this relies on not missing the "allocation removed" update event.
+		// With normal informers, that could be missed because "allocation added"
+		// and "allocation removed" could be joined into a single update event
+		// which then looks like an unrelated change (allocation nil before and after).
+		// But we use an assume cache and should be the only entity which adds
+		// the allocation, so we are guaranteed to not miss the "allocation added"
+		// event and thus will also see the "allocation removed".
+		if originalClaim.Status.Allocation == nil {
+			logger.V(6).Info("claim with structured parameters got deleted, had no allocation")
+			return fwk.QueueSkip, nil
+		}
+		// This is unusual and should not happen in practice.
+		logger.V(6).Info("claim with structured parameters got deleted, had an allocation")
+		return fwk.Queue, nil
 	}
 
 	usesClaim := false
