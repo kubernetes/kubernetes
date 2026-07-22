@@ -24,10 +24,10 @@ import (
 )
 
 // TestInCluster_NotInClusterErrors documents the fail-closed contract: outside a
-// cluster the in-cluster REST config cannot be loaded, so InCluster returns an
-// error rather than a nil verifier. The heavy lifting (local discovery, local
-// JWKS, deferred audience) is exercised against oidc.NewLocalKeySetVerifier in
-// the oidc package; this only pins the thin client-go wiring.
+// cluster the in-cluster REST config cannot load, so InCluster errors rather than
+// returning a nil verifier. The heavy lifting is covered against
+// oidc.NewLocalKeySetVerifier in the oidc package; this pins the thin client-go
+// wiring.
 func TestInCluster_NotInClusterErrors(t *testing.T) {
 	// Force "not in cluster": rest.InClusterConfig requires these env vars.
 	t.Setenv("KUBERNETES_SERVICE_HOST", "")

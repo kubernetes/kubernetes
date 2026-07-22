@@ -70,10 +70,9 @@ func TestBearerToken_Table(t *testing.T) {
 	}
 }
 
-// TestWithTokenVerification_NilRequestBody proves fail-closed on a request with
-// no body at all (r.Body == nil): the adapter denies with a generic 401 and
-// never reaches the downstream handler, rather than treating an absent body as
-// an empty/core-group review.
+// TestWithTokenVerification_NilRequestBody proves fail-closed on a bodyless
+// request (r.Body == nil): a generic 401, downstream not reached, rather than
+// treating an absent body as an empty/core-group review.
 func TestWithTokenVerification_NilRequestBody(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
@@ -96,11 +95,10 @@ func TestWithTokenVerification_NilRequestBody(t *testing.T) {
 	assertNoLeak(t, rec.Body.String())
 }
 
-// TestWithTokenVerification_ValidJSONNoRequest proves fail-closed on a body that
-// is valid JSON and decodes into an AdmissionReview but carries no Request. The
-// adapter must not proceed with a nil Request (which would make the review's
-// resource group ambiguous); it denies with a generic 401 and skips downstream,
-// even with an otherwise-valid token authorized for the core group.
+// TestWithTokenVerification_ValidJSONNoRequest proves fail-closed on valid JSON
+// that decodes to an AdmissionReview with no Request: a nil Request (ambiguous
+// resource group) must not proceed — generic 401, downstream skipped, even with
+// a valid core-group-authorized token.
 func TestWithTokenVerification_ValidJSONNoRequest(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
@@ -124,9 +122,9 @@ func TestWithTokenVerification_ValidJSONNoRequest(t *testing.T) {
 }
 
 // TestWithTokenVerification_HugeBodyDefaultLimit proves the DEFAULT body guard
-// (not just a tiny custom limit) rejects an oversized body: a body larger than
-// the adapter's built-in maximum is denied with a generic 401 and never decoded
-// or forwarded, guarding against unbounded reads on the default configuration.
+// (not just a tiny custom limit) rejects an oversized body with a generic 401,
+// never decoding or forwarding it — guarding against unbounded reads out of the
+// box.
 func TestWithTokenVerification_HugeBodyDefaultLimit(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
@@ -185,10 +183,9 @@ type erroringBody struct{}
 func (erroringBody) Read([]byte) (int, error) { return 0, errors.New("connection reset") }
 func (erroringBody) Close() error             { return nil }
 
-// TestWithTokenVerification_BodyReadErrorFailsClosed proves the adapter fails
-// closed when the request body cannot be read to completion (a mid-transfer I/O
-// error): it denies with a generic 401 and never reaches the downstream handler,
-// rather than proceeding with a partially read or empty review.
+// TestWithTokenVerification_BodyReadErrorFailsClosed proves fail-closed on a
+// body that cannot be read to completion (mid-transfer I/O error): generic 401,
+// downstream not reached, never proceeding on a partial or empty review.
 func TestWithTokenVerification_BodyReadErrorFailsClosed(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
@@ -211,10 +208,9 @@ func TestWithTokenVerification_BodyReadErrorFailsClosed(t *testing.T) {
 	assertNoLeak(t, rec.Body.String())
 }
 
-// closeOnceBody wraps a body reader to prove single consumption: it counts Close
-// calls and refuses any Read after Close. If the adapter buffered-and-reset the
-// body to decode it twice, it would either read after close (error) or close
-// more than once — both of which this body records.
+// closeOnceBody proves single consumption: it counts Close calls and refuses any
+// Read after Close. A buffer-and-reset double decode would either read after
+// close or close twice — both recorded here.
 type closeOnceBody struct {
 	mu       sync.Mutex
 	r        *bytes.Reader
@@ -254,11 +250,10 @@ func (c *closeOnceBody) stats() (closes int, readAfterClose bool) {
 }
 
 // TestWithTokenVerification_DecodeOnce_BodyConsumedExactlyOnce hardens the
-// decode-once contract at the body level: the adapter must read the body a
-// single pass and Close it exactly once, and it must NOT read the body again
-// after closing it (which a buffer-and-reset double decode would require). A
-// counting/poisoned body records both, and the downstream still receives the
-// correctly decoded review.
+// decode-once contract at the body level: the adapter reads the body in a single
+// pass, Closes it exactly once, and never reads after Close (which a
+// buffer-and-reset double decode would require). The downstream still receives
+// the correctly decoded review.
 func TestWithTokenVerification_DecodeOnce_BodyConsumedExactlyOnce(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
@@ -306,11 +301,11 @@ func TestWithTokenVerification_DecodeOnce_BodyConsumedExactlyOnce(t *testing.T) 
 	}
 }
 
-// TestVerifyAdmissionRequest_ZeroDecode documents and asserts the structural
-// guarantee of the already-decoded entry point: VerifyAdmissionRequest operates
-// on the caller's decoded *AdmissionRequest and performs NO body read or JSON
-// decode of its own (there is no io.Reader in its signature). The controller-
-// runtime path therefore decodes exactly once — in the framework, never here.
+// TestVerifyAdmissionRequest_ZeroDecode asserts the already-decoded entry point's
+// structural guarantee: VerifyAdmissionRequest operates on the caller's decoded
+// *AdmissionRequest and performs NO body read or JSON decode (no io.Reader in its
+// signature), so the controller-runtime path decodes exactly once, in the
+// framework.
 func TestVerifyAdmissionRequest_ZeroDecode(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)

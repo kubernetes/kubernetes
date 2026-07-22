@@ -83,11 +83,9 @@ func TestAudienceForService(t *testing.T) {
 
 // TestAudienceForService_ServerParity asserts our derived Service audience is
 // byte-identical to kube-apiserver's validateWebhookAudience
-// (pkg/registry/core/serviceaccount/storage/token.go) for the same inputs. The
-// server defaults a nil/omitted port to 443 and a nil/empty path to "/", and
-// prepends a leading "/" to a path that lacks one. A divergence here would let a
-// legitimately-configured webhook deny-all on an audience mismatch, so this is a
-// tripwire kept in lockstep with the server's derivation.
+// (pkg/registry/core/serviceaccount/storage/token.go) for the same inputs. A
+// divergence would let a legitimately-configured webhook deny-all on an audience
+// mismatch, so this is a tripwire kept in lockstep with the server's derivation.
 func TestAudienceForService_ServerParity(t *testing.T) {
 	// serverAudience reproduces the server's path/port derivation verbatim (same
 	// format string) so a drift on either side is caught. pathSet models the

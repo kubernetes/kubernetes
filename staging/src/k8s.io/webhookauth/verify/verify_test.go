@@ -30,10 +30,10 @@ const testGroup = "apps"
 // decoding and should be rebuilt there. The removed policy cases (bound-object,
 // len>1 reject) do not apply. See kep-6060-review-2.2-actions.md.
 
-// fakeAuthenticator is a stand-in TokenAuthenticator returning a fixed set of
-// admissionReviewAPIGroups (or an error), so the policy layer is tested without crypto.
-// It knows its audience at construction, so BindAudience and HealthCheck are the
-// trivial always-ready implementations an out-of-cluster authenticator provides.
+// fakeAuthenticator is a stand-in TokenAuthenticator returning a fixed group set
+// (or an error), exercising the policy layer without crypto. Its audience is
+// known at construction, so BindAudience/HealthCheck are the trivial always-ready
+// implementations an out-of-cluster authenticator provides.
 type fakeAuthenticator struct {
 	groups []string
 	err    error

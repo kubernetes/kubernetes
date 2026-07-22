@@ -32,14 +32,11 @@ import (
 	"k8s.io/webhookauth/verify/oidc"
 )
 
-// rotatingOIDCServer is a TLS OIDC discovery + JWKS endpoint whose signing key
-// can be rotated at runtime. It lets the test prove the verifier picks up a
-// rotated key from the remote JWKS without reconstruction — go-oidc's remote key
-// set refetches the JWKS when it encounters a key id it has not cached.
-//
-// It is deliberately distinct from the fixed-key oidcTestServer in
-// oidc_test.go so neither helper has to grow mutable state it does not
-// need.
+// rotatingOIDCServer is a TLS OIDC discovery + JWKS endpoint whose signing key can
+// be rotated at runtime, proving the verifier picks up a rotated key without
+// reconstruction (go-oidc refetches the JWKS on an uncached key id). It is kept
+// distinct from the fixed-key oidcTestServer so neither helper grows mutable state
+// it does not need.
 type rotatingOIDCServer struct {
 	server *httptest.Server
 	issuer string
@@ -135,11 +132,10 @@ func (ts *rotatingOIDCServer) baseClaims() map[string]any {
 }
 
 // TestRemoteVerifier_KeyRotation proves the verifier tracks JWKS key rotation:
-// after the issuer rotates its signing key (new key id, published in the same
-// JWKS), a token signed by the NEW key still verifies through the SAME verifier
-// instance. go-oidc refetches the rotated JWKS on the unseen key id — no verifier
-// reconstruction is required, matching how an in-cluster webhook survives the
-// apiserver rotating its service-account signing keys.
+// after the issuer rotates its signing key (new key id, same JWKS), a token
+// signed by the NEW key still verifies through the SAME verifier — go-oidc
+// refetches on the unseen key id, no reconstruction, matching how an in-cluster
+// webhook survives the apiserver rotating its SA signing keys.
 func TestRemoteVerifier_KeyRotation(t *testing.T) {
 	ts := newRotatingOIDCServer(t)
 

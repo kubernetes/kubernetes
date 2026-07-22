@@ -14,13 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// The tests below exercise the admissionhttp adapter's BEHAVIOR — HTTP status
-// codes, whether the downstream handler is reached, body limits, and
-// fail-closed decoding — against REAL token verification. Verifiers are built
-// with oidc.NewRemoteVerifier over a httptest.NewTLSServer that serves an
-// OIDC discovery document and JWKS; tokens are real RS256 JWTs signed by that
-// server's key. There is no insecure path: the client reaches the server only
-// through its own cert pool. The secure production wiring is exercised verbatim.
+// The tests below exercise the admissionhttp adapter's BEHAVIOR — status codes,
+// downstream reachability, body limits, and fail-closed decoding — against REAL
+// token verification: verifiers built with oidc.NewRemoteVerifier over a httptest
+// TLS OIDC/JWKS endpoint, tokens real RS256 JWTs. No insecure path: the client
+// trusts only the server's own cert pool.
 package admissionhttp_test
 
 import (
@@ -64,11 +62,10 @@ const (
 	wildcardAPIGroup                 = "*"
 )
 
-// oidcTestServer is a httptest TLS server that serves an OIDC discovery document
-// and a JWKS holding a single locally generated RSA signing key. It lets the
-// adapter tests exercise the real production path (oidc.NewRemoteVerifier
-// → go-oidc discovery + signature/iss/aud/exp checks) with no insecure or
-// skip-verify option: callers reach it only through the server's own cert pool.
+// oidcTestServer is a httptest TLS server serving an OIDC discovery document and
+// a JWKS with a single locally generated RSA signing key, so the adapter tests
+// run the real production path (oidc.NewRemoteVerifier → go-oidc discovery +
+// signature/iss/aud/exp checks) with no skip-verify option.
 type oidcTestServer struct {
 	server *httptest.Server
 	issuer string
@@ -278,15 +275,12 @@ func newRequest(t *testing.T, body []byte, token string) *http.Request {
 	return r
 }
 
-// TestWithTokenVerification_EndToEnd exercises the adapter's full behavior: a
-// verifier built over a real TLS OIDC discovery/JWKS endpoint, the enforce-only
-// adapter, and a spy downstream AdmissionHandler. Each case asserts the HTTP
-// status, whether the downstream was reached, and that no response leaks claim
-// identifiers. There is no permissive mode: a missing token is a bare 401, a
-// verification failure is a 200 deny (Allowed:false), and the downstream is
-// never reached on failure. Signatures are real RS256 JWTs verified by
-// go-oidc; the deny reason is intentionally NOT observable at the HTTP boundary
-// (anti-enumeration), so it is asserted via the log-reason path elsewhere.
+// TestWithTokenVerification_EndToEnd exercises the adapter's full behavior over a
+// real TLS OIDC endpoint. Each case asserts the HTTP status, downstream
+// reachability, and that no response leaks claim identifiers. There is no
+// permissive mode: a missing token is a bare 401, a verification failure a 200
+// deny (Allowed:false), and the downstream is never reached on failure. The deny
+// reason is intentionally NOT observable at the HTTP boundary (anti-enumeration).
 func TestWithTokenVerification_EndToEnd(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
@@ -510,10 +504,9 @@ func TestWithTokenVerification_OverHTTPServer(t *testing.T) {
 }
 
 // TestWithTokenVerification_UndecodableBodyFailsClosed proves the adapter fails
-// closed: an undecodable AdmissionReview body does not default the review group
-// to the core group (""). The request is denied with a generic 401 and the
-// downstream handler is never reached, even when the presented token is
-// otherwise valid and authorized for the core group.
+// closed: an undecodable body is not defaulted to the core group (""). It is
+// denied with a generic 401 and never reaches the downstream, even when the
+// token is valid and authorized for the core group.
 func TestWithTokenVerification_UndecodableBodyFailsClosed(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	token := ts.sign(t, ts.coreGroupClaims())
@@ -535,10 +528,9 @@ func TestWithTokenVerification_UndecodableBodyFailsClosed(t *testing.T) {
 	assertNoLeak(t, rec.Body.String())
 }
 
-// TestWithTokenVerification_OverLimitBodyRejected proves the adapter keeps the
-// over-limit body guard: a body larger than the configured limit is rejected
-// with a generic 401 instead of decoding truncated bytes or reaching the
-// downstream handler.
+// TestWithTokenVerification_OverLimitBodyRejected proves the over-limit body
+// guard: a body larger than the configured limit is rejected with a generic 401,
+// never decoded truncated or forwarded downstream.
 func TestWithTokenVerification_OverLimitBodyRejected(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
@@ -564,11 +556,10 @@ func TestWithTokenVerification_OverLimitBodyRejected(t *testing.T) {
 	assertNoLeak(t, rec.Body.String())
 }
 
-// TestVerifyAdmissionRequest exercises the primary decoded-input entry point
-// that a caller (for example controller-runtime, whose Request embeds an
-// AdmissionRequest) uses after decoding the review once. It proves a correct
-// token verifies, an unauthorized group produces the single generic failure, and
-// a nil request fails closed.
+// TestVerifyAdmissionRequest exercises the decoded-input entry point a caller
+// (e.g. controller-runtime) uses after decoding the review once: a correct token
+// verifies, an unauthorized group yields the generic failure, a nil request
+// fails closed.
 func TestVerifyAdmissionRequest(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
@@ -654,11 +645,10 @@ func TestWithTokenVerification_InnerObjectGroupChecked(t *testing.T) {
 	})
 }
 
-// TestWithTokenVerification_InnerObjectGroupChecksBothObjects proves the
-// hardened D1.B defense: checkObjectGroup inspects BOTH req.Object and
-// req.OldObject, not just the first non-empty slot. On an UPDATE both are
-// populated, so a mismatched group hidden in the slot that used to be ignored
-// must still be denied.
+// TestWithTokenVerification_InnerObjectGroupChecksBothObjects proves the hardened
+// D1.B defense: checkObjectGroup inspects BOTH req.Object and req.OldObject, not
+// just the first non-empty slot. On an UPDATE both are populated, so a mismatched
+// group hidden in the previously-ignored slot must still be denied.
 func TestWithTokenVerification_InnerObjectGroupChecksBothObjects(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)

@@ -74,11 +74,10 @@ func TestEnsureAudience_BindsOnce(t *testing.T) {
 }
 
 // TestEnsureAudience_ResolverErrorIsFailClosed confirms a resolver error is
-// returned (so the request is denied) and nothing is bound. The failure is NOT
-// cached: because the resolver's inputs are per-request (the request Host is
-// attacker-influenceable), a failed attempt is retried on the next request
-// rather than permanently wedging the handler deny-all. A genuinely permanent
-// misconfiguration keeps failing every attempt and surfaces via HealthCheck.
+// returned (request denied) and nothing is bound. The failure is NOT cached:
+// resolver inputs are per-request (the Host is attacker-influenceable), so a
+// failed attempt is retried rather than permanently wedging the handler deny-all;
+// a permanent misconfiguration keeps failing and surfaces via HealthCheck.
 func TestEnsureAudience_ResolverErrorIsFailClosed(t *testing.T) {
 	spy := &bindSpy{}
 	calls := 0
@@ -105,10 +104,10 @@ func TestEnsureAudience_ResolverErrorIsFailClosed(t *testing.T) {
 }
 
 // TestEnsureAudience_RetriesAfterFailureThenBinds confirms a first request whose
-// resolve fails does NOT permanently wedge the handler: a subsequent request with
-// a resolvable audience binds successfully and is served. This is the fail-closed
-// DoS fix — an unverified caller with a bogus Host can no longer poison the bind
-// for the pod's lifetime (Edie review-3 blocker #1).
+// resolve fails does NOT permanently wedge the handler: a later request with a
+// resolvable audience binds and is served. The DoS fix — an unverified caller
+// with a bogus Host can no longer poison the bind for the pod's lifetime (Edie
+// review-3 blocker #1).
 func TestEnsureAudience_RetriesAfterFailureThenBinds(t *testing.T) {
 	spy := &bindSpy{}
 	fail := true
@@ -158,8 +157,8 @@ func TestEnsureAudience_NoResolverIsNoop(t *testing.T) {
 
 // TestEnsureAudience_NoResolverFailsClosedWhenNotReady confirms the out-of-cluster
 // path still fails closed: with no resolver, ensureAudience consults the backing
-// verifier's readiness and returns an error (denying the request) when the
-// verifier is not ready, so a not-ready verifier can never silently serve.
+// verifier's readiness and denies when not ready, so a not-ready verifier can
+// never silently serve.
 func TestEnsureAudience_NoResolverFailsClosedWhenNotReady(t *testing.T) {
 	spy := &bindSpy{healthErr: errors.New("verifier not ready")}
 	h := newSpyHandler(t, spy, nil)

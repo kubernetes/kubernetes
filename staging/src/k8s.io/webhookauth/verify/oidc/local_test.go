@@ -104,10 +104,10 @@ type localAPIServer struct {
 	wellKnown404 bool
 }
 
-// newLocalAPIServer stands up the double. By default the discovery issuer is the
-// server URL and its jwks_uri is a DECOY endpoint that serves a WRONG key, so any
-// test that verifies a real token proves keys came from the local /openid/v1/jwks
-// path and not from the advertised jwks_uri.
+// newLocalAPIServer stands up the double. By default the discovery jwks_uri is a
+// DECOY endpoint serving a WRONG key, so any test that verifies a real token
+// proves keys came from the local /openid/v1/jwks path, not the advertised
+// jwks_uri.
 func newLocalAPIServer(t *testing.T) *localAPIServer {
 	t.Helper()
 	priv, signer := genSigner(t)
@@ -167,10 +167,10 @@ func TestNewLocalKeySetVerifier_HappyPath(t *testing.T) {
 }
 
 // TestNewLocalKeySetVerifier_UsesLocalJWKSNotDiscoveryURI is the load-bearing
-// corner case: the discovery document's jwks_uri points at a decoy serving the
-// WRONG key, while the local /openid/v1/jwks serves the real key. Verification
-// must succeed, proving the verifier ignores jwks_uri and fetches keys from the
-// hardcoded local endpoint so the request never leaves the cluster network.
+// corner case: jwks_uri points at a decoy serving the WRONG key while the local
+// /openid/v1/jwks serves the real key. Verification must succeed, proving the
+// verifier ignores jwks_uri and reads the hardcoded local endpoint, so the
+// request never leaves the cluster network.
 func TestNewLocalKeySetVerifier_UsesLocalJWKSNotDiscoveryURI(t *testing.T) {
 	s := newLocalAPIServer(t)
 	// Make the decoy explicit and unreachable-looking; the local endpoint is what
@@ -256,9 +256,9 @@ func TestNewLocalKeySetVerifier_TrimsTrailingSlash(t *testing.T) {
 	}
 }
 
-// TestNewLocalKeySetVerifier_ConstructionErrors covers every way construction can
-// fail before a verifier exists: no URL, and discovery documents that are absent,
-// malformed, or missing the issuer. Each must error rather than build a verifier
+// TestNewLocalKeySetVerifier_ConstructionErrors covers each way construction can
+// fail before a verifier exists — no URL, and discovery documents that are
+// absent, malformed, or missing the issuer — each erroring rather than building
 // against an unknown issuer.
 func TestNewLocalKeySetVerifier_ConstructionErrors(t *testing.T) {
 	t.Run("empty apiServerURL", func(t *testing.T) {

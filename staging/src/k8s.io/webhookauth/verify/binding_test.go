@@ -21,10 +21,10 @@ import (
 	"testing"
 )
 
-// fakeBinder is a TokenAuthenticator that records BindAudience calls and reports
-// a configurable health, so the Verifier's direct delegation of BindAudience and
-// HealthCheck can be tested without crypto. It overrides the always-ready
-// implementations promoted from the embedded fakeAuthenticator.
+// fakeBinder is a TokenAuthenticator recording BindAudience calls and reporting a
+// configurable health, so the Verifier's direct delegation of BindAudience and
+// HealthCheck is tested without crypto. It overrides the always-ready methods
+// promoted from the embedded fakeAuthenticator.
 type fakeBinder struct {
 	fakeAuthenticator
 	bound     string
@@ -42,12 +42,11 @@ func (f *fakeBinder) BindAudience(audience string) error {
 
 func (f *fakeBinder) HealthCheck() error { return f.healthErr }
 
-// TestVerifier_BindAudience_NoopForFixedAudienceAuthenticator confirms that
-// BindAudience and HealthCheck on an authenticator whose audience is fixed at
-// construction (the out-of-cluster case, modelled by the plain fakeAuthenticator)
-// are no-ops that report ready, so out-of-cluster callers are unaffected. The
-// delegation is now direct (BindAudience/HealthCheck are part of
-// TokenAuthenticator), not an optional-interface type assertion.
+// TestVerifier_BindAudience_NoopForFixedAudienceAuthenticator confirms that on a
+// fixed-audience authenticator (the out-of-cluster case, modelled by the plain
+// fakeAuthenticator) BindAudience and HealthCheck are no-ops that report ready.
+// Delegation is direct (both are part of TokenAuthenticator), not an
+// optional-interface type assertion.
 func TestVerifier_BindAudience_NoopForFixedAudienceAuthenticator(t *testing.T) {
 	v := mustVerifier(t, fakeAuthenticator{groups: []string{testGroup}})
 	if err := v.BindAudience("https://webhook.example/validate"); err != nil {

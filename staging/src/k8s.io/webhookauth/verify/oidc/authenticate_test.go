@@ -25,13 +25,10 @@ import (
 )
 
 // TestRemoteVerifier_MalformedKubernetesClaims covers the private-claims decode
-// path in the authenticator: a token whose signature and standard claims
-// (iss/aud/exp) are perfectly valid — so go-oidc accepts it — but whose
-// "kubernetes.io" claim is NOT an object cannot be decoded into the webhook
-// private-claims struct. That failure must collapse into the single generic
-// ErrVerificationFailed like any other, never surfacing the decode detail to the
-// caller. This exercises the branch that a well-formed-but-hostile private claim
-// shape must be rejected generically.
+// path: a token whose signature and standard claims (iss/aud/exp) are valid — so
+// go-oidc accepts it — but whose "kubernetes.io" claim is not an object cannot
+// decode into the webhook private-claims struct. That failure must collapse into
+// the generic ErrVerificationFailed, never surfacing decode detail to the caller.
 func TestRemoteVerifier_MalformedKubernetesClaims(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.newVerifier(t)

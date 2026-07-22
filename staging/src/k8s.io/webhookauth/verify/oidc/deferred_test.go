@@ -24,15 +24,13 @@ import (
 )
 
 // TestLocalKeySetVerifier_BindsAudienceAndReportsHealth exercises the in-cluster
-// deferred verifier lifecycle via the public NewLocalKeySetVerifier constructor
-// against the local apiserver double: the key set is fetched at construction from
-// the local /openid/v1/jwks endpoint, but until an audience is bound the verifier
-// denies every token and reports unhealthy. Once bound, it verifies real tokens
-// and reports ready. Rebinding the same audience is a no-op; rebinding a different
-// audience is rejected so the frozen audience cannot be repointed.
+// deferred verifier lifecycle: until an audience is bound it denies every token
+// and reports unhealthy; once bound it verifies real tokens and reports ready.
+// Rebinding the same audience is a no-op; a different audience is rejected so the
+// frozen audience cannot be repointed.
 //
-// The happy path and deferred-until-bind behavior are also covered by
-// TestNewLocalKeySetVerifier_* in local_test.go; this test additionally pins the
+// The happy path and deferred-until-bind cases are also in
+// TestNewLocalKeySetVerifier_* (local_test.go); this test additionally pins
 // rebind idempotency and conflicting-rebind rejection.
 func TestLocalKeySetVerifier_BindsAudienceAndReportsHealth(t *testing.T) {
 	s := newLocalAPIServer(t)

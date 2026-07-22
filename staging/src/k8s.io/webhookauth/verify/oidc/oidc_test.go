@@ -58,9 +58,9 @@ type oidcTestServer struct {
 }
 
 // newOIDCTestServer stands up a TLS server serving discovery + JWKS for a fresh
-// RSA key. The returned server's issuer equals the server URL, so go-oidc's
-// discovery issuer-match check passes without any skip. TLS is exercised for
-// real: callers reach it only through the server's own cert pool.
+// RSA key. Its issuer equals the server URL, so go-oidc's discovery issuer-match
+// passes without any skip; TLS is real — callers reach it only through the
+// server's own cert pool.
 func newOIDCTestServer(t *testing.T) *oidcTestServer {
 	t.Helper()
 
@@ -167,13 +167,10 @@ func (ts *oidcTestServer) newVerifier(t *testing.T) *verify.Verifier {
 }
 
 // TestRemoteVerifier_EndToEnd exercises the full round trip: OIDC discovery over
-// TLS, JWKS fetch, real RS256 signature verification and go-oidc's iss/aud/exp
-// checks, and the KEP-6060 claim policy layered on top by the core Verifier.
-//
-// Every sad path is asserted to collapse into the single generic
-// ErrVerificationFailed (anti-enumeration): go-oidc's descriptive typed errors
-// (expired, wrong key, wrong issuer, wrong audience) must never surface a
-// distinguishable error to the caller.
+// TLS, JWKS fetch, real RS256 signature + iss/aud/exp checks, and the KEP-6060
+// claim policy layered on by the core Verifier. Every sad path must collapse into
+// the single generic ErrVerificationFailed (anti-enumeration) — go-oidc's typed
+// errors (expired, wrong key/issuer/audience) never surface distinguishably.
 func TestRemoteVerifier_EndToEnd(t *testing.T) {
 	ts := newOIDCTestServer(t)
 

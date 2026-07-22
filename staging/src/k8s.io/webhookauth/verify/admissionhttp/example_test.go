@@ -275,18 +275,15 @@ func TestExampleEndToEnd_MinimalWebhook(t *testing.T) {
 }
 
 // TestExampleEndToEnd_InClusterDeferredWebhook is the in-cluster counterpart to
-// TestExampleEndToEnd_MinimalWebhook. It proves the zero-config in-cluster path
-// end-to-end: a DEFERRED verifier — built from the apiserver's local discovery
-// and JWKS, with the audience UNKNOWN at startup — is wired behind the HTTP
-// handler together with InClusterAudienceResolver. The handler derives and binds
-// the expected audience from the FIRST request, then verifies the token; this is
-// the deferred-construction path that carries the in-cluster messiness. Readiness
-// flips from not-ready to ready across that first request, and a later
-// unauthenticated request is denied fail-closed.
+// TestExampleEndToEnd_MinimalWebhook, proving the zero-config path end-to-end: a
+// DEFERRED verifier (local discovery + JWKS, audience UNKNOWN at startup) wired
+// behind the handler with InClusterAudienceResolver. The handler binds the
+// audience from the FIRST request, then verifies; readiness flips not-ready →
+// ready across it, and a later unauthenticated request is denied fail-closed.
 //
-// This mirrors incluster.InCluster, which only adds rest.InClusterConfig on top
-// of oidc.NewLocalKeySetVerifier; here the apiserver is a throwaway TLS double so
-// the test runs offline with no real cluster and verifies REAL signatures.
+// This mirrors incluster.InCluster (which only adds rest.InClusterConfig on top
+// of oidc.NewLocalKeySetVerifier); here the apiserver is a throwaway TLS double,
+// so the test runs offline and verifies REAL signatures.
 func TestExampleEndToEnd_InClusterDeferredWebhook(t *testing.T) {
 	ts := newOIDCTestServer(t)
 
