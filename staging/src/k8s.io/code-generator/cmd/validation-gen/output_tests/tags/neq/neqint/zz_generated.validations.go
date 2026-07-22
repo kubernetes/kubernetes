@@ -63,7 +63,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.IntField
+	{ // field Struct.IntField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -87,7 +87,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("intField"), &obj.IntField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.IntPtrField
+	{ // field Struct.IntPtrField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -99,6 +99,13 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			if e := validate.NEQ(ctx, op, fldPath, obj, oldObj, -1); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -111,7 +118,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("intPtrField"), obj.IntPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.IntTypedefField
+	{ // field Struct.IntTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/neq/neqint.IntType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *IntType,
@@ -135,7 +142,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("intTypedefField"), &obj.IntTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ValidatedTypedefField
+	{ // field Struct.ValidatedTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/neq/neqint.ValidatedIntType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *ValidatedIntType,

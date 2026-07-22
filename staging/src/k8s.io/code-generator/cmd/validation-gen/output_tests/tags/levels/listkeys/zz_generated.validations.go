@@ -64,7 +64,7 @@ func Validate_ListKeyStruct(
 
 	// field ListKeyStruct.TypeMeta has no validation
 
-	{ // field ListKeyStruct.AlphaListTypeStandardKey
+	{ // field ListKeyStruct.AlphaListTypeStandardKey ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listkeys.MapItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MapItem,
@@ -90,7 +90,7 @@ func Validate_ListKeyStruct(
 		errs = append(errs, fn(fldPath.Child("alphaListTypeStandardKey"), obj.AlphaListTypeStandardKey, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListKeyStruct.StandardListTypeAlphaKey
+	{ // field ListKeyStruct.StandardListTypeAlphaKey ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listkeys.MapItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MapItem,
@@ -116,7 +116,7 @@ func Validate_ListKeyStruct(
 		errs = append(errs, fn(fldPath.Child("standardListTypeAlphaKey"), obj.StandardListTypeAlphaKey, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListKeyStruct.AlphaListTypeAlphaKey
+	{ // field ListKeyStruct.AlphaListTypeAlphaKey ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listkeys.MapItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MapItem,
@@ -142,7 +142,7 @@ func Validate_ListKeyStruct(
 		errs = append(errs, fn(fldPath.Child("alphaListTypeAlphaKey"), obj.AlphaListTypeAlphaKey, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListKeyStruct.StandardListTypeMixedKeys1
+	{ // field ListKeyStruct.StandardListTypeMixedKeys1 ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listkeys.MultiKeyItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MultiKeyItem,
@@ -168,7 +168,7 @@ func Validate_ListKeyStruct(
 		errs = append(errs, fn(fldPath.Child("standardListTypeMixedKeys1"), obj.StandardListTypeMixedKeys1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListKeyStruct.StandardListTypeMixedKeys2
+	{ // field ListKeyStruct.StandardListTypeMixedKeys2 ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listkeys.MultiKeyItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MultiKeyItem,
@@ -194,7 +194,7 @@ func Validate_ListKeyStruct(
 		errs = append(errs, fn(fldPath.Child("standardListTypeMixedKeys2"), obj.StandardListTypeMixedKeys2, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListKeyStruct.AlphaListTypeMixedKeys1
+	{ // field ListKeyStruct.AlphaListTypeMixedKeys1 ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listkeys.MultiKeyItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MultiKeyItem,
@@ -220,7 +220,7 @@ func Validate_ListKeyStruct(
 		errs = append(errs, fn(fldPath.Child("alphaListTypeMixedKeys1"), obj.AlphaListTypeMixedKeys1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListKeyStruct.AlphaListTypeMixedKeys2
+	{ // field ListKeyStruct.AlphaListTypeMixedKeys2 ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listkeys.MultiKeyItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MultiKeyItem,
@@ -246,7 +246,7 @@ func Validate_ListKeyStruct(
 		errs = append(errs, fn(fldPath.Child("alphaListTypeMixedKeys2"), obj.AlphaListTypeMixedKeys2, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListKeyStruct.StandardListTypeMixedKeysBeta1
+	{ // field ListKeyStruct.StandardListTypeMixedKeysBeta1 ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listkeys.MultiKeyItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MultiKeyItem,
@@ -272,7 +272,7 @@ func Validate_ListKeyStruct(
 		errs = append(errs, fn(fldPath.Child("standardListTypeMixedKeysBeta1"), obj.StandardListTypeMixedKeysBeta1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListKeyStruct.StandardListTypeMixedKeysBeta2
+	{ // field ListKeyStruct.StandardListTypeMixedKeysBeta2 ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listkeys.MultiKeyItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MultiKeyItem,
@@ -298,7 +298,7 @@ func Validate_ListKeyStruct(
 		errs = append(errs, fn(fldPath.Child("standardListTypeMixedKeysBeta2"), obj.StandardListTypeMixedKeysBeta2, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListKeyStruct.BetaListTypeMixedKeys1
+	{ // field ListKeyStruct.BetaListTypeMixedKeys1 ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listkeys.MultiKeyItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MultiKeyItem,
@@ -324,7 +324,7 @@ func Validate_ListKeyStruct(
 		errs = append(errs, fn(fldPath.Child("betaListTypeMixedKeys1"), obj.BetaListTypeMixedKeys1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListKeyStruct.BetaListTypeMixedKeys2
+	{ // field ListKeyStruct.BetaListTypeMixedKeys2 ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listkeys.MultiKeyItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MultiKeyItem,
@@ -350,7 +350,7 @@ func Validate_ListKeyStruct(
 		errs = append(errs, fn(fldPath.Child("betaListTypeMixedKeys2"), obj.BetaListTypeMixedKeys2, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListKeyStruct.BetaListTypeStandardKey
+	{ // field ListKeyStruct.BetaListTypeStandardKey ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listkeys.MapItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MapItem,
@@ -376,7 +376,7 @@ func Validate_ListKeyStruct(
 		errs = append(errs, fn(fldPath.Child("betaListTypeStandardKey"), obj.BetaListTypeStandardKey, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListKeyStruct.StandardListTypeBetaKey
+	{ // field ListKeyStruct.StandardListTypeBetaKey ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listkeys.MapItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MapItem,
@@ -402,7 +402,7 @@ func Validate_ListKeyStruct(
 		errs = append(errs, fn(fldPath.Child("standardListTypeBetaKey"), obj.StandardListTypeBetaKey, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListKeyStruct.BetaListTypeBetaKey
+	{ // field ListKeyStruct.BetaListTypeBetaKey ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listkeys.MapItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MapItem,

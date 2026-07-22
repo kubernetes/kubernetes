@@ -64,7 +64,7 @@ func Validate_ListMapItemStruct(
 
 	// field ListMapItemStruct.TypeMeta has no validation
 
-	{ // field ListMapItemStruct.StandardItem
+	{ // field ListMapItemStruct.StandardItem ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listmapitem.MapItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MapItem,
@@ -86,7 +86,12 @@ func Validate_ListMapItemStruct(
 					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-							func(o *MapItem) *int { return &o.Value }, validate.DirectEqual,
+							func(o *MapItem) *int {
+								if o == nil {
+									return nil
+								}
+								return &o.Value
+							}, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
 							})
@@ -103,7 +108,7 @@ func Validate_ListMapItemStruct(
 		errs = append(errs, fn(fldPath.Child("standardItem"), obj.StandardItem, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListMapItemStruct.AlphaItemTag
+	{ // field ListMapItemStruct.AlphaItemTag ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listmapitem.MapItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MapItem,
@@ -125,7 +130,12 @@ func Validate_ListMapItemStruct(
 					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-							func(o *MapItem) *int { return &o.Value }, validate.DirectEqual,
+							func(o *MapItem) *int {
+								if o == nil {
+									return nil
+								}
+								return &o.Value
+							}, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
 							})
@@ -142,7 +152,7 @@ func Validate_ListMapItemStruct(
 		errs = append(errs, fn(fldPath.Child("alphaItemTag"), obj.AlphaItemTag, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListMapItemStruct.AlphaValidation
+	{ // field ListMapItemStruct.AlphaValidation ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listmapitem.MapItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MapItem,
@@ -164,7 +174,12 @@ func Validate_ListMapItemStruct(
 					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-							func(o *MapItem) *int { return &o.Value }, validate.DirectEqual,
+							func(o *MapItem) *int {
+								if o == nil {
+									return nil
+								}
+								return &o.Value
+							}, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()
 							})
@@ -181,7 +196,7 @@ func Validate_ListMapItemStruct(
 		errs = append(errs, fn(fldPath.Child("alphaValidation"), obj.AlphaValidation, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListMapItemStruct.DoubleAlpha
+	{ // field ListMapItemStruct.DoubleAlpha ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listmapitem.MapItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MapItem,
@@ -203,7 +218,12 @@ func Validate_ListMapItemStruct(
 					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-							func(o *MapItem) *int { return &o.Value }, validate.DirectEqual,
+							func(o *MapItem) *int {
+								if o == nil {
+									return nil
+								}
+								return &o.Value
+							}, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()
 							})
@@ -220,7 +240,7 @@ func Validate_ListMapItemStruct(
 		errs = append(errs, fn(fldPath.Child("doubleAlpha"), obj.DoubleAlpha, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListMapItemStruct.BetaItemTag
+	{ // field ListMapItemStruct.BetaItemTag ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listmapitem.MapItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MapItem,
@@ -242,7 +262,12 @@ func Validate_ListMapItemStruct(
 					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-							func(o *MapItem) *int { return &o.Value }, validate.DirectEqual,
+							func(o *MapItem) *int {
+								if o == nil {
+									return nil
+								}
+								return &o.Value
+							}, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
 							})
@@ -259,7 +284,7 @@ func Validate_ListMapItemStruct(
 		errs = append(errs, fn(fldPath.Child("betaItemTag"), obj.BetaItemTag, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListMapItemStruct.BetaValidation
+	{ // field ListMapItemStruct.BetaValidation ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listmapitem.MapItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MapItem,
@@ -281,7 +306,12 @@ func Validate_ListMapItemStruct(
 					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-							func(o *MapItem) *int { return &o.Value }, validate.DirectEqual,
+							func(o *MapItem) *int {
+								if o == nil {
+									return nil
+								}
+								return &o.Value
+							}, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkBeta()
 							})
@@ -298,7 +328,7 @@ func Validate_ListMapItemStruct(
 		errs = append(errs, fn(fldPath.Child("betaValidation"), obj.BetaValidation, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListMapItemStruct.DoubleBeta
+	{ // field ListMapItemStruct.DoubleBeta ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listmapitem.MapItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MapItem,
@@ -320,7 +350,12 @@ func Validate_ListMapItemStruct(
 					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-							func(o *MapItem) *int { return &o.Value }, validate.DirectEqual,
+							func(o *MapItem) *int {
+								if o == nil {
+									return nil
+								}
+								return &o.Value
+							}, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkBeta()
 							})

@@ -44,6 +44,11 @@ const (
 
 // UpdateValueByCompare verifies update constraints for comparable value types.
 func UpdateValueByCompare[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T, constraints ...UpdateConstraint) field.ErrorList {
+	if value == nil {
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("update")}
+	}
+
 	// nil oldValue means no prior value to compare against (eg: a new item at +k8s:eachVal scope) -> no transition to check.
 	if op.Type != operation.Update || oldValue == nil {
 		return nil

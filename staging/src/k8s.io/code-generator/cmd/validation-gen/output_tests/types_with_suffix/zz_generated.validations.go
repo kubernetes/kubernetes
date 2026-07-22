@@ -89,7 +89,7 @@ func Validate_StructRequest(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *StructRequest) (errs field.ErrorList) {
 
-	{ // field StructRequest.S
+	{ // field StructRequest.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -113,7 +113,7 @@ func Validate_StructRequest(
 		errs = append(errs, fn(fldPath.Child("s"), &obj.S, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructRequest.T2
+	{ // field StructRequest.T2 (k8s.io/code-generator/cmd/validation-gen/output_tests/types_with_suffix.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *T2,
@@ -149,7 +149,7 @@ func Validate_T2(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T2) (errs field.ErrorList) {
 
-	{ // field T2.I
+	{ // field T2.I (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,

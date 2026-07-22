@@ -42,6 +42,10 @@ func Subfield[Tstruct any, Tfield any](
 	equiv MatchFunc[Tfield],
 	validator ValidateFunc[Tfield],
 ) field.ErrorList {
+	if newStruct == nil {
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "")}
+	}
 	var errs field.ErrorList
 	newVal := getField(newStruct)
 	var oldVal Tfield

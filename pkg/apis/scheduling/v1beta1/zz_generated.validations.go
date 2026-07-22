@@ -1818,9 +1818,9 @@ func Validate_PriorityClass(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *schedulingv1beta1.PriorityClass) (errs field.ErrorList) {
 
-	// field schedulingv1beta1.PriorityClass.TypeMeta has no validation
+	// field PriorityClass.TypeMeta has no validation
 
-	{ // field schedulingv1beta1.PriorityClass.ObjectMeta
+	{ // field PriorityClass.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -1842,10 +1842,10 @@ func Validate_PriorityClass(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field schedulingv1beta1.PriorityClass.Value has no validation
-	// field schedulingv1beta1.PriorityClass.GlobalDefault has no validation
-	// field schedulingv1beta1.PriorityClass.Description has no validation
-	// field schedulingv1beta1.PriorityClass.PreemptionPolicy has no validation
+	// field PriorityClass.Value has no validation
+	// field PriorityClass.GlobalDefault has no validation
+	// field PriorityClass.Description has no validation
+	// field PriorityClass.PreemptionPolicy has no validation
 	return errs
 }
 

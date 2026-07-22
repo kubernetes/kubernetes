@@ -63,7 +63,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.StringField
+	{ // field Struct.StringField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -78,7 +78,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringField"), &obj.StringField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StringPtrField
+	{ // field Struct.StringPtrField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -108,7 +108,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringPtrField"), obj.StringPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.IntField
+	{ // field Struct.IntField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -123,7 +123,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("intField"), &obj.IntField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.IntPtrField
+	{ // field Struct.IntPtrField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -153,7 +153,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("intPtrField"), obj.IntPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.BoolField
+	{ // field Struct.BoolField (bool)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *bool,
@@ -168,7 +168,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("boolField"), &obj.BoolField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.BoolPtrField
+	{ // field Struct.BoolPtrField (bool)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *bool,

@@ -65,9 +65,9 @@ func Validate_ClusterTrustBundle(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *certificatesv1alpha1.ClusterTrustBundle) (errs field.ErrorList) {
 
-	// field certificatesv1alpha1.ClusterTrustBundle.TypeMeta has no validation
+	// field ClusterTrustBundle.TypeMeta has no validation
 
-	{ // field certificatesv1alpha1.ClusterTrustBundle.ObjectMeta
+	{ // field ClusterTrustBundle.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -89,7 +89,7 @@ func Validate_ClusterTrustBundle(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field certificatesv1alpha1.ClusterTrustBundle.Spec
+	{ // field ClusterTrustBundle.Spec (k8s.io/api/certificates/v1alpha1.ClusterTrustBundleSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *certificatesv1alpha1.ClusterTrustBundleSpec,
@@ -120,7 +120,7 @@ func Validate_ClusterTrustBundleSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *certificatesv1alpha1.ClusterTrustBundleSpec) (errs field.ErrorList) {
 
-	{ // field certificatesv1alpha1.ClusterTrustBundleSpec.SignerName
+	{ // field ClusterTrustBundleSpec.SignerName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -152,6 +152,6 @@ func Validate_ClusterTrustBundleSpec(
 		errs = append(errs, fn(fldPath.Child("signerName"), &obj.SignerName, oldVal, oldObj != nil)...)
 	}
 
-	// field certificatesv1alpha1.ClusterTrustBundleSpec.TrustBundle has no validation
+	// field ClusterTrustBundleSpec.TrustBundle has no validation
 	return errs
 }

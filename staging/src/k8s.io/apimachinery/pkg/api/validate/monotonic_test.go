@@ -75,6 +75,9 @@ func testMonotonicPositive[T constraints.Integer](t *testing.T) {
 		op:       operation.Operation{Type: operation.Update},
 		value:    nil,
 		oldValue: &v1,
+		wantErrs: field.ErrorList{
+			field.Required(field.NewPath("fldpath"), "").WithOrigin("monotonic"),
+		},
 	}, {
 		name:     "update nil old value",
 		op:       operation.Operation{Type: operation.Update},

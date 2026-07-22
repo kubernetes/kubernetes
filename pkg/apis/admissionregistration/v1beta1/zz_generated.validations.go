@@ -140,9 +140,9 @@ func Validate_MutatingAdmissionPolicy(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *admissionregistrationv1beta1.MutatingAdmissionPolicy) (errs field.ErrorList) {
 
-	// field admissionregistrationv1beta1.MutatingAdmissionPolicy.TypeMeta has no validation
+	// field MutatingAdmissionPolicy.TypeMeta has no validation
 
-	{ // field admissionregistrationv1beta1.MutatingAdmissionPolicy.ObjectMeta
+	{ // field MutatingAdmissionPolicy.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -164,7 +164,7 @@ func Validate_MutatingAdmissionPolicy(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field admissionregistrationv1beta1.MutatingAdmissionPolicy.Spec has no validation
+	// field MutatingAdmissionPolicy.Spec has no validation
 	return errs
 }
 
@@ -174,9 +174,9 @@ func Validate_MutatingAdmissionPolicyBinding(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *admissionregistrationv1beta1.MutatingAdmissionPolicyBinding) (errs field.ErrorList) {
 
-	// field admissionregistrationv1beta1.MutatingAdmissionPolicyBinding.TypeMeta has no validation
+	// field MutatingAdmissionPolicyBinding.TypeMeta has no validation
 
-	{ // field admissionregistrationv1beta1.MutatingAdmissionPolicyBinding.ObjectMeta
+	{ // field MutatingAdmissionPolicyBinding.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -198,7 +198,7 @@ func Validate_MutatingAdmissionPolicyBinding(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field admissionregistrationv1beta1.MutatingAdmissionPolicyBinding.Spec has no validation
+	// field MutatingAdmissionPolicyBinding.Spec has no validation
 	return errs
 }
 
@@ -208,9 +208,9 @@ func Validate_MutatingWebhookConfiguration(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *admissionregistrationv1beta1.MutatingWebhookConfiguration) (errs field.ErrorList) {
 
-	// field admissionregistrationv1beta1.MutatingWebhookConfiguration.TypeMeta has no validation
+	// field MutatingWebhookConfiguration.TypeMeta has no validation
 
-	{ // field admissionregistrationv1beta1.MutatingWebhookConfiguration.ObjectMeta
+	{ // field MutatingWebhookConfiguration.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -232,7 +232,7 @@ func Validate_MutatingWebhookConfiguration(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field admissionregistrationv1beta1.MutatingWebhookConfiguration.Webhooks has no validation
+	// field MutatingWebhookConfiguration.Webhooks has no validation
 	return errs
 }
 
@@ -242,9 +242,9 @@ func Validate_ValidatingAdmissionPolicy(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *admissionregistrationv1beta1.ValidatingAdmissionPolicy) (errs field.ErrorList) {
 
-	// field admissionregistrationv1beta1.ValidatingAdmissionPolicy.TypeMeta has no validation
+	// field ValidatingAdmissionPolicy.TypeMeta has no validation
 
-	{ // field admissionregistrationv1beta1.ValidatingAdmissionPolicy.ObjectMeta
+	{ // field ValidatingAdmissionPolicy.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -266,9 +266,9 @@ func Validate_ValidatingAdmissionPolicy(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field admissionregistrationv1beta1.ValidatingAdmissionPolicy.Spec has no validation
+	// field ValidatingAdmissionPolicy.Spec has no validation
 
-	{ // field admissionregistrationv1beta1.ValidatingAdmissionPolicy.Status
+	{ // field ValidatingAdmissionPolicy.Status (k8s.io/api/admissionregistration/v1beta1.ValidatingAdmissionPolicyStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *admissionregistrationv1beta1.ValidatingAdmissionPolicyStatus,
@@ -299,9 +299,9 @@ func Validate_ValidatingAdmissionPolicyBinding(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding) (errs field.ErrorList) {
 
-	// field admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding.TypeMeta has no validation
+	// field ValidatingAdmissionPolicyBinding.TypeMeta has no validation
 
-	{ // field admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding.ObjectMeta
+	{ // field ValidatingAdmissionPolicyBinding.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -323,7 +323,7 @@ func Validate_ValidatingAdmissionPolicyBinding(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding.Spec
+	{ // field ValidatingAdmissionPolicyBinding.Spec (k8s.io/api/admissionregistration/v1beta1.ValidatingAdmissionPolicyBindingSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingSpec,
@@ -354,7 +354,7 @@ func Validate_ValidatingAdmissionPolicyBindingSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingSpec) (errs field.ErrorList) {
 
-	{ // field admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingSpec.PolicyName
+	{ // field ValidatingAdmissionPolicyBindingSpec.PolicyName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -383,10 +383,10 @@ func Validate_ValidatingAdmissionPolicyBindingSpec(
 		errs = append(errs, fn(fldPath.Child("policyName"), &obj.PolicyName, oldVal, oldObj != nil)...)
 	}
 
-	// field admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingSpec.ParamRef has no validation
-	// field admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingSpec.MatchResources has no validation
+	// field ValidatingAdmissionPolicyBindingSpec.ParamRef has no validation
+	// field ValidatingAdmissionPolicyBindingSpec.MatchResources has no validation
 
-	{ // field admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingSpec.ValidationActions
+	{ // field ValidatingAdmissionPolicyBindingSpec.ValidationActions ([]k8s.io/api/admissionregistration/v1beta1.ValidationAction)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []admissionregistrationv1beta1.ValidationAction,
@@ -424,10 +424,10 @@ func Validate_ValidatingAdmissionPolicyStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *admissionregistrationv1beta1.ValidatingAdmissionPolicyStatus) (errs field.ErrorList) {
 
-	// field admissionregistrationv1beta1.ValidatingAdmissionPolicyStatus.ObservedGeneration has no validation
-	// field admissionregistrationv1beta1.ValidatingAdmissionPolicyStatus.TypeChecking has no validation
+	// field ValidatingAdmissionPolicyStatus.ObservedGeneration has no validation
+	// field ValidatingAdmissionPolicyStatus.TypeChecking has no validation
 
-	{ // field admissionregistrationv1beta1.ValidatingAdmissionPolicyStatus.Conditions
+	{ // field ValidatingAdmissionPolicyStatus.Conditions ([]k8s.io/apimachinery/pkg/apis/meta/v1.Condition)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []v1.Condition,
@@ -474,9 +474,9 @@ func Validate_ValidatingWebhookConfiguration(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *admissionregistrationv1beta1.ValidatingWebhookConfiguration) (errs field.ErrorList) {
 
-	// field admissionregistrationv1beta1.ValidatingWebhookConfiguration.TypeMeta has no validation
+	// field ValidatingWebhookConfiguration.TypeMeta has no validation
 
-	{ // field admissionregistrationv1beta1.ValidatingWebhookConfiguration.ObjectMeta
+	{ // field ValidatingWebhookConfiguration.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -498,6 +498,6 @@ func Validate_ValidatingWebhookConfiguration(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field admissionregistrationv1beta1.ValidatingWebhookConfiguration.Webhooks has no validation
+	// field ValidatingWebhookConfiguration.Webhooks has no validation
 	return errs
 }

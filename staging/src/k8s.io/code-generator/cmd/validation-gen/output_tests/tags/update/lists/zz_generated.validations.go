@@ -79,7 +79,7 @@ func Validate_UpdateListStruct(
 
 	// field UpdateListStruct.TypeMeta has no validation
 
-	{ // field UpdateListStruct.StringSliceNoSet
+	{ // field UpdateListStruct.StringSliceNoSet ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -108,7 +108,7 @@ func Validate_UpdateListStruct(
 		errs = append(errs, fn(fldPath.Child("stringSliceNoSet"), obj.StringSliceNoSet, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateListStruct.StringSliceNoUnset
+	{ // field UpdateListStruct.StringSliceNoUnset ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -137,7 +137,7 @@ func Validate_UpdateListStruct(
 		errs = append(errs, fn(fldPath.Child("stringSliceNoUnset"), obj.StringSliceNoUnset, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateListStruct.StringSetNoAdd
+	{ // field UpdateListStruct.StringSetNoAdd ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -170,7 +170,7 @@ func Validate_UpdateListStruct(
 		errs = append(errs, fn(fldPath.Child("stringSetNoAdd"), obj.StringSetNoAdd, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateListStruct.StringSetNoRemove
+	{ // field UpdateListStruct.StringSetNoRemove ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -203,7 +203,7 @@ func Validate_UpdateListStruct(
 		errs = append(errs, fn(fldPath.Child("stringSetNoRemove"), obj.StringSetNoRemove, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateListStruct.StringSetFrozenShape
+	{ // field UpdateListStruct.StringSetFrozenShape ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -236,7 +236,7 @@ func Validate_UpdateListStruct(
 		errs = append(errs, fn(fldPath.Child("stringSetFrozenShape"), obj.StringSetFrozenShape, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateListStruct.MapListNoAdd
+	{ // field UpdateListStruct.MapListNoAdd ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/update/lists.UpdateItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []UpdateItem,
@@ -271,7 +271,7 @@ func Validate_UpdateListStruct(
 		errs = append(errs, fn(fldPath.Child("mapListNoAdd"), obj.MapListNoAdd, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateListStruct.MapListFrozenShape
+	{ // field UpdateListStruct.MapListFrozenShape ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/update/lists.UpdateItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []UpdateItem,
@@ -306,7 +306,7 @@ func Validate_UpdateListStruct(
 		errs = append(errs, fn(fldPath.Child("mapListFrozenShape"), obj.MapListFrozenShape, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateListStruct.CompositeKeyList
+	{ // field UpdateListStruct.CompositeKeyList ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/update/lists.CompositeKeyItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []CompositeKeyItem,
@@ -345,7 +345,7 @@ func Validate_UpdateListStruct(
 		errs = append(errs, fn(fldPath.Child("compositeKeyList"), obj.CompositeKeyList, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateListStruct.AtomicUniqueSetNoAdd
+	{ // field UpdateListStruct.AtomicUniqueSetNoAdd ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -378,7 +378,7 @@ func Validate_UpdateListStruct(
 		errs = append(errs, fn(fldPath.Child("atomicUniqueSetNoAdd"), obj.AtomicUniqueSetNoAdd, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateListStruct.AtomicUniqueMapFrozenShape
+	{ // field UpdateListStruct.AtomicUniqueMapFrozenShape ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/update/lists.UpdateItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []UpdateItem,
@@ -413,7 +413,7 @@ func Validate_UpdateListStruct(
 		errs = append(errs, fn(fldPath.Child("atomicUniqueMapFrozenShape"), obj.AtomicUniqueMapFrozenShape, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateListStruct.NonComparableSetFrozenShape
+	{ // field UpdateListStruct.NonComparableSetFrozenShape ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/update/lists.NonComparableItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []NonComparableItem,
@@ -446,7 +446,7 @@ func Validate_UpdateListStruct(
 		errs = append(errs, fn(fldPath.Child("nonComparableSetFrozenShape"), obj.NonComparableSetFrozenShape, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateListStruct.TypedefFrozenList
+	{ // field UpdateListStruct.TypedefFrozenList (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/update/lists.FrozenUserList)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj FrozenUserList,
@@ -478,7 +478,7 @@ func Validate_UpdateListStruct(
 		errs = append(errs, fn(fldPath.Child("typedefFrozenList"), obj.TypedefFrozenList, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateListStruct.EachValNoModifyList
+	{ // field UpdateListStruct.EachValNoModifyList ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/update/lists.UpdateItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []UpdateItem,
@@ -516,7 +516,7 @@ func Validate_UpdateListStruct(
 		errs = append(errs, fn(fldPath.Child("eachValNoModifyList"), obj.EachValNoModifyList, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateListStruct.PointerSliceNoSet
+	{ // field UpdateListStruct.PointerSliceNoSet ([]*string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []*string,
@@ -549,7 +549,7 @@ func Validate_UpdateListStruct(
 		errs = append(errs, fn(fldPath.Child("pointerSliceNoSet"), obj.PointerSliceNoSet, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateListStruct.PointerSetNoAdd
+	{ // field UpdateListStruct.PointerSetNoAdd ([]*string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []*string,
@@ -586,7 +586,7 @@ func Validate_UpdateListStruct(
 		errs = append(errs, fn(fldPath.Child("pointerSetNoAdd"), obj.PointerSetNoAdd, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UpdateListStruct.PointerMapListNoRemove
+	{ // field UpdateListStruct.PointerMapListNoRemove ([]*k8s.io/code-generator/cmd/validation-gen/output_tests/tags/update/lists.UpdateItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []*UpdateItem,

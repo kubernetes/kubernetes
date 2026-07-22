@@ -76,7 +76,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.LongNameField
+	{ // field Struct.LongNameField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -100,7 +100,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("longNameField"), &obj.LongNameField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.LongNamePtrField
+	{ // field Struct.LongNamePtrField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -124,7 +124,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("longNamePtrField"), obj.LongNamePtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.LongNameTypedefField
+	{ // field Struct.LongNameTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/format/k8s-long-name-caseless.LongNameStringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *LongNameStringType,

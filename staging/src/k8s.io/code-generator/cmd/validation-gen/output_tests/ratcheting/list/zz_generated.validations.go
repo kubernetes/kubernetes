@@ -79,7 +79,7 @@ func Validate_Item(
 
 	// field Item.Key has no validation
 
-	{ // field Item.Data
+	{ // field Item.Data (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -114,7 +114,7 @@ func Validate_ItemList(
 
 	// field ItemList.TypeMeta has no validation
 
-	{ // field ItemList.Items
+	{ // field ItemList.Items ([]k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/list.Item)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Item,
@@ -216,7 +216,7 @@ func Validate_StructSlice(
 
 	// field StructSlice.TypeMeta has no validation
 
-	{ // field StructSlice.AtomicSliceStringField
+	{ // field StructSlice.AtomicSliceStringField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/list.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []StringType,
@@ -243,7 +243,7 @@ func Validate_StructSlice(
 		errs = append(errs, fn(fldPath.Child("atomicSliceStringField"), obj.AtomicSliceStringField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructSlice.AtomicSliceTypeField
+	{ // field StructSlice.AtomicSliceTypeField (k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/list.IntSliceType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj IntSliceType,
@@ -270,7 +270,7 @@ func Validate_StructSlice(
 		errs = append(errs, fn(fldPath.Child("atomicSliceTypeField"), obj.AtomicSliceTypeField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructSlice.AtomicSliceComparableField
+	{ // field StructSlice.AtomicSliceComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/list.ComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ComparableStruct,
@@ -297,7 +297,7 @@ func Validate_StructSlice(
 		errs = append(errs, fn(fldPath.Child("atomicSliceComparableField"), obj.AtomicSliceComparableField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructSlice.AtomicSliceNonComparableField
+	{ // field StructSlice.AtomicSliceNonComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/list.NonComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []NonComparableStruct,
@@ -328,7 +328,7 @@ func Validate_StructSlice(
 		errs = append(errs, fn(fldPath.Child("atomicSliceNonComparableField"), obj.AtomicSliceNonComparableField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructSlice.SetSliceComparableField
+	{ // field StructSlice.SetSliceComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/list.ComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ComparableStruct,
@@ -359,7 +359,7 @@ func Validate_StructSlice(
 		errs = append(errs, fn(fldPath.Child("setSliceComparableField"), obj.SetSliceComparableField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructSlice.SetSliceNonComparableField
+	{ // field StructSlice.SetSliceNonComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/list.NonComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []NonComparableStruct,
@@ -394,7 +394,7 @@ func Validate_StructSlice(
 		errs = append(errs, fn(fldPath.Child("setSliceNonComparableField"), obj.SetSliceNonComparableField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructSlice.MapSliceComparableField
+	{ // field StructSlice.MapSliceComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/list.ComparableStructWithKey)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ComparableStructWithKey,
@@ -427,7 +427,7 @@ func Validate_StructSlice(
 		errs = append(errs, fn(fldPath.Child("mapSliceComparableField"), obj.MapSliceComparableField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructSlice.MapSliceNonComparableField
+	{ // field StructSlice.MapSliceNonComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/list.NonComparableStructWithKey)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []NonComparableStructWithKey,
@@ -465,7 +465,7 @@ func Validate_StructSlice(
 		errs = append(errs, fn(fldPath.Child("mapSliceNonComparableField"), obj.MapSliceNonComparableField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructSlice.MapSlicePtrKeyField
+	{ // field StructSlice.MapSlicePtrKeyField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/list.PtrKeyStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []PtrKeyStruct,
@@ -509,7 +509,7 @@ func Validate_StructSlice(
 		errs = append(errs, fn(fldPath.Child("mapSlicePtrKeyField"), obj.MapSlicePtrKeyField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field StructSlice.MapSliceMixedKeyField
+	{ // field StructSlice.MapSliceMixedKeyField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/ratcheting/list.MixedKeyStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MixedKeyStruct,

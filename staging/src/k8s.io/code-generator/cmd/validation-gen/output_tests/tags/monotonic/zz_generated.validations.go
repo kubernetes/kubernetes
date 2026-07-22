@@ -79,7 +79,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.IntField
+	{ // field Struct.IntField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -106,7 +106,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("intField"), &obj.IntField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Int64Field
+	{ // field Struct.Int64Field (int64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int64,
@@ -133,7 +133,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("int64Field"), &obj.Int64Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Uint64Field
+	{ // field Struct.Uint64Field (uint64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *uint64,
@@ -160,7 +160,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("uint64Field"), &obj.Uint64Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.IntPtrField
+	{ // field Struct.IntPtrField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -198,7 +198,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("intPtrField"), obj.IntPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.MonotonicField
+	{ // field Struct.MonotonicField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/monotonic.MonotonicType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *MonotonicType,
@@ -220,7 +220,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("monotonicField"), &obj.MonotonicField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.MonotonicPtrField
+	{ // field Struct.MonotonicPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/monotonic.MonotonicType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *MonotonicType,
@@ -230,6 +230,14 @@ func Validate_Struct(
 				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
 					return nil
 				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_MonotonicType(ctx, op, fldPath, obj, oldObj)...)
@@ -242,7 +250,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("monotonicPtrField"), obj.MonotonicPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.OptionalInt
+	{ // field Struct.OptionalInt (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -280,7 +288,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("optionalInt"), &obj.OptionalInt, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.RequiredInt
+	{ // field Struct.RequiredInt (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -315,7 +323,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("requiredInt"), &obj.RequiredInt, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.OptionalIntPtr
+	{ // field Struct.OptionalIntPtr (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -353,7 +361,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("optionalIntPtr"), obj.OptionalIntPtr, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.RequiredIntPtr
+	{ // field Struct.RequiredIntPtr (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -388,7 +396,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("requiredIntPtr"), obj.RequiredIntPtr, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.NegativeInt
+	{ // field Struct.NegativeInt (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,

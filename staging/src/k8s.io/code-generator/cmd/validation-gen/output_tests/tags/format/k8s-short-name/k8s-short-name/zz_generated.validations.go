@@ -76,7 +76,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.ShortNameField
+	{ // field Struct.ShortNameField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -100,7 +100,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("shortNameField"), &obj.ShortNameField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ShortNamePtrField
+	{ // field Struct.ShortNamePtrField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -124,7 +124,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("shortNamePtrField"), obj.ShortNamePtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ShortNameTypedefField
+	{ // field Struct.ShortNameTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/format/k8s-short-name/k8s-short-name.ShortNameStringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *ShortNameStringType,
