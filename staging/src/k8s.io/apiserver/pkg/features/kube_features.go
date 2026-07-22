@@ -61,7 +61,7 @@ const (
 	// Allow user.DefaultInfo.UID to be set from x509 cert during cert auth.
 	AllowParsingUserUIDFromCertAuth featuregate.Feature = "AllowParsingUserUIDFromCertAuth"
 
-	// owner: @stlaz @tkashem @dgrisonnet
+	// owner: @stlaz @tkashem @dgrisonnet @ibihim
 	// kep: https://kep.k8s.io/3926
 	//
 	// Enables the cluster admin to identify resources that fail to
@@ -337,6 +337,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	AllowUnsafeMalformedObjectDeletion: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	CBORServingAndStorage: {
