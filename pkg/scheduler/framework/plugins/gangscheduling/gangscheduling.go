@@ -128,10 +128,9 @@ func (pl *GangScheduling) isSchedulableAfterPodGroupUpdated(logger klog.Logger, 
 	oldPolicy := oldPodGroup.Spec.SchedulingPolicy
 	newPolicy := newPodGroup.Spec.SchedulingPolicy
 
-	// Non-gang policies should not be updated.
+	// Updates to non-gang policies will not make the waiting pods schedulable.
 	if newPolicy.Gang == nil || oldPolicy.Gang == nil {
-		logger.V(5).Info("pod group was updated but it's not a gang policy, this is unexpected, enqueuing pod", "pod", klog.KObj(pod), "podGroup", klog.KObj(newPodGroup))
-		return fwk.Queue, nil
+		return fwk.QueueSkip, nil
 	}
 
 	// If the gang scheduling policy minCount did not decrease, it will not make the waiting pods schedulable.
