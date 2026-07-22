@@ -95,7 +95,6 @@ type stateData struct {
 	allocator structured.Allocator
 
 	// mutex must be locked while accessing any of the fields below.
-	// It can be acquired independently from a PodGroup's [podGroupStateData.mutex].
 	mutex sync.Mutex
 
 	// The indices of all claims that:
@@ -133,23 +132,6 @@ type podGroupStateData struct {
 
 	// podsStateData stores the stateData of each pod in the PodGroup.
 	podsStateData map[types.NamespacedName]*stateData
-
-	// mutex must be locked while accessing any of the fields below.
-	// It can be acquired independently from a Pod's [stateData.mutex].
-	mutex sync.Mutex
-
-	// The claims that:
-	// - are allocated
-	// - were not available on at least one node
-	//
-	// Entries are read-only as they may come from an informer cache.
-	//
-	// This is not backed by a [claimStore] since these claims are set in
-	// Filter and used by PodGroupPostFilter before they could be updated.
-	//
-	// Set in parallel during Filter, so write access there must be
-	// protected by the mutex.
-	unavailableClaims sets.Set[*resourceapi.ResourceClaim]
 }
 
 func (d *podGroupStateData) Clone() fwk.StateData {
@@ -801,10 +783,6 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	if state.claims.empty() {
 		return nil
 	}
-	podGroupState, err := getPodGroupStateData(cs)
-	if err != nil {
-		return statusError(klog.FromContext(ctx), err)
-	}
 
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
@@ -951,11 +929,6 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	if state.allocator != nil || len(unavailableClaims) > 0 {
 		state.mutex.Lock()
 		defer state.mutex.Unlock()
-
-		if podGroupState != nil {
-			podGroupState.mutex.Lock()
-			defer podGroupState.mutex.Unlock()
-		}
 	}
 
 	if len(unavailableClaims) > 0 {
@@ -965,15 +938,9 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		if state.unavailableClaims == nil {
 			state.unavailableClaims = sets.New[int]()
 		}
-		if podGroupState != nil && podGroupState.unavailableClaims == nil {
-			podGroupState.unavailableClaims = sets.New[*resourceapi.ResourceClaim]()
-		}
 
 		for _, index := range unavailableClaims {
 			state.unavailableClaims.Insert(index)
-			if podGroupState != nil && isPodGroupClaim(state.claims.getBinding(index, pod)) {
-				podGroupState.unavailableClaims.Insert(state.claims.get(index))
-			}
 		}
 
 		return statusUnschedulable(logger, "resourceclaim not available on the node", "pod", klog.KObj(pod))
@@ -1095,22 +1062,26 @@ func (pl *DynamicResources) deallocatePodGroupClaims(ctx context.Context, state 
 
 	// Iterating over a map is random. This is intentional here, we want to
 	// pick one claim randomly because there is no better heuristic.
-	for claim := range state.unavailableClaims {
-		reservedForNobody := len(claim.Status.ReservedFor) == 0
-		reservedForOnlyThisPodGroup := podGroup != nil &&
-			len(claim.Status.ReservedFor) == 1 &&
-			claim.Status.ReservedFor[0].UID == podGroup.UID
+	for _, podState := range state.podsStateData {
+		for index := range podState.unavailableClaims {
+			claim := podState.claims.get(index)
 
-		if reservedForNobody || reservedForOnlyThisPodGroup {
-			claim := claim.DeepCopy()
-			claim.Status.ReservedFor = nil
-			claim.Status.Allocation = nil
-			claim.Status.Devices = nil
-			logger.V(5).Info("Deallocation of PodGroup ResourceClaim", "pod", klog.KObj(pod), "podgroup", klog.KObj(podGroup), "resourceclaim", klog.KObj(claim))
-			if _, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
-				return statusError(logger, err)
+			reservedForNobody := len(claim.Status.ReservedFor) == 0
+			reservedForOnlyThisPodGroup := podGroup != nil &&
+				len(claim.Status.ReservedFor) == 1 &&
+				claim.Status.ReservedFor[0].UID == podGroup.UID
+
+			if reservedForNobody || reservedForOnlyThisPodGroup {
+				claim := claim.DeepCopy()
+				claim.Status.ReservedFor = nil
+				claim.Status.Allocation = nil
+				claim.Status.Devices = nil
+				logger.V(5).Info("Deallocation of PodGroup ResourceClaim", "pod", klog.KObj(pod), "podgroup", klog.KObj(podGroup), "resourceclaim", klog.KObj(claim))
+				if _, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
+					return statusError(logger, err)
+				}
+				return fwk.NewStatus(fwk.Unschedulable, "deallocation of PodGroup ResourceClaim completed")
 			}
-			return fwk.NewStatus(fwk.Unschedulable, "deallocation of PodGroup ResourceClaim completed")
 		}
 	}
 
