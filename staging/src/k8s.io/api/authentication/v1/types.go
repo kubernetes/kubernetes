@@ -173,7 +173,10 @@ type TokenRequestSpec struct {
 	// expirationSeconds is the requested duration of validity of the request. The
 	// token issuer may return a token with a different validity duration so a
 	// client needs to check the 'expiration' field in a response.
-	// +optional
+	// +required
+	// +k8s:alpha(since: "1.37")=+k8s:required
+	// +k8s:alpha(since: "1.37")=+k8s:minimum=600
+	// +k8s:alpha(since: "1.37")=+k8s:maximum=4294967296
 	ExpirationSeconds *int64 `json:"expirationSeconds" protobuf:"varint,4,opt,name=expirationSeconds"`
 
 	// boundObjectRef is a reference to an object that the token will be bound to.

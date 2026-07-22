@@ -19,10 +19,14 @@ limitations under the License.
 package validation
 
 import (
+	"context"
+
+	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/authentication"
 )
-
 const MinTokenAgeSec = 10 * 60 // 10 minutes
 
 // ValidateTokenRequest validates a TokenRequest.
@@ -31,10 +35,18 @@ func ValidateTokenRequest(tr *authentication.TokenRequest) field.ErrorList {
 	specPath := field.NewPath("spec")
 
 	if tr.Spec.ExpirationSeconds < MinTokenAgeSec {
-		allErrs = append(allErrs, field.Invalid(specPath.Child("expirationSeconds"), tr.Spec.ExpirationSeconds, "may not specify a duration less than 10 minutes"))
+		allErrs = append(allErrs, field.Invalid(specPath.Child("expirationSeconds"), tr.Spec.ExpirationSeconds, "may not specify a duration less than 10 minutes").WithOrigin("minimum").MarkCoveredByDeclarative())
 	}
 	if tr.Spec.ExpirationSeconds > 1<<32 {
-		allErrs = append(allErrs, field.Invalid(specPath.Child("expirationSeconds"), tr.Spec.ExpirationSeconds, "may not specify a duration larger than 2^32 seconds"))
+		allErrs = append(allErrs, field.Invalid(specPath.Child("expirationSeconds"), tr.Spec.ExpirationSeconds, "may not specify a duration larger than 2^32 seconds").WithOrigin("maximum").MarkCoveredByDeclarative())
 	}
 	return allErrs
+}
+
+// ValidateTokenRequestCreate is the single composition of handwritten and declarative
+// TokenRequest validation.
+func ValidateTokenRequestCreate(ctx context.Context, scheme *runtime.Scheme, tr *authentication.TokenRequest) field.ErrorList {
+	errs := ValidateTokenRequest(tr)
+	dv := rest.DeclarativeValidation{Scheme: scheme}
+	return dv.ValidateDeclaratively(ctx, tr, nil, errs, operation.Create, rest.DeclarativeValidationConfig{})
 }

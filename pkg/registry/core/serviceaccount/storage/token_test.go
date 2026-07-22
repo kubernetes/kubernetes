@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/warning"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
+	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	token "k8s.io/kubernetes/pkg/serviceaccount"
@@ -135,6 +136,13 @@ func TestCreate_Token_WithExpiryCap(t *testing.T) {
 
 			// add the namespace to the context as it is required
 			ctx = request.WithNamespace(ctx, serviceAccount.Namespace)
+			ctx = request.WithRequestInfo(ctx, &request.RequestInfo{
+				APIGroup:          "authentication.k8s.io",
+				APIVersion:        "v1",
+				Resource:          "tokenrequests",
+				IsResourceRequest: true,
+				Verb:              "create",
+			})
 			storage.Token.extendExpiration = tc.extendExpiration
 			storage.Token.maxExpirationSeconds = int64(tc.maxExpirationSeconds)
 			storage.Token.maxExtendedExpirationSeconds = int64(tc.maxExtendedExpirationSeconds)
@@ -251,6 +259,13 @@ func TestTokenRequest_ServiceAccountUIDValidation(t *testing.T) {
 			dc := dummyRecorder{agent: "", text: ""}
 			ctx := context.Background()
 			ctx = request.WithNamespace(warning.WithWarningRecorder(ctx, &dc), serviceAccount.Namespace)
+			ctx = request.WithRequestInfo(ctx, &request.RequestInfo{
+				APIGroup:          "authentication.k8s.io",
+				APIVersion:        "v1",
+				Resource:          "tokenrequests",
+				IsResourceRequest: true,
+				Verb:              "create",
+			})
 			// create an audit context to allow recording audit information
 			ctx = audit.WithAuditContext(ctx)
 
