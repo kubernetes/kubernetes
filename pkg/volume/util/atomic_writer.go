@@ -83,6 +83,23 @@ const (
 	newDataDirName = "..data_tmp"
 )
 
+// IsTargetPopulated reports whether the given AtomicWriter target directory has
+// already been successfully written to at least once. It is detected via the
+// presence of the "..data" symlink, which Write only creates after a payload has
+// been fully and atomically projected. Volume plugins use this to distinguish a
+// first-time setup from a periodic resync: an already-populated directory may be
+// bind-mounted into a running container, so it must not be torn down when a later
+// write fails (see https://github.com/kubernetes/kubernetes/issues/113242).
+//
+// Only a definitive "does not exist" is treated as not-populated. On any other
+// Lstat error (e.g. a transient failure) the target is conservatively reported as
+// populated, so a volume that may be bind-mounted into a running container is not
+// torn down on the basis of an inconclusive check.
+func IsTargetPopulated(targetDir string) bool {
+	_, err := os.Lstat(filepath.Join(targetDir, dataDirName))
+	return !os.IsNotExist(err)
+}
+
 // Write does an atomic projection of the given payload into the writer's target
 // directory.  Input paths must not begin with '..'.
 // setPerms is an optional pointer to a function that caller can provide to set the

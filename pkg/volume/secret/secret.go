@@ -209,6 +209,13 @@ func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 		return err
 	}
 
+	// If the volume directory has already been populated by a previous successful
+	// setup, this SetUpAt call is a resync of an already-mounted volume. In that
+	// case a failure must not tear the directory down, because it is bind-mounted
+	// into the running container and removing it breaks the mount, leaving the
+	// volume permanently empty (https://github.com/kubernetes/kubernetes/issues/113242).
+	alreadyPopulated := volumeutil.IsTargetPopulated(dir)
+
 	setupSuccess := false
 	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
 		return err
@@ -218,8 +225,10 @@ func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 	}
 
 	defer func() {
-		// Clean up directories if setup fails
-		if !setupSuccess {
+		// Clean up directories only on a failed first-time setup. On resync of an
+		// already-populated volume, leave the existing content in place and let the
+		// volume manager retry; do not tear down a bind-mounted directory.
+		if !setupSuccess && !alreadyPopulated {
 			unmounter, unmountCreateErr := b.plugin.NewUnmounter(b.volName, b.podUID)
 			if unmountCreateErr != nil {
 				klog.Errorf("error cleaning up mount %s after failure. Create unmounter failed with %v", b.volName, unmountCreateErr)
