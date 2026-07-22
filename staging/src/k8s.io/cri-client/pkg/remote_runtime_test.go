@@ -18,6 +18,7 @@ package cri
 
 import (
 	"context"
+	"errors"
 	"os"
 	"runtime"
 	"sync/atomic"
@@ -29,9 +30,11 @@ import (
 	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	kubeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	fakeremote "k8s.io/cri-client/pkg/fake"
@@ -104,6 +107,82 @@ func TestVersion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, apitest.FakeVersion, version.Version)
 	assert.Equal(t, apitest.FakeRuntimeName, version.RuntimeName)
+}
+
+func createTestRemoteRuntimeService(t *testing.T) (*fakeremote.RemoteRuntime, internalapi.RuntimeService) {
+	t.Helper()
+	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
+	rtSvc, err := NewRemoteRuntimeServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(defaultConnectionTimeout).
+		Build(context.Background())
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, rtSvc.Close(context.Background()))
+		fakeRuntime.Stop()
+		if addr, _, err := util.GetAddressAndDialer(endpoint); err == nil {
+			if _, err := os.Stat(addr); err == nil {
+				require.NoError(t, os.Remove(addr))
+			}
+		}
+	})
+	return fakeRuntime, rtSvc
+}
+
+func TestCheckpointPod(t *testing.T) {
+	fakeRuntime, rtSvc := createTestRemoteRuntimeService(t)
+	request := &kubeapi.CheckpointPodRequest{
+		PodSandboxId: "sandbox-id",
+		OutputPath:   "/var/lib/kubelet/pod-checkpoints/checkpoint",
+		ContainerIds: []string{"container-one", "container-two"},
+		Options:      map[string]string{"example.runtime/checkpoint-mode": "fast"},
+	}
+	deadline := time.Now().Add(time.Minute)
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	defer cancel()
+
+	require.NoError(t, rtSvc.CheckpointPod(ctx, request))
+	require.Len(t, fakeRuntime.RuntimeService.CheckpointedPods, 1)
+	assert.True(t, proto.Equal(request, fakeRuntime.RuntimeService.CheckpointedPods[0]))
+	assert.WithinDuration(t, deadline, fakeRuntime.RuntimeService.CheckpointPodDeadline, time.Second)
+
+	fakeRuntime.RuntimeService.InjectError("CheckpointPod", errors.New("checkpoint failed"))
+	require.ErrorContains(t, rtSvc.CheckpointPod(context.Background(), request), "checkpoint failed")
+	require.ErrorContains(t, rtSvc.CheckpointPod(context.Background(), nil), "requires non-nil")
+}
+
+func TestRestorePod(t *testing.T) {
+	fakeRuntime, rtSvc := createTestRemoteRuntimeService(t)
+	request := &kubeapi.RestorePodRequest{
+		CheckpointPath: "/var/lib/kubelet/pod-checkpoints/checkpoint",
+		Config: &kubeapi.PodSandboxConfig{
+			Metadata: &kubeapi.PodSandboxMetadata{Name: "pod", Namespace: "default", Uid: "uid"},
+		},
+		RuntimeHandler: "checkpoint-handler",
+		Options:        map[string]string{"example.runtime/restore-mode": "lazy"},
+		ContainerConfigs: []*kubeapi.ContainerConfig{
+			{Metadata: &kubeapi.ContainerMetadata{Name: "app"}},
+		},
+	}
+	deadline := time.Now().Add(time.Minute)
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	defer cancel()
+
+	response, err := rtSvc.RestorePod(ctx, request)
+	require.NoError(t, err)
+	assert.Equal(t, "fake-restored-pod-id", response.GetPodSandboxId())
+	require.Len(t, response.GetRestoredContainers(), 1)
+	assert.Equal(t, "app", response.GetRestoredContainers()[0].GetName())
+	assert.NotEmpty(t, response.GetRestoredContainers()[0].GetContainerId())
+	require.Len(t, fakeRuntime.RuntimeService.RestoredPods, 1)
+	assert.True(t, proto.Equal(request, fakeRuntime.RuntimeService.RestoredPods[0]))
+	assert.WithinDuration(t, deadline, fakeRuntime.RuntimeService.RestorePodDeadline, time.Second)
+
+	fakeRuntime.RuntimeService.InjectError("RestorePod", errors.New("restore failed"))
+	_, err = rtSvc.RestorePod(context.Background(), request)
+	require.ErrorContains(t, err, "restore failed")
+	_, err = rtSvc.RestorePod(context.Background(), nil)
+	require.ErrorContains(t, err, "requires non-nil")
 }
 
 // TestTracerProviderPropagation verifies that the otelgrpc stats handler
