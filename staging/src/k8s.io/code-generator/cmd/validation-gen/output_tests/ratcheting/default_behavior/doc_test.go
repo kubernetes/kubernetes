@@ -20,14 +20,13 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test_StructPrimitive(t *testing.T) {
 	mkTest := func() *StructPrimitive {
 		return &StructPrimitive{
 			IntField:    1,
-			IntPtrField: ptr.To(1), // Different pointers each call, but same value.
+			IntPtrField: new(1), // Different pointers each call, but same value.
 		}
 	}
 
@@ -87,13 +86,13 @@ func Test_StructStruct(t *testing.T) {
 				IntField: 1,
 			},
 			NonDirectComparableStructField: NonDirectComparableStruct{
-				IntPtrField: ptr.To(1),
+				IntPtrField: new(1),
 			},
 			DirectComparableStructPtr: &DirectComparableStruct{
 				IntField: 1,
 			},
 			NonDirectComparableStructPtr: &NonDirectComparableStruct{
-				IntPtrField: ptr.To(1),
+				IntPtrField: new(1),
 			},
 		}
 	}
@@ -124,7 +123,7 @@ func Test_StructEmbedded(t *testing.T) {
 				IntField: 1,
 			},
 			NonDirectComparableStruct: NonDirectComparableStruct{
-				IntPtrField: ptr.To(1),
+				IntPtrField: new(1),
 			},
 			NestedDirectComparableStructField: NestedDirectComparableStruct{
 				DirectComparableStructField: DirectComparableStruct{
@@ -133,7 +132,7 @@ func Test_StructEmbedded(t *testing.T) {
 			},
 			NestedNonDirectComparableStructField: NestedNonDirectComparableStruct{
 				NonDirectComparableStructField: NonDirectComparableStruct{
-					IntPtrField: ptr.To(1),
+					IntPtrField: new(1),
 				},
 			},
 		}
