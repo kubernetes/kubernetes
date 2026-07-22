@@ -2507,6 +2507,8 @@ rules:
       branch: master
     - repository: api
       branch: master
+    - repository: client-go
+      branch: master
     source:
       branch: master
       dirs:
