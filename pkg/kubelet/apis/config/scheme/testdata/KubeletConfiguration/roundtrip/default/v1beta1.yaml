@@ -27,6 +27,7 @@ cpuManagerPolicy: none
 cpuManagerReconcilePeriod: 10s
 crashLoopBackOff:
   maxContainerRestartPeriod: 5m0s
+draManagerReconcilePeriod: 1m0s
 enableControllerAttachDetach: true
 enableDebugFlagsHandler: true
 enableDebuggingHandlers: true
