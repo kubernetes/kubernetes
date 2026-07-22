@@ -46,6 +46,7 @@ import (
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures/features"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
@@ -14384,6 +14385,49 @@ func TestValidatePodUpdate(t *testing.T) {
 				podtest.SetNodeName("foo")),
 			err:  "metadata.annotations[kubernetes.io/config.mirror]",
 			test: "changed mirror pod annotation",
+		}, {
+			new: *podtest.MakePod("foo",
+				podtest.SetAnnotations(map[string]string{batch.JobCompletionIndexAnnotation: "0"}),
+				podtest.SetNodeName("foo")),
+			old: *podtest.MakePod("foo",
+				podtest.SetNodeName("foo")),
+			err:  "metadata.annotations[batch.kubernetes.io/job-completion-index]",
+			test: "added job completion index annotation",
+		}, {
+			new: *podtest.MakePod("foo",
+				podtest.SetNodeName("foo")),
+			old: *podtest.MakePod("foo",
+				podtest.SetAnnotations(map[string]string{batch.JobCompletionIndexAnnotation: "0"}),
+				podtest.SetNodeName("foo")),
+			err:  "metadata.annotations[batch.kubernetes.io/job-completion-index]",
+			test: "removed job completion index annotation",
+		}, {
+			new: *podtest.MakePod("foo",
+				podtest.SetAnnotations(map[string]string{batch.JobCompletionIndexAnnotation: "1"}),
+				podtest.SetNodeName("foo")),
+			old: *podtest.MakePod("foo",
+				podtest.SetAnnotations(map[string]string{batch.JobCompletionIndexAnnotation: "0"}),
+				podtest.SetNodeName("foo")),
+			err:  "metadata.annotations[batch.kubernetes.io/job-completion-index]",
+			test: "changed job completion index annotation",
+		}, {
+			new: *podtest.MakePod("foo",
+				podtest.SetAnnotations(map[string]string{batch.JobIndexFailureCountAnnotation: "2"}),
+				podtest.SetNodeName("foo")),
+			old: *podtest.MakePod("foo",
+				podtest.SetAnnotations(map[string]string{batch.JobIndexFailureCountAnnotation: "1"}),
+				podtest.SetNodeName("foo")),
+			err:  "metadata.annotations[batch.kubernetes.io/job-index-failure-count]",
+			test: "changed job index failure count annotation",
+		}, {
+			new: *podtest.MakePod("foo",
+				podtest.SetAnnotations(map[string]string{batch.JobIndexIgnoredFailureCountAnnotation: "2"}),
+				podtest.SetNodeName("foo")),
+			old: *podtest.MakePod("foo",
+				podtest.SetAnnotations(map[string]string{batch.JobIndexIgnoredFailureCountAnnotation: "1"}),
+				podtest.SetNodeName("foo")),
+			err:  "metadata.annotations[batch.kubernetes.io/job-index-ignored-failure-count]",
+			test: "changed job index ignored failure count annotation",
 		}, {
 			new: *podtest.MakePod("foo",
 				podtest.SetNodeName("node1"),

@@ -60,6 +60,7 @@ import (
 
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
@@ -247,6 +248,9 @@ func ValidatePodSpecificAnnotationUpdates(newPod, oldPod *core.Pod, fldPath *fie
 		if k == core.MirrorPodAnnotationKey {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not remove or update mirror pod annotation"))
 		}
+		if k == batch.JobCompletionIndexAnnotation || k == batch.JobIndexFailureCountAnnotation || k == batch.JobIndexIgnoredFailureCountAnnotation {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not remove or update job index annotation"))
+		}
 	}
 	// Check for additions
 	for k := range newAnnotations {
@@ -258,6 +262,9 @@ func ValidatePodSpecificAnnotationUpdates(newPod, oldPod *core.Pod, fldPath *fie
 		}
 		if k == core.MirrorPodAnnotationKey {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not add mirror pod annotation"))
+		}
+		if k == batch.JobCompletionIndexAnnotation || k == batch.JobIndexFailureCountAnnotation || k == batch.JobIndexIgnoredFailureCountAnnotation {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not add job index annotation after pod creation"))
 		}
 	}
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(newAnnotations, &newPod.Spec, fldPath, opts)...)
