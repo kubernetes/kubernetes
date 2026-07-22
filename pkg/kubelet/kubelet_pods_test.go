@@ -9303,6 +9303,11 @@ func TestRecordPodLevelResourcesAdmission(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
 	_ = legacyregistry.Register(metrics.PodLevelResourcesAdmissionTotal)
 
+	metricHeader := `
+# HELP kubelet_pod_level_resources_admission_total [ALPHA] Total number of pods admitted during Kubelet admission, categorized by resource configuration mode (pod_and_container_level, pod_level, container_level, or empty for unconfigured/BestEffort) and QoS class.
+# TYPE kubelet_pod_level_resources_admission_total counter
+`
+
 	testCases := []struct {
 		name           string
 		pod            *v1.Pod
@@ -9328,11 +9333,7 @@ func TestRecordPodLevelResourcesAdmission(t *testing.T) {
 					},
 				},
 			},
-			expectedMetric: `
-# HELP kubelet_pod_level_resources_admission_total [ALPHA] Total number of pods admitted during Kubelet admission, categorized by resource configuration mode (pod_and_container_level, pod_level, container_level, or empty for unconfigured/BestEffort) and QoS class.
-# TYPE kubelet_pod_level_resources_admission_total counter
-kubelet_pod_level_resources_admission_total{config_mode="pod_and_container_level",qos_class="burstable"} 1
-`,
+			expectedMetric: `kubelet_pod_level_resources_admission_total{config_mode="pod_and_container_level",qos_class="burstable"} 1`,
 		},
 		{
 			name: "pod level only resources",
@@ -9350,11 +9351,7 @@ kubelet_pod_level_resources_admission_total{config_mode="pod_and_container_level
 					},
 				},
 			},
-			expectedMetric: `
-# HELP kubelet_pod_level_resources_admission_total [ALPHA] Total number of pods admitted during Kubelet admission, categorized by resource configuration mode (pod_and_container_level, pod_level, container_level, or empty for unconfigured/BestEffort) and QoS class.
-# TYPE kubelet_pod_level_resources_admission_total counter
-kubelet_pod_level_resources_admission_total{config_mode="pod_level",qos_class="burstable"} 1
-`,
+			expectedMetric: `kubelet_pod_level_resources_admission_total{config_mode="pod_level",qos_class="burstable"} 1`,
 		},
 		{
 			name: "container level only resources",
@@ -9371,11 +9368,7 @@ kubelet_pod_level_resources_admission_total{config_mode="pod_level",qos_class="b
 					},
 				},
 			},
-			expectedMetric: `
-# HELP kubelet_pod_level_resources_admission_total [ALPHA] Total number of pods admitted during Kubelet admission, categorized by resource configuration mode (pod_and_container_level, pod_level, container_level, or empty for unconfigured/BestEffort) and QoS class.
-# TYPE kubelet_pod_level_resources_admission_total counter
-kubelet_pod_level_resources_admission_total{config_mode="container_level",qos_class="burstable"} 1
-`,
+			expectedMetric: `kubelet_pod_level_resources_admission_total{config_mode="container_level",qos_class="burstable"} 1`,
 		},
 		{
 			name: "no resources best effort",
@@ -9388,11 +9381,7 @@ kubelet_pod_level_resources_admission_total{config_mode="container_level",qos_cl
 					},
 				},
 			},
-			expectedMetric: `
-# HELP kubelet_pod_level_resources_admission_total [ALPHA] Total number of pods admitted during Kubelet admission, categorized by resource configuration mode (pod_and_container_level, pod_level, container_level, or empty for unconfigured/BestEffort) and QoS class.
-# TYPE kubelet_pod_level_resources_admission_total counter
-kubelet_pod_level_resources_admission_total{config_mode="",qos_class="besteffort"} 1
-`,
+			expectedMetric: `kubelet_pod_level_resources_admission_total{config_mode="",qos_class="besteffort"} 1`,
 		},
 	}
 
@@ -9401,7 +9390,8 @@ kubelet_pod_level_resources_admission_total{config_mode="",qos_class="besteffort
 			metrics.PodLevelResourcesAdmissionTotal.Reset()
 			recordPodLevelResourcesAdmission(tc.pod)
 
-			testMetric(t, metrics.PodLevelResourcesAdmissionTotal.FQName(), tc.expectedMetric)
+			expected := metricHeader + tc.expectedMetric + "\n"
+			testMetric(t, metrics.PodLevelResourcesAdmissionTotal.FQName(), expected)
 		})
 	}
 }

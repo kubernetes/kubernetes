@@ -212,7 +212,6 @@ const (
 	PodRequestsGetKey        = "pod_requests_get_total"
 	PodRequestsWatchKey      = "pod_requests_watch_total"
 
-
 	// Metric keys for pod level resources metrics.
 	PodLevelResourcesAdmissionTotalKey = "pod_level_resources_admission_total"
 )
