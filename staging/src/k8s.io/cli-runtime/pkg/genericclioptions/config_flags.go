@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -435,8 +434,8 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 
 // WithDeprecatedPasswordFlag enables the username and password config flags
 func (f *ConfigFlags) WithDeprecatedPasswordFlag() *ConfigFlags {
-	f.Username = ptr.To("")
-	f.Password = ptr.To("")
+	f.Username = new("")
+	f.Password = new("")
 	return f
 }
 
@@ -473,22 +472,22 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 
 	return &ConfigFlags{
 		Insecure:   &insecure,
-		Timeout:    ptr.To("0"),
-		KubeConfig: ptr.To(""),
+		Timeout:    new("0"),
+		KubeConfig: new(""),
 
-		CacheDir:             ptr.To(getDefaultCacheDir()),
-		ClusterName:          ptr.To(""),
-		AuthInfoName:         ptr.To(""),
-		Context:              ptr.To(""),
-		Namespace:            ptr.To(""),
-		APIServer:            ptr.To(""),
-		TLSServerName:        ptr.To(""),
-		CertFile:             ptr.To(""),
-		KeyFile:              ptr.To(""),
-		CAFile:               ptr.To(""),
-		BearerToken:          ptr.To(""),
-		Impersonate:          ptr.To(""),
-		ImpersonateUID:       ptr.To(""),
+		CacheDir:             new(getDefaultCacheDir()),
+		ClusterName:          new(""),
+		AuthInfoName:         new(""),
+		Context:              new(""),
+		Namespace:            new(""),
+		APIServer:            new(""),
+		TLSServerName:        new(""),
+		CertFile:             new(""),
+		KeyFile:              new(""),
+		CAFile:               new(""),
+		BearerToken:          new(""),
+		Impersonate:          new(""),
+		ImpersonateUID:       new(""),
 		ImpersonateGroup:     &impersonateGroup,
 		ImpersonateUserExtra: &impersonateUserExtra,
 		DisableCompression:   &disableCompression,
