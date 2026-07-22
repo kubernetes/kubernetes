@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"slices"
 	"sort"
 
 	v1 "k8s.io/api/core/v1"
@@ -508,10 +507,6 @@ func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, state fwk.P
 		metrics.WorkloadPreemptionAttempts.WithLabelValues(status.Code().String()).Inc()
 	}()
 
-	if pl.fts.EnableTopologyAwareWorkloadScheduling && hasTopologyConstraints(pgInfo) {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "pod group preemption: not supported with topology constraints")
-	}
-
 	mutableLister := pl.fh.MutableSnapshotSharedLister()
 	err := mutableLister.StartMutations()
 	if err != nil {
@@ -529,14 +524,4 @@ func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, state fwk.P
 		return res, fwk.NewStatus(status.Code(), "pod group preemption: "+msg)
 	}
 	return res, status
-}
-
-func hasTopologyConstraints(pgInfo fwk.PodGroupInfo) bool {
-	if pg := pgInfo.GetPodGroup(); pg != nil {
-		return pg.Spec.SchedulingConstraints != nil && len(pg.Spec.SchedulingConstraints.Topology) > 0
-	}
-	if cpg := pgInfo.GetCompositePodGroup(); cpg != nil && cpg.Spec.SchedulingConstraints != nil && len(cpg.Spec.SchedulingConstraints.Topology) > 0 {
-		return true
-	}
-	return slices.ContainsFunc(pgInfo.GetChildren(), hasTopologyConstraints)
 }
