@@ -90,15 +90,16 @@ func (v *volumeExpandTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInf
 	return v.tsInfo
 }
 
-func (v *volumeExpandTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (v *volumeExpandTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	// Check preconditions.
 	if !driver.GetDriverInfo().Capabilities[storageframework.CapControllerExpansion] {
-		e2eskipper.Skipf("Driver %q does not support volume expansion - skipping", driver.GetDriverInfo().Name)
+		return fmt.Sprintf("Driver %q does not support volume expansion", driver.GetDriverInfo().Name)
 	}
 	// Check preconditions.
 	if !driver.GetDriverInfo().Capabilities[storageframework.CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
-		e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", driver.GetDriverInfo().Name)
+		return fmt.Sprintf("Driver %q does not support block volume mode", driver.GetDriverInfo().Name)
 	}
+	return ""
 }
 
 func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
