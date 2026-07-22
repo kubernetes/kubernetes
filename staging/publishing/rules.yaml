@@ -2507,8 +2507,6 @@ rules:
       branch: master
     - repository: api
       branch: master
-    - repository: client-go
-      branch: master
     - repository: streaming
       branch: master
     source:
