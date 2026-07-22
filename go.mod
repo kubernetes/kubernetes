@@ -30,7 +30,7 @@ require (
 	github.com/go-openapi/jsonreference v1.0.0
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/google/cadvisor/lib v0.60.5
-	github.com/google/cel-go v0.27.0
+	github.com/google/cel-go v0.29.2
 	github.com/google/gnostic-models v0.7.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0

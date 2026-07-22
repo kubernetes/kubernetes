@@ -9,7 +9,7 @@ godebug default=go1.26
 require (
 	github.com/emicklei/go-restful/v3 v3.13.0
 	github.com/fxamacker/cbor/v2 v2.9.1
-	github.com/google/cel-go v0.27.0
+	github.com/google/cel-go v0.29.2
 	github.com/google/gnostic-models v0.7.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0

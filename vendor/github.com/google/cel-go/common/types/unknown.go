@@ -181,6 +181,20 @@ func (u *Unknown) GetAttributeTrails(id int64) ([]*AttributeTrail, bool) {
 	return trails, found
 }
 
+// HasUnknownFunction returns whether any of the attribute trails contained within the unknown
+// are unspecified. Unspecified attributes typically indicate an unresolved function call
+// or operation, rather than a missing variable.
+func (u *Unknown) HasUnknownFunction() bool {
+	for _, trails := range u.attributeTrails {
+		for _, t := range trails {
+			if t.variable == "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Contains returns true if the input unknown is a subset of the current unknown.
 func (u *Unknown) Contains(other *Unknown) bool {
 	for id, otherTrails := range other.attributeTrails {
