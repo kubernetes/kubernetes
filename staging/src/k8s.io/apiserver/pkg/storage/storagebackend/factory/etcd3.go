@@ -458,14 +458,25 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 		return nil, nil, err
 	}
 
-	client, err := newETCD3Client(c.Transport)
-	if err != nil {
-		stopCompactor()
-		return nil, nil, err
+	poolSize := 8
+
+	clientsPool := make([]*kubernetes.Client, poolSize)
+	for i := 0; i < poolSize; i++ {
+		cl, err := newETCD3Client(c.Transport)
+		if err != nil {
+			for j := 0; j < i; j++ {
+				_ = clientsPool[j].Close()
+			}
+			stopCompactor()
+			return nil, nil, err
+		}
+		// decorate the KV instance so we can track etcd latency per request.
+		cl.KV = etcd3.NewETCDLatencyTracker(cl.KV)
+		clientsPool[i] = cl
 	}
 
-	// decorate the KV instance so we can track etcd latency per request.
-	client.KV = etcd3.NewETCDLatencyTracker(client.KV)
+	client := clientsPool[0]
+	etcd3.WrapWithConnectionPool(client, clientsPool)
 
 	transformer := c.Transformer
 	if transformer == nil {
@@ -482,7 +493,9 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 	store, err := etcd3.New(client, compactor, c.Codec, newFunc, newListFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder, versioner)
 	if err != nil {
 		stopCompactor()
-		_ = client.Close()
+		for _, cl := range clientsPool {
+			_ = cl.Close()
+		}
 		return nil, nil, err
 	}
 	var once sync.Once
@@ -493,7 +506,9 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 		once.Do(func() {
 			stopCompactor()
 			store.Close()
-			_ = client.Close()
+			for _, cl := range clientsPool {
+				_ = cl.Close()
+			}
 		})
 	}
 	var storage storage.Interface = store
