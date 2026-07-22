@@ -227,11 +227,6 @@ var (
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
 				PodGroupName(podGroupName).
 				Obj()
-	groupedPodWithClaimName2 = st.MakePod().Name(podName + "-2").Namespace(namespace).
-					UID(podUID + "-2").
-					PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
-					PodGroupName(podGroupName).
-					Obj()
 	groupedPodWithPodLevelClaim = st.MakePod().Name(podName + "-podlevel").Namespace(namespace).
 					UID(podUID + "-podlevel").
 					PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, ResourceClaimName: &claimName2}).

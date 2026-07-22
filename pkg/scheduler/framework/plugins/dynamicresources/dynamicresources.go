@@ -2067,7 +2067,3 @@ func nodeSelectorFromAllocation(allocation *resourceapi.AllocationResult) (*node
 	}
 	return nodeaffinity.NewNodeSelector(allocation.NodeSelector)
 }
-
-func isPodGroupClaim(bindTo resourceapi.ResourceClaimConsumerReference) bool {
-	return bindTo.APIGroup == schedulingapi.GroupName && bindTo.Resource == "podgroups"
-}
