@@ -1362,7 +1362,7 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 	if state.claims.empty() {
 		return
 	}
-	podGroupState, err := getPodGroupStateData(cs)
+	pgStateData, err := getPodGroupStateData(cs)
 	if err != nil {
 		return
 	}
@@ -1397,8 +1397,8 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 			// share pending allocations started in *this* cycle until Unreserve
 			// completes for all the Pods sharing that pending allocation and
 			// they can be Reserved again in another cycle.
-			if podGroupState != nil {
-				podGroupState.pendingAllocations.Delete(claim.UID)
+			if pgStateData != nil {
+				pgStateData.pendingAllocations.Delete(claim.UID)
 			}
 		}
 
