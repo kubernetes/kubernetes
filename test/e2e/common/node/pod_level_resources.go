@@ -506,21 +506,18 @@ func podLevelResourcesFixDefaultingTests(f *framework.Framework) {
 		framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
 	})
 
-	// When only a CPU request is set at pod level (no memory request), and containers
-	// define both CPU and memory limits, defaulting should set ONLY the CPU limit.
-	// Memory limit must NOT be defaulted — no pod-level memory request exists, so
-	// defaulting a memory limit would create an asymmetric limits-without-requests state.
-	// Furthermore, a subsequent update (e.g. adding an annotation) must not cause
-	// decode-time defaulting to inject a memory request (since pod-level limits now
-	// exist after the initial create), which would produce request-without-limit asymmetry.
-	ginkgo.It("partial pod-level request: only CPU limit defaulted, memory limit not set, stable across updates", func(ctx context.Context) {
+	// When only a CPU request is set at pod level (no memory request or limits), defaulting
+	// populates missing pod-level requests from aggregated container requests and missing
+	// pod-level limits from container limits to maintain complete pod-level accounting.
+	// Furthermore, subsequent updates preserve these defaulted values.
+	ginkgo.It("partial pod-level request: all missing pod requests and limits defaulted from containers, stable across updates", func(ctx context.Context) {
 		containers := []containerInfo{
 			{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "50m", MemReq: "50Mi", MemLim: "50Mi"}},
 		}
-		// Only CPU request set at pod level — no memory request.
+		// Only CPU request set at pod level — no memory request or limits.
 		podResources := &cgroups.ContainerResources{CPUReq: "50m"}
-		// Expected: CPU limit defaulted from container, memory limit must remain unset.
-		expectedResources := &cgroups.ContainerResources{CPUReq: "50m", CPULim: "50m"}
+		// Expected: memory request defaulted from container, CPU and memory limits defaulted from container limits.
+		expectedResources := &cgroups.ContainerResources{CPUReq: "50m", CPULim: "50m", MemReq: "50Mi", MemLim: "50Mi"}
 
 		podMetadata := makeObjectMetadata("testpod-partial-req", f.Namespace.Name)
 		testPod := makePod(&podMetadata, podResources, containers)
@@ -529,7 +526,7 @@ func podLevelResourcesFixDefaultingTests(f *framework.Framework) {
 		podClient := e2epod.NewPodClient(f)
 		pod := podClient.CreateSync(ctx, testPod)
 
-		ginkgo.By("verifying pod resources after create: CPU limit defaulted, memory limit absent")
+		ginkgo.By("verifying pod resources after create: missing memory request and limits defaulted from container")
 		verifyPodResources(*pod, podResources, expectedResources)
 
 		ginkgo.By("patching an annotation to trigger a decode+update cycle")
@@ -538,7 +535,7 @@ func podLevelResourcesFixDefaultingTests(f *framework.Framework) {
 			ctx, pod.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch pod annotation")
 
-		ginkgo.By("verifying pod resources after annotation update: still no memory request or limit")
+		ginkgo.By("verifying pod resources after annotation update: defaulted memory request and limits remain unchanged")
 		verifyPodResources(*updatedPod, podResources, expectedResources)
 
 		ginkgo.By("deleting pod")
