@@ -28561,7 +28561,7 @@ func schema_k8sio_api_core_v1_PodSchedulingGroup(ref common.ReferenceCallback) c
 				Properties: map[string]spec.Schema{
 					"podGroupName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PodGroupName specifies the name of the standalone PodGroup object that represents the runtime instance of this group. Must be a DNS subdomain.",
+							Description: "PodGroupName specifies the name of the standalone PodGroup object that represents the runtime instance of this group. This is a name reference, not a UID reference. A Pod cannot distinguish between different PodGroup instances that reuse the same namespace and name. Controllers should use a new PodGroup name for each runtime instance. Must be a DNS subdomain.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -29212,7 +29212,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					},
 					"schedulingGroup": {
 						SchemaProps: spec.SchemaProps{
-							Description: "SchedulingGroup provides a reference to the immediate scheduling runtime grouping object that this Pod belongs to. This field is used by the scheduler to identify the group and apply the correct group scheduling policies. The association with a group also impacts other lifecycle aspects of a Pod that are relevant in a wider context of scheduling like preemption, resource attachment, etc. If not specified, the Pod is treated as a single unit in all of these aspects. The group object referenced by this field may not exist at the time the Pod is created. This field is immutable, but a group object with the same name may be recreated with different policies. Doing this during pod scheduling may result in the placement not conforming to the expected policies.",
+							Description: "SchedulingGroup provides a reference to the immediate scheduling runtime grouping object that this Pod belongs to. This field is used by the scheduler to identify the group and apply the correct group scheduling policies. The association with a group also impacts other lifecycle aspects of a Pod that are relevant in a wider context of scheduling like preemption, resource attachment, etc. If not specified, the Pod is treated as a single unit in all of these aspects. The group object referenced by this field may not exist at the time the Pod is created. This field is immutable. The scheduler matches Pods to group objects by namespace and name, not by UID. A group object with the same name may be recreated with different policies, and Pod and group informer events may be observed in different orders. Controllers that recreate runtime groups should use a new group name for each runtime instance; otherwise, placement may not conform to the expected policies.",
 							Ref:         ref(corev1.PodSchedulingGroup{}.OpenAPIModelName()),
 						},
 					},

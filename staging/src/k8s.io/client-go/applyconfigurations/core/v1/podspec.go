@@ -283,9 +283,12 @@ type PodSpecApplyConfiguration struct {
 	// the Pod is treated as a single unit in all of these aspects.
 	// The group object referenced by this field may not exist at the time the
 	// Pod is created.
-	// This field is immutable, but a group object with the same name may be
-	// recreated with different policies. Doing this during pod scheduling
-	// may result in the placement not conforming to the expected policies.
+	// This field is immutable. The scheduler matches Pods to group objects by
+	// namespace and name, not by UID. A group object with the same name may be
+	// recreated with different policies, and Pod and group informer events may
+	// be observed in different orders. Controllers that recreate runtime groups
+	// should use a new group name for each runtime instance; otherwise,
+	// placement may not conform to the expected policies.
 	SchedulingGroup *PodSchedulingGroupApplyConfiguration `json:"schedulingGroup,omitempty"`
 }
 

@@ -4675,9 +4675,12 @@ type PodSpec struct {
 	// the Pod is treated as a single unit in all of these aspects.
 	// The group object referenced by this field may not exist at the time the
 	// Pod is created.
-	// This field is immutable, but a group object with the same name may be
-	// recreated with different policies. Doing this during pod scheduling
-	// may result in the placement not conforming to the expected policies.
+	// This field is immutable. The scheduler matches Pods to group objects by
+	// namespace and name, not by UID. A group object with the same name may be
+	// recreated with different policies, and Pod and group informer events may
+	// be observed in different orders. Controllers that recreate runtime groups
+	// should use a new group name for each runtime instance; otherwise,
+	// placement may not conform to the expected policies.
 	//
 	// +featureGate=GenericWorkload
 	// +optional
@@ -4825,6 +4828,9 @@ type PodSchedulingGate struct {
 type PodSchedulingGroup struct {
 	// PodGroupName specifies the name of the standalone PodGroup object
 	// that represents the runtime instance of this group.
+	// This is a name reference, not a UID reference. A Pod cannot distinguish
+	// between different PodGroup instances that reuse the same namespace and
+	// name. Controllers should use a new PodGroup name for each runtime instance.
 	// Must be a DNS subdomain.
 	//
 	// +optional
