@@ -22,13 +22,13 @@ import (
 	authorizationv1 "k8s.io/api/authorization/v1"
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
-	authorizationv1beta1apiserver "k8s.io/apiserver/pkg/apis/authorization/v1beta1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	authorization "k8s.io/kubernetes/pkg/apis/authorization"
 	authorizationv1internal "k8s.io/kubernetes/pkg/apis/authorization/v1"
 )
 
-// NOTE: These conversion implementations must be kept in sync with k8s.io/apiserver/pkg/apis/authorization/v1beta1/conversion.go
-
+// EnforceUnconditionalHandledDecisionTypesOnly ensures that the handled decision types of ao is exactly [Allow, Deny, NoOpinion],
+// this is the only supported mode when converting from v1 -> v1beta1.
 func enforceUnconditionalHandledDecisionTypesOnly(ao *authorization.AuthorizationOptions) error {
 	// A nil AuthorizationOptions represents the default (unconditional) handled decision types,
 	// which is expressible in v1beta1.
@@ -40,7 +40,12 @@ func enforceUnconditionalHandledDecisionTypesOnly(ao *authorization.Authorizatio
 	if err := authorizationv1internal.Convert_authorization_AuthorizationOptions_To_v1_AuthorizationOptions(ao, authzOptionsV1, nil); err != nil {
 		return err
 	}
-	return authorizationv1beta1apiserver.EnforceUnconditionalHandledDecisionTypesOnly(authzOptionsV1)
+	// Ensure that the HandledDecisionTypes are [Allow, Deny, NoOpinion]
+	if handledDecisionTypes := authzOptionsV1.GetHandledDecisionTypes(); !handledDecisionTypes.Equal(authorizationv1.UnconditionalAuthorizationDecisionTypes()) {
+		return fmt.Errorf("cannot send SubjectAccessReview with non-default AuthorizationOptions to a v1beta1 client. Got handledDecisionTypes %v, supported %v",
+			handledDecisionTypes, sets.List(authorizationv1.UnconditionalAuthorizationDecisionTypes()))
+	}
+	return nil
 }
 
 // Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec explicitly does not propagate the AuthorizationOptions field to the v1beta1
