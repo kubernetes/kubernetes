@@ -116,7 +116,7 @@ func RegisterMetrics() {
 func RecordTransformation(resource, transformationType, transformerPrefix string, elapsed time.Duration, err error) {
 	transformerOperationsTotal.WithLabelValues(resource, transformationType, transformerPrefix, getErrorCode(err)).Inc()
 
-	if err == nil {
+	if err == nil && transformerPrefix != "identity" && transformerPrefix != "" {
 		transformerLatencies.WithLabelValues(transformationType, transformerPrefix).Observe(elapsed.Seconds())
 	}
 }
