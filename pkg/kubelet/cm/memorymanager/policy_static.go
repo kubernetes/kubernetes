@@ -772,7 +772,17 @@ func getPodRequestedResources(logger klog.Logger, pod *v1.Pod) (map[v1.ResourceN
 	}
 
 	reqRsrcs := make(map[v1.ResourceName]uint64)
+	resourceNames := make(map[v1.ResourceName]struct{})
 	for rsrcName := range reqRsrcsByAppCtrs {
+		resourceNames[rsrcName] = struct{}{}
+	}
+	for rsrcName := range reqRsrcsByRestartableInitCtrs {
+		resourceNames[rsrcName] = struct{}{}
+	}
+	for rsrcName := range reqRsrcsByInitCtrs {
+		resourceNames[rsrcName] = struct{}{}
+	}
+	for rsrcName := range resourceNames {
 		// Total resources requested by long-running containers.
 		reqRsrcsByLongRunningCtrs := reqRsrcsByAppCtrs[rsrcName] + reqRsrcsByRestartableInitCtrs[rsrcName]
 		reqRsrcs[rsrcName] = reqRsrcsByLongRunningCtrs
