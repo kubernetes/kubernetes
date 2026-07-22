@@ -1826,7 +1826,7 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 // NOTE: this function assumes lock has been acquired in caller
 func (p *PriorityQueue) requeueEntityWithQueueingStrategy(logger klog.Logger, entity framework.QueuedEntityInfo, strategy queueingStrategy, event string) string {
 	if strategy == queueSkip {
-		// Current Gate status is required for already exisiting entities. For new entities, this parameter is ignored/unused by addPod/addPodGroup.
+		// Current Gate status is required for already existing entities. For new entities, this parameter is ignored/unused by addPod/addPodGroup.
 		p.unschedulableEntities.addOrUpdate(entity, entity.Gated(), event, &strategy)
 		return unschedulableQ
 	}

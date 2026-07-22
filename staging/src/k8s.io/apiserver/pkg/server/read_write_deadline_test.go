@@ -191,7 +191,7 @@ func TestRequestTimeoutBehavior(t *testing.T) {
 		//   d) the handler flushes the ResponseWriter object before request times out: No
 		// observation:
 		//  the timeout filter detects that the context of the request has exceeded its
-		//  deadline, and the the following takes place:
+		//  deadline, and the following takes place:
 		//   - it marks the ResponseWriter object as timeout=true, so any further attempt
 		//   to write to it will yield an 'http: Handler timeout' error
 		//   - it can't send '504 GatewayTimeout' to the client since the ResponseWriter

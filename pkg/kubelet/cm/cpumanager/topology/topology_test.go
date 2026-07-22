@@ -277,7 +277,7 @@ func Test_Discover(t *testing.T) {
 			// TODO(fromanirh): replace with a real-world topology
 			// once we find a suitable one.
 			// Note: this is a fake topology. Thus, there is not a "correct"
-			// representation. This one was created following the these concepts:
+			// representation. This one was created following these concepts:
 			// 1. be internally consistent (most important rule)
 			// 2. be as close as possible as existing HW topologies
 			// 3. if possible, minimize chances wrt existing HW topologies.

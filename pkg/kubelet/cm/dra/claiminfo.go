@@ -299,7 +299,7 @@ func (cache *claimInfoCache) syncToCheckpoint() error {
 	return cache.checkpointer.Store(checkpoint)
 }
 
-// claimsInUse computes the the current counter vector for DRAResourceClaimsInUse.
+// claimsInUse computes the current counter vector for DRAResourceClaimsInUse.
 // It returns a map of driver name to number of claims which have been prepared using
 // the driver. The [kubeletmetrics.DRAResourceClaimsInUseAnyDriver] key stands for
 // all prepared claims.
