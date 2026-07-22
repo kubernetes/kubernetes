@@ -33,6 +33,8 @@ import (
 	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/api/validate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -41,6 +43,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
@@ -49,6 +52,8 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -336,8 +341,7 @@ func (w *WebhookAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attr a
 		return authorizer.ConditionsAwareDecisionDeny(r.Status.Reason, fmt.Errorf("webhook subject access review returned both allow and deny response"))
 	}
 
-	// v1 validation is enforced for the new Conditional Authorization feature, as only v1 supports Conditional Authorization.
-	if errs := authorizationvalidation.ValidateSubjectAccessReviewCreate(ctx, scheme.Scheme, r, "v1"); len(errs) > 0 {
+	if errs := validateSubjectAccessReviewCreate(ctx, r); len(errs) > 0 {
 		return w.conditionsAwareFailureDecision(errs.ToAggregate())
 	}
 
@@ -525,7 +529,7 @@ func (w *WebhookAuthorizer) EvaluateConditions(ctx context.Context, decision aut
 		return decision.FailureDecision(), "failed closed", fmt.Errorf("uid mismatch in webhook EvaluateConditions for webhook with name %q, expected %q but got %q", w.name, evaluateRequestUUID, result.Response.UID)
 	}
 
-	if errs := authorizationvalidation.ValidateAuthorizationConditionsReviewCreate(ctx, scheme.Scheme, result, "v1alpha1"); len(errs) > 0 {
+	if errs := validateAuthorizationConditionsReviewCreate(ctx, r); len(errs) > 0 {
 		return decision.FailureDecision(), "failed closed", errs.ToAggregate()
 	}
 
@@ -548,6 +552,61 @@ func (w *WebhookAuthorizer) EvaluateConditions(ctx context.Context, decision aut
 	default:
 		return decision.FailureDecision(), "failed closed", fmt.Errorf("unrecognized decision type %q", result.Response.Decision.Type)
 	}
+}
+
+func validateSubjectAccessReviewCreate(ctx context.Context, sar *authorizationv1.SubjectAccessReview) field.ErrorList {
+	return compositeValidate(ctx, func() field.ErrorList {
+		return authorizationvalidation.ValidateSubjectAccessReview(sar)
+	}, func() field.ErrorList {
+		op := operation.Operation{
+			Type:    operation.Create,
+			Options: authorizationvalidation.GetDeclarativeValidationOptions(),
+		}
+		return authorizationv1.Validate_SubjectAccessReview(ctx, op, nil /* fldPath */, sar, nil)
+	})
+}
+
+func validateAuthorizationConditionsReviewCreate(ctx context.Context, acr *authorizationv1alpha1.AuthorizationConditionsReview) field.ErrorList {
+	return compositeValidate(ctx, func() field.ErrorList {
+		return authorizationvalidation.ValidateAuthorizationConditionsReview(acr)
+	}, func() field.ErrorList {
+		op := operation.Operation{
+			Type:    operation.Create,
+			Options: authorizationvalidation.GetDeclarativeValidationOptions(),
+		}
+		return authorizationv1alpha1.Validate_AuthorizationConditionsReview(ctx, op, nil /* fldPath */, acr, nil)
+	})
+}
+
+// compositeValidate models rest.ValidateDeclarativelyWithMigrationChecks
+func compositeValidate(ctx context.Context, validateHandwritten, validateDeclarative func() field.ErrorList) field.ErrorList {
+	errs := validateHandwritten()
+
+	declarativeErrs := runValidationWithRecover(ctx, validateDeclarative)
+
+	betaEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationBeta)
+	// TODO: Consider finding mismatches between handwritten and declarative validations at alpha/beta level like rest.ValidateDeclarativelyWithMigrationChecks
+
+	// Collect the declarative errors that are enforced (i.e. surfaced to the user) in the current mode.
+	enforcedDeclarativeErrs := validate.FilterEnforcedDeclarativeErrors(ctx, declarativeErrs, betaEnabled)
+	// Remove handwritten errors that are superseded by an enforced declarative counterpart.
+	errs = validate.FilterCoveredHandwrittenErrors(ctx, errs, enforcedDeclarativeErrs, betaEnabled)
+
+	// Append the enforced declarative errors.
+	errs = append(errs, enforcedDeclarativeErrs...)
+	return errs
+}
+
+// runValidationWithRecover invokes validateDeclaratively with panic recovery.
+// On panic, the panic metric is incremented and an InternalError is appended to the returned errors.
+func runValidationWithRecover(ctx context.Context, validate func() field.ErrorList) (errs field.ErrorList) {
+	defer func() {
+		if r := recover(); r != nil {
+			// TODO(luxas): Consider running validationmetrics.Metrics.IncDeclarativeValidationPanicMetric(o.ValidationIdentifier)
+			errs = append(errs, field.InternalError(nil, fmt.Errorf("panic during declarative validation: %v", r)))
+		}
+	}()
+	return validate()
 }
 
 func resourceAttributesFrom(attr authorizer.Attributes) *authorizationv1.ResourceAttributes {
