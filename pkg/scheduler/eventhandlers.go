@@ -546,7 +546,7 @@ func (sched *Scheduler) addCompositePodGroup(obj any) {
 	logger.V(3).Info("Add event for composite pod group", "compositePodGroup", klog.KObj(cpg))
 	sched.Cache.AddCompositePodGroup(logger, cpg)
 	sched.SchedulingQueue.AddCompositePodGroup(logger, cpg)
-	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, cpg, nil, nil)
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, cpg, nil)
 }
 
 func (sched *Scheduler) updateCompositePodGroup(oldObj, newObj any) {
@@ -571,7 +571,7 @@ func (sched *Scheduler) updateCompositePodGroup(oldObj, newObj any) {
 	logger.V(4).Info("Update event for composite pod group", "compositePodGroup", klog.KObj(newCPG))
 	sched.Cache.UpdateCompositePodGroup(logger, oldCPG, newCPG)
 	sched.SchedulingQueue.UpdateCompositePodGroup(logger, newCPG)
-	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, newCPG, oldCPG, nil)
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldCPG, newCPG, nil)
 }
 
 func (sched *Scheduler) deleteCompositePodGroup(obj any) {
