@@ -216,12 +216,9 @@ func TestPodGuaranteedCPUs(t *testing.T) {
 	}
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.podLevelResourcesEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
-			}
-			if tc.podLevelResourceManagersEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
+
 			requestedCPU := p.podGuaranteedCPUs(logger, tc.pod)
 
 			if requestedCPU != tc.expectedCPU {
@@ -236,12 +233,8 @@ func TestGetTopologyHints(t *testing.T) {
 	machineInfo := returnMachineInfo()
 
 	for _, tc := range returnTestCases() {
-		if tc.podLevelResourcesEnabled {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
-		}
-		if tc.podLevelResourceManagersEnabled {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
-		}
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
 
 		topology, _ := topology.Discover(logger, &machineInfo)
 
@@ -292,12 +285,8 @@ func TestGetPodTopologyHints(t *testing.T) {
 	machineInfo := returnMachineInfo()
 
 	for _, tc := range returnTestCases() {
-		if tc.podLevelResourcesEnabled {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
-		}
-		if tc.podLevelResourceManagersEnabled {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
-		}
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
 
 		topology, _ := topology.Discover(logger, &machineInfo)
 
