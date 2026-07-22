@@ -994,6 +994,9 @@ func setCachingObjects(event *watchCacheEvent, versioner storage.Versioner) {
 }
 
 func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
+	// dispatchStart marks when this event began dispatching; the per-watcher
+	// StageFanout observations below measure from here to each watcher's accept.
+	dispatchStart := time.Now()
 	c.startDispatching(event)
 	defer c.finishDispatching()
 	// Watchers stopped after startDispatching will be delayed to finishDispatching,
@@ -1027,6 +1030,12 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		for _, watcher := range c.watchersBuffer {
 			if !watcher.nonblockingAdd(event) {
 				c.blockedWatchers = append(c.blockedWatchers, watcher)
+			} else {
+				// StageFanout = dispatch start -> accepted into this watcher's
+				// c.input. Fast lane: captures the serial-traversal wait (this
+				// watcher's position in the loop), ~0 at low fan-out but growing
+				// to ms at high fan-out. Blocked ones observed after add() below.
+				watcher.watcherMetrics.ObserveStage(metrics.StageFanout, time.Since(dispatchStart))
 			}
 		}
 
@@ -1044,7 +1053,11 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 			// is running, not only the first ones in the list.
 			timer := c.timer
 			for _, watcher := range c.blockedWatchers {
-				if !watcher.add(event, timer) {
+				accepted := watcher.add(event, timer)
+				// StageFanout for the slow lane: dispatch start -> accepted (or
+				// timed out). Captures traversal + the mailbox-full block wait.
+				watcher.watcherMetrics.ObserveStage(metrics.StageFanout, time.Since(dispatchStart))
+				if !accepted {
 					// fired, clean the timer by set it to nil.
 					timer = nil
 				}

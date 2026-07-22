@@ -55,6 +55,13 @@ const (
 	// i.e. downstream (result channel) backpressure.
 	StageCacheToWatcher
 
+	// StageFanout: dispatched -> event enqueued on this watcher's input channel.
+	// This is the single dispatcher's serial fan-out cost for one watcher: the
+	// wait for the dispatcher to reach this watcher in the loop (grows with
+	// fan-out size) plus any mailbox-full block. It is the stage where the
+	// single-dispatcher scaling problem shows up.
+	StageFanout
+
 	numDispatchStages
 )
 
@@ -62,6 +69,7 @@ var dispatchStageName = [numDispatchStages]string{
 	StageTotal:          "total",
 	StageStorageToCache: "storage_to_cache",
 	StageCacheToWatcher: "cache_to_watcher",
+	StageFanout:         "fanout",
 }
 
 /*
