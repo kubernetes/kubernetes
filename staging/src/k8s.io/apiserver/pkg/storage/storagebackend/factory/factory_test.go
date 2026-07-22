@@ -30,6 +30,7 @@ import (
 	"go.etcd.io/etcd/client/v3/kubernetes"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 type mockKV struct {
@@ -366,6 +367,13 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 		newETCD3Client = newETCD3ClientFn
 	}()
 
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	originalClock := healthcheckClock
+	healthcheckClock = fakeClock
+	defer func() {
+		healthcheckClock = originalClock
+	}()
+
 	cfg := storagebackend.Config{
 		Type:               storagebackend.StorageTypeETCD3,
 		Transport:          storagebackend.TransportConfig{},
@@ -374,6 +382,8 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 	cfg.Transport.ServerList = client.Endpoints()
 
 	ready := make(chan struct{})
+	firstProbe := make(chan struct{})
+	release := make(chan struct{})
 	signal := make(chan struct{})
 
 	var counter uint64
@@ -381,23 +391,11 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 		defer close(ready)
 		dummyKV := mockKV{
 			get: func(ctx context.Context) (*clientv3.GetResponse, error) {
-				atomic.AddUint64(&counter, 1)
-				val := atomic.LoadUint64(&counter)
-				// the first request wait for a custom timeout to trigger an error.
-				// We don't use the context timeout because we want to check that
-				// the cached answer is not overridden, and since the rate limit is
-				// based on cfg.HealthcheckTimeout / 2, the timeout will race with
-				// the race limiter to server the new request from the cache or allow
-				// it to go through
-				if val == 1 {
-					select {
-					case <-ctx.Done():
-						return nil, ctx.Err()
-					case <-time.After((2 * cfg.HealthcheckTimeout) / 3):
-						return nil, fmt.Errorf("etcd down")
-					}
+				if atomic.AddUint64(&counter, 1) == 1 {
+					close(firstProbe)
+					<-release
+					return nil, fmt.Errorf("etcd down")
 				}
-				// subsequent requests will always work
 				return nil, nil
 			},
 		}
@@ -413,7 +411,6 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 	}
 	// Wait for healthcheck to establish connection
 	<-ready
-	// run a first request that fails after 2 seconds
 	go func() {
 		err := healthcheck()
 		if !strings.Contains(err.Error(), "etcd down") {
@@ -422,14 +419,16 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 		close(signal)
 	}()
 
-	// wait until the rate limit allows new connections
-	time.Sleep(cfg.HealthcheckTimeout / 2)
+	<-firstProbe
 
 	select {
 	case <-signal:
 		t.Errorf("first request should not return yet")
 	default:
 	}
+
+	// advance time so the rate limiter allows a new request
+	fakeClock.Step(cfg.HealthcheckTimeout / 2)
 
 	// a new run on request should succeed and increment the counter
 	err = healthcheck()
@@ -442,6 +441,7 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 	}
 
 	// cached request should be success and not be overridden by the late error
+	close(release)
 	<-signal
 	err = healthcheck()
 	if err != nil {

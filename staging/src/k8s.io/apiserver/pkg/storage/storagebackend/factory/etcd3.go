@@ -55,7 +55,11 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics/legacyregistry"
 	tracing "k8s.io/component-base/tracing"
+	"k8s.io/utils/clock"
 )
+
+// healthcheckClock is overridable in tests to advance the rate limiter deterministically.
+var healthcheckClock clock.Clock = clock.RealClock{}
 
 const (
 	// The short keepalive timeout and interval have been chosen to aggressively
@@ -211,12 +215,12 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 		if clientErr != nil {
 			return clientErr
 		}
-		if limiter.Allow() == false {
+		if !limiter.AllowN(healthcheckClock.Now(), 1) {
 			return lastError.Load()
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
-		now := time.Now()
+		now := healthcheckClock.Now()
 		err := prober.Probe(ctx)
 		lastError.Store(err, now)
 		return err
