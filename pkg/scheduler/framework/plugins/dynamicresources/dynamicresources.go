@@ -1435,7 +1435,7 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 	if err != nil {
 		return
 	}
-	// PodGroup snapshots are not available during asynchronous binding, so the
+	// PodGroup snapshots are more likely out of date during asynchronous binding, so the
 	// shared PodGroupManager is used to look up the PodGroup instead.
 	var podGroup *schedulingapi.PodGroup
 	if pl.fts.EnableDRAWorkloadResourceClaims &&
