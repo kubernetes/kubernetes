@@ -29,7 +29,7 @@ import (
 
 	jose "gopkg.in/go-jose/go-jose.v2"
 
-	"k8s.io/webhookauth/verify/oidc"
+	"k8s.io/webhookauth/internal/oidc"
 )
 
 // rotatingOIDCServer is a TLS OIDC discovery + JWKS endpoint whose signing key can

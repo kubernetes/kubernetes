@@ -29,7 +29,7 @@ import (
 	"strings"
 
 	coreosoidc "github.com/coreos/go-oidc"
-	"k8s.io/webhookauth/verify"
+	"k8s.io/webhookauth/internal/verify"
 )
 
 const (

@@ -28,7 +28,7 @@ import (
 
 	jose "gopkg.in/go-jose/go-jose.v2"
 
-	"k8s.io/webhookauth/verify/oidc"
+	"k8s.io/webhookauth/internal/oidc"
 )
 
 // genSigner returns a fresh RSA key and a matching RS256 JWT signer.

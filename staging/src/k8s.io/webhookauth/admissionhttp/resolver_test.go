@@ -14,20 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package admissionhttp_test
+package admissionhttp
 
 import (
 	"net/http/httptest"
 	"testing"
-
-	"k8s.io/webhookauth/verify/admissionhttp"
 )
 
 // TestInClusterAudienceResolver covers the zero-config in-cluster derivation:
 // name/namespace from request.Host, port from the kubelet-injected service env
 // var (which is the trust anchor), and path from request.URL.Path.
 func TestInClusterAudienceResolver(t *testing.T) {
-	resolve := admissionhttp.InClusterAudienceResolver()
+	resolve := inClusterAudienceResolver()
 
 	tests := []struct {
 		name    string

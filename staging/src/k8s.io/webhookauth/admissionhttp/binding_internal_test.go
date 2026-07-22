@@ -23,7 +23,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"k8s.io/webhookauth/verify"
+	"k8s.io/webhookauth/internal/verify"
 )
 
 // bindSpy is a TokenAuthenticator that records BindAudience calls and reports a
@@ -47,7 +47,7 @@ func (b *bindSpy) BindAudience(audience string) error {
 
 func (b *bindSpy) HealthCheck() error { return b.healthErr }
 
-func newSpyHandler(t *testing.T, spy *bindSpy, resolve AudienceResolver) *Handler {
+func newSpyHandler(t *testing.T, spy *bindSpy, resolve audienceResolver) *Handler {
 	t.Helper()
 	v, err := verify.NewVerifier(spy)
 	if err != nil {

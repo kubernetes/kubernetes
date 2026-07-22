@@ -26,16 +26,15 @@ limitations under the License.
 //
 // WithTokenVerification selects an out-of-cluster or in-cluster verifier by
 // option presence: with no option it is the zero-config in-cluster default, and
-// WithRemoteConfig opts into out-of-cluster verification. See its doc for the two
+// WithRemoteIssuer opts into out-of-cluster verification. See its doc for the two
 // modes and the fail-closed/not-ready behavior until an in-cluster audience binds.
 //
 // Callers that have already decoded the review (for example controller-runtime)
-// should build a verifier with oidc.NewRemoteVerifier and use
-// [VerifyAdmissionRequest] directly. Because WithTokenVerification constructs the
-// verifier, this package imports verify/oidc and therefore its JOSE/JWT
-// dependency tree; a consumer that only needs [VerifyAdmissionRequest] and
-// [BearerToken] still pulls that tree transitively.
-package admissionhttp // import "k8s.io/webhookauth/verify/admissionhttp"
+// build a [Verifier] with [NewVerifier] and call [Verifier.Verify] directly.
+// Because this package constructs the verifier it imports the internal OIDC
+// engine and therefore its JOSE/JWT dependency tree; a consumer that only needs
+// [Verifier.Verify] and [BearerToken] still pulls that tree transitively.
+package admissionhttp // import "k8s.io/webhookauth/admissionhttp"
 
 import (
 	"context"
@@ -58,8 +57,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
-	"k8s.io/webhookauth/verify"
-	"k8s.io/webhookauth/verify/oidc"
+	"k8s.io/webhookauth/internal/oidc"
+	"k8s.io/webhookauth/internal/verify"
 )
 
 // scheme and codecs decode incoming AdmissionReview bodies through the codec
@@ -91,6 +90,14 @@ const (
 	reasonBodyTooLarge    = "request body exceeds the configured limit"
 )
 
+// ErrVerificationFailed is the single generic sentinel every verification failure
+// returns. Callers check errors.Is(err, ErrVerificationFailed) (or just
+// err != nil) and MUST NOT branch on any finer taxonomy: the reason is logged,
+// never surfaced, so a rejection cannot be used to enumerate objects or claim
+// values. It aliases the internal sentinel so callers never import an internal
+// package.
+var ErrVerificationFailed = verify.ErrVerificationFailed
+
 // AdmissionHandler performs the admission decision for an already-verified,
 // already-decoded request, mirroring the shape of controller-runtime's
 // Handle(ctx, Request) Response. The adapter echoes the request UID onto the
@@ -109,9 +116,9 @@ type Option func(*builder)
 // issuer/audience/client and the unexported in-cluster endpoint overrides) and
 // handler config (maxBody).
 //
-// remoteSet is the single bright-line mode selector: only WithRemoteConfig sets
-// it, so remote mode is chosen by the PRESENCE of WithRemoteConfig and never by a
-// stray HTTPClient. This keeps the fail-closed contract unambiguous — an injected
+// remoteSet is the single bright-line mode selector: only WithRemoteIssuer sets
+// it, so remote mode is chosen by the PRESENCE of WithRemoteIssuer and never by a
+// stray httpClient. This keeps the fail-closed contract unambiguous — an injected
 // CA can never half-select remote mode.
 type builder struct {
 	// remote verifier inputs; remoteSet true selects remote mode.
@@ -119,6 +126,13 @@ type builder struct {
 	issuer     string
 	audience   string
 	httpClient *http.Client
+
+	// explicitAudience is set by WithAudience: the operator supplies the audience
+	// at construction so the in-cluster issuer path binds it eagerly instead of
+	// deriving it from the first request. It does NOT select remote mode and is only
+	// meaningful on the in-cluster path; with remoteSet the audience already travels
+	// in WithRemoteIssuer, so combining the two is a construction error.
+	explicitAudience bool
 
 	// in-cluster endpoint overrides, set only via withInClusterEndpoint (unexported;
 	// exposed to tests through export_test.go). They do NOT set remoteSet, so the
@@ -148,21 +162,43 @@ func WithMaxBodyBytes(n int64) Option {
 	}
 }
 
-// WithRemoteConfig selects out-of-cluster verification against cfg.Issuer and
-// cfg.Audience (both required; the token must be issued by Issuer and carry
-// Audience). Its PRESENCE selects remote mode: passing it commits the handler to
-// remote, and an incomplete cfg (missing Issuer or Audience) is a construction
-// error from WithTokenVerification, never a silent fallback to in-cluster. Issuer
-// and Audience travel together in one struct so the jointly-required invariant is
-// preserved structurally (an empty audience must never mean "accept any
-// audience"). cfg.HTTPClient, when non-nil, is used for OIDC discovery and key
-// refreshes (for example to trust a private CA).
-func WithRemoteConfig(cfg RemoteConfig) Option {
+// WithRemoteIssuer selects out-of-cluster verification against issuer and
+// audience (both required; the token must be issued by issuer and carry
+// audience). Its PRESENCE selects remote mode: passing it commits the handler to
+// remote, and an incomplete pair (missing issuer or audience) is a construction
+// error from WithTokenVerification or NewVerifier, never a silent fallback to
+// in-cluster. issuer and audience are positional so "issuer only" is
+// inexpressible and an empty audience can never mean "accept any audience".
+// client, when non-nil, is used for OIDC discovery and key refreshes (for example
+// to trust a private CA); a nil client uses the default transport. client is not
+// a bearer token and not a mode selector — it is a pure setter.
+func WithRemoteIssuer(issuer, audience string, client *http.Client) Option {
 	return func(b *builder) {
 		b.remoteSet = true
-		b.issuer = cfg.Issuer
-		b.audience = cfg.Audience
-		b.httpClient = cfg.HTTPClient
+		b.issuer = issuer
+		b.audience = audience
+		b.httpClient = client
+	}
+}
+
+// WithAudience supplies the expected token audience explicitly, for the
+// already-decoded / controller-runtime path where no *http.Request is available
+// to derive it. The issuer is still discovered in-cluster (like the zero-config
+// default), but the audience is bound at construction instead of from the first
+// request, so NewVerifier is ready immediately and [Verifier.Verify] works on the
+// decoded path.
+//
+// It does NOT select remote mode. Combining it with WithRemoteIssuer (which
+// already carries an audience) is a construction error, as is an empty audience.
+// It is a pure setter; validation happens at the single buildVerifier seam.
+//
+// It is also the deterministic override for a net/http handler whose
+// request-derived audience is wrong (for example a mismatched Service port that
+// binds a valid-but-incorrect audience); see [Handler.HealthCheck].
+func WithAudience(audience string) Option {
+	return func(b *builder) {
+		b.explicitAudience = true
+		b.audience = audience
 	}
 }
 
@@ -179,11 +215,11 @@ func withInClusterEndpoint(apiServerURL string, client *http.Client) Option {
 	}
 }
 
-// AudienceResolver derives the expected token audience from the first admission
+// audienceResolver derives the expected token audience from the first admission
 // request. It is used internally by the in-cluster handler, whose audience is not
-// known at startup (see [InClusterAudienceResolver]). A non-nil error denies the
+// known at startup (see inClusterAudienceResolver). A non-nil error denies the
 // request fail-closed and leaves the verifier not-ready.
-type AudienceResolver func(r *http.Request) (audience string, err error)
+type audienceResolver func(r *http.Request) (audience string, err error)
 
 // Handler is the http.Handler returned by WithTokenVerification. Beyond serving
 // admission requests it exposes [Handler.HealthCheck] for readiness wiring.
@@ -195,7 +231,7 @@ type Handler struct {
 	// resolve, when non-nil, derives the expected audience from the first request
 	// and binds it (the in-cluster deferred-audience path); nil means the
 	// verifier's audience is already bound.
-	resolve AudienceResolver
+	resolve audienceResolver
 	// bound is the lock-free steady-state fast path: once the audience has been
 	// bound successfully it flips false→true and every later request observes it
 	// without taking bindMu. bindMu serializes bind attempts while still unbound.
@@ -213,17 +249,6 @@ type Handler struct {
 	bindMu sync.Mutex
 }
 
-// RemoteConfig configures an out-of-cluster verifier for WithTokenVerification.
-// Issuer and Audience are required; the token must be issued by Issuer and
-// carry Audience. HTTPClient, when non-nil, is used for OIDC discovery and key
-// refreshes (for example to trust a private CA); a nil HTTPClient uses the
-// default transport.
-type RemoteConfig struct {
-	Issuer     string
-	Audience   string
-	HTTPClient *http.Client
-}
-
 // WithTokenVerification builds a verifier and returns an http.Handler that checks
 // the bearer token before reading the body, decodes the AdmissionReview once,
 // verifies the token, and — only on success — invokes next with the decoded
@@ -232,12 +257,12 @@ type RemoteConfig struct {
 // The verifier is selected by option presence — the safe path is the zero-config
 // default:
 //   - no remote option builds the in-cluster verifier (zero-config, secure by
-//     default; see oidc.NewLocalKeySetVerifier): the issuer is discovered over the
-//     in-cluster network and the audience is derived from the first request via
-//     [InClusterAudienceResolver]. Until the audience binds, requests are denied
-//     fail-closed and [Handler.HealthCheck] reports not-ready.
-//   - WithRemoteConfig builds an out-of-cluster verifier bound to the config's
-//     Issuer and Audience (see oidc.NewRemoteVerifier). Its presence commits the
+//     default): the issuer is discovered over the in-cluster network and the
+//     audience is derived from the first request via the in-cluster resolver.
+//     Until the audience binds, requests are denied fail-closed and
+//     [Handler.HealthCheck] reports not-ready.
+//   - WithRemoteIssuer builds an out-of-cluster verifier bound to the given
+//     issuer and audience. Its presence commits the
 //     handler to remote mode; a present-but-incomplete config (missing issuer or
 //     audience) is a construction error, never a silent fallback to in-cluster and
 //     never a verifier built with an empty, audience-skipping audience.
@@ -269,9 +294,16 @@ func WithTokenVerification(ctx context.Context, next AdmissionHandler, opts ...O
 }
 
 // buildVerifier constructs the verifier the Handler will use and the audience
-// resolver it needs (nil for remote, the in-cluster resolver otherwise). It is
-// the SINGLE build point where the fail-closed mode contract is enforced.
-func (b *builder) buildVerifier(ctx context.Context) (*verify.Verifier, AudienceResolver, error) {
+// resolver it needs (nil for remote or an explicit WithAudience, the in-cluster
+// resolver otherwise). It is the SINGLE build point where the fail-closed mode
+// contract is enforced.
+func (b *builder) buildVerifier(ctx context.Context) (*verify.Verifier, audienceResolver, error) {
+	// WithRemoteIssuer already carries an audience; WithAudience supplies one for
+	// the in-cluster path. Both together sets the audience two ways and is a hard
+	// construction error, never a silent precedence rule.
+	if b.remoteSet && b.explicitAudience {
+		return nil, nil, errors.New("admissionhttp: WithAudience cannot be combined with WithRemoteIssuer")
+	}
 	if b.remoteSet {
 		// Remote mode is committed: issuer AND audience are jointly required and
 		// validated HERE, before constructing the verifier. A partial config is a
@@ -292,7 +324,7 @@ func (b *builder) buildVerifier(ctx context.Context) (*verify.Verifier, Audience
 	// No remote option: in-cluster (zero-config, secure by default). The verifier
 	// discovers its issuer over the in-cluster network (trusting the projected
 	// service account CA) and derives its audience from the first request via
-	// [InClusterAudienceResolver]. A construction error (missing SA CA bundle,
+	// inClusterAudienceResolver. A construction error (missing SA CA bundle,
 	// failed discovery) propagates unchanged — a not-securely-buildable in-cluster
 	// handler is never returned. url/client default to the real in-cluster address
 	// and SA-CA client; the unexported withInClusterEndpoint override only
@@ -305,7 +337,21 @@ func (b *builder) buildVerifier(ctx context.Context) (*verify.Verifier, Audience
 	if err != nil {
 		return nil, nil, err
 	}
-	return v, InClusterAudienceResolver(), nil
+
+	// WithAudience: the operator supplied the audience, so bind it now (the audience
+	// is "already known at construction time") and skip the request-derived
+	// resolver. This is what makes NewVerifier usable in-cluster on the decoded path
+	// — Verify has no *http.Request to derive from.
+	if b.explicitAudience {
+		if b.audience == "" {
+			return nil, nil, errors.New("admissionhttp: WithAudience requires a non-empty audience")
+		}
+		if err := v.BindAudience(b.audience); err != nil {
+			return nil, nil, err
+		}
+		return v, nil, nil
+	}
+	return v, inClusterAudienceResolver(), nil
 }
 
 // newHandler assembles a Handler around an already-built verifier. resolve is nil
@@ -313,7 +359,7 @@ func (b *builder) buildVerifier(ctx context.Context) (*verify.Verifier, Audience
 // the in-cluster path (audience derived from the first request). maxBody is the
 // resolved request-body read limit. It is the shared seam the exported
 // constructor and tests build through.
-func newHandler(v *verify.Verifier, next AdmissionHandler, resolve AudienceResolver, maxBody int64) *Handler {
+func newHandler(v *verify.Verifier, next AdmissionHandler, resolve audienceResolver, maxBody int64) *Handler {
 	return &Handler{
 		verifier: v,
 		next:     next,
@@ -462,44 +508,80 @@ func (h *Handler) decodeReview(r *http.Request) (review *admissionv1.AdmissionRe
 // all passes, and an undecodable or mismatched object in either slot fails
 // closed.
 func checkObjectGroup(req *admissionv1.AdmissionRequest) error {
-	for _, obj := range []struct {
-		name string
-		raw  []byte
-	}{
-		{"object", req.Object.Raw},
-		{"oldObject", req.OldObject.Raw},
-	} {
-		if len(obj.raw) == 0 {
-			continue
-		}
-		var tm metav1.TypeMeta
-		if err := json.Unmarshal(obj.raw, &tm); err != nil {
-			return fmt.Errorf("%s is undecodable: %w", obj.name, err)
-		}
-		gv, err := schema.ParseGroupVersion(tm.APIVersion)
-		if err != nil {
-			return fmt.Errorf("%s apiVersion %q is invalid: %w", obj.name, tm.APIVersion, err)
-		}
-		if gv.Group != req.Resource.Group {
-			return fmt.Errorf("%s group %q != resource group %q", obj.name, gv.Group, req.Resource.Group)
-		}
+	// Always check the incoming object; check the prior object only when present
+	// (an UPDATE populates both, CONNECT neither).
+	if err := checkRawObjectGroup("object", req.Object.Raw, req.Resource.Group); err != nil {
+		return err
+	}
+	return checkRawObjectGroup("oldObject", req.OldObject.Raw, req.Resource.Group)
+}
+
+// checkRawObjectGroup verifies a single embedded object's API group matches
+// resourceGroup. An empty raw slot is skipped (returns nil); an undecodable,
+// invalid, or mismatched object fails closed.
+func checkRawObjectGroup(name string, raw []byte, resourceGroup string) error {
+	if len(raw) == 0 {
+		return nil
+	}
+	var tm metav1.TypeMeta
+	if err := json.Unmarshal(raw, &tm); err != nil {
+		return fmt.Errorf("%s is undecodable: %w", name, err)
+	}
+	gv, err := schema.ParseGroupVersion(tm.APIVersion)
+	if err != nil {
+		return fmt.Errorf("%s apiVersion %q is invalid: %w", name, tm.APIVersion, err)
+	}
+	if gv.Group != resourceGroup {
+		return fmt.Errorf("%s group %q != resource group %q", name, gv.Group, resourceGroup)
 	}
 	return nil
 }
 
-// VerifyAdmissionRequest verifies token against the KEP-6060 contract for an
-// already-decoded AdmissionRequest — the entry point for consumers (for example
-// controller-runtime) that decode the review themselves.
+// Verifier verifies bearer tokens for already-decoded admission requests — the
+// entry point for consumers (for example controller-runtime) that decode the
+// AdmissionReview themselves. Obtain one from [NewVerifier]. It wraps the
+// internal policy verifier so no internal package appears in this module's public
+// surface.
+type Verifier struct {
+	verifier *verify.Verifier
+}
+
+// NewVerifier builds a Verifier for the already-decoded path, selecting the
+// verifier by option presence exactly like [WithTokenVerification]: no remote
+// option is the zero-config in-cluster default, and WithRemoteIssuer selects
+// out-of-cluster verification (a present-but-incomplete pair is a construction
+// error). ctx governs discovery and background key refreshes, so pass a
+// process-lifetime context.
+//
+// In-cluster on the decoded path: [Verifier.Verify] has no *http.Request to
+// derive the audience from, so supply it explicitly with WithAudience (the issuer
+// is still discovered in-cluster). Without WithAudience or WithRemoteIssuer an
+// in-cluster Verifier cannot bind its audience and stays not-ready
+// ([Verifier.HealthCheck] non-nil), denying every token fail-closed.
+func NewVerifier(ctx context.Context, opts ...Option) (*Verifier, error) {
+	b := newBuilder()
+	for _, opt := range opts {
+		opt(b)
+	}
+	v, _, err := b.buildVerifier(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &Verifier{verifier: v}, nil
+}
+
+// Verify checks token against the KEP-6060 contract for an already-decoded
+// AdmissionRequest.
 //
 // It returns nil on success or a generic error satisfying
-// errors.Is(err, verify.ErrVerificationFailed) on any failure (including a nil
+// errors.Is(err, ErrVerificationFailed) on any failure (including a nil
 // request). The reason is logged; do not branch on the error.
-func VerifyAdmissionRequest(ctx context.Context, v *verify.Verifier, req *admissionv1.AdmissionRequest, token string) error {
+func (v *Verifier) Verify(ctx context.Context, req *admissionv1.AdmissionRequest, token string) error {
 	if req == nil {
 		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", reasonUndecodableBody)
-		return verify.ErrVerificationFailed
+		return ErrVerificationFailed
 	}
-	if err := v.Verify(ctx, token, req.Resource.Group); err != nil {
+	if err := v.verifier.Verify(ctx, token, req.Resource.Group); err != nil {
 		return err
 	}
 	// Defense in depth: the admitted object's own group must match the authorized
@@ -507,9 +589,17 @@ func VerifyAdmissionRequest(ctx context.Context, v *verify.Verifier, req *admiss
 	if err := checkObjectGroup(req); err != nil {
 		klog.FromContext(ctx).V(2).Info("Webhook token verification denied",
 			"reason", "admitted object group does not match the resource group", "detail", err.Error())
-		return verify.ErrVerificationFailed
+		return ErrVerificationFailed
 	}
 	return nil
+}
+
+// HealthCheck reports whether the Verifier is ready to verify tokens by returning
+// the backing verifier's readiness. For an in-cluster Verifier it is non-nil (see
+// the NewVerifier caveat). Wire it into a controller-runtime health/readiness
+// check.
+func (v *Verifier) HealthCheck() error {
+	return v.verifier.HealthCheck()
 }
 
 // BearerToken extracts the token from an "Authorization: Bearer <token>" header,
@@ -591,11 +681,19 @@ func (h *Handler) ensureAudience(r *http.Request) error {
 // controller-runtime health/readiness check so a webhook that can never derive
 // its audience (for example a scheduling race that never yields the Service env
 // var) is restarted rather than silently denying every request.
+//
+// Limitation: HealthCheck reports only whether AN audience is bound, not whether
+// it is the CORRECT one. If the in-cluster resolver derives a wrong-but-valid
+// audience (for example a <NAME>_SERVICE_PORT that does not match the port the
+// token's audience was minted with), it binds on the first request and
+// HealthCheck reports ready, yet every token is then denied fail-closed. The
+// audience freezes on first bind, so recovery is a redeploy with [WithAudience]
+// set to the token's true audience — not a runtime retry.
 func (h *Handler) HealthCheck() error {
 	return h.verifier.HealthCheck()
 }
 
-// InClusterAudienceResolver returns an [AudienceResolver] that derives the
+// inClusterAudienceResolver returns an audienceResolver that derives the
 // expected token audience for an in-cluster, Service-backed admission webhook
 // from the first request, with no static configuration:
 //
@@ -611,7 +709,14 @@ func (h *Handler) HealthCheck() error {
 // the request) if any component is missing; because the process environment is
 // fixed, a missing port env var keeps failing until the pod is rescheduled,
 // surfaced through [Handler.HealthCheck].
-func InClusterAudienceResolver() AudienceResolver {
+//
+// Odd-behavior note: a component that is present but WRONG (most commonly a
+// <NAME>_SERVICE_PORT that does not match the port the token's audience was
+// minted with) yields a valid-but-incorrect audience. That binds successfully on
+// the first request, so [Handler.HealthCheck] reports ready while every token is
+// denied fail-closed, and the frozen audience cannot self-correct. The fix is a
+// redeploy with an explicit [WithAudience] override.
+func inClusterAudienceResolver() audienceResolver {
 	return func(r *http.Request) (string, error) {
 		host := r.Host
 		if h, _, err := net.SplitHostPort(host); err == nil {

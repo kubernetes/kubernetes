@@ -16,21 +16,28 @@ limitations under the License.
 
 package admissionhttp
 
-import "k8s.io/webhookauth/verify"
+import "k8s.io/webhookauth/internal/verify"
 
 // NewHandlerForTest exposes the internal newHandler seam so tests can assemble a
 // Handler around an already-built verify.Verifier without going through
 // WithTokenVerification (which constructs its own verifier via OIDC discovery).
-// resolve is nil for the out-of-cluster path and an AudienceResolver for the
+// resolve is nil for the out-of-cluster path and an audienceResolver for the
 // in-cluster deferred path. Options are applied through the same builder the
 // exported constructor uses, so handler-affecting options (for example
 // WithMaxBodyBytes) behave identically here.
-func NewHandlerForTest(v *verify.Verifier, next AdmissionHandler, resolve AudienceResolver, opts ...Option) *Handler {
+func NewHandlerForTest(v *verify.Verifier, next AdmissionHandler, resolve audienceResolver, opts ...Option) *Handler {
 	b := newBuilder()
 	for _, opt := range opts {
 		opt(b)
 	}
 	return newHandler(v, next, resolve, b.maxBody)
+}
+
+// NewVerifierForTest exposes the internal Verifier wrapper so tests can exercise
+// [Verifier.Verify] against an already-built verify.Verifier without going
+// through NewVerifier (which constructs its own verifier via OIDC discovery).
+func NewVerifierForTest(v *verify.Verifier) *Verifier {
+	return &Verifier{verifier: v}
 }
 
 // WithInClusterEndpointForTest exposes the unexported withInClusterEndpoint option

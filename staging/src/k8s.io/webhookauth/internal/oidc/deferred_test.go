@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"k8s.io/webhookauth/verify/oidc"
+	"k8s.io/webhookauth/internal/oidc"
 )
 
 // TestLocalKeySetVerifier_BindsAudienceAndReportsHealth exercises the in-cluster

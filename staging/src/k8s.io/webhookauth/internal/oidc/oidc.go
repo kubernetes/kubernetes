@@ -19,7 +19,7 @@ limitations under the License.
 //
 // It is the only package in this module that imports go-oidc; consumers who
 // supply their own [verify.TokenAuthenticator] never pull it in.
-package oidc // import "k8s.io/webhookauth/verify/oidc"
+package oidc // import "k8s.io/webhookauth/internal/oidc"
 
 import (
 	"context"
@@ -30,7 +30,7 @@ import (
 	"sync/atomic"
 
 	coreosoidc "github.com/coreos/go-oidc"
-	"k8s.io/webhookauth/verify"
+	"k8s.io/webhookauth/internal/verify"
 )
 
 // config holds the resolved options for the verifier constructors.
@@ -114,7 +114,14 @@ func verifyTokenGroups(ctx context.Context, verifier *coreosoidc.IDTokenVerifier
 	if err := idToken.Claims(&claims); err != nil {
 		return nil, fmt.Errorf("oidc: decoding token claims: %w", err)
 	}
-	return claims.Kubernetes.Attestations[admissionReviewAPIGroupsClaimKey], nil
+	// A verified token must carry at least one authorized API group; an empty
+	// attestation authorizes nothing and is treated as a malformed token rather
+	// than a silent deny-all.
+	groups := claims.Kubernetes.Attestations[admissionReviewAPIGroupsClaimKey]
+	if len(groups) == 0 {
+		return nil, fmt.Errorf("oidc: token carries no %q attestation", admissionReviewAPIGroupsClaimKey)
+	}
+	return groups, nil
 }
 
 // BindAudience builds the go-oidc verifier for audience and makes the

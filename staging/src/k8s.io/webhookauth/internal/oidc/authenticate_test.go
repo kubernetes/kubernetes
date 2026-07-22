@@ -21,7 +21,7 @@ import (
 	"errors"
 	"testing"
 
-	"k8s.io/webhookauth/verify"
+	"k8s.io/webhookauth/internal/verify"
 )
 
 // TestRemoteVerifier_MalformedKubernetesClaims covers the private-claims decode

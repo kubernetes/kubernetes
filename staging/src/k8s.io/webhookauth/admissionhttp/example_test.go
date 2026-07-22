@@ -25,13 +25,13 @@ limitations under the License.
 //   - Example_rawHTTPWebhook       — a plain net/http webhook (mount our handler)
 //   - Example_controllerRuntimeStyle — a decorator over an ALREADY-decoded review
 //     (controller-runtime / Gatekeeper / kube-rbac-proxy: capture the bearer
-//     token in HTTP middleware, then call VerifyAdmissionRequest on the request
+//     token in HTTP middleware, then call Verifier.Verify on the request
 //     the framework already decoded).
 //
 // The ONLY production change is pointing the verifier at the cluster's real OIDC
-// issuer (RemoteConfig.Issuer for the raw-HTTP path, oidc.NewRemoteVerifier for
-// the controller-runtime path) instead of the throwaway TLS issuer these examples
-// stand up. Signatures are verified for real; there is no insecure path.
+// issuer (the issuer passed to WithRemoteIssuer) instead of the throwaway TLS
+// issuer these examples stand up. Signatures are verified for real; there is no
+// insecure path.
 package admissionhttp_test
 
 import (
@@ -46,9 +46,8 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/webhookauth/verify"
-	"k8s.io/webhookauth/verify/admissionhttp"
-	"k8s.io/webhookauth/verify/oidc"
+	"k8s.io/webhookauth/admissionhttp"
+	"k8s.io/webhookauth/internal/verify"
 )
 
 // The verifier's config surface is the issuer, the audience minted for this
@@ -107,7 +106,7 @@ func exampleReview(group string) *admissionv1.AdmissionReview {
 // admission logic. The handler decodes the body once, enforces the token, and —
 // only on success — calls the downstream AdmissionHandler with the decoded request.
 func Example_rawHTTPWebhook() {
-	// PRODUCTION: point RemoteConfig.Issuer at the cluster's OIDC issuer. The
+	// PRODUCTION: point WithRemoteIssuer at the cluster's OIDC issuer. The
 	// example stands up a throwaway TLS issuer so it verifies REAL signatures.
 	issuer, err := startOIDCServer()
 	if err != nil {
@@ -124,14 +123,11 @@ func Example_rawHTTPWebhook() {
 
 	// 2. Build the verification handler in one call: it constructs the verifier
 	//    from the trusted issuer and the audience minted for this webhook, and
-	//    wraps admit. RemoteConfig.HTTPClient supplies a client that trusts the
+	//    wraps admit. The *http.Client passed to WithRemoteIssuer trusts the
 	//    issuer's serving CA (in-cluster: the mounted apiserver CA bundle). Omit
-	//    WithRemoteConfig entirely for the zero-config in-cluster path.
-	h, err := admissionhttp.WithTokenVerification(context.Background(), admit, admissionhttp.WithRemoteConfig(admissionhttp.RemoteConfig{
-		Issuer:     issuer.issuer,
-		Audience:   exampleAudience,
-		HTTPClient: issuer.client(),
-	}))
+	//    WithRemoteIssuer entirely for the zero-config in-cluster path.
+	h, err := admissionhttp.WithTokenVerification(context.Background(), admit,
+		admissionhttp.WithRemoteIssuer(issuer.issuer, exampleAudience, issuer.client()))
 	if err != nil {
 		panic(err) // misconfiguration (empty issuer/audience) or discovery failure
 	}
@@ -164,7 +160,7 @@ func Example_rawHTTPWebhook() {
 // over a framework that has ALREADY decoded the review — controller-runtime,
 // Gatekeeper, kube-rbac-proxy. There is no second decode: the framework hands
 // you the request, and an HTTP middleware you install captures the bearer token
-// into the request context. You then call VerifyAdmissionRequest and branch.
+// into the request context. You then call Verifier.Verify and branch.
 func Example_controllerRuntimeStyle() {
 	issuer, err := startOIDCServer()
 	if err != nil {
@@ -172,7 +168,8 @@ func Example_controllerRuntimeStyle() {
 	}
 	defer issuer.close()
 
-	v, err := oidc.NewRemoteVerifier(context.Background(), issuer.issuer, exampleAudience, oidc.WithHTTPClient(issuer.client()))
+	v, err := admissionhttp.NewVerifier(context.Background(),
+		admissionhttp.WithRemoteIssuer(issuer.issuer, exampleAudience, issuer.client()))
 	if err != nil {
 		panic(err)
 	}
@@ -187,7 +184,7 @@ func Example_controllerRuntimeStyle() {
 
 	// One call gates your admission logic. nil == verified; any error is a single
 	// generic failure (the reason is logged internally; do not branch on it).
-	if err := admissionhttp.VerifyAdmissionRequest(ctx, v, review.Request, token); err != nil {
+	if err := v.Verify(ctx, review.Request, token); err != nil {
 		fmt.Println("denied") // return a 401 / deny AdmissionResponse here
 		return
 	}
@@ -208,11 +205,8 @@ func TestExampleEndToEnd_MinimalWebhook(t *testing.T) {
 		reached = true
 		return &admissionv1.AdmissionResponse{Allowed: true}
 	}
-	h, err := admissionhttp.WithTokenVerification(context.Background(), admit, admissionhttp.WithRemoteConfig(admissionhttp.RemoteConfig{
-		Issuer:     ts.issuer,
-		Audience:   exampleAudience,
-		HTTPClient: ts.client(),
-	}))
+	h, err := admissionhttp.WithTokenVerification(context.Background(), admit,
+		admissionhttp.WithRemoteIssuer(ts.issuer, exampleAudience, ts.client()))
 	if err != nil {
 		t.Fatalf("WithTokenVerification: %v", err)
 	}
@@ -284,7 +278,7 @@ func TestExampleEndToEnd_MinimalWebhook(t *testing.T) {
 // fail-closed.
 //
 // This is the zero-config path production assembles from WithTokenVerification(ctx,
-// admit): no WithRemoteConfig, so the in-cluster branch runs. WithInClusterEndpointForTest
+// admit): no WithRemoteIssuer, so the in-cluster branch runs. WithInClusterEndpointForTest
 // redirects that branch at a throwaway TLS apiserver double and its client while
 // STAYING in-cluster mode (it does not select remote), so the ACTUAL entrypoint runs
 // offline and verifies REAL signatures — the default path only swaps
@@ -292,7 +286,7 @@ func TestExampleEndToEnd_MinimalWebhook(t *testing.T) {
 func TestExampleEndToEnd_InClusterDeferredWebhook(t *testing.T) {
 	ts := newOIDCTestServer(t)
 
-	// The Service backing this webhook. InClusterAudienceResolver derives the
+	// The Service backing this webhook. The in-cluster resolver derives the
 	// audience as https://<name>.<namespace>.svc:<port><path>, reading the port
 	// from the kubelet-injected <NAME>_SERVICE_PORT env var (also a trust anchor:
 	// only a real Service in this pod's namespace has one).
@@ -382,5 +376,111 @@ func TestExampleEndToEnd_InClusterDeferredWebhook(t *testing.T) {
 	}
 	if reached {
 		t.Error("downstream reached for an unauthenticated request")
+	}
+}
+
+// TestExampleEndToEnd_InClusterAudienceMismatchFixedByWithAudience demonstrates a
+// real operational hazard of request-derived audiences and the WithAudience
+// remedy.
+//
+// The in-cluster resolver builds the audience from the kubelet-injected
+// <NAME>_SERVICE_PORT env var. When that port does not match the port the API
+// server minted into the token's audience — e.g. a Service whose exposed port
+// differs from the port the webhook is registered on — the DERIVED audience is
+// still a valid string, so it binds on the first request and the handler reports
+// READY. Yet every token is denied fail-closed, because the bound audience is
+// wrong. And since the audience freezes on first bind (a conflicting rebind is
+// rejected), there is NO runtime recovery: a healthy-looking deny-all.
+//
+// The fix is a construction-time redeploy with an explicit WithAudience override
+// matching the token's true audience — NOT a runtime retry. This is why
+// WithAudience matters for the net/http path too, not only the decoded path.
+func TestExampleEndToEnd_InClusterAudienceMismatchFixedByWithAudience(t *testing.T) {
+	ts := newOIDCTestServer(t)
+
+	const svcName, svcNamespace = "webhook", "default"
+	serviceHost := svcName + "." + svcNamespace + ".svc"
+
+	// The Service exposes 8443 (what the kubelet injects), but the webhook is
+	// registered on 443, so the API server mints the token with the :443 audience.
+	t.Setenv("WEBHOOK_SERVICE_PORT", "8443")
+	derivedAudience := verify.AudienceForService(svcName, svcNamespace, 8443, "/") // what the resolver builds
+	trueAudience := verify.AudienceForService(svcName, svcNamespace, 443, "/")     // what the token carries
+	if derivedAudience == trueAudience {
+		t.Fatal("test setup: derived and true audiences must differ")
+	}
+
+	claims := ts.baseClaims()
+	claims["aud"] = []string{trueAudience}
+	token := ts.sign(t, claims)
+
+	var reached bool
+	admit := func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
+		reached = true
+		return &admissionv1.AdmissionResponse{UID: req.UID, Allowed: true}
+	}
+
+	// run drives one POST (as the apiserver would: Host = Service DNS, path "/")
+	// against a fresh server for h and returns the HTTP status. A post-decode
+	// denial is HTTP 200 with Allowed:false, so `reached` is the allow/deny signal.
+	run := func(h http.Handler) int {
+		srv := httptest.NewServer(h)
+		defer srv.Close()
+		body, err := json.Marshal(exampleReview(exampleAPIGroup))
+		if err != nil {
+			t.Fatalf("marshal review: %v", err)
+		}
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, srv.URL+"/", bytes.NewReader(body))
+		if err != nil {
+			t.Fatalf("new request: %v", err)
+		}
+		req.Host = serviceHost
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp, err := srv.Client().Do(req)
+		if err != nil {
+			t.Fatalf("do request: %v", err)
+		}
+		defer resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	// 1. Default in-cluster handler: derives the :8443 audience, binds it, and
+	//    reports READY — but the :443 token is denied, with no way to recover.
+	hDefault, err := admissionhttp.WithTokenVerification(context.Background(), admit,
+		admissionhttp.WithInClusterEndpointForTest(ts.issuer, ts.client()))
+	if err != nil {
+		t.Fatalf("WithTokenVerification (default): %v", err)
+	}
+	reached = false
+	if got := run(hDefault); got != http.StatusOK {
+		t.Errorf("default handler status = %d, want %d (post-decode denial is 200 Allowed:false)", got, http.StatusOK)
+	}
+	if reached {
+		t.Error("default handler: downstream reached despite the audience mismatch (should be denied)")
+	}
+	// The hazard: bound the WRONG audience, yet reports ready.
+	if err := hDefault.HealthCheck(); err != nil {
+		t.Errorf("default handler: expected READY after binding the (wrong) derived audience, got %v", err)
+	}
+
+	// 2. Fix: reconstruct with WithAudience overriding the derivation to the true
+	//    audience. Ready at construction (no first request needed), and now the
+	//    token verifies and reaches the downstream.
+	hFixed, err := admissionhttp.WithTokenVerification(context.Background(), admit,
+		admissionhttp.WithInClusterEndpointForTest(ts.issuer, ts.client()),
+		admissionhttp.WithAudience(trueAudience))
+	if err != nil {
+		t.Fatalf("WithTokenVerification (WithAudience): %v", err)
+	}
+	if err := hFixed.HealthCheck(); err != nil {
+		t.Errorf("WithAudience handler: expected ready at construction, got %v", err)
+	}
+	reached = false
+	if got := run(hFixed); got != http.StatusOK {
+		t.Errorf("WithAudience handler status = %d, want %d", got, http.StatusOK)
+	}
+	if !reached {
+		t.Error("WithAudience handler: downstream not reached for a matching-audience token")
 	}
 }

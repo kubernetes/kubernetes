@@ -33,10 +33,17 @@ type unverifiedClaims struct {
 
 // parseUnverifiedClaims decodes a JWT payload WITHOUT verifying its signature,
 // for the issuer pre-check only. The result is never trusted.
+//
+// It mirrors the apiserver's untrusted-issuer parsing: a compact JWT has exactly
+// three dot-separated segments, and a payload that begins with "{" is a raw JSON
+// (not a compact JWT) and is rejected outright.
 func parseUnverifiedClaims(token string) (unverifiedClaims, error) {
+	if strings.HasPrefix(strings.TrimSpace(token), "{") {
+		return unverifiedClaims{}, errors.New("token is not a compact JWT")
+	}
 	parts := strings.Split(token, ".")
-	if len(parts) < 2 {
-		return unverifiedClaims{}, errors.New("token is not a JWT")
+	if len(parts) != 3 {
+		return unverifiedClaims{}, errors.New("malformed token")
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {

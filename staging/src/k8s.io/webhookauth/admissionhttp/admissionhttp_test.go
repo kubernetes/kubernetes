@@ -42,9 +42,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/webhookauth/verify"
-	"k8s.io/webhookauth/verify/admissionhttp"
-	"k8s.io/webhookauth/verify/oidc"
+	"k8s.io/webhookauth/admissionhttp"
+	"k8s.io/webhookauth/internal/oidc"
+	"k8s.io/webhookauth/internal/verify"
 )
 
 const (
@@ -562,18 +562,18 @@ func TestWithTokenVerification_OverLimitBodyRejected(t *testing.T) {
 // fails closed.
 func TestVerifyAdmissionRequest(t *testing.T) {
 	ts := newOIDCTestServer(t)
-	v := ts.verifier(t)
+	vv := admissionhttp.NewVerifierForTest(ts.verifier(t))
 
 	t.Run("valid token and matching group -> nil", func(t *testing.T) {
 		token := ts.sign(t, ts.baseClaims())
-		if err := admissionhttp.VerifyAdmissionRequest(context.Background(), v, admissionReview(testGroup).Request, token); err != nil {
+		if err := vv.Verify(context.Background(), admissionReview(testGroup).Request, token); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 	})
 
 	t.Run("group not authorized -> generic failure", func(t *testing.T) {
 		token := ts.sign(t, ts.baseClaims())
-		err := admissionhttp.VerifyAdmissionRequest(context.Background(), v, admissionReview("batch").Request, token)
+		err := vv.Verify(context.Background(), admissionReview("batch").Request, token)
 		if err == nil || !errors.Is(err, verify.ErrVerificationFailed) {
 			t.Fatalf("want generic verification failure, got %v", err)
 		}
@@ -581,7 +581,7 @@ func TestVerifyAdmissionRequest(t *testing.T) {
 
 	t.Run("nil request -> fails closed", func(t *testing.T) {
 		token := ts.sign(t, ts.baseClaims())
-		err := admissionhttp.VerifyAdmissionRequest(context.Background(), v, nil, token)
+		err := vv.Verify(context.Background(), nil, token)
 		if err == nil || !errors.Is(err, verify.ErrVerificationFailed) {
 			t.Fatalf("want generic verification failure for a nil request, got %v", err)
 		}

@@ -35,4 +35,4 @@ limitations under the License.
 //
 // Callers wire [Verifier.Verify] into their own admission entry point; this
 // package ships no http.Handler adapter or controller-runtime decorator.
-package verify // import "k8s.io/webhookauth/verify"
+package verify // import "k8s.io/webhookauth/internal/verify"

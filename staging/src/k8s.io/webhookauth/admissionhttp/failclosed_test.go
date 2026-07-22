@@ -28,8 +28,8 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/webhookauth/verify"
-	"k8s.io/webhookauth/verify/admissionhttp"
+	"k8s.io/webhookauth/admissionhttp"
+	"k8s.io/webhookauth/internal/verify"
 )
 
 // TestBearerToken_Table exercises the header parser directly across the scheme
@@ -177,7 +177,7 @@ func TestWithTokenVerification_EmptyBearerRejected(t *testing.T) {
 // (Was TestWithTokenVerification_NilNextTerminal.)
 
 // TestWithTokenVerification_RemoteConfigValidation proves the fail-closed
-// construction contract for remote mode (Edie M1/M3/M8). WithRemoteConfig commits
+// construction contract for remote mode (Edie M1/M3/M8). WithRemoteIssuer commits
 // the handler to remote, so a present-but-incomplete config — missing audience,
 // missing issuer, or both — is a HARD construction error: a nil handler and a
 // non-nil error, never a silent fallback to in-cluster and never a verifier built
@@ -192,16 +192,17 @@ func TestWithTokenVerification_RemoteConfigValidation(t *testing.T) {
 	// Partial remote configs fail closed BEFORE any verifier is constructed: the
 	// joint issuer+audience check short-circuits, so no network/discovery happens.
 	partials := []struct {
-		name string
-		cfg  admissionhttp.RemoteConfig
+		name     string
+		issuer   string
+		audience string
 	}{
-		{name: "issuer set, audience empty", cfg: admissionhttp.RemoteConfig{Issuer: "https://issuer.example.com"}},
-		{name: "audience set, issuer empty", cfg: admissionhttp.RemoteConfig{Audience: testAudience}},
-		{name: "both empty", cfg: admissionhttp.RemoteConfig{}},
+		{name: "issuer set, audience empty", issuer: "https://issuer.example.com"},
+		{name: "audience set, issuer empty", audience: testAudience},
+		{name: "both empty"},
 	}
 	for _, tc := range partials {
 		t.Run(tc.name, func(t *testing.T) {
-			h, err := admissionhttp.WithTokenVerification(context.Background(), admit, admissionhttp.WithRemoteConfig(tc.cfg))
+			h, err := admissionhttp.WithTokenVerification(context.Background(), admit, admissionhttp.WithRemoteIssuer(tc.issuer, tc.audience, nil))
 			if err == nil {
 				t.Fatalf("expected a construction error for a partial remote config, got nil error (handler=%v)", h)
 			}
@@ -219,11 +220,8 @@ func TestWithTokenVerification_RemoteConfigValidation(t *testing.T) {
 	// builds a handler with no error (mirrors the Example_rawHTTPWebhook setup).
 	t.Run("complete remote config builds", func(t *testing.T) {
 		ts := newOIDCTestServer(t)
-		h, err := admissionhttp.WithTokenVerification(context.Background(), admit, admissionhttp.WithRemoteConfig(admissionhttp.RemoteConfig{
-			Issuer:     ts.issuer,
-			Audience:   testAudience,
-			HTTPClient: ts.client(),
-		}))
+		h, err := admissionhttp.WithTokenVerification(context.Background(), admit,
+			admissionhttp.WithRemoteIssuer(ts.issuer, testAudience, ts.client()))
 		if err != nil {
 			t.Fatalf("complete remote config: unexpected error: %v", err)
 		}
@@ -233,7 +231,7 @@ func TestWithTokenVerification_RemoteConfigValidation(t *testing.T) {
 	})
 
 	// Positive control: the zero-remote-option in-cluster path must NOT be gated by
-	// the remote validation. With no WithRemoteConfig, WithTokenVerification builds
+	// the remote validation. With no WithRemoteIssuer, WithTokenVerification builds
 	// the deferred in-cluster verifier (redirected offline via the test seam)
 	// without a validation error.
 	t.Run("in-cluster path is not gated by remote validation", func(t *testing.T) {
@@ -382,19 +380,91 @@ func TestWithTokenVerification_DecodeOnce_BodyConsumedExactlyOnce(t *testing.T) 
 // framework.
 func TestVerifyAdmissionRequest_ZeroDecode(t *testing.T) {
 	ts := newOIDCTestServer(t)
-	v := ts.verifier(t)
+	vv := admissionhttp.NewVerifierForTest(ts.verifier(t))
 	token := ts.sign(t, ts.baseClaims())
 
 	req := &admissionv1.AdmissionRequest{
 		Resource: metav1.GroupVersionResource{Group: testGroup, Version: "v1", Resource: "deployments"},
 	}
-	if err := admissionhttp.VerifyAdmissionRequest(context.Background(), v, req, token); err != nil {
+	if err := vv.Verify(context.Background(), req, token); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// A nil request fails closed with the generic error, still without any decode.
-	err := admissionhttp.VerifyAdmissionRequest(context.Background(), v, nil, token)
+	err := vv.Verify(context.Background(), nil, token)
 	if err == nil || !errors.Is(err, verify.ErrVerificationFailed) {
 		t.Fatalf("nil request: want generic ErrVerificationFailed, got %v", err)
+	}
+}
+
+// TestNewVerifier_InClusterExplicitAudience proves the already-decoded path is
+// fully supported in-cluster when the audience is supplied via WithAudience: the
+// issuer is discovered in-cluster (offline test seam), the audience is bound at
+// construction, so the Verifier is ready immediately (no first request needed)
+// and verifies a real token. This is the fix for the previously-unsupported
+// in-cluster + decoded cell.
+func TestNewVerifier_InClusterExplicitAudience(t *testing.T) {
+	ts := newOIDCTestServer(t)
+
+	v, err := admissionhttp.NewVerifier(context.Background(),
+		admissionhttp.WithInClusterEndpointForTest(ts.issuer, ts.client()),
+		admissionhttp.WithAudience(testAudience))
+	if err != nil {
+		t.Fatalf("NewVerifier: %v", err)
+	}
+	// Ready at construction: the audience was bound eagerly, so no first request
+	// is needed to leave not-ready.
+	if err := v.HealthCheck(); err != nil {
+		t.Fatalf("expected a ready verifier, got not-ready: %v", err)
+	}
+
+	token := ts.sign(t, ts.baseClaims())
+	if err := v.Verify(context.Background(), admissionReview(testGroup).Request, token); err != nil {
+		t.Errorf("unexpected verification error: %v", err)
+	}
+
+	// A token carrying the wrong audience is denied fail-closed (the bound audience
+	// is enforced natively as the go-oidc ClientID).
+	wrong := ts.baseClaims()
+	wrong["aud"] = []string{"someone.else.example.com"}
+	err = v.Verify(context.Background(), admissionReview(testGroup).Request, ts.sign(t, wrong))
+	if err == nil || !errors.Is(err, verify.ErrVerificationFailed) {
+		t.Errorf("wrong audience: want generic ErrVerificationFailed, got %v", err)
+	}
+}
+
+// TestWithAudience_ConflictsWithRemoteIssuer proves WithAudience and
+// WithRemoteIssuer cannot be combined: the audience would be set two ways, so the
+// builder fails closed at construction rather than applying a silent precedence.
+func TestWithAudience_ConflictsWithRemoteIssuer(t *testing.T) {
+	ts := newOIDCTestServer(t)
+
+	v, err := admissionhttp.NewVerifier(context.Background(),
+		admissionhttp.WithRemoteIssuer(ts.issuer, testAudience, ts.client()),
+		admissionhttp.WithAudience(testAudience))
+	if err == nil {
+		t.Fatalf("expected a construction error combining WithAudience and WithRemoteIssuer, got verifier %v", v)
+	}
+	if v != nil {
+		t.Errorf("expected a nil verifier on a construction error, got %v", v)
+	}
+	if !strings.Contains(err.Error(), "WithAudience cannot be combined with WithRemoteIssuer") {
+		t.Errorf("error = %q, want it to mention the WithAudience/WithRemoteIssuer conflict", err)
+	}
+}
+
+// TestWithAudience_EmptyIsError proves an explicit but empty audience is a hard
+// construction error, never a verifier built with an audience-skipping audience.
+func TestWithAudience_EmptyIsError(t *testing.T) {
+	ts := newOIDCTestServer(t)
+
+	v, err := admissionhttp.NewVerifier(context.Background(),
+		admissionhttp.WithInClusterEndpointForTest(ts.issuer, ts.client()),
+		admissionhttp.WithAudience(""))
+	if err == nil {
+		t.Fatalf("expected a construction error for an empty WithAudience, got verifier %v", v)
+	}
+	if v != nil {
+		t.Errorf("expected a nil verifier on a construction error, got %v", v)
 	}
 }
