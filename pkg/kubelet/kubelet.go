@@ -109,6 +109,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
+	"k8s.io/kubernetes/pkg/kubelet/metrics/cri"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown"
 	oomwatcher "k8s.io/kubernetes/pkg/kubelet/oom"
@@ -419,6 +420,7 @@ func PreInitRuntimeService(ctx context.Context, kubeCfg *kubeletconfiginternal.K
 		Build(ctx); err != nil {
 		return err
 	}
+	kubeDeps.RemoteRuntimeService = cri.NewInstrumentedRuntimeService(kubeDeps.RemoteRuntimeService)
 	if kubeDeps.RemoteImageService, err = remote.NewRemoteImageServiceBuilder().
 		WithEndpoint(remoteImageEndpoint).
 		WithConnectionTimeout(kubeCfg.RuntimeRequestTimeout.Duration).
@@ -427,6 +429,7 @@ func PreInitRuntimeService(ctx context.Context, kubeCfg *kubeletconfiginternal.K
 		Build(ctx); err != nil {
 		return err
 	}
+	kubeDeps.RemoteImageService = cri.NewInstrumentedImageManagerService(kubeDeps.RemoteImageService)
 
 	kubeDeps.useLegacyCadvisorStats = cadvisor.UsingLegacyCadvisorStats(kubeCfg.ContainerRuntimeEndpoint)
 
@@ -846,7 +849,7 @@ func NewMainKubelet(ctx context.Context,
 	}
 	klet.containerRuntime = runtime
 	klet.streamingRuntime = runtime
-	klet.runner = runtime
+	klet.runner = kubecontainer.NewCommandRunner(kubeDeps.RemoteRuntimeService)
 	resizeAdmitHandler := allocation.NewPodResizesAdmitHandler(klet.containerManager, runtime, klet.allocationManager)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime, runtimeCacheRefreshPeriod)

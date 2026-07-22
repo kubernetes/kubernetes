@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kuberuntime
+package cri
 
 import (
 	"net"
@@ -26,6 +26,7 @@ import (
 
 	compbasemetrics "k8s.io/component-base/metrics"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	critesting "k8s.io/cri-api/pkg/apis/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -72,23 +73,23 @@ func TestRecordOperation(t *testing.T) {
 
 func TestInstrumentedVersion(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	fakeRuntime, _, _, _ := createTestRuntimeManager(tCtx)
-	irs := newInstrumentedRuntimeService(fakeRuntime)
+	fakeRuntime := critesting.NewFakeRuntimeService()
+	irs := NewInstrumentedRuntimeService(fakeRuntime)
 	vr, err := irs.Version(tCtx, "1")
 	assert.NoError(t, err)
-	assert.Equal(t, kubeRuntimeAPIVersion, vr.Version)
+	assert.Equal(t, critesting.FakeVersion, vr.Version)
 }
 
 func TestStatus(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	fakeRuntime, _, _, _ := createTestRuntimeManager(tCtx)
+	fakeRuntime := critesting.NewFakeRuntimeService()
 	fakeRuntime.FakeStatus = &runtimeapi.RuntimeStatus{
 		Conditions: []*runtimeapi.RuntimeCondition{
 			{Type: runtimeapi.RuntimeReady, Status: false},
 			{Type: runtimeapi.NetworkReady, Status: true},
 		},
 	}
-	irs := newInstrumentedRuntimeService(fakeRuntime)
+	irs := NewInstrumentedRuntimeService(fakeRuntime)
 	actural, err := irs.Status(tCtx, false)
 	assert.NoError(t, err)
 	expected := &runtimeapi.RuntimeStatus{
