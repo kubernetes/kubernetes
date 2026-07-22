@@ -1116,6 +1116,11 @@ const (
 	// Requires stricter validation of IP addresses and CIDR values in API objects.
 	StrictIPCIDRValidation featuregate.Feature = "StrictIPCIDRValidation"
 
+	// owner: @Astraw99
+	//
+	// Add validation for empty NodeSelectorTerms
+	ValidateEmptyNodeSelectorTerm featuregate.Feature = "ValidateEmptyNodeSelectorTerm"
+
 	// owner: @everpeace
 	// kep: https://kep.k8s.io/3619
 	//
@@ -2065,6 +2070,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	ValidateEmptyNodeSelectorTerm: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	SupplementalGroupsPolicy: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
@@ -2702,6 +2711,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	StorageVersionMigrator: {},
 
 	StrictIPCIDRValidation: {},
+
+	ValidateEmptyNodeSelectorTerm: {},
 
 	SupplementalGroupsPolicy: {},
 

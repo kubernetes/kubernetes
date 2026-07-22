@@ -437,6 +437,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowRestartAllContainers:                               utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
 		AllowImageVolumeWithDigest:                              utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest),
 		AllowExistingRestartContainerForNonSidecarInitContainer: hasRestartContainerForNonSidecarInitContainer(oldPodSpec),
+		AllowEmptyNodeSelectorTerm:                              !utilfeature.DefaultFeatureGate.Enabled(features.ValidateEmptyNodeSelectorTerm),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -454,6 +455,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 
 		opts.AllowInvalidLabelValueInSelector = hasInvalidLabelValueInAffinitySelector(oldPodSpec)
 		opts.AllowInvalidLabelValueInRequiredNodeAffinity = hasInvalidLabelValueInRequiredNodeAffinity(oldPodSpec)
+		if hasEmptyNodeSelectorTerm(oldPodSpec) {
+			opts.AllowEmptyNodeSelectorTerm = true
+		}
 		// if old spec has invalid labelSelector in topologySpreadConstraint, we must allow it
 		opts.AllowInvalidTopologySpreadConstraintLabelSelector = hasInvalidTopologySpreadConstraintLabelSelector(oldPodSpec)
 		if opts.AllowMatchLabelKeysInPodTopologySpread {
@@ -1702,6 +1706,26 @@ func hasInvalidLabelValueInRequiredNodeAffinity(spec *api.PodSpec) bool {
 		return false
 	}
 	return helper.HasInvalidLabelValueInNodeSelectorTerms(spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms)
+}
+
+func hasEmptyNodeSelectorTerm(spec *api.PodSpec) bool {
+	if spec == nil || spec.Affinity == nil || spec.Affinity.NodeAffinity == nil {
+		return false
+	}
+	na := spec.Affinity.NodeAffinity
+	if na.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		for _, term := range na.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+			if len(term.MatchExpressions) == 0 && len(term.MatchFields) == 0 {
+				return true
+			}
+		}
+	}
+	for _, term := range na.PreferredDuringSchedulingIgnoredDuringExecution {
+		if len(term.Preference.MatchExpressions) == 0 && len(term.Preference.MatchFields) == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // KEP: https://kep.k8s.io/4639

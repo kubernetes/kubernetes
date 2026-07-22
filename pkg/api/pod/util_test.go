@@ -4746,6 +4746,74 @@ func TestValidateInvalidLabelValueInNodeSelectorOption(t *testing.T) {
 	}
 }
 
+func TestValidateEmptyNodeSelectorTermOption(t *testing.T) {
+	testCases := []struct {
+		name       string
+		oldPodSpec *api.PodSpec
+		wantOption bool
+	}{
+		{
+			name:       "Create",
+			wantOption: false,
+		},
+		{
+			name: "UpdateEmptyNodeSelectorTermRequired",
+			oldPodSpec: &api.PodSpec{
+				Affinity: &api.Affinity{
+					NodeAffinity: &api.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+							NodeSelectorTerms: []api.NodeSelectorTerm{{}},
+						},
+					},
+				},
+			},
+			wantOption: true,
+		},
+		{
+			name: "UpdateEmptyNodeSelectorTermPreferred",
+			oldPodSpec: &api.PodSpec{
+				Affinity: &api.Affinity{
+					NodeAffinity: &api.NodeAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []api.PreferredSchedulingTerm{{
+							Weight:     10,
+							Preference: api.NodeSelectorTerm{},
+						}},
+					},
+				},
+			},
+			wantOption: true,
+		},
+		{
+			name: "UpdateValidNodeSelectorTerm",
+			oldPodSpec: &api.PodSpec{
+				Affinity: &api.Affinity{
+					NodeAffinity: &api.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+							NodeSelectorTerms: []api.NodeSelectorTerm{{
+								MatchExpressions: []api.NodeSelectorRequirement{{
+									Key:      "foo",
+									Operator: api.NodeSelectorOpIn,
+									Values:   []string{"bar"},
+								}},
+							}},
+						},
+					},
+				},
+			},
+			wantOption: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if tc.wantOption != gotOptions.AllowEmptyNodeSelectorTerm {
+				t.Errorf("Got AllowEmptyNodeSelectorTerm=%t, want %t", gotOptions.AllowEmptyNodeSelectorTerm, tc.wantOption)
+			}
+		})
+	}
+}
+
 func TestHasAPIReferences(t *testing.T) {
 	tests := []struct {
 		name            string

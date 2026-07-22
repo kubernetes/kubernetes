@@ -4535,6 +4535,8 @@ type PodValidationOptions struct {
 	AllowRestartAllContainers bool
 	// Allows container statuses to contain image volume digest
 	AllowImageVolumeWithDigest bool
+	// Allow empty NodeSelectorTerms for backward compatibility
+	AllowEmptyNodeSelectorTerm bool
 	// Allow empty image volume reference for backward compatibility
 	AllowEmptyImageVolumeReference bool
 }
@@ -5079,7 +5081,16 @@ func ValidateNodeFieldSelectorRequirement(req core.NodeSelectorRequirement, fldP
 
 // ValidateNodeSelectorTerm tests that the specified node selector term has valid data
 func ValidateNodeSelectorTerm(term core.NodeSelectorTerm, allowInvalidLabelValueInRequiredNodeAffinity bool, fldPath *field.Path) field.ErrorList {
+	return ValidateNodeSelectorTermWithRatcheting(term, allowInvalidLabelValueInRequiredNodeAffinity, true, fldPath)
+}
+
+func ValidateNodeSelectorTermWithRatcheting(term core.NodeSelectorTerm, allowInvalidLabelValueInRequiredNodeAffinity bool, allowEmptyNodeSelectorTerm bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+
+	if !allowEmptyNodeSelectorTerm && len(term.MatchExpressions) == 0 && len(term.MatchFields) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, "must have at least one matchExpressions or matchFields"))
+		return allErrs
+	}
 
 	for j, req := range term.MatchExpressions {
 		allErrs = append(allErrs, ValidateNodeSelectorRequirement(req, allowInvalidLabelValueInRequiredNodeAffinity, fldPath.Child("matchExpressions").Index(j))...)
@@ -5094,6 +5105,10 @@ func ValidateNodeSelectorTerm(term core.NodeSelectorTerm, allowInvalidLabelValue
 
 // ValidateNodeSelector tests that the specified nodeSelector fields has valid data
 func ValidateNodeSelector(nodeSelector *core.NodeSelector, allowInvalidLabelValueInRequiredNodeAffinity bool, fldPath *field.Path) field.ErrorList {
+	return ValidateNodeSelectorWithRatcheting(nodeSelector, allowInvalidLabelValueInRequiredNodeAffinity, true, fldPath)
+}
+
+func ValidateNodeSelectorWithRatcheting(nodeSelector *core.NodeSelector, allowInvalidLabelValueInRequiredNodeAffinity bool, allowEmptyNodeSelectorTerm bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	termFldPath := fldPath.Child("nodeSelectorTerms")
@@ -5102,7 +5117,7 @@ func ValidateNodeSelector(nodeSelector *core.NodeSelector, allowInvalidLabelValu
 	}
 
 	for i, term := range nodeSelector.NodeSelectorTerms {
-		allErrs = append(allErrs, ValidateNodeSelectorTerm(term, allowInvalidLabelValueInRequiredNodeAffinity, termFldPath.Index(i))...)
+		allErrs = append(allErrs, ValidateNodeSelectorTermWithRatcheting(term, allowInvalidLabelValueInRequiredNodeAffinity, allowEmptyNodeSelectorTerm, termFldPath.Index(i))...)
 	}
 
 	return allErrs
@@ -5196,6 +5211,10 @@ func validatePreferAvoidPodsEntry(avoidPodEntry core.PreferAvoidPodsEntry, fldPa
 
 // ValidatePreferredSchedulingTerms tests that the specified SoftNodeAffinity fields has valid data
 func ValidatePreferredSchedulingTerms(terms []core.PreferredSchedulingTerm, fldPath *field.Path) field.ErrorList {
+	return ValidatePreferredSchedulingTermsWithRatcheting(terms, true, fldPath)
+}
+
+func ValidatePreferredSchedulingTermsWithRatcheting(terms []core.PreferredSchedulingTerm, allowEmptyNodeSelectorTerm bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	for i, term := range terms {
@@ -5205,7 +5224,7 @@ func ValidatePreferredSchedulingTerms(terms []core.PreferredSchedulingTerm, fldP
 
 		// we always allow invalid label-value for preferred affinity
 		// as they can success when cluster has only one node
-		allErrs = append(allErrs, ValidateNodeSelectorTerm(term.Preference, true, fldPath.Index(i).Child("preference"))...)
+		allErrs = append(allErrs, ValidateNodeSelectorTermWithRatcheting(term.Preference, true, allowEmptyNodeSelectorTerm, fldPath.Index(i).Child("preference"))...)
 	}
 	return allErrs
 }
@@ -5275,10 +5294,10 @@ func validateNodeAffinity(na *core.NodeAffinity, opts PodValidationOptions, fldP
 	//	allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingRequiredDuringExecution, fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
 	// }
 	if na.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-		allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingIgnoredDuringExecution, opts.AllowInvalidLabelValueInRequiredNodeAffinity, fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
+		allErrs = append(allErrs, ValidateNodeSelectorWithRatcheting(na.RequiredDuringSchedulingIgnoredDuringExecution, opts.AllowInvalidLabelValueInRequiredNodeAffinity, opts.AllowEmptyNodeSelectorTerm, fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
 	}
 	if len(na.PreferredDuringSchedulingIgnoredDuringExecution) > 0 {
-		allErrs = append(allErrs, ValidatePreferredSchedulingTerms(na.PreferredDuringSchedulingIgnoredDuringExecution, fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
+		allErrs = append(allErrs, ValidatePreferredSchedulingTermsWithRatcheting(na.PreferredDuringSchedulingIgnoredDuringExecution, opts.AllowEmptyNodeSelectorTerm, fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
 	}
 	return allErrs
 }

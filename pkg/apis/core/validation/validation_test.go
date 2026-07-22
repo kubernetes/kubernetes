@@ -11405,39 +11405,7 @@ func TestValidatePod(t *testing.T) {
 					},
 				}),
 		),
-		"serialized node affinity requirements, II": *podtest.MakePod("123",
-			podtest.SetAffinity(
-				// TODO: Uncomment and move this block and move inside NodeAffinity once
-				// RequiredDuringSchedulingRequiredDuringExecution is implemented
-				//		RequiredDuringSchedulingRequiredDuringExecution: &core.NodeSelector{
-				//			NodeSelectorTerms: []core.NodeSelectorTerm{
-				//				{
-				//					MatchExpressions: []core.NodeSelectorRequirement{
-				//						{
-				//							Key: "key1",
-				//							Operator: core.NodeSelectorOpExists
-				//						},
-				//					},
-				//				},
-				//			},
-				//		},
-				&core.Affinity{
-					NodeAffinity: &core.NodeAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-							NodeSelectorTerms: []core.NodeSelectorTerm{{
-								MatchExpressions: []core.NodeSelectorRequirement{},
-							}},
-						},
-						PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
-							Weight: 10,
-							Preference: core.NodeSelectorTerm{
-								MatchExpressions: []core.NodeSelectorRequirement{},
-							},
-						}},
-					},
-				},
-			),
-		),
+
 		"serialized pod affinity in affinity requirements in annotations": *podtest.MakePod("123",
 			podtest.SetAffinity(
 				// TODO: Uncomment and move this block into Annotations map once
@@ -12254,6 +12222,31 @@ func TestValidatePod(t *testing.T) {
 						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
 							NodeSelectorTerms: []core.NodeSelectorTerm{},
 						},
+					},
+				}),
+			),
+		},
+		"invalid NodeSelectorTerm in required node affinity, matchExpressions and matchFields must have at least one element": {
+			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0]: Required value: must have at least one matchExpressions or matchFields",
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{}},
+						},
+					},
+				}),
+			),
+		},
+		"invalid NodeSelectorTerm in preferred node affinity, matchExpressions and matchFields must have at least one element": {
+			expectedError: "spec.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].preference: Required value: must have at least one matchExpressions or matchFields",
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
+							Weight:     10,
+							Preference: core.NodeSelectorTerm{},
+						}},
 					},
 				}),
 			),
@@ -15361,6 +15354,61 @@ func TestValidatePodUpdate(t *testing.T) {
 			),
 			err:  "pod updates may not change fields other than",
 			test: "updated restartPolicyRules",
+		},
+		{
+			test: "empty NodeSelectorTerm in node affinity allowed if old pod had it",
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{}},
+						},
+					},
+				}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{}},
+						},
+					},
+				}),
+			),
+			err:  "",
+			opts: PodValidationOptions{AllowEmptyNodeSelectorTerm: true},
+		},
+		{
+			test: "empty NodeSelectorTerm in node affinity rejected if old pod did not have it",
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{
+								{
+									MatchExpressions: []core.NodeSelectorRequirement{
+										{
+											Key:      "foo",
+											Operator: core.NodeSelectorOpIn,
+											Values:   []string{"bar"},
+										},
+									},
+								},
+							},
+						},
+					},
+				}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{}},
+						},
+					},
+				}),
+			),
+			err: "must have at least one matchExpressions or matchFields",
 		},
 	}
 
