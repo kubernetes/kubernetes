@@ -1920,6 +1920,16 @@ func getPolicyNameForOs() policyType {
 	return PolicyTypeStatic
 }
 
+// getAffinityForOs returns an affinity Store matching the policy selected by
+// getPolicyNameForOs. On Windows the BestEffort policy requires an
+// AuthoritativeStore, so a plain fake manager is not sufficient.
+func getAffinityForOs(logger klog.Logger) topologymanager.Store {
+	if goruntime.GOOS == "windows" {
+		return &fakeBestEffortAffinity{}
+	}
+	return topologymanager.NewFakeManager(logger)
+}
+
 func TestNewManager(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	machineInfo := returnMachineInfo()
@@ -1947,7 +1957,7 @@ func TestNewManager(t *testing.T) {
 					Limits:   v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(gb, resource.BinarySI)},
 				},
 			},
-			affinity:         topologymanager.NewFakeManager(logger),
+			affinity:         getAffinityForOs(logger),
 			expectedError:    nil,
 			expectedReserved: expectedReserved,
 		},
@@ -1970,7 +1980,7 @@ func TestNewManager(t *testing.T) {
 					},
 				},
 			},
-			affinity:         topologymanager.NewFakeManager(logger),
+			affinity:         getAffinityForOs(logger),
 			expectedError:    fmt.Errorf("the total amount \"3Gi\" of type %q is not equal to the value \"2Gi\" determined by Node Allocatable feature", v1.ResourceMemory),
 			expectedReserved: expectedReserved,
 		},
@@ -1980,7 +1990,7 @@ func TestNewManager(t *testing.T) {
 			machineInfo:                machineInfo,
 			nodeAllocatableReservation: v1.ResourceList{},
 			systemReservedMemory:       []kubeletconfig.MemoryReservation{},
-			affinity:                   topologymanager.NewFakeManager(logger),
+			affinity:                   getAffinityForOs(logger),
 			expectedError:              fmt.Errorf("[memorymanager] you should specify the system reserved memory"),
 			expectedReserved:           expectedReserved,
 		},
