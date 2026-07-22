@@ -125,13 +125,13 @@ func Example_rawHTTPWebhook() {
 	// 2. Build the verification handler in one call: it constructs the verifier
 	//    from the trusted issuer and the audience minted for this webhook, and
 	//    wraps admit. RemoteConfig.HTTPClient supplies a client that trusts the
-	//    issuer's serving CA (in-cluster: the mounted apiserver CA bundle). Pass a
-	//    nil *RemoteConfig instead for the zero-config in-cluster path.
-	h, err := admissionhttp.WithTokenVerification(context.Background(), admit, &admissionhttp.RemoteConfig{
+	//    issuer's serving CA (in-cluster: the mounted apiserver CA bundle). Omit
+	//    WithRemoteConfig entirely for the zero-config in-cluster path.
+	h, err := admissionhttp.WithTokenVerification(context.Background(), admit, admissionhttp.WithRemoteConfig(admissionhttp.RemoteConfig{
 		Issuer:     issuer.issuer,
 		Audience:   exampleAudience,
 		HTTPClient: issuer.client(),
-	})
+	}))
 	if err != nil {
 		panic(err) // misconfiguration (empty issuer/audience) or discovery failure
 	}
@@ -208,11 +208,11 @@ func TestExampleEndToEnd_MinimalWebhook(t *testing.T) {
 		reached = true
 		return &admissionv1.AdmissionResponse{Allowed: true}
 	}
-	h, err := admissionhttp.WithTokenVerification(context.Background(), admit, &admissionhttp.RemoteConfig{
+	h, err := admissionhttp.WithTokenVerification(context.Background(), admit, admissionhttp.WithRemoteConfig(admissionhttp.RemoteConfig{
 		Issuer:     ts.issuer,
 		Audience:   exampleAudience,
 		HTTPClient: ts.client(),
-	})
+	}))
 	if err != nil {
 		t.Fatalf("WithTokenVerification: %v", err)
 	}
@@ -275,25 +275,22 @@ func TestExampleEndToEnd_MinimalWebhook(t *testing.T) {
 }
 
 // TestExampleEndToEnd_InClusterDeferredWebhook is the in-cluster counterpart to
-// TestExampleEndToEnd_MinimalWebhook, proving the zero-config path end-to-end: a
-// DEFERRED verifier (local discovery + JWKS, audience UNKNOWN at startup) wired
-// behind the handler with InClusterAudienceResolver. The handler binds the
-// audience from the FIRST request, then verifies; readiness flips not-ready →
-// ready across it, and a later unauthenticated request is denied fail-closed.
+// TestExampleEndToEnd_MinimalWebhook, proving the DEFERRED in-cluster behavior
+// end-to-end through the REAL zero-config entrypoint. WithTokenVerification with
+// no remote option builds the in-cluster verifier (local discovery + JWKS,
+// audience UNKNOWN at startup) behind the handler with InClusterAudienceResolver.
+// The handler binds the audience from the FIRST request, then verifies; readiness
+// flips not-ready → ready across it, and a later unauthenticated request is denied
+// fail-closed.
 //
-// This mirrors incluster.InCluster (which only adds rest.InClusterConfig on top
-// of oidc.NewLocalKeySetVerifier); here the apiserver is a throwaway TLS double,
-// so the test runs offline and verifies REAL signatures.
+// This is the zero-config path production assembles from WithTokenVerification(ctx,
+// admit): no WithRemoteConfig, so the in-cluster branch runs. WithInClusterEndpointForTest
+// redirects that branch at a throwaway TLS apiserver double and its client while
+// STAYING in-cluster mode (it does not select remote), so the ACTUAL entrypoint runs
+// offline and verifies REAL signatures — the default path only swaps
+// oidc.InClusterAPIServerURL and the projected service-account CA client.
 func TestExampleEndToEnd_InClusterDeferredWebhook(t *testing.T) {
 	ts := newOIDCTestServer(t)
-
-	// The in-cluster verifier: the issuer is read from the apiserver's local
-	// discovery document, keys come from its local /openid/v1/jwks endpoint, and
-	// the audience is NOT known yet — it is bound from the first request below.
-	v, err := oidc.NewLocalKeySetVerifier(context.Background(), ts.issuer, oidc.WithHTTPClient(ts.client()))
-	if err != nil {
-		t.Fatalf("NewLocalKeySetVerifier: %v", err)
-	}
 
 	// The Service backing this webhook. InClusterAudienceResolver derives the
 	// audience as https://<name>.<namespace>.svc:<port><path>, reading the port
@@ -317,12 +314,17 @@ func TestExampleEndToEnd_InClusterDeferredWebhook(t *testing.T) {
 		return &admissionv1.AdmissionResponse{UID: req.UID, Allowed: true}
 	}
 
-	// The whole in-cluster wiring: the deferred verifier plus the resolver. In
-	// production admissionhttp.WithTokenVerification(ctx, admit, nil) builds this
-	// same shape, constructing the verifier from oidc.InClusterAPIServerURL; here
-	// the test injects a verifier backed by the throwaway apiserver double via the
-	// NewHandlerForTest seam so it can run offline.
-	h := admissionhttp.NewHandlerForTest(v, admit, admissionhttp.InClusterAudienceResolver())
+	// The whole in-cluster wiring, through the REAL entrypoint: with no remote
+	// option WithTokenVerification builds the deferred in-cluster verifier and the
+	// resolver — the same assembly production gets from WithTokenVerification(ctx,
+	// admit). WithInClusterEndpointForTest redirects the in-cluster branch at the
+	// throwaway apiserver double instead of oidc.InClusterAPIServerURL + the SA-CA
+	// client, staying in-cluster so the test runs offline.
+	h, err := admissionhttp.WithTokenVerification(context.Background(), admit,
+		admissionhttp.WithInClusterEndpointForTest(ts.issuer, ts.client()))
+	if err != nil {
+		t.Fatalf("WithTokenVerification: %v", err)
+	}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
 

@@ -22,7 +22,20 @@ import "k8s.io/webhookauth/verify"
 // Handler around an already-built verify.Verifier without going through
 // WithTokenVerification (which constructs its own verifier via OIDC discovery).
 // resolve is nil for the out-of-cluster path and an AudienceResolver for the
-// in-cluster deferred path.
+// in-cluster deferred path. Options are applied through the same builder the
+// exported constructor uses, so handler-affecting options (for example
+// WithMaxBodyBytes) behave identically here.
 func NewHandlerForTest(v *verify.Verifier, next AdmissionHandler, resolve AudienceResolver, opts ...Option) *Handler {
-	return newHandler(v, next, resolve, opts...)
+	b := newBuilder()
+	for _, opt := range opts {
+		opt(b)
+	}
+	return newHandler(v, next, resolve, b.maxBody)
 }
+
+// WithInClusterEndpointForTest exposes the unexported withInClusterEndpoint option
+// so tests can drive the REAL WithTokenVerification in-cluster branch offline,
+// redirecting it at a throwaway apiserver and HTTP client instead of
+// oidc.InClusterAPIServerURL and the projected service-account CA client. It stays
+// in-cluster mode (it does not select remote), closing the in-cluster e2e gap.
+var WithInClusterEndpointForTest = withInClusterEndpoint

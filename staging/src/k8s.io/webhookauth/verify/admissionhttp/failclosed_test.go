@@ -22,6 +22,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
@@ -174,6 +175,79 @@ func TestWithTokenVerification_EmptyBearerRejected(t *testing.T) {
 // required (WithTokenVerification panics on nil). If a standalone auth-gate use
 // case is ever needed, reintroduce it explicitly rather than via a nil next.
 // (Was TestWithTokenVerification_NilNextTerminal.)
+
+// TestWithTokenVerification_RemoteConfigValidation proves the fail-closed
+// construction contract for remote mode (Edie M1/M3/M8). WithRemoteConfig commits
+// the handler to remote, so a present-but-incomplete config — missing audience,
+// missing issuer, or both — is a HARD construction error: a nil handler and a
+// non-nil error, never a silent fallback to in-cluster and never a verifier built
+// with an empty (audience-skipping) audience. The positive controls prove a
+// complete remote config builds, and that the zero-remote-option in-cluster path
+// is NOT accidentally gated by the remote check.
+func TestWithTokenVerification_RemoteConfigValidation(t *testing.T) {
+	admit := func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
+		return &admissionv1.AdmissionResponse{UID: req.UID, Allowed: true}
+	}
+
+	// Partial remote configs fail closed BEFORE any verifier is constructed: the
+	// joint issuer+audience check short-circuits, so no network/discovery happens.
+	partials := []struct {
+		name string
+		cfg  admissionhttp.RemoteConfig
+	}{
+		{name: "issuer set, audience empty", cfg: admissionhttp.RemoteConfig{Issuer: "https://issuer.example.com"}},
+		{name: "audience set, issuer empty", cfg: admissionhttp.RemoteConfig{Audience: testAudience}},
+		{name: "both empty", cfg: admissionhttp.RemoteConfig{}},
+	}
+	for _, tc := range partials {
+		t.Run(tc.name, func(t *testing.T) {
+			h, err := admissionhttp.WithTokenVerification(context.Background(), admit, admissionhttp.WithRemoteConfig(tc.cfg))
+			if err == nil {
+				t.Fatalf("expected a construction error for a partial remote config, got nil error (handler=%v)", h)
+			}
+			if h != nil {
+				t.Errorf("expected a nil handler on a construction error, got %v", h)
+			}
+			// Robust to wording: assert only the stable substring, not the exact message.
+			if !strings.Contains(err.Error(), "issuer and an audience") {
+				t.Errorf("error = %q, want it to mention the joint issuer/audience requirement", err)
+			}
+		})
+	}
+
+	// Positive control: a fully-populated remote config against a throwaway issuer
+	// builds a handler with no error (mirrors the Example_rawHTTPWebhook setup).
+	t.Run("complete remote config builds", func(t *testing.T) {
+		ts := newOIDCTestServer(t)
+		h, err := admissionhttp.WithTokenVerification(context.Background(), admit, admissionhttp.WithRemoteConfig(admissionhttp.RemoteConfig{
+			Issuer:     ts.issuer,
+			Audience:   testAudience,
+			HTTPClient: ts.client(),
+		}))
+		if err != nil {
+			t.Fatalf("complete remote config: unexpected error: %v", err)
+		}
+		if h == nil {
+			t.Error("expected a non-nil handler for a complete remote config")
+		}
+	})
+
+	// Positive control: the zero-remote-option in-cluster path must NOT be gated by
+	// the remote validation. With no WithRemoteConfig, WithTokenVerification builds
+	// the deferred in-cluster verifier (redirected offline via the test seam)
+	// without a validation error.
+	t.Run("in-cluster path is not gated by remote validation", func(t *testing.T) {
+		ts := newOIDCTestServer(t)
+		h, err := admissionhttp.WithTokenVerification(context.Background(), admit,
+			admissionhttp.WithInClusterEndpointForTest(ts.issuer, ts.client()))
+		if err != nil {
+			t.Fatalf("in-cluster path: unexpected error: %v", err)
+		}
+		if h == nil {
+			t.Error("expected a non-nil handler for the in-cluster path")
+		}
+	})
+}
 
 // erroringBody is a request body whose Read returns a non-EOF error, simulating
 // a client connection that drops mid-transfer. It lets the test drive the

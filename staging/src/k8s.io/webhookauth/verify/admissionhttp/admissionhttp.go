@@ -24,9 +24,10 @@ limitations under the License.
 // downstream handler. Whether a webhook adopts verification at all is a
 // deployment-time concern that defaults off, not a runtime knob here.
 //
-// WithTokenVerification selects an out-of-cluster or in-cluster verifier from its
-// config argument; see its doc for the two modes and the fail-closed/not-ready
-// behavior until an in-cluster audience binds.
+// WithTokenVerification selects an out-of-cluster or in-cluster verifier by
+// option presence: with no option it is the zero-config in-cluster default, and
+// WithRemoteConfig opts into out-of-cluster verification. See its doc for the two
+// modes and the fail-closed/not-ready behavior until an in-cluster audience binds.
 //
 // Callers that have already decoded the review (for example controller-runtime)
 // should build a verifier with oidc.NewRemoteVerifier and use
@@ -97,16 +98,84 @@ const (
 // the raw body.
 type AdmissionHandler func(ctx context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse
 
-// Option configures the handler.
-type Option func(*Handler)
+// Option configures WithTokenVerification. Options mutate an internal builder
+// BEFORE the verifier is constructed, so an option can influence verifier
+// construction (mode selection, remote issuer/audience) as well as handler
+// behavior (body limit).
+type Option func(*builder)
+
+// builder accumulates option state before WithTokenVerification constructs the
+// verifier and assembles the Handler. It holds both verifier inputs (remote
+// issuer/audience/client and the unexported in-cluster endpoint overrides) and
+// handler config (maxBody).
+//
+// remoteSet is the single bright-line mode selector: only WithRemoteConfig sets
+// it, so remote mode is chosen by the PRESENCE of WithRemoteConfig and never by a
+// stray HTTPClient. This keeps the fail-closed contract unambiguous — an injected
+// CA can never half-select remote mode.
+type builder struct {
+	// remote verifier inputs; remoteSet true selects remote mode.
+	remoteSet  bool
+	issuer     string
+	audience   string
+	httpClient *http.Client
+
+	// in-cluster endpoint overrides, set only via withInClusterEndpoint (unexported;
+	// exposed to tests through export_test.go). They do NOT set remoteSet, so the
+	// handler stays in-cluster. inClusterURL=="" uses oidc.InClusterAPIServerURL;
+	// inClusterClient==nil uses the projected service-account CA client built inside
+	// oidc.NewLocalKeySetVerifier — so the default in-cluster path is unchanged.
+	inClusterURL    string
+	inClusterClient *http.Client
+
+	// handler config.
+	maxBody int64
+}
+
+// newBuilder returns a builder seeded with the handler defaults, ready for
+// options to mutate.
+func newBuilder() *builder {
+	return &builder{maxBody: defaultMaxBodyBytes}
+}
 
 // WithMaxBodyBytes overrides the limit applied when reading the request body. A
 // non-positive value is ignored and the default is retained.
 func WithMaxBodyBytes(n int64) Option {
-	return func(h *Handler) {
+	return func(b *builder) {
 		if n > 0 {
-			h.maxBody = n
+			b.maxBody = n
 		}
+	}
+}
+
+// WithRemoteConfig selects out-of-cluster verification against cfg.Issuer and
+// cfg.Audience (both required; the token must be issued by Issuer and carry
+// Audience). Its PRESENCE selects remote mode: passing it commits the handler to
+// remote, and an incomplete cfg (missing Issuer or Audience) is a construction
+// error from WithTokenVerification, never a silent fallback to in-cluster. Issuer
+// and Audience travel together in one struct so the jointly-required invariant is
+// preserved structurally (an empty audience must never mean "accept any
+// audience"). cfg.HTTPClient, when non-nil, is used for OIDC discovery and key
+// refreshes (for example to trust a private CA).
+func WithRemoteConfig(cfg RemoteConfig) Option {
+	return func(b *builder) {
+		b.remoteSet = true
+		b.issuer = cfg.Issuer
+		b.audience = cfg.Audience
+		b.httpClient = cfg.HTTPClient
+	}
+}
+
+// withInClusterEndpoint redirects the in-cluster verifier at apiServerURL and
+// client instead of oidc.InClusterAPIServerURL and the projected service-account
+// CA client. It stays IN-CLUSTER mode (it deliberately does NOT set remoteSet). It
+// is unexported and exposed only through export_test.go, so the real
+// WithTokenVerification entrypoint — not just the NewHandlerForTest seam — can be
+// driven offline against a throwaway apiserver, closing the in-cluster e2e gap.
+func withInClusterEndpoint(apiServerURL string, client *http.Client) Option {
+	return func(b *builder) {
+		b.inClusterURL = apiServerURL
+		b.inClusterClient = client
 	}
 }
 
@@ -160,14 +229,18 @@ type RemoteConfig struct {
 // verifies the token, and — only on success — invokes next with the decoded
 // AdmissionRequest and writes next's AdmissionResponse.
 //
-// cfg selects the verifier:
-//   - cfg != nil builds an out-of-cluster verifier bound to cfg.Issuer and
-//     cfg.Audience (see oidc.NewRemoteVerifier).
-//   - cfg == nil builds the in-cluster verifier (see oidc.NewLocalKeySetVerifier):
-//     the issuer is discovered over the in-cluster network and the audience is
-//     derived from the first request via [InClusterAudienceResolver]. Until the
-//     audience binds, requests are denied fail-closed and [Handler.HealthCheck]
-//     reports not-ready.
+// The verifier is selected by option presence — the safe path is the zero-config
+// default:
+//   - no remote option builds the in-cluster verifier (zero-config, secure by
+//     default; see oidc.NewLocalKeySetVerifier): the issuer is discovered over the
+//     in-cluster network and the audience is derived from the first request via
+//     [InClusterAudienceResolver]. Until the audience binds, requests are denied
+//     fail-closed and [Handler.HealthCheck] reports not-ready.
+//   - WithRemoteConfig builds an out-of-cluster verifier bound to the config's
+//     Issuer and Audience (see oidc.NewRemoteVerifier). Its presence commits the
+//     handler to remote mode; a present-but-incomplete config (missing issuer or
+//     audience) is a construction error, never a silent fallback to in-cluster and
+//     never a verifier built with an empty, audience-skipping audience.
 //
 // A failure before decoding (missing token, undecodable or over-limit body) is a
 // bare 401. A verification failure after decoding is a denied AdmissionResponse
@@ -178,53 +251,75 @@ type RemoteConfig struct {
 // misconfiguration fails fast instead of becoming a no-op auth gate. ctx governs
 // the verifier's discovery and background key refreshes, so pass a
 // process-lifetime context. It returns an error if the verifier cannot be built.
-func WithTokenVerification(ctx context.Context, next AdmissionHandler, cfg *RemoteConfig, opts ...Option) (*Handler, error) {
+func WithTokenVerification(ctx context.Context, next AdmissionHandler, opts ...Option) (*Handler, error) {
 	if next == nil {
 		panic("admissionhttp: next AdmissionHandler must not be nil")
 	}
-	if cfg == nil {
-		return newInClusterHandler(ctx, next, opts...)
+
+	b := newBuilder()
+	for _, opt := range opts {
+		opt(b)
 	}
-	return newRemoteHandler(ctx, next, cfg, opts...)
+
+	v, resolve, err := b.buildVerifier(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return newHandler(v, next, resolve, b.maxBody), nil
+}
+
+// buildVerifier constructs the verifier the Handler will use and the audience
+// resolver it needs (nil for remote, the in-cluster resolver otherwise). It is
+// the SINGLE build point where the fail-closed mode contract is enforced.
+func (b *builder) buildVerifier(ctx context.Context) (*verify.Verifier, AudienceResolver, error) {
+	if b.remoteSet {
+		// Remote mode is committed: issuer AND audience are jointly required and
+		// validated HERE, before constructing the verifier. A partial config is a
+		// hard error — never a silent fallback to in-cluster, and never a verifier
+		// built with an empty (audience-skipping) audience. The message carries no
+		// claim values.
+		if b.issuer == "" || b.audience == "" {
+			return nil, nil, errors.New("admissionhttp: remote verification requires both an issuer and an audience")
+		}
+		v, err := oidc.NewRemoteVerifier(ctx, b.issuer, b.audience, oidc.WithHTTPClient(b.httpClient))
+		if err != nil {
+			return nil, nil, err
+		}
+		// resolve stays nil: the audience is fixed at construction.
+		return v, nil, nil
+	}
+
+	// No remote option: in-cluster (zero-config, secure by default). The verifier
+	// discovers its issuer over the in-cluster network (trusting the projected
+	// service account CA) and derives its audience from the first request via
+	// [InClusterAudienceResolver]. A construction error (missing SA CA bundle,
+	// failed discovery) propagates unchanged — a not-securely-buildable in-cluster
+	// handler is never returned. url/client default to the real in-cluster address
+	// and SA-CA client; the unexported withInClusterEndpoint override only
+	// redirects them for offline tests.
+	url := b.inClusterURL
+	if url == "" {
+		url = oidc.InClusterAPIServerURL
+	}
+	v, err := oidc.NewLocalKeySetVerifier(ctx, url, oidc.WithHTTPClient(b.inClusterClient))
+	if err != nil {
+		return nil, nil, err
+	}
+	return v, InClusterAudienceResolver(), nil
 }
 
 // newHandler assembles a Handler around an already-built verifier. resolve is nil
 // for the out-of-cluster path (audience fixed at construction) and non-nil for
-// the in-cluster path (audience derived from the first request). It is the shared
-// seam the exported constructor and tests build through.
-func newHandler(v *verify.Verifier, next AdmissionHandler, resolve AudienceResolver, opts ...Option) *Handler {
-	h := &Handler{
+// the in-cluster path (audience derived from the first request). maxBody is the
+// resolved request-body read limit. It is the shared seam the exported
+// constructor and tests build through.
+func newHandler(v *verify.Verifier, next AdmissionHandler, resolve AudienceResolver, maxBody int64) *Handler {
+	return &Handler{
 		verifier: v,
 		next:     next,
-		maxBody:  defaultMaxBodyBytes,
+		maxBody:  maxBody,
 		resolve:  resolve,
 	}
-	for _, opt := range opts {
-		opt(h)
-	}
-	return h
-}
-
-// newRemoteHandler builds the out-of-cluster handler: an eagerly-bound verifier
-// for cfg.Issuer/cfg.Audience with no audience resolver.
-func newRemoteHandler(ctx context.Context, next AdmissionHandler, cfg *RemoteConfig, opts ...Option) (*Handler, error) {
-	v, err := oidc.NewRemoteVerifier(ctx, cfg.Issuer, cfg.Audience, oidc.WithHTTPClient(cfg.HTTPClient))
-	if err != nil {
-		return nil, err
-	}
-	return newHandler(v, next, nil, opts...), nil
-}
-
-// newInClusterHandler builds the in-cluster handler: a deferred verifier that
-// discovers its issuer over the in-cluster network (trusting the projected
-// service account CA) and derives its audience from the first request via
-// [InClusterAudienceResolver].
-func newInClusterHandler(ctx context.Context, next AdmissionHandler, opts ...Option) (*Handler, error) {
-	v, err := oidc.NewLocalKeySetVerifier(ctx, oidc.InClusterAPIServerURL)
-	if err != nil {
-		return nil, err
-	}
-	return newHandler(v, next, InClusterAudienceResolver(), opts...), nil
 }
 
 // ServeHTTP implements http.Handler.
