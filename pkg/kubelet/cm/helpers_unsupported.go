@@ -81,6 +81,10 @@ func CPURequestsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
 	return nil
 }
 
+func CPUSharesEqualAfterV2RoundTrip(allocatedShares, readbackShares uint64) bool {
+	return false
+}
+
 func CPULimitsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
 	return nil
 }

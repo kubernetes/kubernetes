@@ -945,3 +945,55 @@ func TestApplyPodLevelMemoryHigh(t *testing.T) {
 		}
 	})
 }
+
+func TestCPUSharesEqualAfterV2RoundTrip(t *testing.T) {
+	testCases := []struct {
+		name            string
+		allocatedShares uint64
+		readbackShares  uint64
+		expected        bool
+	}{
+		{
+			// 50m -> shares=51 -> weight=2 -> shares=28
+			name:            "matches lossy cgroup v2 readback for 50m",
+			allocatedShares: MilliCPUToShares(50),
+			readbackShares:  28,
+			expected:        true,
+		},
+		{
+			name:            "does not match nearby non-roundtrip readback",
+			allocatedShares: MilliCPUToShares(50),
+			readbackShares:  27,
+			expected:        false,
+		},
+		{
+			// 100m -> shares=102 -> weight=4 -> shares=80
+			name:            "matches lossy cgroup v2 readback for 100m",
+			allocatedShares: MilliCPUToShares(100),
+			readbackShares:  80,
+			expected:        true,
+		},
+		{
+			name:            "does not match identity when conversion is lossy",
+			allocatedShares: MilliCPUToShares(100),
+			readbackShares:  MilliCPUToShares(100),
+			expected:        false,
+		},
+		{
+			name:            "does not match unrelated higher readback",
+			allocatedShares: MilliCPUToShares(50),
+			readbackShares:  MilliCPUToShares(100),
+			expected:        false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := CPUSharesEqualAfterV2RoundTrip(tc.allocatedShares, tc.readbackShares)
+			if got != tc.expected {
+				t.Fatalf("CPUSharesEqualAfterV2RoundTrip(%d, %d) = %t, want %t",
+					tc.allocatedShares, tc.readbackShares, got, tc.expected)
+			}
+		})
+	}
+}
