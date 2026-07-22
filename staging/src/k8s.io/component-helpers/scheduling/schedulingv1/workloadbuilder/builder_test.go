@@ -783,8 +783,13 @@ func TestBuilderNewCompositePodGroup(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		if cpg.SchedulingPolicy.Gang == nil || cpg.SchedulingPolicy.Gang.MinGroupCount != 2 {
-			t.Errorf("expected composite Gang policy with MinGroupCount=2 copied from template, got %+v", cpg.SchedulingPolicy)
+		if cpg.Spec.SchedulingPolicy.Gang == nil ||
+			cpg.Spec.SchedulingPolicy.Gang.MinGroupCount != 2 {
+			t.Errorf("expected composite Gang policy with MinGroupCount=2 copied from template, got %+v", cpg.Spec.SchedulingPolicy)
+		}
+		if len(cpg.OwnerReferences) != 1 ||
+			cpg.OwnerReferences[0].Name != "job" {
+			t.Errorf("expected single job ownerReference, got %+v", cpg.OwnerReferences)
 		}
 	})
 

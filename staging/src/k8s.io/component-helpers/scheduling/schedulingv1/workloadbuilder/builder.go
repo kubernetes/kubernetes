@@ -19,6 +19,7 @@ package workloadbuilder
 import (
 	"fmt"
 
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -150,7 +151,7 @@ func (b *Builder) NewPodGroup(podGroupName, templateName string) (*schedulingv1b
 // through a name index built lazily on first use and reused across calls. Parent
 // linkage (spec.parentCompositePodGroupName) and the child (Composite)PodGroups
 // are left to the caller.
-func (b *Builder) NewCompositePodGroup(compositePodGroupName, templateName string) (*schedulingv1beta1.CompositePodGroupTemplate, error) {
+func (b *Builder) NewCompositePodGroup(compositePodGroupName, templateName string) (*schedulingv1alpha3.CompositePodGroup, error) {
 	workload, err := b.resolveWorkload()
 	if err != nil {
 		return nil, err
@@ -162,7 +163,7 @@ func (b *Builder) NewCompositePodGroup(compositePodGroupName, templateName strin
 	if tmpl == nil {
 		return nil, fmt.Errorf("compositePodGroupTemplate %q not found in workload %q (have %v)", templateName, workload.Name, compositePodGroupTemplateNames(workload))
 	}
-	return newCompositePodGroup(tmpl, compositePodGroupName), nil
+	return newCompositePodGroup(workload, tmpl, compositePodGroupName, b.resolveOwners())
 }
 
 // resolveWorkload returns the Workload that NewPodGroup and

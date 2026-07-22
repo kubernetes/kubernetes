@@ -84,4 +84,7 @@ limitations under the License.
 // sets BuildOptions.DisableDeclarativeValidation to skip the first layer and run
 // only the complex checks; it passes the zero ValidationInput regardless of the
 // operation because OldRoot is only consulted by DV. See ExampleJobControllerE2E.
+//
+// +k8s:conversion-gen=k8s.io/api/scheduling/v1alpha3
+// +k8s:conversion-gen-external-types=k8s.io/api/scheduling/v1beta1
 package workloadbuilder
