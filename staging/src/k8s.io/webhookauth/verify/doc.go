@@ -28,14 +28,11 @@ limitations under the License.
 //  2. The namespaced admissionReviewAPIGroups attestation claim authorizes the API group
 //     of the resource under admission — its list contains that group or "*".
 //
-// The policy this package owns is exactly the part go-oidc has no concept of: the
-// admissionReviewAPIGroups match.
-//
 // Anti-enumeration: every failure surfaces the single generic
 // [ErrVerificationFailed] and never echoes webhook names, UIDs, subjects, or
 // group values; the specific reason is logged via the context logger only.
 // Callers must not branch on why verification failed.
 //
-// This package omits the http.Handler adapter and controller-runtime decorator;
-// callers wire [Verifier.Verify] into their own admission entry point.
+// Callers wire [Verifier.Verify] into their own admission entry point; this
+// package ships no http.Handler adapter or controller-runtime decorator.
 package verify // import "k8s.io/webhookauth/verify"

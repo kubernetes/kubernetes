@@ -81,9 +81,8 @@ func NewLocalKeySetVerifier(ctx context.Context, apiServerURL string, opts ...Op
 	}
 	httpClient := cfg.httpClient
 	if httpClient == nil {
-		// No transport was supplied: build one that trusts the cluster CA so the
-		// in-cluster apiserver's serving certificate validates. Fail closed if the
-		// CA bundle cannot be loaded rather than fall back to an untrusted client.
+		// No transport supplied: build one that trusts the cluster CA (see
+		// inClusterHTTPClient), failing closed if the bundle cannot be loaded.
 		var err error
 		httpClient, err = inClusterHTTPClient()
 		if err != nil {

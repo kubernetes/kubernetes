@@ -44,7 +44,7 @@ type config struct {
 type Option func(*config)
 
 // WithHTTPClient sets the [http.Client] used for discovery and JWKS fetches; a
-// nil client is ignored. In-cluster, this supplies a transport that trusts the
+// nil client is ignored. In-cluster this supplies a transport that trusts the
 // cluster CA.
 func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *config) {
@@ -54,11 +54,9 @@ func WithHTTPClient(c *http.Client) Option {
 	}
 }
 
-// oidcAuthenticator implements [verify.TokenAuthenticator] using go-oidc.
-//
-// The key set is fetched at construction, but the go-oidc verifier is built
-// lazily by BindAudience once the expected audience is known. Until then it is
-// nil and every token is denied (fail-closed).
+// oidcAuthenticator implements [verify.TokenAuthenticator] using go-oidc, with
+// the verifier built lazily by BindAudience (fail-closed until an audience is
+// bound).
 type oidcAuthenticator struct {
 	issuer string
 	keySet coreosoidc.KeySet
@@ -88,7 +86,6 @@ type webhookPrivateClaims struct {
 // AuthenticateToken verifies rawToken via go-oidc and returns its
 // admissionReviewAPIGroups values.
 func (a *oidcAuthenticator) AuthenticateToken(ctx context.Context, rawToken string) ([]string, error) {
-	// Fail closed until an audience is bound.
 	verifier := a.verifier.Load()
 	if verifier == nil {
 		return nil, errors.New("oidc: no audience bound yet; verifier not ready")
@@ -96,11 +93,10 @@ func (a *oidcAuthenticator) AuthenticateToken(ctx context.Context, rawToken stri
 	return verifyTokenGroups(ctx, verifier, a.issuer, rawToken)
 }
 
-// verifyTokenGroups performs the cheap unverified issuer pre-check, verifies
-// rawToken with the supplied go-oidc verifier (signature, audience, expiry), and
-// returns the token's admissionReviewAPIGroups values. It is shared by the deferred
-// (in-cluster) and eagerly-bound (out-of-cluster) authenticators so both decode
-// the KEP-6060 attestation claims identically.
+// verifyTokenGroups verifies rawToken with the supplied go-oidc verifier
+// (signature, audience, expiry) and returns its admissionReviewAPIGroups values.
+// Shared by the deferred (in-cluster) and eagerly-bound (out-of-cluster)
+// authenticators so both decode the KEP-6060 attestation claims identically.
 func verifyTokenGroups(ctx context.Context, verifier *coreosoidc.IDTokenVerifier, issuer, rawToken string) ([]string, error) {
 	// Cheap unverified issuer pre-check before the expensive signature work.
 	if parsed, err := parseUnverifiedClaims(rawToken); err != nil {
@@ -154,10 +150,9 @@ func (a *oidcAuthenticator) HealthCheck() error {
 }
 
 // boundAuthenticator implements [verify.TokenAuthenticator] for the
-// out-of-cluster path, where the audience is known at construction. Unlike
-// oidcAuthenticator it holds a go-oidc verifier built eagerly from the standard
-// provider.Verifier, so it is ready immediately and never denies for a missing
-// audience.
+// out-of-cluster path: the audience is fixed at construction and the go-oidc
+// verifier is built eagerly, so it is ready immediately and never fail-closes
+// for a missing audience.
 type boundAuthenticator struct {
 	issuer   string
 	audience string
@@ -186,15 +181,13 @@ func (b *boundAuthenticator) BindAudience(audience string) error {
 // HealthCheck always reports ready: the verifier is built at construction.
 func (b *boundAuthenticator) HealthCheck() error { return nil }
 
-// NewRemoteVerifier returns a [verify.Verifier] that checks tokens against
-// issuer's OIDC discovery document and requires the token audience to equal
-// audience (the out-of-cluster path). The verifier is built eagerly via the
-// standard go-oidc provider.Verifier, which discovers the issuer's jwks_uri,
-// maintains a rotating remote key set, and enforces the audience natively as the
-// ClientID.
+// NewRemoteVerifier returns a [verify.Verifier] for the out-of-cluster path: it
+// checks tokens against issuer's OIDC discovery document and requires the token
+// audience to equal audience, enforced natively as the go-oidc ClientID. The
+// resulting verifier is long-lived and concurrency-safe.
 //
-// The verifier is long-lived and concurrency-safe. ctx governs discovery and the
-// key set's background refreshes, so pass a process-lifetime context.
+// ctx governs discovery and the key set's background refreshes, so pass a
+// process-lifetime context.
 func NewRemoteVerifier(ctx context.Context, issuer, audience string, opts ...Option) (*verify.Verifier, error) {
 	if issuer == "" {
 		return nil, errors.New("oidc: issuer must not be empty")

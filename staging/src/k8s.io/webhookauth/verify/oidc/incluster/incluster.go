@@ -33,11 +33,9 @@ import (
 
 // InCluster builds a [verify.Verifier] for a webhook running inside the cluster,
 // with no static configuration. It reads the issuer and signing keys from the
-// apiserver over the in-cluster network (see [oidc.NewLocalKeySetVerifier]).
-//
-// The audience is derived at runtime from the first admission request (pair with
-// admissionhttp.InClusterAudienceResolver), so until one is bound the verifier
-// denies every token and reports unhealthy. ctx governs the discovery fetch and
+// apiserver over the in-cluster network and defers audience binding, exactly as
+// [oidc.NewLocalKeySetVerifier] documents (pair with
+// admissionhttp.InClusterAudienceResolver). ctx governs the discovery fetch and
 // background key refreshes, so pass a process-lifetime context.
 func InCluster(ctx context.Context) (*verify.Verifier, error) {
 	cfg, err := rest.InClusterConfig()
