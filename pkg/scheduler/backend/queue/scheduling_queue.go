@@ -1835,7 +1835,9 @@ func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.
 			// TODO: Add support for CompositePodGroup (CPG) lookup.
 			if p.isGenericWorkloadEnabled {
 				pod, err := p.podLister.Pods(nn.Namespace).Get(nn.Name)
-				if err == nil && pod.Spec.SchedulingGroup != nil && pod.Spec.SchedulingGroup.PodGroupName != nil {
+				if err != nil {
+					logger.V(5).Info("Failed to get pod for PodGroup lookup", "pod", nn, "err", err)
+				} else if pod.Spec.SchedulingGroup != nil && pod.Spec.SchedulingGroup.PodGroupName != nil {
 					entityKey = fwk.PodGroupKey(nn.Namespace, *pod.Spec.SchedulingGroup.PodGroupName).String()
 					if entity, exists := p.unschedulableEntities.entityInfoMap[entityKey]; exists && !seen[entityKey] {
 						seen[entityKey] = true
