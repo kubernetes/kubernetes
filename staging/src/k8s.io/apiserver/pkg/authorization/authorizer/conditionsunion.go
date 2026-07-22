@@ -50,10 +50,10 @@ type ConditionsAwareDecisionUnion struct {
 }
 
 // Add adds a named sub-decision to the current Union ConditionsAwareDecision builder.
-// Add is a no-op if ContainsUnconditionalAllowOrDeny() is true, as adding decisions after an Allow or
-// Deny will never change the final evaluated outcome.
-// An error might be returned if the name is empty or a duplicate, the bool signifies whether
-// the Add was a no-op.
+// Add is a no-op if ContainsUnconditionalAllowOrDeny() is true, as adding decisions after
+// an Allow or Deny will never change the final evaluated outcome.
+// Invalid inputs (empty name, duplicate name, invalid DNS-1123 subdomain) are recorded as
+// aggregated errors and surfaced by ToDecision(); Add itself never returns.
 // Add is not thread-safe.
 func (unionMap *ConditionsAwareDecisionUnion) Add(authorizerName string, d ConditionsAwareDecision) {
 	if unionMap.ContainsUnconditionalAllowOrDeny() {

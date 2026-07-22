@@ -119,7 +119,7 @@ type Authorizer interface {
 	// return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 	//
 	// The context should only be used for timeouts/cancellation/tracing, and should not influence the
-	// evaluation outcome. Only the given decision and data may infuence the outcome. data must be non-nil.
+	// evaluation outcome. Only the given decision and data may influence the outcome. data must be non-nil.
 	EvaluateConditions(ctx context.Context, decision ConditionsAwareDecision, data ConditionsData) (authorized Decision, reason string, err error)
 }
 

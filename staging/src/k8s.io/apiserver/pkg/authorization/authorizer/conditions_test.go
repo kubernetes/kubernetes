@@ -1026,17 +1026,17 @@ func TestConditionsAwareDecision(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			for i, d := range tt.testDecisions {
 				t.Run(fmt.Sprint(i), func(t *testing.T) {
-					isAllowed := d.IsAllow()
-					if isAllowed != tt.wantIsAllow {
-						t.Errorf("IsAllowed() = %v, want %v", isAllowed, tt.wantIsAllow)
+					isAllow := d.IsAllow()
+					if isAllow != tt.wantIsAllow {
+						t.Errorf("IsAllow() = %v, want %v", isAllow, tt.wantIsAllow)
 					}
 					isNoOpinion := d.IsNoOpinion()
 					if isNoOpinion != tt.wantIsNoOpinion {
 						t.Errorf("IsNoOpinion() = %v, want %v", isNoOpinion, tt.wantIsNoOpinion)
 					}
-					isDenied := d.IsDeny()
-					if isDenied != tt.wantIsDeny {
-						t.Errorf("IsDenied() = %v, want %v", isDenied, tt.wantIsDeny)
+					isDeny := d.IsDeny()
+					if isDeny != tt.wantIsDeny {
+						t.Errorf("IsDeny() = %v, want %v", isDeny, tt.wantIsDeny)
 					}
 					isConditionsMap := d.IsConditionsMap()
 					if isConditionsMap != tt.wantIsConditionsMap {
