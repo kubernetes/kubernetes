@@ -155,6 +155,7 @@ func (f *FieldManager) UpdateNoErrors(liveObj, newObj runtime.Object, manager st
 		if liveAccessor, aErr := meta.Accessor(liveObj); aErr == nil {
 			if newAccessor, aErr := meta.Accessor(newObj); aErr == nil {
 				atMostEverySecond.Do(func() {
+					//nolint:logcheck // Should not be reached.
 					klog.ErrorS(err, "[SHOULD NOT HAPPEN] failed to update managedFields (restored previous managedFields from live object)", "versionKind",
 						newObj.GetObjectKind().GroupVersionKind(), "namespace", newAccessor.GetNamespace(), "name", newAccessor.GetName())
 				})
