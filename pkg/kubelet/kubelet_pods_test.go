@@ -4501,12 +4501,65 @@ func TestConvertToAPIPodLevelResourcesStatus(t *testing.T) {
 			expectedRes: &v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceCPU:    resource.MustParse("1.5"),
-					v1.ResourceMemory: resource.MustParse("1.2Gi"),
+					v1.ResourceMemory: *resource.NewQuantity(1283457024, resource.BinarySI),
 				},
 				Limits: v1.ResourceList{
 					v1.ResourceCPU:    resource.MustParse("2.5"),
 					v1.ResourceMemory: resource.MustParse("2.2Gi"),
 				},
+			},
+		},
+		{
+			name: "running pod memory request resize updates status to new spec value rather than preserving old status",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{Phase: v1.PodRunning},
+				Spec: v1.PodSpec{
+					Overhead: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+			oldStatus: v1.PodStatus{
+				Phase: v1.PodRunning,
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("1.2Gi"),
+					},
+				},
+			},
+			expectedRes: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: *resource.NewQuantity(2357198848, resource.BinarySI),
+				},
+				Limits: v1.ResourceList{},
+			},
+		},
+		{
+			name: "running pod without memory request clears memory request from status",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{Phase: v1.PodRunning},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1"},
+					},
+				},
+			},
+			oldStatus: v1.PodStatus{
+				Phase: v1.PodRunning,
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("1.2Gi"),
+					},
+				},
+			},
+			expectedRes: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{},
+				Limits:   v1.ResourceList{},
 			},
 		},
 	}
