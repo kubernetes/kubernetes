@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // ValidateSubjectAccessReviewSpec validates a SubjectAccessReviewSpec and returns an
@@ -337,4 +339,11 @@ func validateDomainPrefixSeparator(fldPath *field.Path, key string) field.ErrorL
 		return field.ErrorList{field.Invalid(fldPath, key, `must be a domain-prefixed key (such as "acme.io/foo")`)}
 	}
 	return nil
+}
+
+// GetDeclarativeValidationOptions returns the options used in the authorization.k8s.io API group
+func GetDeclarativeValidationOptions() map[string]bool {
+	return map[string]bool{
+		string(genericfeatures.ConditionalAuthorization): utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization),
+	}
 }

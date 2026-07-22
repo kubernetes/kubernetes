@@ -28,8 +28,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 
 	apiservervalidation "k8s.io/apiserver/pkg/apis/authorization/validation"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 )
 
@@ -100,8 +98,6 @@ func ValidateAuthorizationConditionsReviewCreate(ctx context.Context, scheme *ru
 // tag on spec.conditionalAuthorization does not reject the field.
 func sarValidationConfig() rest.DeclarativeValidationConfig {
 	return rest.DeclarativeValidationConfig{
-		Options: map[string]bool{
-			string(genericfeatures.ConditionalAuthorization): utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization),
-		},
+		Options: apiservervalidation.GetDeclarativeValidationOptions(),
 	}
 }
