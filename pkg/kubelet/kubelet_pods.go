@@ -2220,10 +2220,26 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	cpuRequest := cm.CPURequestsFromConfig(cpuConfig)
 	cpuLimit := cm.CPULimitsFromConfig(cpuConfig)
 
-	preserveOldResourcesValue := func(rName v1.ResourceName, oldStatusResource, resource v1.ResourceList) {
+	// preserveOldStatusValue preserves old pod status resources if already present.
+	preserveOldStatusValue := func(rName v1.ResourceName, oldStatusResource, resource v1.ResourceList) bool {
 		if allocatedPod.Status.Phase == v1.PodRunning && oldPodStatus.Phase == v1.PodRunning && oldPodStatus.Resources != nil {
 			if r, exists := oldStatusResource[rName]; exists {
 				resource[rName] = r.DeepCopy()
+				return true
+			}
+		}
+		return false
+	}
+
+	// addOverheadToFallbackValue adds pod overhead when falling back to spec resources.
+	addOverheadToFallbackValue := func(rName v1.ResourceName, resource v1.ResourceList, isLimit bool) {
+		if val, found := resource[rName]; found && allocatedPod.Spec.Overhead != nil {
+			if overhead, ok := allocatedPod.Spec.Overhead[rName]; ok {
+				// Add overhead for requests, but for limits only add if a non-zero limit is set.
+				if !isLimit || !val.IsZero() {
+					val.Add(overhead)
+					resource[rName] = val
+				}
 			}
 		}
 	}
@@ -2267,18 +2283,22 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 				resources.Requests[v1.ResourceCPU] = cpuRequest.DeepCopy()
 			}
 		}
-	} else {
-		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Requests, resources.Requests)
+	} else if !preserveOldStatusValue(v1.ResourceCPU, oldPodStatus.Resources.Requests, resources.Requests) {
+		addOverheadToFallbackValue(v1.ResourceCPU, resources.Requests, false)
 	}
 
-	if _, found := resources.Requests[v1.ResourceMemory]; !found {
-		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		}
-		aggregatedResources := resourcehelper.PodRequests(allocatedPod, opts)
-		if val, ok := aggregatedResources[v1.ResourceMemory]; ok {
-			resources.Requests[v1.ResourceMemory] = val
-		}
+	// Memory requests are not read from cgroups because cgroups do not track or enforce memory requests.
+	// Always aggregate/derive memory requests from pod spec and overhead.
+	opts := resourcehelper.PodResourcesOptions{
+		SkipPodLevelResources:                          !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		UseStatusResources:                             utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
+	}
+	aggregatedResources := resourcehelper.PodRequests(allocatedPod, opts)
+	if val, ok := aggregatedResources[v1.ResourceMemory]; ok {
+		resources.Requests[v1.ResourceMemory] = val
+	} else {
+		delete(resources.Requests, v1.ResourceMemory)
 	}
 
 	if cpuLimit != nil {
@@ -2288,15 +2308,14 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		if cpuLimit.MilliValue() > cm.MinMilliCPULimit || resources.Limits.Cpu().MilliValue() > cm.MinMilliCPULimit {
 			resources.Limits[v1.ResourceCPU] = cpuLimit.DeepCopy()
 		}
-	} else {
-		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Limits, resources.Limits)
-
+	} else if !preserveOldStatusValue(v1.ResourceCPU, oldPodStatus.Resources.Limits, resources.Limits) {
+		addOverheadToFallbackValue(v1.ResourceCPU, resources.Limits, true)
 	}
 
 	if memoryLimit != nil {
 		resources.Limits[v1.ResourceMemory] = memoryLimit.DeepCopy()
-	} else {
-		preserveOldResourcesValue(v1.ResourceMemory, oldPodStatus.Resources.Limits, resources.Limits)
+	} else if !preserveOldStatusValue(v1.ResourceMemory, oldPodStatus.Resources.Limits, resources.Limits) {
+		addOverheadToFallbackValue(v1.ResourceMemory, resources.Limits, true)
 	}
 
 	return resources
