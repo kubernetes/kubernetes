@@ -3539,6 +3539,120 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req1, driverA, pool1, device3, false),
 			)},
 		},
+		// device1 is allocated, but the driver has republished the pool
+		// without it. How much it consumed is recorded nowhere: the slice no
+		// longer declares the device, and the allocated state carries only
+		// its ID - there is no allocation-time record of counter
+		// consumption. The premise of this scenario is that device1 consumed
+		// the entire 8Gi counter when it was allocated, so granting device2
+		// (which needs all 8Gi) over-commits the physical counter. The
+		// allocator must not hand out counters it cannot account for; the
+		// allocated DeviceID names this pool, so the unaccounted device is
+		// detectable even without a consumption record.
+		"partitionable-devices-allocated-device-removed-from-slice": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("8Gi"),
+						},
+					),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// Same as above, but device1's allocation is recorded as a shared
+		// (allow-multiple) allocation rather than a dedicated one. It is still
+		// allocated, the pool no longer publishes it, and its counter
+		// consumption is unaccountable, so device2 must not be granted the 8Gi
+		// counter device1 may still hold.
+		"partitionable-devices-allocated-shared-device-removed-from-slice": {
+			features: Features{
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			allocatedSharedDeviceIDs: sets.New(
+				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("8Gi"),
+						},
+					),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// Same as above, but device1's allocation is recorded only as aggregated
+		// consumed capacity (a manually constructed or future producer state that
+		// IsDeviceAllocated still counts as allocated), with no dedicated or shared
+		// entry. The pool no longer publishes device1, so the pool must fail closed
+		// here too, not just when the allocation is recorded dedicated or shared.
+		"partitionable-devices-allocated-capacity-device-removed-from-slice": {
+			features: Features{
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			allocatedCapacityDevices: ConsumedCapacityCollection{
+				MakeDeviceID(driverA, pool1, device1): ConsumedCapacity{
+					capacity0: ptr.To(one),
+				},
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("8Gi"),
+						},
+					),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
 		"partitionable-devices-multiple-capacity-pools": {
 			features: Features{
 				PrioritizedList:      true,
