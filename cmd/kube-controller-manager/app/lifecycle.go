@@ -43,11 +43,11 @@ func newEvictionRequestController(ctx context.Context, controllerContext Control
 
 	evictionRequestController, err := evictionrequest.NewController(
 		ctx,
+		controllerName,
 		controllerContext.InformerFactory.Lifecycle().V1alpha1().Evictions(),
 		controllerContext.InformerFactory.Lifecycle().V1alpha1().EvictionRequests(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		client,
-		controllerName,
 	)
 	if err != nil {
 		return nil, err
