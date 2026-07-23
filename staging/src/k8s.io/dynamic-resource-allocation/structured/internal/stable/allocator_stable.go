@@ -68,10 +68,10 @@ type Allocator struct {
 	// about each pool is never updated once set the first time.
 	// This is computed bsed on information on the Allocator, so it will
 	// be correct even for multiple usages of the Allocator.
-	// The keys in the map are resource pool names.
+	// The keys in the map are resource pool IDs (driver name and pool name).
 	// The allocator might be accessed by different goroutines, so
 	// access to this map must be synchronized.
-	availableCounters map[draapi.UniqueString]counterSets
+	availableCounters map[PoolID]counterSets
 	mutex             sync.RWMutex
 	// numAllocateOneInvocations counts the number of times the allocateOne
 	// function is called for the allocator. This is a measurement of the
@@ -99,7 +99,7 @@ func NewAllocator(ctx context.Context,
 		classLister:       classLister,
 		slices:            slices,
 		celCache:          celCache,
-		availableCounters: make(map[draapi.UniqueString]counterSets),
+		availableCounters: make(map[PoolID]counterSets),
 	}, nil
 }
 
@@ -116,7 +116,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		claimsToAllocate:     claims,
 		deviceMatchesRequest: make(map[matchKey]bool),
 		constraints:          make([][]constraint, len(claims)),
-		consumedCounters:     make(map[draapi.UniqueString]counterSets),
+		consumedCounters:     make(map[PoolID]counterSets),
 		requestData:          make(map[requestIndices]requestData),
 		result:               make([]internalAllocationResult, len(claims)),
 	}
@@ -510,8 +510,8 @@ type allocator struct {
 	constraints          [][]constraint // one list of constraints per claim
 	// consumedCounters keeps track of the counters consumed by all devices
 	// that are in the process of being allocated.
-	// The keys in the map are resource pool names.
-	consumedCounters map[draapi.UniqueString]counterSets
+	// The keys in the map are resource pool IDs (driver name and pool name).
+	consumedCounters map[PoolID]counterSets
 	requestData      map[requestIndices]requestData // one entry per request with no subrequests and one entry per subrequest
 	// allocatingDevices tracks which devices will be newly allocated for a
 	// particular attempt to find a solution. The map is indexed by device
@@ -1279,12 +1279,12 @@ func taintTolerated(taint resourceapi.DeviceTaint, request requestAccessor) bool
 // consumes counters.
 func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error) {
 	pool := device.pool
-	poolName := pool.PoolID.Pool
+	poolID := pool.PoolID
 
 	// Check first if the available counters for this pool have already been
 	// calculated.
 	alloc.mutex.RLock()
-	availableCountersForPool, found := alloc.availableCounters[poolName]
+	availableCountersForPool, found := alloc.availableCounters[poolID]
 	alloc.mutex.RUnlock()
 	// If not, we need to do it now. But we store the result so it doesn't need
 	// to be calculated again.
@@ -1341,18 +1341,18 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		// Set the available counters on the allocator so we don't have to
 		// compute this again.
 		alloc.mutex.Lock()
-		alloc.availableCounters[poolName] = availableCountersForPool
+		alloc.availableCounters[poolID] = availableCountersForPool
 		alloc.mutex.Unlock()
 	}
 
 	// Update the consumedCounters data structure with the counters consumed
 	// by the current device.
-	consumedCountersForPool, found := alloc.consumedCounters[poolName]
+	consumedCountersForPool, found := alloc.consumedCounters[poolID]
 	// If no devices in the allocating state have consumed any counters from the current
 	// pool, initialize the data structure.
 	if !found {
 		consumedCountersForPool = make(counterSets)
-		alloc.consumedCounters[poolName] = consumedCountersForPool
+		alloc.consumedCounters[poolID] = consumedCountersForPool
 	}
 	for _, deviceCounterConsumption := range device.ConsumesCounters {
 		consumedCountersForCounterSet, found := consumedCountersForPool[deviceCounterConsumption.CounterSet]
@@ -1403,9 +1403,9 @@ func (alloc *allocator) allocatingDeviceForClaim(deviceID DeviceID, claimIndex i
 // deallocateCountersForDevice subtracts the consumed counters of the provided
 // device from the consumedCounters data structure.
 func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
-	poolName := device.pool.PoolID.Pool
+	poolID := device.pool.PoolID
 
-	consumedCountersForPool := alloc.consumedCounters[poolName]
+	consumedCountersForPool := alloc.consumedCounters[poolID]
 	for _, deviceCounterConsumption := range device.ConsumesCounters {
 		counterSetName := deviceCounterConsumption.CounterSet
 		consumedCounterSet := consumedCountersForPool[counterSetName]
