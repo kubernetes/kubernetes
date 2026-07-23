@@ -4656,7 +4656,6 @@ type PodSpec struct {
 	// - `hostNetwork` must be set to false.
 	//
 	// This field must be a valid DNS subdomain as defined in RFC 1123 and contain at most 64 characters.
-	// Requires the HostnameOverride feature gate to be enabled.
 	//
 	// +featureGate=HostnameOverride
 	// +optional
