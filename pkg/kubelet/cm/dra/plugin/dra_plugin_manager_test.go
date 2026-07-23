@@ -17,11 +17,14 @@ limitations under the License.
 package plugin
 
 import (
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -99,36 +102,102 @@ func TestAddSameName(t *testing.T) {
 func TestHealthStreamUsesLatestPlugin(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
-	manager := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
+	streamHandler := &mockStreamHandler{}
+	manager := NewDRAPluginManager(tCtx, nil, nil, streamHandler, 0)
 	defer manager.Stop()
 
-	activeStreams := func() map[string]uint64 {
+	activeStream := func() (string, uint64) {
 		manager.mutex.RLock()
 		defer manager.mutex.RUnlock()
-		streams := make(map[string]uint64)
-		for _, plugin := range manager.store[driverName] {
-			if plugin.healthStreamCancel != nil {
-				streams[plugin.endpoint] = plugin.healthStreamGeneration
-			}
+		stream := manager.healthStreams[driverName]
+		if stream == nil {
+			return "", 0
 		}
-		return streams
+		return stream.plugin.endpoint, stream.generation
 	}
 
 	tCtx.ExpectNoError(manager.add(driverName, "old.sock", "", drahealthv1.DRAResourceHealthService, defaultClientCallTimeout), "add old plugin")
-	oldStreams := activeStreams()
-	require.Len(t, oldStreams, 1)
-	oldGeneration := oldStreams["old.sock"]
+	endpoint, oldGeneration := activeStream()
+	require.Equal(t, "old.sock", endpoint)
 	require.NotZero(t, oldGeneration)
 
 	tCtx.ExpectNoError(manager.add(driverName, "new.sock", "", drahealthv1.DRAResourceHealthService, defaultClientCallTimeout), "add new plugin")
-	newStreams := activeStreams()
-	require.Equal(t, map[string]uint64{"new.sock": oldGeneration + 1}, newStreams)
+	endpoint, newGeneration := activeStream()
+	require.Equal(t, "new.sock", endpoint)
+	require.Equal(t, oldGeneration+1, newGeneration)
+	require.Equal(t, []healthStreamLifecycleEvent{
+		{action: "activate", driverName: driverName, generation: oldGeneration},
+		{action: "activate", driverName: driverName, generation: newGeneration},
+	}, streamHandler.lifecycleEvents(), "handover must activate the replacement without deactivating health")
 
 	manager.remove(driverName, "old.sock")
-	require.Equal(t, newStreams, activeStreams(), "removing the old endpoint must not replace the active stream")
+	endpoint, generation := activeStream()
+	require.Equal(t, "new.sock", endpoint)
+	require.Equal(t, newGeneration, generation, "removing the old endpoint must not replace the active stream")
 
 	manager.remove(driverName, "new.sock")
-	require.Empty(t, activeStreams())
+	endpoint, generation = activeStream()
+	require.Empty(t, endpoint)
+	require.Zero(t, generation)
+	require.Equal(t, []healthStreamLifecycleEvent{
+		{action: "activate", driverName: driverName, generation: oldGeneration},
+		{action: "activate", driverName: driverName, generation: newGeneration},
+		{action: "deactivate", driverName: driverName, generation: newGeneration},
+	}, streamHandler.lifecycleEvents())
+}
+
+func TestHealthStreamDoesNotFallBackFromPreferredPlugin(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
+	streamHandler := &mockStreamHandler{}
+	manager := NewDRAPluginManager(tCtx, nil, nil, streamHandler, 0)
+	defer manager.Stop()
+
+	tCtx.ExpectNoError(manager.add(driverName, "old.sock", "", drahealthv1.DRAResourceHealthService, defaultClientCallTimeout), "add old plugin")
+	tCtx.ExpectNoError(manager.add(driverName, "new.sock", "", "", defaultClientCallTimeout), "add new plugin without health service")
+
+	manager.mutex.RLock()
+	stream := manager.healthStreams[driverName]
+	manager.mutex.RUnlock()
+	require.NotNil(t, stream)
+	require.Equal(t, "new.sock", stream.plugin.endpoint)
+	require.Zero(t, stream.generation)
+	require.Equal(t, []healthStreamLifecycleEvent{
+		{action: "activate", driverName: driverName, generation: 1},
+		{action: "deactivate", driverName: driverName, generation: 1},
+	}, streamHandler.lifecycleEvents())
+}
+
+func TestHealthStreamUnimplemented(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
+	streamHandler := &mockStreamHandler{}
+	manager := NewDRAPluginManager(tCtx, nil, nil, streamHandler, 0)
+	defer manager.Stop()
+
+	tCtx.ExpectNoError(manager.add(driverName, "plugin.sock", "", drahealthv1.DRAResourceHealthService, defaultClientCallTimeout), "add plugin")
+	manager.mutex.RLock()
+	stream := manager.healthStreams[driverName]
+	manager.mutex.RUnlock()
+	require.NotNil(t, stream)
+	require.NotZero(t, stream.generation)
+	generation := stream.generation
+
+	require.False(t, manager.healthStreamTerminated(tCtx, stream.plugin, generation, errors.New("temporary stream failure")))
+	require.Equal(t, []healthStreamLifecycleEvent{
+		{action: "activate", driverName: driverName, generation: generation},
+	}, streamHandler.lifecycleEvents())
+
+	require.True(t, manager.healthStreamTerminated(tCtx, stream.plugin, generation, status.Error(codes.Unimplemented, "not supported")))
+	require.Equal(t, []healthStreamLifecycleEvent{
+		{action: "activate", driverName: driverName, generation: generation},
+		{action: "deactivate", driverName: driverName, generation: generation},
+	}, streamHandler.lifecycleEvents())
+
+	manager.mutex.RLock()
+	defer manager.mutex.RUnlock()
+	require.Zero(t, manager.healthStreams[driverName].generation)
+	require.Nil(t, manager.healthStreams[driverName].cancel)
 }
 
 func TestDelete(t *testing.T) {

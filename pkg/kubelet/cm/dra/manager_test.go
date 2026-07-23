@@ -1991,9 +1991,14 @@ func TestHandleWatchResourcesStreamOwnership(t *testing.T) {
 		}
 	}
 
+	manager.ActivateHealthStream(tCtx, driverName, 1)
 	oldResponses, oldDone := startStream(1)
 	oldResponses <- response(drahealthv1.HealthStatus_HEALTHY)
 	expectPodUpdate()
+
+	manager.ActivateHealthStream(tCtx, driverName, 2)
+	require.Equal(t, state.DeviceHealthStatusHealthy, manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName).Health)
+	require.Empty(t, manager.update, "handover triggered an unexpected pod update")
 
 	newResponses, newDone := startStream(2)
 	newResponses <- response(drahealthv1.HealthStatus_UNHEALTHY)
@@ -2009,16 +2014,38 @@ func TestHandleWatchResourcesStreamOwnership(t *testing.T) {
 	require.Equal(t, state.DeviceHealthStatusUnhealthy, manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName).Health)
 	require.Empty(t, manager.update, "superseded health stream triggered an unexpected pod update")
 
-	close(newResponses)
-	expectPodUpdate()
+	newResponses <- struct {
+		Resp *drahealthv1.NodeWatchResourcesResponse
+		Err  error
+	}{Err: errors.New("transient stream error")}
 	select {
 	case err := <-newDone:
-		require.NoError(t, err)
+		require.ErrorContains(t, err, "transient stream error")
 	case <-time.After(time.Second):
 		t.Fatal("active health stream did not stop")
 	}
+	require.Equal(t, state.DeviceHealthStatusUnhealthy, manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName).Health)
+	require.Empty(t, manager.update, "retryable stream exit triggered an unexpected pod update")
+
+	manager.ActivateHealthStream(tCtx, driverName, 1)
+	staleResponses, staleDone := startStream(1)
+	select {
+	case err := <-staleDone:
+		require.ErrorContains(t, err, "is not active")
+	case <-time.After(time.Second):
+		t.Fatal("older health stream entered its receive loop")
+	}
+
+	manager.DeactivateHealthStream(tCtx, driverName, 1)
+	require.Equal(t, state.DeviceHealthStatusUnhealthy, manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName).Health)
+	require.Empty(t, manager.update, "stale deactivation triggered an unexpected pod update")
+
+	manager.DeactivateHealthStream(tCtx, driverName, 2)
+	expectPodUpdate()
 	require.Equal(t, state.DeviceHealthStatusUnknown, manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName).Health)
 	close(oldResponses)
+	close(newResponses)
+	close(staleResponses)
 }
 
 // TestHandleWatchResourcesStream verifies the manager's ability to process health updates
@@ -2062,6 +2089,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 				Err  error
 			},
 		) (<-chan resourceupdates.Update, chan struct{}, chan error) {
+			managerInstance.ActivateHealthStream(streamCtx, driverName, 1)
 			mockStream := &mockWatchResourcesClient{
 				RecvChan: responses,
 				Ctx:      streamCtx,

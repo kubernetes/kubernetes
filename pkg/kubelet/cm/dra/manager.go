@@ -1075,18 +1075,12 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 	logger = klog.LoggerWithValues(logger, "pluginName", pluginName, "generation", generation)
 
 	m.healthStreamMutex.Lock()
-	if err := ctx.Err(); err != nil {
+	activeGeneration, active := m.activeHealthStreams[pluginName]
+	if !active || activeGeneration != generation {
 		m.healthStreamMutex.Unlock()
-		return err
+		return fmt.Errorf("health stream generation %d for DRA driver %s is not active", generation, pluginName)
 	}
-	if activeGeneration, ok := m.activeHealthStreams[pluginName]; ok && activeGeneration > generation {
-		m.healthStreamMutex.Unlock()
-		return fmt.Errorf("health stream generation %d for DRA driver %s is older than active generation %d", generation, pluginName, activeGeneration)
-	}
-	m.activeHealthStreams[pluginName] = generation
 	m.healthStreamMutex.Unlock()
-
-	defer m.stopHealthStream(logger, pluginName, generation)
 
 	for {
 		resp, err := stream.Recv()
@@ -1136,7 +1130,23 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 	}
 }
 
-func (m *Manager) stopHealthStream(logger klog.Logger, pluginName string, generation uint64) {
+// ActivateHealthStream transfers ownership before the old stream gets
+// canceled, so its remaining updates can no longer modify the cache.
+func (m *Manager) ActivateHealthStream(_ context.Context, pluginName string, generation uint64) {
+	m.healthStreamMutex.Lock()
+	defer m.healthStreamMutex.Unlock()
+	if activeGeneration, ok := m.activeHealthStreams[pluginName]; ok && activeGeneration >= generation {
+		return
+	}
+	m.activeHealthStreams[pluginName] = generation
+}
+
+// DeactivateHealthStream clears health only when the authoritative endpoint
+// is permanently lost. A retryable stream exit does not call this method.
+func (m *Manager) DeactivateHealthStream(ctx context.Context, pluginName string, generation uint64) {
+	logger := klog.FromContext(ctx).WithName("dra-manager")
+	logger = klog.LoggerWithValues(logger, "pluginName", pluginName, "generation", generation)
+
 	m.healthStreamMutex.Lock()
 	defer m.healthStreamMutex.Unlock()
 
@@ -1145,7 +1155,7 @@ func (m *Manager) stopHealthStream(logger klog.Logger, pluginName string, genera
 	}
 	delete(m.activeHealthStreams, pluginName)
 
-	logger.V(4).Info("Clearing health cache for driver upon stream exit")
+	logger.V(4).Info("Clearing health cache for driver after health reporting stopped")
 	changedDevices, err := m.healthInfoCache.clearDriver(logger, pluginName)
 	if err != nil {
 		logger.Error(err, "Failed to clear health info cache for driver")

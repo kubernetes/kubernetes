@@ -535,13 +535,32 @@ func TestClearDriver(t *testing.T) {
 	cache, err := newHealthInfoCache(logger, "")
 	require.NoError(t, err)
 
-	_, err = cache.updateHealthInfo(logger, testDriver, []state.DeviceHealth{testDeviceHealth})
+	now := time.Now()
+	devices := []state.DeviceHealth{
+		{PoolName: testPool, DeviceName: "fresh-healthy", Health: state.DeviceHealthStatusHealthy, LastUpdated: now, HealthCheckTimeout: time.Minute},
+		{PoolName: testPool, DeviceName: "expired-healthy", Health: state.DeviceHealthStatusHealthy, LastUpdated: now.Add(-2 * time.Minute), HealthCheckTimeout: time.Minute},
+		{PoolName: testPool, DeviceName: "unknown-with-message", Health: state.DeviceHealthStatusUnknown, Message: "initializing", LastUpdated: now, HealthCheckTimeout: time.Minute},
+		{PoolName: testPool, DeviceName: "unknown-without-message", Health: state.DeviceHealthStatusUnknown, LastUpdated: now, HealthCheckTimeout: time.Minute},
+	}
+	_, err = cache.updateHealthInfo(logger, testDriver, devices)
 	require.NoError(t, err)
-	assert.Equal(t, state.DeviceHealthStatusHealthy, cache.getHealthInfo(testDriver, testPool, testDevice).Health)
+	require.NoError(t, cache.withLock(func() error {
+		expired := (*cache.HealthInfo)[testDriver].Devices[testPool+"/expired-healthy"]
+		expired.LastUpdated = now.Add(-2 * time.Minute)
+		(*cache.HealthInfo)[testDriver].Devices[testPool+"/expired-healthy"] = expired
+		return nil
+	}))
 
 	changedDevices, err := cache.clearDriver(logger, testDriver)
 	require.NoError(t, err)
-	require.Len(t, changedDevices, 1)
-	assert.Equal(t, state.DeviceHealthStatusUnknown, changedDevices[0].Health)
-	assert.Equal(t, state.DeviceHealthStatusUnknown, cache.getHealthInfo(testDriver, testPool, testDevice).Health)
+	changedDeviceNames := make([]string, 0, len(changedDevices))
+	for _, device := range changedDevices {
+		changedDeviceNames = append(changedDeviceNames, device.DeviceName)
+		assert.Equal(t, state.DeviceHealthStatusUnknown, device.Health)
+		assert.Empty(t, device.Message)
+	}
+	assert.ElementsMatch(t, []string{"fresh-healthy", "unknown-with-message"}, changedDeviceNames)
+	for _, device := range devices {
+		assert.Equal(t, state.DeviceHealthStatusUnknown, cache.getHealthInfo(testDriver, testPool, device.DeviceName).Health)
+	}
 }

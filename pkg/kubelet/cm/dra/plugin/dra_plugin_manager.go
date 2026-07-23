@@ -73,6 +73,11 @@ type DRAPluginManager struct {
 	// driver name -> DRAPlugin in the order in which they got added
 	store map[string][]*monitoredPlugin
 
+	// healthStreams tracks the endpoint which owns health reporting for each
+	// driver. A zero generation means that the preferred endpoint does not
+	// provide health reports. It is protected by mutex.
+	healthStreams map[string]*healthStreamState
+
 	// nextHealthStreamGeneration distinguishes successive authoritative streams
 	// for a driver. It is protected by mutex.
 	nextHealthStreamGeneration uint64
@@ -101,10 +106,12 @@ type monitoredPlugin struct {
 
 	// connected is protected by store.mutex.
 	connected bool
+}
 
-	// healthStreamCancel and healthStreamGeneration are protected by pm.mutex.
-	healthStreamCancel     context.CancelFunc
-	healthStreamGeneration uint64
+type healthStreamState struct {
+	plugin     *monitoredPlugin
+	generation uint64
+	cancel     context.CancelFunc
 }
 
 var _ grpcstats.Handler = &monitoredPlugin{}
@@ -165,6 +172,7 @@ func NewDRAPluginManager(ctx context.Context, kubeClient kubernetes.Interface, g
 		getNode:       getNode,
 		wipingDelay:   wipingDelay,
 		streamHandler: streamHandler,
+		healthStreams: make(map[string]*healthStreamState),
 	}
 	pm.pendingWipes = timedworkers.CreateWorkerQueue(func(ctx context.Context, fireAt time.Time, args *timedworkers.WorkArgs) error {
 		pm.wipeResourceSlices(ctx, args.Object.Name)
@@ -475,15 +483,6 @@ func (pm *DRAPluginManager) remove(driverName, endpoint string) {
 		pm.store[driverName] = slices.Delete(plugins, i, i+1)
 	}
 
-	// Cancel the plugin's health stream if it was active. sync will start a
-	// stream for the new preferred endpoint, if there is one.
-	if p.healthStreamCancel != nil {
-		logger.V(4).Info("Canceling health stream during deregistration")
-		p.healthStreamCancel()
-		p.healthStreamCancel = nil
-		p.healthStreamGeneration = 0
-	}
-
 	logger.V(3).Info("Unregistered DRA plugin", "driverName", driverName, "endpoint", endpoint, "numPlugins", len(pm.store[driverName]))
 	pm.sync(driverName)
 }
@@ -537,31 +536,51 @@ func (pm *DRAPluginManager) syncHealthStream(driverName string) {
 
 	logger := klog.FromContext(pm.backgroundCtx)
 	preferredPlugin := pm.getPreferredPlugin(driverName)
-	for _, plugin := range pm.store[driverName] {
-		if plugin == preferredPlugin || plugin.healthStreamCancel == nil {
-			continue
-		}
-		logger.V(4).Info("Canceling health stream for non-preferred endpoint", "driverName", driverName, "endpoint", plugin.endpoint)
-		plugin.healthStreamCancel()
-		plugin.healthStreamCancel = nil
-		plugin.healthStreamGeneration = 0
+	current := pm.healthStreams[driverName]
+	if current != nil && current.plugin == preferredPlugin {
+		return
 	}
 
-	if preferredPlugin == nil || preferredPlugin.chosenHealthService == "" || preferredPlugin.healthStreamCancel != nil {
+	if preferredPlugin == nil || preferredPlugin.chosenHealthService == "" {
+		if preferredPlugin == nil {
+			delete(pm.healthStreams, driverName)
+		} else {
+			// Health reporting follows the same authoritative endpoint as other
+			// DRA calls. Do not fall back to an older health-capable endpoint.
+			pm.healthStreams[driverName] = &healthStreamState{plugin: preferredPlugin}
+		}
+		if current != nil && current.generation != 0 {
+			pm.streamHandler.DeactivateHealthStream(pm.backgroundCtx, driverName, current.generation)
+		}
+		if current != nil && current.cancel != nil {
+			logger.V(4).Info("Canceling health stream with no replacement", "driverName", driverName, "endpoint", current.plugin.endpoint)
+			current.cancel()
+		}
 		return
 	}
 
 	pm.nextHealthStreamGeneration++
 	generation := pm.nextHealthStreamGeneration
 	streamCtx, streamCancel := context.WithCancel(preferredPlugin.backgroundCtx)
-	preferredPlugin.healthStreamCancel = streamCancel
-	preferredPlugin.healthStreamGeneration = generation
+
+	// Transfer ownership before canceling the old stream. This prevents its
+	// teardown from clearing health data during a seamless handover.
+	pm.streamHandler.ActivateHealthStream(pm.backgroundCtx, driverName, generation)
+	pm.healthStreams[driverName] = &healthStreamState{
+		plugin:     preferredPlugin,
+		generation: generation,
+		cancel:     streamCancel,
+	}
+	if current != nil && current.cancel != nil {
+		logger.V(4).Info("Canceling health stream for non-preferred endpoint", "driverName", driverName, "endpoint", current.plugin.endpoint)
+		current.cancel()
+	}
 
 	pm.wg.Add(1)
-	go pm.runHealthStream(streamCtx, streamCancel, preferredPlugin.DRAPlugin, generation)
+	go pm.runHealthStream(streamCtx, preferredPlugin, generation)
 }
 
-func (pm *DRAPluginManager) runHealthStream(ctx context.Context, cancel context.CancelFunc, plugin *DRAPlugin, generation uint64) {
+func (pm *DRAPluginManager) runHealthStream(ctx context.Context, plugin *monitoredPlugin, generation uint64) {
 	defer pm.wg.Done()
 
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "driverName", plugin.driverName, "endpoint", plugin.endpoint, "generation", generation)
@@ -580,12 +599,35 @@ func (pm *DRAPluginManager) runHealthStream(ctx context.Context, cancel context.
 		logger.V(2).Info("Successfully started WatchResources health stream")
 		err = pm.streamHandler.HandleWatchResourcesStream(ctx, stream, plugin.driverName, generation)
 		logger.V(2).Info("WatchResources health stream has ended", "error", err)
-		if status.Code(err) == codes.Unimplemented {
+		if pm.healthStreamTerminated(ctx, plugin, generation, err) {
 			// A driver which gains support re-registers and gets a new stream.
 			logger.V(2).Info("Driver does not support WatchResources health stream, stopping")
-			cancel()
 		}
 	}, 5*time.Second)
+}
+
+// healthStreamTerminated permanently stops a stream only when the health RPC
+// is unsupported. Retryable failures retain the last reported health until the
+// retry succeeds or the health timeout expires.
+func (pm *DRAPluginManager) healthStreamTerminated(ctx context.Context, plugin *monitoredPlugin, generation uint64, streamErr error) bool {
+	if status.Code(streamErr) != codes.Unimplemented {
+		return false
+	}
+
+	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
+
+	current := pm.healthStreams[plugin.driverName]
+	if current == nil || current.plugin != plugin || current.generation != generation {
+		return false
+	}
+	pm.streamHandler.DeactivateHealthStream(ctx, plugin.driverName, generation)
+	current.generation = 0
+	if current.cancel != nil {
+		current.cancel()
+		current.cancel = nil
+	}
+	return true
 }
 
 // usable returns true if at least one endpoint is ready to handle gRPC calls for the DRA driver.

@@ -264,11 +264,19 @@ func (cache *healthInfoCache) updateHealthInfo(logger klog.Logger, driverName st
 func (cache *healthInfoCache) clearDriver(logger klog.Logger, driverName string) ([]state.DeviceHealth, error) {
 	changedDevices := []state.DeviceHealth{}
 	err := cache.withLock(func() error {
+		now := time.Now()
 		driver, exists := (*cache.HealthInfo)[driverName]
 		if !exists {
 			return nil
 		}
 		for _, device := range driver.Devices {
+			timeout := device.HealthCheckTimeout
+			if timeout == 0 {
+				timeout = DefaultHealthTimeout
+			}
+			if now.Sub(device.LastUpdated) > timeout {
+				continue
+			}
 			if device.Health != state.DeviceHealthStatusUnknown || device.Message != "" {
 				device.Health = state.DeviceHealthStatusUnknown
 				device.Message = ""

@@ -26,6 +26,10 @@ import (
 // This interface is implemented by the DRA Manager to decouple the plugin
 // package from the manager package, breaking the import cycle.
 type StreamHandler interface {
+	// ActivateHealthStream transfers ownership of a driver's health data to a stream.
+	ActivateHealthStream(ctx context.Context, driverName string, generation uint64)
+	// DeactivateHealthStream releases ownership and clears the driver's health data.
+	DeactivateHealthStream(ctx context.Context, driverName string, generation uint64)
 	// HandleWatchResourcesStream processes health updates from a specific DRA plugin stream.
 	HandleWatchResourcesStream(ctx context.Context, stream drahealthv1.DRAResourceHealth_NodeWatchResourcesClient, driverName string, generation uint64) error
 }
