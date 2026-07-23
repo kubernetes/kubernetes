@@ -35,12 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -214,37 +212,6 @@ func windowsHostCheckForTopologyMetrics() (int, int) {
 	return minCPUsPerNUMA, maxCPUsPerNUMA
 }
 
-func windowsDetectCPUsPerNUMANode() map[int]int {
-	outData, err := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", "Get-CimInstance Win32_PerfRawData_Counters_ProcessorInformation | Select-Object -ExpandProperty Name").Output()
-	framework.ExpectNoError(err)
-
-	perNodeCPUCounts := map[int]int{}
-	for _, line := range strings.Split(strings.TrimSpace(string(outData)), "\n") {
-		name := strings.TrimSpace(line)
-		if name == "" || name == "_Total" || strings.HasSuffix(name, "_Total") {
-			continue
-		}
-		parts := strings.Split(name, ",")
-		if len(parts) != 2 {
-			continue
-		}
-		nodeID, err := strconv.Atoi(strings.TrimSpace(parts[0]))
-		if err != nil {
-			continue
-		}
-		cpuIDPart := strings.TrimSpace(parts[1])
-		if cpuIDPart == "_Total" {
-			continue
-		}
-		if _, err := strconv.Atoi(cpuIDPart); err != nil {
-			continue
-		}
-		perNodeCPUCounts[nodeID]++
-	}
-
-	return perNodeCPUCounts
-}
-
 func windowsDetectTotalLogicalCPUs() int {
 	outData, err := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", "(Get-CimInstance Win32_Processor | Measure-Object -Property NumberOfLogicalProcessors -Sum).Sum").Output()
 	framework.ExpectNoError(err)
@@ -282,28 +249,11 @@ func makeGuaranteedCPUExclusivePausePodWindows(name string, cpus int) *v1.Pod {
 	}
 }
 
-func getWindowsKubeletMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
-	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, fmt.Sprintf("%s:%d", nodeNameOrIP(), ports.KubeletReadOnlyPort), "/metrics")
-}
-
-func nodeID(_ interface{}) string {
-	return ""
-}
-
 func makeCustomPairID(pri, sec string) func(interface{}) string {
 	return func(element interface{}) string {
 		el := element.(*testutil.Sample)
 		return fmt.Sprintf("%s::%s", el.Metric[testutil.LabelName(pri)], el.Metric[testutil.LabelName(sec)])
 	}
-}
-
-func timelessSample(value interface{}) types.GomegaMatcher {
-	return gstruct.PointTo(gstruct.MatchAllFields(gstruct.Fields{
-		"Metric":    gstruct.Ignore(),
-		"Value":     gomega.BeNumerically("==", value),
-		"Timestamp": gstruct.Ignore(),
-		"Histogram": gstruct.Ignore(),
-	}))
 }
 
 func checkMetricValueGreaterThan(value interface{}) types.GomegaMatcher {

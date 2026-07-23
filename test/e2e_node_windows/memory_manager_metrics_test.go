@@ -27,14 +27,11 @@ import (
 	"github.com/onsi/gomega/gstruct"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -93,10 +90,16 @@ var _ = SIGWindowsDescribe(feature.MemoryManager, feature.Windows, framework.Wit
 		})
 
 		ginkgo.It("should report pinning failures when the memory manager allocation is known to fail", func(ctx context.Context) {
-			// A guaranteed pod requesting more memory than the node can satisfy
-			// causes the memory manager allocation to fail, which increments both
-			// the pinning request and pinning error counters.
-			testPod = e2epod.NewPodClient(f).Create(ctx, makeGuaranteedMemoryManagerPodWindows("memmngr-fail", "1", "1000Gi"))
+			// The memory manager only records a pinning error when it makes its OWN
+			// NUMA-placement decision and that Allocate fails. That path is reached
+			// only by a Guaranteed pod with a FRACTIONAL CPU request: it gets no
+			// exclusive CPUs, so the memory manager does not follow the CPU manager's
+			// node and instead selects/extends NUMA nodes itself. An integer CPU
+			// request would take the follow-CPU path, which binds best-effort and
+			// never errors (the pod would just be rejected later by the node-fit
+			// predicate). The oversized memory request fits no NUMA node, so Allocate
+			// fails and both the pinning request and error counters increment.
+			testPod = e2epod.NewPodClient(f).Create(ctx, makeGuaranteedMemoryManagerPodWindows("memmngr-fail", "500m", "1000Gi"))
 
 			matchResourceMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 				"kubelet_memory_manager_pinning_requests_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
@@ -130,73 +133,3 @@ var _ = SIGWindowsDescribe(feature.MemoryManager, feature.Windows, framework.Wit
 		})
 	})
 })
-
-// buildWindowsMemoryManagerKubeletConfig returns a KubeletConfiguration with the
-// Windows memory manager enabled under the BestEffort policy. It reuses the CPU
-// manager config (static policy + WindowsCPUAndMemoryAffinity gate) because the
-// Windows memory manager is wired alongside the CPU manager and follows its NUMA
-// decision. The reserved-memory numbers must add up: the per-NUMA reservation
-// (1100Mi on node 0) equals systemReserved + kubeReserved + evictionHard memory
-// (500Mi + 500Mi + 100Mi), which the memory manager validates at startup.
-func buildWindowsMemoryManagerKubeletConfig(oldCfg *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-	newCfg := buildWindowsCPUManagerKubeletConfig(oldCfg, true)
-	newCfg.MemoryManagerPolicy = "BestEffort"
-	// Keep the topology manager out of the admission decision so the memory
-	// manager's Allocate always runs. With single-numa-node/restricted the
-	// topology manager would reject an unsatisfiable request at the hint-merge
-	// stage before Allocate is called, and the pinning counters would never
-	// increment. "none" (like the Linux memory manager metrics test) admits the
-	// pod to the allocate phase so the failure path is exercised.
-	newCfg.TopologyManagerPolicy = topologymanager.PolicyNone
-	newCfg.ReservedMemory = []kubeletconfig.MemoryReservation{
-		{
-			NumaNode: 0,
-			Limits: v1.ResourceList{
-				v1.ResourceMemory: resource.MustParse("1100Mi"),
-			},
-		},
-	}
-	if newCfg.SystemReserved == nil {
-		newCfg.SystemReserved = map[string]string{}
-	}
-	newCfg.SystemReserved[string(v1.ResourceMemory)] = "500Mi"
-	if newCfg.KubeReserved == nil {
-		newCfg.KubeReserved = map[string]string{}
-	}
-	newCfg.KubeReserved[string(v1.ResourceMemory)] = "500Mi"
-	if newCfg.EvictionHard == nil {
-		newCfg.EvictionHard = map[string]string{}
-	}
-	newCfg.EvictionHard["memory.available"] = "100Mi"
-	return newCfg
-}
-
-// makeGuaranteedMemoryManagerPodWindows returns a Guaranteed-QoS pod (requests
-// equal limits for both CPU and memory) so the memory manager attempts to pin
-// its memory, exercising the pinning counters.
-func makeGuaranteedMemoryManagerPodWindows(name, cpu, memory string) *v1.Pod {
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name + "-pod",
-		},
-		Spec: v1.PodSpec{
-			RestartPolicy: v1.RestartPolicyNever,
-			Containers: []v1.Container{
-				{
-					Name:  name + "-cnt",
-					Image: imageutils.GetPauseImageName(),
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse(cpu),
-							v1.ResourceMemory: resource.MustParse(memory),
-						},
-						Limits: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse(cpu),
-							v1.ResourceMemory: resource.MustParse(memory),
-						},
-					},
-				},
-			},
-		},
-	}
-}
