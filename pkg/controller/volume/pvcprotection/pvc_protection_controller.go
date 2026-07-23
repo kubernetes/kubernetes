@@ -266,7 +266,9 @@ func (c *Controller) processPVC(ctx context.Context, pvcNamespace, pvcName strin
 		return err
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeClaimUnusedSinceTime) && pvc.DeletionTimestamp == nil {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeClaimUnusedSinceTime) &&
+		pvc.DeletionTimestamp == nil && pvc.Status.Phase == v1.ClaimBound {
+		// Avoid conflict with PV controller binding process.
 		isUsed, err := c.isBeingUsedWith(ctx, pvc, lazyLivePodList, c.podUsesPVCForUnusedSince)
 		if err != nil {
 			return err
