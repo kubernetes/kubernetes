@@ -187,6 +187,12 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 	defer m.workerLock.Unlock()
 
 	logger := klog.FromContext(ctx)
+	// Detach the workers' context from the caller's: the pod worker cancels the
+	// sync context when the pod begins terminating, but probe workers must keep
+	// probing until the container stops so a failing readiness probe can mark
+	// the pod NotReady during graceful termination. Workers are stopped
+	// explicitly via their stop channel (RemovePod/CleanupPods).
+	ctx = context.WithoutCancel(ctx)
 	key := probeKey{podUID: pod.UID}
 	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {
 		key.containerName = c.Name
