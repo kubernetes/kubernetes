@@ -211,6 +211,9 @@ const (
 	PodRequestsListKey       = "pod_requests_list_total"
 	PodRequestsGetKey        = "pod_requests_get_total"
 	PodRequestsWatchKey      = "pod_requests_watch_total"
+
+	// Metric keys for pod level resources metrics.
+	PodLevelResourcesAdmissionTotalKey = "pod_level_resources_admission_total"
 )
 
 // PriorityBucket represents the priority bucket label value for pod resize metrics.
@@ -1398,6 +1401,25 @@ var (
 		},
 		[]string{"server_api_version", "status_code"},
 	)
+	// PodLevelResourcesAdmissionTotal tracks feature adoption metrics for KEP-2837 (Pod-Level Resources) upon pod admission.
+	// Only admitted pods are recorded.
+	// config_mode categorizes how resources are specified on the pod:
+	//   - "pod_and_container_level": Both pod-level and container-level resources are set.
+	//   - "pod_level": Only pod-level resources are set.
+	//   - "container_level": Only container-level resources are set.
+	//   - "": Neither pod-level nor container-level resources are set (BestEffort QoS).
+	// Bounded cardinality: max 12 series (4 config_modes * 3 qos_classes).
+	// Note: This metric is ALPHA and temporary. It is intended to track feature adoption while the
+	// feature is new and is scheduled to be removed 2-3 releases after the Pod-Level Resources feature reaches GA.
+	PodLevelResourcesAdmissionTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodLevelResourcesAdmissionTotalKey,
+			Help:           "Total number of pods admitted during Kubelet admission, categorized by resource configuration mode (pod_and_container_level, pod_level, container_level, or empty for unconfigured/BestEffort) and QoS class.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"config_mode", "qos_class"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1533,6 +1555,9 @@ func Register() {
 		legacyregistry.MustRegister(PodRequestsList)
 		legacyregistry.MustRegister(PodRequestsGet)
 		legacyregistry.MustRegister(PodRequestsWatch)
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
+			legacyregistry.MustRegister(PodLevelResourcesAdmissionTotal)
+		}
 	})
 }
 
