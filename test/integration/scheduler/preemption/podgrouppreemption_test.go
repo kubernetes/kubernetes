@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -2697,4 +2698,209 @@ func deleteCompositePodGroups(ctx context.Context, cs clientset.Interface, ns st
 		}
 	}
 	return nil
+}
+
+const stateSaverKey fwk.StateKey = "stateSaverKey"
+
+type podGroupStateData struct {
+	podNames []string
+}
+
+func (d *podGroupStateData) Clone() fwk.StateData {
+	return &podGroupStateData{
+		podNames: append([]string(nil), d.podNames...),
+	}
+}
+
+type stateSaverPreFilterPlugin struct {
+	name   string
+	handle fwk.Handle
+}
+
+func (p *stateSaverPreFilterPlugin) Name() string {
+	return p.name
+}
+
+func (p *stateSaverPreFilterPlugin) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if !state.IsPodGroupSchedulingCycle() {
+		return nil, nil
+	}
+	pgState := state.GetPodGroupSchedulingCycle()
+	if pgState == nil {
+		return nil, nil
+	}
+
+	var podNames []string
+	if p.handle != nil && p.handle.SnapshotSharedLister() != nil {
+		nodeInfos, err := p.handle.SnapshotSharedLister().NodeInfos().List()
+		if err == nil {
+			for _, nodeInfo := range nodeInfos {
+				for _, podInfo := range nodeInfo.GetPods() {
+					if podInfo != nil && podInfo.GetPod() != nil {
+						podNames = append(podNames, podInfo.GetPod().Name)
+					}
+				}
+			}
+		}
+	}
+
+	pgState.Write(stateSaverKey, &podGroupStateData{podNames: podNames})
+	return nil, nil
+}
+
+func (p *stateSaverPreFilterPlugin) PreFilterExtensions() fwk.PreFilterExtensions {
+	return nil
+}
+
+var _ fwk.PreFilterPlugin = &stateSaverPreFilterPlugin{}
+
+type stateVerifierPostFilterPlugin struct {
+	name             string
+	called           bool
+	recordedPodNames []string
+	readErr          error
+	lock             sync.Mutex
+}
+
+func (p *stateVerifierPostFilterPlugin) Name() string {
+	return p.name
+}
+
+func (p *stateVerifierPostFilterPlugin) PodGroupPostFilter(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.called = true
+
+	data, err := state.Read(stateSaverKey)
+	p.readErr = err
+	if err == nil {
+		if stateData, ok := data.(*podGroupStateData); ok {
+			p.recordedPodNames = append([]string(nil), stateData.podNames...)
+		}
+	}
+	return nil, fwk.NewStatus(fwk.Unschedulable, "injected verifier PostFilter")
+}
+
+var _ fwk.PodGroupPostFilterPlugin = &stateVerifierPostFilterPlugin{}
+
+func TestPodGroupCycleStatePreserved(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload: true,
+	})
+
+	stateSaverPluginName := "stateSaverPreFilterPlugin"
+	stateVerifierPluginName := "stateVerifierPostFilterPlugin"
+
+	var stateSaver stateSaverPreFilterPlugin
+	var stateVerifier stateVerifierPostFilterPlugin
+
+	registry := make(frameworkruntime.Registry)
+	err := registry.Register(stateSaverPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+		stateSaver = stateSaverPreFilterPlugin{
+			name:   stateSaverPluginName,
+			handle: fh,
+		}
+		return &stateSaver, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to register stateSaverPreFilterPlugin: %v", err)
+	}
+
+	err = registry.Register(stateVerifierPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+		stateVerifier = stateVerifierPostFilterPlugin{
+			name: stateVerifierPluginName,
+		}
+		return &stateVerifier, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to register stateVerifierPostFilterPlugin: %v", err)
+	}
+
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			Plugins: &configv1.Plugins{
+				MultiPoint: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
+						{Name: stateSaverPluginName},
+						{Name: names.DefaultPreemption},
+						{Name: stateVerifierPluginName},
+					},
+					Disabled: []configv1.Plugin{
+						{Name: names.DefaultPreemption},
+					},
+				},
+			},
+		}},
+	})
+
+	testCtx := testutils.InitTestSchedulerWithNS(t, "state-preserved",
+		scheduler.WithProfiles(cfg.Profiles...),
+		scheduler.WithFrameworkOutOfTreeRegistry(registry),
+		scheduler.WithPodMaxBackoffSeconds(1),
+		scheduler.WithPodInitialBackoffSeconds(0),
+	)
+	cs, ns := testCtx.ClientSet, testCtx.NS.Name
+
+	// 1. Create node with 3 CPU capacity
+	node := st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj()
+	if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
+
+	// 2. Create high-pod (priority 500, CPU 2) and low-pod (priority 10, CPU 1)
+	highPod := st.MakePod().Name("high-pod").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(500).ZeroTerminationGracePeriod().Node("node1").Obj()
+	lowPod := st.MakePod().Name("low-pod").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).ZeroTerminationGracePeriod().Node("node1").Obj()
+
+	for _, p := range []*v1.Pod{highPod, lowPod} {
+		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+		}
+	}
+
+	// Wait for initial pods to be scheduled
+	for _, p := range []*v1.Pod{highPod, lowPod} {
+		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+			t.Fatalf("Failed to wait for initial pod %s to schedule: %v", p.Name, err)
+		}
+	}
+
+	// 3. Create preemptor pods belonging to pg1 (each needing CPU 2)
+	preemptor1 := st.MakePod().Name("preemptor-1").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg1").Priority(100).ZeroTerminationGracePeriod().Obj()
+	preemptor2 := st.MakePod().Name("preemptor-2").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg1").Priority(100).ZeroTerminationGracePeriod().Obj()
+
+	for _, p := range []*v1.Pod{preemptor1, preemptor2} {
+		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create preemptor pod %s: %v", p.Name, err)
+		}
+	}
+
+	// 4. Create PodGroup with minCount=2 and priority=100
+	pg := st.MakePodGroup().Name("pg1").Namespace(ns).Priority(100).MinCount(2).Obj()
+	if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create PodGroup pg1: %v", err)
+	}
+
+	var recordedPods sets.Set[string]
+
+	// 5. Verify that stateVerifierPostFilterPlugin was called and state was preserved
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+		stateVerifier.lock.Lock()
+		recordedPods = sets.New(stateVerifier.recordedPodNames...)
+		defer stateVerifier.lock.Unlock()
+		return stateVerifier.called, nil
+	})
+	if err != nil {
+		t.Fatalf("Timed out waiting for stateVerifierPostFilterPlugin to be called: %v", err)
+	}
+
+	if stateVerifier.readErr != nil {
+		t.Errorf("Expected no error reading stateSaverKey from PodGroupCycleState, got: %v", stateVerifier.readErr)
+	}
+
+	expectedPods := sets.New("high-pod", "low-pod")
+
+	if !recordedPods.IsSuperset(expectedPods) {
+		t.Errorf("PodGroupCycleState lost pod information! Expected pods %v to be in state, got %v", sets.List(expectedPods), sets.List(recordedPods))
+	}
 }
