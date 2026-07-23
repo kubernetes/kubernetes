@@ -448,6 +448,7 @@ func TestRotateLatestLog(t *testing.T) {
 		assert.NoError(t, f.AssertCalls([]string{"ReopenContainerLog"}))
 	}
 }
+
 func TestRmRedundantLogs(t *testing.T) {
 	for desc, test := range map[string]struct {
 		files       []string
@@ -484,7 +485,6 @@ func TestRmRedundantLogs(t *testing.T) {
 			files:       []string{"abc.log", "0.log", "1.log", "2.log"},
 			currentLog:  "abc.log",
 			maxFiles:    2,
-			expectError: true,
 			expectFiles: []string{"abc.log", "0.log", "1.log", "2.log"},
 		},
 		"skip cleanup for log without extension": {

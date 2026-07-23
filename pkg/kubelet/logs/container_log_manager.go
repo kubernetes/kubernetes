@@ -302,22 +302,32 @@ func (c *containerLogManager) rmRedundantLogs(_ context.Context, id, log string)
 
 	logFileNum, err := strconv.Atoi(parts[0])
 	if err != nil {
-		klog.ErrorS(err, "Log file name has unexpected format, cannot extract log file number", "log", log)
-		return err
+		klog.V(4).InfoS("Log file name does not have a numeric prefix, skipping redundant log cleanup", "log", log)
+		return nil
 	}
 
 	// Keep the latest MaxFiles revisions, remove everything older.
 	removeBelow := logFileNum - c.policy.MaxFiles + 1
+	if removeBelow <= 0 {
+		klog.V(4).InfoS("Current log revision is too low to trigger cleanup, skipping redundant log truncation", "logFileNum", logFileNum, "maxFiles", c.policy.MaxFiles, "logDir", logDir)
+		return nil
+	}
 	logs, err := getLogsLessThanN(logDir, removeBelow)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get logs less than N", "logDir", logDir, "N", removeBelow)
 		return err
 	}
 
+	var removeErrors bool
 	for _, l := range logs {
 		if err := c.osInterface.Remove(l); err != nil {
+			removeErrors = true
 			klog.ErrorS(err, "Failed to remove old log", "log", l)
 		}
+	}
+
+	if removeErrors {
+		return fmt.Errorf("failed to remove one or more old logs in dir %q", logDir)
 	}
 
 	return nil

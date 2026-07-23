@@ -152,8 +152,10 @@ var _ = SIGDescribe("ContainerLogRedundantCleanup", framework.WithSlow(), framew
 			ginkgo.DeferCleanup(e2epod.NewPodClient(f).DeleteSync, logPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
 			ginkgo.By("wait for the container to restart enough times to exceed MaxFiles")
-			// We need at least MaxFiles+1 restarts to trigger redundant log cleanup.
-			targetRestarts := int32(redundantTestMaxFiles + 2)
+			// With exponential restart backoff (10s, 20s, 40s, 80s, ...),
+			// MaxFiles+1 restarts (backoff sum ~70s) is sufficient to trigger
+			// redundant log cleanup while staying well within the 3m timeout.
+			targetRestarts := int32(redundantTestMaxFiles + 1)
 			gomega.Eventually(ctx, func() (int32, error) {
 				p, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
 				if err != nil {
