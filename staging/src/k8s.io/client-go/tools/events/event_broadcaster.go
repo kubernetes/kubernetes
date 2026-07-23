@@ -42,6 +42,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/record/util"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -73,7 +74,7 @@ type eventBroadcasterImpl struct {
 	eventCache    map[eventKey]*eventsv1.Event
 	sleepDuration time.Duration
 	sink          EventSink
-	eventQueue    chan *eventsv1.Event
+	eventQueue    workqueue.TypedInterface[eventKey]
 	cancel        func()
 }
 
@@ -120,7 +121,7 @@ func newBroadcaster(sink EventSink, sleepDuration time.Duration, eventCache map[
 		eventCache:    eventCache,
 		sleepDuration: sleepDuration,
 		sink:          sink,
-		eventQueue:    make(chan *eventsv1.Event, maxQueuedEvents),
+		eventQueue:    workqueue.NewTyped[eventKey](),
 	}
 }
 
@@ -220,52 +221,63 @@ func (e *eventBroadcasterImpl) NewRecorder(scheme *runtime.Scheme, reportingCont
 func (e *eventBroadcasterImpl) recordToSink(ctx context.Context, event *eventsv1.Event, clock clock.Clock) {
 	// Make a copy before modification, because there could be multiple listeners.
 	eventCopy := event.DeepCopy()
-	record := func() *eventsv1.Event {
+	key := getKey(eventCopy)
+	needsRecording := func() bool {
 		e.mu.Lock()
 		defer e.mu.Unlock()
-		eventKey := getKey(eventCopy)
-		isomorphicEvent, isIsomorphic := e.eventCache[eventKey]
+		isomorphicEvent, isIsomorphic := e.eventCache[key]
 		if isIsomorphic {
 			if isomorphicEvent.Series != nil {
 				isomorphicEvent.Series.Count++
 				isomorphicEvent.Series.LastObservedTime = metav1.MicroTime{Time: clock.Now()}
-				return nil
+				return false
 			}
 			isomorphicEvent.Series = &eventsv1.EventSeries{
 				Count:            2,
 				LastObservedTime: metav1.MicroTime{Time: clock.Now()},
 			}
-			// Make a copy of the Event to make sure that recording it
-			// doesn't mess with the object stored in cache.
-			return isomorphicEvent.DeepCopy()
+			return true
 		}
-		e.eventCache[eventKey] = eventCopy
-		// Make a copy of the Event to make sure that recording it doesn't
-		// mess with the object stored in cache.
-		return eventCopy.DeepCopy()
+		e.eventCache[key] = eventCopy
+		return true
 	}()
-	if record != nil {
-		select {
-		case e.eventQueue <- record:
-		default:
-			klog.FromContext(ctx).Error(nil, "Unable to record event: too many queued events, dropped event", "event", record)
-		}
+	if needsRecording {
+		e.eventQueue.Add(key)
 	}
 }
 
-// recordingWorker delivers queued events to the sink until the context is
-// canceled.
+// recordingWorker delivers queued events to the sink until the queue is shut
+// down.
 func (e *eventBroadcasterImpl) recordingWorker(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	for {
-		select {
-		case <-ctx.Done():
+		key, shutdown := e.eventQueue.Get()
+		if shutdown {
 			return
-		case record := <-e.eventQueue:
-			// TODO: Add a metric counting the number of recording attempts
-			e.attemptRecording(ctx, record)
 		}
+		func() {
+			defer e.eventQueue.Done(key)
+			e.processNextItem(ctx, key)
+		}()
 	}
+}
+
+// processNextItem looks up the current cached state for key and, if it is
+// still present, attempts to record it to the sink.
+func (e *eventBroadcasterImpl) processNextItem(ctx context.Context, key eventKey) {
+	e.mu.Lock()
+	event, ok := e.eventCache[key]
+	if !ok {
+		e.mu.Unlock()
+		return
+	}
+	// Make a copy of the Event to make sure that recording it doesn't mess
+	// with the object stored in cache.
+	eventCopy := event.DeepCopy()
+	e.mu.Unlock()
+
+	// TODO: Add a metric counting the number of recording attempts
+	e.attemptRecording(ctx, eventCopy)
 }
 
 func (e *eventBroadcasterImpl) attemptRecording(ctx context.Context, event *eventsv1.Event) {
@@ -445,6 +457,7 @@ func (e *eventBroadcasterImpl) startRecordingEvents(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
 		stopWatcher()
+		e.eventQueue.ShutDown()
 	}()
 	return nil
 }
