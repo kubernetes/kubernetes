@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"runtime"
+	runtimemetrics "runtime/metrics"
 	"sort"
 	"testing"
 	"time"
@@ -46,23 +48,35 @@ const dispatchDurationMetric = "apiserver_watch_events_dispatch_duration_seconds
 func TestDispatchStageSweep(t *testing.T) {
 	metrics.Register()
 
-	fmt.Printf("\n%-9s | %11s %11s\n", "watchers", "fanout p50", "fanout p99")
-	fmt.Println("----------+-------------------------")
+	fmt.Printf("\nGOMAXPROCS=%d\n", runtime.GOMAXPROCS(0))
+	fmt.Printf("\n%-9s | %11s %11s | %12s %12s\n",
+		"watchers", "fanout p50", "fanout p99", "sched p50", "sched p99")
+	fmt.Println("----------+-------------------------+---------------------------")
 
 	for _, numWatchers := range []int{100, 1000, 2500, 5000, 10000} {
 		fanBefore := snapshotStage(t, "fanout")
+		schedBefore := snapshotSchedLatency()
 
 		runSweep(t, numWatchers)
 
 		fan := deltaHist(snapshotStage(t, "fanout"), fanBefore)
+		sched := deltaSched(snapshotSchedLatency(), schedBefore)
 
-		fmt.Printf("%-9d | %11s %11s\n",
+		fmt.Printf("%-9d | %11s %11s | %12s %12s\n",
 			numWatchers,
-			dur(histQuantile(fan, 0.50)), dur(histQuantile(fan, 0.99)))
+			dur(histQuantile(fan, 0.50)), dur(histQuantile(fan, 0.99)),
+			dur(schedQuantile(sched, 0.50)), dur(schedQuantile(sched, 0.99)))
 	}
 	fmt.Println("\nfanout = stage=\"fanout\" (dispatch -> c.input accept, the single dispatcher's serial cost)")
 	fmt.Println("on apiserver_watch_events_dispatch_duration_seconds. p99 grows with watcher count:")
 	fmt.Println("the serial single-dispatcher fan-out is the stage that scales with fan-out size.")
+	fmt.Println("")
+	fmt.Println("sched  = /sched/latencies:seconds delta over the same window (runtime-global time")
+	fmt.Println("goroutines sat runnable-but-not-running). If sched p99 climbs in lockstep with")
+	fmt.Println("fanout p99, the fan-out cost IS the goroutine-scheduling storm (claim 3 confirmed).")
+	fmt.Println("If sched stays flat while fanout grows, the cost is plain serial loop/channel work,")
+	fmt.Println("not scheduling -- claim 3 denied.")
+	fmt.Println("")
 	fmt.Println("(stage=\"total\" is not measured here: this harness uses a fake clock, and post-")
 	fmt.Println("#140851 sendWatchCacheEvent stamps sentAt from that clock, so total reads ~0.")
 	fmt.Println("Compare fanout vs total in a real-clock scale/e2e run instead.)")
@@ -217,6 +231,67 @@ func histQuantile(h histSnap, q float64) float64 {
 
 func dur(seconds float64) string {
 	return time.Duration(seconds * float64(time.Second)).Round(time.Microsecond).String()
+}
+
+// schedSnap is a snapshot of the runtime's /sched/latencies:seconds histogram.
+// Counts[i] covers the bucket [Buckets[i], Buckets[i+1]).
+type schedSnap struct {
+	counts  []uint64
+	buckets []float64
+}
+
+// snapshotSchedLatency reads the runtime-global scheduling-latency histogram:
+// how long goroutines sit runnable before a P actually runs them. A goroutine
+// storm (dispatcher waking N process goroutines that then contend for cores)
+// shows up here as the tail climbing.
+func snapshotSchedLatency() schedSnap {
+	s := []runtimemetrics.Sample{{Name: "/sched/latencies:seconds"}}
+	runtimemetrics.Read(s)
+	h := s[0].Value.Float64Histogram()
+	c := make([]uint64, len(h.Counts))
+	copy(c, h.Counts)
+	b := make([]float64, len(h.Buckets))
+	copy(b, h.Buckets)
+	return schedSnap{counts: c, buckets: b}
+}
+
+// deltaSched isolates the scheduling latency that accrued between two snapshots
+// (the counts are cumulative since process start).
+func deltaSched(after, before schedSnap) schedSnap {
+	d := schedSnap{buckets: after.buckets, counts: make([]uint64, len(after.counts))}
+	for i := range after.counts {
+		if i < len(before.counts) {
+			d.counts[i] = after.counts[i] - before.counts[i]
+		} else {
+			d.counts[i] = after.counts[i]
+		}
+	}
+	return d
+}
+
+// schedQuantile returns the q-quantile upper bound from the runtime histogram,
+// the same cumulative-bucket walk histQuantile uses.
+func schedQuantile(s schedSnap, q float64) float64 {
+	var total uint64
+	for _, c := range s.counts {
+		total += c
+	}
+	if total == 0 {
+		return 0
+	}
+	target := q * float64(total)
+	var cum uint64
+	for i, c := range s.counts {
+		cum += c
+		if float64(cum) >= target {
+			hi := s.buckets[i+1]
+			if math.IsInf(hi, 1) {
+				return s.buckets[i]
+			}
+			return hi
+		}
+	}
+	return s.buckets[len(s.buckets)-1]
 }
 
 func podFields(pod *example.Pod) fields.Set {
