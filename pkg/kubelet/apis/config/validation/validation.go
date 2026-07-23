@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"regexp"
 	"time"
 	"unicode"
 
@@ -30,6 +31,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	tracingapi "k8s.io/component-base/tracing/api/v1"
+	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	imagepullmanager "k8s.io/kubernetes/pkg/kubelet/images/pullmanager"
@@ -99,6 +101,28 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 	if kc.ImageMaximumGCAge.Duration != 0 && !localFeatureGate.Enabled(features.ImageMaximumGCAge) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ImageMaximumGCAge feature gate is required for Kubelet configuration option imageMaximumGCAge"))
+	}
+	if len(kc.DefaultPodSysctls) > 0 {
+		if !localFeatureGate.Enabled(features.DefaultPodSysctls) {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: DefaultPodSysctls feature gate is required for Kubelet configuration option defaultPodSysctls"))
+		} else {
+			seenSysctls := sets.New[string]()
+			for k := range kc.DefaultPodSysctls {
+				if !isValidSysctlName(k) {
+					allErrors = append(allErrors, fmt.Errorf("invalid configuration: %q is not a valid sysctl name for defaultPodSysctls", k))
+				} else {
+					ns, _, _ := utilsysctl.GetNamespace(k)
+					if ns == utilsysctl.UnknownNamespace {
+						allErrors = append(allErrors, fmt.Errorf("invalid configuration: %q is not known to be namespaced for defaultPodSysctls", k))
+					}
+					normalizedKey := utilsysctl.NormalizeName(k)
+					if seenSysctls.Has(normalizedKey) {
+						allErrors = append(allErrors, fmt.Errorf("invalid configuration: duplicate sysctl %q found in defaultPodSysctls", normalizedKey))
+					}
+					seenSysctls.Insert(normalizedKey)
+				}
+			}
+		}
 	}
 	if kc.ImageMinimumGCAge.Duration < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageMinimumGCAge %v must not be negative", kc.ImageMinimumGCAge.Duration))
@@ -412,4 +436,22 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 
 	return utilerrors.NewAggregate(allErrors)
+}
+
+// From https://github.com/kubernetes/kubernetes/blob/master/pkg/apis/policy/validation/validation.go
+const (
+	sysctlSegmentFmt      string = "[a-z0-9]([-_a-z0-9]*[a-z0-9])?"
+	sysctlContainSlashFmt string = "(" + sysctlSegmentFmt + "[\\./])*" + sysctlSegmentFmt
+	sysctlMaxLength       int    = 253
+)
+
+var sysctlRegexp = regexp.MustCompile("^" + sysctlContainSlashFmt + "$")
+
+// We validate this at configuration time to prevent Kubelet from attempting to
+// apply invalid sysctls to sandbox containers, which would fail at runtime.
+func isValidSysctlName(name string) bool {
+	if len(name) > sysctlMaxLength {
+		return false
+	}
+	return sysctlRegexp.MatchString(name)
 }

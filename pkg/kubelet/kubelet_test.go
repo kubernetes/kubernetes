@@ -541,6 +541,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		nil,
 		kubeCfg.CPUCFSQuota,
 		kubeCfg.CPUCFSQuotaPeriod,
+		kubeCfg.DefaultPodSysctls,
 		runtimeSvc,
 		imageSvc,
 		kubelet.containerManager,
