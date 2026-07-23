@@ -17,6 +17,7 @@ limitations under the License.
 package prober
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"testing"
@@ -28,7 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
@@ -663,6 +667,7 @@ func testUpdateReadiness(tCtx ktesting.TContext) {
 	m.statusManager.SetPodStatus(logger, testPod, getTestRunningStatus())
 
 	m.AddPod(tCtx, testPod)
+	m.StartContainerProbes(tCtx.Context, testPod, &testPod.Spec.Containers[0], testContainerID, "", time.Now())
 	probePaths := []probeKey{{testPodUID, testContainerName, readiness}}
 	if err := expectProbes(m, probePaths); err != nil {
 		t.Error(err)
@@ -769,5 +774,333 @@ func cleanup(t ktesting.TB, m *manager) {
 	}
 	if err := wait.Poll(interval, wait.ForeverTestTimeout, condition); err != nil {
 		t.Fatalf("Error during cleanup: %v", err)
+	}
+}
+
+func TestStartContainerProbes(t *testing.T) {
+	// Runs with the feature on and off. With the feature on, the probe workers are
+	// activated by StartContainerProbes; with it off, they are launched by AddPod and
+	// StartContainerProbes is a no-op. Either way the expected workers must be running.
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("featureEnabled=%t", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerLifecycleProber, enabled)
+			ktesting.Init(t).SyncTest("", testStartContainerProbes)
+		})
+	}
+}
+
+func testStartContainerProbes(tCtx ktesting.TContext) {
+	t := tCtx.TB()
+	ctx := tCtx.Context
+
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "start_probe_pod",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:           "with_startup",
+					StartupProbe:   defaultProbe,
+					ReadinessProbe: defaultProbe,
+					LivenessProbe:  defaultProbe,
+				},
+				{
+					Name:           "without_startup",
+					ReadinessProbe: defaultProbe,
+					LivenessProbe:  defaultProbe,
+				},
+			},
+		},
+	}
+
+	m := newTestManager()
+	defer cleanup(t, m)
+
+	m.AddPod(ctx, &pod)
+
+	c1ID := kubecontainer.ContainerID{Type: "docker", ID: "cid1"}
+	c2ID := kubecontainer.ContainerID{Type: "docker", ID: "cid2"}
+	now := time.Now()
+
+	// Calling StartContainerProbes for container with startup probe starts startup probe worker.
+	m.StartContainerProbes(ctx, &pod, &pod.Spec.Containers[0], c1ID, "10.0.0.1", now)
+
+	w1Startup, ok := m.getWorker("start_probe_pod", "with_startup", startup)
+	if !ok || !w1Startup.running.Load() {
+		t.Errorf("expected startup worker to be running for with_startup container")
+	}
+
+	// Calling StartContainerProbes for container without startup probe starts readiness and liveness workers.
+	m.StartContainerProbes(ctx, &pod, &pod.Spec.Containers[1], c2ID, "10.0.0.1", now)
+
+	w2Readiness, ok := m.getWorker("start_probe_pod", "without_startup", readiness)
+	if !ok || !w2Readiness.running.Load() {
+		t.Errorf("expected readiness worker to be running for without_startup container")
+	}
+	w2Liveness, ok := m.getWorker("start_probe_pod", "without_startup", liveness)
+	if !ok || !w2Liveness.running.Load() {
+		t.Errorf("expected liveness worker to be running for without_startup container")
+	}
+
+	// StartContainerProbes is idempotent.
+	m.StartContainerProbes(ctx, &pod, &pod.Spec.Containers[1], c2ID, "10.0.0.1", now)
+}
+
+func TestStopContainerProbes(t *testing.T) {
+	// Runs with the feature on and off: StopContainerProbes must tear down the target
+	// container's workers regardless of how they were started (StartContainerProbes when on,
+	// AddPod when off).
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("featureEnabled=%t", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerLifecycleProber, enabled)
+			ktesting.Init(t).SyncTest("", testStopContainerProbes)
+		})
+	}
+}
+
+func testStopContainerProbes(tCtx ktesting.TContext) {
+	t := tCtx.TB()
+	ctx := tCtx.Context
+
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "stop_probe_pod",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:           "container1",
+					ReadinessProbe: defaultProbe,
+				},
+				{
+					Name:           "container2",
+					ReadinessProbe: defaultProbe,
+				},
+			},
+		},
+	}
+
+	m := newTestManager()
+	defer cleanup(t, m)
+
+	m.AddPod(ctx, &pod)
+
+	c1ID := kubecontainer.ContainerID{Type: "docker", ID: "cid1"}
+	c2ID := kubecontainer.ContainerID{Type: "docker", ID: "cid2"}
+	now := time.Now()
+
+	m.StartContainerProbes(ctx, &pod, &pod.Spec.Containers[0], c1ID, "10.0.0.1", now)
+	m.StartContainerProbes(ctx, &pod, &pod.Spec.Containers[1], c2ID, "10.0.0.1", now)
+
+	// Stopping container1 should stop and remove container1's workers, but keep container2.
+	m.StopContainerProbes("stop_probe_pod", "container1")
+
+	if err := waitForWorkerExit(t, m, []probeKey{{"stop_probe_pod", "container1", readiness}}); err != nil {
+		t.Fatalf("expected container1 worker to exit: %v", err)
+	}
+
+	if _, ok := m.getWorker("stop_probe_pod", "container2", readiness); !ok {
+		t.Errorf("expected container2 worker to still exist")
+	}
+}
+
+// TestStartContainerProbesCrashRestart verifies that calling StartContainerProbes with a
+// different containerID for the same container (a crash-restart that did not go through
+// StopContainerProbes) tears down the stale worker and starts a fresh one bound to the new
+// instance.
+func TestStartContainerProbesCrashRestart(t *testing.T) {
+	ktesting.Init(t).SyncTest("", testStartContainerProbesCrashRestart)
+}
+
+func testStartContainerProbesCrashRestart(tCtx ktesting.TContext) {
+	t := tCtx.TB()
+	ctx := tCtx.Context
+
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "crash_restart_pod",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:          "container1",
+					LivenessProbe: defaultProbe,
+				},
+			},
+		},
+	}
+
+	m := newTestManager()
+	defer cleanup(t, m)
+
+	m.AddPod(ctx, &pod)
+
+	oldID := kubecontainer.ContainerID{Type: "docker", ID: "cid-old"}
+	newID := kubecontainer.ContainerID{Type: "docker", ID: "cid-new"}
+	now := time.Now()
+
+	// First instance.
+	m.StartContainerProbes(ctx, &pod, &pod.Spec.Containers[0], oldID, "10.0.0.1", now)
+
+	oldWorker, ok := m.getWorker("crash_restart_pod", "container1", liveness)
+	if !ok || !oldWorker.running.Load() {
+		t.Fatalf("expected liveness worker running for first instance")
+	}
+	if oldWorker.containerID != oldID {
+		t.Fatalf("expected worker bound to %v, got %v", oldID, oldWorker.containerID)
+	}
+
+	// Second instance with a different containerID, without an intervening StopContainerProbes.
+	m.StartContainerProbes(ctx, &pod, &pod.Spec.Containers[0], newID, "10.0.0.1", now)
+
+	newWorker, ok := m.getWorker("crash_restart_pod", "container1", liveness)
+	if !ok || !newWorker.running.Load() {
+		t.Fatalf("expected liveness worker running for second instance")
+	}
+	if newWorker == oldWorker {
+		t.Errorf("expected a fresh worker for the new container instance, got the stale one")
+	}
+	if newWorker.containerID != newID {
+		t.Errorf("expected new worker bound to %v, got %v", newID, newWorker.containerID)
+	}
+
+	// The stale worker's goroutine must eventually exit.
+	if err := wait.PollUntilContextTimeout(ctx, interval, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		return !oldWorker.running.Load(), nil
+	}); err != nil {
+		t.Errorf("stale worker did not stop: %v", err)
+	}
+}
+
+// TestStartContainerProbesCrashRestartWithStartupProbe verifies that when a container with a startup
+// probe and liveness probe crash-restarts without an intervening StopContainerProbes, the exiting
+// stale liveness worker does not delete the replacement worker entry before the new startup probe
+// completes and activates dependents.
+func TestStartContainerProbesCrashRestartWithStartupProbe(t *testing.T) {
+	ktesting.Init(t).SyncTest("", testStartContainerProbesCrashRestartWithStartupProbe)
+}
+
+func testStartContainerProbesCrashRestartWithStartupProbe(tCtx ktesting.TContext) {
+	t := tCtx.TB()
+	ctx := tCtx.Context
+
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "crash_restart_startup_pod",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:          "container1",
+					StartupProbe:  defaultProbe,
+					LivenessProbe: defaultProbe,
+				},
+			},
+		},
+	}
+
+	m := newTestManager()
+	defer cleanup(t, m)
+
+	m.AddPod(ctx, &pod)
+
+	oldID := kubecontainer.ContainerID{Type: "docker", ID: "cid-old"}
+	newID := kubecontainer.ContainerID{Type: "docker", ID: "cid-new"}
+	now := time.Now()
+
+	// First instance starts container probes (activates startup probe).
+	m.StartContainerProbes(ctx, &pod, &pod.Spec.Containers[0], oldID, "10.0.0.1", now)
+
+	// Simulate startup probe completing and activating liveness/readiness for the first instance.
+	m.startLivenessAndReadiness(ctx, &pod, &pod.Spec.Containers[0], oldID, "10.0.0.1", now)
+
+	oldLivenessWorker, ok := m.getWorker("crash_restart_startup_pod", "container1", liveness)
+	if !ok || !oldLivenessWorker.running.Load() {
+		t.Fatalf("expected active liveness worker for first instance")
+	}
+
+	// Crash-restart: StartContainerProbes called for newID without StopContainerProbes.
+	m.StartContainerProbes(ctx, &pod, &pod.Spec.Containers[0], newID, "10.0.0.1", now)
+
+	// Wait for the stale liveness worker goroutine from oldID to stop and exit.
+	if err := wait.PollUntilContextTimeout(ctx, interval, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		return !oldLivenessWorker.running.Load(), nil
+	}); err != nil {
+		t.Fatalf("stale liveness worker did not stop: %v", err)
+	}
+
+	// Simulate startup probe succeeding for the new instance and activating dependents.
+	m.startLivenessAndReadiness(ctx, &pod, &pod.Spec.Containers[0], newID, "10.0.0.1", now)
+
+	newLivenessWorker, ok := m.getWorker("crash_restart_startup_pod", "container1", liveness)
+	if !ok || !newLivenessWorker.running.Load() {
+		t.Fatalf("expected active liveness worker for second instance after startup probe completed")
+	}
+	if newLivenessWorker == oldLivenessWorker {
+		t.Errorf("expected a fresh worker for the new container instance, got the stale one")
+	}
+	if newLivenessWorker.containerID != newID {
+		t.Errorf("expected new worker bound to %v, got %v", newID, newLivenessWorker.containerID)
+	}
+}
+
+// TestUnstartedWorkerStopAndStart verifies that stopping an unstarted worker (e.g. before
+// StartContainerProbes is called) and then starting probes for the container cleanly allocates
+// and runs a fresh worker without map corruption or lost workers.
+func TestUnstartedWorkerStopAndStart(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerLifecycleProber: true,
+	})
+	ktesting.Init(t).SyncTest("", testUnstartedWorkerStopAndStart)
+}
+
+func testUnstartedWorkerStopAndStart(tCtx ktesting.TContext) {
+	t := tCtx.TB()
+	ctx := tCtx.Context
+
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "unstarted_stop_pod"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:          "container1",
+					LivenessProbe: defaultProbe,
+				},
+			},
+		},
+	}
+
+	m := newTestManager()
+	defer cleanup(t, m)
+
+	// AddPod creates the unstarted placeholder worker.
+	m.AddPod(ctx, &pod)
+
+	placeholderWorker, ok := m.getWorker("unstarted_stop_pod", "container1", liveness)
+	if !ok {
+		t.Fatalf("expected placeholder worker after AddPod")
+	}
+	if placeholderWorker.running.Load() {
+		t.Fatalf("expected worker not to be running before StartContainerProbes")
+	}
+
+	// Stop container probes while the worker is unstarted.
+	m.StopContainerProbes("unstarted_stop_pod", "container1")
+
+	// Start probes for the container instance.
+	cID := kubecontainer.ContainerID{Type: "docker", ID: "cid-fresh"}
+	now := time.Now()
+	m.StartContainerProbes(ctx, &pod, &pod.Spec.Containers[0], cID, "10.0.0.1", now)
+
+	activeWorker, ok := m.getWorker("unstarted_stop_pod", "container1", liveness)
+	if !ok || !activeWorker.running.Load() {
+		t.Fatalf("expected active running worker after StartContainerProbes")
+	}
+	if activeWorker == placeholderWorker {
+		t.Errorf("expected fresh worker instance, got original placeholder")
+	}
+	if activeWorker.containerID != cID {
+		t.Errorf("expected worker bound to %v, got %v", cID, activeWorker.containerID)
 	}
 }

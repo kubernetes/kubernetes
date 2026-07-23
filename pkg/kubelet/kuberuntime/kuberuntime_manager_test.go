@@ -62,6 +62,7 @@ import (
 	imagetypes "k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	probertesting "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
@@ -6605,4 +6606,65 @@ func TestOnPodSandboxReadyTiming(t *testing.T) {
 	// verify the final state of pod
 	assert.Len(t, fakeRuntime.Sandboxes, 1, "final sandbox count")
 	assert.Len(t, fakeRuntime.Containers, 1, "final container count")
+}
+
+type spyProbeManager struct {
+	probertesting.FakeManager
+	started map[string]kubecontainer.ContainerID
+	stopped map[string]types.UID
+}
+
+func (s *spyProbeManager) StartContainerProbes(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID, podIP string, containerStartTime time.Time) {
+	if s.started == nil {
+		s.started = make(map[string]kubecontainer.ContainerID)
+	}
+	s.started[container.Name] = containerID
+}
+
+func (s *spyProbeManager) StopContainerProbes(podUID types.UID, containerName string) {
+	if s.stopped == nil {
+		s.stopped = make(map[string]types.UID)
+	}
+	s.stopped[containerName] = podUID
+}
+
+func TestReconcileRunningContainerProbes(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerLifecycleProber, true)
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	spyPM := &spyProbeManager{}
+	m.InitializeProbeManager(spyPM)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "test-pod-uid"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "running-c"},
+				{Name: "exited-c"},
+			},
+		},
+	}
+
+	podStatus := &kubecontainer.PodStatus{
+		IPs: []string{"10.0.0.1"},
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				Name:  "running-c",
+				ID:    kubecontainer.ContainerID{Type: "docker", ID: "running-cid"},
+				State: kubecontainer.ContainerStateRunning,
+			},
+			{
+				Name:  "exited-c",
+				ID:    kubecontainer.ContainerID{Type: "docker", ID: "exited-cid"},
+				State: kubecontainer.ContainerStateExited,
+			},
+		},
+	}
+
+	m.reconcileRunningContainerProbes(tCtx, pod, podStatus)
+
+	assert.Equal(t, kubecontainer.ContainerID{Type: "docker", ID: "running-cid"}, spyPM.started["running-c"])
+	assert.Equal(t, types.UID("test-pod-uid"), spyPM.stopped["exited-c"])
 }

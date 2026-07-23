@@ -196,6 +196,7 @@ func (m *kubeGenericRuntimeManager) getPodRuntimeHandler(pod *v1.Pod) (podRuntim
 // * pull the image
 // * create the container
 // * start the container
+// * start container probes (if ContainerLifecycleProber feature gate is enabled)
 // * run the post start lifecycle hooks (if applicable)
 func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, spec *startSpec, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (string, error) {
 	logger := klog.FromContext(ctx)
@@ -316,7 +317,16 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		}
 	}
 
-	// Step 4: execute the post start hook.
+	// Step 4: start container probes for the newly started container.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerLifecycleProber) && m.probeManager != nil {
+		kubeContainerID := kubecontainer.ContainerID{
+			Type: m.runtimeName,
+			ID:   containerID,
+		}
+		m.probeManager.StartContainerProbes(ctx, pod, container, kubeContainerID, podIP, time.Now())
+	}
+
+	// Step 5: execute the post start hook.
 	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
 		kubeContainerID := kubecontainer.ContainerID{
 			Type: m.runtimeName,
@@ -922,6 +932,11 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 
 	if ordering != nil {
 		ordering.containerTerminated(containerName)
+	}
+
+	// Stop container probes when the container has terminated.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerLifecycleProber) && m.probeManager != nil && pod != nil {
+		m.probeManager.StopContainerProbes(pod.UID, containerName)
 	}
 
 	return nil

@@ -19,6 +19,7 @@ package prober
 import (
 	"context"
 	"math/rand"
+	"sync/atomic"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -36,6 +37,9 @@ import (
 // associated with it which runs the probe loop until the container permanently terminates, or the
 // stop channel is closed. The worker uses the probe Manager's statusManager to get up-to-date
 // container IDs.
+// worker handles periodic probing for a container probe. Under the ContainerLifecycleProber
+// feature gate, each container run allocates a dedicated 1-to-1 worker struct and goroutine to
+// prevent racing on mutable state or premature cleanup across container restarts.
 type worker struct {
 	// Channel for stopping the probe.
 	stopCh chan struct{}
@@ -71,6 +75,18 @@ type worker struct {
 
 	// If set, skip probing.
 	onHold bool
+
+	// running reports whether the probe loop goroutine is active. It is only meaningful
+	// when the ContainerLifecycleProber feature is enabled.
+	running atomic.Bool
+	// dependentsStarted records that a startup worker has already activated the
+	// readiness and liveness workers for its container, so it happens only once.
+	// Only accessed from the worker's own probe loop goroutine.
+	dependentsStarted bool
+	// podIP and containerStartTime capture the container instance this worker probes,
+	// as reported by the runtime at container start time.
+	podIP              string
+	containerStartTime time.Time
 
 	// proberResultsMetricLabels holds the labels attached to this worker
 	// for the ProberResults metric by result.
@@ -159,23 +175,26 @@ func (w *worker) run(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
 
-	// If kubelet restarted the probes could be started in rapid succession.
-	// Let the worker wait for a random portion of tickerPeriod before probing.
-	// Do it only if the kubelet has started recently.
-	if probeTickerPeriod > time.Since(w.probeManager.start) {
-		time.Sleep(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ContainerLifecycleProber) {
+		// If kubelet restarted the probes could be started in rapid succession.
+		// Let the worker wait for a random portion of tickerPeriod before probing.
+		// Do it only if the kubelet has started recently.
+		if probeTickerPeriod > time.Since(w.probeManager.start) {
+			time.Sleep(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
+		}
 	}
 
 	probeTicker := time.NewTicker(probeTickerPeriod)
 
 	defer func() {
 		// Clean up.
+		w.running.Store(false)
 		probeTicker.Stop()
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
 
-		w.probeManager.removeWorker(w.pod.UID, w.container.Name, w.probeType)
+		w.probeManager.removeWorkerIfCurrent(w)
 		ProberResults.Delete(w.proberResultsSuccessfulMetricLabels)
 		ProberResults.Delete(w.proberResultsFailedMetricLabels)
 		ProberResults.Delete(w.proberResultsUnknownMetricLabels)
@@ -204,9 +223,11 @@ probeLoop:
 // stop stops the probe worker. The worker handles cleanup and removes itself from its manager.
 // It is safe to call stop multiple times.
 func (w *worker) stop() {
-	select {
-	case w.stopCh <- struct{}{}:
-	default: // Non-blocking.
+	if w.running.Load() {
+		select {
+		case w.stopCh <- struct{}{}:
+		default: // Non-blocking.
+		}
 	}
 }
 
@@ -328,7 +349,11 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Probe disabled for InitialDelaySeconds.
-	if int32(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.spec.InitialDelaySeconds {
+	containerStartTime := c.State.Running.StartedAt.Time
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerLifecycleProber) && !w.containerStartTime.IsZero() {
+		containerStartTime = w.containerStartTime
+	}
+	if int32(time.Since(containerStartTime).Seconds()) < w.spec.InitialDelaySeconds {
 		return true
 	}
 
@@ -336,6 +361,10 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		// Stop probing for startup once container has started.
 		// we keep it running to make sure it will work for restarted container.
 		if w.probeType == startup {
+			// The container is already past startup (e.g. after a Kubelet restart the
+			// startup worker adopts an already-started container and never re-probes).
+			// Make sure the readiness and liveness workers are activated.
+			w.startDependents(ctx)
 			return true
 		}
 	} else {
@@ -346,7 +375,11 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	probePodStatus := status
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerLifecycleProber) && w.podIP != "" {
+		probePodStatus = v1.PodStatus{PodIP: w.podIP}
+	}
+	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, probePodStatus, w.container, w.containerID)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
@@ -390,7 +423,24 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		w.resultRun = 0
 	}
 
+	if w.probeType == startup && result == results.Success {
+		w.startDependents(ctx)
+	}
+
 	return true
+}
+
+// startDependents activates the readiness and liveness workers for a container once its
+// startup probe has been satisfied. It is a no-op unless this is a startup worker running
+// under the ContainerLifecycleProber feature, and it only triggers the transition once.
+// Called only from the worker's own probe loop goroutine.
+func (w *worker) startDependents(ctx context.Context) {
+	if w.probeType != startup || w.dependentsStarted ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.ContainerLifecycleProber) {
+		return
+	}
+	w.dependentsStarted = true
+	w.probeManager.startLivenessAndReadiness(ctx, w.pod, &w.container, w.containerID, w.podIP, w.containerStartTime)
 }
 
 func deepCopyPrometheusLabels(m metrics.Labels) metrics.Labels {

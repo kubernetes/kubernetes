@@ -1003,6 +1003,7 @@ func NewMainKubelet(ctx context.Context,
 			klet.runner,
 			kubeDeps.Recorder)
 	}
+	runtime.InitializeProbeManager(klet.probeManager)
 
 	var clusterTrustBundleManager clustertrustbundle.Manager = &clustertrustbundle.NoopManager{}
 	if kubeDeps.KubeClient != nil && utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundleProjection) {
