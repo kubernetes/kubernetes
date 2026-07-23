@@ -2598,3 +2598,78 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 		})
 	}
 }
+
+// TestDRAStatusPreservedOnStatusUpdate verifies that the apiserver preserves
+// ResourceClaimStatuses when a DRA-unaware client overwrites the status of a
+// running pod and omits fields that it does not know about.
+func TestDRAStatusPreservedOnStatusUpdate(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
+
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "dra-status-preserve", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	ctx := context.Background()
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dra-pod",
+			Namespace: ns.Name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:  "c",
+				Image: "pause",
+			}},
+			ResourceClaims: []v1.PodResourceClaim{
+				{Name: "gpu", ResourceClaimName: new("dra-pod-gpu")},
+			},
+		},
+	}
+	pod, err := client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("create pod: %v", err)
+	}
+
+	// Simulate DRA controller writing resourceClaimStatuses.
+	wantStatuses := []v1.PodResourceClaimStatus{
+		{Name: "gpu", ResourceClaimName: new("dra-pod-gpu")},
+	}
+	pod.Status.ResourceClaimStatuses = wantStatuses
+	pod, err = client.CoreV1().Pods(ns.Name).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("set ResourceClaimStatuses: %v", err)
+	}
+	if len(pod.Status.ResourceClaimStatuses) == 0 {
+		t.Fatal("ResourceClaimStatuses not persisted after initial UpdateStatus")
+	}
+
+	// Simulate an old DRA-unaware client (e.g. Multus using k8s.io/client-go v0.29)
+	// calling UpdateStatus to write annotations. The round-tripped pod omits
+	// ResourceClaimStatuses because the old client does not know the field.
+	oldClientPod := pod.DeepCopy()
+	oldClientPod.Status.ResourceClaimStatuses = nil
+
+	updated, err := client.CoreV1().Pods(ns.Name).UpdateStatus(ctx, oldClientPod, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("old-client UpdateStatus: %v", err)
+	}
+
+	if diff := cmp.Diff(wantStatuses, updated.Status.ResourceClaimStatuses); diff != "" {
+		t.Errorf("ResourceClaimStatuses changed after old-client UpdateStatus (-want,+got):\n%s", diff)
+	}
+
+	// An explicit empty list remains a valid way for a field-aware client to
+	// clear a slice field.
+	clearPatch := []byte(`{"status":{"resourceClaimStatuses":[]}}`)
+	cleared, err := client.CoreV1().Pods(ns.Name).Patch(ctx, pod.Name, types.MergePatchType, clearPatch, metav1.PatchOptions{}, "status")
+	if err != nil {
+		t.Fatalf("clear ResourceClaimStatuses: %v", err)
+	}
+	if len(cleared.Status.ResourceClaimStatuses) != 0 {
+		t.Errorf("ResourceClaimStatuses not cleared: %v", cleared.Status.ResourceClaimStatuses)
+	}
+}

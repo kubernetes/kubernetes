@@ -1553,12 +1553,20 @@ func TestClearNodeAllocatableResourceClaimStatus(t *testing.T) {
 			for _, action := range actions {
 				if action.Matches("patch", "pods") && action.GetSubresource() == "status" {
 					gotPatch = true
+					patchAction := action.(clienttesting.PatchAction)
+					if patchAction.GetPatchType() != types.MergePatchType {
+						t.Errorf("patch type = %q, want %q", patchAction.GetPatchType(), types.MergePatchType)
+					}
+					wantPatch := `{"metadata":{"uid":"pod-uid"},"status":{"nodeAllocatableResourceClaimStatuses":[]}}`
+					if diff := cmp.Diff(wantPatch, string(patchAction.GetPatch())); diff != "" {
+						t.Errorf("clear patch mismatch (-want +got):\n%s", diff)
+					}
 					break
 				}
 			}
 
 			if gotPatch != tt.wantPatch {
-				t.Errorf("patchNodeAllocatableResourceClaimStatus() gotPatch = %v, want %v", gotPatch, tt.wantPatch)
+				t.Errorf("clearNodeAllocatableResourceClaimStatus() gotPatch = %v, want %v", gotPatch, tt.wantPatch)
 			}
 		})
 	}
