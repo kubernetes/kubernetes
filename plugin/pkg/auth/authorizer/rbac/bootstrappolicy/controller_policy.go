@@ -603,6 +603,23 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		})
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "evictionrequest-controller"},
+			Rules: []rbacv1.PolicyRule{
+				// Evictions: create, watch, update status and metadata
+				rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "patch").Groups(lifecycleGroup).Resources("evictions").RuleOrDie(),
+				rbacv1helpers.NewRule("update", "patch").Groups(lifecycleGroup).Resources("evictions/status").RuleOrDie(),
+				// EvictionRequests: watch, update status
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(lifecycleGroup).Resources("evictionrequests").RuleOrDie(),
+				rbacv1helpers.NewRule("update", "patch").Groups(lifecycleGroup).Resources("evictionrequests/status").RuleOrDie(),
+				// Pods: read pod info, labels, evictionResponders
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				eventsRule(),
+			},
+		})
+	}
+
 	return controllerRoles, controllerRoleBindings
 }
 
