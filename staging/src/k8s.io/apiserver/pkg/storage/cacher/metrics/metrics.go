@@ -45,6 +45,11 @@ const (
 	// StageTotal: end-to-end, etcd decode -> written to the result channel.
 	StageTotal DispatchStage = iota
 
+	// StageStorageToCache: event decoded from etcd -> event received by cacher.
+	// Captures the delay between when an event is decoded from the storage backend
+	// and when it is first processed by the cacher's reflector loop.
+	StageStorageToCache
+
 	// StageCacheToWatcher: watch.Event built -> written to watcher's result channel.
 	// Captures time spent blocked handing the event off to the client,
 	// i.e. downstream (result channel) backpressure.
@@ -55,6 +60,7 @@ const (
 
 var dispatchStageName = [numDispatchStages]string{
 	StageTotal:          "total",
+	StageStorageToCache: "storage_to_cache",
 	StageCacheToWatcher: "cache_to_watcher",
 }
 

@@ -573,13 +573,13 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 
 	// note that we can add three events even though the chanSize is two because
 	// one event has been popped off from the input chan
-	if !w.add(&watchCacheEvent{Object: makePod(5), ResourceVersion: 5, RecordTime: fakeClock.Now().Add(-2 * time.Second)}, time.NewTimer(1*time.Second)) {
+	if !w.add(&watchCacheEvent{Object: makePod(5), ResourceVersion: 5, RecordTime: fakeClock.Now().Add(-2 * time.Second), CacheReceived: fakeClock.Now().Add(-1 * time.Second)}, time.NewTimer(1*time.Second)) {
 		t.Fatal("failed adding an even to the watcher")
 	}
 	if !w.nonblockingAdd(&watchCacheEvent{Type: watch.Bookmark, ResourceVersion: 10, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "10"}}}) {
 		t.Fatal("failed adding an even to the watcher")
 	}
-	if !w.add(&watchCacheEvent{Object: makePod(15), ResourceVersion: 15, RecordTime: fakeClock.Now().Add(-2 * time.Second)}, time.NewTimer(1*time.Second)) {
+	if !w.add(&watchCacheEvent{Object: makePod(15), ResourceVersion: 15, RecordTime: fakeClock.Now().Add(-2 * time.Second), CacheReceived: fakeClock.Now().Add(-1 * time.Second)}, time.NewTimer(1*time.Second)) {
 		t.Fatal("failed adding an even to the watcher")
 	}
 	if w.add(&watchCacheEvent{Object: makePod(20), ResourceVersion: 20}, time.NewTimer(1*time.Second)) {
@@ -623,6 +623,9 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 apiserver_watch_events_dispatch_duration_seconds_bucket{group="",resource="pods",stage="cache_to_watcher",le="+Inf"} 2
 apiserver_watch_events_dispatch_duration_seconds_sum{group="",resource="pods",stage="cache_to_watcher"} 0
 apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",stage="cache_to_watcher"} 2
+apiserver_watch_events_dispatch_duration_seconds_bucket{group="",resource="pods",stage="storage_to_cache",le="+Inf"} 2
+apiserver_watch_events_dispatch_duration_seconds_sum{group="",resource="pods",stage="storage_to_cache"} 2
+apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",stage="storage_to_cache"} 2
 apiserver_watch_events_dispatch_duration_seconds_bucket{group="",resource="pods",stage="total",le="+Inf"} 2
 apiserver_watch_events_dispatch_duration_seconds_sum{group="",resource="pods",stage="total"} 4
 apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",stage="total"} 2
