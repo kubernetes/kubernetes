@@ -660,6 +660,9 @@ template:
         subPath: subPathValue
         subPathExpr: subPathExprValue
       workingDir: workingDirValue
+    evictionResponders:
+    - name: nameValue
+      priority: 2
     hostAliases:
     - hostnames:
       - hostnamesValue

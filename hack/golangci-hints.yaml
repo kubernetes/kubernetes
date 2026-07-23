@@ -262,6 +262,18 @@ linters:
       # These fields use the Reference suffix, but renaming them would be a breaking change, so they are allowlisted.
       - text: 'noreferences: naming convention "reference-to-ref": field (SerializedReference|ImageVolumeSource)\.Reference:'
         path: "staging/src/k8s.io/api/core/v1/types.go"
+      
+      # The EvictionRequest.Spec.Target and Eviction.Spec.Target fields are of a union type and nonpointerstructs does not understand unions today.
+      # Validation makes this require at least one of the fields within to be set.
+      - text: "nonpointerstructs: field EvictionRequestSpec.Target is a non-pointer struct with no required fields."
+        path: "staging/src/k8s.io/api/lifecycle/v1alpha1/types.go"
+      - text: "nonpointerstructs: field EvictionSpec.Target is a non-pointer struct with no required fields."
+        path: "staging/src/k8s.io/api/lifecycle/v1alpha1/types.go"
+      # Status is conventionally a non-pointer.
+      - text: "optionalfields: field EvictionRequest.Status should be a pointer."
+        path: "staging/src/k8s.io/api/lifecycle/v1alpha1/types.go"
+      - text: "optionalfields: field Eviction.Status should be a pointer."
+        path: "staging/src/k8s.io/api/lifecycle/v1alpha1/types.go"
 
       - linters:
         - forbidigo

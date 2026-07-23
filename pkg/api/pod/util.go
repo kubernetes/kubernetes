@@ -761,6 +761,7 @@ func dropDisabledFields(
 	dropDisabledAtomicWriteVolumeUserFields(podSpec, oldPodSpec)
 	dropDisabledSchedulingGroup(podSpec, oldPodSpec)
 	dropDisabledGRPCContainerProbeTLS(podSpec, oldPodSpec)
+	dropDisabledEvictionResponders(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop ResizePolicy fields. Don't drop updates to Resources field as template.spec.resources
@@ -2393,4 +2394,20 @@ func DropInitContainerAnnotations(annotations map[string]string) {
 	for k := range initContainerAnnotations {
 		delete(annotations, k)
 	}
+}
+
+// dropDisabledEvictionResponders removes eviction responders from its spec
+// unless it is already used by the old pod spec.
+func dropDisabledEvictionResponders(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) && !evictionRespondersInUse(oldPodSpec) {
+		podSpec.EvictionResponders = nil
+	}
+}
+
+func evictionRespondersInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	return len(podSpec.EvictionResponders) > 0
 }

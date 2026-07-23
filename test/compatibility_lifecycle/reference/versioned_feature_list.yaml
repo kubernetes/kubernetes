@@ -687,6 +687,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.26"
+- name: EvictionRequestAPI
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: ExcludeAdmissionWebhookVirtualResources
   versionedSpecs:
   - default: true

@@ -47,6 +47,7 @@ import (
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	v1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
+	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
@@ -102,6 +103,7 @@ import (
 	flowcontrolv1beta3 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta3"
 	applyconfigurationsimagepolicyv1alpha1 "k8s.io/client-go/applyconfigurations/imagepolicy/v1alpha1"
 	internal "k8s.io/client-go/applyconfigurations/internal"
+	applyconfigurationslifecyclev1alpha1 "k8s.io/client-go/applyconfigurations/lifecycle/v1alpha1"
 	applyconfigurationsmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	applyconfigurationsnetworkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
 	applyconfigurationsnetworkingv1beta1 "k8s.io/client-go/applyconfigurations/networking/v1beta1"
@@ -724,6 +726,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.EventSeriesApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("EventSource"):
 		return &applyconfigurationscorev1.EventSourceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("EvictionResponder"):
+		return &applyconfigurationscorev1.EvictionResponderApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ExecAction"):
 		return &applyconfigurationscorev1.ExecActionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("FCVolumeSource"):
@@ -1356,6 +1360,34 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsapiserverinternalv1alpha1.StorageVersionConditionApplyConfiguration{}
 	case apiserverinternalv1alpha1.SchemeGroupVersion.WithKind("StorageVersionStatus"):
 		return &applyconfigurationsapiserverinternalv1alpha1.StorageVersionStatusApplyConfiguration{}
+
+		// Group=lifecycle.k8s.io, Version=v1alpha1
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("Eviction"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionPodReference"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionPodReferenceApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionRequest"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionRequestApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionRequestPodReference"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionRequestPodReferenceApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionRequestSpec"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionRequestSpecApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionRequestStatus"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionRequestStatusApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionRequestTarget"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionRequestTargetApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionSpec"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionSpecApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionStatus"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionStatusApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionTarget"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionTargetApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("Requester"):
+		return &applyconfigurationslifecyclev1alpha1.RequesterApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("ResponderStatus"):
+		return &applyconfigurationslifecyclev1alpha1.ResponderStatusApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("TargetResponder"):
+		return &applyconfigurationslifecyclev1alpha1.TargetResponderApplyConfiguration{}
 
 		// Group=meta.k8s.io, Version=v1
 	case metav1.SchemeGroupVersion.WithKind("Condition"):

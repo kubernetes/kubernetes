@@ -54,6 +54,7 @@ const (
 	coordinationGroup            = "coordination.k8s.io"
 	discoveryGroup               = "discovery.k8s.io"
 	extensionsGroup              = "extensions"
+	lifecycleGroup               = "lifecycle.k8s.io"
 	policyGroup                  = "policy"
 	rbacGroup                    = "rbac.authorization.k8s.io"
 	resourceGroup                = "resource.k8s.io"
@@ -152,6 +153,9 @@ func viewRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
 		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("compositepodgroups", "compositepodgroups/status").RuleOrDie())
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
+		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(lifecycleGroup).Resources("evictionrequests", "evictions").RuleOrDie())
+	}
 	return rules
 }
 
@@ -198,6 +202,10 @@ func editRules() []rbacv1.PolicyRule {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
 		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources("compositepodgroups").RuleOrDie())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
+		// "evictions" are in the domain of the system and should be only updated by the evictionrequest-controller. "evictionrequests" are user-scoped.
+		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(lifecycleGroup).Resources("evictionrequests").RuleOrDie())
 	}
 	return rules
 }

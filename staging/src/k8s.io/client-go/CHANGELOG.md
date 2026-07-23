@@ -4,6 +4,13 @@ Go API changes are typically not included in the Kubernetes release notes, so
 noteworthy Go API changes *may* be documented here. This is currently not
 *required*, so consult the git history to see all changes.
 
+### Introduce Lifecycle API group for v1alpha1 EvictionRequest and Eviction APIs
+
+See [PR #137050](https://github.com/kubernetes/kubernetes/pull/137050)
+```
+- ./informers.SharedInformerFactory.Lifecycle: added
+```
+
 ### Type-safe informers
 
 All code using the result of the generated client-go Informer() methods (a

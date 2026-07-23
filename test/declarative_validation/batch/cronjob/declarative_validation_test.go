@@ -32,6 +32,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/batch/cronjob"
+	poddeclarativevalidation "k8s.io/kubernetes/test/declarative_validation/core/pod"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
@@ -429,6 +430,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	}
 	updateObj := mkCronJob()
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
+	poddeclarativevalidation.RunDeclarativeValidateEvictionRespondersTestCases(t, ctx, registry.Strategy, field.NewPath("spec", "jobTemplate", "spec", "template", "spec"), new(mkCronJob()), func(baseObj *batch.CronJob, responders []api.EvictionResponder, schedulingGroup *api.PodSchedulingGroup) {
+		baseObj.Spec.JobTemplate.Spec.Template.Spec.EvictionResponders = responders
+		baseObj.Spec.JobTemplate.Spec.Template.Spec.SchedulingGroup = schedulingGroup
+	})
 }
 
 func tweakJobSchedulingBasic() func(*batch.CronJob) {

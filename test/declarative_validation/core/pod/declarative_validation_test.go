@@ -76,6 +76,11 @@ func TestDeclarativeValidate(t *testing.T) {
 		}
 		obj := *podtest.MakePod("foo")
 		meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
+		obj2 := podtest.MakePod("foo")
+		RunDeclarativeValidateEvictionRespondersTestCases(t, ctx, registry.Strategy, field.NewPath("spec"), obj2, func(baseObj *api.Pod, responders []api.EvictionResponder, schedulingGroup *api.PodSchedulingGroup) {
+			baseObj.Spec.EvictionResponders = responders
+			baseObj.Spec.SchedulingGroup = schedulingGroup
+		})
 	}
 }
 

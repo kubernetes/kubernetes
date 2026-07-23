@@ -15405,6 +15405,25 @@ func TestValidatePodUpdate(t *testing.T) {
 			),
 			err:  "pod updates may not change fields other than",
 			test: "updated restartPolicyRules",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetEvictionResponders(
+					core.EvictionResponder{
+						Name: "foo.example.com",
+					}, core.EvictionResponder{
+						Name: "bar.example.com",
+					}),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetEvictionResponders(
+					core.EvictionResponder{
+						Name: "foo.example.com",
+					}, core.EvictionResponder{
+						Name: "new.example.com",
+					}),
+			),
+			err:  "pod updates may not change fields other than",
+			test: "updated eviction interceptors",
 		},
 	}
 
@@ -24287,6 +24306,8 @@ func TestValidateOSFields(t *testing.T) {
 		"EphemeralContainers[*].EphemeralContainerCommon.StartupProbe",
 		"EphemeralContainers[*].EphemeralContainerCommon.VolumeDevices[*]",
 		"EphemeralContainers[*].EphemeralContainerCommon.VolumeMounts[*]",
+		"EvictionResponders[*].Name",
+		"EvictionResponders[*].Priority",
 		"HostAliases",
 		"Hostname",
 		"HostnameOverride",
