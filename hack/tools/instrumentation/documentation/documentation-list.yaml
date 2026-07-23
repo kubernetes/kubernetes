@@ -6668,7 +6668,7 @@
     endpoint: /metrics
 - name: store_schedule_results_duration_seconds
   subsystem: scheduler
-  help: Latency for getting a no.
+  help: Latency for storing scheduling results.
   type: Histogram
   stabilityLevel: ALPHA
   labels:

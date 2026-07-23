@@ -539,7 +539,7 @@ func InitMetrics() {
 			Subsystem: SchedulerSubsystem,
 			Name:      "get_node_hint_duration_seconds",
 			Help:      "Latency for getting a node hint.",
-			// Start with 0.01ms with the last bucket being [~200ms, Inf)
+			// Start with 0.01ms with the last bucket being [~20ms, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.00001, 2, 12),
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -549,8 +549,8 @@ func InitMetrics() {
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "store_schedule_results_duration_seconds",
-			Help:      "Latency for getting a no.",
-			// Start with 0.01ms with the last bucket being [~200ms, Inf)
+			Help:      "Latency for storing scheduling results.",
+			// Start with 0.01ms with the last bucket being [~20ms, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.00001, 2, 12),
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -561,7 +561,7 @@ func InitMetrics() {
 			Subsystem: SchedulerSubsystem,
 			Name:      "batch_rescore_duration_seconds",
 			Help:      "Latency for rescoring a node during opportunistic batching.",
-			// Start with 0.01ms with the last bucket being [~200ms, Inf)
+			// Start with 0.01ms with the last bucket being [~20ms, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.00001, 2, 12),
 			StabilityLevel: metrics.ALPHA,
 		},
