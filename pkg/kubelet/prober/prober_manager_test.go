@@ -17,8 +17,10 @@ limitations under the License.
 package prober
 
 import (
+	"context"
 	"fmt"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -29,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -692,4 +695,77 @@ func cleanup(t *testing.T, m *manager) {
 	if err := wait.Poll(interval, wait.ForeverTestTimeout, condition); err != nil {
 		t.Fatalf("Error during cleanup: %v", err)
 	}
+}
+
+// TestAddPodContextCancellationDoesNotAffectProbeWorkers is a regression test for
+// https://github.com/kubernetes/kubernetes/issues/140509
+//
+// When AddPod is called with a context that is later cancelled (as happens when
+// the pod worker's sync context is cancelled during pod termination), the probe
+// workers must NOT be affected. In particular, exec-based readiness probes must
+// continue to run so that the pod's Ready condition is correctly updated to False,
+// allowing endpoints controllers to remove the pod from service.
+func TestAddPodContextCancellationDoesNotAffectProbeWorkers(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	m := newTestManager()
+	defer cleanup(t, m)
+
+	// Use the REAL exec prober (not the fake) so the full path
+	// prober.probe() → exec.Probe() → execInContainer.Start() → runner.RunInContainer(ctx, ...)
+	// is exercised. This is the path where the context cancellation bug manifests.
+	var ctxWasCancelled atomic.Bool
+	var probeCalled atomic.Bool
+	m.prober.runner = &contextCheckingRunner{
+		onRun: func(runCtx context.Context) {
+			probeCalled.Store(true)
+			if runCtx.Err() != nil {
+				ctxWasCancelled.Store(true)
+			}
+		},
+	}
+	// Replace the fake exec prober with the real one that calls through to runner
+	m.prober.exec = execprobe.New()
+
+	// Create a pod with exec readiness probe
+	testPod := getTestPod()
+	setTestProbe(testPod, readiness, v1.Probe{PeriodSeconds: 1})
+
+	// Set pod status so the probe worker can find a running container
+	m.statusManager.SetPodStatus(logger, testPod, getTestRunningStatus())
+
+	// Create a cancellable context to simulate the pod worker's sync context
+	podCtx, cancel := context.WithCancel(context.Background())
+
+	// Add the pod — starts probe worker goroutine with podCtx
+	m.AddPod(podCtx, testPod)
+
+	// Simulate: pod enters terminating state → sync context is cancelled
+	cancel()
+
+	// Wait for the probe worker to execute at least one probe cycle via RunInContainer
+	err := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
+		return probeCalled.Load(), nil
+	})
+	if err != nil {
+		t.Fatal("Probe worker never executed RunInContainer after context cancellation — worker likely exited")
+	}
+
+	// The key assertion: the context passed to RunInContainer must NOT be cancelled
+	if ctxWasCancelled.Load() {
+		t.Error("RunInContainer received a cancelled context after parent ctx was cancelled. " +
+			"This is the bug from issue #140509: exec probes fail with 'context canceled' during termination")
+	}
+}
+
+// contextCheckingRunner implements kubecontainer.CommandRunner for testing.
+type contextCheckingRunner struct {
+	onRun func(ctx context.Context)
+}
+
+func (r *contextCheckingRunner) RunInContainer(ctx context.Context, id kubecontainer.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
+	if r.onRun != nil {
+		r.onRun(ctx)
+	}
+	return []byte("ok"), nil
 }

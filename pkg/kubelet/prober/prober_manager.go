@@ -187,6 +187,15 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 	defer m.workerLock.Unlock()
 
 	logger := klog.FromContext(ctx)
+	// Detach cancellation from the incoming context. The ctx passed here
+	// originates from the pod worker's sync context (podSyncStatus.ctx),
+	// which is cancelled when the pod enters terminating state. Probe workers
+	// must outlive a single SyncPod call — in particular, readiness probes
+	// must continue to run during graceful termination so that endpoints are
+	// correctly removed. Using WithoutCancel preserves the logger/trace
+	// values while preventing the parent's cancellation from propagating to
+	// probe goroutines.
+	probeCtx := context.WithoutCancel(ctx)
 	key := probeKey{podUID: pod.UID}
 	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {
 		key.containerName = c.Name
@@ -200,7 +209,7 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 			}
 			w := newWorker(m, startup, pod, c)
 			m.workers[key] = w
-			go w.run(ctx)
+			go w.run(probeCtx)
 		}
 
 		if c.ReadinessProbe != nil {
@@ -212,7 +221,7 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 			}
 			w := newWorker(m, readiness, pod, c)
 			m.workers[key] = w
-			go w.run(ctx)
+			go w.run(probeCtx)
 		}
 
 		if c.LivenessProbe != nil {
@@ -224,7 +233,7 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 			}
 			w := newWorker(m, liveness, pod, c)
 			m.workers[key] = w
-			go w.run(ctx)
+			go w.run(probeCtx)
 		}
 	}
 }
