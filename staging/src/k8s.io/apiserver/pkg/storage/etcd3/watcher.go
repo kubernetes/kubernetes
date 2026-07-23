@@ -678,30 +678,30 @@ func (wc *watchChan) transform(e *event) (res *watch.Event, err error) {
 			}
 		}
 		res = &watch.Event{
-			Type:   watch.Bookmark,
-			Object: object,
+			Type:       watch.Bookmark,
+			Object:     object,
 		}
 	case e.isDeleted:
 		if !wc.filter(oldObj) {
 			return nil, nil
 		}
 		res = &watch.Event{
-			Type:   watch.Deleted,
-			Object: oldObj,
+			Type:       watch.Deleted,
+			Object:     oldObj,
 		}
 	case e.isCreated:
 		if !wc.filter(curObj) {
 			return nil, nil
 		}
 		res = &watch.Event{
-			Type:   watch.Added,
-			Object: curObj,
+			Type:       watch.Added,
+			Object:     curObj,
 		}
 	default:
 		if wc.acceptAll() {
 			res = &watch.Event{
-				Type:   watch.Modified,
-				Object: curObj,
+				Type:       watch.Modified,
+				Object:     curObj,
 			}
 			break
 		}
@@ -710,18 +710,18 @@ func (wc *watchChan) transform(e *event) (res *watch.Event, err error) {
 		switch {
 		case curObjPasses && oldObjPasses:
 			res = &watch.Event{
-				Type:   watch.Modified,
-				Object: curObj,
+				Type:       watch.Modified,
+				Object:     curObj,
 			}
 		case curObjPasses && !oldObjPasses:
 			res = &watch.Event{
-				Type:   watch.Added,
-				Object: curObj,
+				Type:       watch.Added,
+				Object:     curObj,
 			}
 		case !curObjPasses && oldObjPasses:
 			res = &watch.Event{
-				Type:   watch.Deleted,
-				Object: oldObj,
+				Type:       watch.Deleted,
+				Object:     oldObj,
 			}
 		}
 	}

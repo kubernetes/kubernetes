@@ -22,8 +22,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/utils/clock"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -50,10 +48,19 @@ const (
 	cacheWatcherBookmarkSent
 )
 
+// inputEvent is what travels through a cacheWatcher's input channel: the event
+// pointer plus the per-delivery timestamp at which it was enqueued. The enqueue
+// time is per-watcher (fan-out makes it unique per delivery), so it cannot live
+// on the shared watchCacheEvent.
+type inputEvent struct {
+	event      *watchCacheEvent
+	enqueuedAt time.Time
+}
+
 // cacheWatcher implements watch.Interface
 // this is not thread-safe
 type cacheWatcher struct {
-	input     chan *watchCacheEvent
+	input     chan inputEvent
 	result    chan watch.Event
 	done      chan struct{}
 	filter    filterWithAttrsFunc
@@ -66,7 +73,6 @@ type cacheWatcher struct {
 	allowWatchBookmarks bool
 	groupResource       schema.GroupResource
 	watcherMetrics      *metrics.WatcherMetricsObservers
-	clock               clock.Clock
 
 	// human readable identifier that helps assigning cacheWatcher
 	// instance with request
@@ -100,14 +106,10 @@ func newCacheWatcher(
 	allowWatchBookmarks bool,
 	groupResource schema.GroupResource,
 	watcherMetrics *metrics.WatcherMetricsObservers,
-	clk clock.Clock,
 	identifier string,
 ) *cacheWatcher {
-	if clk == nil {
-		clk = clock.RealClock{}
-	}
 	return &cacheWatcher{
-		input:               make(chan *watchCacheEvent, chanSize),
+		input:               make(chan inputEvent, chanSize),
 		result:              make(chan watch.Event, chanSize),
 		done:                make(chan struct{}),
 		filter:              filter,
@@ -118,7 +120,6 @@ func newCacheWatcher(
 		allowWatchBookmarks: allowWatchBookmarks,
 		groupResource:       groupResource,
 		watcherMetrics:      watcherMetrics,
-		clock:               clk,
 		identifier:          identifier,
 	}
 }
@@ -165,7 +166,7 @@ func (c *cacheWatcher) nonblockingAdd(event *watchCacheEvent) bool {
 		return false
 	}
 	select {
-	case c.input <- event:
+	case c.input <- inputEvent{event: event, enqueuedAt: time.Now()}:
 		c.markBookmarkAfterRvAsReceived(event)
 		return true
 	default:
@@ -222,7 +223,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 
 	// OK, block sending, but only until timer fires.
 	select {
-	case c.input <- event:
+	case c.input <- inputEvent{event: event, enqueuedAt: time.Now()}:
 		return true
 	case <-timer.C:
 		closeFunc()
@@ -412,13 +413,16 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 }
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
+// builtAt is when the outgoing watch.Event finished being built (filter +
+// convert); sentAt is when it was written to the result channel. sentAt is
+// zero if the watcher was not interested in the event or was already done.
 func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sentAt time.Time) {
 	watchEvent := c.convertToWatchEvent(event)
 	if watchEvent == nil {
 		// Watcher is not interested in that object.
 		return time.Time{}, time.Time{}
 	}
-	builtAt = c.clock.Now()
+	builtAt = time.Now()
 
 	// We need to ensure that if we put event X to the c.result, all
 	// previous events were already put into it before, no matter whether
@@ -441,10 +445,10 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 	select {
 	case c.result <- *watchEvent:
 		c.markBookmarkAfterRvSent(event)
-		sentAt = c.clock.Now()
+		sentAt = time.Now()
 	case <-c.done:
 	}
-	return builtAt, sentAt
+	return
 }
 
 func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
@@ -542,16 +546,20 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 
 	for {
 		select {
-		case event, ok := <-c.input:
+		case ie, ok := <-c.input:
 			if !ok {
 				return
 			}
+			event := ie.event
+			dequeuedAt := time.Now()
 			// only send events newer than resourceVersion
 			// or a bookmark event with an RV equal to resourceVersion
 			// if we haven't sent one to the client
 			if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && !c.wasBookmarkAfterRvSent()) {
 				builtAt, sentAt := c.sendWatchCacheEvent(event)
-				c.observeDispatchMetrics(event, builtAt, sentAt)
+				if !sentAt.IsZero() {
+					c.recordLifecycleMetrics(event, ie.enqueuedAt, dequeuedAt, builtAt, sentAt)
+				}
 			}
 		case <-ctx.Done():
 			return
@@ -559,13 +567,28 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 	}
 }
 
-func (c *cacheWatcher) observeDispatchMetrics(event *watchCacheEvent, builtAt, sentAt time.Time) {
-	if event.Type == watch.Bookmark || sentAt.IsZero() || event.RecordTime.IsZero() {
+// recordLifecycleMetrics observes the per-stage and total dispatch latency for
+// one event delivered to this watcher. The pre-fanout stamps come from the
+// shared event.timeline; enqueuedAt/dequeuedAt/builtAt/sentAt are per-watcher
+// locals measured after fan-out. Stages whose endpoints are zero (e.g. events
+// injected directly, bypassing the dispatcher) are skipped.
+func (c *cacheWatcher) recordLifecycleMetrics(event *watchCacheEvent, enqueuedAt, dequeuedAt, builtAt, sentAt time.Time) {
+	tl := event.timeline
+	c.observeStage(metrics.StagePropagation, event.RecordTime, tl.cacheReceived)
+	c.observeStage(metrics.StageCacheIngest, tl.cacheReceived, tl.ringBuffered)
+	c.observeStage(metrics.StageIncomingQueue, tl.ringBuffered, tl.dispatched)
+	c.observeStage(metrics.StageFanout, tl.dispatched, enqueuedAt)
+	c.observeStage(metrics.StageWatcherQueue, enqueuedAt, dequeuedAt)
+	c.observeStage(metrics.StageEncode, dequeuedAt, builtAt)
+	c.observeStage(metrics.StageHandoff, builtAt, sentAt)
+	c.observeStage(metrics.StageTotal, event.RecordTime, sentAt)
+}
+
+// observeStage records the [from, to] interval for the given stage, skipping it
+// when either endpoint is unset.
+func (c *cacheWatcher) observeStage(stage metrics.DispatchStage, from, to time.Time) {
+	if from.IsZero() || to.IsZero() {
 		return
 	}
-	if !event.CacheReceived.IsZero() {
-		c.watcherMetrics.ObserveStage(metrics.StageStorageToCache, event.CacheReceived.Sub(event.RecordTime))
-	}
-	c.watcherMetrics.ObserveStage(metrics.StageCacheToWatcher, sentAt.Sub(builtAt))
-	c.watcherMetrics.ObserveStage(metrics.StageTotal, sentAt.Sub(event.RecordTime))
+	c.watcherMetrics.ObserveStage(stage, to.Sub(from))
 }

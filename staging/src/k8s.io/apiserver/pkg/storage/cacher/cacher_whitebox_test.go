@@ -2537,6 +2537,7 @@ func TestForgetWatcher(t *testing.T) {
 		forgetCounter++
 		forgetWatcherFn(drainWatcher)
 	}
+	groupResource := schema.GroupResource{Resource: "pods"}
 	w := newCacheWatcher(
 		0,
 		func(_ string, _ labels.Set, _ fields.Set, _ runtime.Object) bool { return true },
@@ -2544,9 +2545,8 @@ func TestForgetWatcher(t *testing.T) {
 		storage.APIObjectVersioner{},
 		testingclock.NewFakeClock(time.Now()).Now().Add(2*time.Minute),
 		true,
-		schema.GroupResource{Resource: "pods"},
+		groupResource,
 		metrics.NewNoopWatcherMetricsObservers(),
-		testingclock.NewFakeClock(time.Now()),
 		"1",
 	)
 	forgetWatcherFn = forgetWatcher(cacher, w, 0, namespacedName{}, "", false)
@@ -2992,6 +2992,16 @@ func TestComputeListLimit(t *testing.T) {
 // In the future we could have a function that would allow for setting the feature
 // only for duration of a test.
 func forceRequestWatchProgressSupport(t *testing.T) {
+	// DefaultFeatureSupportChecker is a process-global. Without restoring it, the
+	// RequestWatchProgress support set below leaks into every later test in the
+	// package: their consistent reads then take the blocking wait-until-fresh path
+	// and record into the process-global apiserver_watch_cache_read_wait_seconds
+	// metric, which TestHistogramCacheReadWait asserts on. Scope the override to
+	// this test by swapping in a fresh checker and restoring the original.
+	original := etcdfeature.DefaultFeatureSupportChecker
+	t.Cleanup(func() { etcdfeature.DefaultFeatureSupportChecker = original })
+	etcdfeature.DefaultFeatureSupportChecker = etcdfeature.NewDefaultFeatureSupportChecker()
+
 	if etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress) {
 		return
 	}
