@@ -155,8 +155,19 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 
 	if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
 		effectiveReqs := pod.Spec.Resources.Requests
-		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && pod.Status.Resources != nil {
-			effectiveReqs = effectivePodLevelResources(pod, pod.Spec.Resources.Requests, pod.Status.Resources.Requests, pod.Status.AllocatedResources)
+		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && (pod.Status.Resources != nil || pod.Status.AllocatedResources != nil) {
+			var statusRequests, allocatedRequests v1.ResourceList
+			if pod.Status.Resources != nil {
+				statusRequests = pod.Status.Resources.Requests
+			}
+			if pod.Status.AllocatedResources != nil {
+				allocatedRequests = pod.Status.AllocatedResources
+			}
+			if pod.Spec.Overhead != nil {
+				statusRequests = subtractResourceList(statusRequests, pod.Spec.Overhead)
+				allocatedRequests = subtractResourceList(allocatedRequests, pod.Spec.Overhead)
+			}
+			effectiveReqs = effectivePodLevelResources(pod, pod.Spec.Resources.Requests, statusRequests, allocatedRequests)
 		}
 
 		applyPodLevelResources(reqs, effectiveReqs)
@@ -306,6 +317,10 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 			specReqs = aggregateContainerResourcesByFn(pod, opts, containerSpecRequests)
 			allocatedReqs = pod.Status.AllocatedResources
 			actuatedReqs = pod.Status.Resources.Requests
+			if pod.Spec.Overhead != nil {
+				allocatedReqs = subtractResourceList(allocatedReqs, pod.Spec.Overhead)
+				actuatedReqs = subtractResourceList(actuatedReqs, pod.Spec.Overhead)
+			}
 		} else {
 			specReqs = aggregateContainerResourcesByFn(pod, opts, containerSpecRequests)
 			allocatedReqs = aggregateContainerResourcesByFn(pod, opts, containerAllocatedRequests)
@@ -391,7 +406,11 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	if !opts.SkipPodLevelResources && IsPodLevelResourcesSet(pod) {
 		effectiveLims := pod.Spec.Resources.Limits
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && pod.Status.Resources != nil {
-			effectiveLims = effectivePodLevelResources(pod, pod.Spec.Resources.Limits, pod.Status.Resources.Limits)
+			statusLimits := pod.Status.Resources.Limits
+			if pod.Spec.Overhead != nil {
+				statusLimits = subtractResourceList(statusLimits, pod.Spec.Overhead)
+			}
+			effectiveLims = effectivePodLevelResources(pod, pod.Spec.Resources.Limits, statusLimits)
 		}
 		applyPodLevelResources(limits, effectiveLims)
 	}
@@ -429,6 +448,9 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && pod.Status.Resources != nil && pod.Status.Resources.Limits != nil {
 			specLimits = aggregateContainerResourcesByFn(pod, opts, containerSpecLimits)
 			actuatedLimits = pod.Status.Resources.Limits
+			if pod.Spec.Overhead != nil {
+				actuatedLimits = subtractResourceList(actuatedLimits, pod.Spec.Overhead)
+			}
 		} else {
 			specLimits = aggregateContainerResourcesByFn(pod, opts, containerSpecLimits)
 			actuatedLimits = aggregateContainerResourcesByFn(pod, opts, containerActuatedLimits)
@@ -453,6 +475,25 @@ func addResourceList(list, newList v1.ResourceList) {
 			list[name] = value
 		}
 	}
+}
+
+// subtractResourceList returns a copy of list with the resources in newList subtracted.
+// If list is nil, it returns nil. If subtraction results in a value less than zero, it sets it to zero.
+func subtractResourceList(list, newList v1.ResourceList) v1.ResourceList {
+	if list == nil {
+		return nil
+	}
+	result := list.DeepCopy()
+	for name, quantity := range newList {
+		if value, ok := result[name]; ok {
+			value.Sub(quantity)
+			if value.Sign() < 0 {
+				value.Set(0)
+			}
+			result[name] = value
+		}
+	}
+	return result
 }
 
 // maxResourceList sets list to the greater of list/newList for every resource in newList
