@@ -9896,6 +9896,7 @@ func TestPreQueueingHint_Metrics(t *testing.T) {
 	}
 
 	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, st.MakeNode().Name("node1").Obj(), nil)
+	q.metricsRecorder.FlushMetrics()
 
 	// Verify metric was incremented with "narrowed" label
 	narrowedCount, err := testutil.GetCounterMetricValue(metrics.PreQueueingHintEvaluations.WithLabelValues("testPlugin", "narrowed"))

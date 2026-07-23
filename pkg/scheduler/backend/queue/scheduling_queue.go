@@ -2311,10 +2311,10 @@ func (p *PriorityQueue) runPreQueueingHintPlugins(logger klog.Logger, event fwk.
 				}
 				if hintResult.AllPods {
 					// This plugin wants all pods evaluated; we cannot narrow.
-					metrics.PreQueueingHintEvaluations.WithLabelValues(hintfn.PluginName, "all_pods").Inc()
+					p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, "all_pods")
 					return nil
 				}
-				metrics.PreQueueingHintEvaluations.WithLabelValues(hintfn.PluginName, "narrowed").Inc()
+				p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, "narrowed")
 				keys := sets.New(hintResult.Pods...)
 				if existing, ok := result.perPlugin[hintfn.PluginName]; ok {
 					result.perPlugin[hintfn.PluginName] = existing.Union(keys)
