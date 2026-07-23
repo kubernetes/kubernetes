@@ -22,7 +22,7 @@ import (
 	"slices"
 	"sort"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/cli-runtime/pkg/printers"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
@@ -110,14 +110,19 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 	defer w.Flush()
 
 	columnWidth := len(printer.podColumns)
+	if withNamespace {
+		columnWidth++
+	}
+	if printContainers {
+		columnWidth++
+	}
+
 	if !noHeaders {
 		if withNamespace {
 			printValue(w, NamespaceColumn)
-			columnWidth++
 		}
 		if printContainers {
 			printValue(w, PodColumn)
-			columnWidth++
 		}
 		printColumnNames(w, printer.podColumns)
 	}
@@ -131,7 +136,6 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 		} else {
 			printer.printSinglePodMetrics(w, &m, withNamespace, printer.measuredResources)
 		}
-
 	}
 
 	if sum {
