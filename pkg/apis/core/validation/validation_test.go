@@ -6183,6 +6183,72 @@ func TestValidateVolumes(t *testing.T) {
 
 }
 
+func TestValidateEmptyDirVolumeMode(t *testing.T) {
+	testCases := []struct {
+		name      string
+		mode      *int32
+		expectErr bool
+	}{
+		{
+			name:      "nil mode (unset)",
+			mode:      nil,
+			expectErr: false,
+		},
+		{
+			name:      "valid mode 0",
+			mode:      ptr.To[int32](0),
+			expectErr: false,
+		},
+		{
+			name:      "valid mode 0750",
+			mode:      ptr.To[int32](0o750),
+			expectErr: false,
+		},
+		{
+			name:      "valid mode 0777",
+			mode:      ptr.To[int32](0o777),
+			expectErr: false,
+		},
+		{
+			name:      "valid mode 01000 (sticky only)",
+			mode:      ptr.To[int32](0o1000),
+			expectErr: false,
+		},
+		{
+			name:      "valid mode 01777 (max)",
+			mode:      ptr.To[int32](0o1777),
+			expectErr: false,
+		},
+		{
+			name:      "invalid mode negative",
+			mode:      ptr.To[int32](-1),
+			expectErr: true,
+		},
+		{
+			name:      "invalid mode 02000",
+			mode:      ptr.To[int32](0o2000),
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			source := core.VolumeSource{
+				EmptyDir: &core.EmptyDirVolumeSource{
+					Mode: tc.mode,
+				},
+			}
+			errs := validateVolumeSource(&source, field.NewPath("field").Index(0), "test-vol", nil, PodValidationOptions{})
+			if tc.expectErr && len(errs) == 0 {
+				t.Errorf("expected error but got none")
+			}
+			if !tc.expectErr && len(errs) != 0 {
+				t.Errorf("unexpected error: %v", errs)
+			}
+		})
+	}
+}
+
 func TestHugePagesIsolation(t *testing.T) {
 	testCases := map[string]struct {
 		pod         *core.Pod

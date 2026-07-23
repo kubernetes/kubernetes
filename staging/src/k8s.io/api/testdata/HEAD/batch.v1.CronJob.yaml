@@ -1142,6 +1142,7 @@ spec:
                 user: 5
             emptyDir:
               medium: mediumValue
+              mode: 3
               sizeLimit: "0"
             ephemeral:
               volumeClaimTemplate:

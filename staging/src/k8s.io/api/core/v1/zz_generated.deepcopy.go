@@ -1286,6 +1286,11 @@ func (in *EmptyDirVolumeSource) DeepCopyInto(out *EmptyDirVolumeSource) {
 		x := (*in).DeepCopy()
 		*out = &x
 	}
+	if in.Mode != nil {
+		in, out := &in.Mode, &out.Mode
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

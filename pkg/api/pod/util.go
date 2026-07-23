@@ -799,6 +799,14 @@ func dropDisabledFields(
 		}
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirVolumeMode) && !emptyDirVolumeModeInUse(oldPodSpec) {
+		for i := range podSpec.Volumes {
+			if podSpec.Volumes[i].EmptyDir != nil {
+				podSpec.Volumes[i].EmptyDir.Mode = nil
+			}
+		}
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.HostnameOverride) && !setHostnameOverrideInUse(oldPodSpec) {
 		// Set HostnameOverride to nil only if feature is disabled and it is not used
 		podSpec.HostnameOverride = nil
@@ -1530,6 +1538,18 @@ func rroInUse(podSpec *api.PodSpec) bool {
 		return true
 	})
 	return inUse
+}
+
+func emptyDirVolumeModeInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, vol := range podSpec.Volumes {
+		if vol.EmptyDir != nil && vol.EmptyDir.Mode != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec *api.PodSpec) {

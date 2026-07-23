@@ -146,7 +146,8 @@
             },
             "emptyDir": {
               "medium": "mediumValue",
-              "sizeLimit": "0"
+              "sizeLimit": "0",
+              "mode": 3
             },
             "gcePersistentDisk": {
               "pdName": "pdNameValue",
