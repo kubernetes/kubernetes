@@ -498,6 +498,7 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 			RecursiveReadOnly: v.RecursiveReadOnly,
 			Image:             v.Image,
 			ImageSubPath:      v.ImageSubPath,
+			MountOptions:      v.BindMountOptions,
 		}
 
 		volumeMounts = append(volumeMounts, mount)

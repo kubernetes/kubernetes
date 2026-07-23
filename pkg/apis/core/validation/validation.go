@@ -3218,6 +3218,36 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]strin
 			allErrs = append(allErrs, validateMountPropagation(mnt.MountPropagation, container, fldPath.Child("mountPropagation"))...)
 		}
 		allErrs = append(allErrs, validateMountRecursiveReadOnly(mnt, fldPath.Child("recursiveReadOnly"))...)
+		allErrs = append(allErrs, validateBindMountOptions(mnt.BindMountOptions, idxPath.Child("bindMountOptions"))...)
+		if len(mnt.BindMountOptions) > 0 {
+			if vs, ok := volumes[mnt.Name]; ok && vs.Image != nil {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("bindMountOptions"), mnt.BindMountOptions, "bindMountOptions may not be used with image volumes"))
+			}
+		}
+	}
+	return allErrs
+}
+
+var supportedBindMountOptions = sets.New(
+	string(core.BindMountOptionNoExec),
+	string(core.BindMountOptionNoDev),
+	string(core.BindMountOptionNoSUID),
+)
+
+func validateBindMountOptions(bindMountOptions []string, fldPath *field.Path) field.ErrorList {
+	if len(bindMountOptions) == 0 {
+		return nil
+	}
+	allErrs := field.ErrorList{}
+	seen := sets.New[string]()
+	for i, opt := range bindMountOptions {
+		if !supportedBindMountOptions.Has(opt) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Index(i), opt, sets.List(supportedBindMountOptions)))
+		}
+		if seen.Has(opt) {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), opt))
+		}
+		seen.Insert(opt)
 	}
 	return allErrs
 }

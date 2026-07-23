@@ -6800,6 +6800,11 @@ func (in *VolumeMount) DeepCopyInto(out *VolumeMount) {
 		*out = new(MountPropagationMode)
 		**out = **in
 	}
+	if in.BindMountOptions != nil {
+		in, out := &in.BindMountOptions, &out.BindMountOptions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

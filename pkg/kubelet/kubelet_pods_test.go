@@ -9481,3 +9481,32 @@ func TestRecordPodLevelResourcesAdmission(t *testing.T) {
 		})
 	}
 }
+
+func TestMakeMountsBindMountOptions(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	podDir := t.TempDir()
+	volPath := filepath.Join(podDir, "volumes", "disk")
+	require.NoError(t, os.MkdirAll(volPath, 0755))
+
+	container := v1.Container{
+		VolumeMounts: []v1.VolumeMount{
+			{MountPath: "/mnt/a", Name: "disk", BindMountOptions: []string{"noexec", "nosuid"}},
+			{MountPath: "/mnt/b", Name: "disk"},
+		},
+	}
+
+	fhu := hostutil.NewFakeHostUtil(nil)
+	podVolumes := kubecontainer.VolumeMap{
+		"disk": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: volPath}},
+	}
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "test-pod-uid"},
+	}
+
+	mounts, _, err := makeMounts(logger, &pod, podDir, &container, "fakepod", "", []string{""}, podVolumes, fhu, &trackingSubpath{}, nil, false, nil)
+	require.NoError(t, err)
+	require.Len(t, mounts, 3) // 2 volume mounts + /etc/hosts
+	assert.Equal(t, []string{"noexec", "nosuid"}, mounts[0].BindMountOptions)
+	assert.Empty(t, mounts[1].BindMountOptions)
+}

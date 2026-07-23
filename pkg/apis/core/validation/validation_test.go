@@ -8197,6 +8197,78 @@ func TestValidateDisabledSubpathExpr(t *testing.T) {
 	}
 }
 
+func TestValidateBindMountOptions(t *testing.T) {
+	volDevices := GetVolumeDeviceMap(nil)
+	volumes := map[string]core.VolumeSource{
+		"foo":   {EmptyDir: &core.EmptyDirVolumeSource{}},
+		"image": {Image: &core.ImageVolumeSource{Reference: "busybox:latest"}},
+	}
+
+	tests := []struct {
+		name        string
+		mount       core.VolumeMount
+		expectError bool
+	}{
+		{
+			name:        "valid single option",
+			mount:       core.VolumeMount{Name: "foo", MountPath: "/foo", BindMountOptions: []string{"noexec"}},
+			expectError: false,
+		},
+		{
+			name:        "valid multiple options",
+			mount:       core.VolumeMount{Name: "foo", MountPath: "/foo", BindMountOptions: []string{"noexec", "nodev", "nosuid"}},
+			expectError: false,
+		},
+		{
+			name:        "empty options",
+			mount:       core.VolumeMount{Name: "foo", MountPath: "/foo", BindMountOptions: []string{}},
+			expectError: false,
+		},
+		{
+			name:        "nil options",
+			mount:       core.VolumeMount{Name: "foo", MountPath: "/foo"},
+			expectError: false,
+		},
+		{
+			name:        "invalid option",
+			mount:       core.VolumeMount{Name: "foo", MountPath: "/foo", BindMountOptions: []string{"rw"}},
+			expectError: true,
+		},
+		{
+			name:        "mix of valid and invalid",
+			mount:       core.VolumeMount{Name: "foo", MountPath: "/foo", BindMountOptions: []string{"noexec", "sync"}},
+			expectError: true,
+		},
+		{
+			name:        "duplicate option",
+			mount:       core.VolumeMount{Name: "foo", MountPath: "/foo", BindMountOptions: []string{"noexec", "noexec"}},
+			expectError: true,
+		},
+		{
+			name:        "duplicate invalid option",
+			mount:       core.VolumeMount{Name: "foo", MountPath: "/foo", BindMountOptions: []string{"rw", "rw"}},
+			expectError: true,
+		},
+		{
+			name:        "bind mount options with image volume",
+			mount:       core.VolumeMount{Name: "image", MountPath: "/img", BindMountOptions: []string{"noexec"}},
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			errs := ValidateVolumeMounts([]core.VolumeMount{test.mount}, volDevices, volumes, nil, field.NewPath("field"), PodValidationOptions{})
+			if len(errs) > 0 && !test.expectError {
+				t.Errorf("unexpected error: %v", errs)
+			}
+			if len(errs) == 0 && test.expectError {
+				t.Errorf("expected error but got none")
+			}
+		})
+	}
+}
+
 func TestValidateMountPropagation(t *testing.T) {
 	bTrue := true
 	bFalse := false

@@ -1242,6 +1242,12 @@ const (
 	// Enables user specified volume attributes for persistent volumes, like iops and throughput.
 	VolumeAttributesClass featuregate.Feature = "VolumeAttributesClass"
 
+	// owner: @nispriha
+	// kep: https://kep.k8s.io/5855
+	//
+	// Enables bind mount options (noexec, nodev, nosuid) on volumeMounts.
+	VolumeBindMountOptions featuregate.Feature = "VolumeBindMountOptions"
+
 	// owner: @gnufied
 	// kep: https://kep.k8s.io/5030
 	// alpha: v1.35
@@ -2204,6 +2210,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
+	VolumeBindMountOptions: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	VolumeLimitScaling: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
@@ -2825,6 +2835,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	UserNamespacesSupport: {},
 
 	VolumeAttributesClass: {},
+
+	VolumeBindMountOptions: {},
 
 	VolumeLimitScaling: {},
 

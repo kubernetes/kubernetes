@@ -465,7 +465,9 @@ spec:
         - devicePath: devicePathValue
           name: nameValue
         volumeMounts:
-        - mountPath: mountPathValue
+        - bindMountOptions:
+          - bindMountOptionsValue
+          mountPath: mountPathValue
           mountPropagation: mountPropagationValue
           name: nameValue
           readOnly: true
@@ -702,7 +704,9 @@ spec:
         - devicePath: devicePathValue
           name: nameValue
         volumeMounts:
-        - mountPath: mountPathValue
+        - bindMountOptions:
+          - bindMountOptionsValue
+          mountPath: mountPathValue
           mountPropagation: mountPropagationValue
           name: nameValue
           readOnly: true
@@ -943,7 +947,9 @@ spec:
         - devicePath: devicePathValue
           name: nameValue
         volumeMounts:
-        - mountPath: mountPathValue
+        - bindMountOptions:
+          - bindMountOptionsValue
+          mountPath: mountPathValue
           mountPropagation: mountPropagationValue
           name: nameValue
           readOnly: true
