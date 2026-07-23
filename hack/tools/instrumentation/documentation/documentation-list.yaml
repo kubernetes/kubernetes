@@ -2735,12 +2735,14 @@
     endpoint: /metrics
 - name: resourceclaim_creates_total
   subsystem: dynamic_resource_allocation
-  help: Number of ResourceClaims creation requests, categorized by creation status
-    and admin access
+  help: Number of ResourceClaims creation requests, categorized by creation status,
+    admin access, and owning API group and kind (either Pod or scheduling.k8s.io/PodGroup)
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - admin_access
+  - owner_api_group
+  - owner_api_kind
   - status
   componentEndpoints:
   - component: kube-controller-manager
