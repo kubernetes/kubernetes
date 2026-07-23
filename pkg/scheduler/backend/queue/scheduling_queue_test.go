@@ -9595,6 +9595,125 @@ func TestPriorityQueue_PreQueueingHint(t *testing.T) {
 			}},
 			wantMoved: []string{"pod1_ns1", "pod2_ns1", "pod3_ns1"},
 		},
+		{
+			name:           "single plugin narrows to subset (2 of 3)",
+			featureEnabled: true,
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj(),
+				st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj(),
+				st.MakePod().Name("pod3").Namespace("ns1").UID("3").Obj(),
+			},
+			hints: []*QueueingHintFunction{{
+				PluginName:     "foo",
+				QueueingHintFn: queueHintReturnQueue,
+				PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
+					return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{
+						{Name: "pod1", Namespace: "ns1"},
+						{Name: "pod3", Namespace: "ns1"},
+					}}, nil
+				},
+			}},
+			wantMoved: []string{"pod1_ns1", "pod3_ns1"},
+		},
+		{
+			name:           "hint narrows but QueueingHint rejects",
+			featureEnabled: true,
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj(),
+				st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj(),
+			},
+			hints: []*QueueingHintFunction{{
+				PluginName:     "foo",
+				QueueingHintFn: queueHintReturnSkip,
+				PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
+					return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{{Name: "pod1", Namespace: "ns1"}}}, nil
+				},
+			}},
+			wantMoved: []string{},
+		},
+		{
+			name:           "two plugins narrow to same pod",
+			featureEnabled: true,
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj(),
+				st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj(),
+			},
+			hints: []*QueueingHintFunction{
+				{
+					PluginName:     "foo",
+					QueueingHintFn: queueHintReturnQueue,
+					PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
+						return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{{Name: "pod1", Namespace: "ns1"}}}, nil
+					},
+				},
+				{
+					PluginName:     "bar",
+					QueueingHintFn: queueHintReturnQueue,
+					PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
+						return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{{Name: "pod1", Namespace: "ns1"}}}, nil
+					},
+				},
+			},
+			wantMoved: []string{"pod1_ns1"},
+		},
+		{
+			name:           "two plugins narrow to same two pods",
+			featureEnabled: true,
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj(),
+				st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj(),
+				st.MakePod().Name("pod3").Namespace("ns1").UID("3").Obj(),
+			},
+			hints: []*QueueingHintFunction{
+				{
+					PluginName:     "foo",
+					QueueingHintFn: queueHintReturnQueue,
+					PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
+						return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{
+							{Name: "pod1", Namespace: "ns1"},
+							{Name: "pod2", Namespace: "ns1"},
+						}}, nil
+					},
+				},
+				{
+					PluginName:     "bar",
+					QueueingHintFn: queueHintReturnQueue,
+					PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
+						return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{
+							{Name: "pod1", Namespace: "ns1"},
+							{Name: "pod2", Namespace: "ns1"},
+						}}, nil
+					},
+				},
+			},
+			wantMoved: []string{"pod1_ns1", "pod2_ns1"},
+		},
+		{
+			name:           "two plugins disjoint pods (union evaluated)",
+			featureEnabled: true,
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj(),
+				st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj(),
+				st.MakePod().Name("pod3").Namespace("ns1").UID("3").Obj(),
+			},
+			hints: []*QueueingHintFunction{
+				{
+					PluginName:     "foo",
+					QueueingHintFn: queueHintReturnQueue,
+					PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
+						return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{{Name: "pod1", Namespace: "ns1"}}}, nil
+					},
+				},
+				{
+					PluginName:     "bar",
+					QueueingHintFn: queueHintReturnQueue,
+					PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
+						return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{{Name: "pod2", Namespace: "ns1"}}}, nil
+					},
+				},
+			},
+			wantMoved: []string{"pod1_ns1", "pod2_ns1"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -10002,220 +10121,6 @@ func TestPreQueueingHint_PodGroupPreCheck(t *testing.T) {
 	}
 }
 
-func TestPreQueueingHint_NarrowThenQueueingHintRejects(t *testing.T) {
-	// PreQueueingHint narrows to pod1, but QueueingHintFn returns Skip for pod1.
-	// Pod1 should remain in unschedulable.
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.SchedulerPreQueueingHints: true,
-	})
-	logger, ctx := ktesting.NewTestContext(t)
-
-	m := makeEmptyQueueingHintMapPerProfile()
-	m[""][nodeAdd] = []*QueueingHintFunction{
-		{
-			PluginName: "fakePlugin",
-			QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-				return fwk.QueueSkip, nil
-			},
-			PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
-				return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{{Name: "pod1", Namespace: "ns1"}}}, nil
-			},
-		},
-	}
-
-	q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m))
-
-	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()
-	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj()
-
-	for _, pod := range []*v1.Pod{pod1, pod2} {
-		q.Add(ctx, pod)
-		entity, err := q.Pop(logger)
-		if err != nil {
-			t.Fatalf("Pop failed: %v", err)
-		}
-		pInfo := entity.(*framework.QueuedPodInfo)
-		pInfo.UnschedulablePlugins = sets.New[string]("fakePlugin")
-		if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
-			t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
-		}
-	}
-
-	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, st.MakeNode().Name("node1").Obj(), nil)
-
-	// pod1 was narrowed but QueueingHint said Skip, so it stays in unschedulable.
-	// pod2 was not narrowed so it also stays.
-	unschedPods := q.UnschedulablePods()
-	if len(unschedPods) != 2 {
-		t.Errorf("expected 2 pods in unschedulable (QueueingHint rejected), got %d", len(unschedPods))
-	}
-}
-
-func TestPreQueueingHint_TwoPluginsSamePod(t *testing.T) {
-	// Two plugins both narrow to the same single pod.
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.SchedulerPreQueueingHints: true,
-	})
-	logger, ctx := ktesting.NewTestContext(t)
-
-	m := makeEmptyQueueingHintMapPerProfile()
-	m[""][nodeAdd] = []*QueueingHintFunction{
-		{
-			PluginName:     "pluginA",
-			QueueingHintFn: queueHintReturnQueue,
-			PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
-				return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{{Name: "pod1", Namespace: "ns1"}}}, nil
-			},
-		},
-		{
-			PluginName:     "pluginB",
-			QueueingHintFn: queueHintReturnQueue,
-			PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
-				return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{{Name: "pod1", Namespace: "ns1"}}}, nil
-			},
-		},
-	}
-
-	q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m))
-
-	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()
-	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj()
-
-	for _, pod := range []*v1.Pod{pod1, pod2} {
-		q.Add(ctx, pod)
-		entity, err := q.Pop(logger)
-		if err != nil {
-			t.Fatalf("Pop failed: %v", err)
-		}
-		pInfo := entity.(*framework.QueuedPodInfo)
-		pInfo.UnschedulablePlugins = sets.New[string]("pluginA", "pluginB")
-		if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
-			t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
-		}
-	}
-
-	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, st.MakeNode().Name("node1").Obj(), nil)
-
-	// Only pod1 should be moved; pod2 stays in unschedulable.
-	unschedPods := q.UnschedulablePods()
-	if len(unschedPods) != 1 {
-		t.Errorf("expected 1 pod in unschedulable, got %d", len(unschedPods))
-	}
-}
-
-func TestPreQueueingHint_TwoPluginsSameTwoPods(t *testing.T) {
-	// Two plugins both narrow to the same two pods.
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.SchedulerPreQueueingHints: true,
-	})
-	logger, ctx := ktesting.NewTestContext(t)
-
-	m := makeEmptyQueueingHintMapPerProfile()
-	m[""][nodeAdd] = []*QueueingHintFunction{
-		{
-			PluginName:     "pluginA",
-			QueueingHintFn: queueHintReturnQueue,
-			PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
-				return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{
-					{Name: "pod1", Namespace: "ns1"},
-					{Name: "pod2", Namespace: "ns1"},
-				}}, nil
-			},
-		},
-		{
-			PluginName:     "pluginB",
-			QueueingHintFn: queueHintReturnQueue,
-			PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
-				return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{
-					{Name: "pod1", Namespace: "ns1"},
-					{Name: "pod2", Namespace: "ns1"},
-				}}, nil
-			},
-		},
-	}
-
-	q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m))
-
-	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()
-	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj()
-	pod3 := st.MakePod().Name("pod3").Namespace("ns1").UID("3").Obj()
-
-	for _, pod := range []*v1.Pod{pod1, pod2, pod3} {
-		q.Add(ctx, pod)
-		entity, err := q.Pop(logger)
-		if err != nil {
-			t.Fatalf("Pop failed: %v", err)
-		}
-		pInfo := entity.(*framework.QueuedPodInfo)
-		pInfo.UnschedulablePlugins = sets.New[string]("pluginA", "pluginB")
-		if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
-			t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
-		}
-	}
-
-	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, st.MakeNode().Name("node1").Obj(), nil)
-
-	// pod1 and pod2 should be moved; pod3 stays in unschedulable.
-	unschedPods := q.UnschedulablePods()
-	if len(unschedPods) != 1 {
-		t.Errorf("expected 1 pod in unschedulable, got %d", len(unschedPods))
-	}
-}
-
-func TestPreQueueingHint_TwoPluginsDisjointPods(t *testing.T) {
-	// Two plugins narrow to different pods (disjoint sets).
-	// The union should be evaluated.
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.SchedulerPreQueueingHints: true,
-	})
-	logger, ctx := ktesting.NewTestContext(t)
-
-	m := makeEmptyQueueingHintMapPerProfile()
-	m[""][nodeAdd] = []*QueueingHintFunction{
-		{
-			PluginName:     "pluginA",
-			QueueingHintFn: queueHintReturnQueue,
-			PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
-				return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{{Name: "pod1", Namespace: "ns1"}}}, nil
-			},
-		},
-		{
-			PluginName:     "pluginB",
-			QueueingHintFn: queueHintReturnQueue,
-			PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
-				return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{{Name: "pod2", Namespace: "ns1"}}}, nil
-			},
-		},
-	}
-
-	q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m))
-
-	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()
-	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj()
-	pod3 := st.MakePod().Name("pod3").Namespace("ns1").UID("3").Obj()
-
-	for _, pod := range []*v1.Pod{pod1, pod2, pod3} {
-		q.Add(ctx, pod)
-		entity, err := q.Pop(logger)
-		if err != nil {
-			t.Fatalf("Pop failed: %v", err)
-		}
-		pInfo := entity.(*framework.QueuedPodInfo)
-		pInfo.UnschedulablePlugins = sets.New[string]("pluginA", "pluginB")
-		if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
-			t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
-		}
-	}
-
-	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, st.MakeNode().Name("node1").Obj(), nil)
-
-	// pod1 and pod2 should be moved (union of disjoint hints); pod3 stays.
-	unschedPods := q.UnschedulablePods()
-	if len(unschedPods) != 1 {
-		t.Errorf("expected 1 pod in unschedulable (pod3), got %d", len(unschedPods))
-	}
-}
-
 func TestPreQueueingHint_CPGDisablesNarrowing(t *testing.T) {
 	// When CompositePodGroup feature gate is enabled, PreQueueingHint
 	// narrowing is disabled to avoid missing CPG entities.
@@ -10320,65 +10225,6 @@ func TestPreQueueingHint_WildcardSkipsNarrowing(t *testing.T) {
 		t.Errorf("expected 0 pods in unschedulable after wildcard event, got %d", len(unschedPods))
 	}
 }
-
-// TestPreQueueingHint_SinglePluginSubset verifies that a single plugin can narrow
-// to a subset of pods (2 out of 3), and only those pods are moved.
-func TestPreQueueingHint_SinglePluginSubset(t *testing.T) {
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.SchedulerPreQueueingHints: true,
-	})
-	logger, ctx := ktesting.NewTestContext(t)
-
-	m := makeEmptyQueueingHintMapPerProfile()
-	m[""][nodeAdd] = []*QueueingHintFunction{
-		{
-			PluginName:     "pluginA",
-			QueueingHintFn: queueHintReturnQueue,
-			PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
-				// Return 2 of 3 pods.
-				return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{
-					{Name: "pod1", Namespace: "ns1"},
-					{Name: "pod3", Namespace: "ns1"},
-				}}, nil
-			},
-		},
-	}
-
-	q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m))
-
-	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()
-	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj()
-	pod3 := st.MakePod().Name("pod3").Namespace("ns1").UID("3").Obj()
-
-	for _, pod := range []*v1.Pod{pod1, pod2, pod3} {
-		q.Add(ctx, pod)
-		entity, err := q.Pop(logger)
-		if err != nil {
-			t.Fatalf("Pop failed: %v", err)
-		}
-		pInfo := entity.(*framework.QueuedPodInfo)
-		pInfo.UnschedulablePlugins = sets.New[string]("pluginA")
-		if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
-			t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
-		}
-	}
-
-	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, st.MakeNode().Name("node1").Obj(), nil)
-
-	// pod1 and pod3 should be moved; pod2 stays.
-	unschedPods := q.UnschedulablePods()
-	if len(unschedPods) != 1 {
-		t.Errorf("expected 1 pod in unschedulable (pod2), got %d", len(unschedPods))
-	}
-	for _, pod := range unschedPods {
-		if pod.Name != "pod2" {
-			t.Errorf("expected pod2 to stay unschedulable, got %s", pod.Name)
-		}
-	}
-}
-
-// TestPreQueueingHint_PerPluginNarrowing verifies that when two plugins register PreQueueingHintFn,
-// each plugin's QueueingHintFn is only called for the pods its PreQueueingHintFn identified.
 func TestPreQueueingHint_PerPluginNarrowing(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.SchedulerPreQueueingHints: true,
