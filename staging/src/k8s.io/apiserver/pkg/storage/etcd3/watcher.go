@@ -91,7 +91,7 @@ type watcher struct {
 	client                   *clientv3.Client
 	codec                    runtime.Codec
 	newFunc                  func() runtime.Object
-	reverseKeyFunc           storage.ReverseKeyFunc
+	reverseKeyFunc           storageKeyReverseFunc
 	objectType               string
 	groupResource            schema.GroupResource
 	versioner                storage.Versioner
@@ -99,6 +99,14 @@ type watcher struct {
 	getCurrentStorageRV      func(context.Context) (uint64, error)
 	getResourceSizeEstimator func() *resourceSizeEstimator
 }
+
+// storageKey keeps backend-prefixed keys distinct from the resource-relative
+// keys accepted by storage.ReverseKeyFunc.
+type storageKey string
+
+// storageKeyReverseFunc recovers object identity from an etcd key that still
+// contains the backend-specific prefix.
+type storageKeyReverseFunc func(key storageKey) (name string, namespace string, err error)
 
 // watchChan implements watch.Interface.
 type watchChan struct {
@@ -825,7 +833,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	}
 
 	if !e.isDeleted {
-		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.value, authenticatedDataString(string(e.key)))
+		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.value, authenticatedDataString(e.key))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -840,7 +848,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	// we need the object only to compute whether it was filtered out
 	// before).
 	if len(e.prevValue) > 0 && (e.isDeleted || !wc.acceptAll()) {
-		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(string(e.key)))
+		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(e.key))
 		if err != nil {
 			return nil, nil, wc.watcher.transformIfCorruptObjectError(e, err)
 		}

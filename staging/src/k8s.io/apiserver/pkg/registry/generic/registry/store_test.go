@@ -147,30 +147,43 @@ func NewTestGenericStoreRegistry(t *testing.T) (factory.DestroyFunc, *Store) {
 
 func TestCompleteWithOptionsDefaultsStoreKeyFuncs(t *testing.T) {
 	testCases := []struct {
-		name          string
-		namespaced    bool
-		ctx           context.Context
-		expectRootKey string
-		expectKey     string
-		expectName    string
-		expectNS      string
+		name           string
+		namespaced     bool
+		ctx            context.Context
+		resourcePrefix string
+		expectRootKey  string
+		expectKey      string
+		expectName     string
+		expectNS       string
 	}{
 		{
-			name:          "namespaced",
-			namespaced:    true,
-			ctx:           genericapirequest.WithNamespace(genericapirequest.NewContext(), "ns1"),
-			expectRootKey: "/pods/ns1",
-			expectKey:     "/pods/ns1/pod1",
-			expectName:    "pod1",
-			expectNS:      "ns1",
+			name:           "namespaced",
+			namespaced:     true,
+			ctx:            genericapirequest.WithNamespace(genericapirequest.NewContext(), "ns1"),
+			resourcePrefix: "pods",
+			expectRootKey:  "/pods/ns1",
+			expectKey:      "/pods/ns1/pod1",
+			expectName:     "pod1",
+			expectNS:       "ns1",
 		},
 		{
-			name:          "cluster scoped",
-			namespaced:    false,
-			ctx:           genericapirequest.NewContext(),
-			expectRootKey: "/pods",
-			expectKey:     "/pods/pod1",
-			expectName:    "pod1",
+			name:           "cluster scoped",
+			namespaced:     false,
+			ctx:            genericapirequest.NewContext(),
+			resourcePrefix: "pods",
+			expectRootKey:  "/pods",
+			expectKey:      "/pods/pod1",
+			expectName:     "pod1",
+		},
+		{
+			name:           "resource prefix with trailing slash",
+			namespaced:     true,
+			ctx:            genericapirequest.WithNamespace(genericapirequest.NewContext(), "ns1"),
+			resourcePrefix: "pods/",
+			expectRootKey:  "/pods/ns1",
+			expectKey:      "/pods/ns1/pod1",
+			expectName:     "pod1",
+			expectNS:       "ns1",
 		},
 	}
 
@@ -187,9 +200,10 @@ func TestCompleteWithOptionsDefaultsStoreKeyFuncs(t *testing.T) {
 			store.KeyFunc = nil
 			store.TableConvertor = rest.NewDefaultTableConvertor(store.DefaultQualifiedResource)
 
-			if err := store.CompleteWithOptions(&generic.StoreOptions{
-				RESTOptions: generic.RESTOptions{ResourcePrefix: "pods"},
-			}); err != nil {
+			err := store.CompleteWithOptions(&generic.StoreOptions{
+				RESTOptions: generic.RESTOptions{ResourcePrefix: tc.resourcePrefix},
+			})
+			if err != nil {
 				t.Fatalf("CompleteWithOptions failed: %v", err)
 			}
 
@@ -210,14 +224,10 @@ func TestCompleteWithOptionsDefaultsStoreKeyFuncs(t *testing.T) {
 			if got != tc.expectKey {
 				t.Fatalf("KeyFunc returned %q, expect %q", got, tc.expectKey)
 			}
-			keyFuncs, err := defaultStoreKeyFuncs("/pods", "/registry/pods/", tc.namespaced)
-			if err != nil {
-				t.Fatalf("defaultStoreKeyFuncs failed: %v", err)
-			}
-			if keyFuncs.storageReverseKeyFunc == nil {
+			if store.ReverseKeyFunc == nil {
 				t.Fatal("ReverseKeyFunc was not defaulted")
 			}
-			name, namespace, err := keyFuncs.storageReverseKeyFunc(storage.StorageKey("/registry" + tc.expectKey))
+			name, namespace, err := store.ReverseKeyFunc(tc.expectKey)
 			if err != nil {
 				t.Fatalf("ReverseKeyFunc failed: %v", err)
 			}
@@ -323,10 +333,7 @@ func TestDefaultStoreKeyFuncs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			keyFuncs, err := defaultStoreKeyFuncs("/pods", "/registry/pods/", tc.namespaced)
-			if err != nil {
-				t.Fatalf("defaultStoreKeyFuncs failed: %v", err)
-			}
+			keyFuncs := defaultStoreKeyFuncs("/pods", tc.namespaced)
 
 			if got := keyFuncs.requestKeyRootFunc(tc.ctx); got != tc.expectRootKey {
 				t.Fatalf("requestKeyRootFunc returned %q, expect %q", got, tc.expectRootKey)
@@ -349,10 +356,10 @@ func TestDefaultStoreKeyFuncs(t *testing.T) {
 			}
 
 			if tc.expectKey != "" {
-				if keyFuncs.storageReverseKeyFunc == nil {
+				if keyFuncs.reverseKeyFunc == nil {
 					t.Fatal("ReverseKeyFunc is nil")
 				}
-				name, namespace, err := keyFuncs.storageReverseKeyFunc(storage.StorageKey("/registry" + tc.expectKey))
+				name, namespace, err := keyFuncs.reverseKeyFunc(tc.expectKey)
 				if err != nil {
 					t.Fatalf("ReverseKeyFunc error = %v", err)
 				}
@@ -373,62 +380,63 @@ func TestDefaultStoreKeyFuncs(t *testing.T) {
 }
 
 func TestReverseKeyFunc(t *testing.T) {
-	keyPrefix := "/registry/pods/"
+	namespacedReverseKeyFunc := NamespaceReverseKeyFunc("/pods")
+	clusterScopedReverseKeyFunc := NoNamespaceReverseKeyFunc("/nodes")
 	testCases := []struct {
 		name           string
 		reverseKeyFunc storage.ReverseKeyFunc
-		key            storage.StorageKey
+		key            string
 		expectName     string
 		expectNS       string
 		expectErr      bool
 	}{
 		{
 			name:           "namespaced",
-			reverseKeyFunc: mustReverseKeyFunc(t, NamespaceReverseKeyFunc, keyPrefix),
-			key:            "/registry/pods/ns1/pod1",
+			reverseKeyFunc: namespacedReverseKeyFunc,
+			key:            "/pods/ns1/pod1",
 			expectName:     "pod1",
 			expectNS:       "ns1",
 		},
 		{
 			name:           "cluster scoped",
-			reverseKeyFunc: mustReverseKeyFunc(t, NoNamespaceReverseKeyFunc, keyPrefix),
-			key:            "/registry/pods/pod1",
-			expectName:     "pod1",
+			reverseKeyFunc: clusterScopedReverseKeyFunc,
+			key:            "/nodes/node1",
+			expectName:     "node1",
 		},
 		{
-			name:           "invalid key prefix",
-			reverseKeyFunc: mustReverseKeyFunc(t, NamespaceReverseKeyFunc, keyPrefix),
-			key:            "/registry/services/ns1/pod1",
+			name:           "namespaced rejects a different resource prefix",
+			reverseKeyFunc: namespacedReverseKeyFunc,
+			key:            "/services/ns1/pod1",
 			expectErr:      true,
 		},
 		{
-			name:           "invalid namespaced key",
-			reverseKeyFunc: mustReverseKeyFunc(t, NamespaceReverseKeyFunc, keyPrefix),
-			key:            "/registry/pods/ns1/pod1/extra",
+			name:           "namespaced rejects an extra instance segment",
+			reverseKeyFunc: namespacedReverseKeyFunc,
+			key:            "/pods/ns1/pod1/extra",
 			expectErr:      true,
 		},
 		{
-			name:           "empty namespace",
-			reverseKeyFunc: mustReverseKeyFunc(t, NamespaceReverseKeyFunc, keyPrefix),
-			key:            "/registry/pods//pod1",
+			name:           "namespaced requires non-empty namespace",
+			reverseKeyFunc: namespacedReverseKeyFunc,
+			key:            "/pods//pod1",
 			expectErr:      true,
 		},
 		{
-			name:           "empty namespaced name",
-			reverseKeyFunc: mustReverseKeyFunc(t, NamespaceReverseKeyFunc, keyPrefix),
-			key:            "/registry/pods/ns1/",
+			name:           "namespaced requires non-empty name",
+			reverseKeyFunc: namespacedReverseKeyFunc,
+			key:            "/pods/ns1/",
 			expectErr:      true,
 		},
 		{
-			name:           "invalid cluster scoped key",
-			reverseKeyFunc: mustReverseKeyFunc(t, NoNamespaceReverseKeyFunc, keyPrefix),
-			key:            "/registry/pods/pod1/extra",
+			name:           "cluster scoped rejects an extra instance segment",
+			reverseKeyFunc: clusterScopedReverseKeyFunc,
+			key:            "/nodes/group/node1",
 			expectErr:      true,
 		},
 		{
-			name:           "empty cluster scoped name",
-			reverseKeyFunc: mustReverseKeyFunc(t, NoNamespaceReverseKeyFunc, keyPrefix),
-			key:            "/registry/pods/",
+			name:           "cluster scoped requires non-empty name",
+			reverseKeyFunc: clusterScopedReverseKeyFunc,
+			key:            "/nodes/",
 			expectErr:      true,
 		},
 	}
@@ -446,6 +454,39 @@ func TestReverseKeyFunc(t *testing.T) {
 				t.Fatalf("reverseKeyFunc returned name=%q namespace=%q, expect name=%q namespace=%q", name, namespace, tc.expectName, tc.expectNS)
 			}
 		})
+	}
+}
+
+func TestNewStoreKeyFuncsPreservesCustomReverseKeyFunc(t *testing.T) {
+	customReverseKeyFunc := func(key string) (name string, namespace string, err error) {
+		if key != "/custom/ns1/pod1" {
+			return "", "", fmt.Errorf("unexpected key %q", key)
+		}
+		return "pod1", "ns1", nil
+	}
+	keyFuncs := newStoreKeyFuncs(
+		true,
+		func(context.Context) string { return "/custom" },
+		func(context.Context, string) (string, error) { return "/custom/ns1/pod1", nil },
+		customReverseKeyFunc,
+	)
+
+	name, namespace, err := keyFuncs.reverseKeyFunc("/custom/ns1/pod1")
+	if err != nil {
+		t.Fatalf("custom ReverseKeyFunc failed: %v", err)
+	}
+	if name != "pod1" || namespace != "ns1" {
+		t.Fatalf("custom ReverseKeyFunc returned name=%q namespace=%q", name, namespace)
+	}
+
+	keyFuncs = newStoreKeyFuncs(
+		true,
+		func(context.Context) string { return "/custom" },
+		func(context.Context, string) (string, error) { return "/custom/ns1/pod1", nil },
+		nil,
+	)
+	if keyFuncs.reverseKeyFunc != nil {
+		t.Fatal("custom key funcs without ReverseKeyFunc must preserve the decode-fallback signal")
 	}
 }
 
@@ -3254,153 +3295,5 @@ func TestValidateIndexers(t *testing.T) {
 		if !tc.expectedError && err != nil {
 			t.Errorf("%v: expected no error, but got %v", tc.name, err)
 		}
-	}
-}
-
-func mustReverseKeyFunc(t *testing.T, factory func(string) (storage.ReverseKeyFunc, error), prefix string) storage.ReverseKeyFunc {
-	t.Helper()
-	reverseKeyFunc, err := factory(prefix)
-	if err != nil {
-		t.Fatalf("failed to create reverse key func: %v", err)
-	}
-	return reverseKeyFunc
-}
-
-func TestReverseKeyFuncInvalidPrefixes(t *testing.T) {
-	testcases := []struct {
-		name    string
-		factory func(string) (storage.ReverseKeyFunc, error)
-		prefix  string
-	}{
-		{
-			name:    "cluster scoped prefix must end with slash",
-			factory: NoNamespaceReverseKeyFunc,
-			prefix:  "/registry/pods",
-		},
-		{
-			name:    "namespaced prefix must end with slash",
-			factory: NamespaceReverseKeyFunc,
-			prefix:  "/registry/pods",
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			if reverseKeyFunc, err := tc.factory(tc.prefix); err == nil {
-				t.Fatalf("factory(%q) returned reverseKeyFunc=%v, expected error", tc.prefix, reverseKeyFunc)
-			}
-		})
-	}
-}
-
-func TestReverseKeyFuncInvalidInputs(t *testing.T) {
-	testcases := []struct {
-		name           string
-		reverseKeyFunc storage.ReverseKeyFunc
-		key            string
-	}{
-		{
-			name:           "cluster scoped name is required",
-			reverseKeyFunc: mustReverseKeyFunc(t, NoNamespaceReverseKeyFunc, "/registry/pods/"),
-			key:            "/registry/pods/",
-		},
-		{
-			name:           "cluster scoped name cannot contain slash",
-			reverseKeyFunc: mustReverseKeyFunc(t, NoNamespaceReverseKeyFunc, "/registry/pods/"),
-			key:            "/registry/pods/ns/foo",
-		},
-		{
-			name:           "namespace is required",
-			reverseKeyFunc: mustReverseKeyFunc(t, NamespaceReverseKeyFunc, "/registry/pods/"),
-			key:            "/registry/pods//foo",
-		},
-		{
-			name:           "name is required",
-			reverseKeyFunc: mustReverseKeyFunc(t, NamespaceReverseKeyFunc, "/registry/pods/"),
-			key:            "/registry/pods/ns/",
-		},
-		{
-			name:           "namespaced key has only namespace and name",
-			reverseKeyFunc: mustReverseKeyFunc(t, NamespaceReverseKeyFunc, "/registry/pods/"),
-			key:            "/registry/pods/ns/foo/extra",
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			if name, namespace, err := tc.reverseKeyFunc(storage.StorageKey(tc.key)); err == nil {
-				t.Fatalf("reverseKeyFunc(%q) returned name=%q namespace=%q, expected error", tc.key, name, namespace)
-			}
-		})
-	}
-}
-
-func TestNormalizeStorageConfigPrefix(t *testing.T) {
-	testcases := []struct {
-		name                string
-		storageConfigPrefix string
-		want                string
-		wantErr             bool
-	}{
-		{
-			name:                "empty storage config prefix",
-			storageConfigPrefix: "",
-			want:                "/",
-		},
-		{
-			name:                "storage config prefix starts with slash",
-			storageConfigPrefix: "/registry",
-			want:                "/registry/",
-		},
-		{
-			name:                "storage config prefix does not start with slash",
-			storageConfigPrefix: "registry",
-			want:                "/registry/",
-		},
-		{
-			name:                "storage config prefix ends with slash",
-			storageConfigPrefix: "registry/",
-			want:                "/registry/",
-		},
-		{
-			name:                "storage config prefix contains repeated slash",
-			storageConfigPrefix: "registry//foo",
-			wantErr:             true,
-		},
-		{
-			name:                "storage config prefix contains repeated slash between segments",
-			storageConfigPrefix: "registry/foo//bar",
-			wantErr:             true,
-		},
-		{
-			name:                "storage config prefix contains parent traversal",
-			storageConfigPrefix: "registry/foo/../bar",
-			wantErr:             true,
-		},
-		{
-			name:                "storage config prefix contains parent traversal between segments",
-			storageConfigPrefix: "registry/baz/foo/../bar/qux",
-			wantErr:             true,
-		},
-		{
-			name:                "storage config prefix contains current directory",
-			storageConfigPrefix: "registry/./foo",
-			wantErr:             true,
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := normalizeStorageConfigPrefix(tc.storageConfigPrefix)
-			if (err != nil) != tc.wantErr {
-				t.Fatalf("normalizeStorageConfigPrefix(%q) error = %v, wantErr %t", tc.storageConfigPrefix, err, tc.wantErr)
-			}
-			if err != nil {
-				return
-			}
-			if got != tc.want {
-				t.Fatalf("normalizeStorageConfigPrefix(%q) = %q, want %q", tc.storageConfigPrefix, got, tc.want)
-			}
-		})
 	}
 }

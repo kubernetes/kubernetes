@@ -446,12 +446,13 @@ func PrepareKey(resourcePrefix, key string, recursive bool) (string, error) {
 	return key, nil
 }
 
-// StorageKey is a key after the storage backend prefix has been applied.
-type StorageKey string
-
-// ReverseKeyFunc recovers object identity from a storage key.
+// ReverseKeyFunc recovers object identity from a resource-relative key
+// produced by the corresponding registry KeyFunc. Backend-specific prefixes
+// are removed before the key is passed to this function.
 //
 // For namespaced resources, namespace and name are both non-empty. For
 // cluster-scoped resources, namespace is empty and name is non-empty. An error
 // is returned if the key cannot be parsed into a valid object identity.
-type ReverseKeyFunc func(key StorageKey) (name string, namespace string, err error)
+// A nil ReverseKeyFunc indicates that identity cannot be derived from the
+// key and callers must fall back to decoding the stored object.
+type ReverseKeyFunc func(key string) (name string, namespace string, err error)

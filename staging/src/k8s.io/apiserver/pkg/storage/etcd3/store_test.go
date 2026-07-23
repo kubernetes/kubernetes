@@ -688,6 +688,31 @@ func TestPrefix(t *testing.T) {
 	}
 }
 
+func TestNewStorageKeyReverseFunc(t *testing.T) {
+	reverseKeyFunc := func(key string) (name string, namespace string, err error) {
+		if key != "/pods/ns1/pod1" {
+			return "", "", fmt.Errorf("unexpected resource-relative key %q", key)
+		}
+		return "pod1", "ns1", nil
+	}
+	storageKeyReverseFunc := newStorageKeyReverseFunc("/custom/backend/", reverseKeyFunc)
+
+	name, namespace, err := storageKeyReverseFunc(storageKey("/custom/backend/pods/ns1/pod1"))
+	if err != nil {
+		t.Fatalf("storage key reverse func failed: %v", err)
+	}
+	if name != "pod1" || namespace != "ns1" {
+		t.Fatalf("storage key reverse func returned name=%q namespace=%q", name, namespace)
+	}
+
+	if _, _, err := storageKeyReverseFunc(storageKey("/other/backend/pods/ns1/pod1")); err == nil {
+		t.Fatal("storage key without the configured backend prefix must be rejected")
+	}
+	if got := newStorageKeyReverseFunc("/custom/backend/", nil); got != nil {
+		t.Fatal("nil ReverseKeyFunc must preserve the decode-fallback signal")
+	}
+}
+
 func Test_growSlice(t *testing.T) {
 	type args struct {
 		initialCapacity int

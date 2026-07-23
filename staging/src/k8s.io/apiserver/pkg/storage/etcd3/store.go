@@ -172,7 +172,7 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 		client:         c.Client,
 		codec:          codec,
 		newFunc:        newFunc,
-		reverseKeyFunc: reverseKeyFunc,
+		reverseKeyFunc: newStorageKeyReverseFunc(pathPrefix, reverseKeyFunc),
 		groupResource:  groupResource,
 		versioner:      versioner,
 		transformer:    transformer,
@@ -205,6 +205,19 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 	}
 	etcdfeature.DefaultFeatureSupportChecker.CheckClient(c.Ctx(), c, storage.RequestWatchProgress)
 	return s, nil
+}
+
+func newStorageKeyReverseFunc(pathPrefix string, reverseKeyFunc storage.ReverseKeyFunc) storageKeyReverseFunc {
+	if reverseKeyFunc == nil {
+		return nil
+	}
+	return func(key storageKey) (name string, namespace string, err error) {
+		resourceKey, found := strings.CutPrefix(string(key), pathPrefix)
+		if !found {
+			return "", "", fmt.Errorf("storage key %q does not have backend prefix %q", key, pathPrefix)
+		}
+		return reverseKeyFunc("/" + resourceKey)
+	}
 }
 
 func (s *store) CompactRevision() int64 {
