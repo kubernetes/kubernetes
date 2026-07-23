@@ -830,7 +830,7 @@ func getOrCreatePodGroupStateData(cs fwk.CycleState) (*podGroupStateData, error)
 			return nil, err
 		}
 		podGroupState := &podGroupStateData{
-			pendingAllocations: make(sets.Set[types.UID]),
+			pendingAllocations: make(map[types.UID]sets.Set[types.UID]),
 			podsStateData:      make(map[types.NamespacedName]*stateData),
 		}
 		podGroupCycleState.Write(stateKey, podGroupState)
