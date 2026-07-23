@@ -207,6 +207,12 @@ func IsStandardContainerResourceName(name core.ResourceName) bool {
 	return standardContainerResources.Has(name) || IsHugePageResourceName(name)
 }
 
+// IsNodeAllocatableResourceName returns true if the resource name is valid for DRA NodeAllocatableResources.
+// Currently, only cpu, memory, and hugepages are supported (excluding ephemeral-storage for alpha).
+func IsNodeAllocatableResourceName(name core.ResourceName) bool {
+	return name == core.ResourceCPU || name == core.ResourceMemory || IsHugePageResourceName(name)
+}
+
 // IsExtendedResourceName returns true if:
 // 1. the resource name is not in the default namespace;
 // 2. resource name does not have "requests." prefix,

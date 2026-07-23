@@ -1252,11 +1252,33 @@ func (NodeAffinity) SwaggerDoc() map[string]string {
 	return map_NodeAffinity
 }
 
+var map_NodeAllocatableMappedResources = map[string]string{
+	"":         "NodeAllocatableMappedResources describes mapped node allocatable resource allocations.",
+	"name":     "Name is the name of the resource (e.g., cpu, memory).",
+	"quantity": "Quantity is the total node allocatable resource capacity allocated for the claim. This claim's allocated devices is shared by all the containers referencing the claim. Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.",
+}
+
+func (NodeAllocatableMappedResources) SwaggerDoc() map[string]string {
+	return map_NodeAllocatableMappedResources
+}
+
+var map_NodeAllocatableOverheadResources = map[string]string{
+	"":             "NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.",
+	"name":         "Name is the name of the resource (e.g., cpu, memory).",
+	"perPod":       "PerPod is the flat overhead quantity allocated per pod. Adding to each container limit allows individual containers to utilize the overhead, while the parent pod-level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.",
+	"perContainer": "PerContainer is the variable overhead quantity applied for each container referencing the claim. The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`. The total overhead quantity allocated for the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.",
+}
+
+func (NodeAllocatableOverheadResources) SwaggerDoc() map[string]string {
+	return map_NodeAllocatableOverheadResources
+}
+
 var map_NodeAllocatableResourceClaimStatus = map[string]string{
 	"":                  "NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.",
 	"resourceClaimName": "ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.",
 	"containers":        "Containers lists the names of all containers in this pod that reference the claim.",
-	"resources":         "Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.",
+	"mapping":           "Mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
+	"overhead":          "Overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
 }
 
 func (NodeAllocatableResourceClaimStatus) SwaggerDoc() map[string]string {

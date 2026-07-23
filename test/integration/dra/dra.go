@@ -434,7 +434,10 @@ func createNodes(tCtx ktesting.TContext) {
 				v1.ResourceMemory: resource.MustParse(nodeMemoryCapacity),
 				v1.ResourcePods:   *resource.NewScaledQuantity(maxPodsPerNode, 0),
 			},
-			Phase: v1.NodeRunning,
+			// Required for tests in test/integration/dra/node_allocatable_resources.go.
+			// DeclaredFeatures must include DRANodeAllocatableResources to pass node feature validation during admission.
+			DeclaredFeatures: []string{"DRANodeAllocatableResources"},
+			Phase:            v1.NodeRunning,
 			Conditions: []v1.NodeCondition{
 				{
 					Type:   v1.NodeReady,

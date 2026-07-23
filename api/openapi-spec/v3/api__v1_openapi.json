@@ -3682,6 +3682,59 @@
         },
         "type": "object"
       },
+      "io.k8s.api.core.v1.NodeAllocatableMappedResources": {
+        "description": "NodeAllocatableMappedResources describes mapped node allocatable resource allocations.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "Name is the name of the resource (e.g., cpu, memory).",
+            "type": "string"
+          },
+          "quantity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
+            "description": "Quantity is the total node allocatable resource capacity allocated for the claim. This claim's allocated devices is shared by all the containers referencing the claim. Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim."
+          }
+        },
+        "required": [
+          "name",
+          "quantity"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.NodeAllocatableOverheadResources": {
+        "description": "NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "Name is the name of the resource (e.g., cpu, memory).",
+            "type": "string"
+          },
+          "perContainer": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
+            "description": "PerContainer is the variable overhead quantity applied for each container referencing the claim. The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`. The total overhead quantity allocated for the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration."
+          },
+          "perPod": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+              }
+            ],
+            "description": "PerPod is the flat overhead quantity allocated per pod. Adding to each container limit allows individual containers to utilize the overhead, while the parent pod-level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration."
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus": {
         "description": "NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.",
         "properties": {
@@ -3693,22 +3746,40 @@
             "type": "array",
             "x-kubernetes-list-type": "set"
           },
+          "mapping": {
+            "description": "Mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeAllocatableMappedResources"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge"
+          },
+          "overhead": {
+            "description": "Overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeAllocatableOverheadResources"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge"
+          },
           "resourceClaimName": {
             "default": "",
             "description": "ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.",
             "type": "string"
-          },
-          "resources": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
-            },
-            "description": "Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.",
-            "type": "object"
           }
         },
         "required": [
-          "resourceClaimName",
-          "resources"
+          "resourceClaimName"
         ],
         "type": "object"
       },
@@ -5929,7 +6000,12 @@
               "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus"
             },
             "type": "array",
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-map-keys": [
+              "resourceClaimName"
+            ],
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "resourceClaimName",
+            "x-kubernetes-patch-strategy": "merge"
           },
           "nominatedNodeName": {
             "description": "nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be scheduled right away as preemption victims receive their graceful termination periods. This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to give the resources on this node to a higher priority pod that is created after preemption. As a result, this field may be different than PodSpec.nodeName when the pod is scheduled.",

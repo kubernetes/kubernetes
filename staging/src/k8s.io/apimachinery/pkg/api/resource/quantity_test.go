@@ -1981,3 +1981,55 @@ func TestParseQuantity(t *testing.T) {
 		})
 	}
 }
+
+func TestQuantityPtrEqual(t *testing.T) {
+	q1 := MustParse("100m")
+	q2 := MustParse("100m")
+	q3 := MustParse("200m")
+
+	tests := []struct {
+		name   string
+		a      *Quantity
+		b      *Quantity
+		expect bool
+	}{
+		{
+			name:   "both nil",
+			a:      nil,
+			b:      nil,
+			expect: true,
+		},
+		{
+			name:   "first nil",
+			a:      nil,
+			b:      &q1,
+			expect: false,
+		},
+		{
+			name:   "second nil",
+			a:      &q1,
+			b:      nil,
+			expect: false,
+		},
+		{
+			name:   "equal quantities",
+			a:      &q1,
+			b:      &q2,
+			expect: true,
+		},
+		{
+			name:   "unequal quantities",
+			a:      &q1,
+			b:      &q3,
+			expect: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := QuantityPtrEqual(tt.a, tt.b); got != tt.expect {
+				t.Errorf("QuantityPtrEqual() = %v, want %v", got, tt.expect)
+			}
+		})
+	}
+}

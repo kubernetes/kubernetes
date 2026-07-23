@@ -4918,7 +4918,8 @@ type PodStatus struct {
 	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
 	// +featureGate=DRANodeAllocatableResources
 	// +optional
-	// +listType=atomic
+	// +listType=map
+	// +listMapKey=resourceClaimName
 	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus
 
 	// volumeHealth contains node-reported health for each volume the pod is using.
@@ -7508,7 +7509,51 @@ type NodeAllocatableResourceClaimStatus struct {
 	// +optional
 	// +listType=set
 	Containers []string
-	// Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.
+	// Mapping contains allocations through devices mapped in `device.nodeAllocatableResources.mapping`.
+	// This is used by kubelet for pod level and container level cgroup enforcement.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	Mapping []NodeAllocatableMappedResources
+	// Overhead contains allocations through devices mapped in `device.nodeAllocatableResources.overhead`.
+	// This is used by kubelet for pod level and container level cgroup enforcement.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	Overhead []NodeAllocatableOverheadResources
+}
+
+// NodeAllocatableMappedResources describes mapped node allocatable resource allocations.
+type NodeAllocatableMappedResources struct {
+	// Name is the name of the resource (e.g., cpu, memory).
 	// +required
-	Resources map[ResourceName]resource.Quantity
+	Name ResourceName
+	// Quantity is the total node allocatable resource capacity allocated for the claim.
+	// This claim's allocated devices is shared by all the containers referencing the claim.
+	// Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.
+	// +required
+	Quantity *resource.Quantity
+}
+
+// NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.
+type NodeAllocatableOverheadResources struct {
+	// Name is the name of the resource (e.g., cpu, memory).
+	// +required
+	Name ResourceName
+	// PerPod is the flat overhead quantity allocated per pod.
+	// Adding to each container limit allows individual containers to utilize the overhead, while the parent pod-level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once.
+	// At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
+	// +optional
+	PerPod *resource.Quantity
+	// PerContainer is the variable overhead quantity applied for each container referencing the claim.
+	// The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`.
+	// The total overhead quantity allocated for the claim is computed as:
+	// Quantity = PerPod + (PerContainer * NumReferences)
+	// Kubelet accounts for this overhead in cgroups:
+	// - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences).
+	// - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container.
+	// This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.
+	// At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
+	// +optional
+	PerContainer *resource.Quantity
 }

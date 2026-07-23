@@ -2794,20 +2794,86 @@ message NodeAffinity {
   repeated PreferredSchedulingTerm preferredDuringSchedulingIgnoredDuringExecution = 2;
 }
 
+// NodeAllocatableMappedResources describes mapped node allocatable resource allocations.
+message NodeAllocatableMappedResources {
+  // Name is the name of the resource (e.g., cpu, memory).
+  // +required
+  // +k8s:required
+  optional string name = 1;
+
+  // Quantity is the total node allocatable resource capacity allocated for the claim.
+  // This claim's allocated devices is shared by all the containers referencing the claim.
+  // Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.
+  // +required
+  // +k8s:required
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity quantity = 2;
+}
+
+// NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.
+message NodeAllocatableOverheadResources {
+  // Name is the name of the resource (e.g., cpu, memory).
+  // +required
+  // +k8s:required
+  optional string name = 1;
+
+  // PerPod is the flat overhead quantity allocated per pod.
+  // Adding to each container limit allows individual containers to utilize the overhead, while the parent pod-level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once.
+  // At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
+  // +optional
+  // +k8s:optional
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity perPod = 2;
+
+  // PerContainer is the variable overhead quantity applied for each container referencing the claim.
+  // The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`.
+  // The total overhead quantity allocated for the claim is computed as:
+  // Quantity = PerPod + (PerContainer * NumReferences)
+  // Kubelet accounts for this overhead in cgroups:
+  // - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences).
+  // - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container.
+  // This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.
+  // At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
+  // +optional
+  // +k8s:optional
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity perContainer = 3;
+}
+
 // NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.
 message NodeAllocatableResourceClaimStatus {
   // ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.
   // +required
+  // +k8s:required
   optional string resourceClaimName = 1;
 
   // Containers lists the names of all containers in this pod that reference the claim.
   // +optional
   // +listType=set
+  // +k8s:optional
+  // +k8s:listType=set
   repeated string containers = 2;
 
-  // Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.
-  // +required
-  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> resources = 3;
+  // Mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field.
+  // This is used by kubelet for pod level and container-level cgroup enforcement.
+  // +optional
+  // +patchStrategy=merge
+  // +patchMergeKey=name
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  repeated NodeAllocatableMappedResources mapping = 4;
+
+  // Overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field.
+  // This is used by kubelet for pod level and container-level cgroup enforcement.
+  // +optional
+  // +patchStrategy=merge
+  // +patchMergeKey=name
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  repeated NodeAllocatableOverheadResources overhead = 5;
 }
 
 // NodeCondition contains condition information for a node.
@@ -5168,7 +5234,13 @@ message PodStatus {
   // Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
   // +featureGate=DRANodeAllocatableResources
   // +optional
-  // +listType=atomic
+  // +patchStrategy=merge
+  // +patchMergeKey=resourceClaimName
+  // +listType=map
+  // +listMapKey=resourceClaimName
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=resourceClaimName
   repeated NodeAllocatableResourceClaimStatus nodeAllocatableResourceClaimStatuses = 21;
 
   // volumeHealth contains node-reported health for each volume the pod is using.

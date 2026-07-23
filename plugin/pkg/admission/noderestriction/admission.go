@@ -28,6 +28,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -432,20 +433,28 @@ func nodeAllocatableResourceClaimStatusesEqual(statusA, statusB []api.NodeAlloca
 		if !slices.Equal(statusA[i].Containers, statusB[i].Containers) {
 			return false
 		}
-		if len(statusA[i].Resources) != len(statusB[i].Resources) {
+		if !nodeAllocatableMappedResourcesEqual(statusA[i].Mapping, statusB[i].Mapping) {
 			return false
 		}
-		for name, qtyA := range statusA[i].Resources {
-			qtyB, ok := statusB[i].Resources[name]
-			if !ok {
-				return false
-			}
-			if qtyA.Cmp(qtyB) != 0 {
-				return false
-			}
+		if !nodeAllocatableOverheadResourcesEqual(statusA[i].Overhead, statusB[i].Overhead) {
+			return false
 		}
 	}
 	return true
+}
+
+func nodeAllocatableMappedResourcesEqual(a, b []api.NodeAllocatableMappedResources) bool {
+	itemEqual := func(x, y api.NodeAllocatableMappedResources) bool {
+		return x.Name == y.Name && apiresource.QuantityPtrEqual(x.Quantity, y.Quantity)
+	}
+	return slices.EqualFunc(a, b, itemEqual)
+}
+
+func nodeAllocatableOverheadResourcesEqual(a, b []api.NodeAllocatableOverheadResources) bool {
+	itemEqual := func(x, y api.NodeAllocatableOverheadResources) bool {
+		return x.Name == y.Name && apiresource.QuantityPtrEqual(x.PerPod, y.PerPod) && apiresource.QuantityPtrEqual(x.PerContainer, y.PerContainer)
+	}
+	return slices.EqualFunc(a, b, itemEqual)
 }
 
 // admitPodEviction allows to evict a pod if it is assigned to the current node.

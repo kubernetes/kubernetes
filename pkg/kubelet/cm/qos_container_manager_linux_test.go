@@ -34,8 +34,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
@@ -142,39 +145,38 @@ func TestQoSContainerCgroup(t *testing.T) {
 	guaranteedMin := resource.MustParse("128Mi")
 
 	tests := []struct {
-		name                  string
-		pods                  []*v1.Pod
-		initialGuaranteed     string
-		initialBurstable      string
-		expectedGuaranteedMin string
-		expectedGuaranteedLow string
-		expectedBurstableLow  string
+		name                               string
+		pods                               []*v1.Pod
+		initialGuaranteed                  string
+		initialBurstable                   string
+		expectedGuaranteed                 string
+		expectedBurstable                  string
+		draNodeAllocatableResourcesEnabled bool
+		podLevelResourcesEnabled           bool
 	}{
 		{
-			name:                  "writes aggregated memory protection",
-			pods:                  activeTestPods(),
-			initialGuaranteed:     "",
-			initialBurstable:      "",
-			expectedGuaranteedMin: strconv.FormatInt(burstableMin.Value()+guaranteedMin.Value(), 10),
-			expectedGuaranteedLow: strconv.FormatInt(burstableMin.Value(), 10),
-			expectedBurstableLow:  strconv.FormatInt(burstableMin.Value(), 10),
+			name:               "writes aggregated memory min",
+			pods:               activeTestPods(),
+			initialGuaranteed:  "",
+			initialBurstable:   "",
+			expectedGuaranteed: strconv.FormatInt(burstableMin.Value()+guaranteedMin.Value(), 10),
+			expectedBurstable:  strconv.FormatInt(burstableMin.Value(), 10),
 		},
 		{
-			name: "writes zero memory protection for best effort pod",
+			name: "writes zero memory min for best effort pod",
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{UID: "99999999", Name: "besteffort-pod", Namespace: "test"},
 					Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "foo", Image: "busybox"}}},
 				},
 			},
-			initialGuaranteed:     "",
-			initialBurstable:      "",
-			expectedGuaranteedMin: "0",
-			expectedGuaranteedLow: "0",
-			expectedBurstableLow:  "0",
+			initialGuaranteed:  "",
+			initialBurstable:   "",
+			expectedGuaranteed: "0",
+			expectedBurstable:  "0",
 		},
 		{
-			name: "writes zero memory protection for burstable pod without memory request",
+			name: "writes zero memory min for burstable pod without memory request",
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{UID: "88888888", Name: "burstable-pod-no-memory-request", Namespace: "test"},
@@ -191,25 +193,182 @@ func TestQoSContainerCgroup(t *testing.T) {
 					},
 				},
 			},
-			initialGuaranteed:     "",
-			initialBurstable:      "",
-			expectedGuaranteedMin: "0",
-			expectedGuaranteedLow: "0",
-			expectedBurstableLow:  "0",
+			initialGuaranteed:  "",
+			initialBurstable:   "",
+			expectedGuaranteed: "0",
+			expectedBurstable:  "0",
 		},
 		{
-			name:                  "clears stale memory protection when all pods removed",
-			pods:                  nil,
-			initialGuaranteed:     "1234",
-			initialBurstable:      "5678",
-			expectedGuaranteedMin: "0",
-			expectedGuaranteedLow: "0",
-			expectedBurstableLow:  "0",
+			name:               "clears stale memory min when all pods removed",
+			pods:               nil,
+			initialGuaranteed:  "1234",
+			initialBurstable:   "5678",
+			expectedGuaranteed: "0",
+			expectedBurstable:  "0",
+		},
+		{
+			name: "writes zero memory min for best effort pod with DRA",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{UID: "99999999", Name: "besteffort-pod-with-dra", Namespace: "test"},
+					Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "foo", Image: "busybox"}}},
+					Status: v1.PodStatus{
+						NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+							{
+								ResourceClaimName: "direct-claim",
+								Containers:        []string{"foo"},
+								Mapping: []v1.NodeAllocatableMappedResources{
+									{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
+								},
+							},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			initialGuaranteed:                  "",
+			initialBurstable:                   "",
+			expectedGuaranteed:                 "0",
+			expectedBurstable:                  "0",
+		},
+		{
+			name: "writes memory min including DRA allocations",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "guaranteed-pod", Namespace: "test"},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:  "foo",
+								Image: "busybox",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceMemory: resource.MustParse("128Mi"),
+										v1.ResourceCPU:    resource.MustParse("1"),
+									},
+									Limits: v1.ResourceList{
+										v1.ResourceMemory: resource.MustParse("128Mi"),
+										v1.ResourceCPU:    resource.MustParse("1"),
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{UID: "87654321", Name: "burstable-pod", Namespace: "test"},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:  "foo",
+								Image: "busybox",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceMemory: resource.MustParse("128Mi"),
+										v1.ResourceCPU:    resource.MustParse("1"),
+									},
+									Limits: v1.ResourceList{
+										v1.ResourceMemory: resource.MustParse("256Mi"),
+										v1.ResourceCPU:    resource.MustParse("2"),
+									},
+								},
+							},
+						},
+					},
+					Status: v1.PodStatus{
+						NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+							{
+								ResourceClaimName: "direct-claim",
+								Containers:        []string{"foo"},
+								Mapping: []v1.NodeAllocatableMappedResources{
+									{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
+								},
+							},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			initialGuaranteed:                  "",
+			initialBurstable:                   "",
+			expectedGuaranteed:                 strconv.FormatInt(384*1024*1024, 10), // Guaranteed 128Mi + Burstable (128Mi spec + 128Mi DRA) = 384Mi
+			expectedBurstable:                  strconv.FormatInt(256*1024*1024, 10), // Burstable 128Mi spec + 128Mi DRA = 256Mi
+		},
+		{
+			name: "writes memory min with pod-level resources",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "guaranteed-pod", Namespace: "test"},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:  "foo",
+								Image: "busybox",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceMemory: resource.MustParse("128Mi"),
+										v1.ResourceCPU:    resource.MustParse("1"),
+									},
+									Limits: v1.ResourceList{
+										v1.ResourceMemory: resource.MustParse("128Mi"),
+										v1.ResourceCPU:    resource.MustParse("1"),
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{UID: "87654321", Name: "burstable-pod-pod-level", Namespace: "test"},
+					Spec: v1.PodSpec{
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("512Mi"),
+							},
+						},
+						Containers: []v1.Container{
+							{
+								Name:  "foo",
+								Image: "busybox",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceMemory: resource.MustParse("128Mi"),
+										v1.ResourceCPU:    resource.MustParse("1"),
+									},
+									Limits: v1.ResourceList{
+										v1.ResourceMemory: resource.MustParse("256Mi"),
+										v1.ResourceCPU:    resource.MustParse("2"),
+									},
+								},
+							},
+						},
+					},
+					Status: v1.PodStatus{
+						NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+							{
+								ResourceClaimName: "direct-claim",
+								Containers:        []string{"foo"},
+								Mapping: []v1.NodeAllocatableMappedResources{
+									{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
+								},
+							},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			podLevelResourcesEnabled:           true,
+			initialGuaranteed:                  "",
+			initialBurstable:                   "",
+			expectedGuaranteed:                 strconv.FormatInt(640*1024*1024, 10), // Guaranteed 128Mi + Burstable pod-level 512Mi = 640Mi
+			expectedBurstable:                  strconv.FormatInt(512*1024*1024, 10), // Burstable pod-level 512Mi
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.DRANodeAllocatableResources, tc.draNodeAllocatableResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, tc.podLevelResourcesEnabled)
 			logger, _ := ktesting.NewTestContext(t)
 			m, err := createTestQOSContainerManager(logger)
 			require.NoError(t, err)
@@ -247,9 +406,8 @@ func TestQoSContainerCgroup(t *testing.T) {
 
 			m.setMemoryQoS(logger, qosConfigs)
 
-			assert.Equal(t, tc.expectedGuaranteedMin, qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin])
-			assert.Equal(t, tc.expectedGuaranteedLow, qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryLow])
-			assert.Equal(t, tc.expectedBurstableLow, qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryLow])
+			assert.Equal(t, tc.expectedGuaranteed, qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin])
+			assert.Equal(t, tc.expectedBurstable, qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryLow])
 		})
 	}
 }
@@ -290,7 +448,6 @@ func TestQoSContainerCgroupWithMemoryReservationPolicyNone(t *testing.T) {
 	m.setMemoryQoS(logger, qosConfigs)
 
 	assert.Equal(t, "0", qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin])
-	assert.Equal(t, "0", qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryLow])
 	assert.Equal(t, "0", qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryLow])
 }
 

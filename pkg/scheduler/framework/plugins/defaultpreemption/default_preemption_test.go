@@ -36,6 +36,7 @@ import (
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/api/scheduling/v1beta1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -672,18 +673,30 @@ type candidate struct {
 }
 
 func TestDryRunPreemption(t *testing.T) {
+	victimPodWithDRANodeAllocatable := st.MakePod().Name("victimPod").UID("p1").Node("node1").Priority(midPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+	victimPodWithDRANodeAllocatable.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+		{
+			ResourceClaimName: "claim-1",
+			Mapping: []v1.NodeAllocatableMappedResources{
+				{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
+			},
+		},
+	}
+	victimPodStandard := st.MakePod().Name("victimPodStandard").UID("p2").Node("node1").Priority(midPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
 	tests := []struct {
-		name                    string
-		args                    *config.DefaultPreemptionArgs
-		nodeNames               []string
-		testPods                []*v1.Pod
-		initPods                []*v1.Pod
-		registerPlugins         []tf.RegisterPluginFunc
-		pdbs                    []*policy.PodDisruptionBudget
-		fakeFilterRC            fwk.Code // return code for fake filter plugin
-		disableParallelism      bool
-		expected                [][]candidate
-		expectedNumFilterCalled []int32
+		name                              string
+		enableDRANodeAllocatableResources bool
+		nodeCapacity                      map[v1.ResourceName]string
+		args                              *config.DefaultPreemptionArgs
+		nodeNames                         []string
+		testPods                          []*v1.Pod
+		initPods                          []*v1.Pod
+		registerPlugins                   []tf.RegisterPluginFunc
+		pdbs                              []*policy.PodDisruptionBudget
+		fakeFilterRC                      fwk.Code // return code for fake filter plugin
+		disableParallelism                bool
+		expected                          [][]candidate
+		expectedNumFilterCalled           []int32
 	}{
 		{
 			name: "a pod that does not fit on any node",
@@ -1305,15 +1318,105 @@ func TestDryRunPreemption(t *testing.T) {
 			},
 			expectedNumFilterCalled: []int32{8},
 		},
+		{
+			name:                              "Preemption with DRA Node Allocatable: victim pod has DRA, preemptor does not",
+			enableDRANodeAllocatableResources: true,
+			nodeCapacity:                      map[v1.ResourceName]string{v1.ResourceCPU: "5", v1.ResourceMemory: "500"},
+			nodeNames:                         []string{"node1"},
+			testPods: []*v1.Pod{
+				st.MakePod().Name("p").UID("p").Priority(highPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Obj(),
+			},
+			// victimPodWithDRANodeAllocatable consumes 3 CPUs (out of the 5 CPUs on the node) - 1 through standard request and 2 through DRA claim
+			initPods: []*v1.Pod{victimPodWithDRANodeAllocatable},
+			registerPlugins: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			},
+			expected: [][]candidate{
+				{
+					candidate{
+						name: "node1",
+						victims: &extenderv1.Victims{
+							Pods: []*v1.Pod{victimPodWithDRANodeAllocatable},
+						},
+					},
+				},
+			},
+			// Filter is called 2 times:
+			// 1. To check if the preemptor fits on the simulated node after evicting the victim.
+			// 2. To check if the preemptor still fits when the victim is reprieved (added back).
+			expectedNumFilterCalled: []int32{2},
+		},
+		{
+			name:                              "Preemption with DRA Node Allocatable: victim pod has DRA but feature gate is disabled",
+			enableDRANodeAllocatableResources: false,
+			nodeCapacity:                      map[v1.ResourceName]string{v1.ResourceCPU: "5", v1.ResourceMemory: "500"},
+			nodeNames:                         []string{"node1"},
+			testPods: []*v1.Pod{
+				st.MakePod().Name("p").UID("p").Priority(highPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Obj(),
+			},
+			initPods: []*v1.Pod{victimPodWithDRANodeAllocatable},
+			registerPlugins: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			},
+			// Since feature gate is disabled, DRA footprint (2 CPUs) is ignored.
+			// Remaining capacity with victim reprieved = 5 - 1 = 4 CPUs.
+			// Preemptor (3 CPUs) fits, so reprieve check succeeds.
+			// No candidates are returned since the preemptor can schedule via reprieve (no eviction needed).
+			expected: [][]candidate{
+				{},
+			},
+			expectedNumFilterCalled: []int32{2},
+		},
+		{
+			name:                              "Preemption with DRA Node Allocatable: two victims, one with DRA is evicted, standard one is reprieved",
+			enableDRANodeAllocatableResources: true,
+			nodeCapacity:                      map[v1.ResourceName]string{v1.ResourceCPU: "5", v1.ResourceMemory: "500"},
+			nodeNames:                         []string{"node1"},
+			testPods: []*v1.Pod{
+				st.MakePod().Name("p").UID("p").Priority(highPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Obj(),
+			},
+			initPods: []*v1.Pod{
+				victimPodWithDRANodeAllocatable, // 1 CPU standard + 2 CPU DRA = 3 CPU total
+				victimPodStandard,               // 1 CPU standard
+			},
+			registerPlugins: []tf.RegisterPluginFunc{
+				tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			},
+			// Reprieve victimPodStandard (1 CPU): requested = 1, remaining = 4. Preemptor fits. Reprieved!
+			// Reprieve victimPodWithDRANodeAllocatable (3 CPU): requested = 3 + 1 (standard) = 4, remaining = 1. Preemptor does not fit. Not reprieved!
+			// So only victimPodWithDRANodeAllocatable is evicted.
+			expected: [][]candidate{
+				{
+					candidate{
+						name: "node1",
+						victims: &extenderv1.Victims{
+							Pods: []*v1.Pod{victimPodWithDRANodeAllocatable},
+						},
+					},
+				},
+			},
+			// Filter is called 3 times:
+			// 1. To check if the preemptor fits on the simulated node after evicting both victims.
+			// 2. To check if the preemptor still fits when the standard victim is reprieved (added back).
+			// 3. To check if the preemptor still fits when the DRA victim is reprieved (added back).
+			expectedNumFilterCalled: []int32{3},
+		},
 	}
 
 	labelKeys := []string{"hostname", "zone", "region"}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.enableDRANodeAllocatableResources {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
+			}
 			nodes := make([]*v1.Node, len(tt.nodeNames))
 			fakeFilterRCMap := make(map[string]fwk.Code, len(tt.nodeNames))
 			for i, nodeName := range tt.nodeNames {
-				nodeWrapper := st.MakeNode().Capacity(veryLargeRes)
+				capacity := veryLargeRes
+				if tt.nodeCapacity != nil {
+					capacity = tt.nodeCapacity
+				}
+				nodeWrapper := st.MakeNode().Capacity(capacity)
 				// Split node name by '/' to form labels in a format of
 				// {"hostname": tpKeys[0], "zone": tpKeys[1], "region": tpKeys[2]}
 				tpKeys := strings.Split(nodeName, "/")

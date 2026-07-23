@@ -357,7 +357,7 @@ func dropDisabledDRANodeAllocatableResourcesFields(newSlice, oldSlice *resource.
 	}
 
 	for i := range newSlice.Spec.Devices {
-		newSlice.Spec.Devices[i].NodeAllocatableResourceMappings = nil
+		newSlice.Spec.Devices[i].NodeAllocatableResources = nil
 	}
 }
 
@@ -367,7 +367,7 @@ func draNodeAllocatableResourcesFeatureInUse(slice *resource.ResourceSlice) bool
 	}
 
 	for _, device := range slice.Spec.Devices {
-		if len(device.NodeAllocatableResourceMappings) > 0 {
+		if len(device.NodeAllocatableResources) > 0 {
 			return true
 		}
 	}

@@ -65,7 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
@@ -6284,7 +6284,7 @@ func validateNodeAllocatableResourceClaimStatus(podStatus core.PodStatus, podSpe
 	for i, nodeAllocatableStatus := range podStatus.NodeAllocatableResourceClaimStatuses {
 		statusFldPath := fldPath.Index(i)
 		if nodeAllocatableStatus.ResourceClaimName == "" {
-			allErrs = append(allErrs, field.Required(statusFldPath.Child("resourceClaimName"), "must not be empty"))
+			continue
 		}
 
 		// First check the podSpec to see if the ResourceClaim is directly referenced.
@@ -6309,28 +6309,51 @@ func validateNodeAllocatableResourceClaimStatus(podStatus core.PodStatus, podSpe
 			allErrs = append(allErrs, field.Invalid(statusFldPath.Child("resourceClaimName"), nodeAllocatableStatus.ResourceClaimName, "no mapping found in pod reference"))
 		}
 
-		// TODO(KEP-5517): Evaluate if its ok to have no containers referencing a node allocatable resource claim.
-		// This is pending on defining kubelet cgroup enforcement.
-		if len(nodeAllocatableStatus.Containers) == 0 {
-			allErrs = append(allErrs, field.Required(statusFldPath.Child("containers"), "must not be empty"))
+		if len(nodeAllocatableStatus.Mapping) > 0 {
+			allErrs = append(allErrs, validateNodeAllocatableMappedResources(nodeAllocatableStatus.Mapping, statusFldPath.Child("mapping"))...)
 		}
-
-		resourcesFldPath := statusFldPath.Child("resources")
-		if len(nodeAllocatableStatus.Resources) == 0 {
-			allErrs = append(allErrs, field.Required(resourcesFldPath, "must not be empty"))
-		}
-
-		for resourceName, quantity := range nodeAllocatableStatus.Resources {
-			keyPath := resourcesFldPath.Key(string(resourceName))
-			if !v1helper.IsNativeResource(v1.ResourceName(resourceName)) {
-				allErrs = append(allErrs, field.Invalid(keyPath, resourceName, "must be a node allocatable resource name"))
-			}
-			if quantity.Cmp(resource.Quantity{}) < 0 {
-				allErrs = append(allErrs, field.Invalid(keyPath, quantity.String(), "must be non-negative"))
-			}
+		if len(nodeAllocatableStatus.Overhead) > 0 {
+			allErrs = append(allErrs, validateNodeAllocatableOverheadResources(nodeAllocatableStatus.Overhead, statusFldPath.Child("overhead"))...)
 		}
 	}
 
+	return allErrs
+}
+
+// validateNodeAllocatableMappedResources validates a list of mapped node allocatable resources
+func validateNodeAllocatableMappedResources(mapping []core.NodeAllocatableMappedResources, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, item := range mapping {
+		itemPath := fldPath.Index(i)
+		if !helper.IsNodeAllocatableResourceName(item.Name) {
+			allErrs = append(allErrs, field.Invalid(itemPath.Child("name"), item.Name, "must be a node allocatable resource name"))
+		}
+		if item.Quantity != nil && item.Quantity.Cmp(resource.Quantity{}) < 0 {
+			allErrs = append(allErrs, field.Invalid(itemPath.Child("quantity"), item.Quantity.String(), "must be non-negative"))
+		}
+	}
+	return allErrs
+}
+
+// validateNodeAllocatableOverheadResources validates a list of overhead node allocatable resources
+func validateNodeAllocatableOverheadResources(overhead []core.NodeAllocatableOverheadResources, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, item := range overhead {
+		itemPath := fldPath.Index(i)
+		if !helper.IsNodeAllocatableResourceName(item.Name) {
+			allErrs = append(allErrs, field.Invalid(itemPath.Child("name"), item.Name, "must be a node allocatable resource name"))
+		}
+		if item.PerPod == nil && item.PerContainer == nil {
+			allErrs = append(allErrs, field.Invalid(itemPath, "", "at least one of perPod or perContainer must be set"))
+		} else {
+			if item.PerPod != nil && item.PerPod.Cmp(resource.Quantity{}) < 0 {
+				allErrs = append(allErrs, field.Invalid(itemPath.Child("perPod"), item.PerPod.String(), "must be non-negative"))
+			}
+			if item.PerContainer != nil && item.PerContainer.Cmp(resource.Quantity{}) < 0 {
+				allErrs = append(allErrs, field.Invalid(itemPath.Child("perContainer"), item.PerContainer.String(), "must be non-negative"))
+			}
+		}
+	}
 	return allErrs
 }
 
@@ -6484,15 +6507,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, validatePodLevelResourcesResize(newPod, oldPod, &newPodSpecCopy, specPath, opts)...)
 	}
 
-	// Part 3: Disable InPlaceResize if a pod is using DRA resource claims for node-allocatable resources.
-	// TODO(KEP-5517) - Handle in place resize with node-allocatable resource claims.
-	// Currently, the presence of any node-allocatable resource claim blocks resizing for all resources, irrespective of whether
-	// ResourceClaim is used for the same resource.
-	if len(oldPod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
-		allErrs = append(allErrs, field.Forbidden(specPath, "pods with node allocatable resource claims cannot be resized"))
-	}
-
-	// Part 4: Validate that the changes between oldPod.Spec.Containers[].Resources and
+	// Part 3: Validate that the changes between oldPod.Spec.Containers[].Resources and
 	// newPod.Spec.Containers[].Resources are allowed. Also validate that the changes between oldPod.Spec.InitContainers[].Resources and
 	// newPod.Spec.InitContainers[].Resources are allowed.
 
@@ -6691,6 +6706,19 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, podSpecToMutate *
 		allErrs = append(allErrs, errs)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) && len(newPod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
+		v1Pod := &v1.Pod{}
+		if err := corev1.Convert_core_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
+			allErrs = append(allErrs, field.InternalError(specPath, fmt.Errorf("failed to convert pod for DRA validation: %w", err)))
+		} else {
+			// TODO(pravk03): Explore optimization to avoid double aggregation of container resources
+			// in validatePodResourceConsistency and validatePodLevelResourcesCoverDRA.
+			if ok, msg := validatePodLevelResourcesCoverDRA(v1Pod); !ok {
+				allErrs = append(allErrs, field.Invalid(specPath.Child("resources"), newPod.Spec.Resources, msg))
+			}
+		}
+	}
+
 	return allErrs
 }
 
@@ -6721,7 +6749,8 @@ func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList) core.
 func dropCPUMemoryResourcesFromContainer(container *core.Container, oldPodSpecContainer *core.Container) {
 	lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPodSpecContainer.Resources.Limits)
 	req := dropCPUMemoryUpdates(container.Resources.Requests, oldPodSpecContainer.Resources.Requests)
-	container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
+	// Resource claims are immutable during pod resize and the original configuration must be preserved.
+	container.Resources = core.ResourceRequirements{Limits: lim, Requests: req, Claims: container.Resources.Claims}
 }
 
 // dropCPUMemoryResourceRequirementsUpdates deletes the cpu and memory resources
@@ -6756,6 +6785,88 @@ func dropCPUMemoryResourceRequirementsUpdates(resources *core.ResourceRequiremen
 		}
 	}
 	return resources
+}
+
+func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
+	if pod.Spec.Resources == nil {
+		return true, ""
+	}
+
+	if pod.Spec.Resources.Requests != nil {
+		opts := resourcehelper.PodResourcesOptions{
+			SkipPodLevelResources:                    true,
+			UseDRANodeAllocatableResourceClaimStatus: true,
+		}
+		requestWithoutPodLevel := resourcehelper.AggregateContainerRequests(pod, opts)
+
+		for resName, podLevelReq := range pod.Spec.Resources.Requests {
+			if !resourcehelper.IsSupportedPodLevelResource(resName) {
+				continue
+			}
+			val, ok := requestWithoutPodLevel[resName]
+			if !ok {
+				continue
+			}
+			if val.Cmp(podLevelReq) > 0 {
+				return false, fmt.Sprintf("pod level request for %s is insufficient to cover the aggregated container and node-allocatable DRA requests", resName)
+			}
+		}
+	}
+
+	if pod.Spec.Resources.Limits != nil {
+		opts := resourcehelper.PodResourcesOptions{
+			SkipPodLevelResources:                    true,
+			UseDRANodeAllocatableResourceClaimStatus: true,
+		}
+		limitsWithoutPodLevel := resourcehelper.AggregateContainerLimits(pod, opts)
+
+		// Pod level hugepage limits must be always equal or greater than the aggregated
+		// container level hugepage limits + DRA limits
+		for resourceName, ctrLims := range limitsWithoutPodLevel {
+			if !helper.IsHugePageResourceName(core.ResourceName(resourceName)) {
+				continue
+			}
+
+			podLevelResLimit, hasLimit := pod.Spec.Resources.Limits[resourceName]
+			if !hasLimit {
+				continue
+			}
+
+			if ctrLims.Cmp(podLevelResLimit) > 0 {
+				return false, fmt.Sprintf("pod level limit for %s is insufficient to cover the aggregated container and node-allocatable DRA limits", resourceName)
+			}
+		}
+
+		// Individual Container limits + DRA overheads must be <= Pod-level limits.
+		containerDRAAllocations := make(map[string]v1.ResourceList, len(pod.Spec.Containers))
+		for _, ctr := range pod.Spec.Containers {
+			containerDRAAllocations[ctr.Name] = resourcehelper.GetContainerDRAAllocations(pod, ctr.Name)
+		}
+
+		for _, ctr := range pod.Spec.Containers {
+			for resourceName, ctrLimit := range ctr.Resources.Limits {
+				if helper.IsHugePageResourceName(core.ResourceName(resourceName)) {
+					continue
+				}
+
+				// Skip if the pod-level limit of the resource is not set.
+				podLevelResLimit, exists := pod.Spec.Resources.Limits[resourceName]
+				if !exists {
+					continue
+				}
+
+				draResAllocation := containerDRAAllocations[ctr.Name][resourceName]
+				effectiveLimit := ctrLimit.DeepCopy()
+				effectiveLimit.Add(draResAllocation)
+
+				if effectiveLimit.Cmp(podLevelResLimit) > 0 {
+					return false, fmt.Sprintf("pod level limit for %s is insufficient to cover the limit and DRA overhead for container %s", resourceName, ctr.Name)
+				}
+			}
+		}
+	}
+
+	return true, ""
 }
 
 // isPodResizeRequestSupported checks whether the pod is running on a node with InPlacePodVerticalScaling enabled.

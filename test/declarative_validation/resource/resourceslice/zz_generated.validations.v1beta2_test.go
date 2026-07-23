@@ -87,6 +87,15 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.devices[*].nodeAllocatableResources[*].mapping": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"spec.devices[*].nodeAllocatableResources[*].mapping.capacityKey": {
+				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},
+			},
+			"spec.devices[*].nodeAllocatableResources[*].mapping.capacityMultiplier": {
+				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},
+			},
 			"spec.devices[*].taints[*].effect": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
