@@ -308,7 +308,7 @@ func (vm *volumeManager) Run(ctx context.Context, sourcesReady config.SourcesRea
 	logger.V(2).Info("The desired_state_of_world populator starts")
 
 	logger.Info("Starting Kubelet Volume Manager")
-	go vm.reconciler.Run(ctx, ctx.Done())
+	go vm.reconciler.Run(ctx)
 
 	metrics.Register(vm.actualStateOfWorld, vm.desiredStateOfWorld, vm.volumePluginMgr)
 
