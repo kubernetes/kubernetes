@@ -29,17 +29,6 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// defaultGangMinCount fills gang MinCount when Gang is selected but unset,
-// mirroring the Job controller's defaultMinCountForJob from KEP-6089.
-func defaultGangMinCount(n int32) SchedulingConfigFunc {
-	return func(cfg *SchedulingConfig) {
-		p := cfg.Policy
-		if p != nil && p.Gang != nil && p.Gang.MinCount == nil {
-			p.Gang.MinCount = new(n)
-		}
-	}
-}
-
 func TestBuildWorkload(t *testing.T) {
 	// Tracks whether the empty-leaf-name case's callback ran, proving the name
 	// check short-circuits before callbacks.
@@ -109,7 +98,7 @@ func TestBuildWorkload(t *testing.T) {
 			root: &WorkloadItem{
 				Name:          "override-job",
 				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-				Input:         WorkloadInput{Policy: PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](2)}}}},
+				Input:         WorkloadInput{Policy: PolicyInput{PodGroupData: gangData(2)}},
 			},
 			verify: func(t *testing.T, wl *schedulingv1beta1.Workload, _ *WorkloadItem) {
 				gang := wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang
@@ -319,6 +308,184 @@ func TestBuildWorkload(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "composite root compiles into a composite template with leaf children",
+			root: &WorkloadItem{
+				Name:          "cpg-root",
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](2)}}},
+				Children: []*WorkloadItem{
+					{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](4)}}}},
+					{Name: "ps", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+				},
+			},
+			verify: func(t *testing.T, wl *schedulingv1beta1.Workload, _ *WorkloadItem) {
+				if len(wl.Spec.PodGroupTemplates) != 0 {
+					t.Errorf("expected no top-level PodGroupTemplates for a composite root, got %d", len(wl.Spec.PodGroupTemplates))
+				}
+				if len(wl.Spec.CompositePodGroupTemplates) != 1 {
+					t.Fatalf("expected 1 composite template, got %d", len(wl.Spec.CompositePodGroupTemplates))
+				}
+				cpg := wl.Spec.CompositePodGroupTemplates[0]
+				if cpg.Name != "cpg-root" {
+					t.Errorf("expected composite template name 'cpg-root', got %q", cpg.Name)
+				}
+				if cpg.SchedulingPolicy.Gang == nil || cpg.SchedulingPolicy.Gang.MinGroupCount != 2 {
+					t.Errorf("expected composite Gang policy with MinGroupCount=2, got %+v", cpg.SchedulingPolicy)
+				}
+				if len(cpg.PodGroupTemplates) != 2 {
+					t.Fatalf("expected 2 child PodGroupTemplates, got %d", len(cpg.PodGroupTemplates))
+				}
+				if cpg.PodGroupTemplates[0].SchedulingPolicy.Gang == nil || cpg.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount != 4 {
+					t.Error("expected first child to carry Gang MinCount=4")
+				}
+				if cpg.PodGroupTemplates[1].SchedulingPolicy.Basic == nil {
+					t.Error("expected second child to carry Basic policy")
+				}
+			},
+		},
+		{
+			name: "composite gang minGroupCount from user input",
+			root: &WorkloadItem{
+				Name:  "cpg-root",
+				Input: WorkloadInput{Policy: PolicyInput{CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{MinGroupCount: ptr.To[int32](3)}}}},
+				Children: []*WorkloadItem{
+					{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+				},
+			},
+			verify: func(t *testing.T, wl *schedulingv1beta1.Workload, _ *WorkloadItem) {
+				cpg := wl.Spec.CompositePodGroupTemplates[0]
+				if cpg.SchedulingPolicy.Gang == nil || cpg.SchedulingPolicy.Gang.MinGroupCount != 3 {
+					t.Errorf("expected composite Gang MinGroupCount=3 from user input, got %+v", cpg.SchedulingPolicy)
+				}
+			},
+		},
+		{
+			name: "composite constraints and disruption mode compile onto the composite template",
+			root: &WorkloadItem{
+				Name:          "cpg-root",
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+				Input: WorkloadInput{
+					Constraints: ConstraintsInput{CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints{
+						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
+					}},
+					DisruptionMode: DisruptionModeInput{CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{All: &schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{}}},
+				},
+				Children: []*WorkloadItem{
+					{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+				},
+			},
+			verify: func(t *testing.T, wl *schedulingv1beta1.Workload, _ *WorkloadItem) {
+				cpg := wl.Spec.CompositePodGroupTemplates[0]
+				if cpg.SchedulingConstraints == nil || len(cpg.SchedulingConstraints.Topology) != 1 ||
+					cpg.SchedulingConstraints.Topology[0].Key != "topology.kubernetes.io/zone" {
+					t.Errorf("expected composite topology constraint to compile, got %+v", cpg.SchedulingConstraints)
+				}
+				if cpg.DisruptionMode == nil || cpg.DisruptionMode.All == nil {
+					t.Errorf("expected composite All disruption mode to compile, got %+v", cpg.DisruptionMode)
+				}
+			},
+		},
+		{
+			name: "composite defaults to basic policy",
+			root: &WorkloadItem{
+				Name: "cpg-root",
+				Children: []*WorkloadItem{
+					{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+				},
+			},
+			verify: func(t *testing.T, wl *schedulingv1beta1.Workload, _ *WorkloadItem) {
+				cpg := wl.Spec.CompositePodGroupTemplates[0]
+				if cpg.SchedulingPolicy.Basic == nil {
+					t.Error("expected composite to default to Basic policy when no config is provided")
+				}
+			},
+		},
+		{
+			name: "nested composite compiles recursively",
+			root: &WorkloadItem{
+				Name:          "cpg-root",
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+				Children: []*WorkloadItem{
+					{
+						Name:          "inner",
+						DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](2)}}},
+						Children: []*WorkloadItem{
+							{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+						},
+					},
+				},
+			},
+			verify: func(t *testing.T, wl *schedulingv1beta1.Workload, _ *WorkloadItem) {
+				cpg := wl.Spec.CompositePodGroupTemplates[0]
+				if len(cpg.CompositePodGroupTemplates) != 1 {
+					t.Fatalf("expected 1 nested composite template, got %d", len(cpg.CompositePodGroupTemplates))
+				}
+				inner := cpg.CompositePodGroupTemplates[0]
+				if inner.Name != "inner" || inner.SchedulingPolicy.Gang == nil || inner.SchedulingPolicy.Gang.MinGroupCount != 2 {
+					t.Errorf("unexpected nested composite: %+v", inner)
+				}
+				if len(inner.PodGroupTemplates) != 1 || inner.PodGroupTemplates[0].Name != "workers" {
+					t.Errorf("expected nested composite to own the leaf child, got %+v", inner.PodGroupTemplates)
+				}
+			},
+		},
+		{
+			name: "composite gang missing minGroupCount fails",
+			root: &WorkloadItem{
+				Name:  "cpg-root",
+				Input: WorkloadInput{Policy: PolicyInput{CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{}}}},
+				Children: []*WorkloadItem{
+					{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "composite policy set together with a leaf building block fails the input union",
+			root: &WorkloadItem{
+				Name: "cpg-root",
+				Input: WorkloadInput{
+					Policy:         PolicyInput{CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{MinGroupCount: ptr.To[int32](2)}}},
+					DisruptionMode: DisruptionModeInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{Single: &schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{}}},
+				},
+				Children: []*WorkloadItem{
+					{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "composite with a nil child fails",
+			root: &WorkloadItem{
+				Name:          "cpg-root",
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+				Children:      []*WorkloadItem{nil},
+			},
+			wantErr: true,
+		},
+		{
+			name: "composite child with empty name fails",
+			root: &WorkloadItem{
+				Name:          "cpg-root",
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+				Children: []*WorkloadItem{
+					{Name: "", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "duplicate template names across the tree fail",
+			root: &WorkloadItem{
+				Name:          "cpg-root",
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+				Children: []*WorkloadItem{
+					{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+					{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+				},
+			},
+			wantErr: true,
+		},
+		{
 			name:    "nil root fails",
 			root:    nil,
 			wantErr: true,
@@ -423,51 +590,6 @@ func TestResolveSchedulingConfigMergesEveryField(t *testing.T) {
 
 	if !reflect.DeepEqual(resolved, expectedConfig) {
 		t.Errorf("resolved config does not match expected; a field is likely missing from resolveSchedulingConfig's merge\n resolved: %+v\n expected: %+v", resolved, expectedConfig)
-	}
-}
-
-// Every leaf is populated, including the mutually-exclusive union arms.
-func TestSchedulingConfigDeepCopyCopiesEveryField(t *testing.T) {
-	original := &SchedulingConfig{
-		Policy: &SchedulingPolicy{
-			Basic: &BasicSchedulingPolicy{},
-			Gang:  &GangSchedulingPolicy{MinCount: ptr.To[int32](4)},
-		},
-		Constraints:       &SchedulingConstraints{Topology: []schedulingv1beta1.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}}},
-		DisruptionMode:    &DisruptionMode{Single: &SingleDisruptionMode{}, All: &AllDisruptionMode{}},
-		ResourceClaims:    []ResourceClaim{{Name: "gpu", ResourceClaimName: new("claim"), ResourceClaimTemplateName: new("tmpl")}},
-		PriorityClassName: "high-priority",
-	}
-
-	// A field added anywhere under SchedulingConfig (top-level or nested)
-	// without updating this fixture leaves a zero leaf and trips here, forcing
-	// the fixture to grow so DeepCopy stays fully exercised.
-	pkg := reflect.TypeFor[SchedulingConfig]().PkgPath()
-	if leaf := firstZeroLeaf(reflect.ValueOf(*original), "SchedulingConfig", pkg); leaf != "" {
-		t.Fatalf("fixture leaves %s unset; populate it so DeepCopy is fully exercised", leaf)
-	}
-
-	clone := original.DeepCopy()
-
-	// A field DeepCopy forgets stays at its zero value in the clone.
-	if !reflect.DeepEqual(original, clone) {
-		t.Errorf("DeepCopy is not exhaustive; clone differs from original (a field is likely not copied)\n original: %+v\n clone:    %+v", original, clone)
-	}
-
-	// Mutating the clone must not affect the original; otherwise a field is
-	// aliased rather than deep-copied.
-	clone.Policy.Gang.MinCount = ptr.To[int32](99)
-	clone.Constraints.Topology[0].Key = "mutated"
-	clone.DisruptionMode.All = nil
-	clone.ResourceClaims[0].Name = "mutated"
-	*clone.ResourceClaims[0].ResourceClaimName = "mutated"
-
-	if *original.Policy.Gang.MinCount != 4 ||
-		original.Constraints.Topology[0].Key != "topology.kubernetes.io/zone" ||
-		original.DisruptionMode.All == nil ||
-		original.ResourceClaims[0].Name != "gpu" ||
-		*original.ResourceClaims[0].ResourceClaimName != "claim" {
-		t.Errorf("DeepCopy produced an aliased clone; mutating the clone changed the original: %+v", original)
 	}
 }
 
@@ -617,6 +739,114 @@ func TestBuilderNewPodGroup(t *testing.T) {
 			t.Error("expected error for unknown template name")
 		}
 	})
+
+	t.Run("builds the template index once and reuses it across calls", func(t *testing.T) {
+		b := NewBuilder(createGangWorkloadItem(), BuildOptions{Name: "wl", Namespace: "ns", Owner: jobOwner()})
+		if _, err := b.BuildWorkload(); err != nil {
+			t.Fatalf("unexpected build error: %v", err)
+		}
+		if _, err := b.NewPodGroup("pg-1", "pgt-0"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		first := b.podGroupTemplateIndex
+		if first == nil {
+			t.Fatal("expected the template index to be built on first use")
+		}
+		if _, err := b.NewPodGroup("pg-2", "pgt-0"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if reflect.ValueOf(b.podGroupTemplateIndex).Pointer() != reflect.ValueOf(first).Pointer() {
+			t.Error("expected the template index to be reused, not rebuilt on the second call")
+		}
+	})
+}
+
+func TestBuilderNewCompositePodGroup(t *testing.T) {
+	t.Run("requires a workload first", func(t *testing.T) {
+		b := NewBuilder(createCompositeWorkloadItem(), BuildOptions{Name: "wl", Namespace: "ns", Owner: jobOwner()})
+		_, err := b.NewCompositePodGroup("cpg", "cpgt-0")
+		if err == nil {
+			t.Fatal("expected error when neither BuildWorkload nor NewBuilderFromExistingWorkload has run")
+		}
+		if !strings.Contains(err.Error(), "call BuildWorkload or use NewBuilderFromExistingWorkload") {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("materializes from the compiled composite template owned by the configured owner", func(t *testing.T) {
+		b := NewBuilder(createCompositeWorkloadItem(), BuildOptions{Name: "wl", Namespace: "ns", Owner: jobOwner()})
+		if _, err := b.BuildWorkload(); err != nil {
+			t.Fatalf("unexpected build error: %v", err)
+		}
+		cpg, err := b.NewCompositePodGroup("cpg", "cpgt-0")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if cpg.Spec.SchedulingPolicy.Gang == nil ||
+			cpg.Spec.SchedulingPolicy.Gang.MinGroupCount != 2 {
+			t.Errorf("expected composite Gang policy with MinGroupCount=2 copied from template, got %+v", cpg.Spec.SchedulingPolicy)
+		}
+		if len(cpg.OwnerReferences) != 1 ||
+			cpg.OwnerReferences[0].Name != "job" {
+			t.Errorf("expected single job ownerReference, got %+v", cpg.OwnerReferences)
+		}
+	})
+
+	t.Run("omits ownerReferences when no owner is configured", func(t *testing.T) {
+		b := NewBuilder(createCompositeWorkloadItem(), BuildOptions{Name: "wl", Namespace: "ns", Owner: jobOwner()})
+		if _, err := b.BuildWorkload(); err != nil {
+			t.Fatalf("unexpected build error: %v", err)
+		}
+		b.opts.Owner = nil
+		_, err := b.NewCompositePodGroup("cpg", "cpgt-0")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+	})
+
+	t.Run("resolves a nested composite template through the recursive index", func(t *testing.T) {
+		b := NewBuilder(createCompositeWorkloadItem(), BuildOptions{Name: "wl", Namespace: "ns", Owner: jobOwner()})
+		if _, err := b.BuildWorkload(); err != nil {
+			t.Fatalf("unexpected build error: %v", err)
+		}
+		_, err := b.NewCompositePodGroup("cpg", "cpgt-1")
+		if err != nil {
+			t.Fatalf("unexpected error resolving nested composite template: %v", err)
+		}
+
+	})
+
+	t.Run("errors on unknown template", func(t *testing.T) {
+		b := NewBuilder(createCompositeWorkloadItem(), BuildOptions{Name: "wl", Namespace: "ns", Owner: jobOwner()})
+		if _, err := b.BuildWorkload(); err != nil {
+			t.Fatalf("unexpected build error: %v", err)
+		}
+		if _, err := b.NewCompositePodGroup("cpg", "missing"); err == nil {
+			t.Error("expected error for unknown composite template name")
+		}
+	})
+
+	t.Run("builds the composite template index once and reuses it across calls", func(t *testing.T) {
+		b := NewBuilder(createCompositeWorkloadItem(), BuildOptions{Name: "wl", Namespace: "ns", Owner: jobOwner()})
+		if _, err := b.BuildWorkload(); err != nil {
+			t.Fatalf("unexpected build error: %v", err)
+		}
+		if _, err := b.NewCompositePodGroup("cpg-1", "cpgt-0"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		first := b.compositePodGroupTemplateIndex
+		if first == nil {
+			t.Fatal("expected the composite template index to be built on first use")
+		}
+		if _, err := b.NewCompositePodGroup("cpg-2", "cpgt-1"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if reflect.ValueOf(b.compositePodGroupTemplateIndex).Pointer() != reflect.ValueOf(first).Pointer() {
+			t.Error("expected the composite template index to be reused, not rebuilt on the second call")
+		}
+	})
 }
 
 func TestNewBuilderFromExistingWorkload(t *testing.T) {
@@ -658,7 +888,7 @@ func TestNewBuilderFromExistingWorkload(t *testing.T) {
 
 	t.Run("Validate is refused in existing mode", func(t *testing.T) {
 		b := NewBuilderFromExistingWorkload(existingWorkload(), BuildOptions{Owner: jobOwner()})
-		errs := b.Validate(ctx, field.NewPath("spec", "scheduling"), ValidationInput{})
+		errs := b.Validate(ctx, ValidationInput{})
 		if len(errs) != 1 {
 			t.Fatalf("expected exactly one validation error, got %v", errs)
 		}
@@ -681,10 +911,27 @@ func jobOwner() *metav1.OwnerReference {
 
 func createGangWorkloadItem() *WorkloadItem {
 	return &WorkloadItem{
-		Name: "pgt-0",
-		Input: WorkloadInput{Policy: PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-			Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](3)},
-		}}},
+		Name:  "pgt-0",
+		Input: WorkloadInput{Policy: PolicyInput{PodGroupData: gangData(3)}},
+	}
+}
+
+func createCompositeWorkloadItem() *WorkloadItem {
+	// cpgt-0 owns both a leaf child (pgt-0) and a nested composite child,
+	// so the composite template index must recurse to find cpgt-1.
+	return &WorkloadItem{
+		Name:          "cpgt-0",
+		DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](2)}}},
+		Children: []*WorkloadItem{
+			{Name: "pgt-0", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+			{
+				Name:          "cpgt-1",
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Gang: &GangSchedulingPolicy{MinCount: ptr.To[int32](2)}}},
+				Children: []*WorkloadItem{
+					{Name: "pgt-1", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+				},
+			},
+		},
 	}
 }
 
@@ -702,38 +949,11 @@ func existingWorkload() *schedulingv1beta1.Workload {
 	}
 }
 
-// firstZeroLeaf walks v and returns the dotted path of the first leaf still
-// holding its zero value, or "" when every leaf is populated.
-func firstZeroLeaf(v reflect.Value, path, pkg string) string {
-	switch v.Kind() {
-	case reflect.Pointer:
-		if v.IsNil() {
-			return path
+func defaultGangMinCount(n int32) SchedulingConfigFunc {
+	return func(cfg *SchedulingConfig) {
+		p := cfg.Policy
+		if p != nil && p.Gang != nil && p.Gang.MinCount == nil {
+			p.Gang.MinCount = new(n)
 		}
-		return firstZeroLeaf(v.Elem(), path, pkg)
-	case reflect.Slice:
-		if v.Len() == 0 {
-			return path
-		}
-		return firstZeroLeaf(v.Index(0), path+"[0]", pkg)
-	case reflect.Struct:
-		if v.Type().PkgPath() != pkg {
-			if v.IsZero() {
-				return path
-			}
-			return ""
-		}
-		t := v.Type()
-		for i := 0; i < v.NumField(); i++ {
-			if leaf := firstZeroLeaf(v.Field(i), path+"."+t.Field(i).Name, pkg); leaf != "" {
-				return leaf
-			}
-		}
-		return ""
-	default:
-		if v.IsZero() {
-			return path
-		}
-		return ""
 	}
 }

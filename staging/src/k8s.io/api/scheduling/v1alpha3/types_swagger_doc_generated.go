@@ -329,6 +329,68 @@ func (Workload) SwaggerDoc() map[string]string {
 	return map_Workload
 }
 
+var map_WorkloadCompositePodGroupAllDisruptionMode = map[string]string{
+	"": "WorkloadCompositePodGroupAllDisruptionMode indicates that all child groups must be disrupted together.",
+}
+
+func (WorkloadCompositePodGroupAllDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadCompositePodGroupAllDisruptionMode
+}
+
+var map_WorkloadCompositePodGroupBasicSchedulingPolicy = map[string]string{
+	"": "WorkloadCompositePodGroupBasicSchedulingPolicy indicates that the child groups of a composite group should be scheduled independently.",
+}
+
+func (WorkloadCompositePodGroupBasicSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadCompositePodGroupBasicSchedulingPolicy
+}
+
+var map_WorkloadCompositePodGroupDisruptionMode = map[string]string{
+	"":       "WorkloadCompositePodGroupDisruptionMode defines how the child groups of a composite group can be disrupted. Exactly one mode must be set.",
+	"single": "single specifies that child groups can be disrupted independently from each other.",
+	"all":    "all specifies that all child groups must be disrupted together.",
+}
+
+func (WorkloadCompositePodGroupDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadCompositePodGroupDisruptionMode
+}
+
+var map_WorkloadCompositePodGroupGangSchedulingPolicy = map[string]string{
+	"":              "WorkloadCompositePodGroupGangSchedulingPolicy defines the parameters for gang scheduling of a composite group's child groups.",
+	"minGroupCount": "minGroupCount is the minimum number of child groups that must be schedulable at the same time for the scheduler to admit the entire composite group. This field is optional. If it is not specified, the controller should inject a context-specific sane default (e.g., the number of child groups). If set, it must be a positive integer.",
+}
+
+func (WorkloadCompositePodGroupGangSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadCompositePodGroupGangSchedulingPolicy
+}
+
+var map_WorkloadCompositePodGroupSchedulingConstraints = map[string]string{
+	"":         "WorkloadCompositePodGroupSchedulingConstraints defines composite-level scheduling constraints, such as topology, for a CompositePodGroup (a group of groups) managed by a workload controller.",
+	"topology": "topology specifies desired topological placements for all child groups within the composite group. If unset, no topology placement is requested.",
+}
+
+func (WorkloadCompositePodGroupSchedulingConstraints) SwaggerDoc() map[string]string {
+	return map_WorkloadCompositePodGroupSchedulingConstraints
+}
+
+var map_WorkloadCompositePodGroupSchedulingPolicy = map[string]string{
+	"":      "WorkloadCompositePodGroupSchedulingPolicy defines the scheduling policy for a CompositePodGroup (a group of groups) managed by a workload controller. Exactly one policy must be set.",
+	"basic": "basic specifies that the child groups of this composite group should be scheduled independently.",
+	"gang":  "gang specifies that the child groups of this composite group should be scheduled using all-or-nothing semantics.",
+}
+
+func (WorkloadCompositePodGroupSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadCompositePodGroupSchedulingPolicy
+}
+
+var map_WorkloadCompositePodGroupSingleDisruptionMode = map[string]string{
+	"": "WorkloadCompositePodGroupSingleDisruptionMode indicates that child groups can be disrupted independently.",
+}
+
+func (WorkloadCompositePodGroupSingleDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadCompositePodGroupSingleDisruptionMode
+}
+
 var map_WorkloadList = map[string]string{
 	"":         "WorkloadList contains a list of Workload resources.",
 	"metadata": "Standard list metadata.",

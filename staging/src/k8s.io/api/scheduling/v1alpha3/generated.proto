@@ -897,6 +897,160 @@ message Workload {
   optional WorkloadSpec spec = 2;
 }
 
+// WorkloadCompositePodGroupAllDisruptionMode indicates that all child groups
+// must be disrupted together.
+message WorkloadCompositePodGroupAllDisruptionMode {
+}
+
+// WorkloadCompositePodGroupBasicSchedulingPolicy indicates that the child groups
+// of a composite group should be scheduled independently.
+message WorkloadCompositePodGroupBasicSchedulingPolicy {
+}
+
+// WorkloadCompositePodGroupDisruptionMode defines how the child groups of a
+// composite group can be disrupted. Exactly one mode must be set.
+//
+// ---
+//
+// This is a reusable building block meant to be embedded in a composite
+// controller's own API, next to its other scheduling fields. It is the
+// group-of-groups analogue of WorkloadPodGroupDisruptionMode. It's recommended
+// to freeze the field after creation (+k8s:immutable), since the selected mode
+// is immutable in the compiled Workload. For example,
+//
+// 	type JobSetSchedulingConfiguration struct {
+// 		// DisruptionMode defines the mode in which this JobSet's child groups
+// 		// can be disrupted.
+// 		// One of Single, All.
+// 		// This field is immutable after creation: it may not be added or removed,
+// 		// and the selected mode may not be changed.
+// 		// +optional
+// 		// +k8s:optional
+// 		// +k8s:immutable
+// 		DisruptionMode *schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,N,opt,name=disruptionMode"`
+//
+// 		// other scheduling fields
+// 	}
+//
+// +union
+message WorkloadCompositePodGroupDisruptionMode {
+  // single specifies that child groups can be disrupted independently from
+  // each other.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional WorkloadCompositePodGroupSingleDisruptionMode single = 1;
+
+  // all specifies that all child groups must be disrupted together.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional WorkloadCompositePodGroupAllDisruptionMode all = 2;
+}
+
+// WorkloadCompositePodGroupGangSchedulingPolicy defines the parameters for gang
+// scheduling of a composite group's child groups.
+message WorkloadCompositePodGroupGangSchedulingPolicy {
+  // minGroupCount is the minimum number of child groups that must be
+  // schedulable at the same time for the scheduler to admit the entire
+  // composite group.
+  // This field is optional. If it is not specified, the controller
+  // should inject a context-specific sane default (e.g., the number of
+  // child groups).
+  // If set, it must be a positive integer.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:minimum=1
+  optional int32 minGroupCount = 1;
+}
+
+// WorkloadCompositePodGroupSchedulingConstraints defines composite-level
+// scheduling constraints, such as topology, for a CompositePodGroup (a group of
+// groups) managed by a workload controller.
+//
+// ---
+//
+// This is a reusable building block meant to be embedded in a composite
+// controller's own API, next to its other scheduling fields. It is the
+// group-of-groups analogue of WorkloadPodGroupSchedulingConstraints. It's
+// recommended to freeze the field after creation (+k8s:immutable), since
+// constraints are immutable in the compiled Workload. For example,
+//
+// 	type JobSetSchedulingConfiguration struct {
+// 		// SchedulingConstraints defines scheduling constraints (e.g. topology)
+// 		// for this JobSet.
+// 		// This field is immutable after creation.
+// 		// +optional
+// 		// +k8s:optional
+// 		// +k8s:immutable
+// 		SchedulingConstraints *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,N,opt,name=schedulingConstraints"`
+//
+// 		// other scheduling fields
+// 	}
+message WorkloadCompositePodGroupSchedulingConstraints {
+  // topology specifies desired topological placements for all child groups
+  // within the composite group.
+  // If unset, no topology placement is requested.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:maxItems=1
+  // +listType=atomic
+  // +k8s:listType=atomic
+  repeated TopologyConstraint topology = 1;
+}
+
+// WorkloadCompositePodGroupSchedulingPolicy defines the scheduling policy for a
+// CompositePodGroup (a group of groups) managed by a workload controller.
+// Exactly one policy must be set.
+//
+// ---
+//
+// This is a reusable building block meant to be embedded in a composite
+// controller's own API, next to its other scheduling fields. It is the
+// group-of-groups analogue of WorkloadPodGroupSchedulingPolicy. The composite
+// scheduling policy is immutable, so it's recommended to freeze the whole
+// field after creation (+k8s:immutable). For example,
+//
+// 	type JobSetSchedulingConfiguration struct {
+// 		// SchedulingPolicy defines the scheduling policy for this JobSet.
+// 		// Exactly one of Basic or Gang must be set.
+// 		// This field is immutable after creation.
+// 		// +optional
+// 		// +k8s:optional
+// 		// +k8s:immutable
+// 		SchedulingPolicy *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty" protobuf:"bytes,N,opt,name=schedulingPolicy"`
+//
+// 		// other scheduling fields
+// 	}
+//
+// +union
+message WorkloadCompositePodGroupSchedulingPolicy {
+  // basic specifies that the child groups of this composite group should be
+  // scheduled independently.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional WorkloadCompositePodGroupBasicSchedulingPolicy basic = 1;
+
+  // gang specifies that the child groups of this composite group should be
+  // scheduled using all-or-nothing semantics.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional WorkloadCompositePodGroupGangSchedulingPolicy gang = 2;
+}
+
+// WorkloadCompositePodGroupSingleDisruptionMode indicates that child groups
+// can be disrupted independently.
+message WorkloadCompositePodGroupSingleDisruptionMode {
+}
+
 // WorkloadList contains a list of Workload resources.
 message WorkloadList {
   // Standard list metadata.

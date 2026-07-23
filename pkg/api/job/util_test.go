@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
@@ -165,25 +166,35 @@ func TestWorkloadItemForJob(t *testing.T) {
 		priorityClassName string
 		parallelism       *int32
 		input             workloadbuilder.WorkloadInput
+		path              *field.Path
 	}{
 		"name and priority class carried onto the item": {
 			itemName:          "job-pgt-0",
 			priorityClassName: "high",
 			parallelism:       ptr.To[int32](4),
 			input:             input,
+			path:              field.NewPath("spec", "scheduling"),
 		},
 		"empty priority class and nil parallelism": {
 			itemName: "job",
 			input:    input,
 		},
+		"nil path is carried through": {
+			itemName: "job",
+			input:    input,
+			path:     nil,
+		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got := WorkloadItemForJob(tc.itemName, tc.priorityClassName, tc.parallelism, tc.input)
+			got := WorkloadItemForJob(tc.itemName, tc.priorityClassName, tc.parallelism, tc.input, tc.path)
 
 			if got.Name != tc.itemName {
 				t.Errorf("Name = %q, want %q", got.Name, tc.itemName)
+			}
+			if got.Path.String() != tc.path.String() {
+				t.Errorf("Path = %q, want %q", got.Path.String(), tc.path.String())
 			}
 			wantDefault := &workloadbuilder.SchedulingConfig{
 				Policy:            &workloadbuilder.SchedulingPolicy{Basic: &workloadbuilder.BasicSchedulingPolicy{}},
@@ -238,7 +249,7 @@ func TestWorkloadItemForJobMinCountDefaulting(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			item := WorkloadItemForJob("job", "", tc.parallelism, WorkloadInput(nil, nil, nil, nil))
+			item := WorkloadItemForJob("job", "", tc.parallelism, WorkloadInput(nil, nil, nil, nil), nil)
 			item.Callbacks[0](tc.cfg)
 			if diff := cmp.Diff(tc.wantMin, tc.cfg.Policy.Gang.MinCount); diff != "" {
 				t.Errorf("unexpected resolved MinCount (-want,+got):\n%s", diff)
@@ -247,7 +258,7 @@ func TestWorkloadItemForJobMinCountDefaulting(t *testing.T) {
 	}
 
 	t.Run("basic policy is left untouched", func(t *testing.T) {
-		item := WorkloadItemForJob("job", "", ptr.To[int32](5), WorkloadInput(nil, nil, nil, nil))
+		item := WorkloadItemForJob("job", "", ptr.To[int32](5), WorkloadInput(nil, nil, nil, nil), nil)
 		cfg := &workloadbuilder.SchedulingConfig{
 			Policy: &workloadbuilder.SchedulingPolicy{Basic: &workloadbuilder.BasicSchedulingPolicy{}},
 		}
@@ -258,7 +269,7 @@ func TestWorkloadItemForJobMinCountDefaulting(t *testing.T) {
 	})
 
 	t.Run("nil config does not panic", func(t *testing.T) {
-		item := WorkloadItemForJob("job", "", ptr.To[int32](5), WorkloadInput(nil, nil, nil, nil))
+		item := WorkloadItemForJob("job", "", ptr.To[int32](5), WorkloadInput(nil, nil, nil, nil), nil)
 		item.Callbacks[0](nil)
 	})
 }

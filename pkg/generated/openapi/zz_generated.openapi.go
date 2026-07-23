@@ -1209,6 +1209,13 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		schedulingv1alpha3.TopologyConstraint{}.OpenAPIModelName():                                                      schema_k8sio_api_scheduling_v1alpha3_TopologyConstraint(ref),
 		schedulingv1alpha3.TypedLocalObjectReference{}.OpenAPIModelName():                                               schema_k8sio_api_scheduling_v1alpha3_TypedLocalObjectReference(ref),
 		schedulingv1alpha3.Workload{}.OpenAPIModelName():                                                                schema_k8sio_api_scheduling_v1alpha3_Workload(ref),
+		schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{}.OpenAPIModelName():                              schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupAllDisruptionMode(ref),
+		schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{}.OpenAPIModelName():                          schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupBasicSchedulingPolicy(ref),
+		schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{}.OpenAPIModelName():                                 schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupDisruptionMode(ref),
+		schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{}.OpenAPIModelName():                           schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupGangSchedulingPolicy(ref),
+		schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints{}.OpenAPIModelName():                          schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupSchedulingConstraints(ref),
+		schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{}.OpenAPIModelName():                               schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupSchedulingPolicy(ref),
+		schedulingv1alpha3.WorkloadCompositePodGroupSingleDisruptionMode{}.OpenAPIModelName():                           schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupSingleDisruptionMode(ref),
 		schedulingv1alpha3.WorkloadList{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha3_WorkloadList(ref),
 		schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}.OpenAPIModelName():                                       schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupAllDisruptionMode(ref),
 		schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}.OpenAPIModelName():                                   schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupBasicSchedulingPolicy(ref),
@@ -57077,6 +57084,170 @@ func schema_k8sio_api_scheduling_v1alpha3_Workload(ref common.ReferenceCallback)
 		},
 		Dependencies: []string{
 			schedulingv1alpha3.WorkloadSpec{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupAllDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadCompositePodGroupAllDisruptionMode indicates that all child groups must be disrupted together.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupBasicSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadCompositePodGroupBasicSchedulingPolicy indicates that the child groups of a composite group should be scheduled independently.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadCompositePodGroupDisruptionMode defines how the child groups of a composite group can be disrupted. Exactly one mode must be set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"single": {
+						SchemaProps: spec.SchemaProps{
+							Description: "single specifies that child groups can be disrupted independently from each other.",
+							Ref:         ref(schedulingv1alpha3.WorkloadCompositePodGroupSingleDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+					"all": {
+						SchemaProps: spec.SchemaProps{
+							Description: "all specifies that all child groups must be disrupted together.",
+							Ref:         ref(schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"all":    "All",
+								"single": "Single",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.WorkloadCompositePodGroupSingleDisruptionMode{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupGangSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadCompositePodGroupGangSchedulingPolicy defines the parameters for gang scheduling of a composite group's child groups.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"minGroupCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "minGroupCount is the minimum number of child groups that must be schedulable at the same time for the scheduler to admit the entire composite group. This field is optional. If it is not specified, the controller should inject a context-specific sane default (e.g., the number of child groups). If set, it must be a positive integer.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupSchedulingConstraints(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadCompositePodGroupSchedulingConstraints defines composite-level scheduling constraints, such as topology, for a CompositePodGroup (a group of groups) managed by a workload controller.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"topology": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "topology specifies desired topological placements for all child groups within the composite group. If unset, no topology placement is requested.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1alpha3.TopologyConstraint{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.TopologyConstraint{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadCompositePodGroupSchedulingPolicy defines the scheduling policy for a CompositePodGroup (a group of groups) managed by a workload controller. Exactly one policy must be set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"basic": {
+						SchemaProps: spec.SchemaProps{
+							Description: "basic specifies that the child groups of this composite group should be scheduled independently.",
+							Ref:         ref(schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+					"gang": {
+						SchemaProps: spec.SchemaProps{
+							Description: "gang specifies that the child groups of this composite group should be scheduled using all-or-nothing semantics.",
+							Ref:         ref(schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"basic": "Basic",
+								"gang":  "Gang",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupSingleDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadCompositePodGroupSingleDisruptionMode indicates that child groups can be disrupted independently.",
+				Type:        []string{"object"},
+			},
+		},
 	}
 }
 

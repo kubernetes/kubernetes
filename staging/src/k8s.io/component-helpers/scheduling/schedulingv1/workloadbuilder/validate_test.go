@@ -22,7 +22,10 @@ import (
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/utils/ptr"
+)
+
+var (
+	schedulingPath = field.NewPath("spec", "scheduling")
 )
 
 func TestBuilderValidate(t *testing.T) {
@@ -30,10 +33,16 @@ func TestBuilderValidate(t *testing.T) {
 	allPolicies := []SchedulingPolicyOption{BasicPolicy, GangPolicy}
 	allModes := []DisruptionModeOption{SingleMode, AllMode}
 	gang := func() PolicyInput {
-		return PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](2)}}}
+		return PolicyInput{PodGroupData: gangData(2)}
 	}
 	basic := func() PolicyInput {
 		return PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}}}
+	}
+	compositeGang := func() PolicyInput {
+		return PolicyInput{CompositePodGroupData: compositeGangData(2)}
+	}
+	compositeBasic := func() PolicyInput {
+		return PolicyInput{CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{}}}
 	}
 
 	tests := []struct {
@@ -62,6 +71,15 @@ func TestBuilderValidate(t *testing.T) {
 			allowModes:    allModes,
 		},
 		{
+			name:             "empty item name is rejected",
+			root:             &WorkloadItem{Name: "", Path: schedulingPath, Input: WorkloadInput{Policy: basic()}},
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInternal,
+			wantErrFieldPath: "spec.scheduling",
+		},
+		{
 			name:          "basic forbidden when not allow-listed",
 			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: basic()}},
 			allowPolicies: []SchedulingPolicyOption{GangPolicy},
@@ -85,13 +103,13 @@ func TestBuilderValidate(t *testing.T) {
 		},
 		{
 			name:          "single disruption allowed",
-			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: gang(), DisruptionMode: DisruptionModeInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{Single: &schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{}}}}},
+			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: gang(), DisruptionMode: singleDisruption()}},
 			allowPolicies: allPolicies,
 			allowModes:    []DisruptionModeOption{SingleMode},
 		},
 		{
 			name:          "all disruption forbidden when not allow-listed",
-			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: gang(), DisruptionMode: DisruptionModeInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}}}}},
+			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: gang(), DisruptionMode: allDisruption()}},
 			allowPolicies: allPolicies,
 			allowModes:    []DisruptionModeOption{SingleMode},
 			wantErrs:      1,
@@ -99,7 +117,7 @@ func TestBuilderValidate(t *testing.T) {
 		},
 		{
 			name:          "basic with all disruption is rejected by cross-field rule",
-			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: basic(), DisruptionMode: DisruptionModeInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}}}}},
+			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: basic(), DisruptionMode: allDisruption()}},
 			allowPolicies: allPolicies,
 			allowModes:    allModes,
 			wantErrs:      1,
@@ -107,16 +125,13 @@ func TestBuilderValidate(t *testing.T) {
 		},
 		{
 			name:          "gang with all disruption is valid",
-			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: gang(), DisruptionMode: DisruptionModeInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}}}}},
+			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: gang(), DisruptionMode: allDisruption()}},
 			allowPolicies: allPolicies,
 			allowModes:    allModes,
 		},
 		{
-			name: "gang minCount below minimum fails declarative validation at injected path",
-			root: &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: PolicyInput{
-				PathElements: []string{"schedulingPolicy"},
-				PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](0)}},
-			}}},
+			name:             "gang minCount below minimum fails declarative validation at injected path",
+			root:             newWorkloadItem("job", withPath(schedulingPath), withGang(0)),
 			allowPolicies:    allPolicies,
 			allowModes:       allModes,
 			wantErrs:         1,
@@ -124,18 +139,24 @@ func TestBuilderValidate(t *testing.T) {
 			wantErrFieldPath: "spec.scheduling.schedulingPolicy.gang.minCount",
 		},
 		{
-			name: "declarative validation is skipped when disabled",
-			root: &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: PolicyInput{
-				PathElements: []string{"schedulingPolicy"},
-				PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](0)}},
-			}}},
+			name:             "nil item Path reports building-block errors without a root prefix",
+			root:             newWorkloadItem("job", withGang(0)),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInvalid,
+			wantErrFieldPath: "schedulingPolicy.gang.minCount",
+		},
+		{
+			name:          "declarative validation is skipped when disabled",
+			root:          newWorkloadItem("job", withPath(schedulingPath), withGang(0)),
 			allowPolicies: allPolicies,
 			allowModes:    allModes,
 			disableDV:     true,
 		},
 		{
 			name: "disruptionMode with single and all fails union declarative validation",
-			root: &WorkloadItem{Name: "job", Input: WorkloadInput{
+			root: &WorkloadItem{Name: "job", Path: schedulingPath, Input: WorkloadInput{
 				Policy: gang(),
 				DisruptionMode: DisruptionModeInput{
 					PathElements: []string{"disruptionMode"},
@@ -153,7 +174,7 @@ func TestBuilderValidate(t *testing.T) {
 		},
 		{
 			name: "too many topology constraints fails declarative validation",
-			root: &WorkloadItem{Name: "job", Input: WorkloadInput{
+			root: &WorkloadItem{Name: "job", Path: schedulingPath, Input: WorkloadInput{
 				Policy: gang(),
 				Constraints: ConstraintsInput{
 					PathElements: []string{"schedulingConstraints"},
@@ -170,7 +191,7 @@ func TestBuilderValidate(t *testing.T) {
 		},
 		{
 			name: "resourceClaim with no source fails union declarative validation at indexed path",
-			root: &WorkloadItem{Name: "job", Input: WorkloadInput{
+			root: &WorkloadItem{Name: "job", Path: schedulingPath, Input: WorkloadInput{
 				Policy: gang(),
 				ResourceClaims: ResourceClaimsInput{
 					PathElements: []string{"resourceClaims"},
@@ -184,6 +205,99 @@ func TestBuilderValidate(t *testing.T) {
 			wantErrFieldPath: "spec.scheduling.resourceClaims[0]",
 		},
 		{
+			name:          "composite gang allowed",
+			root:          compositeRoot(WorkloadInput{Policy: compositeGang()}),
+			allowPolicies: []SchedulingPolicyOption{GangPolicy},
+			allowModes:    allModes,
+		},
+		{
+			name:          "composite basic forbidden when not allow-listed",
+			root:          compositeRoot(WorkloadInput{Policy: compositeBasic()}),
+			allowPolicies: []SchedulingPolicyOption{GangPolicy},
+			allowModes:    allModes,
+			wantErrs:      1,
+			wantType:      field.ErrorTypeForbidden,
+		},
+		{
+			name: "composite gang minGroupCount below minimum fails declarative validation at injected path",
+			root: compositeRoot(WorkloadInput{Policy: PolicyInput{
+				PathElements:          []string{"schedulingPolicy"},
+				CompositePodGroupData: compositeGangData(0),
+			}}),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInvalid,
+			wantErrFieldPath: "spec.scheduling.schedulingPolicy.gang.minGroupCount",
+		},
+		{
+			name: "composite policy with basic and gang fails union declarative validation",
+			root: compositeRoot(WorkloadInput{Policy: PolicyInput{
+				PathElements: []string{"schedulingPolicy"},
+				CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+					Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{},
+					Gang:  &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{MinGroupCount: new(int32(2))},
+				},
+			}}),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInvalid,
+			wantErrFieldPath: "spec.scheduling.schedulingPolicy",
+		},
+		{
+			name: "composite policy set with a leaf policy fails the input union",
+			root: compositeRoot(WorkloadInput{Policy: PolicyInput{
+				PathElements:          []string{"schedulingPolicy"},
+				CompositePodGroupData: compositeGangData(2),
+				PodGroupData:          gangData(2),
+			}}),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInternal,
+			wantErrFieldPath: "spec.scheduling",
+		},
+		{
+			name: "composite policy set with a leaf disruptionMode fails the input union",
+			root: compositeRoot(WorkloadInput{
+				Policy: PolicyInput{
+					PathElements:          []string{"schedulingPolicy"},
+					CompositePodGroupData: compositeGangData(2),
+				},
+				DisruptionMode: singleDisruption(),
+			}),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInternal,
+			wantErrFieldPath: "spec.scheduling",
+		},
+		{
+			name: "input union is enforced even when declarative validation is disabled",
+			root: compositeRoot(WorkloadInput{Policy: PolicyInput{
+				PathElements:          []string{"schedulingPolicy"},
+				CompositePodGroupData: compositeGangData(2),
+				PodGroupData:          gangData(2),
+			}}),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			disableDV:        true,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInternal,
+			wantErrFieldPath: "spec.scheduling",
+		},
+		{
+			name: "invalid leaf child in a composite tree is validated recursively",
+			root: newWorkloadItem("root", withPath(schedulingPath), withInput(WorkloadInput{Policy: compositeBasic()}),
+				withChildren(newWorkloadItem("child", withPath(schedulingPath), withGang(0)))),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInvalid,
+			wantErrFieldPath: "spec.scheduling.schedulingPolicy.gang.minCount",
+		},
+		{
 			name:          "update with matching root name is accepted",
 			root:          &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: gang()}},
 			oldRoot:       &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: gang()}},
@@ -192,7 +306,7 @@ func TestBuilderValidate(t *testing.T) {
 		},
 		{
 			name:             "update with mismatched root name is an internal error",
-			root:             &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: gang()}},
+			root:             &WorkloadItem{Name: "job", Path: schedulingPath, Input: WorkloadInput{Policy: gang()}},
 			oldRoot:          &WorkloadItem{Name: "stale-job", Input: WorkloadInput{Policy: gang()}},
 			allowPolicies:    allPolicies,
 			allowModes:       allModes,
@@ -225,15 +339,34 @@ func TestBuilderValidate(t *testing.T) {
 			name: "update clearing disruptionMode skips declarative validation for the new nil disruptionMode",
 			root: &WorkloadItem{Name: "job", Input: WorkloadInput{Policy: gang()}},
 			oldRoot: &WorkloadItem{Name: "job", Input: WorkloadInput{
-				Policy: gang(),
-				DisruptionMode: DisruptionModeInput{
-					PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-						Single: &schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{},
-					},
-				},
+				Policy:         gang(),
+				DisruptionMode: singleDisruption(),
 			}},
 			allowPolicies: allPolicies,
 			allowModes:    allModes,
+		},
+		{
+			// A child that keeps its name and position correlates with its old
+			// counterpart, so its unchanged (and still invalid) minCount is
+			// ratcheted and not re-validated on update.
+			name:          "update of an unchanged child at the same position is ratcheted",
+			root:          newWorkloadItem("root", withChildren(newWorkloadItem("leaf", withGang(0)))),
+			oldRoot:       newWorkloadItem("root", withChildren(newWorkloadItem("leaf", withGang(0)))),
+			allowPolicies: allPolicies,
+			allowModes:    allModes,
+		},
+		{
+			// The same-named "leaf" moves up a level (root>mid>leaf becomes
+			// root>leaf), so it does not correlate with any old child at the root
+			// level. It is validated as an addition, surfacing its invalid minCount.
+			name:             "update of a child that changed position is validated as an addition",
+			root:             newWorkloadItem("root", withPath(schedulingPath), withChildren(newWorkloadItem("leaf", withPath(schedulingPath), withGang(0)))),
+			oldRoot:          newWorkloadItem("root", withChildren(newWorkloadItem("mid", withChildren(newWorkloadItem("leaf", withGang(0)))))),
+			allowPolicies:    allPolicies,
+			allowModes:       allModes,
+			wantErrs:         1,
+			wantType:         field.ErrorTypeInvalid,
+			wantErrFieldPath: "spec.scheduling.schedulingPolicy.gang.minCount",
 		},
 	}
 
@@ -245,7 +378,7 @@ func TestBuilderValidate(t *testing.T) {
 				AllowedDisruptionModes:       tt.allowModes,
 				DisableDeclarativeValidation: tt.disableDV,
 			})
-			errs := b.Validate(ctx, field.NewPath("spec", "scheduling"), ValidationInput{OldRoot: tt.oldRoot})
+			errs := b.Validate(ctx, ValidationInput{OldRoot: tt.oldRoot})
 			if len(errs) != tt.wantErrs {
 				t.Fatalf("expected %d error(s), got %d: %v", tt.wantErrs, len(errs), errs)
 			}
@@ -256,5 +389,79 @@ func TestBuilderValidate(t *testing.T) {
 				t.Errorf("expected error field %q, got %q", tt.wantErrFieldPath, errs[0].Field)
 			}
 		})
+	}
+}
+
+type itemOption func(*WorkloadItem)
+
+func newWorkloadItem(name string, opts ...itemOption) *WorkloadItem {
+	item := &WorkloadItem{Name: name}
+	for _, opt := range opts {
+		opt(item)
+	}
+	return item
+}
+
+func withPath(path *field.Path) itemOption {
+	return func(i *WorkloadItem) {
+		i.Path = path
+	}
+}
+
+func withInput(in WorkloadInput) itemOption {
+	return func(i *WorkloadItem) {
+		i.Input = in
+	}
+}
+
+func withGang(minCount int32) itemOption {
+	return func(i *WorkloadItem) {
+		i.Input.Policy = PolicyInput{
+			PathElements: []string{"schedulingPolicy"},
+			PodGroupData: gangData(minCount),
+		}
+	}
+}
+
+func withChildren(children ...*WorkloadItem) itemOption {
+	return func(i *WorkloadItem) {
+		i.Children = children
+	}
+}
+
+func compositeRoot(in WorkloadInput) *WorkloadItem {
+	return newWorkloadItem("root", withPath(schedulingPath), withInput(in),
+		withChildren(newWorkloadItem("child", withPath(schedulingPath), withGang(2))))
+}
+
+func singleDisruption() DisruptionModeInput {
+	return DisruptionModeInput{
+		PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
+			Single: &schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{},
+		},
+	}
+}
+
+func allDisruption() DisruptionModeInput {
+	return DisruptionModeInput{
+		PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
+			All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+		},
+	}
+}
+
+func gangData(minCount int32) *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy {
+	return &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+		Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{
+			MinCount: new(minCount),
+		},
+	}
+}
+
+func compositeGangData(minGroupCount int32) *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy {
+	return &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+		Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{
+			MinGroupCount: new(minGroupCount),
+		},
 	}
 }

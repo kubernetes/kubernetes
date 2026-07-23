@@ -532,7 +532,7 @@ func buildWorkloadItem(job *batch.Job) *workloadbuilder.WorkloadItem {
 		input = jobutil.WorkloadInputForJobV1(s)
 	}
 	return jobutil.WorkloadItemForJob(podGroupTemplateName(job),
-		job.Spec.Template.Spec.PriorityClassName, job.Spec.Parallelism, input)
+		job.Spec.Template.Spec.PriorityClassName, job.Spec.Parallelism, input, nil)
 }
 
 // generateWorkload compiles the Job's spec.scheduling into a Workload via the

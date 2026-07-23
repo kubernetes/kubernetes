@@ -19,6 +19,7 @@ package workloadbuilder
 import (
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // SchedulingConfig is the hierarchy-agnostic intermediate representation of a
@@ -130,6 +131,10 @@ type WorkloadItem struct {
 	// must be non-empty.
 	Name string
 
+	// Path is the field path at which this item's scheduling blocks are embedded
+	// in the controller's API. For instance, for a Job this is "spec.scheduling".
+	Path *field.Path
+
 	// DefaultConfig is the controller's default config for this node, used for
 	// any field the user left unset.
 	DefaultConfig *SchedulingConfig
@@ -142,6 +147,17 @@ type WorkloadItem struct {
 	// Callbacks run in order against the resolved config after the
 	// default/user merge.
 	Callbacks []SchedulingConfigFunc
+
+	// Children holds the logical sub-components of this node.
+	//   - len(Children) > 0 makes this a composite node, compiled into a
+	//     CompositePodGroupTemplate whose children are compiled recursively.
+	//   - len(Children) == 0 makes this a leaf node, compiled into a single
+	//     PodGroupTemplate.
+	//
+	// A composite node carries the group-of-groups scheduling policy in its own
+	// Input/DefaultConfig (via WorkloadInput.Policy.CompositePodGroupData) and
+	// does not own pods directly.
+	Children []*WorkloadItem
 }
 
 // WorkloadInput bundles the leaf-level building blocks a controller embeds
@@ -162,35 +178,56 @@ type WorkloadInput struct {
 }
 
 // PolicyInput wraps the scheduling policy building block with its field path.
+//
+// A node is either a leaf or a composite: at most one of PodGroupData and
+// CompositePodGroupData should be set. PodGroupData is consulted for leaf nodes
+// (len(WorkloadItem.Children) == 0) and CompositePodGroupData for composite
+// nodes (len(WorkloadItem.Children) > 0).
 type PolicyInput struct {
-	// PodGroupData is the Workload scheduling policy info for the PodGroup.
+	// PodGroupData is the Workload scheduling policy info for a leaf PodGroup.
 	PodGroupData *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy
 
-	// PathElements is the path, relative to the WorkloadItem's rootPath, at
-	// which this building block is embedded in the controller's API. For a
-	// rootPath of `spec.scheduling` and PathElements of []string{"schedulingPolicy"},
-	// validation errors are reported at `spec.scheduling.schedulingPolicy`. When
-	// empty, errors are reported directly at the rootPath.
+	// CompositePodGroupData is the group-of-groups scheduling policy info for a
+	// composite CompositePodGroup node.
+	CompositePodGroupData *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy
+
+	// PathElements is the path, relative to the WorkloadItem's Path, at
+	// which this building block is embedded in the controller's API. When
+	// empty, errors are reported directly at the item's Path.
 	PathElements []string
 }
 
 // ConstraintsInput wraps the scheduling constraints building block with its field path.
+//
+// A node is either a leaf or a composite, at most one of PodGroupData and
+// CompositePodGroupData should be set.
 type ConstraintsInput struct {
-	// PodGroupData is the Workload scheduling constraints info for the PodGroup.
+	// PodGroupData is the Workload scheduling constraints info for a leaf PodGroup.
 	PodGroupData *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints
 
-	// PathElements is the path, relative to the WorkloadItem's rootPath, at which
+	// CompositePodGroupData is the scheduling constraints info for a composite
+	// CompositePodGroup node.
+	CompositePodGroupData *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints
+
+	// PathElements is the path, relative to the WorkloadItem's Path, at which
 	// this building block is embedded in the controller's API; see PolicyInput.PathElements.
 	PathElements []string
 }
 
 // DisruptionModeInput wraps the disruption mode building block with its field path.
+//
+// A node is either a leaf or a composite, at most one of PodGroupData and
+// CompositePodGroupData should be set.
 type DisruptionModeInput struct {
-	// PodGroupData is the Workload disruption mode info for the PodGroup.
+	// PodGroupData is the Workload disruption mode info for a leaf PodGroup.
 	PodGroupData *schedulingv1alpha3.WorkloadPodGroupDisruptionMode
 
-	// PathElements is the path, relative to the WorkloadItem's rootPath, at which
-	// this building block is embedded in the controller's API; see PolicyInput.PathElements.
+	// CompositePodGroupData is the disruption mode info for a composite
+	// CompositePodGroup node.
+	CompositePodGroupData *schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode
+
+	// PathElements is the path, relative to the WorkloadItem's Path, at which
+	// this building block is embedded in the controller's API.
 	PathElements []string
 }
 
@@ -199,7 +236,7 @@ type ResourceClaimsInput struct {
 	// PodGroupData is the list of Workload resource claims for the PodGroup.
 	PodGroupData []schedulingv1alpha3.WorkloadPodGroupResourceClaim
 
-	// PathElements is the path, relative to the WorkloadItem's rootPath, at which
+	// PathElements is the path, relative to the WorkloadItem's Path, at which
 	// this building block is embedded in the controller's API; see PolicyInput.PathElements.
 	PathElements []string
 }

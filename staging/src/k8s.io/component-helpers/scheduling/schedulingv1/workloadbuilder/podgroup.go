@@ -17,27 +17,17 @@ limitations under the License.
 package workloadbuilder
 
 import (
-	"fmt"
-
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// materializes a runtime PodGroup from the named PodGroupTemplate, which
-// BuildWorkload does not create. The template's scheduling fields are
-// deep-copied into the spec, workloadRef points back at the template,
-// and the PodGroup lands in the workload's namespace. Owners are
-// caller-supplied because they differ by case.
-func newPodGroup(workload *schedulingv1beta1.Workload, templateName, podGroupName string, owners []metav1.OwnerReference) (*schedulingv1beta1.PodGroup, error) {
-	if workload == nil {
-		return nil, fmt.Errorf("workload must not be nil")
-	}
-
-	tmpl := findPodGroupTemplate(workload, templateName)
-	if tmpl == nil {
-		return nil, fmt.Errorf("podGroupTemplate %q not found in workload %q (have %v)", templateName, workload.Name, podGroupTemplateNames(workload))
-	}
-
+// newPodGroup materializes a runtime PodGroup from the given PodGroupTemplate,
+// which BuildWorkload does not create. The template's scheduling fields are
+// deep-copied into the spec, workloadRef points back at the template, and the
+// PodGroup lands in the workload's namespace. Template lookup is the caller's
+// responsibility (the Builder resolves it through a cached name index).
+func newPodGroup(workload *schedulingv1beta1.Workload, tmpl *schedulingv1beta1.PodGroupTemplate, podGroupName string, owners []metav1.OwnerReference) *schedulingv1beta1.PodGroup {
 	spec := schedulingv1beta1.PodGroupSpec{
 		WorkloadRef: &schedulingv1beta1.WorkloadReference{
 			WorkloadName: workload.Name,
@@ -55,8 +45,7 @@ func newPodGroup(workload *schedulingv1beta1.Workload, templateName, podGroupNam
 		}
 	}
 	if tmpl.Priority != nil {
-		p := *tmpl.Priority
-		spec.Priority = &p
+		spec.Priority = new(*tmpl.Priority)
 	}
 
 	return &schedulingv1beta1.PodGroup{
@@ -66,16 +55,64 @@ func newPodGroup(workload *schedulingv1beta1.Workload, templateName, podGroupNam
 			OwnerReferences: owners,
 		},
 		Spec: spec,
-	}, nil
+	}
 }
 
-func findPodGroupTemplate(workload *schedulingv1beta1.Workload, name string) *schedulingv1beta1.PodGroupTemplate {
-	for i := range workload.Spec.PodGroupTemplates {
-		if workload.Spec.PodGroupTemplates[i].Name == name {
-			return &workload.Spec.PodGroupTemplates[i]
+// newCompositePodGroup materializes a runtime CompositePodGroup from the given
+// CompositePodGroupTemplate, which BuildWorkload does not create.
+func newCompositePodGroup(workload *schedulingv1beta1.Workload, tmpl *schedulingv1beta1.CompositePodGroupTemplate,
+	compositePodGroupName string, owners []metav1.OwnerReference) (*schedulingv1alpha3.CompositePodGroup, error) {
+	spec := schedulingv1alpha3.CompositePodGroupSpec{
+		WorkloadRef: &schedulingv1alpha3.WorkloadReference{
+			WorkloadName: workload.Name,
+			TemplateName: tmpl.Name,
+		},
+		PriorityClassName: tmpl.PriorityClassName,
+	}
+
+	if err := Convert_v1beta1_CompositePodGroupSchedulingPolicy_To_v1alpha3_CompositePodGroupSchedulingPolicy(&tmpl.SchedulingPolicy, &spec.SchedulingPolicy, nil); err != nil {
+		return nil, err
+	}
+	if tmpl.SchedulingConstraints != nil {
+		spec.SchedulingConstraints = &schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}
+		if err := Convert_v1beta1_CompositePodGroupSchedulingConstraints_To_v1alpha3_CompositePodGroupSchedulingConstraints(tmpl.SchedulingConstraints, spec.SchedulingConstraints, nil); err != nil {
+			return nil, err
 		}
 	}
-	return nil
+	if tmpl.DisruptionMode != nil {
+		spec.DisruptionMode = &schedulingv1alpha3.CompositeDisruptionMode{}
+		if err := Convert_v1beta1_CompositeDisruptionMode_To_v1alpha3_CompositeDisruptionMode(tmpl.DisruptionMode, spec.DisruptionMode, nil); err != nil {
+			return nil, err
+		}
+	}
+	if tmpl.Priority != nil {
+		spec.Priority = new(*tmpl.Priority)
+	}
+
+	cpg := &schedulingv1alpha3.CompositePodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            compositePodGroupName,
+			Namespace:       workload.Namespace,
+			OwnerReferences: owners,
+		},
+		Spec: spec,
+	}
+	// The generated Convert_* helpers are shallow (unsafe.Pointer) copies, so
+	// the spec still aliases the template's Gang/Topology pointers. DeepCopy
+	// before returning so the caller can mutate the CompositePodGroup without
+	// corrupting the Workload template cached in the Builder.
+	return cpg.DeepCopy(), nil
+}
+
+// indexPodGroupTemplates maps every leaf PodGroupTemplate by name for O(1)
+// lookup. The Builder builds it once and reuses it across materializations
+// rather than rescanning the slice on every NewPodGroup call.
+func indexPodGroupTemplates(workload *schedulingv1beta1.Workload) map[string]*schedulingv1beta1.PodGroupTemplate {
+	index := make(map[string]*schedulingv1beta1.PodGroupTemplate, len(workload.Spec.PodGroupTemplates))
+	for i := range workload.Spec.PodGroupTemplates {
+		index[workload.Spec.PodGroupTemplates[i].Name] = &workload.Spec.PodGroupTemplates[i]
+	}
+	return index
 }
 
 func podGroupTemplateNames(workload *schedulingv1beta1.Workload) []string {
@@ -83,5 +120,40 @@ func podGroupTemplateNames(workload *schedulingv1beta1.Workload) []string {
 	for i := range workload.Spec.PodGroupTemplates {
 		names[i] = workload.Spec.PodGroupTemplates[i].Name
 	}
+	return names
+}
+
+// walkCompositePodGroupTemplates invokes visit for every template in the
+// composite tree, in pre-order.
+func walkCompositePodGroupTemplates(tmpls []schedulingv1beta1.CompositePodGroupTemplate,
+	visit func(*schedulingv1beta1.CompositePodGroupTemplate)) {
+	for i := range tmpls {
+		visit(&tmpls[i])
+		walkCompositePodGroupTemplates(tmpls[i].CompositePodGroupTemplates, visit)
+	}
+}
+
+// indexCompositePodGroupTemplates maps every CompositePodGroupTemplate in the
+// workload's composite tree by name. Template names are unique across the whole
+// Workload, so the flat map is unambiguous. The Builder builds it once and
+// reuses it across materializations rather than re-walking the tree on every
+// NewCompositePodGroup call.
+func indexCompositePodGroupTemplates(workload *schedulingv1beta1.Workload) map[string]*schedulingv1beta1.CompositePodGroupTemplate {
+	index := map[string]*schedulingv1beta1.CompositePodGroupTemplate{}
+	walkCompositePodGroupTemplates(workload.Spec.CompositePodGroupTemplates,
+		func(tmpl *schedulingv1beta1.CompositePodGroupTemplate) {
+			index[tmpl.Name] = tmpl
+		})
+	return index
+}
+
+// compositePodGroupTemplateNames lists every CompositePodGroupTemplate name in
+// the workload's composite template tree, for error messages.
+func compositePodGroupTemplateNames(workload *schedulingv1beta1.Workload) []string {
+	var names []string
+	walkCompositePodGroupTemplates(workload.Spec.CompositePodGroupTemplates,
+		func(tmpl *schedulingv1beta1.CompositePodGroupTemplate) {
+			names = append(names, tmpl.Name)
+		})
 	return names
 }

@@ -47,6 +47,7 @@ func ExampleOutOfTreeControllerValidation() {
 
 	item := &workloadbuilder.WorkloadItem{
 		Name: "worker",
+		Path: schedulingPath,
 		DefaultConfig: &workloadbuilder.SchedulingConfig{
 			Policy: &workloadbuilder.SchedulingPolicy{Basic: &workloadbuilder.BasicSchedulingPolicy{}},
 		},
@@ -63,7 +64,7 @@ func ExampleOutOfTreeControllerValidation() {
 		Owner:                  &metav1.OwnerReference{APIVersion: "batch/v1", Kind: "Job", Name: "worker", UID: "job-uid"},
 		AllowedPolicies:        []workloadbuilder.SchedulingPolicyOption{workloadbuilder.BasicPolicy, workloadbuilder.GangPolicy},
 		AllowedDisruptionModes: []workloadbuilder.DisruptionModeOption{workloadbuilder.SingleMode, workloadbuilder.AllMode},
-	}).Validate(ctx, schedulingPath, workloadbuilder.ValidationInput{})
+	}).Validate(ctx, workloadbuilder.ValidationInput{})
 
 	if len(allErrs) > 0 {
 		fmt.Printf("rejected: %v\n", allErrs.ToAggregate())
@@ -105,6 +106,7 @@ func ExampleJobControllerE2E() {
 	//    callback mutates only the resolved config, never the caller's inputs.
 	item := &workloadbuilder.WorkloadItem{
 		Name:          "trainer-pgt-0",
+		Path:          field.NewPath("spec", "scheduling"),
 		DefaultConfig: &workloadbuilder.SchedulingConfig{Policy: &workloadbuilder.SchedulingPolicy{Basic: &workloadbuilder.BasicSchedulingPolicy{}}},
 		Input:         userInput,
 		Callbacks: []workloadbuilder.SchedulingConfigFunc{
@@ -136,7 +138,7 @@ func ExampleJobControllerE2E() {
 
 	// 4. Run the complex controller-policy checks. Structural building-block
 	// validation already ran at the apiserver, so it is disabled above.
-	if errs := builder.Validate(context.Background(), field.NewPath("spec", "scheduling"), workloadbuilder.ValidationInput{}); len(errs) > 0 {
+	if errs := builder.Validate(context.Background(), workloadbuilder.ValidationInput{}); len(errs) > 0 {
 		fmt.Printf("validation failed: %v\n", errs.ToAggregate())
 		return
 	}
@@ -200,7 +202,7 @@ func ExampleDelegatedPodGroupFromExistingWorkload() {
 	builder := workloadbuilder.NewBuilderFromExistingWorkload(parentWorkload, workloadbuilder.BuildOptions{Owner: owner})
 
 	// Validate is a no-op for a builder created from an existing Workload.
-	if errs := builder.Validate(context.Background(), field.NewPath("spec", "scheduling"), workloadbuilder.ValidationInput{}); len(errs) > 0 {
+	if errs := builder.Validate(context.Background(), workloadbuilder.ValidationInput{}); len(errs) > 0 {
 		fmt.Printf("unexpected validation errors: %v\n", errs.ToAggregate())
 		return
 	}
