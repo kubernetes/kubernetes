@@ -28,9 +28,19 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/authentication/v1";
 
+// AttestationValue masks the value so protobuf can generate
+// +protobuf.nullable=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+message AttestationValue {
+  // items, if empty, will result in an empty slice
+
+  repeated string items = 1;
+}
+
 // BoundObjectReference is a reference to an object that a token is bound to.
 message BoundObjectReference {
-  // kind of the referent. Valid kinds are 'Pod' and 'Secret'.
+  // kind of the referent. Valid kinds are 'Pod', 'Secret', 'Node',
+  // 'ValidatingWebhookConfiguration', and 'MutatingWebhookConfiguration'.
   // +optional
   optional string kind = 1;
 
@@ -121,6 +131,14 @@ message TokenRequestSpec {
   // small if you want prompt revocation.
   // +optional
   optional BoundObjectReference boundObjectRef = 3;
+
+  // attestations is a map of well-known keys to string-slice values.
+  // The values for each key have a specific semantic meaning, which is
+  // documented on the key definition. Requesters of tokens may ask
+  // the Kubernetes API Server to attest to certain claims. The API Server
+  // may perform authorization checks depending on the key of this map.
+  // +optional
+  map<string, AttestationValue> attestations = 5;
 }
 
 // TokenRequestStatus is the result of a token request.

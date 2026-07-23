@@ -19,8 +19,11 @@ package storage
 import (
 	"context"
 	"fmt"
+	"iter"
+	"strings"
 	"time"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	authenticationapiv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +36,8 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	authenticationtokenjwt "k8s.io/apiserver/pkg/authentication/token/jwt"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -44,6 +49,10 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	token "k8s.io/kubernetes/pkg/serviceaccount"
+)
+
+const (
+	maxAdmissionReviewWebhookTokenExpirationSeconds = 10 * 60
 )
 
 func (r *TokenREST) New() runtime.Object {
@@ -61,9 +70,12 @@ type TokenREST struct {
 	pods                         rest.Getter
 	secrets                      rest.Getter
 	nodes                        rest.Getter
+	validatingWebhooks           *vwhGetter
+	mutatingWebhooks             *mwhGetter
+	authorizer                   authorizer.Authorizer
 	issuer                       token.TokenGenerator
 	auds                         authenticator.Audiences
-	audsSet                      sets.String
+	audsSet                      sets.Set[string]
 	maxExpirationSeconds         int64
 	extendExpiration             bool
 	maxExtendedExpirationSeconds int64
@@ -104,6 +116,8 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		return nil, err
 	}
 	svcacct := svcacctObj.(*api.ServiceAccount)
+
+	attestations := req.Spec.Attestations
 
 	if len(req.UID) > 0 && req.UID != svcacct.UID {
 		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.TokenRequestServiceAccountUIDValidation) {
@@ -149,9 +163,11 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	}
 
 	var (
-		pod    *api.Pod
-		node   *api.Node
-		secret *api.Secret
+		pod        *api.Pod
+		node       *api.Node
+		secret     *api.Secret
+		validating *admissionregistrationv1.ValidatingWebhookConfiguration
+		mutating   *admissionregistrationv1.MutatingWebhookConfiguration
 	)
 
 	if ref := req.Spec.BoundObjectRef; ref != nil {
@@ -211,6 +227,42 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 			}
 			secret = secretObj.(*api.Secret)
 			uid = secret.UID
+		case gvk.GroupVersion() == admissionregistrationv1.SchemeGroupVersion && (gvk.Kind == "ValidatingWebhookConfiguration" || gvk.Kind == "MutatingWebhookConfiguration"): // TODO(enj): we seem to have ignored the version for the other refs which is questionable ...
+			if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerWebhookAuthenticationToken) {
+				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token to object of type %s (feature gate %s is disabled)", gvk.String(), genericfeatures.APIServerWebhookAuthenticationToken))
+			}
+
+			if r.hasAnyKubeAudiences(req.Spec.Audiences) {
+				return nil, errors.NewBadRequest("api server audiences are invalid for webhook token requests")
+			}
+
+			newCtx, err := getNewWebhookCtx(ctx, gvk, ref.Name)
+			if err != nil {
+				return nil, errors.NewInternalError(err)
+			}
+
+			// validation guarantees the presence of both of these and their single value
+			admissionReviewAPIGroup := attestations[authenticationapi.AttestationAdmissionReviewAPIGroups][0]
+			audience := req.Spec.Audiences[0]
+
+			req.Spec.ExpirationSeconds = min(req.Spec.ExpirationSeconds, maxAdmissionReviewWebhookTokenExpirationSeconds)
+
+			if err := r.authorizeAdmissionWebhookAuthnTokenRequest(newCtx, svcacct, admissionReviewAPIGroup); err != nil {
+				return nil, err
+			}
+
+			switch gvk.Kind {
+			case "ValidatingWebhookConfiguration":
+				validating, uid, err = getAndValidateWebhookConfig(newCtx, ref.Name, audience, admissionReviewAPIGroup, r.validatingWebhooks, nowTime)
+			case "MutatingWebhookConfiguration":
+				mutating, uid, err = getAndValidateWebhookConfig(newCtx, ref.Name, audience, admissionReviewAPIGroup, r.mutatingWebhooks, nowTime)
+			default:
+				return nil, errors.NewInternalError(fmt.Errorf("unhandled kind"))
+			}
+			if err != nil {
+				klog.V(4).ErrorS(err, "validation for bound webhook failed", "kind", gvk.Kind)
+				return nil, errors.NewForbidden(schema.GroupResource{Group: "", Resource: "serviceaccounts/token"}, svcacct.Name, fmt.Errorf("token request denied"))
+			}
 		default:
 			return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token to object of type %s", gvk.String()))
 		}
@@ -236,7 +288,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		exp = r.maxExtendedExpirationSeconds
 	}
 
-	sc, pc, err := token.Claims(*svcacct, pod, secret, node, exp, warnAfter, req.Spec.Audiences)
+	sc, pc, err := token.Claims(*svcacct, pod, secret, node, validating, mutating, exp, warnAfter, req.Spec.Audiences, attestations)
 	if err != nil {
 		return nil, err
 	}
@@ -257,8 +309,52 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	return out, nil
 }
 
+func (r *TokenREST) authorizeAdmissionWebhookAuthnTokenRequest(ctx context.Context, sa *api.ServiceAccount, admissionReviewAPIGroup string) error {
+	attributes := authorizer.AttributesRecord{
+		User: (&serviceaccount.ServiceAccountInfo{
+			Name:      sa.Name,
+			Namespace: sa.Namespace,
+			UID:       string(sa.UID),
+		}).UserInfo(),
+		Verb:            "attest",
+		APIVersion:      "*",
+		APIGroup:        "authentication.k8s.io",
+		Resource:        authenticationapi.AttestationAdmissionReviewAPIGroups,
+		Name:            admissionReviewAPIGroup,
+		ResourceRequest: true,
+	}
+
+	authorized, reason, err := r.authorizer.Authorize(ctx, attributes)
+	if authorized == authorizer.DecisionAllow {
+		return nil
+	}
+
+	msg := reason
+	switch {
+	case err != nil && len(reason) > 0:
+		msg = fmt.Sprintf("%v: %s", err, reason)
+	case err != nil:
+		msg = err.Error()
+	}
+
+	return responsewriters.ForbiddenStatusError(attributes, msg)
+}
+
 func (r *TokenREST) GroupVersionKind(schema.GroupVersion) schema.GroupVersionKind {
 	return gvk
+}
+
+func getNewWebhookCtx(ctx context.Context, gvk schema.GroupVersionKind, refName string) (context.Context, error) {
+	var newCtx context.Context
+	switch gvk.Kind {
+	case "ValidatingWebhookConfiguration":
+		newCtx = newContext(ctx, "validatingwebhookconfigurations", refName, "", gvk)
+	case "MutatingWebhookConfiguration":
+		newCtx = newContext(ctx, "mutatingwebhookconfigurations", refName, "", gvk)
+	default:
+		return nil, fmt.Errorf("unhandled kind")
+	}
+	return newCtx, nil
 }
 
 // newContext return a copy of ctx in which new RequestInfo is set
@@ -282,8 +378,145 @@ func (r *TokenREST) isKubeAudiences(tokenAudience []string) bool {
 	return r.audsSet.HasAll(tokenAudience...)
 }
 
+// hasAnyKubeAudiences returns true if the tokenaudiences has any apiserver audiences.
+func (r *TokenREST) hasAnyKubeAudiences(tokenAudience []string) bool {
+	return r.audsSet.HasAny(tokenAudience...)
+}
+
 // PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate indicates that the
 // TokenRequest's UID should be preserved when creating subresources
 func (r *TokenREST) PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate() bool {
 	return true
+}
+
+type whFieldGetter[T webhook] interface {
+	get(ctx context.Context, name string, now time.Time) (T, iter.Seq[*webhookFields], error)
+}
+
+type webhookFields struct {
+	config *admissionregistrationv1.WebhookClientConfig
+	rules  []admissionregistrationv1.RuleWithOperations
+}
+
+type vwhGetter struct {
+	validatingWebhooks webhookGetter[*admissionregistrationv1.ValidatingWebhookConfiguration]
+}
+
+func (v *vwhGetter) get(ctx context.Context, name string, now time.Time) (*admissionregistrationv1.ValidatingWebhookConfiguration, iter.Seq[*webhookFields], error) {
+	wh, err := v.validatingWebhooks.Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if wh.DeletionTimestamp != nil && now.After(wh.DeletionTimestamp.Time) {
+		return nil, nil, fmt.Errorf("deletion timestamp has passed for validating webhook configuration %q", wh.Name)
+	}
+
+	return wh, func(yield func(*webhookFields) bool) {
+		for _, hook := range wh.Webhooks {
+			if !yield(&webhookFields{config: &hook.ClientConfig, rules: hook.Rules}) {
+				return
+			}
+		}
+	}, nil
+}
+
+type mwhGetter struct {
+	mutatingWebhooks webhookGetter[*admissionregistrationv1.MutatingWebhookConfiguration]
+}
+
+func (m *mwhGetter) get(ctx context.Context, name string, now time.Time) (*admissionregistrationv1.MutatingWebhookConfiguration, iter.Seq[*webhookFields], error) {
+	wh, err := m.mutatingWebhooks.Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if wh.DeletionTimestamp != nil && now.After(wh.DeletionTimestamp.Time) {
+		return nil, nil, fmt.Errorf("deletion timestamp has passed for mutating webhook configuration %q", wh.Name)
+	}
+	return wh, func(yield func(*webhookFields) bool) {
+		for _, hook := range wh.Webhooks {
+			if !yield(&webhookFields{config: &hook.ClientConfig, rules: hook.Rules}) {
+				return
+			}
+		}
+	}, nil
+}
+
+func getAndValidateWebhookConfig[T webhook](ctx context.Context, name, audience, admissionReviewAPIGroup string, getter whFieldGetter[T], now time.Time) (T, types.UID, error) {
+	obj, whs, err := getter.get(ctx, name, now)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// "*" means the token is valid for all API groups; skip the check. We
+	// expect only kube-apiserver to ever be authorized to ask for this.
+	if admissionReviewAPIGroup == "*" {
+		return obj, obj.GetUID(), nil
+	}
+
+	// check if any webhook in the config both matches the requested admissionReviewAPIGroup and audience (at the same time)
+	for wh := range whs {
+		if validateAttestationAPIGroup(wh, admissionReviewAPIGroup) && validateWebhookAudience(wh, audience) {
+			return obj, obj.GetUID(), nil
+		}
+	}
+
+	return nil, "", fmt.Errorf("no matching webhook found in config %q", name)
+}
+
+// validateWebhookAudience checks whether the requested audience matches at
+// least the provided webhook's client config. For URL-configured webhooks the
+// audience must be the URL verbatim. For service-configured webhooks the
+// audience must be https://$name.$namespace.svc:$port[/$path] . Note that the
+// trailing slash must match between the webhook's expected audience and the
+// service's configuration.
+func validateWebhookAudience(hook *webhookFields, audience string) bool {
+	cc := hook.config
+	if cc.URL != nil && audience == *cc.URL {
+		return true
+	}
+	if cc.Service != nil {
+		port := int32(443)
+		if cc.Service.Port != nil {
+			port = *cc.Service.Port
+		}
+		path := "/"
+		if cc.Service.Path != nil {
+			path = *cc.Service.Path
+			if !strings.HasPrefix(path, "/") {
+				path = "/" + path
+			}
+		}
+		svcAud := fmt.Sprintf("https://%s.%s.svc:%d%s", cc.Service.Name, cc.Service.Namespace, port, path)
+
+		if audience == svcAud {
+			return true
+		}
+	}
+	return false
+}
+
+// validateAttestationAPIGroup checks whether the attested API group matches at
+// least one Rule in the provided webhook. A "*" admissionReviewAPIGroup
+// attestation value skips this check since it represents all API groups. A "*"
+// in a Rule's APIGroups matches any attested value. It is assumed that the cel
+// expressions in the matchConditions properly match the AdmissionReview request
+// for which the TokenRequest is being made.
+func validateAttestationAPIGroup(hook *webhookFields, attestedGroup string) bool {
+	for _, rule := range hook.rules {
+		for _, group := range rule.APIGroups {
+			if group == "*" || group == attestedGroup {
+				return true
+			}
+		}
+	}
+
+	// An aggregated API Server will never need a cross-group equivalent, so we
+	// do not check equivalents here.
+
+	// If this point is reached, there are either a) no rules or b) rules but
+	// none matched. If there are no rules, the invocation will never match and
+	// the request should be denied.
+	return false
 }

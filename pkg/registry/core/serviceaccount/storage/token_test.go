@@ -26,17 +26,22 @@ import (
 
 	"gopkg.in/go-jose/go-jose.v2/jwt"
 
+	admissionregistration "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
+	fake "k8s.io/client-go/kubernetes/fake"
+	ktesting "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -341,3 +346,587 @@ func (r *dummyRecorder) getWarning() string {
 }
 
 var _ warning.Recorder = &dummyRecorder{}
+
+func TestValidateWebhookAudience(t *testing.T) {
+	cases := []struct {
+		name     string
+		hook     *webhookFields
+		audience string
+		want     bool
+	}{
+		{
+			name:     "URL match",
+			hook:     &webhookFields{config: &admissionregistration.WebhookClientConfig{URL: new("https://validate.example.com")}},
+			audience: "https://validate.example.com",
+			want:     true,
+		},
+		{
+			name: "service match with port and path",
+			hook: &webhookFields{config: &admissionregistration.WebhookClientConfig{
+				Service: &admissionregistration.ServiceReference{Name: "webhook-svc", Namespace: "webhook-ns", Port: new(int32(8443)), Path: new("/validate")},
+			}},
+			audience: "https://webhook-svc.webhook-ns.svc:8443/validate",
+			want:     true,
+		},
+		{
+			name: "service match with default port (nil path)",
+			hook: &webhookFields{config: &admissionregistration.WebhookClientConfig{
+				Service: &admissionregistration.ServiceReference{Name: "default-port-svc", Namespace: "default-ns"},
+			}},
+			audience: "https://default-port-svc.default-ns.svc:443/",
+			want:     true,
+		},
+		{
+			name: "service path without leading slash gets slash prepended",
+			hook: &webhookFields{config: &admissionregistration.WebhookClientConfig{
+				Service: &admissionregistration.ServiceReference{Name: "svc", Namespace: "ns", Port: new(int32(443)), Path: new("hooks")},
+			}},
+			audience: "https://svc.ns.svc:443/hooks",
+			want:     true,
+		},
+		{
+			name: "service with empty string path treated as slash",
+			hook: &webhookFields{config: &admissionregistration.WebhookClientConfig{
+				Service: &admissionregistration.ServiceReference{Name: "svc", Namespace: "ns", Port: new(int32(443)), Path: new("")},
+			}},
+			audience: "https://svc.ns.svc:443/",
+			want:     true,
+		},
+		{
+			name: "service with explicit slash path",
+			hook: &webhookFields{config: &admissionregistration.WebhookClientConfig{
+				Service: &admissionregistration.ServiceReference{Name: "svc", Namespace: "ns", Port: new(int32(443)), Path: new("/")},
+			}},
+			audience: "https://svc.ns.svc:443/",
+			want:     true,
+		},
+		{
+			name: "service with trailing slash rejected",
+			hook: &webhookFields{config: &admissionregistration.WebhookClientConfig{
+				Service: &admissionregistration.ServiceReference{Name: "webhook-svc", Namespace: "webhook-ns", Port: new(int32(8443)), Path: new("/validate")},
+			}},
+			audience: "https://webhook-svc.webhook-ns.svc:8443/validate/",
+			want:     false,
+		},
+		{
+			name:     "no match",
+			hook:     &webhookFields{config: &admissionregistration.WebhookClientConfig{URL: new("https://validate.example.com")}},
+			audience: "https://unknown.example.com",
+			want:     false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := validateWebhookAudience(tc.hook, tc.audience)
+			if got != tc.want {
+				t.Errorf("validateWebhookAudience(%q) = %v, want %v", tc.audience, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateAttestationAPIGroup(t *testing.T) {
+	cases := []struct {
+		name  string
+		hook  *webhookFields
+		group string
+		want  bool
+	}{
+		{
+			name: "exact match apps",
+			hook: &webhookFields{rules: []admissionregistration.RuleWithOperations{
+				{Rule: admissionregistration.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}}},
+			}},
+			group: "apps",
+			want:  true,
+		},
+		{
+			name: "exact match batch among multiple rules",
+			hook: &webhookFields{rules: []admissionregistration.RuleWithOperations{
+				{Rule: admissionregistration.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}}},
+				{Rule: admissionregistration.Rule{APIGroups: []string{"batch"}, APIVersions: []string{"v1"}, Resources: []string{"jobs"}}},
+			}},
+			group: "batch",
+			want:  true,
+		},
+		{
+			name: "wildcard rule matches any group",
+			hook: &webhookFields{rules: []admissionregistration.RuleWithOperations{
+				{Rule: admissionregistration.Rule{APIGroups: []string{"*"}, APIVersions: []string{"v1"}, Resources: []string{"*"}}},
+			}},
+			group: "networking.k8s.io",
+			want:  true,
+		},
+		{
+			name: "wildcard attestation matches wildcard rule",
+			hook: &webhookFields{rules: []admissionregistration.RuleWithOperations{
+				{Rule: admissionregistration.Rule{APIGroups: []string{"*"}, APIVersions: []string{"v1"}, Resources: []string{"*"}}},
+			}},
+			group: "*",
+			want:  true,
+		},
+		{
+			name: "wildcard attestation does not match specific rule",
+			hook: &webhookFields{rules: []admissionregistration.RuleWithOperations{
+				{Rule: admissionregistration.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}}},
+			}},
+			group: "*",
+			want:  false,
+		},
+		{
+			name: "no match",
+			hook: &webhookFields{rules: []admissionregistration.RuleWithOperations{
+				{Rule: admissionregistration.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}}},
+			}},
+			group: "networking.k8s.io",
+			want:  false,
+		},
+		{
+			name:  "empty rules",
+			hook:  &webhookFields{},
+			group: "apps",
+			want:  false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := validateAttestationAPIGroup(tc.hook, tc.group)
+			if got != tc.want {
+				t.Errorf("validateAttestationAPIGroup(%q) = %v, want %v", tc.group, got, tc.want)
+			}
+		})
+	}
+}
+
+// recordingAuthorizer records all Authorize calls and returns a configurable decision.
+type recordingAuthorizer struct {
+	decision authorizer.Decision
+	calls    []authorizer.Attributes
+}
+
+func (r *recordingAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+	r.calls = append(r.calls, a)
+	if r.decision == authorizer.DecisionAllow {
+		return authorizer.DecisionAllow, "", nil
+	}
+	return authorizer.DecisionDeny, "denied by test", nil
+}
+
+func (r *recordingAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(r.Authorize(ctx, a))
+}
+
+func (r *recordingAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", nil
+}
+
+func newTestTokenREST(t *testing.T, authz authorizer.Authorizer, fakeClient *fake.Clientset) *TokenREST {
+	sa := &api.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-sa", Namespace: "test-ns", UID: "sa-uid-123"},
+	}
+	return &TokenREST{
+		svcaccts: &fakeObjectGetter{obj: sa},
+		pods:     nil,
+		secrets:  nil,
+		nodes:    nil,
+		validatingWebhooks: &vwhGetter{
+			validatingWebhooks: fakeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations(),
+		},
+		mutatingWebhooks: &mwhGetter{
+			mutatingWebhooks: fakeClient.AdmissionregistrationV1().MutatingWebhookConfigurations(),
+		},
+		authorizer:           authz,
+		issuer:               fakeTokenGenerator{"fake-token"},
+		auds:                 authenticator.Audiences{"api"},
+		audsSet:              sets.New("api"),
+		maxExpirationSeconds: 3600,
+	}
+}
+
+func testWebhookCreateContext() context.Context {
+	ctx := request.WithNamespace(request.NewContext(), "test-ns")
+	ctx = request.WithRequestInfo(ctx, &request.RequestInfo{
+		IsResourceRequest: true,
+		Verb:              "create",
+		Namespace:         "test-ns",
+		Resource:          "serviceaccounts",
+		Subresource:       "token",
+		Name:              "test-sa",
+	})
+	return audit.WithAuditContext(ctx)
+}
+
+type fakeObjectGetter struct {
+	obj runtime.Object
+	err error
+}
+
+func (f *fakeObjectGetter) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.obj, nil
+}
+
+func TestTokenRESTCreateWebhookAuthenticationFlow(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIServerWebhookAuthenticationToken, true)
+
+	webhookCfg := &admissionregistration.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-webhook", UID: "webhook-uid-456"},
+		Webhooks: []admissionregistration.ValidatingWebhook{{
+			ClientConfig: admissionregistration.WebhookClientConfig{URL: new("https://webhook.example.com")},
+			Rules: []admissionregistration.RuleWithOperations{{
+				Rule: admissionregistration.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}},
+			}},
+		}},
+	}
+
+	validReq := &authenticationapi.TokenRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-sa", Namespace: "test-ns"},
+		Spec: authenticationapi.TokenRequestSpec{
+			Audiences:         []string{"https://webhook.example.com"},
+			ExpirationSeconds: 3600,
+			BoundObjectRef: &authenticationapi.BoundObjectReference{
+				Kind:       "ValidatingWebhookConfiguration",
+				APIVersion: "admissionregistration.k8s.io/v1",
+				Name:       "my-webhook",
+			},
+			Attestations: map[string]authenticationapi.AttestationValue{
+				"admissionReviewAPIGroups": {"apps"},
+			},
+		},
+	}
+
+	ctx := testWebhookCreateContext()
+
+	t.Run("success", func(t *testing.T) {
+		authz := &recordingAuthorizer{decision: authorizer.DecisionAllow}
+		fakeClient := fake.NewClientset(webhookCfg)
+		r := newTestTokenREST(t, authz, fakeClient)
+
+		_, err := r.Create(ctx, "test-sa", validReq.DeepCopy(), nil, &metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		// Verify authorizer was called with correct attributes
+		if len(authz.calls) != 1 {
+			t.Fatalf("expected 1 authorizer call, got %d", len(authz.calls))
+		}
+		call := authz.calls[0]
+		if call.GetVerb() != "attest" {
+			t.Errorf("expected verb 'attest', got %q", call.GetVerb())
+		}
+		if call.GetAPIGroup() != "authentication.k8s.io" {
+			t.Errorf("expected API group 'authentication.k8s.io', got %q", call.GetAPIGroup())
+		}
+		if call.GetResource() != "admissionReviewAPIGroups" {
+			t.Errorf("expected resource 'admissionReviewAPIGroups', got %q", call.GetResource())
+		}
+		if call.GetName() != "apps" {
+			t.Errorf("expected name 'apps', got %q", call.GetName())
+		}
+
+		// Verify the fake client was called to get the webhook config
+		actions := fakeClient.Actions()
+		if len(actions) != 1 {
+			t.Fatalf("expected 1 client action, got %d: %v", len(actions), actions)
+		}
+		getAction, ok := actions[0].(ktesting.GetAction)
+		if !ok {
+			t.Fatalf("expected GetAction, got %T", actions[0])
+		}
+		if getAction.GetName() != "my-webhook" {
+			t.Errorf("expected get of 'my-webhook', got %q", getAction.GetName())
+		}
+	})
+
+	t.Run("denied by authorizer", func(t *testing.T) {
+		authz := &recordingAuthorizer{decision: authorizer.DecisionDeny}
+		fakeClient := fake.NewClientset(webhookCfg)
+		r := newTestTokenREST(t, authz, fakeClient)
+
+		_, err := r.Create(ctx, "test-sa", validReq.DeepCopy(), nil, &metav1.CreateOptions{})
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		wantErr := `admissionReviewAPIGroups.authentication.k8s.io "apps" is forbidden: User "system:serviceaccount:test-ns:test-sa" cannot attest resource "admissionReviewAPIGroups" in API group "authentication.k8s.io" at the cluster scope: denied by test`
+		if got := err.Error(); got != wantErr {
+			t.Fatalf("expected error:\n\t%s\ngot:\n\t%s", wantErr, got)
+		}
+
+		// Authorizer should have been called
+		if len(authz.calls) != 1 {
+			t.Fatalf("expected 1 authorizer call, got %d", len(authz.calls))
+		}
+		// Webhook getter should NOT have been called (authz denied before reaching it)
+		if len(fakeClient.Actions()) != 0 {
+			t.Fatalf("expected 0 client actions, got %d", len(fakeClient.Actions()))
+		}
+	})
+
+	t.Run("wrong audience", func(t *testing.T) {
+		authz := &recordingAuthorizer{decision: authorizer.DecisionAllow}
+		fakeClient := fake.NewClientset(webhookCfg)
+		r := newTestTokenREST(t, authz, fakeClient)
+
+		req := validReq.DeepCopy()
+		req.Spec.Audiences = []string{"https://wrong.example.com"}
+
+		_, err := r.Create(ctx, "test-sa", req, nil, &metav1.CreateOptions{})
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		wantErr := `serviceaccounts/token "test-sa" is forbidden: token request denied`
+		if got := err.Error(); got != wantErr {
+			t.Fatalf("expected error:\n\t%s\ngot:\n\t%s", wantErr, got)
+		}
+
+		// Webhook getter should have been called (audience check happens after fetch)
+		if len(fakeClient.Actions()) != 1 {
+			t.Fatalf("expected 1 client action, got %d", len(fakeClient.Actions()))
+		}
+	})
+
+	t.Run("API group not in webhook rules", func(t *testing.T) {
+		authz := &recordingAuthorizer{decision: authorizer.DecisionAllow}
+		fakeClient := fake.NewClientset(webhookCfg)
+		r := newTestTokenREST(t, authz, fakeClient)
+
+		req := validReq.DeepCopy()
+		req.Spec.Attestations = map[string]authenticationapi.AttestationValue{
+			"admissionReviewAPIGroups": {"networking.k8s.io"},
+		}
+
+		_, err := r.Create(ctx, "test-sa", req, nil, &metav1.CreateOptions{})
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		wantErr := `serviceaccounts/token "test-sa" is forbidden: token request denied`
+		if got := err.Error(); got != wantErr {
+			t.Fatalf("expected error:\n\t%s\ngot:\n\t%s", wantErr, got)
+		}
+	})
+
+	t.Run("audience matches one webhook but API group matches another", func(t *testing.T) {
+		splitCfg := &admissionregistration.ValidatingWebhookConfiguration{
+			ObjectMeta: metav1.ObjectMeta{Name: "split-webhook", UID: "split-uid"},
+			Webhooks: []admissionregistration.ValidatingWebhook{
+				{
+					ClientConfig: admissionregistration.WebhookClientConfig{URL: new("https://webhook.example.com")},
+					Rules: []admissionregistration.RuleWithOperations{{
+						Rule: admissionregistration.Rule{APIGroups: []string{"educate.dolphins.io"}, APIVersions: []string{"v1"}, Resources: []string{"courses"}},
+					}},
+				},
+				{
+					ClientConfig: admissionregistration.WebhookClientConfig{URL: new("https://other.example.com")},
+					Rules: []admissionregistration.RuleWithOperations{{
+						Rule: admissionregistration.Rule{APIGroups: []string{"train.parrots.dev"}, APIVersions: []string{"v1"}, Resources: []string{"sessions"}},
+					}},
+				},
+			},
+		}
+
+		authz := &recordingAuthorizer{decision: authorizer.DecisionAllow}
+		fakeClient := fake.NewClientset(splitCfg)
+		r := newTestTokenREST(t, authz, fakeClient)
+
+		req := validReq.DeepCopy()
+		req.Spec.BoundObjectRef.Name = "split-webhook"
+		req.Spec.Audiences = []string{"https://webhook.example.com"}
+		req.Spec.Attestations = map[string]authenticationapi.AttestationValue{
+			"admissionReviewAPIGroups": {"train.parrots.dev"},
+		}
+
+		_, err := r.Create(ctx, "test-sa", req, nil, &metav1.CreateOptions{})
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		wantErr := `serviceaccounts/token "test-sa" is forbidden: token request denied`
+		if got := err.Error(); got != wantErr {
+			t.Fatalf("expected error:\n\t%s\ngot:\n\t%s", wantErr, got)
+		}
+	})
+
+	t.Run("feature gate disabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIServerWebhookAuthenticationToken, false)
+
+		authz := &recordingAuthorizer{decision: authorizer.DecisionAllow}
+		fakeClient := fake.NewClientset(webhookCfg)
+		r := newTestTokenREST(t, authz, fakeClient)
+
+		_, err := r.Create(ctx, "test-sa", validReq.DeepCopy(), nil, &metav1.CreateOptions{})
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		wantErr := `cannot bind token to object of type admissionregistration.k8s.io/v1, Kind=ValidatingWebhookConfiguration (feature gate APIServerWebhookAuthenticationToken is disabled)`
+		if got := err.Error(); got != wantErr {
+			t.Fatalf("expected error:\n\t%s\ngot:\n\t%s", wantErr, got)
+		}
+
+		// Neither authorizer nor webhook getter should be called
+		if len(authz.calls) != 0 {
+			t.Fatalf("expected 0 authorizer calls, got %d", len(authz.calls))
+		}
+		if len(fakeClient.Actions()) != 0 {
+			t.Fatalf("expected 0 client actions, got %d", len(fakeClient.Actions()))
+		}
+	})
+}
+
+func TestTokenRESTCreateWebhookExpirationCap(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIServerWebhookAuthenticationToken, true)
+
+	webhookCfg := &admissionregistration.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-webhook", UID: "webhook-uid-456"},
+		Webhooks: []admissionregistration.ValidatingWebhook{{
+			ClientConfig: admissionregistration.WebhookClientConfig{URL: new("https://webhook.example.com")},
+			Rules: []admissionregistration.RuleWithOperations{{
+				Rule: admissionregistration.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}},
+			}},
+		}},
+	}
+
+	ctx := testWebhookCreateContext()
+
+	cases := []struct {
+		name          string
+		requestExp    int64
+		wantExpCapped int64
+	}{
+		{
+			name:          "expiration at minimum (equals cap) is preserved",
+			requestExp:    600,
+			wantExpCapped: 600,
+		},
+		{
+			name:          "expiration over cap is truncated to 10 minutes",
+			requestExp:    3600,
+			wantExpCapped: 600,
+		},
+		{
+			name:          "expiration slightly over cap is truncated",
+			requestExp:    601,
+			wantExpCapped: 600,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			authz := &recordingAuthorizer{decision: authorizer.DecisionAllow}
+			fakeClient := fake.NewClientset(webhookCfg)
+			r := newTestTokenREST(t, authz, fakeClient)
+
+			req := &authenticationapi.TokenRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sa", Namespace: "test-ns"},
+				Spec: authenticationapi.TokenRequestSpec{
+					Audiences:         []string{"https://webhook.example.com"},
+					ExpirationSeconds: tc.requestExp,
+					BoundObjectRef: &authenticationapi.BoundObjectReference{
+						Kind:       "ValidatingWebhookConfiguration",
+						APIVersion: "admissionregistration.k8s.io/v1",
+						Name:       "my-webhook",
+					},
+					Attestations: map[string]authenticationapi.AttestationValue{
+						"admissionReviewAPIGroups": {"apps"},
+					},
+				},
+			}
+
+			result, err := r.Create(ctx, "test-sa", req, nil, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			tokenReq := result.(*authenticationapi.TokenRequest)
+			if tokenReq.Spec.ExpirationSeconds != tc.wantExpCapped {
+				t.Errorf("expected ExpirationSeconds %d, got %d", tc.wantExpCapped, tokenReq.Spec.ExpirationSeconds)
+			}
+		})
+	}
+}
+
+func TestTokenRESTCreateWebhookDeletionTimestamp(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIServerWebhookAuthenticationToken, true)
+
+	ctx := testWebhookCreateContext()
+
+	makeReq := func() *authenticationapi.TokenRequest {
+		return &authenticationapi.TokenRequest{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-sa", Namespace: "test-ns"},
+			Spec: authenticationapi.TokenRequestSpec{
+				Audiences:         []string{"https://webhook.example.com"},
+				ExpirationSeconds: 600,
+				BoundObjectRef: &authenticationapi.BoundObjectReference{
+					Kind:       "ValidatingWebhookConfiguration",
+					APIVersion: "admissionregistration.k8s.io/v1",
+					Name:       "my-webhook",
+				},
+				Attestations: map[string]authenticationapi.AttestationValue{
+					"admissionReviewAPIGroups": {"apps"},
+				},
+			},
+		}
+	}
+
+	baseWebhook := func() *admissionregistration.ValidatingWebhookConfiguration {
+		return &admissionregistration.ValidatingWebhookConfiguration{
+			ObjectMeta: metav1.ObjectMeta{Name: "my-webhook", UID: "webhook-uid-456"},
+			Webhooks: []admissionregistration.ValidatingWebhook{{
+				ClientConfig: admissionregistration.WebhookClientConfig{URL: new("https://webhook.example.com")},
+				Rules: []admissionregistration.RuleWithOperations{{
+					Rule: admissionregistration.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}},
+				}},
+			}},
+		}
+	}
+
+	t.Run("nil deletion timestamp succeeds", func(t *testing.T) {
+		cfg := baseWebhook()
+		// DeletionTimestamp is nil by default
+		authz := &recordingAuthorizer{decision: authorizer.DecisionAllow}
+		fakeClient := fake.NewClientset(cfg)
+		r := newTestTokenREST(t, authz, fakeClient)
+
+		_, err := r.Create(ctx, "test-sa", makeReq(), nil, &metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("deletion timestamp in the past is rejected", func(t *testing.T) {
+		cfg := baseWebhook()
+		pastTime := metav1.NewTime(time.Now().Add(-1 * time.Hour))
+		cfg.DeletionTimestamp = &pastTime
+
+		authz := &recordingAuthorizer{decision: authorizer.DecisionAllow}
+		fakeClient := fake.NewClientset(cfg)
+		r := newTestTokenREST(t, authz, fakeClient)
+
+		_, err := r.Create(ctx, "test-sa", makeReq(), nil, &metav1.CreateOptions{})
+		if err == nil {
+			t.Fatal("expected error for webhook with past deletion timestamp, got nil")
+		}
+		wantErr := `serviceaccounts/token "test-sa" is forbidden: token request denied`
+		if got := err.Error(); got != wantErr {
+			t.Fatalf("expected error:\n\t%s\ngot:\n\t%s", wantErr, got)
+		}
+	})
+
+	t.Run("deletion timestamp in the future succeeds", func(t *testing.T) {
+		cfg := baseWebhook()
+		futureTime := metav1.NewTime(time.Now().Add(1 * time.Hour))
+		cfg.DeletionTimestamp = &futureTime
+
+		authz := &recordingAuthorizer{decision: authorizer.DecisionAllow}
+		fakeClient := fake.NewClientset(cfg)
+		r := newTestTokenREST(t, authz, fakeClient)
+
+		_, err := r.Create(ctx, "test-sa", makeReq(), nil, &metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+}
