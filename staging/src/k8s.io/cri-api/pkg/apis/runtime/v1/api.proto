@@ -1111,6 +1111,10 @@ message LinuxContainerSecurityContext {
     //   <full-path-to-profile> is the full path of the profile.
     // Default: "", which is identical with unconfined.
     string seccomp_profile_path = 10 [deprecated=true];
+    // cgroup_mount_mode controls how the cgroup filesystem is mounted.
+    // "ReadOnly" (default) or "Writable" (allows container to manage its cgroup subtree).
+    // Only effective with cgroup v2.
+    string cgroup_mount_mode = 18;
 }
 
 // LinuxContainerConfig contains platform-specific configuration for
@@ -1894,6 +1898,8 @@ message RuntimeFeatures {
     // user_namespaces_host_network is set to true if the runtime supports containers using both
     // host network and user namespace simultaneously.
     bool user_namespaces_host_network = 2;
+    // supports_cgroup_options is set to true if the CRI implementation supports cgroup options.
+    bool supports_cgroup_options = 3;
 }
 
 message StatusResponse {

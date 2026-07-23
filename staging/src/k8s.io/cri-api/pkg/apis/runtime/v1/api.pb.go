@@ -4726,8 +4726,12 @@ type LinuxContainerSecurityContext struct {
 	//
 	// Deprecated: Marked as deprecated in staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto.
 	SeccompProfilePath string `protobuf:"bytes,10,opt,name=seccomp_profile_path,json=seccompProfilePath,proto3" json:"seccomp_profile_path,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// cgroup_mount_mode controls how the cgroup filesystem is mounted.
+	// "ReadOnly" (default) or "Writable" (allows container to manage its cgroup subtree).
+	// Only effective with cgroup v2.
+	CgroupMountMode string `protobuf:"bytes,18,opt,name=cgroup_mount_mode,json=cgroupMountMode,proto3" json:"cgroup_mount_mode,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *LinuxContainerSecurityContext) Reset() {
@@ -4877,6 +4881,13 @@ func (x *LinuxContainerSecurityContext) GetApparmorProfile() string {
 func (x *LinuxContainerSecurityContext) GetSeccompProfilePath() string {
 	if x != nil {
 		return x.SeccompProfilePath
+	}
+	return ""
+}
+
+func (x *LinuxContainerSecurityContext) GetCgroupMountMode() string {
+	if x != nil {
+		return x.CgroupMountMode
 	}
 	return ""
 }
@@ -8902,8 +8913,10 @@ type RuntimeFeatures struct {
 	// user_namespaces_host_network is set to true if the runtime supports containers using both
 	// host network and user namespace simultaneously.
 	UserNamespacesHostNetwork bool `protobuf:"varint,2,opt,name=user_namespaces_host_network,json=userNamespacesHostNetwork,proto3" json:"user_namespaces_host_network,omitempty"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	// supports_cgroup_options is set to true if the CRI implementation supports cgroup options.
+	SupportsCgroupOptions bool `protobuf:"varint,3,opt,name=supports_cgroup_options,json=supportsCgroupOptions,proto3" json:"supports_cgroup_options,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *RuntimeFeatures) Reset() {
@@ -8946,6 +8959,13 @@ func (x *RuntimeFeatures) GetSupplementalGroupsPolicy() bool {
 func (x *RuntimeFeatures) GetUserNamespacesHostNetwork() bool {
 	if x != nil {
 		return x.UserNamespacesHostNetwork
+	}
+	return false
+}
+
+func (x *RuntimeFeatures) GetSupportsCgroupOptions() bool {
+	if x != nil {
+		return x.SupportsCgroupOptions
 	}
 	return false
 }
@@ -12202,7 +12222,7 @@ const file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc = ""
 	"Capability\x12)\n" +
 	"\x10add_capabilities\x18\x01 \x03(\tR\x0faddCapabilities\x12+\n" +
 	"\x11drop_capabilities\x18\x02 \x03(\tR\x10dropCapabilities\x128\n" +
-	"\x18add_ambient_capabilities\x18\x03 \x03(\tR\x16addAmbientCapabilities\"\xa2\a\n" +
+	"\x18add_ambient_capabilities\x18\x03 \x03(\tR\x16addAmbientCapabilities\"\xce\a\n" +
 	"\x1dLinuxContainerSecurityContext\x12:\n" +
 	"\fcapabilities\x18\x01 \x01(\v2\x16.runtime.v1.CapabilityR\fcapabilities\x12\x1e\n" +
 	"\n" +
@@ -12225,7 +12245,8 @@ const file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc = ""
 	"\bapparmor\x18\x10 \x01(\v2\x1b.runtime.v1.SecurityProfileR\bapparmor\x12-\n" +
 	"\x10apparmor_profile\x18\t \x01(\tB\x02\x18\x01R\x0fapparmorProfile\x124\n" +
 	"\x14seccomp_profile_path\x18\n" +
-	" \x01(\tB\x02\x18\x01R\x12seccompProfilePath\"\xaf\x01\n" +
+	" \x01(\tB\x02\x18\x01R\x12seccompProfilePath\x12*\n" +
+	"\x11cgroup_mount_mode\x18\x12 \x01(\tR\x0fcgroupMountMode\"\xaf\x01\n" +
 	"\x14LinuxContainerConfig\x12A\n" +
 	"\tresources\x18\x01 \x01(\v2#.runtime.v1.LinuxContainerResourcesR\tresources\x12T\n" +
 	"\x10security_context\x18\x02 \x01(\v2).runtime.v1.LinuxContainerSecurityContextR\x0fsecurityContext\"i\n" +
@@ -12509,10 +12530,11 @@ const file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc = ""
 	"\x0fuser_namespaces\x18\x02 \x01(\bR\x0euserNamespaces\"d\n" +
 	"\x0eRuntimeHandler\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12>\n" +
-	"\bfeatures\x18\x02 \x01(\v2\".runtime.v1.RuntimeHandlerFeaturesR\bfeatures\"\x90\x01\n" +
+	"\bfeatures\x18\x02 \x01(\v2\".runtime.v1.RuntimeHandlerFeaturesR\bfeatures\"\xc8\x01\n" +
 	"\x0fRuntimeFeatures\x12<\n" +
 	"\x1asupplemental_groups_policy\x18\x01 \x01(\bR\x18supplementalGroupsPolicy\x12?\n" +
-	"\x1cuser_namespaces_host_network\x18\x02 \x01(\bR\x19userNamespacesHostNetwork\"\xb6\x02\n" +
+	"\x1cuser_namespaces_host_network\x18\x02 \x01(\bR\x19userNamespacesHostNetwork\x126\n" +
+	"\x17supports_cgroup_options\x18\x03 \x01(\bR\x15supportsCgroupOptions\"\xb6\x02\n" +
 	"\x0eStatusResponse\x121\n" +
 	"\x06status\x18\x01 \x01(\v2\x19.runtime.v1.RuntimeStatusR\x06status\x128\n" +
 	"\x04info\x18\x02 \x03(\v2$.runtime.v1.StatusResponse.InfoEntryR\x04info\x12E\n" +
