@@ -268,9 +268,6 @@ type PriorityQueue struct {
 	isInPlacePodVerticalScalingSchedulerPreemptionEnabled bool
 	// isPreQueueingHintsEnabled indicates whether the SchedulerPreQueueingHints feature gate is enabled.
 	isPreQueueingHintsEnabled bool
-	// activePreQueueingHintKeys holds per-plugin PreQueueingHint results during moveAllToActiveOrBackoffQueue.
-	// It is set before calling moveEntitiesToActiveOrBackoffQueue and cleared after.
-	activePreQueueingHintKeys *preQueueingHintPodKeys
 }
 
 // QueueingHintFunction is the wrapper of QueueingHintFn that has PluginName.
@@ -564,12 +561,12 @@ func (p *PriorityQueue) isPodGroupMember(pod *v1.Pod) bool {
 }
 
 // isEntityWorthRequeuing calls isPodWorthRequeuing for all pods belonging to the entity and returns the highest queueing strategy.
-func (p *PriorityQueue) isEntityWorthRequeuing(logger klog.Logger, entity framework.QueuedEntityInfo, event fwk.ClusterEvent, oldObj, newObj interface{}) queueingStrategy {
+func (p *PriorityQueue) isEntityWorthRequeuing(logger klog.Logger, entity framework.QueuedEntityInfo, event fwk.ClusterEvent, oldObj, newObj interface{}, hintKeys *preQueueingHintPodKeys) queueingStrategy {
 	// For pod groups, if any pod is worth requeuing, the whole group is worth it.
 	// But we should prioritize higher strategies.
 	bestStrategy := queueSkip
 	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
-		strategy := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj)
+		strategy := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj, hintKeys)
 		if strategy > bestStrategy {
 			bestStrategy = strategy
 		}
@@ -587,7 +584,7 @@ func (p *PriorityQueue) isEntityWorthRequeuing(logger klog.Logger, entity framew
 // the scheduling queue is supposed to enqueue this Pod to activeQ, skipping backoffQ.
 // If any of pInfo.unschedulablePlugins return Queue,
 // the scheduling queue is supposed to enqueue this Pod to activeQ/backoffQ depending on the remaining backoff time of the Pod.
-func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework.QueuedPodInfo, event fwk.ClusterEvent, oldObj, newObj interface{}) queueingStrategy {
+func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework.QueuedPodInfo, event fwk.ClusterEvent, oldObj, newObj interface{}, hintKeys *preQueueingHintPodKeys) queueingStrategy {
 	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
 	if rejectorPlugins.Len() == 0 {
 		logger.V(6).Info("Worth requeuing because no failed plugins", "pod", klog.KObj(pInfo.Pod))
@@ -636,8 +633,8 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 			}
 			// Per-plugin PreQueueingHint narrowing: skip this plugin's QueueingHintFn
 			// if the pod wasn't identified by this plugin's PreQueueingHintFn.
-			if p.activePreQueueingHintKeys != nil {
-				if pluginPods, ok := p.activePreQueueingHintKeys.perPlugin[hintfn.PluginName]; ok {
+			if hintKeys != nil {
+				if pluginPods, ok := hintKeys.perPlugin[hintfn.PluginName]; ok {
 					if !pluginPods.Has(podNN) {
 						continue
 					}
@@ -1051,7 +1048,7 @@ func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger
 	for _, e := range events {
 		logger.V(5).Info("Checking event for in-flight pod", "pod", klog.KObj(pInfo.Pod), "event", e.event.Label())
 
-		switch p.isPodWorthRequeuing(logger, pInfo, e.event, e.oldObj, e.newObj) {
+		switch p.isPodWorthRequeuing(logger, pInfo, e.event, e.oldObj, e.newObj, nil) {
 		case queueSkip:
 			continue
 		case queueImmediately:
@@ -1326,7 +1323,7 @@ func (p *PriorityQueue) flushUnschedulableEntitiesLeftover(logger klog.Logger) {
 	}
 
 	if len(entitiesToMove) > 0 {
-		p.moveEntitiesToActiveOrBackoffQueue(logger, entitiesToMove, framework.EventUnschedulableTimeout, nil, nil)
+		p.moveEntitiesToActiveOrBackoffQueue(logger, entitiesToMove, framework.EventUnschedulableTimeout, nil, nil, nil)
 	}
 }
 
@@ -1434,7 +1431,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 			// where a pod re-queued to activeQ in requeueEntityWithQueueingStrategy is popped and processed quickly enough,
 			// so the write in its failure handler overwrites the pod object in PodInfo, which is accessed for logging.
 			entityRef := klog.KObj(entity)
-			hint := p.isEntityWorthRequeuing(logger, entity, evt, oldPod, newPod)
+			hint := p.isEntityWorthRequeuing(logger, entity, evt, oldPod, newPod, nil)
 			queue := p.requeueEntityWithQueueingStrategy(logger, entity, hint, evt.Label())
 			if queue != unschedulableQ {
 				logger.V(5).Info("Entity moved to an internal scheduling queue because the Pod is updated", "type", entity.Type(), "entity", entityRef, "pod", klog.KObj(newPod), "event", evt.Label(), "queue", queue)
@@ -1816,11 +1813,7 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 	}
 
 	entities, hintKeys := p.collectEntitiesToEvaluate(logger, event, oldObj, newObj, preCheck)
-	if !p.isCompositePodGroupEnabled && hintKeys != nil {
-		p.activePreQueueingHintKeys = hintKeys
-	}
-	p.moveEntitiesToActiveOrBackoffQueue(logger, entities, event, oldObj, newObj)
-	p.activePreQueueingHintKeys = nil
+	p.moveEntitiesToActiveOrBackoffQueue(logger, entities, event, oldObj, newObj, hintKeys)
 }
 
 // collectEntitiesToEvaluate determines which unschedulable entities should be evaluated
@@ -1923,7 +1916,7 @@ func (p *PriorityQueue) requeueEntityWithQueueingStrategy(logger klog.Logger, en
 }
 
 // NOTE: this function assumes lock has been acquired in caller
-func (p *PriorityQueue) moveEntitiesToActiveOrBackoffQueue(logger klog.Logger, entityInfoList []framework.QueuedEntityInfo, event fwk.ClusterEvent, oldObj, newObj interface{}) {
+func (p *PriorityQueue) moveEntitiesToActiveOrBackoffQueue(logger klog.Logger, entityInfoList []framework.QueuedEntityInfo, event fwk.ClusterEvent, oldObj, newObj interface{}, hintKeys *preQueueingHintPodKeys) {
 	if !p.isEventOfInterest(logger, event) {
 		// No plugin is interested in this event.
 		return
@@ -1940,7 +1933,7 @@ func (p *PriorityQueue) moveEntitiesToActiveOrBackoffQueue(logger klog.Logger, e
 			continue
 		}
 
-		schedulingHint := p.isEntityWorthRequeuing(logger, entity, event, oldObj, newObj)
+		schedulingHint := p.isEntityWorthRequeuing(logger, entity, event, oldObj, newObj, hintKeys)
 		if schedulingHint == queueSkip {
 			// QueueingHintFn determined that this entity isn't worth putting to activeQ or backoffQ by this event.
 			logger.V(5).Info("Event is not making entity schedulable", "type", entity.Type(), "entity", entity, "event", event.Label())

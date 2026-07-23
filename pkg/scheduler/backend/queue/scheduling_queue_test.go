@@ -5828,7 +5828,7 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 			count = 0 // reset count every time
 			logger, ctx := ktesting.NewTestContext(t)
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(test.queueingHintMap))
-			actual := q.isPodWorthRequeuing(logger, test.podInfo, test.event, test.oldObj, test.newObj)
+			actual := q.isPodWorthRequeuing(logger, test.podInfo, test.event, test.oldObj, test.newObj, nil)
 			if actual != test.expected {
 				t.Errorf("isPodWorthRequeuing() = %v, want %v", actual, test.expected)
 			}
