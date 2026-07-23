@@ -262,6 +262,14 @@ type NodeExpandableVolumePlugin interface {
 	NodeExpand(resizeOptions NodeResizeOptions) (bool, error)
 }
 
+// ResizableEphemeralVolumePlugin is an extended interface of VolumePlugin and is used for volumes that
+// can be directly resized on the node without going through the standard async reconciler flow.
+type ResizableEphemeralVolumePlugin interface {
+	VolumePlugin
+	// ResizeEphemeralVolume resizes the volume on the node.
+	ResizeEphemeralVolume(spec *Spec, pod *v1.Pod, newSize *resource.Quantity) error
+}
+
 // BlockVolumePlugin is an extend interface of VolumePlugin and is used for block volumes support.
 type BlockVolumePlugin interface {
 	VolumePlugin

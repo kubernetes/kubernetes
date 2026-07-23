@@ -27,7 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -525,7 +525,7 @@ func TestRunOp(t *testing.T) {
 
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			podInformer := informerFactory.Core().V1().Pods()
-			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
+			podGroupInformer := informerFactory.Scheduling().V1beta1().PodGroups()
 			podGroupInformer.Informer()
 			informerFactory.Start(tCtx.Done())
 			informerFactory.WaitForCacheSync(tCtx.Done())
@@ -607,7 +607,7 @@ func verifyCount(expectedCount int) verifyFunc {
 				return fmt.Errorf("unexpected pod count: got %d, want %d", got, expectedCount)
 			}
 		case *createPodGroups:
-			pgs, err := tCtx.Client().SchedulingV1alpha3().PodGroups(concreteOp.Namespace).List(tCtx, metav1.ListOptions{})
+			pgs, err := tCtx.Client().SchedulingV1beta1().PodGroups(concreteOp.Namespace).List(tCtx, metav1.ListOptions{})
 			if err != nil {
 				return fmt.Errorf("failed to list pod groups: %w", err)
 			}
@@ -789,7 +789,7 @@ func verifyObj(expectedObj any) verifyFunc {
 				return fmt.Errorf("expectedPodGroupTemplate.Namespace must be set")
 			}
 
-			podGroupsList, listErr := tCtx.Client().SchedulingV1alpha3().PodGroups(namespace).List(tCtx, metav1.ListOptions{})
+			podGroupsList, listErr := tCtx.Client().SchedulingV1beta1().PodGroups(namespace).List(tCtx, metav1.ListOptions{})
 			if listErr != nil {
 				return fmt.Errorf("failed to list pod groups: %w", listErr)
 			}

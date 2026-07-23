@@ -72,7 +72,6 @@ maxPods: 110
 memoryManagerPolicy: None
 memoryReservationPolicy: None
 memorySwap: {}
-memoryThrottlingFactor: 0.9
 mergeDefaultEvictionSettings: false
 nodeLeaseDurationSeconds: 40
 nodeStatusMaxImages: 50

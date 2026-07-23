@@ -130,6 +130,21 @@ type Store interface {
 	Name() string
 }
 
+// AuthoritativeStore is an optional extension of Store that reports whether the
+// affinity hint for a container is authoritative. When IsHintAuthoritative
+// returns true, the consumer must use the hint as-is and must not extend it to
+// additional NUMA nodes.
+//
+// This is used on Windows, where memory placement has to follow the CPU
+// manager's NUMA decision (Windows has no cpuset.mems): the affinity Store is a
+// wrapper that owns the CPU-following knowledge, so the coupling between the CPU
+// and memory managers passes through the Store rather than being a peer-to-peer
+// dependency between the two managers.
+type AuthoritativeStore interface {
+	Store
+	IsHintAuthoritative(podUID, containerName string) bool
+}
+
 // TopologyHint is a struct containing the NUMANodeAffinity for a Container
 type TopologyHint struct {
 	NUMANodeAffinity bitmask.BitMask

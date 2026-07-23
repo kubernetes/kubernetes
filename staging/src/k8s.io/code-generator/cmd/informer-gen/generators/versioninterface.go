@@ -85,7 +85,7 @@ var versionTemplate = `
 type Interface interface {
 	$range .types -$
 		// $.|publicPlural$ returns a $.|public$Informer.
-		$.|publicPlural$() $.|public$Informer
+		$.|publicPlural$() Typed$.|public$Informer
 	$end$
 }
 
@@ -102,8 +102,8 @@ func New(f $.interfacesSharedInformerFactory|raw$, namespace string, tweakListOp
 `
 
 var versionFuncTemplate = `
-// $.type|publicPlural$ returns a $.type|public$Informer.
-func (v *version) $.type|publicPlural$() $.type|public$Informer {
+// $.type|publicPlural$ returns a Typed$.type|public$Informer.
+func (v *version) $.type|publicPlural$() Typed$.type|public$Informer {
 	return &$.type|private$Informer{factory: v.factory$if .namespaced$, namespace: v.namespace$end$, tweakListOptions: v.tweakListOptions}
 }
 `

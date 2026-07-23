@@ -17,10 +17,11 @@ limitations under the License.
 package topologyawarescheduling
 
 import (
+	"fmt"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -33,6 +34,10 @@ import (
 
 func makeGangPodGroup(podGroupName, topologyKey string, minCount int32) *schedulingapi.PodGroup {
 	return st.MakePodGroup().Name(podGroupName).WorkloadRef("t1", "workload").TopologyKey(topologyKey).MinCount(minCount).Priority(100).Obj()
+}
+
+func makeGangPodGroupWithPriority(podGroupName, topologyKey string, minCount int32, priority int32) *schedulingapi.PodGroup {
+	return st.MakePodGroup().Name(podGroupName).WorkloadRef("t1", "workload").TopologyKey(topologyKey).MinCount(minCount).Priority(priority).Obj()
 }
 
 func makeBasicPodGroup(podGroupName, topologyKey string) *schedulingapi.PodGroup {
@@ -48,9 +53,18 @@ func makePod(podName, podGroupName string) *v1.Pod {
 		PodGroupName(podGroupName).Priority(100).ZeroTerminationGracePeriod().Obj()
 }
 
+func makePodWithPriority(podName, podGroupName string, priority int32) *v1.Pod {
+	return st.MakePod().Name(podName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
+		PodGroupName(podGroupName).Priority(priority).ZeroTerminationGracePeriod().Obj()
+}
+
 // makeAssignedPod creates a pre-existing pod assigned to a node in the cluster
 func makeAssignedPod(podName, nodeName, consumedCPU string) *v1.Pod {
 	return st.MakePod().Name(podName).Node(nodeName).Req(map[v1.ResourceName]string{v1.ResourceCPU: consumedCPU}).Container("image").Priority(100).ZeroTerminationGracePeriod().Obj()
+}
+
+func makeAssignedPodWithPriority(podName, nodeName, consumedCPU string, priority int32) *v1.Pod {
+	return st.MakePod().Name(podName).Node(nodeName).Req(map[v1.ResourceName]string{v1.ResourceCPU: consumedCPU}).Container("image").Priority(priority).ZeroTerminationGracePeriod().Obj()
 }
 
 // makeLargePod creates a pod that consumes all resources of a single node
@@ -188,6 +202,161 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				{
 					Name:                 "Verify the entire gang is now scheduled",
 					WaitForPodsScheduled: []string{"p1", "p2", "p3"},
+				},
+			},
+		},
+		{
+			name: "gang uses pod group preemption when resources are consumed by lower priority existing pods",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes in a rack",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-rack1", "rack-1", "zone-1"),
+						makeNode("node2-rack1", "rack-1", "zone-1"),
+						makeNode("node3-rack1", "rack-1", "zone-1"),
+					},
+				},
+				{
+					Name: "Create assigned pods in rack1, making rack1 unable to fit 3 additional pods",
+					CreatePods: []*v1.Pod{
+						makeAssignedPod("existing1", "node1-rack1", "2"),
+						makeAssignedPod("existing2", "node3-rack1", "2"),
+					},
+				},
+				{
+					Name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
+					CreatePodGroup: makeGangPodGroupWithPriority("pg1", "rack", 3, 200),
+				},
+				{
+					Name: "Create all pods belonging to the podgroup, requesting more resources in total than available in any rack",
+					CreatePods: []*v1.Pod{
+						makePodWithPriority("p1", "pg1", 200),
+						makePodWithPriority("p2", "pg1", 200),
+						makePodWithPriority("p3", "pg1", 200),
+					},
+				},
+				{
+					Name:                 "Verify the entire gang is scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3"},
+				},
+				{
+					Name:               "Verify that low prio pods are removed",
+					WaitForPodsRemoved: []string{"existing1", "existing2"},
+				},
+			},
+		},
+		{
+			name: "gang uses preemption and schedules on a single rack, choosing placement with the highest score",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes in multiple zones and racks",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-rack1", "rack-1", "zone-1"),
+						makeNode("node2-rack1", "rack-1", "zone-1"),
+						makeNode("node3-rack2", "rack-2", "zone-2"),
+						makeNode("node4-rack2", "rack-2", "zone-2"),
+						makeNode("node5-rack2", "rack-2", "zone-2"),
+						makeNode("node6-rack3", "rack-3", "zone-2"),
+					},
+				},
+				{
+					Name: "Create low-priority assigned pods making rack1 and rack2 unable to fit 3 additional pods without preemption",
+					CreatePods: []*v1.Pod{
+						makeAssignedPodWithPriority("low1-rack1", "node1-rack1", "2", 10),
+						makeAssignedPodWithPriority("low1-rack2", "node3-rack2", "2", 10),
+						makeAssignedPodWithPriority("low2-rack2", "node4-rack2", "2", 10),
+					},
+				},
+				{
+					Name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
+					CreatePodGroup: makeGangPodGroupWithPriority("pg1", "rack", 3, 200),
+				},
+				{
+					Name: "Create all high-priority pods belonging to the podgroup. Preemption occurs, and rack1 scores higher than rack2",
+					CreatePods: []*v1.Pod{
+						makePodWithPriority("p1", "pg1", 200),
+						makePodWithPriority("p2", "pg1", 200),
+						makePodWithPriority("p3", "pg1", 200),
+					},
+				},
+				{
+					Name:                 "Verify the entire gang is now scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3"},
+				},
+				{
+					Name:               "Verify that low prio victim pod on rack1 is removed",
+					WaitForPodsRemoved: []string{"low1-rack1"},
+				},
+				{
+					// Scoring results: PodGroupPodsCount will score the same for rack1 and rack2,
+					// and NodeResourcesFit with default strategy MostAllocated will score higher on rack1 (3/4 = 75% vs 3/6 = 50%).
+					Name: "Verify all pods scheduled on rack1",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2", "p3"},
+						Nodes: sets.New("node1-rack1", "node2-rack1"),
+					},
+				},
+			},
+		},
+		{
+			name: "gang uses preemption and schedules on a single rack, choosing placement with highest allocation percentage with pre-existing pods in cluster",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes in multiple zones and racks",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-rack1", "rack-1", "zone-1"),
+						makeNode("node2-rack1", "rack-1", "zone-1"),
+						makeNode("node3-rack2", "rack-2", "zone-2"),
+						makeNode("node4-rack2", "rack-2", "zone-2"),
+						makeNode("node5-rack2", "rack-2", "zone-2"),
+						makeNode("node6-rack3", "rack-3", "zone-2"),
+						makeNode("node7-rack3", "rack-3", "zone-2"),
+						makeNode("node8-rack3", "rack-3", "zone-2"),
+						makeNode("node9-rack4", "rack-4", "zone-2"),
+					},
+				},
+				{
+					Name: "Create pre-existing high-priority pods and low-priority victim pods forcing preemption across racks",
+					CreatePods: []*v1.Pod{
+						makeAssignedPodWithPriority("existing1", "node3-rack2", "2", 200),
+						makeAssignedPodWithPriority("existing2", "node8-rack3", "1", 200),
+						makeAssignedPodWithPriority("low1-rack1", "node1-rack1", "2", 10),
+						makeAssignedPodWithPriority("low1-rack2", "node4-rack2", "2", 10),
+						makeAssignedPodWithPriority("low1-rack3", "node6-rack3", "2", 10),
+						makeAssignedPodWithPriority("low2-rack3", "node8-rack3", "1", 10),
+					},
+				},
+				{
+					Name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
+					CreatePodGroup: makeGangPodGroupWithPriority("pg1", "rack", 3, 200),
+				},
+				{
+					Name: "Create all high-priority pods belonging to the podgroup",
+					CreatePods: []*v1.Pod{
+						makePodWithPriority("p1", "pg1", 200),
+						makePodWithPriority("p2", "pg1", 200),
+						makePodWithPriority("p3", "pg1", 200),
+					},
+				},
+				{
+					Name:                 "Verify the entire gang is now scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3"},
+				},
+				{
+					Name:               "Verify that low prio victim pod on rack2 is removed",
+					WaitForPodsRemoved: []string{"low1-rack2"},
+				},
+				// Allocation fractions in racks after preemption (max allocation for MostAllocated strategy):
+				// - rack1: (0 + 3)/4 = 0.75
+				// - rack2: (2 + 3)/6 = 0.833
+				// - rack3: (1 + 3)/6 = 0.667
+				// - rack4: unfeasible (only 2 CPUs total)
+				{
+					Name: "Verify all pods scheduled on rack2",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2", "p3"},
+						Nodes: sets.New("node3-rack2", "node4-rack2", "node5-rack2"),
+					},
 				},
 			},
 		},
@@ -620,6 +789,89 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 			},
 		},
 		{
+			name: "gang with minCount < pod count schedules on a single rack without preemption, additional pod triggers preemption on the same rack",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes in multiple racks, one can fit 4 pods, second can fit 6 pods, last is too small",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-rack1", "rack-1", "zone-1"),
+						makeNode("node2-rack1", "rack-1", "zone-1"),
+						makeNode("node3-rack1", "rack-1", "zone-1"),
+						makeNode("node4-rack2", "rack-2", "zone-1"),
+						makeNode("node5-rack2", "rack-2", "zone-1"),
+						makeNode("node6-rack3", "rack-3", "zone-2"),
+					},
+				},
+				{
+					Name: "Create a low-priority assigned pod on rack2",
+					CreatePods: []*v1.Pod{
+						makeAssignedPodWithPriority("low1-rack2", "node5-rack2", "1", 10),
+					},
+				},
+				{
+					Name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
+					CreatePodGroup: makeGangPodGroupWithPriority("pg1", "rack", 3, 200),
+				},
+				{
+					Name: "Create 3 pods (=minCount) belonging to the gang, fitting on rack2 without preemption",
+					CreatePods: []*v1.Pod{
+						makePodWithPriority("p1", "pg1", 200),
+						makePodWithPriority("p2", "pg1", 200),
+						makePodWithPriority("p3", "pg1", 200),
+					},
+				},
+				{
+					Name:                 "Verify the initial gang is now scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3"},
+				},
+				{
+					Name: "Verify all initial pods scheduled on rack2 without preempting low-priority pod",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2", "p3", "low1-rack2"},
+						Nodes: sets.New("node4-rack2", "node5-rack2"),
+					},
+				},
+				{
+					Name: "Create an additional pod (pod count > minCount) belonging to the gang, which requires preemption on rack2",
+					CreatePods: []*v1.Pod{
+						makePodWithPriority("p4", "pg1", 200),
+					},
+				},
+				{
+					Name:                 "Verify the new pod gets scheduled",
+					WaitForPodsScheduled: []string{"p4"},
+				},
+				{
+					Name:               "Verify low-priority pod on rack2 was preempted",
+					WaitForPodsRemoved: []string{"low1-rack2"},
+				},
+				{
+					Name: "Verify all gang pods scheduled on rack2",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2", "p3", "p4"},
+						Nodes: sets.New("node4-rack2", "node5-rack2"),
+					},
+				},
+				{
+					Name: "Create one more pod belonging to the gang",
+					CreatePods: []*v1.Pod{
+						makePodWithPriority("p5", "pg1", 200),
+					},
+				},
+				{
+					Name:                     "Verify the last pod becomes unschedulable because rack2 is full and preemption cannot place it elsewhere",
+					WaitForPodsUnschedulable: []string{"p5"},
+				},
+				{
+					Name: "Verify assignments of scheduled gang pods remain on rack2",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2", "p3", "p4"},
+						Nodes: sets.New("node4-rack2", "node5-rack2"),
+					},
+				},
+			},
+		},
+		{
 			name: "gang does not schedule on a single rack when preemption could free up enough resources",
 			steps: []stepsframework.Step{
 				{
@@ -656,9 +908,11 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			runTestScenario(t, tt)
-		})
+		for _, cpgEnabled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s (CPG: %v)", tt.name, cpgEnabled), func(t *testing.T) {
+				runTestScenario(t, tt, cpgEnabled)
+			})
+		}
 	}
 }
 
@@ -1318,14 +1572,17 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			runTestScenario(t, tt)
-		})
+		for _, cpgEnabled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s (CPG: %v)", tt.name, cpgEnabled), func(t *testing.T) {
+				runTestScenario(t, tt, cpgEnabled)
+			})
+		}
 	}
 }
 
-func runTestScenario(t *testing.T, tt scenario) {
+func runTestScenario(t *testing.T, tt scenario, cpgEnabled bool) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.CompositePodGroup:               cpgEnabled,
 		features.GenericWorkload:                 true,
 		features.TopologyAwareWorkloadScheduling: true,
 	})

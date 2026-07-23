@@ -1,0 +1,88 @@
+#
+# The following labels are used in this file. (listed in ascending order of the number of covered test cases)
+#
+# - integration-test: test cases to run as the integration test, usually to spot some issues in the scheduler implementation or scheduler-perf itself.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+#
+# Specifically, the CIs use labels like the following:
+# - `ci-kubernetes-integration-master` (`integration-test`): Test cases are chosen based on a tradeoff between code coverage and overall runtime.
+# It basically covers all test cases but with their smallest workload.
+# - `pull-kubernetes-integration` (`integration-test`,`short`): Test cases are chosen so that they should take less than total 5 min to complete.
+# - `ci-benchmark-scheduler-perf` (`performance`): Long enough test cases are chosen (ideally, longer than 10 seconds)
+# to provide meaningful samples for the pod scheduling rate.
+#
+# Also, `performance`+`short` isn't used in the CIs, but it's used to test the performance test locally.
+# (Sometimes, the test cases with `integration-test` are too small to spot issues.)
+#
+# Combining `performance` and `short` selects suitable workloads for a local
+# before/after comparisons with benchstat.
+
+# SchedulingWithResourceClaimTemplateListAttributes is a variant of
+# SchedulingWithResourceClaimTemplate that exercises MatchAttribute with
+# list-valued device attributes. Each device carries either a shared value
+# plus a device-specific suffix list, or only the device-specific suffix
+# list. The ResourceSlice layout keeps a contiguous block of non-matching
+# devices before the matching suffix, so each claim request has to work
+# through that block before it reaches enough compatible devices. This is
+# intended to stress the MatchAttribute search path by forcing repeated
+# incompatible checks before the allocator can complete an exact-fit
+# allocation from the matching suffix.
+- name: SchedulingWithResourceClaimTemplateListAttributes
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAListTypeAttributes: true
+  workloadTemplate:
+  - opcode: createNodes
+    nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: ../templates/resourceslice-list-attributes-devices.yaml
+    countParam: $nodesWithDRA
+    templateParams:
+      numDevices: $numDevices|64
+      numNonMatchingDevices: $numNonMatchingDevices|32
+      numListValues: $numListValues|32
+  - opcode: createAny
+    templatePath: ../templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: ../templates/resourceclaimtemplate.yaml
+    namespace: test
+    templateParams:
+      numRequests: $numRequests|1
+      constraints: $constraints|
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    steadyStateParam: $steadyState
+    durationParam: $duration
+    podTemplatePath: ../templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      measurePods: 1
+      steadyState: false
+      duration: 0s # unused
+      numDevices: 64
+      numNonMatchingDevices: 32
+      numRequests: 32
+      numListValues: 47
+      constraints:
+      - matchAttribute: dra.example.com/match
+  - name: empty_500nodes
+    params:
+      nodesWithDRA: 500
+      measurePods: 500
+      steadyState: true
+      duration: 10s
+      numDevices: 64
+      numNonMatchingDevices: 32
+      numRequests: 32
+      numListValues: 47
+      constraints:
+      - matchAttribute: dra.example.com/match

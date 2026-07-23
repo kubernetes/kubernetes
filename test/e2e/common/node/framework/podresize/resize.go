@@ -174,7 +174,8 @@ func VerifyPodResources(gotPod *v1.Pod, wantInfo []ResizableContainerInfo, wantP
 			if wantCtr.Name != gotCtr.Name {
 				continue
 			}
-			gomega.Expect(gotCtr.Resources).To(gomega.BeComparableTo(wantCtr.Resources))
+			gomega.Expect(gotCtr.Resources.Requests).To(gomega.BeComparableTo(wantCtr.Resources.Requests))
+			gomega.Expect(gotCtr.Resources.Limits).To(gomega.BeComparableTo(wantCtr.Resources.Limits))
 		}
 	}
 	gomega.Expect(gotPod.Spec.Resources).To(gomega.BeComparableTo(wantPodResources))

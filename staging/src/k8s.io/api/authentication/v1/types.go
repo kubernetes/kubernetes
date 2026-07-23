@@ -39,6 +39,33 @@ const (
 	// It can be repeated multiplied times for multiple map keys and the same key can be repeated multiple
 	// times to have multiple elements in the slice under a single key
 	ImpersonateUserExtraHeaderPrefix = "Impersonate-Extra-"
+
+	// AttestationAdmissionReviewAPIGroups is the map key for the
+	// admissionReviewAPIGroups claim. It represents the APIGroup that a token
+	// authorizes its bearer to query admission webhooks about. The value
+	// corresponding to this key must be a slice of length 1, and the first and
+	// only element of this slice must match the APIGroup of the AdmissionReview
+	// request being made of the webhook. The empty string is invalid as the
+	// first and only element of the value slice. The special value "*" means
+	// "all api groups", and requires matching permissions (described below).
+	//
+	// For this claim to be considered valid, the TokenRequest must meet two
+	// conditions. First, the BoundObjectRef must be one of
+	// ValidatingWebhookConfiguration or MutatingWebhookConfiguration; the
+	// Webhook Configuration in question must have a Rule governing a resource
+	// under the APIGroup named in the value to this key. Second, the requested
+	// audience must match one of the following patterns:
+	//   1. When the webhook is configured with a URL, the audience must match
+	//      the URL field exactly.
+	//   2. When the webhook is configured with a service, the audience must
+	//      match the pattern `https://$name.$namespace.svc:$port[/$path]`, where
+	//      `/$path` is optional.
+	//
+	// The service account for which the TokenRequest is being made must have
+	// "attest" permissions on group "authentication.k8s.io", resource
+	// "admissionReviewAPIGroups", and a resource name matching exactly either
+	// "*", or the API group named in the value to this key.
+	AttestationAdmissionReviewAPIGroups = "admissionReviewAPIGroups"
 )
 
 // +genclient
@@ -137,6 +164,15 @@ func (t ExtraValue) String() string {
 	return fmt.Sprintf("%v", []string(t))
 }
 
+// AttestationValue masks the value so protobuf can generate
+// +protobuf.nullable=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+type AttestationValue []string
+
+func (a AttestationValue) String() string {
+	return fmt.Sprintf("%v", []string(a))
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.10
 
@@ -183,6 +219,14 @@ type TokenRequestSpec struct {
 	// small if you want prompt revocation.
 	// +optional
 	BoundObjectRef *BoundObjectReference `json:"boundObjectRef" protobuf:"bytes,3,opt,name=boundObjectRef"`
+
+	// attestations is a map of well-known keys to string-slice values.
+	// The values for each key have a specific semantic meaning, which is
+	// documented on the key definition. Requesters of tokens may ask
+	// the Kubernetes API Server to attest to certain claims. The API Server
+	// may perform authorization checks depending on the key of this map.
+	// +optional
+	Attestations map[string]AttestationValue `json:"attestations,omitempty" protobuf:"bytes,5,rep,name=attestations"`
 }
 
 // TokenRequestStatus is the result of a token request.
@@ -197,7 +241,8 @@ type TokenRequestStatus struct {
 
 // BoundObjectReference is a reference to an object that a token is bound to.
 type BoundObjectReference struct {
-	// kind of the referent. Valid kinds are 'Pod' and 'Secret'.
+	// kind of the referent. Valid kinds are 'Pod', 'Secret', 'Node',
+	// 'ValidatingWebhookConfiguration', and 'MutatingWebhookConfiguration'.
 	// +optional
 	Kind string `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
 	// apiVersion is API version of the referent.

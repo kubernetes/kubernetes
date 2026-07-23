@@ -1,6 +1,10 @@
 {
   "components": {
     "schemas": {
+      "io.k8s.api.scheduling.v1alpha3.AllCompositeDisruptionMode": {
+        "description": "AllCompositeDisruptionMode means that children of a CompositePodGroup can only be disrupted or preempted together.",
+        "type": "object"
+      },
       "io.k8s.api.scheduling.v1alpha3.AllDisruptionMode": {
         "description": "AllDisruptionMode specifies that children can only be disrupted together.",
         "type": "object"
@@ -12,6 +16,36 @@
       "io.k8s.api.scheduling.v1alpha3.CompositeBasicSchedulingPolicy": {
         "description": "CompositeBasicSchedulingPolicy indicates that the groups belonging to the composite group should be scheduled independently.",
         "type": "object"
+      },
+      "io.k8s.api.scheduling.v1alpha3.CompositeDisruptionMode": {
+        "description": "CompositeDisruptionMode defines how individual entities within a composite pod group can be disrupted. Exactly one mode must be set.",
+        "properties": {
+          "all": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.AllCompositeDisruptionMode"
+              }
+            ],
+            "description": "all specifies that all children groups can only be disrupted together."
+          },
+          "single": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.SingleCompositeDisruptionMode"
+              }
+            ],
+            "description": "single specifies that children groups can be disrupted independently from each other."
+          }
+        },
+        "type": "object",
+        "x-kubernetes-unions": [
+          {
+            "fields-to-discriminateBy": {
+              "all": "All",
+              "single": "Single"
+            }
+          }
+        ]
       },
       "io.k8s.api.scheduling.v1alpha3.CompositeGangSchedulingPolicy": {
         "description": "CompositeGangSchedulingPolicy indicates that the groups belonging to the composite group should be scheduled using all-or-nothing semantics.",
@@ -119,6 +153,20 @@
           }
         ]
       },
+      "io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingConstraints": {
+        "description": "CompositePodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a CompositePodGroup.",
+        "properties": {
+          "topology": {
+            "description": "topology defines the topology constraints for the composite pod group. Currently only a single topology constraint can be specified. This may change in the future.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.TopologyConstraint"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingPolicy": {
         "description": "CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set.",
         "properties": {
@@ -152,8 +200,23 @@
       "io.k8s.api.scheduling.v1alpha3.CompositePodGroupSpec": {
         "description": "CompositePodGroupSpec defines the desired state of CompositePodGroup.",
         "properties": {
+          "disruptionMode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.CompositeDisruptionMode"
+              }
+            ],
+            "default": {
+              "single": {}
+            },
+            "description": "disruptionMode defines the mode in which a given CompositePodGroup can be disrupted. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. One of Single, All. Defaults to Single if unset. This field is immutable."
+          },
           "parentCompositePodGroupName": {
             "description": "parentCompositePodGroupName contains the name of the parent composite pod group within the same namespace as this composite pod group. It must be a DNS name. If it's nil, then this composite pod group is a root of a workload's hierarchy. This field is immutable.",
+            "type": "string"
+          },
+          "preemptionPolicy": {
+            "description": "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset. When Priority Admission Controller is enabled, it populates this field from PriorityClassName, and defaults to PreemptLowerPriority if value is unset in PriorityClass. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.",
             "type": "string"
           },
           "priority": {
@@ -164,6 +227,14 @@
           "priorityClassName": {
             "description": "priorityClassName defines the priority that should be considered when scheduling this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the composite pod group's priority will be zero). This field is immutable.",
             "type": "string"
+          },
+          "schedulingConstraints": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingConstraints"
+              }
+            ],
+            "description": "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable."
           },
           "schedulingPolicy": {
             "allOf": [
@@ -222,6 +293,14 @@
             ],
             "x-kubernetes-list-type": "map"
           },
+          "disruptionMode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.CompositeDisruptionMode"
+              }
+            ],
+            "description": "disruptionMode defines the mode in which a given CompositePodGroup can be disrupted. One of Single, All. This field is immutable."
+          },
           "name": {
             "default": "",
             "description": "name is a unique identifier for the CompositePodGroupTemplate within the Workload. It must be a DNS label. This field is required.",
@@ -238,6 +317,10 @@
             ],
             "x-kubernetes-list-type": "map"
           },
+          "preemptionPolicy": {
+            "description": "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.",
+            "type": "string"
+          },
           "priority": {
             "description": "priority is the value of priority of composite pod groups created from this template. Various system components use this field to find the priority of the composite pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
             "format": "int32",
@@ -246,6 +329,14 @@
           "priorityClassName": {
             "description": "priorityClassName indicates the priority that should be considered when scheduling a composite pod group created from this template. If no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, composite pod groups created from this template will have the priority set to zero. This field is immutable.",
             "type": "string"
+          },
+          "schedulingConstraints": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingConstraints"
+              }
+            ],
+            "description": "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate. This field is immutable."
           },
           "schedulingPolicy": {
             "allOf": [
@@ -654,6 +745,10 @@
           "name",
           "schedulingPolicy"
         ],
+        "type": "object"
+      },
+      "io.k8s.api.scheduling.v1alpha3.SingleCompositeDisruptionMode": {
+        "description": "SingleCompositeDisruptionMode means that individual children of a CompositePodGroup can be disrupted or preempted independently.",
         "type": "object"
       },
       "io.k8s.api.scheduling.v1alpha3.SingleDisruptionMode": {

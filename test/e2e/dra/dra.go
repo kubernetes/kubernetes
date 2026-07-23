@@ -44,11 +44,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	metadata "k8s.io/dynamic-resource-allocation/api/metadata"
+	metadatav1alpha1 "k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
+	metadatav1beta1 "k8s.io/dynamic-resource-allocation/api/metadata/v1beta1"
 	"k8s.io/dynamic-resource-allocation/devicemetadata"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -663,6 +667,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 									"UnavailableDevices": gomega.Equal(ptr.To[int32](0)),
 									"NodeName":           gomega.BeNil(),
 									"ValidationError":    gomega.BeNil(),
+									"PartitionSummary":   gomega.BeEmpty(),
+									"ShareableSummary":   gomega.BeNil(),
 								}),
 							),
 							"Conditions": gomega.ContainElement(
@@ -710,6 +716,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 									"UnavailableDevices": gomega.Equal(ptr.To[int32](0)),
 									"NodeName":           gomega.BeNil(),
 									"ValidationError":    gomega.BeNil(),
+									"PartitionSummary":   gomega.BeEmpty(),
+									"ShareableSummary":   gomega.BeNil(),
 								}),
 							),
 							"Conditions": gomega.ContainElement(
@@ -724,6 +732,87 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 	})
 
+	// ResourcePoolStatusRequest advanced views. Own driver-less context so each
+	// sub-context's driver is the only one that sets up.
+	framework.Context("control plane views", f.WithFeatureGate(features.DRAResourcePoolStatus), func() {
+		expectPool := func(ctx context.Context, driverName string, poolMatcher any) {
+			client := f.ClientSet.ResourceV1alpha3().ResourcePoolStatusRequests()
+			gomega.Eventually(ctx, func(g gomega.Gomega, ctx context.Context) {
+				request, err := client.Create(ctx, &resourcealphaapi.ResourcePoolStatusRequest{
+					ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-views-"},
+					Spec:       resourcealphaapi.ResourcePoolStatusRequestSpec{Driver: driverName},
+				}, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
+				defer func() { _ = client.Delete(ctx, request.Name, metav1.DeleteOptions{}) }()
+
+				g.Eventually(ctx, framework.GetObject(client.Get, request.Name, metav1.GetOptions{})).
+					WithTimeout(15 * time.Second).
+					Should(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"Status": gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+							"Pools": gomega.ContainElement(poolMatcher),
+							"Conditions": gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+								"Type":   gomega.Equal("Complete"),
+								"Status": gomega.Equal(metav1.ConditionTrue),
+							})),
+						})),
+					})))
+			}).WithTimeout(60 * time.Second).WithPolling(2 * time.Second).Should(gomega.Succeed())
+		}
+
+		framework.Context("partitionable typed view", f.WithFeatureGate(features.DRAPartitionableDevices), f.WithFeatureGate(features.DRAPartitionableDevicesType), func() {
+			pnodes := drautils.NewNodes(f, 1, 1)
+			pdriver := drautils.NewDriver(f, pnodes, drautils.PartitionableResources(true))
+			pdriver.WithKubelet = false
+
+			f.It("should report partitionSummary for a partitionable pool", func(ctx context.Context) {
+				expectPool(ctx, pdriver.Name, gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"PoolName":        gomega.Equal("partitioned"),
+					"ValidationError": gomega.BeNil(),
+					"PartitionSummary": gomega.ConsistOf(
+						gomega.Equal(resourcealphaapi.PartitionTypeStatus{Attribute: string(drautils.PartitionProfileAttribute), Type: "Full", Total: ptr.To[int32](1), Allocatable: ptr.To[int32](1)}),
+						gomega.Equal(resourcealphaapi.PartitionTypeStatus{Attribute: string(drautils.PartitionProfileAttribute), Type: "Half", Total: ptr.To[int32](2), Allocatable: ptr.To[int32](2)}),
+					),
+				}))
+			})
+		})
+
+		framework.Context("partitionable pool without a partition type", f.WithFeatureGate(features.DRAPartitionableDevices), func() {
+			cnodes := drautils.NewNodes(f, 1, 1)
+			cdriver := drautils.NewDriver(f, cnodes, drautils.PartitionableResources(false))
+			cdriver.WithKubelet = false
+
+			f.It("should report no partition summary when no partition type is declared", func(ctx context.Context) {
+				expectPool(ctx, cdriver.Name, gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"PoolName":         gomega.Equal("partitioned"),
+					"ValidationError":  gomega.BeNil(),
+					"PartitionSummary": gomega.BeEmpty(),
+				}))
+			})
+		})
+
+		framework.Context("shareable view", f.WithFeatureGate(features.DRAConsumableCapacity), func() {
+			snodes := drautils.NewNodes(f, 1, 1)
+			sdriver := drautils.NewDriver(f, snodes, drautils.ShareableResources(2))
+			sdriver.WithKubelet = false
+
+			f.It("should report shareableSummary for a pool with shareable devices", func(ctx context.Context) {
+				expectPool(ctx, sdriver.Name, gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"PoolName":        gomega.Equal("shareable"),
+					"ValidationError": gomega.BeNil(),
+					"ShareableSummary": gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"FullyAvailableDevices":     gstruct.PointTo(gomega.BeEquivalentTo(2)),
+						"PartiallyAvailableDevices": gstruct.PointTo(gomega.BeEquivalentTo(0)),
+						"Capacity": gomega.ConsistOf(
+							gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+								"Name": gomega.Equal("memory"),
+							}),
+						),
+					})),
+				}))
+			})
+		})
+	})
+
 	type expectedMetadataFile struct {
 		claimName      string
 		claimNamespace string
@@ -732,6 +821,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		requestName    string
 		driverName     string
 		generation     int64
+		version        schema.GroupVersion
 	}
 
 	expectStringMetadataAttribute := func(tCtx ktesting.TContext, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, name resourceapi.QualifiedName, expected, filePath string) {
@@ -761,10 +851,17 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		tCtx.Expect(stderr).To(gomega.BeEmpty(), "metadata file stderr for container %s", containerName)
 
 		var md metadata.DeviceMetadata
+		var gvk schema.GroupVersionKind
+		var validationResult error
 		tCtx.ExpectNoError(devicemetadata.DecodeMetadataFromStream(
 			json.NewDecoder(strings.NewReader(stdout)), &md,
+			devicemetadata.DecodeMetadataWithValidationResult(&validationResult),
+			devicemetadata.DecodeMetadataStoreGVKResult(&gvk),
+			// Validation is on by default.
 		), "decode metadata file %s", filePath)
+		tCtx.ExpectNoError(validationResult, "validation of metadata file %s", filePath)
 
+		tCtx.Expect(gvk).To(gomega.HaveField("GroupVersion()", gomega.Equal(expected.version)))
 		if expected.claimName != "" {
 			tCtx.Expect(md.Name).To(gomega.Equal(expected.claimName), "claim name in %s", filePath)
 		}
@@ -793,10 +890,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		}
 	}
 
-	f.Context("kubelet", feature.DynamicResourceAllocation, func() {
+	testMetadata := func(expectVersion schema.GroupVersion, enableVersions ...schema.GroupVersion) {
 		nodes := drautils.NewNodes(f, 1, 1)
 		driver := drautils.NewDriver(f, nodes, drautils.DriverResources(2))
 		driver.EnableDeviceMetadata = true
+		driver.DeviceMetadataVersions = enableVersions
 		b := drautils.NewBuilder(f, driver)
 
 		ginkgo.It("must mount device metadata for resource claims", func(ctx context.Context) {
@@ -817,6 +915,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				requestName:    "my-request",
 				driverName:     driver.Name,
 				generation:     1,
+				version:        expectVersion,
 			})
 		})
 
@@ -849,6 +948,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					requestName:    requestName,
 					driverName:     driver.Name,
 					generation:     1,
+					version:        expectVersion,
 				})
 			}
 			expectMetadata("all-requests", "req0")
@@ -883,20 +983,32 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				requestName:    "my-request",
 				driverName:     driver.Name,
 				generation:     1,
+				version:        expectVersion,
 			})
+		})
+	}
+	f.Context("metadata", feature.DynamicResourceAllocation, func() {
+		// v1alpha1 alone not supported!
+		f.Context("v1beta1", func() {
+			testMetadata(metadatav1beta1.SchemeGroupVersion /* <- expected, enabled: */, metadatav1beta1.SchemeGroupVersion)
+		})
+		f.Context("v1alpha1+v1beta1", func() {
+			testMetadata(metadatav1beta1.SchemeGroupVersion /* <- expected, enabled: */, metadatav1beta1.SchemeGroupVersion, metadatav1alpha1.SchemeGroupVersion)
 		})
 	})
 
-	f.Context("kubelet", feature.DynamicResourceAllocation, func() {
+	f.Context("metadata", feature.DynamicResourceAllocation, func() {
 		nodes := drautils.NewNodes(f, 1, 1)
 
 		driverA := drautils.NewDriver(f, nodes, drautils.DriverResources(1))
 		driverA.NameSuffix = "-a"
 		driverA.EnableDeviceMetadata = true
+		driverA.DeviceMetadataVersions = []schema.GroupVersion{metadatav1beta1.SchemeGroupVersion}
 
 		driverB := drautils.NewDriver(f, nodes, drautils.DriverResources(1))
 		driverB.NameSuffix = "-b"
 		driverB.EnableDeviceMetadata = true
+		driverB.DeviceMetadataVersions = []schema.GroupVersion{metadatav1beta1.SchemeGroupVersion}
 
 		bA := drautils.NewBuilder(f, driverA)
 
@@ -949,6 +1061,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					requestName:    "my-request",
 					driverName:     driverName,
 					generation:     1,
+					version:        metadatav1beta1.SchemeGroupVersion,
 				})
 			}
 		})
@@ -1069,6 +1182,63 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			gomega.Eventually(ctx, func(ctx context.Context) (*v1.Pod, error) {
 				return f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 			}).WithTimeout(f.Timeouts.PodStartSlow).Should(gomega.HaveField("Status.ContainerStatuses", gomega.ContainElements(gomega.HaveField("RestartCount", gomega.BeNumerically(">=", 2)))))
+		})
+	})
+
+	f.Context("kubelet", feature.DynamicResourceAllocation, func() {
+		const poolName = "all-nodes-pool"
+
+		nodes := drautils.NewNodes(f, 1, 1)
+		driver := drautils.NewDriver(f, nodes, func(nodes *drautils.Nodes) map[string]resourceslice.DriverResources {
+			return map[string]resourceslice.DriverResources{
+				nodes.NodeNames[0]: {
+					Pools: map[string]resourceslice.Pool{
+						poolName: {
+							AllNodes: true,
+							Slices: []resourceslice.Slice{{
+								Devices: []resourceapi.Device{{Name: "device-00"}},
+							}},
+						},
+					},
+				},
+			}
+		})
+		driver.ReconcilePoolWithName = poolName
+		driver.UsePrivilegedClient = true
+
+		ginkgo.It("reconciles ResourceSlices with ReconcilePoolWithName", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			fieldSelector := fields.Set{
+				resourceapi.ResourceSliceSelectorDriver:   driver.Name,
+				resourceapi.ResourceSliceSelectorPoolName: poolName,
+			}.String()
+			getSlices := framework.ListObjects(f.ClientSet.ResourceV1().ResourceSlices().List, metav1.ListOptions{FieldSelector: fieldSelector})
+			resourceSliceMatcher := gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"Spec": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Driver":   gomega.Equal(driver.Name),
+					"NodeName": gomega.BeNil(),
+					"AllNodes": gomega.Equal(new(true)),
+					"Pool": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"Name":               gomega.Equal(poolName),
+						"ResourceSliceCount": gomega.Equal(int64(1)),
+					}),
+				}),
+			})
+			expectedSlices := gomega.HaveField("Items", gomega.ConsistOf(resourceSliceMatcher))
+			ginkgo.By("waiting for the initial ResourceSlice")
+			tCtx.Eventually(getSlices).Should(expectedSlices)
+
+			slices, err := getSlices(tCtx)
+			tCtx.ExpectNoError(err, "list ResourceSlices for pool %q", poolName)
+			oldSlice := slices.Items[0]
+			err = f.ClientSet.ResourceV1().ResourceSlices().Delete(tCtx, oldSlice.Name, metav1.DeleteOptions{})
+			tCtx.ExpectNoError(err, "delete ResourceSlice %q", oldSlice.Name)
+
+			ginkgo.By("waiting for the recreated ResourceSlice")
+			tCtx.Eventually(getSlices).WithTimeout(50 * time.Second).Should(expectedSlices)
+			slices, err = getSlices(tCtx)
+			tCtx.ExpectNoError(err, "list recreated ResourceSlices for pool %q", poolName)
+			tCtx.Expect(slices.Items[0].UID).ToNot(gomega.Equal(oldSlice.UID), "ResourceSlice must be recreated after deletion")
 		})
 	})
 

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"testing"
 
@@ -110,81 +111,257 @@ func (m *mockDRAManager) ListWithDeviceTaintRules() ([]*resourceapi.ResourceSlic
 func TestValidateNodeAllocatableDRAClaimSharing(t *testing.T) {
 	claimName := "node-allocatable-claim"
 	claimNameSpace := "test-ns"
-	claim1Key := types.NamespacedName{Namespace: claimNameSpace, Name: claimName}
+
+	mappedMultiplier := resource.MustParse("1")
+	cpuDevice := resourceapi.Device{
+		Name: "cpu0",
+		NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+			v1.ResourceCPU: {
+				Mapping: &resourceapi.NodeAllocatableMapping{
+					DeviceMultiplier: &mappedMultiplier,
+				},
+			},
+		},
+	}
+
+	gpuOverheadDevice := resourceapi.Device{
+		Name: "gpu0",
+		NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+			v1.ResourceMemory: {
+				Overhead: &resourceapi.NodeAllocatableOverhead{
+					PerContainer: resource.NewQuantity(100, resource.DecimalSI),
+				},
+			},
+		},
+	}
+
+	sliceMapped := &resourceapi.ResourceSlice{
+		Spec: resourceapi.ResourceSliceSpec{
+			Pool: resourceapi.ResourcePool{
+				Name: "pool-1",
+			},
+			Devices: []resourceapi.Device{cpuDevice},
+		},
+	}
+
+	sliceOverhead := &resourceapi.ResourceSlice{
+		Spec: resourceapi.ResourceSliceSpec{
+			Pool: resourceapi.ResourcePool{
+				Name: "pool-2",
+			},
+			Devices: []resourceapi.Device{gpuOverheadDevice},
+		},
+	}
+
+	claimMapped := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      claimName,
+			Namespace: claimNameSpace,
+			UID:       "claim-uid",
+		},
+		Status: resourceapi.ResourceClaimStatus{
+			Allocation: &resourceapi.AllocationResult{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: []resourceapi.DeviceRequestAllocationResult{
+						{
+							Pool:   "pool-1",
+							Device: "cpu0",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	claimOverhead := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      claimName,
+			Namespace: claimNameSpace,
+			UID:       "claim-uid",
+		},
+		Status: resourceapi.ResourceClaimStatus{
+			Allocation: &resourceapi.AllocationResult{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: []resourceapi.DeviceRequestAllocationResult{
+						{
+							Pool:   "pool-2",
+							Device: "gpu0",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	combinedMappingAndOverheadDevice := resourceapi.Device{
+		Name: "combined",
+		NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+			v1.ResourceCPU: {
+				Mapping: &resourceapi.NodeAllocatableMapping{
+					DeviceMultiplier: &mappedMultiplier,
+				},
+				Overhead: &resourceapi.NodeAllocatableOverhead{
+					PerContainer: resource.NewQuantity(100, resource.DecimalSI),
+				},
+			},
+		},
+	}
+
+	sliceCombinedOverheadAndMapped := &resourceapi.ResourceSlice{
+		Spec: resourceapi.ResourceSliceSpec{
+			Pool: resourceapi.ResourcePool{
+				Name: "pool-combined",
+			},
+			Devices: []resourceapi.Device{combinedMappingAndOverheadDevice},
+		},
+	}
+
+	claimCombinedOverheadAndMappedDevice := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      claimName,
+			Namespace: claimNameSpace,
+			UID:       "claim-uid",
+		},
+		Status: resourceapi.ResourceClaimStatus{
+			Allocation: &resourceapi.AllocationResult{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: []resourceapi.DeviceRequestAllocationResult{
+						{
+							Pool:   "pool-combined",
+							Device: "combined",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	claimMappedReserved := claimMapped.DeepCopy()
+	claimMappedReserved.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{
+		{UID: "other-pod-uid"},
+	}
+
+	claimCombinedReserved := claimCombinedOverheadAndMappedDevice.DeepCopy()
+	claimCombinedReserved.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{
+		{UID: "other-pod-uid"},
+	}
 
 	tests := []struct {
-		name       string
-		pod        *v1.Pod
-		claim      *resourceapi.ResourceClaim
-		nodeInfo   *framework.NodeInfo
-		wantStatus *fwk.Status
+		name          string
+		pod           *v1.Pod
+		claim         *resourceapi.ResourceClaim
+		nodeInfo      *framework.NodeInfo
+		draManager    fwk.SharedDRAManager
+		podGroupState *podGroupStateData
+		features      feature.Features
+		wantStatus    *fwk.Status
 	}{
 		{
 			name:  "empty claim",
 			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").Obj(),
 			claim: nil,
-			nodeInfo: &framework.NodeInfo{
-				NodeAllocatableDRAClaimStates: map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{},
+			nodeInfo: func() *framework.NodeInfo {
+				return framework.NewNodeInfo()
+			}(),
+			draManager: &mockDRAManager{},
+			wantStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name: "claim not allocated yet",
+			pod:  st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      claimName,
+					Namespace: claimNameSpace,
+				},
+			},
+			nodeInfo: func() *framework.NodeInfo {
+				return framework.NewNodeInfo()
+			}(),
+			draManager: &mockDRAManager{},
+			wantStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name:  "mapped claim, not shared (no other pods on node)",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimMapped,
+			nodeInfo: func() *framework.NodeInfo {
+				return framework.NewNodeInfo()
+			}(),
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
 			},
 			wantStatus: fwk.NewStatus(fwk.Success),
 		},
 		{
-			name: "claim not in node info",
-			pod:  st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
-			claim: &resourceapi.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      claimName,
-					Namespace: claimNameSpace,
-					UID:       "claim-uid",
-				},
+			name:  "mapped claim, shared (other pod using it)",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimMappedReserved,
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
 			},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim has a mapped device and cannot be shared across pods"),
+		},
+		{
+			name:  "overhead-only mapped claim, shared (other pod using it)",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimOverhead,
 			nodeInfo: func() *framework.NodeInfo {
 				ni := framework.NewNodeInfo()
-				ni.NodeAllocatableDRAClaimStates = map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{}
+				otherPod := st.MakePod().Name("other-pod").Namespace(claimNameSpace).UID("other-pod-uid").Obj()
+				otherPod.Spec.ResourceClaims = []v1.PodResourceClaim{
+					{
+						Name:              "my-claim-ref",
+						ResourceClaimName: new(claimName),
+					},
+				}
+				otherPod.Status = v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: claimName,
+						},
+					},
+				}
+				ni.AddPod(otherPod)
 				return ni
 			}(),
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceOverhead},
+			},
 			wantStatus: fwk.NewStatus(fwk.Success),
 		},
 		{
-			name: "claim shared, current pod not in consumers",
-			pod:  st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
-			claim: &resourceapi.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      claimName,
-					Namespace: claimNameSpace,
-					UID:       "claim-uid",
-				},
-			},
+			name:  "mapped claim, same name but different namespace (sharing allowed)",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimMapped,
 			nodeInfo: func() *framework.NodeInfo {
 				ni := framework.NewNodeInfo()
-				ni.NodeAllocatableDRAClaimStates = map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
-					claim1Key: {ConsumerPods: sets.New[types.UID]("other-pod-uid", "another-pod-uid")},
+				otherPod := st.MakePod().Name("other-pod").Namespace("other-namespace").UID("other-pod-uid").Obj()
+				otherPod.Spec.ResourceClaims = []v1.PodResourceClaim{
+					{
+						Name:              "my-claim-ref",
+						ResourceClaimName: new(claimName),
+					},
 				}
+				ni.AddPod(otherPod)
 				return ni
 			}(),
-			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim shared by multiple pods"),
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
+			},
+			wantStatus: fwk.NewStatus(fwk.Success),
 		},
 		{
-			name: "claim shared, current pod in consumers",
-			pod:  st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
-			claim: &resourceapi.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      claimName,
-					Namespace: claimNameSpace,
-					UID:       "claim-uid",
-				},
+			name:  "mapped claim, shared (other pod using it via template)",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimMappedReserved,
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
 			},
-			nodeInfo: func() *framework.NodeInfo {
-				ni := framework.NewNodeInfo()
-				ni.NodeAllocatableDRAClaimStates = map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
-					claim1Key: {ConsumerPods: sets.New[types.UID]("pod-uid", "another-pod-uid")},
-				}
-				return ni
-			}(),
-			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim shared by multiple pods"),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim has a mapped device and cannot be shared across pods"),
 		},
 		{
-			name: "claim only used by other pod",
+			name: "mapped claim, already reserved for another pod - early exit",
 			pod:  st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
 			claim: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -192,22 +369,176 @@ func TestValidateNodeAllocatableDRAClaimSharing(t *testing.T) {
 					Namespace: claimNameSpace,
 					UID:       "claim-uid",
 				},
+				Status: resourceapi.ResourceClaimStatus{
+					Allocation: &resourceapi.AllocationResult{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{{Pool: "pool-1", Device: "cpu0"}},
+						},
+					},
+					ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+						{UID: "other-pod-uid"},
+					},
+				},
 			},
 			nodeInfo: func() *framework.NodeInfo {
-				ni := framework.NewNodeInfo()
-				ni.NodeAllocatableDRAClaimStates = map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState{
-					claim1Key: {ConsumerPods: sets.New[types.UID]("other-pod-uid")},
-				}
-				return ni
+				return framework.NewNodeInfo() // no pods on node, early exit triggers purely on reservation
 			}(),
-			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim is already used by another pod"),
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
+			},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim has a mapped device and cannot be shared across pods"),
+		},
+		{
+			name: "mapped claim, reserved for same pod group, workload claims enabled - allowed since no pods on node",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").
+				PodGroupName("my-pod-group").Obj(),
+			claim: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      claimName,
+					Namespace: claimNameSpace,
+					UID:       "claim-uid",
+				},
+				Status: resourceapi.ResourceClaimStatus{
+					Allocation: &resourceapi.AllocationResult{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{{Pool: "pool-1", Device: "cpu0"}},
+						},
+					},
+					ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+						{
+							APIGroup: "scheduling.k8s.io",
+							Resource: "podgroups",
+							Name:     "my-pod-group",
+						},
+					},
+				},
+			},
+			nodeInfo: func() *framework.NodeInfo {
+				return framework.NewNodeInfo()
+			}(),
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
+			},
+			features:   feature.Features{EnableDRAWorkloadResourceClaims: true},
+			wantStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name: "mapped claim, reserved for different pod group, workload claims enabled - exit early",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").
+				PodGroupName("my-pod-group").Obj(),
+			claim: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      claimName,
+					Namespace: claimNameSpace,
+					UID:       "claim-uid",
+				},
+				Status: resourceapi.ResourceClaimStatus{
+					Allocation: &resourceapi.AllocationResult{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{{Pool: "pool-1", Device: "cpu0"}},
+						},
+					},
+					ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+						{
+							APIGroup: "scheduling.k8s.io",
+							Resource: "podgroups",
+							Name:     "other-pod-group", // reserved for a different group
+						},
+					},
+				},
+			},
+			nodeInfo: func() *framework.NodeInfo {
+				return framework.NewNodeInfo() // no pods on node, early exit triggers purely on reservation mismatch
+			}(),
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
+			},
+			features:   feature.Features{EnableDRAWorkloadResourceClaims: true},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim has a mapped device and cannot be shared across pods"),
+		},
+		{
+			name:  "mapping and overhead in same device, shared (other pod using it)",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimCombinedReserved,
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceCombinedOverheadAndMapped},
+			},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim has a mapped device and cannot be shared across pods"),
+		},
+		{
+			name:  "mapped claim, pending allocation by another pod in same group",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimMapped,
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
+			},
+			podGroupState: &podGroupStateData{
+				pendingAllocations: map[types.UID]sets.Set[types.UID]{
+					"claim-uid": sets.New[types.UID]("other-pod-uid"),
+				},
+			},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim has a mapped device and cannot be shared across pods"),
+		},
+		{
+			name:  "mapped claim, pending allocation by same pod in same group",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimMapped,
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
+			},
+			podGroupState: &podGroupStateData{
+				pendingAllocations: map[types.UID]sets.Set[types.UID]{
+					"claim-uid": sets.New[types.UID]("pod-uid"),
+				},
+			},
+			wantStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name:  "overhead-only claim, pending allocation by another pod in same group",
+			pod:   st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: claimOverhead,
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceOverhead},
+			},
+			podGroupState: &podGroupStateData{
+				pendingAllocations: map[types.UID]sets.Set[types.UID]{
+					"claim-uid": sets.New[types.UID]("other-pod-uid"),
+				},
+			},
+			wantStatus: fwk.NewStatus(fwk.Success),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pl := &DynamicResources{}
-			gotStatus := pl.validateNodeAllocatableDRAClaimSharing(tt.pod, tt.nodeInfo, tt.claim)
+			pl := &DynamicResources{
+				draManager: tt.draManager,
+				fts:        tt.features,
+			}
+			state := &stateData{
+				claimHasNodeAllocatableMappedDevice: make(map[types.UID]bool),
+			}
+			if tt.claim != nil {
+				if tt.claim.Status.Allocation != nil {
+					isMapped := false
+					for _, result := range tt.claim.Status.Allocation.Devices.Results {
+						device, err := getDeviceFromManager(tt.draManager, &result)
+						if err == nil && device != nil && device.NodeAllocatableResources != nil {
+							for _, mapping := range device.NodeAllocatableResources {
+								if mapping.Mapping != nil {
+									isMapped = true
+									break
+								}
+							}
+						}
+						if isMapped {
+							break
+						}
+					}
+					state.claimHasNodeAllocatableMappedDevice[tt.claim.UID] = isMapped
+				}
+			}
+			gotStatus := pl.validateNodeAllocatableDRAClaimSharing(tt.pod, tt.claim, state, tt.podGroupState)
 			if diff := cmp.Diff(tt.wantStatus, gotStatus); diff != "" {
 				t.Errorf("validateDRAClaimShareState() returned diff (-want +got):\n%s", diff)
 			}
@@ -218,42 +549,69 @@ func TestValidateNodeAllocatableDRAClaimSharing(t *testing.T) {
 func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 	cpuDevicePerInstance := resourceapi.Device{
 		Name: "cpu0",
-		NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+		NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 			v1.ResourceCPU: {
-				AllocationMultiplier: ptr.To(resource.MustParse("1")),
+				Mapping: &resourceapi.NodeAllocatableMapping{
+					DeviceMultiplier: new(resource.MustParse("1")),
+				},
 			},
 		},
 	}
 
 	cpuDeviceCapacity := resourceapi.Device{
 		Name: "cpu0",
-		NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+		NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 			v1.ResourceCPU: {
-				CapacityKey: ptr.To(resourceapi.QualifiedName("dra.example.com/cpu")),
+				Mapping: &resourceapi.NodeAllocatableMapping{
+					CapacityKey: ptr.To(resourceapi.QualifiedName("dra.example.com/cpu")),
+				},
 			},
 		},
 	}
 
 	cpuMemDeviceCapacity := resourceapi.Device{
 		Name: "device1",
-		NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+		NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 			v1.ResourceCPU: {
-				CapacityKey: ptr.To(resourceapi.QualifiedName("dra.example.com/cpu")),
+				Mapping: &resourceapi.NodeAllocatableMapping{
+					CapacityKey: ptr.To(resourceapi.QualifiedName("dra.example.com/cpu")),
+				},
 			},
 			v1.ResourceMemory: {
-				CapacityKey: ptr.To(resourceapi.QualifiedName("dra.example.com/memory")),
+				Mapping: &resourceapi.NodeAllocatableMapping{
+					CapacityKey: ptr.To(resourceapi.QualifiedName("dra.example.com/memory")),
+				},
 			},
 		},
 	}
 
 	gpuDeviceAux := resourceapi.Device{
 		Name: "gpu0",
-		NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+		NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 			v1.ResourceCPU: {
-				AllocationMultiplier: ptr.To(resource.MustParse("2")),
+				Mapping: &resourceapi.NodeAllocatableMapping{
+					DeviceMultiplier: new(resource.MustParse("2")),
+				},
 			},
 			v1.ResourceMemory: {
-				AllocationMultiplier: ptr.To(resource.MustParse("4Gi")),
+				Mapping: &resourceapi.NodeAllocatableMapping{
+					DeviceMultiplier: new(resource.MustParse("4Gi")),
+				},
+			},
+		},
+	}
+
+	combinedDevice := resourceapi.Device{
+		Name: "combined-device",
+		NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+			v1.ResourceCPU: {
+				Mapping: &resourceapi.NodeAllocatableMapping{
+					DeviceMultiplier: new(resource.MustParse("2")),
+				},
+				Overhead: &resourceapi.NodeAllocatableOverhead{
+					PerPod:       new(resource.MustParse("1")),
+					PerContainer: new(resource.MustParse("500m")),
+				},
 			},
 		},
 	}
@@ -278,6 +636,7 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 
 	allocResult := func(pool, device string, consumed ...map[resourceapi.QualifiedName]resource.Quantity) *resourceapi.AllocationResult {
 		res := resourceapi.DeviceRequestAllocationResult{
+			Driver: "dra.example.com",
 			Pool:   pool,
 			Device: device,
 		}
@@ -326,9 +685,10 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 				ResourceClaimName: "node-allocatable-claim",
 
 				Containers: []string{"c1"},
-				Resources: map[v1.ResourceName]resource.Quantity{
-					v1.ResourceCPU: resource.MustParse("1"),
-				},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceCPU,
+					Quantity: new(resource.MustParse("1")),
+				}},
 			}},
 		},
 		{
@@ -356,10 +716,13 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			want: []v1.NodeAllocatableResourceClaimStatus{{
 				ResourceClaimName: "node-allocatable-claim",
 				Containers:        []string{"c1"},
-				Resources: map[v1.ResourceName]resource.Quantity{
-					v1.ResourceCPU:    resource.MustParse("4"),
-					v1.ResourceMemory: resource.MustParse("8Gi"),
-				},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceCPU,
+					Quantity: new(resource.MustParse("4")),
+				}, {
+					Name:     v1.ResourceMemory,
+					Quantity: new(resource.MustParse("8Gi")),
+				}},
 			}},
 		},
 		{
@@ -401,9 +764,10 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			want: []v1.NodeAllocatableResourceClaimStatus{{
 				ResourceClaimName: "fungible-claim",
 				Containers:        []string{"c1"},
-				Resources: map[v1.ResourceName]resource.Quantity{
-					v1.ResourceCPU: resource.MustParse("30"),
-				},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceCPU,
+					Quantity: new(resource.MustParse("30")),
+				}},
 			}},
 		},
 		{
@@ -434,16 +798,20 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			want: []v1.NodeAllocatableResourceClaimStatus{{
 				ResourceClaimName: "cpu-claim",
 				Containers:        []string{"c1"},
-				Resources: map[v1.ResourceName]resource.Quantity{
-					v1.ResourceCPU: resource.MustParse("10"),
-				},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceCPU,
+					Quantity: new(resource.MustParse("10")),
+				}},
 			}, {
 				ResourceClaimName: "gpu-claim",
 				Containers:        []string{"c1"},
-				Resources: map[v1.ResourceName]resource.Quantity{
-					v1.ResourceCPU:    resource.MustParse("2"),
-					v1.ResourceMemory: resource.MustParse("4Gi"),
-				},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceCPU,
+					Quantity: new(resource.MustParse("2")),
+				}, {
+					Name:     v1.ResourceMemory,
+					Quantity: new(resource.MustParse("4Gi")),
+				}},
 			}},
 		},
 		{
@@ -472,9 +840,10 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			want: []v1.NodeAllocatableResourceClaimStatus{{
 				ResourceClaimName: "cpu-claim",
 				Containers:        []string{"c1", "c2"},
-				Resources: map[v1.ResourceName]resource.Quantity{
-					v1.ResourceCPU: resource.MustParse("10"),
-				},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceCPU,
+					Quantity: new(resource.MustParse("10")),
+				}},
 			}},
 		},
 		{
@@ -504,15 +873,17 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			want: []v1.NodeAllocatableResourceClaimStatus{{
 				ResourceClaimName: "claim1",
 				Containers:        []string{"c1"},
-				Resources: map[v1.ResourceName]resource.Quantity{
-					v1.ResourceCPU: resource.MustParse("4"),
-				},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceCPU,
+					Quantity: new(resource.MustParse("4")),
+				}},
 			}, {
 				ResourceClaimName: "claim2",
 				Containers:        []string{"c1"},
-				Resources: map[v1.ResourceName]resource.Quantity{
-					v1.ResourceMemory: resource.MustParse("8Gi"),
-				},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceMemory,
+					Quantity: new(resource.MustParse("8Gi")),
+				}},
 			}},
 		},
 		{
@@ -530,9 +901,74 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			want: []v1.NodeAllocatableResourceClaimStatus{{
 				ResourceClaimName: "unref-claim",
 				Containers:        []string{},
-				Resources: map[v1.ResourceName]resource.Quantity{
-					v1.ResourceCPU: resource.MustParse("4"),
-				},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceCPU,
+					Quantity: new(resource.MustParse("4")),
+				}},
+			}},
+		},
+		{
+			name: "Unreferenced Claims with Overhead",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{Name: "c1"}}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("unref-claim", "unref-claim-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "device1",
+					NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+						v1.ResourceMemory: {
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerPod:       new(resource.MustParse("1Gi")),
+								PerContainer: new(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "unref-claim", UID: "unref-claim-uid"}: allocResult("pool1", "device1"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "unref-claim",
+				Containers:        []string{},
+				Mapping:           []v1.NodeAllocatableMappedResources{},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerPod:       new(resource.MustParse("1Gi")),
+					PerContainer: new(resource.MustParse("500Mi")),
+				}},
+			}},
+		},
+		{
+			name: "Unreferenced Claims with Overhead Per Container Only",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{Name: "c1"}}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("unref-claim", "unref-claim-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "device1",
+					NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+						v1.ResourceMemory: {
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerContainer: new(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "unref-claim", UID: "unref-claim-uid"}: allocResult("pool1", "device1"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "unref-claim",
+				Containers:        []string{},
+				Mapping:           []v1.NodeAllocatableMappedResources{},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerContainer: new(resource.MustParse("500Mi")),
+				}},
 			}},
 		},
 		{
@@ -547,10 +983,12 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			resourceSlices: []*resourceapi.ResourceSlice{
 				makeSlice("slice1", resourceapi.Device{
 					Name: "device1",
-					NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+					NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 						v1.ResourceCPU: {
-							CapacityKey:          ptr.To(resourceapi.QualifiedName("dra.example.com/cores")),
-							AllocationMultiplier: ptr.To(resource.MustParse("2")),
+							Mapping: &resourceapi.NodeAllocatableMapping{
+								CapacityKey:        ptr.To(resourceapi.QualifiedName("dra.example.com/cores")),
+								CapacityMultiplier: new(resource.MustParse("2")),
+							},
 						},
 					},
 				}),
@@ -561,9 +999,10 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			want: []v1.NodeAllocatableResourceClaimStatus{{
 				ResourceClaimName: "claim1",
 				Containers:        []string{"c1"},
-				Resources: map[v1.ResourceName]resource.Quantity{
-					v1.ResourceCPU: resource.MustParse("8"),
-				},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceCPU,
+					Quantity: new(resource.MustParse("8")),
+				}},
 			}},
 		},
 		{
@@ -575,6 +1014,291 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "cpu0", map[resourceapi.QualifiedName]resource.Quantity{"dra.example.com/wrong": resource.MustParse("4")}),
 			},
 			want: []v1.NodeAllocatableResourceClaimStatus{},
+		},
+		{
+			name: "Overhead Mappings",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{
+					Name:      "c1",
+					Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}},
+				}}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "device1",
+					NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+						v1.ResourceMemory: {
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerPod:       new(resource.MustParse("1Gi")),
+								PerContainer: new(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "device1"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "claim1",
+				Containers:        []string{"c1"},
+				Mapping:           []v1.NodeAllocatableMappedResources{},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerPod:       new(resource.MustParse("1Gi")),
+					PerContainer: new(resource.MustParse("500Mi")),
+				}},
+			}},
+		},
+		{
+			name: "Overhead Mappings - Only PerPod",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{
+					Name:      "c1",
+					Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}},
+				}}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "device1",
+					NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+						v1.ResourceMemory: {
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerPod: new(resource.MustParse("1Gi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "device1"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "claim1",
+				Containers:        []string{"c1"},
+				Mapping:           []v1.NodeAllocatableMappedResources{},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:   v1.ResourceMemory,
+					PerPod: new(resource.MustParse("1Gi")),
+				}},
+			}},
+		},
+		{
+			name: "Overhead Mappings - Only PerContainer",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{
+					Name:      "c1",
+					Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}},
+				}}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "device1",
+					NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+						v1.ResourceMemory: {
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerContainer: new(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "device1"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "claim1",
+				Containers:        []string{"c1"},
+				Mapping:           []v1.NodeAllocatableMappedResources{},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerContainer: new(resource.MustParse("500Mi")),
+				}},
+			}},
+		},
+		{
+			name: "Overhead Mappings - Multiple Containers",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{
+					{
+						Name:      "c1",
+						Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}},
+					},
+					{
+						Name:      "c2",
+						Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}},
+					},
+				}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "device1",
+					NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+						v1.ResourceMemory: {
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerPod:       new(resource.MustParse("1Gi")),
+								PerContainer: new(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "device1"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "claim1",
+				Containers:        []string{"c1", "c2"},
+				Mapping:           []v1.NodeAllocatableMappedResources{},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerPod:       new(resource.MustParse("1Gi")),
+					PerContainer: new(resource.MustParse("500Mi")),
+				}},
+			}},
+		},
+		{
+			name: "Combined direct mapped and overhead mappings for the same resource",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{
+					Name:      "c1",
+					Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}},
+				}}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "device1",
+					NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+						v1.ResourceMemory: {
+							Mapping: &resourceapi.NodeAllocatableMapping{
+								DeviceMultiplier: new(resource.MustParse("2Gi")),
+							},
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerPod:       new(resource.MustParse("1Gi")),
+								PerContainer: new(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "device1"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "claim1",
+				Containers:        []string{"c1"},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceMemory,
+					Quantity: new(resource.MustParse("2Gi")),
+				}},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerPod:       new(resource.MustParse("1Gi")),
+					PerContainer: new(resource.MustParse("500Mi")),
+				}},
+			}},
+		},
+		{
+			name: "device with both mapped and overhead",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{
+					Name:      "c1",
+					Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}},
+				}}).
+				Obj(),
+			claims:         []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{makeSlice("slice1", combinedDevice)},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "combined-device"),
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "claim1",
+				Containers:        []string{"c1"},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceCPU,
+					Quantity: new(resource.MustParse("2")),
+				}},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceCPU,
+					PerPod:       new(resource.MustParse("1")),
+					PerContainer: new(resource.MustParse("500m")),
+				}},
+			}},
+		},
+		{
+			name: "Driver name collision with same pool and device name",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Claims: []v1.ResourceClaim{{Name: "claim1"}},
+					},
+				}}).
+				Obj(),
+			claims: []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "slice-a", Namespace: "test-ns"},
+					Spec: resourceapi.ResourceSliceSpec{
+						Pool:     resourceapi.ResourcePool{Name: "pool1"},
+						NodeName: new("test-node"),
+						Driver:   "driver-a.example.com",
+						Devices: []resourceapi.Device{{
+							Name: "cpu0",
+							NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+								v1.ResourceCPU: {
+									Mapping: &resourceapi.NodeAllocatableMapping{
+										DeviceMultiplier: new(resource.MustParse("1")),
+									},
+								},
+							},
+						}},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "slice-b", Namespace: "test-ns"},
+					Spec: resourceapi.ResourceSliceSpec{
+						Pool:     resourceapi.ResourcePool{Name: "pool1"},
+						NodeName: new("test-node"),
+						Driver:   "driver-b.example.com",
+						Devices: []resourceapi.Device{{
+							Name: "cpu0",
+							NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+								v1.ResourceCPU: {
+									Mapping: &resourceapi.NodeAllocatableMapping{
+										DeviceMultiplier: new(resource.MustParse("8")),
+									},
+								},
+							},
+						}},
+					},
+				},
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: {
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{{
+							Driver: "driver-b.example.com",
+							Pool:   "pool1",
+							Device: "cpu0",
+						}},
+					},
+				},
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "claim1",
+				Containers:        []string{"c1"},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name: v1.ResourceCPU,
+					// Extract quantity correctly from "driver-b.example.com",
+					Quantity: new(resource.MustParse("8")),
+				}},
+			}},
 		},
 		{
 			name:           "Invalid -  Device Not Found",
@@ -603,7 +1327,8 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 				claimNametoUID[claim.Name] = claim.UID
 			}
 
-			got, err := pl.buildNodeAllocatableDRAInfo(tt.pod, tt.nodeAllocatableClaimAllocations, claimNametoUID)
+			slices, _ := draManager.ResourceSlices().ListWithDeviceTaintRules()
+			got, err := pl.buildNodeAllocatableDRAInfo(tt.pod, tt.nodeAllocatableClaimAllocations, claimNametoUID, slices, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("buildNodeAllocatableDRAInfo() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -611,6 +1336,18 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			if err != nil {
 				return
 			}
+			normalizeSlices := func(claimStatuses []v1.NodeAllocatableResourceClaimStatus) {
+				for i := range claimStatuses {
+					if claimStatuses[i].Mapping == nil {
+						claimStatuses[i].Mapping = []v1.NodeAllocatableMappedResources{}
+					}
+					if claimStatuses[i].Overhead == nil {
+						claimStatuses[i].Overhead = []v1.NodeAllocatableOverheadResources{}
+					}
+				}
+			}
+			normalizeSlices(got)
+			normalizeSlices(tt.want)
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf(`buildNodeAllocatableDRAInfo() diff (-want +got):
 %s`, diff)
@@ -642,9 +1379,10 @@ func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "claim1",
 						Containers:        []string{"c1"},
-						Resources: map[v1.ResourceName]resource.Quantity{
-							v1.ResourceCPU: resource.MustParse("1"),
-						},
+						Mapping: []v1.NodeAllocatableMappedResources{{
+							Name:     v1.ResourceCPU,
+							Quantity: new(resource.MustParse("1")),
+						}},
 					},
 				},
 			},
@@ -652,9 +1390,10 @@ func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 				{
 					ResourceClaimName: "claim1",
 					Containers:        []string{"c1"},
-					Resources: map[v1.ResourceName]resource.Quantity{
-						v1.ResourceCPU: resource.MustParse("1"),
-					},
+					Mapping: []v1.NodeAllocatableMappedResources{{
+						Name:     v1.ResourceCPU,
+						Quantity: new(resource.MustParse("1")),
+					}},
 				},
 			},
 			wantPatch:  true,
@@ -667,9 +1406,10 @@ func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "claim1",
 						Containers:        []string{"c1"},
-						Resources: map[v1.ResourceName]resource.Quantity{
-							v1.ResourceCPU: resource.MustParse("1"),
-						},
+						Mapping: []v1.NodeAllocatableMappedResources{{
+							Name:     v1.ResourceCPU,
+							Quantity: new(resource.MustParse("1")),
+						}},
 					},
 				},
 			},
@@ -677,9 +1417,10 @@ func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 				{
 					ResourceClaimName: "claim1",
 					Containers:        []string{"c1"},
-					Resources: map[v1.ResourceName]resource.Quantity{
-						v1.ResourceCPU: resource.MustParse("2"),
-					},
+					Mapping: []v1.NodeAllocatableMappedResources{{
+						Name:     v1.ResourceCPU,
+						Quantity: new(resource.MustParse("2")),
+					}},
 				},
 			},
 			wantPatch:  false,
@@ -692,9 +1433,10 @@ func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "claim1",
 						Containers:        []string{"c1"},
-						Resources: map[v1.ResourceName]resource.Quantity{
-							v1.ResourceCPU: resource.MustParse("1"),
-						},
+						Mapping: []v1.NodeAllocatableMappedResources{{
+							Name:     v1.ResourceCPU,
+							Quantity: new(resource.MustParse("1")),
+						}},
 					},
 				},
 			},
@@ -702,9 +1444,10 @@ func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 				{
 					ResourceClaimName: "claim1",
 					Containers:        []string{"c1"},
-					Resources: map[v1.ResourceName]resource.Quantity{
-						v1.ResourceCPU: resource.MustParse("1"),
-					},
+					Mapping: []v1.NodeAllocatableMappedResources{{
+						Name:     v1.ResourceCPU,
+						Quantity: new(resource.MustParse("1")),
+					}},
 				},
 			},
 			wantPatch:     true,
@@ -779,9 +1522,10 @@ func TestClearNodeAllocatableResourceClaimStatus(t *testing.T) {
 					{
 						ResourceClaimName: "claim1",
 						Containers:        []string{"c1"},
-						Resources: map[v1.ResourceName]resource.Quantity{
-							v1.ResourceCPU: resource.MustParse("1"),
-						},
+						Mapping: []v1.NodeAllocatableMappedResources{{
+							Name:     v1.ResourceCPU,
+							Quantity: new(resource.MustParse("1")),
+						}},
 					},
 				},
 			},
@@ -809,12 +1553,20 @@ func TestClearNodeAllocatableResourceClaimStatus(t *testing.T) {
 			for _, action := range actions {
 				if action.Matches("patch", "pods") && action.GetSubresource() == "status" {
 					gotPatch = true
+					patchAction := action.(clienttesting.PatchAction)
+					if patchAction.GetPatchType() != types.MergePatchType {
+						t.Errorf("patch type = %q, want %q", patchAction.GetPatchType(), types.MergePatchType)
+					}
+					wantPatch := `{"metadata":{"uid":"pod-uid"},"status":{"nodeAllocatableResourceClaimStatuses":[]}}`
+					if diff := cmp.Diff(wantPatch, string(patchAction.GetPatch())); diff != "" {
+						t.Errorf("clear patch mismatch (-want +got):\n%s", diff)
+					}
 					break
 				}
 			}
 
 			if gotPatch != tt.wantPatch {
-				t.Errorf("patchNodeAllocatableResourceClaimStatus() gotPatch = %v, want %v", gotPatch, tt.wantPatch)
+				t.Errorf("clearNodeAllocatableResourceClaimStatus() gotPatch = %v, want %v", gotPatch, tt.wantPatch)
 			}
 		})
 	}
@@ -989,14 +1741,14 @@ func TestNodeFitsNativeResources(t *testing.T) {
 	}
 }
 
-func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
+func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 	tests := []struct {
 		name                  string
 		pod                   *v1.Pod
 		nodeAllocatableStatus []v1.NodeAllocatableResourceClaimStatus
-		requestWithPodLevel   v1.ResourceList
-		wantStatusCode        fwk.Code
-		wantErrorMessage      string
+
+		wantStatusCode   fwk.Code
+		wantErrorMessage string
 	}{
 		{
 			name: "PodLevelResources enabled, no pod resources set",
@@ -1013,13 +1765,15 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 				Obj(),
 			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
 				ResourceClaimName: "dra-claim",
-				Resources: map[v1.ResourceName]resource.Quantity{
-					v1.ResourceCPU:    resource.MustParse("500m"),
-					v1.ResourceMemory: resource.MustParse("512Mi"),
-				},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceCPU,
+					Quantity: new(resource.MustParse("500m")),
+				}, {
+					Name:     v1.ResourceMemory,
+					Quantity: new(resource.MustParse("512Mi")),
+				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{},
-			wantStatusCode:      fwk.Success,
+			wantStatusCode: fwk.Success,
 		},
 		{
 			name: "PodLevel resources sufficient",
@@ -1042,15 +1796,14 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 				Obj(),
 			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
 				ResourceClaimName: "dra-claim",
-				Resources: map[v1.ResourceName]resource.Quantity{
-					v1.ResourceCPU:    resource.MustParse("500m"),
-					v1.ResourceMemory: resource.MustParse("512Mi"),
-				},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceCPU,
+					Quantity: new(resource.MustParse("500m")),
+				}, {
+					Name:     v1.ResourceMemory,
+					Quantity: new(resource.MustParse("512Mi")),
+				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("2"),
-				v1.ResourceMemory: resource.MustParse("2Gi"),
-			},
 			wantStatusCode: fwk.Success,
 		},
 		{
@@ -1074,15 +1827,14 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 				Obj(),
 			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
 				ResourceClaimName: "dra-claim",
-				Resources: map[v1.ResourceName]resource.Quantity{
-					v1.ResourceCPU:    resource.MustParse("300m"), // 800 + 300 = 1100 > 1000
-					v1.ResourceMemory: resource.MustParse("512Mi"),
-				},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceCPU,
+					Quantity: new(resource.MustParse("300m")),
+				}, {
+					Name:     v1.ResourceMemory,
+					Quantity: new(resource.MustParse("512Mi")),
+				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("1"),
-				v1.ResourceMemory: resource.MustParse("2Gi"),
-			},
 			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
 			wantErrorMessage: "pod level request for cpu is insufficient to cover the aggregated container and node-allocatable DRA requests",
 		},
@@ -1107,15 +1859,14 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 				Obj(),
 			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
 				ResourceClaimName: "dra-claim",
-				Resources: map[v1.ResourceName]resource.Quantity{
-					v1.ResourceCPU:    resource.MustParse("100m"),
-					v1.ResourceMemory: resource.MustParse("100Mi"),
-				},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceCPU,
+					Quantity: new(resource.MustParse("100m")),
+				}, {
+					Name:     v1.ResourceMemory,
+					Quantity: new(resource.MustParse("100Mi")),
+				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("1"),
-				v1.ResourceMemory: resource.MustParse("1Gi"),
-			},
 			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
 			wantErrorMessage: "insufficient to cover the aggregated container and node-allocatable DRA requests",
 		},
@@ -1149,15 +1900,163 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 			},
 			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
 				ResourceClaimName: "dra-claim",
-				Resources: map[v1.ResourceName]resource.Quantity{
-					v1.ResourceCPU:    resource.MustParse("1"),
-					v1.ResourceMemory: resource.MustParse("1Gi"),
-				},
+				Mapping: []v1.NodeAllocatableMappedResources{{
+					Name:     v1.ResourceCPU,
+					Quantity: new(resource.MustParse("1")),
+				}, {
+					Name:     v1.ResourceMemory,
+					Quantity: new(resource.MustParse("1Gi")),
+				}},
 			}},
-			requestWithPodLevel: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("4"),
-				v1.ResourceMemory: resource.MustParse("3Gi"),
-			},
+			wantStatusCode: fwk.Success,
+		},
+		{
+			name: "PodLevel resources sufficient with DRA Overhead",
+			pod: st.MakePod().Name("test-pod").
+				Resources(v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("2"),
+						v1.ResourceMemory: resource.MustParse("3Gi"), // Container (1Gi) + DRA flat pod overhead (1Gi) + DRA container overhead (1Gi) = 3Gi
+					},
+				}).
+				Containers([]v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1"),
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+						Claims: []v1.ResourceClaim{{Name: "dra-claim"}},
+					},
+				}}).
+				Obj(),
+			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "dra-claim",
+				Containers:        []string{"c1"},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerPod:       new(resource.MustParse("1Gi")),
+					PerContainer: new(resource.MustParse("1Gi")),
+				}},
+			}},
+			wantStatusCode: fwk.Success,
+		},
+		{
+			name: "PodLevel resources insufficient with DRA Overhead",
+			pod: st.MakePod().Name("test-pod").
+				Resources(v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("2"),
+						v1.ResourceMemory: resource.MustParse("2Gi"), // Container (1Gi) + DRA flat pod overhead (1Gi) + DRA container overhead (1Gi) = 3Gi > 2Gi
+					},
+				}).
+				Containers([]v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1"),
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+						Claims: []v1.ResourceClaim{{Name: "dra-claim"}},
+					},
+				}}).
+				Obj(),
+			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "dra-claim",
+				Containers:        []string{"c1"},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerPod:       new(resource.MustParse("1Gi")),
+					PerContainer: new(resource.MustParse("1Gi")),
+				}},
+			}},
+			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
+			wantErrorMessage: "pod level request for memory is insufficient to cover the aggregated container and node-allocatable DRA requests",
+		},
+		{
+			name: "PodLevel limits cover DRA",
+			pod: st.MakePod().Name("test-pod").
+				Resources(v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+				}).
+				Containers([]v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+						Claims: []v1.ResourceClaim{{Name: "dra-claim"}},
+					},
+				}}).
+				Obj(),
+			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "dra-claim",
+				Containers:        []string{"c1"},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerContainer: new(resource.MustParse("512Mi")),
+				}},
+			}},
+			wantStatusCode: fwk.Success,
+		},
+		{
+			name: "PodLevel limits does not cover DRA",
+			pod: st.MakePod().Name("test-pod").
+				Resources(v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+				}).
+				Containers([]v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("1.5Gi"),
+						},
+						Claims: []v1.ResourceClaim{{Name: "dra-claim"}},
+					},
+				}}).
+				Obj(),
+			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "dra-claim",
+				Containers:        []string{"c1"},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerContainer: new(resource.MustParse("1Gi")),
+				}},
+			}},
+			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
+			wantErrorMessage: "pod level limit for memory is insufficient to cover the limit and DRA overhead for container c1",
+		},
+		{
+			name: "PodLevel limits overcommitted but individual container limits with DRA covered by pod level limits",
+			pod: st.MakePod().Name("test-pod").
+				Resources(v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}).
+				Containers([]v1.Container{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("3Gi"),
+							},
+						},
+					},
+					{
+						Name: "c2",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("3Gi"),
+							},
+						},
+					},
+				}).
+				Obj(),
 			wantStatusCode: fwk.Success,
 		},
 	}
@@ -1168,14 +2067,99 @@ func TestValidatePodLevelRequestsCoverDRA(t *testing.T) {
 				fts: feature.Features{EnablePodLevelResources: true},
 			}
 			tt.pod.Status.NodeAllocatableResourceClaimStatuses = tt.nodeAllocatableStatus
-			gotStatus := pl.validatePodLevelRequestsCoverDRA(klog.TODO(), tt.pod, tt.requestWithPodLevel)
+			gotStatus := pl.validatePodLevelResourcesCoverDRA(tt.pod)
 			if diff := cmp.Diff(tt.wantStatusCode, gotStatus.Code()); diff != "" {
-				t.Errorf("validatePodLevelRequestsCoverDRA() returned diff (-want +got):\n%s", diff)
+				t.Errorf("validatePodLevelResourcesCoverDRA() returned diff (-want +got):\n%s", diff)
 			}
 			if tt.wantStatusCode != fwk.Success && tt.wantErrorMessage != "" {
 				if !strings.Contains(gotStatus.Message(), tt.wantErrorMessage) {
-					t.Errorf("validatePodLevelRequestsCoverDRA() returned error %q, want it to contain %q", gotStatus.Message(), tt.wantErrorMessage)
+					t.Errorf("validatePodLevelResourcesCoverDRA() returned error %q, want it to contain %q", gotStatus.Message(), tt.wantErrorMessage)
 				}
+			}
+		})
+	}
+}
+
+func TestFilterSlicesForNode(t *testing.T) {
+	nodeName := "node1"
+	otherNodeName := "node2"
+	allNodes := true
+
+	tests := []struct {
+		name      string
+		node      *v1.Node
+		slices    []*resourceapi.ResourceSlice
+		wantNames []string
+	}{
+		{
+			name: "matches NodeName exactly",
+			node: st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Obj(),
+			slices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "nodename"},
+					Spec: resourceapi.ResourceSliceSpec{
+						NodeName: &nodeName,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "othernode"},
+					Spec: resourceapi.ResourceSliceSpec{
+						NodeName: &otherNodeName,
+					},
+				},
+			},
+			wantNames: []string{"nodename"},
+		},
+		{
+			name: "matches AllNodes",
+			node: st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Obj(),
+			slices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "allnodes"},
+					Spec: resourceapi.ResourceSliceSpec{
+						AllNodes: &allNodes,
+					},
+				},
+			},
+			wantNames: []string{"allnodes"},
+		},
+		{
+			name: "matches NodeSelector",
+			node: st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Obj(),
+			slices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "nodeselector"},
+					Spec: resourceapi.ResourceSliceSpec{
+						NodeSelector: st.MakeNodeSelector().In("kubernetes.io/hostname", []string{nodeName}, st.NodeSelectorTypeMatchExpressions).Obj(),
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "othernodeselector"},
+					Spec: resourceapi.ResourceSliceSpec{
+						NodeSelector: st.MakeNodeSelector().In("kubernetes.io/hostname", []string{otherNodeName}, st.NodeSelectorTypeMatchExpressions).Obj(),
+					},
+				},
+			},
+			wantNames: []string{"nodeselector"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			draManager := &mockDRAManager{resourceSlices: tt.slices}
+			got, _ := filterSlicesForNode(draManager, tt.node)
+
+			var gotNames []string
+			for _, slice := range got {
+				gotNames = append(gotNames, slice.Name)
+			}
+
+			// Sort slices to make comparison stable.
+			sort.Strings(gotNames)
+			sort.Strings(tt.wantNames)
+
+			if diff := cmp.Diff(tt.wantNames, gotNames); diff != "" {
+				t.Errorf("filterSlicesForNode() diff (-want +got):\n%s", diff)
 			}
 		})
 	}

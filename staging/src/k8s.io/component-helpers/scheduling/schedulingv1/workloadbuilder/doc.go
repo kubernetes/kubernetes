@@ -31,7 +31,7 @@ limitations under the License.
 //		AllowedPolicies:        []workloadbuilder.SchedulingPolicyOption{workloadbuilder.BasicPolicy, workloadbuilder.GangPolicy},
 //		AllowedDisruptionModes: []workloadbuilder.DisruptionModeOption{workloadbuilder.SingleMode, workloadbuilder.AllMode},
 //	})
-//	if errs := builder.Validate(ctx, fldPath, workloadbuilder.ValidationInput{}); len(errs) > 0 { /* reject */ }
+//	if errs := builder.Validate(ctx, workloadbuilder.ValidationInput{}); len(errs) > 0 { /* reject */ }
 //	workload, err := builder.BuildWorkload()
 //	podGroup, err := builder.NewPodGroup("trainer-pg", "trainer-pgt-0")
 //
@@ -61,20 +61,21 @@ limitations under the License.
 //
 //	item := &workloadbuilder.WorkloadItem{
 //		Name: "worker",
+//		Path: fldPath,
 //		Input: workloadbuilder.WorkloadInput{
 //			Policy:         workloadbuilder.PolicyInput{PodGroupData: policy, PathElements: []string{"schedulingPolicy"}},
 //			DisruptionMode: workloadbuilder.DisruptionModeInput{PodGroupData: mode, PathElements: []string{"disruptionMode"}},
 //		},
 //	}
 //	builder := workloadbuilder.NewBuilder(item, opts)
-//	allErrs = append(allErrs, builder.Validate(ctx, fldPath, workloadbuilder.ValidationInput{})...)
+//	allErrs = append(allErrs, builder.Validate(ctx, workloadbuilder.ValidationInput{})...)
 //
 // The zero ValidationInput validates a create. On an update the controller sets
 // OldRoot so DV runs the update-time checks (i.e. immutability) against the
 // previously persisted item; the operation is inferred from OldRoot being
 // non-nil:
 //
-//	allErrs = append(allErrs, builder.Validate(ctx, fldPath, workloadbuilder.ValidationInput{
+//	allErrs = append(allErrs, builder.Validate(ctx, workloadbuilder.ValidationInput{
 //		OldRoot: oldItem,
 //	})...)
 //
@@ -83,4 +84,7 @@ limitations under the License.
 // sets BuildOptions.DisableDeclarativeValidation to skip the first layer and run
 // only the complex checks; it passes the zero ValidationInput regardless of the
 // operation because OldRoot is only consulted by DV. See ExampleJobControllerE2E.
+//
+// +k8s:conversion-gen=k8s.io/api/scheduling/v1alpha3
+// +k8s:conversion-gen-external-types=k8s.io/api/scheduling/v1beta1
 package workloadbuilder

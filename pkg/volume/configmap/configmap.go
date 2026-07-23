@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -208,7 +210,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 		len(configMap.Data)+len(configMap.BinaryData),
 		totalBytes)
 
-	payload, err := MakePayload(b.source.Items, configMap, b.source.DefaultMode, optional)
+	payload, err := MakePayload(b.source.Items, configMap, b.source.DefaultMode, b.source.DefaultUser, optional)
 	if err != nil {
 		return err
 	}
@@ -260,7 +262,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 }
 
 // MakePayload function is exported so that it can be called from the projection volume driver
-func MakePayload(mappings []v1.KeyToPath, configMap *v1.ConfigMap, defaultMode *int32, optional bool) (map[string]volumeutil.FileProjection, error) {
+func MakePayload(mappings []v1.KeyToPath, configMap *v1.ConfigMap, defaultMode *int32, defaultUser *int64, optional bool) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
 		return nil, fmt.Errorf("no defaultMode used, not even the default value for it")
 	}
@@ -272,11 +274,17 @@ func MakePayload(mappings []v1.KeyToPath, configMap *v1.ConfigMap, defaultMode *
 		for name, data := range configMap.Data {
 			fileProjection.Data = []byte(data)
 			fileProjection.Mode = *defaultMode
+			if utilfeature.DefaultFeatureGate.Enabled(features.AtomicWriteVolumeUserFields) {
+				fileProjection.FsUser = defaultUser
+			}
 			payload[name] = fileProjection
 		}
 		for name, data := range configMap.BinaryData {
 			fileProjection.Data = data
 			fileProjection.Mode = *defaultMode
+			if utilfeature.DefaultFeatureGate.Enabled(features.AtomicWriteVolumeUserFields) {
+				fileProjection.FsUser = defaultUser
+			}
 			payload[name] = fileProjection
 		}
 	} else {
@@ -292,11 +300,13 @@ func MakePayload(mappings []v1.KeyToPath, configMap *v1.ConfigMap, defaultMode *
 				return nil, fmt.Errorf("configmap references non-existent config key: %s", ktp.Key)
 			}
 
+			fileProjection.FsUser = volumeutil.ResolvesFsUser(defaultUser, ktp.User)
 			if ktp.Mode != nil {
 				fileProjection.Mode = *ktp.Mode
 			} else {
 				fileProjection.Mode = *defaultMode
 			}
+
 			payload[ktp.Path] = fileProjection
 		}
 	}

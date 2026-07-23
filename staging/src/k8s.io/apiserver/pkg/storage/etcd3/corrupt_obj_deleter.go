@@ -247,8 +247,9 @@ func (e *aggregatedStorageError) Error() string {
 // NewAPIStatusError creates a new APIStatus object from the
 // aggregated list of StorageError
 func (e *aggregatedStorageError) NewAPIStatusError(qualifiedResource schema.GroupResource) *apierrors.StatusError {
+	errs := e.errs.Errors()
 	var causes []metav1.StatusCause
-	for _, err := range e.errs.Errors() {
+	for _, err := range errs {
 		var storageErr *storage.StorageError
 		if errors.As(err, &storageErr) {
 			causes = append(causes, metav1.StatusCause{
@@ -272,6 +273,14 @@ func (e *aggregatedStorageError) NewAPIStatusError(qualifiedResource schema.Grou
 		})
 	}
 
+	// the top-level message carries the first underlying error so it survives
+	// layers that flatten the error to text and drop the causes, for example
+	// the watch cache wrapping the reflector list error.
+	message := fmt.Sprintf("failed to read one or more %s from the storage: %v", qualifiedResource.String(), errs[0])
+	if len(errs) > 1 {
+		message = fmt.Sprintf("%s (and %d more)", message, len(errs)-1)
+	}
+
 	return &apierrors.StatusError{
 		ErrStatus: metav1.Status{
 			Status: metav1.StatusFailure,
@@ -283,7 +292,7 @@ func (e *aggregatedStorageError) NewAPIStatusError(qualifiedResource schema.Grou
 				Name:   e.resourcePrefix,
 				Causes: causes,
 			},
-			Message: fmt.Sprintf("failed to read one or more %s from the storage", qualifiedResource.String()),
+			Message: message,
 		},
 	}
 }

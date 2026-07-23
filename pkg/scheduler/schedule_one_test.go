@@ -38,7 +38,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1041,7 +1041,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		var gotNominatingInfo *fwk.NominatingInfo
 
 		var clientObjs []runtime.Object
-		var podGroup *schedulingv1alpha3.PodGroup
+		var podGroup *schedulingv1beta1.PodGroup
 		if scheduleAsPodGroup {
 			group := &v1.PodSchedulingGroup{
 				PodGroupName: new("pg"),
@@ -1056,7 +1056,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				item.expectPodInUnschedulable = nil
 			}
 
-			podGroup = &schedulingv1alpha3.PodGroup{
+			podGroup = &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: item.sendPod.Namespace},
 			}
 			clientObjs = []runtime.Object{item.sendPod, podGroup}
@@ -4139,6 +4139,16 @@ func Test_prioritizeNodes(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+						{
+							Name:  "Node2Prioritizer",
+							Score: 10,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "Node2Prioritizer",
@@ -4153,6 +4163,16 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+						{
+							Name:  "Node2Prioritizer",
+							Score: 100,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "Node2Prioritizer",
@@ -4201,8 +4221,13 @@ func Test_prioritizeNodes(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+					},
 					Scores: []fwk.PluginScore{
-
 						{
 							Name:  "FakeExtender1",
 							Score: 300,
@@ -4220,6 +4245,12 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "FakeExtender1",
@@ -4256,6 +4287,16 @@ func Test_prioritizeNodes(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+						{
+							Name:  "Node2Prioritizer",
+							Score: 10,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "Node2Prioritizer",
@@ -4270,6 +4311,16 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+						{
+							Name:  "Node2Prioritizer",
+							Score: 100,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "Node2Prioritizer",
@@ -4298,8 +4349,8 @@ func Test_prioritizeNodes(t *testing.T) {
 			},
 			extenders: nil,
 			want: []fwk.NodePluginScores{
-				{Name: "node1", Scores: []fwk.PluginScore{}},
-				{Name: "node2", Scores: []fwk.PluginScore{}},
+				{Name: "node1", RawScores: []fwk.PluginScore{}, Scores: []fwk.PluginScore{}},
+				{Name: "node2", RawScores: []fwk.PluginScore{}, Scores: []fwk.PluginScore{}},
 			},
 		},
 		{
@@ -4327,6 +4378,12 @@ func Test_prioritizeNodes(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 5,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
@@ -4337,6 +4394,12 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 5,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
@@ -4347,6 +4410,12 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node3",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 5,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
@@ -4381,6 +4450,12 @@ func Test_prioritizeNodes(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 18,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
@@ -4391,6 +4466,12 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 18,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
@@ -4401,6 +4482,12 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node3",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 0,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",

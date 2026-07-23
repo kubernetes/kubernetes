@@ -21,16 +21,22 @@ limitations under the License.
 package devicemetadata
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/dynamic-resource-allocation/api/metadata"
 	"k8s.io/dynamic-resource-allocation/api/metadata/install"
+	metadatav1alpha1 "k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
+	metadatav1beta1 "k8s.io/dynamic-resource-allocation/api/metadata/v1beta1"
 )
 
 var (
@@ -54,7 +60,18 @@ var (
 // is recommended because it can be decoded with less conversions and source
 // code does not need to be updated when new API versions get added or (at
 // some point) removed.
-func DecodeMetadataFromStream(decoder *json.Decoder, dest runtime.Object) error {
+//
+// By default, the input data does not get validated before converting it to the
+// desired type. Validation can be enabled with [DecodeMetadataWithValidationResult]
+// which will store a validation error separately, if there is any.
+// Callers which want to know what was decoded can request to get
+// the GVK stored via [DecodeMetadataStoreGVKResult].
+func DecodeMetadataFromStream(decoder *json.Decoder, dest runtime.Object, opts ...DecodeMetadataOption) error {
+	var options decodeMetadataOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	gvks, _, err := scheme.ObjectKinds(dest)
 	if err != nil {
 		return fmt.Errorf("determine target type: %w", err)
@@ -80,8 +97,42 @@ func DecodeMetadataFromStream(decoder *json.Decoder, dest runtime.Object) error 
 			return fmt.Errorf("decode %s: %w", gvk.GroupVersion(), err)
 		}
 
-		if err := scheme.Convert(obj, dest, nil); err != nil {
-			return fmt.Errorf("convert %s: %w", obj.GetObjectKind().GroupVersionKind().GroupVersion(), err)
+		if options.validationResult != nil {
+			// Error wrapping is left to the caller, they know that a validation error
+			// is because of a failed validation and can add the GKV if they want to.
+			switch obj := obj.(type) {
+			case *metadatav1alpha1.DeviceMetadata:
+				if err := metadatav1alpha1.Validate_DeviceMetadata(context.Background(), operation.Operation{Type: operation.Create}, nil, obj, nil).ToAggregate(); err != nil {
+					*options.validationResult = err
+				}
+			case *metadatav1beta1.DeviceMetadata:
+				if err := metadatav1beta1.Validate_DeviceMetadata(context.Background(), operation.Operation{Type: operation.Create}, nil, obj, nil).ToAggregate(); err != nil {
+					*options.validationResult = err
+				}
+			default:
+				*options.validationResult = fmt.Errorf("cannot validate object of type %T", obj)
+			}
+		}
+
+		// Only write into dest once, using the method that is most likely to work.
+		// It's uncertain if partial conversion would be properly overwritten by
+		// a second attempt.
+		if reflect.TypeOf(dest) != reflect.TypeFor[*metadata.DeviceMetadata]() &&
+			reflect.TypeOf(dest) != reflect.TypeOf(obj) {
+			// The destination type is not the internal version and
+			// the two objects have different types, so maybe we
+			// can convert indirectly.
+			var intermediate metadata.DeviceMetadata
+			if err := scheme.Convert(obj, &intermediate, nil); err != nil {
+				return fmt.Errorf("convert %s into internal version: %w", gvk, err)
+			}
+			if err := scheme.Convert(&intermediate, dest, nil); err != nil {
+				return fmt.Errorf("convert internal version into %s: %w", gvk, err)
+			}
+		} else {
+			if err := scheme.Convert(obj, dest, nil); err != nil {
+				return fmt.Errorf("convert %s: %w", gvk, err)
+			}
 		}
 
 		// scheme.Convert does not propagate TypeMeta. Set it explicitly
@@ -90,12 +141,42 @@ func DecodeMetadataFromStream(decoder *json.Decoder, dest runtime.Object) error 
 		if gvks[0].Version != runtime.APIVersionInternal {
 			dest.GetObjectKind().SetGroupVersionKind(gvks[0])
 		}
+
+		if options.gvkResult != nil {
+			*options.gvkResult = *gvk
+		}
 		return nil
 	}
 	if len(unknownVersions) == 0 {
 		return fmt.Errorf("no metadata objects found in stream")
 	}
 	return fmt.Errorf("no compatible metadata version found in stream (unknown versions: %s)", strings.Join(unknownVersions, ", "))
+}
+
+type DecodeMetadataOption func(*decodeMetadataOptions)
+
+// DecodeMetadataWithValidationResult enables or disables validation in [DecodeMetadataFromStream].
+// In case of a validation error, it'll be stored where requested here.
+// Providing a nil pointer disables validation.
+// The error comes straight from the underlying declarative validation with no wrapping
+// or explains why validation is not possible.
+func DecodeMetadataWithValidationResult(err *error) DecodeMetadataOption {
+	return func(options *decodeMetadataOptions) {
+		options.validationResult = err
+	}
+}
+
+// DecodeMetadataStoreGVKResult tells [DecodeMetadataFromStream] where to store
+// the group/version/kind that was decoded from the input in case of success.
+func DecodeMetadataStoreGVKResult(gvk *schema.GroupVersionKind) DecodeMetadataOption {
+	return func(options *decodeMetadataOptions) {
+		options.gvkResult = gvk
+	}
+}
+
+type decodeMetadataOptions struct {
+	validationResult *error
+	gvkResult        *schema.GroupVersionKind
 }
 
 // ReadResourceClaimMetadataWithDriverName reads and decodes the metadata file

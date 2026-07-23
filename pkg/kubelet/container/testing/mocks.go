@@ -1026,6 +1026,52 @@ func (_c *MockRuntime_ImageStats_Call) RunAndReturn(run func(ctx context.Context
 	return _c
 }
 
+// InitializeActuatedPod provides a mock function for the type MockRuntime
+func (_mock *MockRuntime) InitializeActuatedPod(logger klog.Logger, allocatedPod *v10.Pod) {
+	_mock.Called(logger, allocatedPod)
+	return
+}
+
+// MockRuntime_InitializeActuatedPod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InitializeActuatedPod'
+type MockRuntime_InitializeActuatedPod_Call struct {
+	*mock.Call
+}
+
+// InitializeActuatedPod is a helper method to define mock.On call
+//   - logger klog.Logger
+//   - allocatedPod *v10.Pod
+func (_e *MockRuntime_Expecter) InitializeActuatedPod(logger interface{}, allocatedPod interface{}) *MockRuntime_InitializeActuatedPod_Call {
+	return &MockRuntime_InitializeActuatedPod_Call{Call: _e.mock.On("InitializeActuatedPod", logger, allocatedPod)}
+}
+
+func (_c *MockRuntime_InitializeActuatedPod_Call) Run(run func(logger klog.Logger, allocatedPod *v10.Pod)) *MockRuntime_InitializeActuatedPod_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 klog.Logger
+		if args[0] != nil {
+			arg0 = args[0].(klog.Logger)
+		}
+		var arg1 *v10.Pod
+		if args[1] != nil {
+			arg1 = args[1].(*v10.Pod)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRuntime_InitializeActuatedPod_Call) Return() *MockRuntime_InitializeActuatedPod_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockRuntime_InitializeActuatedPod_Call) RunAndReturn(run func(logger klog.Logger, allocatedPod *v10.Pod)) *MockRuntime_InitializeActuatedPod_Call {
+	_c.Run(run)
+	return _c
+}
+
 // IsPodResizeInProgress provides a mock function for the type MockRuntime
 func (_mock *MockRuntime) IsPodResizeInProgress(allocatedPod *v10.Pod, podStatus *container.PodStatus) bool {
 	ret := _mock.Called(allocatedPod, podStatus)

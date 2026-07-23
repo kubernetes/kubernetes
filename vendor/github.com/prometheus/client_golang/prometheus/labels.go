@@ -184,6 +184,5 @@ func validateLabelValues(vals []string, expectedNumberOfValues int) error {
 }
 
 func checkLabelName(l string) bool {
-	//nolint:staticcheck // TODO: Don't use deprecated model.NameValidationScheme.
-	return model.NameValidationScheme.IsValidLabelName(l) && !strings.HasPrefix(l, reservedLabelPrefix)
+	return model.UTF8Validation.IsValidLabelName(l) && !strings.HasPrefix(l, reservedLabelPrefix)
 }

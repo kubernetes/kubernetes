@@ -25,11 +25,15 @@ import (
 	"github.com/google/uuid"
 	"gopkg.in/go-jose/go-jose.v2/jwt"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/audit"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	authenticationtokenjwt "k8s.io/apiserver/pkg/authentication/token/jwt"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -54,12 +58,15 @@ type privateClaims struct {
 }
 
 type kubernetes struct {
-	Namespace string           `json:"namespace,omitempty"`
-	Svcacct   ref              `json:"serviceaccount,omitempty"`
-	Pod       *ref             `json:"pod,omitempty"`
-	Secret    *ref             `json:"secret,omitempty"`
-	Node      *ref             `json:"node,omitempty"`
-	WarnAfter *jwt.NumericDate `json:"warnafter,omitempty"`
+	Namespace                      string                                     `json:"namespace,omitempty"`
+	Svcacct                        ref                                        `json:"serviceaccount,omitempty"`
+	Pod                            *ref                                       `json:"pod,omitempty"`
+	Secret                         *ref                                       `json:"secret,omitempty"`
+	Node                           *ref                                       `json:"node,omitempty"`
+	ValidatingWebhookConfiguration *ref                                       `json:"validatingwebhookconfiguration,omitempty"`
+	MutatingWebhookConfiguration   *ref                                       `json:"mutatingwebhookconfiguration,omitempty"`
+	Attestations                   map[string]authentication.AttestationValue `json:"attestations,omitempty"`
+	WarnAfter                      *jwt.NumericDate                           `json:"warnafter,omitempty"`
 }
 
 type ref struct {
@@ -67,7 +74,7 @@ type ref struct {
 	UID  string `json:"uid,omitempty"`
 }
 
-func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *core.Node, expirationSeconds, warnafter int64, audience []string) (*jwt.Claims, interface{}, error) {
+func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *core.Node, validating *admissionregistrationv1.ValidatingWebhookConfiguration, mutating *admissionregistrationv1.MutatingWebhookConfiguration, expirationSeconds, warnafter int64, audience []string, attestations map[string]authentication.AttestationValue) (*jwt.Claims, interface{}, error) {
 	now := now()
 	sc := &jwt.Claims{
 		Subject:   apiserverserviceaccount.MakeUsername(sa.Namespace, sa.Name),
@@ -86,6 +93,7 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *co
 				Name: sa.Name,
 				UID:  string(sa.UID),
 			},
+			Attestations: attestations,
 		},
 	}
 
@@ -119,6 +127,16 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *co
 		pc.Kubernetes.Node = &ref{
 			Name: node.Name,
 			UID:  string(node.UID),
+		}
+	case validating != nil:
+		pc.Kubernetes.ValidatingWebhookConfiguration = &ref{
+			Name: validating.Name,
+			UID:  string(validating.UID),
+		}
+	case mutating != nil:
+		pc.Kubernetes.MutatingWebhookConfiguration = &ref{
+			Name: mutating.Name,
+			UID:  string(mutating.UID),
 		}
 	}
 
@@ -176,6 +194,8 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 	podref := private.Kubernetes.Pod
 	noderef := private.Kubernetes.Node
 	secref := private.Kubernetes.Secret
+	valref := private.Kubernetes.ValidatingWebhookConfiguration
+	mutref := private.Kubernetes.MutatingWebhookConfiguration
 	// Make sure service account still exists (name and UID)
 	serviceAccount, err := v.getter.GetServiceAccount(ctx, namespace, saref.Name)
 	if err != nil {
@@ -262,6 +282,35 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 		}
 	}
 
+	var (
+		validatingName, validatingUID       string
+		mutatingName, mutatingUID           string
+		attestationAdmissionReviewAPIGroups []string
+	)
+	if valref != nil || mutref != nil {
+		if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerWebhookAuthenticationToken) {
+			return nil, fmt.Errorf("feature gate %q is disabled, but token is webhook bound", genericfeatures.APIServerWebhookAuthenticationToken)
+		}
+
+		attestationAdmissionReviewAPIGroups = private.Kubernetes.Attestations[authentication.AttestationAdmissionReviewAPIGroups]
+		if len(attestationAdmissionReviewAPIGroups) == 0 {
+			return nil, fmt.Errorf("bound object was a webhook config, but %q attestation is missing", authentication.AttestationAdmissionReviewAPIGroups)
+		}
+	}
+
+	if valref != nil {
+		validatingName, validatingUID, err = validateWebhookCfgRef(ctx, v.getValidatingWebhookMeta, "ValidatingWebhookConfiguration", &private.Kubernetes, valref, invalidIfDeletedBefore)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if mutref != nil {
+		mutatingName, mutatingUID, err = validateWebhookCfgRef(ctx, v.getMutatingWebhookMeta, "MutatingWebhookConfiguration", &private.Kubernetes, mutref, invalidIfDeletedBefore)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Check special 'warnafter' field for projected service account token transition.
 	warnafter := private.Kubernetes.WarnAfter
 	if warnafter != nil && *warnafter != 0 {
@@ -280,13 +329,53 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 		jti = public.ID
 	}
 	return &apiserverserviceaccount.ServiceAccountInfo{
-		Namespace:    private.Kubernetes.Namespace,
-		Name:         private.Kubernetes.Svcacct.Name,
-		UID:          private.Kubernetes.Svcacct.UID,
-		PodName:      podName,
-		PodUID:       podUID,
-		NodeName:     nodeName,
-		NodeUID:      nodeUID,
-		CredentialID: authenticationtokenjwt.CredentialIDForJTI(jti),
+		Namespace:                           private.Kubernetes.Namespace,
+		Name:                                private.Kubernetes.Svcacct.Name,
+		UID:                                 private.Kubernetes.Svcacct.UID,
+		PodName:                             podName,
+		PodUID:                              podUID,
+		NodeName:                            nodeName,
+		NodeUID:                             nodeUID,
+		AttestationAdmissionReviewAPIGroups: attestationAdmissionReviewAPIGroups,
+		ValidatingWebhookConfigurationName:  validatingName,
+		ValidatingWebhookConfigurationUID:   validatingUID,
+		MutatingWebhookConfigurationName:    mutatingName,
+		MutatingWebhookConfigurationUID:     mutatingUID,
+		CredentialID:                        authenticationtokenjwt.CredentialIDForJTI(jti),
 	}, nil
+}
+
+func (v *validator) getValidatingWebhookMeta(ctx context.Context, name string) (metav1.ObjectMeta, error) {
+	obj, err := v.getter.GetValidatingWebhookConfiguration(ctx, name)
+	if err != nil {
+		return metav1.ObjectMeta{}, err
+	}
+	return obj.ObjectMeta, nil
+}
+
+func (v *validator) getMutatingWebhookMeta(ctx context.Context, name string) (metav1.ObjectMeta, error) {
+	obj, err := v.getter.GetMutatingWebhookConfiguration(ctx, name)
+	if err != nil {
+		return metav1.ObjectMeta{}, err
+	}
+	return obj.ObjectMeta, nil
+}
+
+type getter func(ctx context.Context, name string) (metav1.ObjectMeta, error)
+
+func validateWebhookCfgRef(ctx context.Context, get getter, kind string, private *kubernetes, ref *ref, invalidIfDeletedBefore time.Time) (string, string, error) {
+	obj, err := get(ctx, ref.Name)
+	if err != nil {
+		klog.V(4).Infof("Could not retrieve %s object %q for service account %s/%s: %v", kind, ref.Name, private.Namespace, private.Svcacct.Name, err)
+		return "", "", errors.New("service account token has been invalidated")
+	}
+	if objUID := string(obj.UID); ref.UID != objUID {
+		klog.V(4).Infof("%s UID no longer matches %s: %q != %q", kind, ref.Name, objUID, ref.UID)
+		return "", "", fmt.Errorf("%s UID (%s) does not match service account validating ref claim (%s)", kind, objUID, ref.UID)
+	}
+	if deltime := obj.DeletionTimestamp; deltime != nil && deltime.Time.Before(invalidIfDeletedBefore) {
+		klog.V(4).Infof("%s %q is deleted and awaiting removal for service account %s/%s", kind, obj.Name, private.Namespace, private.Svcacct.Name)
+		return "", "", errors.New("service account token has been invalidated")
+	}
+	return ref.Name, ref.UID, nil
 }

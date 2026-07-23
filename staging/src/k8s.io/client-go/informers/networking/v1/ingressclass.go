@@ -34,11 +34,39 @@ import (
 )
 
 // IngressClassInformer provides access to a shared informer and lister for
-// IngressClasses.
+// IngressClasses. Prefer using the type-safe variant (see [TypedIngressClassInformer]).
 type IngressClassInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() networkingv1.IngressClassLister
 }
+
+// TypedIngressClassInformer provides access to a shared informer and lister for
+// IngressClasses, including the type-safe TypedInformer variant.
+// It is a superset of IngressClassInformer.
+type TypedIngressClassInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() IngressClassIndexInformer
+	Lister() networkingv1.IngressClassLister
+}
+
+// IngressClassIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type IngressClassIndexInformer cache.TypedSharedIndexInformer[*apinetworkingv1.IngressClass]
+
+// IngressClassHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for IngressClass.
+type IngressClassHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apinetworkingv1.IngressClass]
+
+// IngressClassDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for IngressClass.
+type IngressClassDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apinetworkingv1.IngressClass]
+
+// IngressClassFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for IngressClass.
+type IngressClassFilteringHandler = cache.TypedFilteringResourceEventHandler[*apinetworkingv1.IngressClass]
+
+// IngressClassIndexers is a specialization of [cache.TypedIndexers] for IngressClass.
+type IngressClassIndexers = cache.TypedIndexers[*apinetworkingv1.IngressClass]
+
+// DeletedIngressClass is a specialization of [cache.DeletedObject] for IngressClass.
+type DeletedIngressClass = cache.DeletedObject[*apinetworkingv1.IngressClass]
 
 type ingressClassInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +76,49 @@ type ingressClassInformer struct {
 // NewIngressClassInformer constructs a new informer for IngressClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedIngressClassInformer]).
 func NewIngressClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewIngressClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedIngressClassInformer constructs a new informer for IngressClass type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedIngressClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers IngressClassIndexers) IngressClassIndexInformer {
+	return NewTypedIngressClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredIngressClassInformer constructs a new informer for IngressClass type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredIngressClassInformer]).
 func NewFilteredIngressClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewIngressClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedIngressClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredIngressClassInformer constructs a new informer for IngressClass type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredIngressClassInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers IngressClassIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) IngressClassIndexInformer {
+	return NewTypedIngressClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewIngressClassInformerWithOptions constructs a new informer for IngressClass type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedIngressClassInformerWithOptions]).
 func NewIngressClassInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedIngressClassInformerWithOptions(client, options)
+}
+
+// NewTypedIngressClassInformerWithOptions constructs a new informer for IngressClass type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedIngressClassInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) IngressClassIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "networking.k8s.io", Version: "v1", Resource: "ingressclasss"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apinetworkingv1.IngressClass](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,17 +151,57 @@ func NewIngressClassInformerWithOptions(client kubernetes.Interface, options int
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *ingressClassInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewIngressClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedIngressClassInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *ingressClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apinetworkingv1.IngressClass{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *ingressClassInformer) TypedInformer() IngressClassIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apinetworkingv1.IngressClass](f.factory.InformerFor(&apinetworkingv1.IngressClass{}, f.defaultInformer))
 }
 
 func (f *ingressClassInformer) Lister() networkingv1.IngressClassLister {
 	return networkingv1.NewIngressClassLister(f.Informer().GetIndexer())
+}
+
+// ToTypedIngressClassInformer converts an untyped informer into a TypedIngressClassInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *IngressClass. If that is not the case, calling type-safe methods of the returned
+// TypedIngressClassInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedIngressClassInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedIngressClassInformer(informer IngressClassInformer) TypedIngressClassInformer {
+	if informer, ok := informer.(TypedIngressClassInformer); ok {
+		return informer
+	}
+	return &ingressClassTypedInformerAdapter{informer}
+}
+
+type ingressClassTypedInformerAdapter struct {
+	IngressClassInformer
+}
+
+func (a *ingressClassTypedInformerAdapter) TypedInformer() IngressClassIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apinetworkingv1.IngressClass](a.Informer())
+}
+
+// ToIngressClassIndexInformer converts an untyped informer into a IngressClassIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *IngressClass. If that is not the case, calling type-safe methods of the returned
+// IngressClassIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a IngressClassIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToIngressClassIndexInformer(informer cache.SharedIndexInformer) IngressClassIndexInformer {
+	if informer, ok := informer.(IngressClassIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apinetworkingv1.IngressClass](informer)
 }

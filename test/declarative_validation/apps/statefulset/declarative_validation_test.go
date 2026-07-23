@@ -28,6 +28,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/apps/statefulset"
+	poddeclarativevalidation "k8s.io/kubernetes/test/declarative_validation/core/pod"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
@@ -111,6 +112,10 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	poddeclarativevalidation.RunDeclarativeValidateEvictionRespondersTestCases(t, ctx, registry.Strategy, field.NewPath("spec", "template", "spec"), new(mkValidStatefulSet()), func(baseObj *apps.StatefulSet, responders []api.EvictionResponder, schedulingGroup *api.PodSchedulingGroup) {
+		baseObj.Spec.Template.Spec.EvictionResponders = responders
+		baseObj.Spec.Template.Spec.SchedulingGroup = schedulingGroup
+	})
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {

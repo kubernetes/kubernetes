@@ -48,6 +48,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	dracel "k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured"
+	core "k8s.io/kubernetes/pkg/apis/core"
+	corehelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -740,7 +742,73 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 			return counterSet.Name
 		}, fldPath.Child("sharedCounters"), sizeCovered, uniquenessCovered)...)
 
+	// The name format is validated declaratively; see the field's tags.
+	if spec.PartitionTypeAttribute != nil {
+		allErrs = append(allErrs, validatePartitionTypeAttribute(spec, fldPath)...)
+	}
+
 	return allErrs
+}
+
+// validatePartitionTypeAttribute checks that a slice naming a partition type
+// attribute declares devices which consume counters, and that each of those
+// devices carries the attribute as a string. Devices which consume no counters
+// are exempt and may appear alongside them.
+func validatePartitionTypeAttribute(spec *resource.ResourceSliceSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	name := string(*spec.PartitionTypeAttribute)
+
+	if !haveConsumesCounters(spec) {
+		return append(allErrs, field.Invalid(fldPath.Child("partitionTypeAttribute"), name,
+			"may only be set on a slice which declares devices that consume counters"))
+	}
+
+	// A malformed name is reported declaratively; no device can carry it, so
+	// checking each of them would only bury that one error.
+	if len(validateFullyQualifiedName(*spec.PartitionTypeAttribute, nil)) > 0 {
+		return allErrs
+	}
+
+	// A name in the driver's own domain may also be declared bare. Strip the
+	// prefix once here rather than allocating driver+"/" per device below.
+	bareName, _ := strings.CutPrefix(name, spec.Driver+"/")
+
+	for i, device := range spec.Devices {
+		if len(device.ConsumesCounters) == 0 {
+			continue
+		}
+		attrPath := fldPath.Child("devices").Index(i).Child("attributes").Key(name)
+		attribute, ok := lookupQualifiedAttribute(device.Attributes, name, bareName)
+		if !ok {
+			allErrs = append(allErrs, field.Required(attrPath,
+				"device consumes counters and `partitionTypeAttribute` names this attribute, so it must be set"))
+			continue
+		}
+		if attribute.StringValue == nil {
+			allErrs = append(allErrs, field.Invalid(attrPath, attribute,
+				"must be a string value because `partitionTypeAttribute` names this attribute"))
+		}
+	}
+
+	return allErrs
+}
+
+// lookupQualifiedAttribute finds a device attribute by its fully qualified
+// name. A key that carries no domain defaults to the driver's own domain, so an
+// attribute in the driver's domain may be declared either explicitly or bare.
+// The explicit form wins, keeping the result deterministic when a device
+// declares both; bareName (the name with the driver's domain stripped, empty
+// when the name is in another domain) is consulted only when non-empty.
+func lookupQualifiedAttribute(attributes map[resource.QualifiedName]resource.DeviceAttribute, name, bareName string) (resource.DeviceAttribute, bool) {
+	if attribute, ok := attributes[resource.QualifiedName(name)]; ok {
+		return attribute, true
+	}
+	if bareName != "" {
+		if attribute, ok := attributes[resource.QualifiedName(bareName)]; ok {
+			return attribute, true
+		}
+	}
+	return resource.DeviceAttribute{}, false
 }
 
 func haveListAttributes(spec *resource.ResourceSliceSpec) bool {
@@ -907,37 +975,81 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 	}
 
 	allErrs = append(allErrs, validateDeviceBindingParameters(device.BindingConditions, device.BindingFailureConditions, fldPath)...)
-	allErrs = append(allErrs, validateNodeAllocatableResourceMappings(device.NodeAllocatableResourceMappings, device.Capacity, fldPath.Child("nodeAllocatableResourceMappings"))...)
+	allErrs = append(allErrs, validateNodeAllocatableResources(device.NodeAllocatableResources, device.Capacity, fldPath.Child("nodeAllocatableResources"))...)
 
 	return allErrs
 }
 
-func validateNodeAllocatableResourceMappings(mappings map[corev1.ResourceName]resource.NodeAllocatableResourceMapping, capacities map[resource.QualifiedName]resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
+func validateNodeAllocatableResources(mappings map[corev1.ResourceName]resource.NodeAllocatableResource, capacities map[resource.QualifiedName]resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	for resourceName, mapping := range mappings {
 		keyPath := fldPath.Key(string(resourceName))
-		if !v1helper.IsNativeResource(resourceName) {
+		if !corehelper.IsNodeAllocatableResourceName(core.ResourceName(resourceName)) {
 			allErrs = append(allErrs, field.Invalid(keyPath, resourceName, "must be a node allocatable resource name"))
 		}
 
-		if mapping.AllocationMultiplier == nil && mapping.CapacityKey == nil {
-			allErrs = append(allErrs, field.Invalid(keyPath, "", "at least one of allocationMultiplier or capacityKey must be set"))
+		if mapping.Mapping == nil && mapping.Overhead == nil {
+			allErrs = append(allErrs, field.Required(keyPath, "at least one of mapping or overhead must be set"))
+		}
+		if mapping.Mapping != nil {
+			allErrs = append(allErrs, validateNodeAllocatableMapping(mapping.Mapping, capacities, keyPath.Child("mapping"))...)
+		}
+		if mapping.Overhead != nil {
+			allErrs = append(allErrs, validateNodeAllocatableOverheadMapping(mapping.Overhead, keyPath.Child("overhead"))...)
+		}
+	}
+	return allErrs
+}
+
+// validateNodeAllocatableMapping validates a mapped node allocatable resource configuration
+func validateNodeAllocatableMapping(mapping *resource.NodeAllocatableMapping, capacities map[resource.QualifiedName]resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if mapping.CapacityKey != nil {
+		if *mapping.CapacityKey == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("capacityKey"), "", "capacityKey must not be an empty string"))
 		} else {
-			if mapping.AllocationMultiplier != nil {
-				if mapping.AllocationMultiplier.Sign() <= 0 {
-					allErrs = append(allErrs, field.Invalid(keyPath.Child("allocationMultiplier"), mapping.AllocationMultiplier.String(), "must be positive"))
-				}
+			var exists bool
+			if capacities != nil {
+				_, exists = capacities[*mapping.CapacityKey]
 			}
-			if mapping.CapacityKey != nil {
-				if *mapping.CapacityKey == "" {
-					allErrs = append(allErrs, field.Invalid(keyPath.Child("capacityKey"), "", "capacityKey must not be an empty string"))
-				} else if capacities == nil {
-					allErrs = append(allErrs, field.NotFound(keyPath.Child("capacityKey"), *mapping.CapacityKey))
-				} else if _, exists := capacities[*mapping.CapacityKey]; !exists {
-					allErrs = append(allErrs, field.NotFound(keyPath.Child("capacityKey"), *mapping.CapacityKey))
-				}
+			if !exists {
+				allErrs = append(allErrs, field.NotFound(fldPath.Child("capacityKey"), *mapping.CapacityKey))
 			}
 		}
+		if mapping.CapacityMultiplier == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("capacityMultiplier"), "capacityMultiplier is required when capacityKey is set").WithOrigin("dependentRequired").MarkCoveredByDeclarative())
+		} else if mapping.CapacityMultiplier.Sign() <= 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("capacityMultiplier"), mapping.CapacityMultiplier.String(), "must be positive"))
+		}
+	}
+
+	if mapping.DeviceMultiplier != nil {
+		if mapping.DeviceMultiplier.Sign() <= 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("deviceMultiplier"), mapping.DeviceMultiplier.String(), "must be positive"))
+		}
+	}
+
+	if mapping.CapacityMultiplier != nil && mapping.CapacityKey == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("capacityKey"), "capacityKey is required when capacityMultiplier is set").WithOrigin("dependentRequired").MarkCoveredByDeclarative())
+	}
+
+	return allErrs
+}
+
+// validateNodeAllocatableOverheadMapping validates an overhead node allocatable resource configuration
+func validateNodeAllocatableOverheadMapping(overhead *resource.NodeAllocatableOverhead, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if overhead.PerPod == nil && overhead.PerContainer == nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "at least one of perPod or perContainer must be set"))
+		return allErrs
+	}
+
+	if overhead.PerPod != nil && overhead.PerPod.Sign() < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("perPod"), overhead.PerPod.String(), "must be non-negative"))
+	}
+
+	if overhead.PerContainer != nil && overhead.PerContainer.Sign() < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("perContainer"), overhead.PerContainer.String(), "must be non-negative"))
 	}
 	return allErrs
 }

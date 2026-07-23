@@ -262,7 +262,7 @@ func verifyMemoryPinning(f *framework.Framework, ctx context.Context, pod *v1.Po
 	gomega.Expect(numaNodeIDs).To(gomega.Equal(currentNUMANodeIDs.List()))
 }
 
-func verifyMemoryManagerAllocations(ctx context.Context, pod *v1.Pod, expectedGuaranteedContainers []string, expectedSharedMemorySize int64) {
+func verifyMemoryManagerAllocations(ctx context.Context, pod *v1.Pod, expectedGuaranteedContainers []string, expectedPodLevelMemorySize int64) {
 	ginkgo.GinkgoHelper()
 	ginkgo.By("Verifying memory manager allocations via pod resource API")
 	endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
@@ -284,6 +284,16 @@ func verifyMemoryManagerAllocations(ctx context.Context, pod *v1.Pod, expectedGu
 	for _, podResource := range resp.PodResources {
 		if podResource.Name != pod.Name {
 			continue
+		}
+
+		if expectedPodLevelMemorySize > 0 {
+			var totalAllocated uint64
+			for _, mem := range podResource.Memory {
+				totalAllocated += mem.Size
+			}
+			gomega.Expect(totalAllocated).To(gomega.BeEquivalentTo(expectedPodLevelMemorySize), "pod %s memory should match expected pod-level memory", podResource.Name)
+		} else {
+			gomega.Expect(podResource.Memory).To(gomega.BeEmpty(), "expected no pod-level memory resources for pod %s", podResource.Name)
 		}
 
 		for _, containerResource := range podResource.Containers {
@@ -315,16 +325,7 @@ func verifyMemoryManagerAllocations(ctx context.Context, pod *v1.Pod, expectedGu
 					gomega.Expect(val).To(gomega.BeEquivalentTo(mem.Size))
 				}
 			} else {
-				if expectedSharedMemorySize > 0 {
-					gomega.Expect(containerResource.Memory).ToNot(gomega.BeEmpty(), "expected memory resources for non-guaranteed container %s", containerResource.Name)
-					var totalAllocated uint64
-					for _, mem := range containerResource.Memory {
-						totalAllocated += mem.Size
-					}
-					gomega.Expect(totalAllocated).To(gomega.BeEquivalentTo(expectedSharedMemorySize), "container %s memory should match shared pool size", containerResource.Name)
-				} else {
-					gomega.Expect(containerResource.Memory).To(gomega.BeEmpty(), "expected no memory resources for container %s", containerResource.Name)
-				}
+				gomega.Expect(containerResource.Memory).To(gomega.BeEmpty(), "expected no container-level memory resources for non-guaranteed container %s", containerResource.Name)
 			}
 		}
 	}
@@ -807,9 +808,10 @@ func configureMemoryManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration,
 	}
 
 	newCfg.FeatureGates["PodLevelResources"] = kubeletArguments.enablePodLevelResources
-	// InPlacePodLevelResourcesVerticalScaling and PodLevelResourcesFixKubeletQOSClass are only supported when PodLevelResources is enabled
+	// InPlacePodLevelResourcesVerticalScaling, PodLevelResourcesFixDefaulting and PodLevelResourcesFixKubeletQOSClass are only supported when PodLevelResources is enabled
 	if !kubeletArguments.enablePodLevelResources {
 		newCfg.FeatureGates["InPlacePodLevelResourcesVerticalScaling"] = kubeletArguments.enablePodLevelResources
+		newCfg.FeatureGates["PodLevelResourcesFixDefaulting"] = kubeletArguments.enablePodLevelResources
 		newCfg.FeatureGates["PodLevelResourcesFixKubeletQOSClass"] = kubeletArguments.enablePodLevelResources
 	}
 	newCfg.FeatureGates["PodLevelResourceManagers"] = kubeletArguments.enablePodLevelResourceManagers
@@ -925,7 +927,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 				verifyMemoryManagerAllocations(ctx, testPod, []string{
 					"gu-container",
-				}, 0)
+				}, 128*1024*1024)
 
 				if !*isMultiNUMASupported {
 					framework.Logf("Skipping memory pinning verification on single-NUMA machine")
@@ -1037,7 +1039,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 				ginkgo.By("Running the test pod")
 				testPod = createPodSync(ctx, testPod)
 
-				verifyMemoryManagerAllocations(ctx, testPod, []string{"gu-container"}, 64*1024*1024)
+				verifyMemoryManagerAllocations(ctx, testPod, []string{"gu-container"}, 128*1024*1024)
 
 				if !*isMultiNUMASupported {
 					framework.Logf("Skipping memory pinning verification on single-NUMA machine")
@@ -1099,7 +1101,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 				ginkgo.By("Running the test pod")
 				testPod = createPodSync(ctx, testPod)
 
-				verifyMemoryManagerAllocations(ctx, testPod, []string{"gu-init-container", "gu-container"}, 64*1024*1024)
+				verifyMemoryManagerAllocations(ctx, testPod, []string{"gu-init-container", "gu-container"}, 128*1024*1024)
 
 				if !*isMultiNUMASupported {
 					framework.Logf("Skipping memory pinning verification on single-NUMA machine")

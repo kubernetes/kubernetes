@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
@@ -36,7 +37,9 @@ func TestMapWorkloadInput(t *testing.T) {
 		{
 			name: "all nil leaves fields unset",
 			check: func(t *testing.T, cfg *SchedulingConfig) {
-				if cfg.Policy != nil || cfg.Constraints != nil || cfg.DisruptionMode != nil || cfg.ResourceClaims != nil {
+				if cfg.Policy != nil || cfg.Constraints != nil ||
+					cfg.DisruptionMode != nil ||
+					cfg.ResourceClaims != nil {
 					t.Errorf("expected all fields nil, got %+v", cfg)
 				}
 			},
@@ -180,49 +183,210 @@ func TestMapWorkloadInput(t *testing.T) {
 	}
 }
 
-// TestMapPodGroupConfigEndToEnd exercises the documented Job integration path:
-// map the public building blocks into the IR, then compile via the builder.
-func TestMapPodGroupConfigEndToEnd(t *testing.T) {
-	userInput := WorkloadInput{
-		Policy: PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-			Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{},
-		}},
-		Constraints: ConstraintsInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-			Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
-		}},
-		DisruptionMode: DisruptionModeInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-			All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
-		}},
-	}
-
-	root := &WorkloadItem{
-		Name:          "job-root",
-		DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
-		Input:         userInput,
-		Callbacks:     []SchedulingConfigFunc{defaultGangMinCount(4)},
-	}
-
-	wl, err := NewBuilder(root, BuildOptions{
-		Name:      "job",
-		Namespace: "ns",
-		Owner: &metav1.OwnerReference{
-			APIVersion: "batch/v1",
-			Kind:       "Job",
-			Name:       "test-job",
-			UID:        "12345",
+func TestMapCompositeGroupInput(t *testing.T) {
+	inputPolicy := &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+		Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{
+			MinGroupCount: ptr.To[int32](2),
 		},
-	}).BuildWorkload()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
 	}
-	tmpl := wl.Spec.PodGroupTemplates[0]
-	if tmpl.SchedulingPolicy.Gang == nil || tmpl.SchedulingPolicy.Gang.MinCount != 4 {
-		t.Error("expected Gang policy with defaulted MinCount=4")
+
+	tests := []struct {
+		name        string
+		policy      *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy
+		constraints *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints
+		disruption  *schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode
+		check       func(t *testing.T, cfg *SchedulingConfig)
+	}{
+		{
+			name: "nil policy leaves Policy unset",
+			check: func(t *testing.T, cfg *SchedulingConfig) {
+				if cfg.Policy != nil {
+					t.Errorf("expected nil policy for nil input, got %+v", cfg.Policy)
+				}
+			},
+		},
+		{
+			name:        "composite topology constraints",
+			constraints: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints{Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "zone"}}},
+			check: func(t *testing.T, cfg *SchedulingConfig) {
+				if cfg.Constraints == nil || len(cfg.Constraints.Topology) != 1 || cfg.Constraints.Topology[0].Key != "zone" {
+					t.Errorf("expected 1 composite topology constraint, got %+v", cfg.Constraints)
+				}
+			},
+		},
+		{
+			name:       "composite disruption mode all",
+			disruption: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{All: &schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{}},
+			check: func(t *testing.T, cfg *SchedulingConfig) {
+				if cfg.DisruptionMode == nil || cfg.DisruptionMode.All == nil {
+					t.Error("expected composite All disruption mode")
+				}
+			},
+		},
+		{
+			name:   "empty policy maps to nil so the default survives",
+			policy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{},
+			check: func(t *testing.T, cfg *SchedulingConfig) {
+				if cfg.Policy != nil {
+					t.Errorf("expected nil policy for empty input, got %+v", cfg.Policy)
+				}
+			},
+		},
+		{
+			name:   "basic policy",
+			policy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{}},
+			check: func(t *testing.T, cfg *SchedulingConfig) {
+				if cfg.Policy == nil || cfg.Policy.Basic == nil {
+					t.Error("expected Basic policy")
+				}
+			},
+		},
+		{
+			name:   "gang policy carries minGroupCount in the IR MinCount",
+			policy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{MinGroupCount: ptr.To[int32](3)}},
+			check: func(t *testing.T, cfg *SchedulingConfig) {
+				if cfg.Policy == nil || cfg.Policy.Gang == nil {
+					t.Fatal("expected Gang policy")
+				}
+				if cfg.Policy.Gang.MinCount == nil || *cfg.Policy.Gang.MinCount != 3 {
+					t.Errorf("expected MinCount=3 (from minGroupCount), got %v", cfg.Policy.Gang.MinCount)
+				}
+			},
+		},
+		{
+			name:   "gang policy preserves nil minGroupCount",
+			policy: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{}},
+			check: func(t *testing.T, cfg *SchedulingConfig) {
+				if cfg.Policy == nil || cfg.Policy.Gang == nil {
+					t.Fatal("expected Gang policy")
+				}
+				if cfg.Policy.Gang.MinCount != nil {
+					t.Errorf("expected nil MinCount to be preserved, got %d", *cfg.Policy.Gang.MinCount)
+				}
+			},
+		},
+		{
+			name:   "gang policy copies minGroupCount instead of aliasing the input",
+			policy: inputPolicy,
+			check: func(t *testing.T, cfg *SchedulingConfig) {
+				if cfg.Policy == nil || cfg.Policy.Gang == nil || cfg.Policy.Gang.MinCount == nil {
+					t.Fatal("expected Gang policy with MinCount")
+				}
+				// Mutating the resolved value must not leak back into the caller's
+				// building block.
+				*cfg.Policy.Gang.MinCount = 99
+				if *inputPolicy.Gang.MinGroupCount != 2 {
+					t.Errorf("mapping aliased the input; minGroupCount mutated to %d", *inputPolicy.Gang.MinGroupCount)
+				}
+			},
+		},
 	}
-	if tmpl.SchedulingConstraints == nil || len(tmpl.SchedulingConstraints.Topology) != 1 {
-		t.Error("expected topology constraint to pass through")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := mapCompositeGroupInput(WorkloadInput{
+				Policy:         PolicyInput{CompositePodGroupData: tt.policy},
+				Constraints:    ConstraintsInput{CompositePodGroupData: tt.constraints},
+				DisruptionMode: DisruptionModeInput{CompositePodGroupData: tt.disruption},
+			})
+			if cfg == nil {
+				t.Fatal("expected non-nil config")
+			}
+			// resourceClaims is leaf-only; a composite never maps it.
+			if cfg.ResourceClaims != nil {
+				t.Errorf("expected no resourceClaims for a composite, got %+v", cfg.ResourceClaims)
+			}
+			tt.check(t, cfg)
+		})
 	}
-	if tmpl.DisruptionMode == nil || tmpl.DisruptionMode.All == nil {
-		t.Error("expected All disruption mode to pass through")
+}
+
+// TestMapConfigEndToEnd exercises the documented controller integration path:
+// map the public building blocks into the IR, then compile via the builder, for
+// both the leaf and composite group shapes.
+func TestMapConfigEndToEnd(t *testing.T) {
+	tests := []struct {
+		name   string
+		root   *WorkloadItem
+		verify func(t *testing.T, wl *schedulingv1beta1.Workload)
+	}{
+		{
+			name: "leaf group maps and compiles every building block",
+			root: &WorkloadItem{
+				Name:          "job-root",
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}},
+				Input: WorkloadInput{
+					Policy: PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{},
+					}},
+					Constraints: ConstraintsInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
+						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
+					}},
+					DisruptionMode: DisruptionModeInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
+						All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+					}},
+				},
+				Callbacks: []SchedulingConfigFunc{defaultGangMinCount(4)},
+			},
+			verify: func(t *testing.T, wl *schedulingv1beta1.Workload) {
+				tmpl := wl.Spec.PodGroupTemplates[0]
+				if tmpl.SchedulingPolicy.Gang == nil || tmpl.SchedulingPolicy.Gang.MinCount != 4 {
+					t.Error("expected Gang policy with defaulted MinCount=4")
+				}
+				if tmpl.SchedulingConstraints == nil || len(tmpl.SchedulingConstraints.Topology) != 1 {
+					t.Error("expected topology constraint to pass through")
+				}
+				if tmpl.DisruptionMode == nil || tmpl.DisruptionMode.All == nil {
+					t.Error("expected All disruption mode to pass through")
+				}
+			},
+		},
+		{
+			name: "composite group maps and compiles the group-of-groups policy",
+			root: &WorkloadItem{
+				Name: "cpg-root",
+				DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{
+					Basic: &BasicSchedulingPolicy{},
+				},
+				},
+				Input: WorkloadInput{
+					Policy: PolicyInput{CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{},
+					}},
+				},
+				Callbacks: []SchedulingConfigFunc{defaultGangMinCount(4)},
+				Children: []*WorkloadItem{
+					{Name: "workers", DefaultConfig: &SchedulingConfig{Policy: &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}}},
+				},
+			},
+			verify: func(t *testing.T, wl *schedulingv1beta1.Workload) {
+				cpg := wl.Spec.CompositePodGroupTemplates[0]
+				if cpg.SchedulingPolicy.Gang == nil || cpg.SchedulingPolicy.Gang.MinGroupCount != 4 {
+					t.Errorf("expected composite Gang policy with defaulted MinGroupCount=4, got %+v", cpg.SchedulingPolicy)
+				}
+				if len(cpg.PodGroupTemplates) != 1 || cpg.PodGroupTemplates[0].Name != "workers" {
+					t.Errorf("expected the leaf child to compile, got %+v", cpg.PodGroupTemplates)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wl, err := NewBuilder(tt.root, BuildOptions{
+				Name:      "job",
+				Namespace: "ns",
+				Owner: &metav1.OwnerReference{
+					APIVersion: "batch/v1",
+					Kind:       "Job",
+					Name:       "test-job",
+					UID:        "12345",
+				},
+			}).BuildWorkload()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			tt.verify(t, wl)
+		})
 	}
 }

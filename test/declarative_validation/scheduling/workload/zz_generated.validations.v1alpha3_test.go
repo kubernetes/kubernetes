@@ -81,6 +81,10 @@ func init() {
 				{ErrorType: "FieldValueDuplicate"},
 				{ErrorType: "FieldValueForbidden", Origin: "update"},
 			},
+			"spec.compositePodGroupTemplates[*].disruptionMode": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
 			"spec.compositePodGroupTemplates[*].name": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
 				{ErrorType: "FieldValueRequired"},
@@ -156,6 +160,11 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.compositePodGroupTemplates[*].preemptionPolicy": {
+				{ErrorType: "FieldValueForbidden"},
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueNotSupported"},
+			},
 			"spec.compositePodGroupTemplates[*].priority": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
@@ -163,6 +172,16 @@ func init() {
 			"spec.compositePodGroupTemplates[*].priorityClassName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.compositePodGroupTemplates[*].schedulingConstraints": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.compositePodGroupTemplates[*].schedulingConstraints.topology": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.compositePodGroupTemplates[*].schedulingConstraints.topology[*].key": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueRequired"},
 			},
 			"spec.compositePodGroupTemplates[*].schedulingPolicy": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},

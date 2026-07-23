@@ -61,6 +61,23 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"status.healthStatus.healthConditions": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"status.healthStatus.healthConditions[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.healthStatus.healthConditions[*].message": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
+			"status.healthStatus.healthConditions[*].reason": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
+			"status.healthStatus.healthConditions[*].status": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
 		},
 	)
 }

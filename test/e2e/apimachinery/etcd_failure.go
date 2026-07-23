@@ -37,7 +37,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("Etcd failure", framework.WithDisruptive(), func() {
+var _ = SIGDescribe("Etcd failure", framework.WithDisruptive(), framework.WithProvider("gce", "aws"), func() {
 
 	f := framework.NewDefaultFramework("etcd-failure")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -46,9 +46,8 @@ var _ = SIGDescribe("Etcd failure", framework.WithDisruptive(), func() {
 		// This test requires:
 		// - SSH
 		// - master access
-		// ... so the provider check should be identical to the intersection of
+		// ... so the provider check above should be identical to the intersection of
 		// providers that provide those capabilities.
-		e2eskipper.SkipUnlessProviderIs("gce", "aws")
 		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		err := e2erc.RunRC(ctx, testutils.RCConfig{

@@ -23,8 +23,10 @@ import (
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -64,18 +66,18 @@ const (
 	VolumeStatsInodesKey               = "volume_stats_inodes"
 	VolumeStatsInodesFreeKey           = "volume_stats_inodes_free"
 	VolumeStatsInodesUsedKey           = "volume_stats_inodes_used"
-	VolumeStatsHealthStatusAbnormalKey = "volume_stats_health_status_abnormal"
-	RunningPodsKey                     = "running_pods"
-	RunningContainersKey               = "running_containers"
-	DesiredPodCountKey                 = "desired_pods"
-	ActivePodCountKey                  = "active_pods"
-	MirrorPodCountKey                  = "mirror_pods"
-	WorkingPodCountKey                 = "working_pods"
-	OrphanedRuntimePodTotalKey         = "orphaned_runtime_pods_total"
-	RestartedPodTotalKey               = "restarted_pods_total"
-	ImagePullDurationKey               = "image_pull_duration_seconds"
-	CgroupVersionKey                   = "cgroup_version"
-	CRILosingSupportKey                = "cri_losing_support"
+
+	RunningPodsKey             = "running_pods"
+	RunningContainersKey       = "running_containers"
+	DesiredPodCountKey         = "desired_pods"
+	ActivePodCountKey          = "active_pods"
+	MirrorPodCountKey          = "mirror_pods"
+	WorkingPodCountKey         = "working_pods"
+	OrphanedRuntimePodTotalKey = "orphaned_runtime_pods_total"
+	RestartedPodTotalKey       = "restarted_pods_total"
+	ImagePullDurationKey       = "image_pull_duration_seconds"
+	CgroupVersionKey           = "cgroup_version"
+	CRILosingSupportKey        = "cri_losing_support"
 
 	// Metrics keys of remote runtime operations
 	RuntimeOperationsKey         = "runtime_operations_total"
@@ -193,18 +195,49 @@ const (
 	DRAResourceClaimsInUseAnyDriver = "<any>"
 
 	// Metric keys for in-place pod resize operations.
-	ContainerRequestedResizesKey     = "container_requested_resizes_total"
-	PodResizeDurationMillisecondsKey = "pod_resize_duration_milliseconds"
-	PodPendingResizesKey             = "pod_pending_resizes"
-	PodInfeasibleResizesKey          = "pod_infeasible_resizes_total"
-	PodInProgressResizesKey          = "pod_in_progress_resizes"
-	PodDeferredAcceptedResizesKey    = "pod_deferred_accepted_resizes_total"
+	ContainerRequestedResizesKey        = "container_requested_resizes_total"
+	PodResizeDurationMillisecondsKey    = "pod_resize_duration_milliseconds"
+	PodPendingResizesKey                = "pod_pending_resizes"
+	PodInfeasibleResizesKey             = "pod_infeasible_resizes_total"
+	PodInProgressResizesKey             = "pod_in_progress_resizes"
+	PodDeferredAcceptedResizesKey       = "pod_deferred_accepted_resizes_total"
+	PodDeferredResizeDurationSecondsKey = "pod_deferred_resize_duration_seconds"
 
 	// Metric key for podcertificate states.
 	PodCertificateStatesKey = "podcertificate_states"
 
-	// Metric key for podsapi
 	PodWatchEventsDroppedKey = "pod_watch_events_dropped_total"
+	PodRequestsTotalKey      = "pod_requests_total"
+	PodRequestsListKey       = "pod_requests_list_total"
+	PodRequestsGetKey        = "pod_requests_get_total"
+	PodRequestsWatchKey      = "pod_requests_watch_total"
+
+	// Metric keys for pod level resources metrics.
+	PodLevelResourcesAdmissionTotalKey = "pod_level_resources_admission_total"
+)
+
+// PriorityBucket represents the priority bucket label value for pod resize metrics.
+type PriorityBucket string
+
+const (
+	// Priority bucket label values for pod resize metrics.
+	PriorityBucketSystemCritical PriorityBucket = "system-critical"
+	PriorityBucketHigh           PriorityBucket = "high"
+	PriorityBucketMedium         PriorityBucket = "medium"
+	PriorityBucketNormal         PriorityBucket = "normal"
+	PriorityBucketLow            PriorityBucket = "low"
+	PriorityBucketVeryLow        PriorityBucket = "very-low"
+	PriorityBucketUnknown        PriorityBucket = "unknown"
+)
+
+// DeferredResizeResolution represents the resolution status label value for pod deferred resize duration metric.
+type DeferredResizeResolution string
+
+const (
+	// Deferred resize resolution label values for pod deferred resize duration metric.
+	DeferredResizeResolutionAccepted   DeferredResizeResolution = "accepted"
+	DeferredResizeResolutionReverted   DeferredResizeResolution = "reverted"
+	DeferredResizeResolutionTerminated DeferredResizeResolution = "terminated"
 )
 
 type imageSizeBucket struct {
@@ -239,6 +272,9 @@ var (
 
 	// podResizeDurationBuckets is the bucket boundaries for pod_resize_duration_milliseconds metrics.
 	podResizeDurationBuckets = []float64{10, 50, 100, 500, 1000, 2000, 5000, 10000, 20000, 30000, 60000, 120000, 300000, 600000}
+
+	// podDeferredResizeDurationBuckets is the bucket boundaries for pod_deferred_resize_duration_seconds metrics.
+	podDeferredResizeDurationBuckets = []float64{5, 10, 15, 20, 30, 45, 60, 90, 120, 150, 180, 300, 600, 1200, 1800, 3600}
 )
 
 var (
@@ -1223,10 +1259,10 @@ var (
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           PodPendingResizesKey,
-			Help:           "Number of pending resizes for pods.",
+			Help:           "Number of pending resizes for pods. Label 'priority_bucket' classifies the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod). Label 'reason' describes the state (deferred, infeasible).",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"reason"},
+		[]string{"reason", "priority_bucket"},
 	)
 
 	// PodInfeasibleResizes tracks the number of infeasible resizes for pods.
@@ -1259,6 +1295,18 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"retry_trigger"},
+	)
+
+	// PodDeferredResizeDurationSeconds tracks the duration (in seconds) that a pod remains deferred before completion.
+	PodDeferredResizeDurationSeconds = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodDeferredResizeDurationSecondsKey,
+			Help:           "Duration in seconds that a pod resize remains deferred before completion. Label 'priority_bucket' classifies the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod). Label 'resolution' describes how the deferred resize was resolved (accepted, reverted, terminated).",
+			Buckets:        podDeferredResizeDurationBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resolution", "priority_bucket"},
 	)
 
 	// ResourceManagerAllocationsTotal counts the total number of exclusive resource
@@ -1308,6 +1356,69 @@ var (
 			Help:           "Cumulative number of pod watch events dropped.",
 			StabilityLevel: metrics.ALPHA,
 		},
+	)
+
+	// PodRequestsTotal tracks the cumulative number of requests to the PodsAPI endpoints.
+	PodRequestsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodRequestsTotalKey,
+			Help:           "Cumulative number of requests to the PodsAPI endpoint. Broken down by server api version and status code.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version", "status_code"},
+	)
+
+	// PodRequestsList tracks the cumulative number of requests to the ListPods endpoint.
+	PodRequestsList = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodRequestsListKey,
+			Help:           "Number of requests to the PodsAPI List endpoint. Broken down by server api version and status code.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version", "status_code"},
+	)
+
+	// PodRequestsGet tracks the cumulative number of requests to the GetPod endpoint.
+	PodRequestsGet = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodRequestsGetKey,
+			Help:           "Number of requests to the PodsAPI Get endpoint. Broken down by server api version and status code.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version", "status_code"},
+	)
+
+	// PodRequestsWatch tracks the cumulative number of requests to the WatchPods endpoint.
+	PodRequestsWatch = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodRequestsWatchKey,
+			Help:           "Number of requests to the PodsAPI Watch endpoint. Broken down by server api version and status code.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version", "status_code"},
+	)
+	// PodLevelResourcesAdmissionTotal tracks feature adoption metrics for KEP-2837 (Pod-Level Resources) upon pod admission.
+	// Only admitted pods are recorded.
+	// config_mode categorizes how resources are specified on the pod:
+	//   - "pod_and_container_level": Both pod-level and container-level resources are set.
+	//   - "pod_level": Only pod-level resources are set.
+	//   - "container_level": Only container-level resources are set.
+	//   - "": Neither pod-level nor container-level resources are set (BestEffort QoS).
+	// Bounded cardinality: max 12 series (4 config_modes * 3 qos_classes).
+	// Note: This metric is ALPHA and temporary. It is intended to track feature adoption while the
+	// feature is new and is scheduled to be removed 2-3 releases after the Pod-Level Resources feature reaches GA.
+	PodLevelResourcesAdmissionTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodLevelResourcesAdmissionTotalKey,
+			Help:           "Total number of pods admitted during Kubelet admission, categorized by resource configuration mode (pod_and_container_level, pod_level, container_level, or empty for unconfigured/BestEffort) and QoS class.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"config_mode", "qos_class"},
 	)
 )
 
@@ -1430,6 +1541,7 @@ func Register() {
 			legacyregistry.MustRegister(PodInfeasibleResizes)
 			legacyregistry.MustRegister(PodInProgressResizes)
 			legacyregistry.MustRegister(PodDeferredAcceptedResizes)
+			legacyregistry.MustRegister(PodDeferredResizeDurationSeconds)
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
@@ -1439,6 +1551,13 @@ func Register() {
 		}
 
 		legacyregistry.MustRegister(PodWatchEventsDroppedTotal)
+		legacyregistry.MustRegister(PodRequestsTotal)
+		legacyregistry.MustRegister(PodRequestsList)
+		legacyregistry.MustRegister(PodRequestsGet)
+		legacyregistry.MustRegister(PodRequestsWatch)
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
+			legacyregistry.MustRegister(PodLevelResourcesAdmissionTotal)
+		}
 	})
 }
 
@@ -1474,4 +1593,35 @@ func GetImageSizeBucket(sizeInBytes uint64) string {
 
 	// return empty string when sizeInBytes is 0 (error getting image size)
 	return ""
+}
+
+// GetPriorityBucketLabel returns the priority bucket label value for a given pod based on its priority value.
+// Mappings:
+//   - system-critical: priority >= 2000000000 (SystemCriticalPriority)
+//   - high: 100000 <= priority < 2000000000
+//   - medium: 1 <= priority < 100000
+//   - normal: priority == 0 or default (DefaultPriorityWhenNoDefaultClassExists)
+//   - low: -999 <= priority <= -1
+//   - very-low: priority <= -1000
+//   - unknown: pod is nil
+func GetPriorityBucketLabel(pod *v1.Pod) PriorityBucket {
+	if pod == nil {
+		return PriorityBucketUnknown
+	}
+	if pod.Spec.Priority == nil || *pod.Spec.Priority == scheduling.DefaultPriorityWhenNoDefaultClassExists {
+		return PriorityBucketNormal
+	}
+	p := *pod.Spec.Priority
+	switch {
+	case p >= scheduling.SystemCriticalPriority:
+		return PriorityBucketSystemCritical
+	case p >= 100000:
+		return PriorityBucketHigh
+	case p > 0:
+		return PriorityBucketMedium
+	case p > -1000:
+		return PriorityBucketLow
+	default:
+		return PriorityBucketVeryLow
+	}
 }

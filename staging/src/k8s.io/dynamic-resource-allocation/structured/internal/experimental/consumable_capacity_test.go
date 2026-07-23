@@ -34,9 +34,14 @@ const (
 )
 
 var (
-	one   = resource.MustParse("1")
-	two   = resource.MustParse("2")
-	three = resource.MustParse("3")
+	one        = resource.MustParse("1")
+	two        = resource.MustParse("2")
+	three      = resource.MustParse("3")
+	zero       = resource.MustParse("0")
+	maxInt64Q  = resource.MustParse("9223372036854775807")
+	maxInt64P1 = resource.MustParse("9223372036854775808")
+	twoPow64P3 = resource.MustParse("18446744073709551619")
+	maxInt64M1 = resource.MustParse("9223372036854775806")
 
 	pointTwoFive = resource.MustParse("250m")
 	pointFour    = resource.MustParse("400m")
@@ -110,8 +115,9 @@ func TestConsumableCapacity(t *testing.T) {
 				Value: one, // no request and no policy (no default), expect capacity value
 			},
 		}
-		consumedCapacity := GetConsumedCapacityFromRequest(requestedCapacity, consumableCapacity, false)
 		g := NewWithT(t)
+		consumedCapacity, err := GetConsumedCapacityFromRequest(requestedCapacity, consumableCapacity, false)
+		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(consumedCapacity).To(HaveLen(3))
 		for name, val := range consumedCapacity {
 			g.Expect(string(name)).Should(BeElementOf([]string{capacity0, capacity1, "dummy"}))
@@ -126,6 +132,38 @@ func TestConsumableCapacity(t *testing.T) {
 	t.Run("safe-milli-value", testSafeMilliValue)
 
 	t.Run("use-milli", testUseMilli)
+
+	t.Run("cmp-request-over-capacity-fatal-beats-soft", testCmpRequestOverCapacityFatalBeatsSoft)
+}
+
+// testCmpRequestOverCapacityFatalBeatsSoft pins that a representability error takes
+// precedence over a soft policy or capacity mismatch on the same device. The allocator
+// enforces that precedence by resolving representability for all capacities before it
+// runs the soft checks, so the outcome does not depend on Go's unspecified map order.
+func testCmpRequestOverCapacityFatalBeatsSoft(t *testing.T) {
+	g := NewWithT(t)
+	capacity := map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+		capacity0: {Value: one}, // no policy; the request of 2 over-fills the value of 1 (soft)
+		capacity1: {
+			Value: maxInt64P1,
+			RequestPolicy: &resourceapi.CapacityRequestPolicy{
+				ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &zero, Step: &two},
+			},
+		},
+	}
+	request := &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]resource.Quantity{
+			capacity0: two,       // over capacity0's value of 1: soft, skip this device
+			capacity1: maxInt64Q, // rounding MaxInt64 up to the next step of 2 passes MaxInt64: fatal
+		},
+	}
+	// Go's map order is unspecified, so run the check repeatedly to make an
+	// order-dependent regression very likely to surface rather than to rely on one order.
+	for range 64 {
+		ok, err := CmpRequestOverCapacity(NewConsumedCapacity(), request, nil, capacity, NewConsumedCapacity(), false)
+		g.Expect(ok).To(BeFalseBecause("an unrepresentable request must not be considered satisfiable"))
+		g.Expect(err).To(MatchError(errCapacityRequestNotRepresentable), "a representability error must take precedence over the soft over-capacity mismatch")
+	}
 }
 
 func testSafeMilliValue(t *testing.T) {
@@ -313,8 +351,34 @@ func testCalculateConsumedCapacity(t *testing.T) {
 		requestPolicy           *resourceapi.CapacityRequestPolicy
 		fractionalCapacityRange bool
 		expectResult            resource.Quantity
+		expectErr               bool
 	}{
 		"empty": {requestedVal: nil, capacityValue: one, requestPolicy: &resourceapi.CapacityRequestPolicy{}, expectResult: one},
+		// A request above MaxInt64 cannot be read with Value() without wrapping, so
+		// calculateConsumedCapacity returns a fatal error rather than acting on a
+		// wrapped read (#140441).
+		"request-above-maxint64-is-rejected": {
+			requestedVal:  &twoPow64P3,
+			capacityValue: twoPow64P3,
+			requestPolicy: &resourceapi.CapacityRequestPolicy{Default: &zero, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &zero, Step: &three}},
+			expectErr:     true,
+		},
+		// Rounding MaxInt64 up to the next step passes MaxInt64 and would wrap; return a
+		// fatal error instead of a wrapped value.
+		"rounded-value-above-maxint64-is-rejected": {
+			requestedVal:  &maxInt64Q,
+			capacityValue: maxInt64P1,
+			requestPolicy: &resourceapi.CapacityRequestPolicy{Default: &zero, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &zero, Step: &two}},
+			expectErr:     true,
+		},
+		// Maximum safe boundary: MaxInt64-1 with min=1, step=2 rounds to exactly MaxInt64,
+		// which still fits, so it is accepted. Guards on > (not >=) so this is not rejected.
+		"max-safe-boundary-rounds-to-maxint64": {
+			requestedVal:  &maxInt64M1,
+			capacityValue: maxInt64Q,
+			requestPolicy: &resourceapi.CapacityRequestPolicy{Default: &one, ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: &one, Step: &two}},
+			expectResult:  maxInt64Q,
+		},
 		"min in range": {
 			requestedVal:  nil,
 			capacityValue: two,
@@ -399,8 +463,9 @@ func testCalculateConsumedCapacity(t *testing.T) {
 			requestPolicy: &resourceapi.CapacityRequestPolicy{Default: &one, ValidValues: []resource.Quantity{one, two}},
 			expectResult:  three,
 		},
-		// overflow guard: min=1, step=1, requested is huge; rounding n overflows, caps at MaxInt64m
-		"fractional step overflow cap rounds to MaxInt64 milli": {
+		// A request that cannot be converted to a milli value safely is rejected with a
+		// fatal error rather than passed through unrounded.
+		"fractional-step-request-not-milli-representable-is-rejected": {
 			requestedVal:  &tooBigForMilli,
 			capacityValue: tooBigForMilli,
 			requestPolicy: &resourceapi.CapacityRequestPolicy{
@@ -411,12 +476,11 @@ func testCalculateConsumedCapacity(t *testing.T) {
 				},
 			},
 			fractionalCapacityRange: true,
-			// requested can't be converted to milli safely, so roundUpRange returns
-			// requestedVal unchanged; calculateConsumedCapacity uses that as-is.
-			expectResult: tooBigForMilli,
+			expectErr:               true,
 		},
-		// overflow guard via large but milli-representable requested value.
-		"fractional step overflow cap: large milli-representable request capped at MaxInt64m": {
+		// A milli-representable request whose rounded value passes the milli-value range is
+		// rejected with a fatal error rather than silently capped.
+		"fractional-step-rounded-value-passes-milli-range-is-rejected": {
 			requestedVal: func() *resource.Quantity {
 				q := resource.NewMilliQuantity(math.MaxInt64-1, resource.DecimalSI)
 				return q
@@ -430,7 +494,7 @@ func testCalculateConsumedCapacity(t *testing.T) {
 				},
 			},
 			fractionalCapacityRange: true,
-			expectResult:            *resource.NewMilliQuantity(math.MaxInt64, resource.DecimalSI),
+			expectErr:               true,
 		},
 	}
 	for name, tc := range testcases {
@@ -440,8 +504,13 @@ func testCalculateConsumedCapacity(t *testing.T) {
 				Value:         tc.capacityValue,
 				RequestPolicy: tc.requestPolicy,
 			}
-			consumedCapacity := calculateConsumedCapacity(tc.requestedVal, capacity, tc.fractionalCapacityRange)
-			g.Expect(consumedCapacity.Cmp(tc.expectResult)).To(BeZero())
+			consumedCapacity, err := calculateConsumedCapacity(tc.requestedVal, capacity, tc.fractionalCapacityRange)
+			if tc.expectErr {
+				g.Expect(err).To(MatchError(errCapacityRequestNotRepresentable))
+			} else {
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(consumedCapacity.Cmp(tc.expectResult)).To(BeZero())
+			}
 		})
 	}
 }

@@ -288,6 +288,19 @@ type CompositePodGroupTemplate struct {
 	// +required
 	SchedulingPolicy CompositePodGroupSchedulingPolicy
 
+	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate.
+	// This field is immutable.
+	//
+	// +optional
+	SchedulingConstraints *CompositePodGroupSchedulingConstraints
+
+	// DisruptionMode defines the mode in which a given CompositePodGroup can be disrupted.
+	// One of Single, All.
+	// This field is immutable.
+	//
+	// +optional
+	DisruptionMode *CompositeDisruptionMode
+
 	// PriorityClassName indicates the priority that should be considered when scheduling
 	// a composite pod group created from this template. If no priority class is specified,
 	// admission control can set this to the global default priority class if it exists.
@@ -307,6 +320,15 @@ type CompositePodGroupTemplate struct {
 	//
 	// +optional
 	Priority *int32
+
+	// PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// This field is immutable.
+	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
+	//
+	// +featureGate=PodGroupPreemptionPolicy
+	// +optional
+	PreemptionPolicy *PreemptionPolicy
 
 	// PodGroupTemplates is the list of templates for children PodGroups.
 	// The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates
@@ -765,6 +787,21 @@ type CompositePodGroupSpec struct {
 	// +required
 	SchedulingPolicy CompositePodGroupSchedulingPolicy
 
+	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// This field is immutable.
+	//
+	// +optional
+	SchedulingConstraints *CompositePodGroupSchedulingConstraints
+
+	// DisruptionMode defines the mode in which a given CompositePodGroup can be disrupted.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// One of Single, All. Defaults to Single if unset.
+	// This field is immutable.
+	//
+	// +optional
+	DisruptionMode *CompositeDisruptionMode
+
 	// PriorityClassName defines the priority that should be considered when scheduling this CompositePodGroup.
 	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
 	// If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods
@@ -784,6 +821,17 @@ type CompositePodGroupSpec struct {
 	//
 	// +optional
 	Priority *int32
+
+	// PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+	// One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset.
+	// When Priority Admission Controller is enabled, it populates this field from PriorityClassName,
+	// and defaults to PreemptLowerPriority if value is unset in PriorityClass.
+	// This field is immutable.
+	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
+	//
+	// +featureGate=PodGroupPreemptionPolicy
+	// +optional
+	PreemptionPolicy *PreemptionPolicy
 }
 
 // CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup.
@@ -824,6 +872,34 @@ type CompositeGangSchedulingPolicy struct {
 	MinGroupCount int32
 }
 
+// CompositeDisruptionMode defines how individual entities within a composite pod group can be disrupted.
+// Exactly one mode must be set.
+//
+// +union
+type CompositeDisruptionMode struct {
+	// Single specifies that children groups can be disrupted independently from each other.
+	//
+	// +optional
+	Single *SingleCompositeDisruptionMode
+
+	// All specifies that all children groups can only be disrupted together.
+	//
+	// +optional
+	All *AllCompositeDisruptionMode
+}
+
+// SingleCompositeDisruptionMode means that individual children of a CompositePodGroup
+// can be disrupted or preempted independently.
+type SingleCompositeDisruptionMode struct {
+	// This is intentionally empty.
+}
+
+// AllCompositeDisruptionMode means that children of a CompositePodGroup can only be
+// disrupted or preempted together.
+type AllCompositeDisruptionMode struct {
+	// This is intentionally empty.
+}
+
 // CompositePodGroupStatus represents information about the status of a composite pod group.
 type CompositePodGroupStatus struct {
 	// Conditions represent the latest observations of the CompositePodGroup's state.
@@ -855,4 +931,14 @@ type CompositePodGroupStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition
+}
+
+// CompositePodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a CompositePodGroup.
+type CompositePodGroupSchedulingConstraints struct {
+	// Topology defines the topology constraints for the composite pod group.
+	// Currently only a single topology constraint can be specified. This may change in the future.
+	//
+	// +optional
+	// +listType=atomic
+	Topology []TopologyConstraint
 }

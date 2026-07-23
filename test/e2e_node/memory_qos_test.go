@@ -555,6 +555,43 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 					"memory.high should not be max when MemoryQoS is enabled for Burstable")
 			}
 		})
+
+		ginkgo.It("should NOT set memory.high when memoryThrottlingFactor is nil (default)", func(ctx context.Context) {
+			newCfg := oldCfg.DeepCopy()
+			if newCfg.FeatureGates == nil {
+				newCfg.FeatureGates = make(map[string]bool)
+			}
+			newCfg.FeatureGates["MemoryQoS"] = true
+			newCfg.MemoryThrottlingFactor = nil
+			newCfg.CgroupsPerQOS = true
+			newCfg.EnforceNodeAllocatable = []string{"pods"}
+
+			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+			restartKubelet(ctx, true)
+			waitForKubeletToStart(ctx, f)
+
+			requestsMem := resource.MustParse("256Mi")
+			limitsMem := resource.MustParse("512Mi")
+
+			pod := memqosMakePod("memqos-nil-factor", f.Namespace.Name,
+				v1.ResourceList{v1.ResourceMemory: requestsMem},
+				v1.ResourceList{v1.ResourceMemory: limitsMem},
+			)
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
+
+			for _, cs := range pod.Status.ContainerStatuses {
+				containerCgroupPath := memqosGetContainerCgroupPath(podCgroupPath, cs.ContainerID, cgroupDriver)
+
+				containerMemHigh, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryHigh)
+				framework.ExpectNoError(err, "reading container memory.high")
+
+				framework.Logf("Container %s memory.high with nil factor: got=%d (expect max/-1)", cs.Name, containerMemHigh)
+				gomega.Expect(containerMemHigh).To(gomega.Equal(int64(-1)),
+					"memory.high should be max when memoryThrottlingFactor is nil")
+			}
+		})
 	})
 
 	f.Describe("memory.events observability", func() {
@@ -695,6 +732,78 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 				return val
 			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal("max"),
 				"memory.high should be 'max' after resize with MemoryQoS disabled")
+		})
+
+		ginkgo.It("should set memory.high after updating memoryThrottlingFactor from nil to 0.9 and resizing", func(ctx context.Context) {
+			ginkgo.By("Starting kubelet with MemoryQoS enabled but memoryThrottlingFactor=nil (default)")
+			newCfg := oldCfg.DeepCopy()
+			if newCfg.FeatureGates == nil {
+				newCfg.FeatureGates = make(map[string]bool)
+			}
+			newCfg.FeatureGates["MemoryQoS"] = true
+			newCfg.MemoryThrottlingFactor = nil
+			newCfg.CgroupsPerQOS = true
+			newCfg.EnforceNodeAllocatable = []string{"pods"}
+
+			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+			restartKubelet(ctx, true)
+			waitForKubeletToStart(ctx, f)
+
+			requestsMem := resource.MustParse("128Mi")
+			limitsMem := resource.MustParse("256Mi")
+
+			pod := memqosMakePod("memqos-factor-update", f.Namespace.Name,
+				v1.ResourceList{
+					v1.ResourceMemory: requestsMem,
+					v1.ResourceCPU:    resource.MustParse("50m"),
+				},
+				v1.ResourceList{
+					v1.ResourceMemory: limitsMem,
+					v1.ResourceCPU:    resource.MustParse("100m"),
+				},
+			)
+			pod.Spec.Containers[0].ResizePolicy = []v1.ContainerResizePolicy{
+				{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired},
+				{ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired},
+			}
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
+			containerCgroupPath := memqosGetContainerCgroupPath(podCgroupPath, pod.Status.ContainerStatuses[0].ContainerID, cgroupDriver)
+
+			memHigh, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryHigh)
+			framework.ExpectNoError(err)
+			framework.Logf("memory.high with nil factor: %d (expect max/-1)", memHigh)
+			gomega.Expect(memHigh).To(gomega.Equal(int64(-1)),
+				"memory.high should be max when memoryThrottlingFactor is nil")
+
+			ginkgo.By("Restarting kubelet with memoryThrottlingFactor=0.9")
+			throttlingFactor := 0.9
+			configureMemoryQoS(ctx, throttlingFactor)
+
+			memHighStale, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryHigh)
+			framework.ExpectNoError(err)
+			framework.Logf("memory.high after setting factor=0.9 (stale): %d (expect max/-1)", memHighStale)
+			gomega.Expect(memHighStale).To(gomega.Equal(int64(-1)),
+				"memory.high should still be max before resize (no reconciliation for config-only changes)")
+
+			ginkgo.By("Resizing the container to trigger updateContainerResources")
+			pod, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			newRequestsMem := resource.MustParse("160Mi")
+			newLimitsMem := resource.MustParse("320Mi")
+			pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = newRequestsMem
+			pod.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = newLimitsMem
+			_, err = f.ClientSet.CoreV1().Pods(pod.Namespace).UpdateResize(ctx, pod.Name, pod, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+
+			expected := memqosExpectedMemoryHigh(newRequestsMem.Value(), newLimitsMem.Value(), throttlingFactor)
+			gomega.Eventually(ctx, func() int64 {
+				val, _ := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryHigh)
+				return val
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal(expected),
+				"memory.high should be set using formula after resize with memoryThrottlingFactor=0.9")
 		})
 
 		ginkgo.It("should not clobber other cgroup values when clearing stale memory protection at startup", func(ctx context.Context) {
@@ -1195,6 +1304,62 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(
 				gomega.Equal(memLowBefore),
 				"container-level memory.low persists after rollback (CRI limitation)")
+		})
+	})
+
+	f.Describe("IPPR resize with memory protection", func() {
+		ginkgo.AfterEach(func(ctx context.Context) { restoreConfig(ctx) })
+
+		ginkgo.It("should update pod-level memory.low after Burstable pod resize", func(ctx context.Context) {
+			configureMemoryQoSWithPolicy(ctx, 0.9, kubeletconfig.TieredReservationMemoryReservationPolicy)
+
+			initialRequest := resource.MustParse("128Mi")
+			initialLimit := resource.MustParse("256Mi")
+			pod := memqosMakePod("memqos-resize-protection", f.Namespace.Name,
+				v1.ResourceList{
+					v1.ResourceMemory: initialRequest,
+					v1.ResourceCPU:    resource.MustParse("50m"),
+				},
+				v1.ResourceList{
+					v1.ResourceMemory: initialLimit,
+					v1.ResourceCPU:    resource.MustParse("100m"),
+				},
+			)
+			pod.Spec.Containers[0].ResizePolicy = []v1.ContainerResizePolicy{
+				{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired},
+				{ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired},
+			}
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
+			gomega.Expect(podCgroupPath).NotTo(gomega.BeEmpty())
+
+			ginkgo.By("Verifying initial memory.low matches request")
+			podMemLow, err := memqosReadCgroupInt64(podCgroupPath, cgroupMemoryLow)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod memory.low before resize: got=%d, expected=%d", podMemLow, initialRequest.Value())
+			gomega.Expect(podMemLow).To(gomega.Equal(initialRequest.Value()),
+				"pod memory.low should equal initial request before resize")
+
+			ginkgo.By("Resizing memory request and limit via IPPR")
+			pod, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			newRequest := resource.MustParse("192Mi")
+			newLimit := resource.MustParse("384Mi")
+			pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = newRequest
+			pod.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = newLimit
+			_, err = f.ClientSet.CoreV1().Pods(pod.Namespace).UpdateResize(ctx, pod.Name, pod, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verifying pod-level memory.low updated to new request")
+			gomega.Eventually(ctx, func() int64 {
+				val, _ := memqosReadCgroupInt64(podCgroupPath, cgroupMemoryLow)
+				framework.Logf("Pod memory.low after resize: got=%d, expected=%d", val, newRequest.Value())
+				return val
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(
+				gomega.Equal(newRequest.Value()),
+				"pod memory.low should update to new request after IPPR resize")
 		})
 	})
 })

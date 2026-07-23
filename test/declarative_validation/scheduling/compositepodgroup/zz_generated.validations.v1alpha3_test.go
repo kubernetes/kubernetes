@@ -61,9 +61,19 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.disruptionMode": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"spec.parentCompositePodGroupName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.preemptionPolicy": {
+				{ErrorType: "FieldValueForbidden"},
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueNotSupported"},
 			},
 			"spec.priority": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
@@ -72,6 +82,16 @@ func init() {
 			"spec.priorityClassName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.schedulingConstraints": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.schedulingConstraints.topology": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.schedulingConstraints.topology[*].key": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueRequired"},
 			},
 			"spec.schedulingPolicy": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},

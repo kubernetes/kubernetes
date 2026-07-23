@@ -1,0 +1,19 @@
+# Template for PodGroup (Coscheduling / Gang Scheduling).
+# Parameters:
+#   - Index: Group index (required)
+#   - minCount: Minimum pod count required for gang scheduling (required)
+#   - priority: Priority value (default: 1000)
+#   - disruptionMode: Eviction behavior ("single" or "all", defaults to "all")
+apiVersion: scheduling.k8s.io/v1alpha3
+kind: PodGroup
+metadata:
+  name: gang-{{.Index}}
+spec:
+  priority: {{if .priority}}{{AddInt 0 .priority}}{{else}}1000{{end}}
+{{if .disruptionMode}}
+  disruptionMode:
+    {{if eq .disruptionMode "single"}}single: {}{{else}}all: {}{{end}}
+{{end}}
+  schedulingPolicy:
+    gang:
+      minCount: {{.minCount}}

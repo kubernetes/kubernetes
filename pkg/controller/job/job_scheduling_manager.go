@@ -24,7 +24,7 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apiserver/pkg/util/feature"
-	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha3"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	workloadbuilder "k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
 	"k8s.io/klog/v2"
@@ -118,7 +118,7 @@ func filterControlledByJob[T metav1.Object](objs []T, job *batch.Job) []T {
 // ensureWorkloadAndPodGroup discovers or creates Workload and PodGroup for the given Job.
 // Returns both objects when workload integration is active, or nils when the Job
 // should fall back to default scheduling / defers ownership to a parent.
-func (jm *Controller) ensureWorkloadAndPodGroup(ctx context.Context, job *batch.Job, pods []*v1.Pod) (*schedulingv1alpha3.Workload, *schedulingv1alpha3.PodGroup, error) {
+func (jm *Controller) ensureWorkloadAndPodGroup(ctx context.Context, job *batch.Job, pods []*v1.Pod) (*schedulingv1beta1.Workload, *schedulingv1beta1.PodGroup, error) {
 	mode := getManagementMode(job)
 	if mode == manageNone {
 		return nil, nil, nil
@@ -167,7 +167,7 @@ func (jm *Controller) ensureWorkloadAndPodGroup(ctx context.Context, job *batch.
 // Basic policies are a no-op. Only minCount is changed; every other
 // Workload/PodGroup field is immutable at the API.
 func (jm *Controller) syncGangMinCount(ctx context.Context, job *batch.Job,
-	workload *schedulingv1alpha3.Workload, podGroup *schedulingv1alpha3.PodGroup) error {
+	workload *schedulingv1beta1.Workload, podGroup *schedulingv1beta1.PodGroup) error {
 
 	desiredWorkload, err := jm.generateWorkload(job)
 	if err != nil || len(desiredWorkload.Spec.PodGroupTemplates) == 0 {
@@ -205,7 +205,7 @@ func (jm *Controller) syncGangMinCount(ctx context.Context, job *batch.Job,
 
 // patchWorkloadMinCount sets the gang minCount on the Workload's single
 // PodGroupTemplate. minCount is the only mutable field on a compiled Workload.
-func (jm *Controller) patchWorkloadMinCount(ctx context.Context, workload *schedulingv1alpha3.Workload, minCount int32) error {
+func (jm *Controller) patchWorkloadMinCount(ctx context.Context, workload *schedulingv1beta1.Workload, minCount int32) error {
 	updatedW := workload.DeepCopy()
 	updatedW.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount = minCount
 
@@ -218,17 +218,17 @@ func (jm *Controller) patchWorkloadMinCount(ctx context.Context, workload *sched
 	if err != nil {
 		return err
 	}
-	patch, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1alpha3.Workload{})
+	patch, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1beta1.Workload{})
 	if err != nil {
 		return err
 	}
-	_, err = jm.kubeClient.SchedulingV1alpha3().Workloads(workload.Namespace).
+	_, err = jm.kubeClient.SchedulingV1beta1().Workloads(workload.Namespace).
 		Patch(ctx, workload.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
 	return err
 }
 
 // patchPodGroupMinCount sets the gang minCount on the runtime PodGroup.
-func (jm *Controller) patchPodGroupMinCount(ctx context.Context, podGroup *schedulingv1alpha3.PodGroup, minCount int32) error {
+func (jm *Controller) patchPodGroupMinCount(ctx context.Context, podGroup *schedulingv1beta1.PodGroup, minCount int32) error {
 	updatedPG := podGroup.DeepCopy()
 	updatedPG.Spec.SchedulingPolicy.Gang.MinCount = minCount
 
@@ -242,11 +242,11 @@ func (jm *Controller) patchPodGroupMinCount(ctx context.Context, podGroup *sched
 		return err
 	}
 
-	patch, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1alpha3.PodGroup{})
+	patch, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1beta1.PodGroup{})
 	if err != nil {
 		return err
 	}
-	_, err = jm.kubeClient.SchedulingV1alpha3().PodGroups(podGroup.Namespace).
+	_, err = jm.kubeClient.SchedulingV1beta1().PodGroups(podGroup.Namespace).
 		Patch(ctx, podGroup.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
 	return err
 }
@@ -254,7 +254,7 @@ func (jm *Controller) patchPodGroupMinCount(ctx context.Context, podGroup *sched
 // findParentWorkload returns the parent-owned Workload for a non-root Job: the
 // Workload in the Job's namespace whose spec.controllerRef points to the Job's
 // parent controller.
-func (jm *Controller) findParentWorkload(job *batch.Job) (*schedulingv1alpha3.Workload, error) {
+func (jm *Controller) findParentWorkload(job *batch.Job) (*schedulingv1beta1.Workload, error) {
 	if jm.workloadLister == nil {
 		return nil, fmt.Errorf("workload lister is not configured")
 	}
@@ -288,7 +288,7 @@ func (jm *Controller) findParentWorkload(job *batch.Job) (*schedulingv1alpha3.Wo
 // the parent-owned Workload via the named PodGroupTemplate from the delegation
 // annotation and carries only a controller ownerRef to the Job.
 func (jm *Controller) getOrCreateDelegatedPodGroup(ctx context.Context,
-	job *batch.Job, newJob bool) (*schedulingv1alpha3.PodGroup, error) {
+	job *batch.Job, newJob bool) (*schedulingv1beta1.PodGroup, error) {
 	logger := klog.FromContext(ctx)
 
 	parentWorkload, err := jm.findParentWorkload(job)
@@ -317,7 +317,7 @@ func (jm *Controller) getOrCreateDelegatedPodGroup(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	var updatedPG *schedulingv1alpha3.PodGroup
+	var updatedPG *schedulingv1beta1.PodGroup
 	for _, pg := range matched {
 		if metav1.IsControlledBy(pg, job) {
 			updatedPG = pg
@@ -349,7 +349,7 @@ func (jm *Controller) getOrCreateDelegatedPodGroup(ctx context.Context,
 // runtime PodGroup. The parent's template is the source of truth in the
 // delegated mode.
 func (jm *Controller) syncDelegatedPodGroupMinCount(ctx context.Context,
-	template *schedulingv1alpha3.PodGroupTemplate, podGroup *schedulingv1alpha3.PodGroup) error {
+	template *schedulingv1beta1.PodGroupTemplate, podGroup *schedulingv1beta1.PodGroup) error {
 	if podGroup == nil ||
 		template.SchedulingPolicy.Gang == nil || podGroup.Spec.SchedulingPolicy.Gang == nil {
 		return nil
@@ -386,7 +386,7 @@ func isNewJob(job *batch.Job, pods []*v1.Pod) bool {
 // (i.e., ambiguous matches, unsupported structure, or
 // not a new Job).
 func (jm *Controller) getOrCreateWorkload(ctx context.Context,
-	job *batch.Job, newJob bool) (*schedulingv1alpha3.Workload, error) {
+	job *batch.Job, newJob bool) (*schedulingv1beta1.Workload, error) {
 	allWorkloads, err := jm.listWorkloadsForJob(job)
 	if err != nil {
 		return nil, err
@@ -429,7 +429,7 @@ func (jm *Controller) getOrCreateWorkload(ctx context.Context,
 // scheduling policy). Before beta we need to decide how to handle such
 // mutations; overwrite them back to the expected state, fall back to
 // default scheduling, or reject the update via admission.
-func (jm *Controller) validateWorkloadStructure(job *batch.Job, wl *schedulingv1alpha3.Workload) error {
+func (jm *Controller) validateWorkloadStructure(job *batch.Job, wl *schedulingv1beta1.Workload) error {
 	if len(wl.Spec.PodGroupTemplates) != 1 {
 		return fmt.Errorf("workload %s/%s for job %s/%s has %d PodGroupTemplates, want exactly 1",
 			wl.Namespace, wl.Name, job.Namespace, job.Name, len(wl.Spec.PodGroupTemplates))
@@ -441,7 +441,7 @@ func (jm *Controller) validateWorkloadStructure(job *batch.Job, wl *schedulingv1
 // Returns (nil, nil) when the Job should fall back to default scheduling
 // (ambiguous matches or not owned by this controller).
 func (jm *Controller) getOrCreatePodGroup(ctx context.Context, job *batch.Job,
-	workload *schedulingv1alpha3.Workload, newJob bool) (*schedulingv1alpha3.PodGroup, error) {
+	workload *schedulingv1beta1.Workload, newJob bool) (*schedulingv1beta1.PodGroup, error) {
 	builder := newBuilderFromExistingWorkload(job, workload)
 
 	allPodGroups, err := jm.listPodGroupsForWorkload(workload)
@@ -476,7 +476,7 @@ func (jm *Controller) getOrCreatePodGroup(ctx context.Context, job *batch.Job,
 
 // listWorkloadsForJob returns all Workloads in the Job's namespace whose
 // spec.controllerRef points to the given Job.
-func (jm *Controller) listWorkloadsForJob(job *batch.Job) ([]*schedulingv1alpha3.Workload, error) {
+func (jm *Controller) listWorkloadsForJob(job *batch.Job) ([]*schedulingv1beta1.Workload, error) {
 	if jm.workloadIndexer == nil {
 		return nil, fmt.Errorf("workload indexer is not configured")
 	}
@@ -485,9 +485,9 @@ func (jm *Controller) listWorkloadsForJob(job *batch.Job) ([]*schedulingv1alpha3
 	if err != nil {
 		return nil, err
 	}
-	matched := make([]*schedulingv1alpha3.Workload, 0, len(all))
+	matched := make([]*schedulingv1beta1.Workload, 0, len(all))
 	for _, wl := range all {
-		workload, ok := wl.(*schedulingv1alpha3.Workload)
+		workload, ok := wl.(*schedulingv1beta1.Workload)
 		if !ok {
 			continue
 		}
@@ -498,7 +498,7 @@ func (jm *Controller) listWorkloadsForJob(job *batch.Job) ([]*schedulingv1alpha3
 
 // listPodGroupsForWorkload returns all PodGroups in the Workload's namespace
 // whose spec.workloadRef references the given Workload.
-func (jm *Controller) listPodGroupsForWorkload(workload *schedulingv1alpha3.Workload) ([]*schedulingv1alpha3.PodGroup, error) {
+func (jm *Controller) listPodGroupsForWorkload(workload *schedulingv1beta1.Workload) ([]*schedulingv1beta1.PodGroup, error) {
 	if jm.podGroupIndexer == nil {
 		return nil, fmt.Errorf("podgroup indexer is not configured")
 	}
@@ -507,9 +507,9 @@ func (jm *Controller) listPodGroupsForWorkload(workload *schedulingv1alpha3.Work
 	if err != nil {
 		return nil, err
 	}
-	matched := make([]*schedulingv1alpha3.PodGroup, 0, len(all))
+	matched := make([]*schedulingv1beta1.PodGroup, 0, len(all))
 	for _, pg := range all {
-		podGroup, ok := pg.(*schedulingv1alpha3.PodGroup)
+		podGroup, ok := pg.(*schedulingv1beta1.PodGroup)
 		if !ok {
 			continue
 		}
@@ -532,13 +532,13 @@ func buildWorkloadItem(job *batch.Job) *workloadbuilder.WorkloadItem {
 		input = jobutil.WorkloadInputForJobV1(s)
 	}
 	return jobutil.WorkloadItemForJob(podGroupTemplateName(job),
-		job.Spec.Template.Spec.PriorityClassName, job.Spec.Parallelism, input)
+		job.Spec.Template.Spec.PriorityClassName, job.Spec.Parallelism, input, nil)
 }
 
 // generateWorkload compiles the Job's spec.scheduling into a Workload via the
 // shared workloadbuilder library. BuildWorkload also sets the controller
 // ownerReference and spec.controllerRef pointing at the Job.
-func (jm *Controller) generateWorkload(job *batch.Job) (*schedulingv1alpha3.Workload, error) {
+func (jm *Controller) generateWorkload(job *batch.Job) (*schedulingv1beta1.Workload, error) {
 	return workloadbuilder.NewBuilder(buildWorkloadItem(job), workloadbuilder.BuildOptions{
 		Name:      computeWorkloadName(job),
 		Namespace: job.Namespace,
@@ -547,7 +547,7 @@ func (jm *Controller) generateWorkload(job *batch.Job) (*schedulingv1alpha3.Work
 }
 
 // createWorkloadForJob compiles and creates a new Workload object for the given Job.
-func (jm *Controller) createWorkloadForJob(ctx context.Context, job *batch.Job) (*schedulingv1alpha3.Workload, error) {
+func (jm *Controller) createWorkloadForJob(ctx context.Context, job *batch.Job) (*schedulingv1beta1.Workload, error) {
 	workload, err := jm.generateWorkload(job)
 	if err != nil {
 		jm.recorder.Eventf(job, v1.EventTypeWarning, "FailedWorkloadCompilation",
@@ -555,7 +555,7 @@ func (jm *Controller) createWorkloadForJob(ctx context.Context, job *batch.Job) 
 		return nil, err
 	}
 
-	created, err := jm.kubeClient.SchedulingV1alpha3().Workloads(job.Namespace).Create(ctx, workload, metav1.CreateOptions{})
+	created, err := jm.kubeClient.SchedulingV1beta1().Workloads(job.Namespace).Create(ctx, workload, metav1.CreateOptions{})
 	if err != nil {
 		jm.recorder.Eventf(job, v1.EventTypeWarning, "FailedWorkloadCreate",
 			"Failed to create Workload for Job %s: %v", job.Name, err)
@@ -569,7 +569,7 @@ func (jm *Controller) createWorkloadForJob(ctx context.Context, job *batch.Job) 
 
 // getPodGroupTemplateByName returns the named PodGroupTemplate from the Workload.
 // An empty name selects the Workload's single template.
-func getPodGroupTemplateByName(workload *schedulingv1alpha3.Workload, name string) (*schedulingv1alpha3.PodGroupTemplate, error) {
+func getPodGroupTemplateByName(workload *schedulingv1beta1.Workload, name string) (*schedulingv1beta1.PodGroupTemplate, error) {
 	if len(workload.Spec.PodGroupTemplates) == 0 {
 		return nil, fmt.Errorf("workload %s/%s has no PodGroupTemplates", workload.Namespace, workload.Name)
 	}
@@ -589,7 +589,7 @@ func getPodGroupTemplateByName(workload *schedulingv1alpha3.Workload, name strin
 // compiled by a parent, so its persisted template is the source of truth and the
 // Job's own spec.scheduling is irrelevant here. Only the Job controllerRef and
 // the supplied Workload are needed.
-func newBuilderFromExistingWorkload(job *batch.Job, workload *schedulingv1alpha3.Workload) *workloadbuilder.Builder {
+func newBuilderFromExistingWorkload(job *batch.Job, workload *schedulingv1beta1.Workload) *workloadbuilder.Builder {
 	return workloadbuilder.NewBuilderFromExistingWorkload(workload, workloadbuilder.BuildOptions{
 		Owner: metav1.NewControllerRef(job, controllerKind),
 	})
@@ -601,8 +601,8 @@ func newBuilderFromExistingWorkload(job *batch.Job, workload *schedulingv1alpha3
 // to the Workload; a delegated (parent-owned) Workload gets none, leaving the
 // parent as the Workload's sole owner. BlockOwnerDeletion is left unset so
 // Workload deletion is never blocked by surviving PodGroups.
-func (jm *Controller) createPodGroup(ctx context.Context, job *batch.Job, workload *schedulingv1alpha3.Workload,
-	templateName string, linkWorkloadOwner bool, builder *workloadbuilder.Builder) (*schedulingv1alpha3.PodGroup, error) {
+func (jm *Controller) createPodGroup(ctx context.Context, job *batch.Job, workload *schedulingv1beta1.Workload,
+	templateName string, linkWorkloadOwner bool, builder *workloadbuilder.Builder) (*schedulingv1beta1.PodGroup, error) {
 	template, err := getPodGroupTemplateByName(workload, templateName)
 	if err != nil {
 		return nil, err
@@ -614,14 +614,14 @@ func (jm *Controller) createPodGroup(ctx context.Context, job *batch.Job, worklo
 	}
 	if linkWorkloadOwner {
 		podGroup.OwnerReferences = append(podGroup.OwnerReferences, metav1.OwnerReference{
-			APIVersion: schedulingv1alpha3.SchemeGroupVersion.String(),
+			APIVersion: schedulingv1beta1.SchemeGroupVersion.String(),
 			Kind:       "Workload",
 			Name:       workload.Name,
 			UID:        workload.UID,
 		})
 	}
 
-	created, err := jm.kubeClient.SchedulingV1alpha3().PodGroups(job.Namespace).Create(ctx, podGroup, metav1.CreateOptions{})
+	created, err := jm.kubeClient.SchedulingV1beta1().PodGroups(job.Namespace).Create(ctx, podGroup, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -722,7 +722,7 @@ func namespacedNameIndexKey(namespace, name string) string {
 
 // workloadControllerRefJobName returns the Job name from the Workload's
 // spec.controllerRef if it points to a batch Job, or "" otherwise.
-func workloadControllerRefJobName(wl *schedulingv1alpha3.Workload) string {
+func workloadControllerRefJobName(wl *schedulingv1beta1.Workload) string {
 	if wl.Spec.ControllerRef == nil ||
 		wl.Spec.ControllerRef.APIGroup != batch.SchemeGroupVersion.Group ||
 		wl.Spec.ControllerRef.Kind != "Job" ||
@@ -734,7 +734,7 @@ func workloadControllerRefJobName(wl *schedulingv1alpha3.Workload) string {
 
 // podGroupWorkloadName returns the workload name from the PodGroup's
 // spec.workloadRef, or "" if the reference is not set.
-func podGroupWorkloadName(pg *schedulingv1alpha3.PodGroup) string {
+func podGroupWorkloadName(pg *schedulingv1beta1.PodGroup) string {
 	if pg.Spec.WorkloadRef == nil ||
 		pg.Spec.WorkloadRef.WorkloadName == "" {
 		return ""
@@ -743,7 +743,7 @@ func podGroupWorkloadName(pg *schedulingv1alpha3.PodGroup) string {
 }
 
 func workloadByJobNameIndexFunc(obj interface{}) ([]string, error) {
-	wl, ok := obj.(*schedulingv1alpha3.Workload)
+	wl, ok := obj.(*schedulingv1beta1.Workload)
 	if !ok {
 		return nil, fmt.Errorf("unexpected object type %T", obj)
 	}
@@ -754,7 +754,7 @@ func workloadByJobNameIndexFunc(obj interface{}) ([]string, error) {
 }
 
 func podGroupByWorkloadNameIndexFunc(obj interface{}) ([]string, error) {
-	pg, ok := obj.(*schedulingv1alpha3.PodGroup)
+	pg, ok := obj.(*schedulingv1beta1.PodGroup)
 	if !ok {
 		return nil, fmt.Errorf("unexpected object type %T", obj)
 	}

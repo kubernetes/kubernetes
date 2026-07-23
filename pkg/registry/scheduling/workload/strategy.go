@@ -86,7 +86,7 @@ func (workloadStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.O
 }
 
 func (workloadStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
-	return true
+	return false
 }
 
 // dropDisabledWorkloadFields removes fields which are covered by a feature gate.
@@ -138,7 +138,7 @@ func dropDisabledPodGroupTemplatesFields(templates, oldTemplates []scheduling.Po
 		template := &templates[i]
 		dropDisabledSchedulingConstraintsFields(template, oldTemplate)
 		dropDisabledDRAWorkloadResourceClaimsFields(template, oldTemplate)
-		dropDisabledPreemptionPolicyFields(template, oldTemplate)
+		dropDisabledPGPreemptionPolicyFields(template, oldTemplate)
 	}
 }
 
@@ -150,6 +150,8 @@ func dropDisabledCompositePodGroupTemplatesFields(templates, oldTemplates []sche
 	for i := range templates {
 		template := &templates[i]
 		oldTemplate := oldTemplatesMap[template.Name]
+
+		dropDisabledCPGPreemptionPolicyFields(template, oldTemplate)
 
 		var cpgTemplates, oldCpgTemplates []scheduling.CompositePodGroupTemplate
 		cpgTemplates = template.CompositePodGroupTemplates
@@ -190,10 +192,10 @@ func dropDisabledDRAWorkloadResourceClaimsFields(template, oldTemplate *scheduli
 	template.ResourceClaims = nil
 }
 
-// dropDisabledPreemptionPolicyFields removes the PreemptionPolicy field
+// dropDisabledPGPreemptionPolicyFields removes the PreemptionPolicy field
 // from the PodGroupTemplate if the PodGroupPreemptionPolicy feature gate is disabled,
 // unless the field already used in the old PodGroupTemplate.
-func dropDisabledPreemptionPolicyFields(template, oldTemplate *scheduling.PodGroupTemplate) {
+func dropDisabledPGPreemptionPolicyFields(template, oldTemplate *scheduling.PodGroupTemplate) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) || preemptionPolicyInUse(oldTemplate) {
 		return
 	}
@@ -210,4 +212,18 @@ func draWorkloadResourceClaimsInUse(pgt *scheduling.PodGroupTemplate) bool {
 
 func preemptionPolicyInUse(pgt *scheduling.PodGroupTemplate) bool {
 	return pgt != nil && pgt.PreemptionPolicy != nil
+}
+
+// dropDisabledCPGPreemptionPolicyFields removes the PreemptionPolicy field
+// from the CompositePodGroupTemplate if the PodGroupPreemptionPolicy feature gate is disabled,
+// unless the field already used in the old CompositePodGroupTemplate.
+func dropDisabledCPGPreemptionPolicyFields(template, oldTemplate *scheduling.CompositePodGroupTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) || cpgPreemptionPolicyInUse(oldTemplate) {
+		return
+	}
+	template.PreemptionPolicy = nil
+}
+
+func cpgPreemptionPolicyInUse(cpgt *scheduling.CompositePodGroupTemplate) bool {
+	return cpgt != nil && cpgt.PreemptionPolicy != nil
 }

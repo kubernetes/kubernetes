@@ -341,16 +341,16 @@ func estimateExtractCost() checker.FunctionEstimator {
 			targetSize := estimateSize(c, args[0])
 			// Fixed size estimate of +1 is added for safety from zero size args.
 			// The target cost is the size of the target string, scaled by a traversal factor.
-			targetCost := targetSize.Add(checker.FixedSizeEstimate(1)).MultiplyByCostFactor(common.StringTraversalCostFactor)
+			targetCost := targetSize.Add(fixedSizeEstimate(1)).MultiplyByCostFactor(common.StringTraversalCostFactor)
 			// The regex cost is the size of the regex pattern, scaled by a complexity factor.
-			regexCost := estimateSize(c, args[1]).Add(checker.FixedSizeEstimate(1)).MultiplyByCostFactor(common.RegexStringLengthCostFactor)
+			regexCost := estimateSize(c, args[1]).Add(fixedSizeEstimate(1)).MultiplyByCostFactor(common.RegexStringLengthCostFactor)
 			// The result is a single string. Worst Case: it's the size of the entire target.
-			resultSize := &checker.SizeEstimate{Min: 0, Max: targetSize.Max}
+			resultSize := rangedSizeEstimate(0, targetSize.Max)
 			// The total cost is the search cost (target + regex) plus the allocation cost for the result string.
-			return &checker.CallEstimate{
-				CostEstimate: regexCost.Multiply(targetCost).Add(checker.CostEstimate(*resultSize)),
-				ResultSize:   resultSize,
-			}
+			return callEstimate(
+				regexCost.Multiply(targetCost).Add(checker.CostEstimate(resultSize)),
+				&resultSize,
+			)
 		}
 		return nil
 	}
@@ -362,18 +362,18 @@ func estimateExtractAllCost() checker.FunctionEstimator {
 			targetSize := estimateSize(c, args[0])
 			// Fixed size estimate of +1 is added for safety from zero size args.
 			// The target cost is the size of the target string, scaled by a traversal factor.
-			targetCost := targetSize.Add(checker.FixedSizeEstimate(1)).MultiplyByCostFactor(common.StringTraversalCostFactor)
+			targetCost := targetSize.Add(fixedSizeEstimate(1)).MultiplyByCostFactor(common.StringTraversalCostFactor)
 			// The regex cost is the size of the regex pattern, scaled by a complexity factor.
-			regexCost := estimateSize(c, args[1]).Add(checker.FixedSizeEstimate(1)).MultiplyByCostFactor(common.RegexStringLengthCostFactor)
+			regexCost := estimateSize(c, args[1]).Add(fixedSizeEstimate(1)).MultiplyByCostFactor(common.RegexStringLengthCostFactor)
 			// The result is a list of strings. Worst Case: it's contents are the size of the entire target.
-			resultSize := &checker.SizeEstimate{Min: 0, Max: targetSize.Max}
+			resultSize := rangedSizeEstimate(0, targetSize.Max)
 			// The cost to allocate the result list is its base cost plus the size of its contents.
-			allocationSize := resultSize.Add(checker.FixedSizeEstimate(common.ListCreateBaseCost))
+			allocationSize := resultSize.Add(fixedSizeEstimate(common.ListCreateBaseCost))
 			// The total cost is the search cost (target + regex) plus the allocation cost for the result list.
-			return &checker.CallEstimate{
-				CostEstimate: targetCost.Multiply(regexCost).Add(checker.CostEstimate(allocationSize)),
-				ResultSize:   resultSize,
-			}
+			return callEstimate(
+				targetCost.Multiply(regexCost).Add(checker.CostEstimate(allocationSize)),
+				&resultSize,
+			)
 		}
 		return nil
 	}
@@ -382,28 +382,28 @@ func estimateExtractAllCost() checker.FunctionEstimator {
 func estimateReplaceCost() checker.FunctionEstimator {
 	return func(c checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
 		l := len(args)
-		if l == 3 || l == 4 {
+		if target == nil && (l == 3 || l == 4) {
 			targetSize := estimateSize(c, args[0])
 			replacementSize := estimateSize(c, args[2])
 			// Fixed size estimate of +1 is added for safety from zero size args.
 			// The target cost is the size of the target string, scaled by a traversal factor.
-			targetCost := targetSize.Add(checker.FixedSizeEstimate(1)).MultiplyByCostFactor(common.StringTraversalCostFactor)
+			targetCost := targetSize.Add(fixedSizeEstimate(1)).MultiplyByCostFactor(common.StringTraversalCostFactor)
 			// The regex cost is the size of the regex pattern, scaled by a complexity factor.
-			regexCost := estimateSize(c, args[1]).Add(checker.FixedSizeEstimate(1)).MultiplyByCostFactor(common.RegexStringLengthCostFactor)
+			regexCost := estimateSize(c, args[1]).Add(fixedSizeEstimate(1)).MultiplyByCostFactor(common.RegexStringLengthCostFactor)
 			// Estimate the potential size range of the output string. The final size could be smaller
 			// (if the replacement size is 0) or larger than the original.
 			allReplacedSize := targetSize.Max * replacementSize.Max
 			noneReplacedSize := targetSize.Max
 			// The allocation cost for the result is based on the estimated size of the output string.
-			resultSize := &checker.SizeEstimate{Min: noneReplacedSize, Max: allReplacedSize}
+			resultSize := rangedSizeEstimate(noneReplacedSize, allReplacedSize)
 			if replacementSize.Max == 0 {
-				resultSize = &checker.SizeEstimate{Min: allReplacedSize, Max: noneReplacedSize}
+				resultSize = rangedSizeEstimate(allReplacedSize, noneReplacedSize)
 			}
 			// The final cost is result of search cost (target cost + regex cost) plus the allocation cost for the output string.
-			return &checker.CallEstimate{
-				CostEstimate: targetCost.Multiply(regexCost).Add(checker.CostEstimate(*resultSize)),
-				ResultSize:   resultSize,
-			}
+			return callEstimate(
+				targetCost.Multiply(regexCost).Add(resultSize.AsCost()),
+				&resultSize,
+			)
 		}
 		return nil
 	}
@@ -411,8 +411,8 @@ func estimateReplaceCost() checker.FunctionEstimator {
 
 func extractCostTracker() interpreter.FunctionTracker {
 	return func(args []ref.Val, result ref.Val) *uint64 {
-		targetCost := float64(actualSize(args[0])+1) * common.StringTraversalCostFactor
-		regexCost := float64(actualSize(args[1])+1) * common.RegexStringLengthCostFactor
+		targetCost := float64(safeAdd(actualSize(args[0]), 1)) * common.StringTraversalCostFactor
+		regexCost := float64(safeAdd(actualSize(args[1]), 1)) * common.RegexStringLengthCostFactor
 		// Actual search cost calculation = targetCost + regexCost
 		searchCost := targetCost * regexCost
 		// The total cost is the base call cost + search cost + result string allocation.

@@ -237,12 +237,21 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	if err != nil {
 		return err
 	}
+	ctx, span := tracing.Start(ctx, "Get etcd3",
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+		attribute.String("key", key),
+		attribute.String("group", s.groupResource.Group),
+		attribute.String("resource", s.groupResource.Resource),
+	)
+	defer span.End(500 * time.Millisecond)
 	startTime := time.Now()
 	getResp, err := s.client.Kubernetes.Get(ctx, preparedKey, kubernetes.GetOptions{})
 	metrics.RecordEtcdRequest("get", s.groupResource, err, startTime)
 	if err != nil {
+		span.AddEvent("Get call failed", attribute.String("err", err.Error()))
 		return err
 	}
+	span.AddEvent("Get call succeeded")
 	if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Revision)); err != nil {
 		return err
 	}
@@ -256,14 +265,18 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 
 	data, _, err := s.transformer.TransformFromStorage(ctx, getResp.KV.Value, authenticatedDataString(preparedKey))
 	if err != nil {
+		span.AddEvent("TransformFromStorage failed", attribute.String("err", err.Error()))
 		return storage.NewInternalError(err)
 	}
+	span.AddEvent("TransformFromStorage succeeded")
 
 	err = s.decoder.Decode(data, out, getResp.KV.ModRevision)
 	if err != nil {
+		span.AddEvent("Decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
 		recordDecodeError(s.groupResource, preparedKey)
 		return err
 	}
+	span.AddEvent("Decode succeeded", attribute.Int("len", len(data)))
 	return nil
 }
 
@@ -326,11 +339,11 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	if out != nil {
 		err = s.decoder.Decode(data, out, txnResp.Revision)
 		if err != nil {
-			span.AddEvent("decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
+			span.AddEvent("Decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
 			recordDecodeError(s.groupResource, preparedKey)
 			return err
 		}
-		span.AddEvent("decode succeeded", attribute.Int("len", len(data)))
+		span.AddEvent("Decode succeeded", attribute.Int("len", len(data)))
 	}
 	return nil
 }
@@ -614,11 +627,11 @@ func (s *store) GuaranteedUpdate(
 
 		err = s.decoder.Decode(data, destination, txnResp.Revision)
 		if err != nil {
-			span.AddEvent("decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
+			span.AddEvent("Decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
 			recordDecodeError(s.groupResource, preparedKey)
 			return err
 		}
-		span.AddEvent("decode succeeded", attribute.Int("len", len(data)))
+		span.AddEvent("Decode succeeded", attribute.Int("len", len(data)))
 		return nil
 	}
 }
@@ -734,9 +747,12 @@ func (s *store) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
 // shouldStream determines whether a list request should use etcd RangeStream.
 func shouldStream(opts storage.ListOptions) bool {
 	// Only recursive lists stream, a non-recursive request reads a single object.
-	// Streaming's main goal is to bound unbounded reads, limited and continue requests are
-	// already bounded by pagination, so we are opting out of streaming for them for now.
-	if !opts.Recursive || opts.Predicate.Limit > 0 || opts.Predicate.Continue != "" {
+	if !opts.Recursive {
+		return false
+	}
+	// etcd is unaware of selector matches, so a filtered page can't carry a proper limit.
+	// Stream only unfiltered pages.
+	if opts.Predicate.Limit > 0 && !opts.Predicate.Empty() {
 		return false
 	}
 	return utilfeature.DefaultFeatureGate.Enabled(features.EtcdRangeStream) &&
@@ -782,20 +798,24 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	var count int64
 	var numFetched int
 	var numEvald int
+	var streamed bool
+	startTime := time.Now()
 	// Because these metrics are for understanding the costs of handling LIST requests,
 	// get them recorded even in error cases.
 	defer func() {
 		numReturn := v.Len()
 		metrics.RecordStorageListMetrics(s.groupResource, "", numFetched, numEvald, numReturn)
+		metrics.RecordListLatency(s.groupResource, streamed, startTime)
 	}()
 
 	aggregator := s.listErrAggrFactory()
 
 	chunks := s.pagedChunks(ctx, keyPrefix, opts, withRev, limit, continueKey)
 	if shouldStream(opts) {
-		streamChunks, supported := s.streamChunks(ctx, keyPrefix, withRev)
+		streamChunks, supported := s.streamChunks(ctx, keyPrefix, withRev, limit, continueKey)
 		if supported {
 			chunks = streamChunks
+			streamed = true
 		} else {
 			etcdfeature.DefaultFeatureSupportChecker.MarkUnsupported(storage.RangeStream)
 			klog.V(4).Infof("etcd server does not support RangeStream for %v; falling back to paginated list", s.groupResource)
@@ -912,14 +932,23 @@ func (s *store) listReadError(ctx context.Context, err error, withRev int64, pag
 }
 
 // streamChunks reads the list as a single etcd RangeStream, pinned to withRev when
-// nonzero. supported is false when the etcd server does not implement RangeStream.
-func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev int64) (chunks iter.Seq2[listChunk, error], supported bool) {
+// nonzero, capped at limit keys and resumed from continueKey when set.
+// supported is false when the etcd server does not implement RangeStream.
+func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev, limit int64, continueKey string) (chunks iter.Seq2[listChunk, error], supported bool) {
 	startTime := time.Now()
+	paging := continueKey != ""
+	startKey := keyPrefix
+	if paging {
+		startKey = continueKey
+	}
 	streamOpts := []clientv3.OpOption{clientv3.WithRange(clientv3.GetPrefixRangeEnd(keyPrefix))}
 	if withRev > 0 {
 		streamOpts = append(streamOpts, clientv3.WithRev(withRev))
 	}
-	stream, streamErr := s.client.KV.GetStream(ctx, keyPrefix, streamOpts...)
+	if limit > 0 {
+		streamOpts = append(streamOpts, clientv3.WithLimit(limit))
+	}
+	stream, streamErr := s.client.KV.GetStream(ctx, startKey, streamOpts...)
 	var first clientv3.RangeStreamResponse
 	var firstOk bool
 	if streamErr == nil {
@@ -936,7 +965,7 @@ func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev int6
 			metrics.RecordEtcdRequest("listStream", s.groupResource, err, startTime)
 		}()
 		if err = streamErr; err != nil {
-			yield(listChunk{}, s.listReadError(ctx, err, withRev, false, "", keyPrefix))
+			yield(listChunk{}, s.listReadError(ctx, err, withRev, paging, continueKey, keyPrefix))
 			return
 		}
 		estimator := s.getResourceSizeEstimator()
@@ -947,7 +976,7 @@ func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev int6
 		resp, ok := first, firstOk
 		for ok {
 			if err = resp.Err(); err != nil {
-				yield(listChunk{}, s.listReadError(ctx, err, withRev, false, "", keyPrefix))
+				yield(listChunk{}, s.listReadError(ctx, err, withRev, paging, continueKey, keyPrefix))
 				return
 			}
 			rangeResp := resp.RangeResponse
@@ -959,7 +988,9 @@ func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev int6
 				revision = &rangeResp.Header.Revision
 			}
 			next, nextOk := <-stream
-			if !yield(listChunk{kvs: rangeResp.Kvs, revision: revision, count: rangeResp.Count, hasMore: nextOk}, nil) {
+			// On the final chunk, More means the limit truncated the range, so there
+			// is a next page even though the stream ended.
+			if !yield(listChunk{kvs: rangeResp.Kvs, revision: revision, count: rangeResp.Count, hasMore: nextOk || rangeResp.More}, nil) {
 				return
 			}
 			resp, ok = next, nextOk

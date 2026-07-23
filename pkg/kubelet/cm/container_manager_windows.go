@@ -171,6 +171,15 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 		cm.topologyManager.AddHintProvider(logger, cm.cpuManager)
 
 		logger.Info("Creating memory manager")
+		// On Windows memory affinity is best-effort and there is no cpuset.mems
+		// equivalent to pin memory to a NUMA node directly. We choose to have
+		// memory placement follow the CPU manager's NUMA decision as a best-effort
+		// design. Wrap the topology manager store so the memory manager's
+		// GetAffinity returns the NUMA nodes of the container's exclusive CPUs.
+		// This relies on the CPU manager already being registered as a hint
+		// provider above, so its Allocate runs first and its CPUs are committed by
+		// the time the memory manager reads the affinity.
+		memoryAffinity := newCPUFollowingStore(cm.topologyManager, cm.cpuManager, machineInfo)
 		cm.memoryManager, err = memorymanager.NewManager(
 			logger,
 			nodeConfig.MemoryManagerPolicy,
@@ -178,7 +187,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 			cm.GetNodeAllocatableReservation(),
 			nodeConfig.MemoryManagerReservedMemory,
 			nodeConfig.KubeletRootDir,
-			cm.topologyManager,
+			memoryAffinity,
 		)
 		if err != nil {
 			logger.Error(err, "Failed to initialize memory manager")
@@ -327,13 +336,17 @@ func (cm *containerManagerImpl) UpdateAllocatedDevices(_ klog.Logger) {
 	return
 }
 
-func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
+func (cm *containerManagerImpl) GetCPUs(pod *v1.Pod, container *v1.Container) []int64 {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
 		if cm.cpuManager != nil {
-			return int64Slice(cm.cpuManager.GetExclusiveCPUs(podUID, containerName).UnsortedList())
+			return int64Slice(cm.cpuManager.GetExclusiveCPUs(string(pod.UID), container.Name).UnsortedList())
 		}
 		return []int64{}
 	}
+	return nil
+}
+
+func (cm *containerManagerImpl) GetPodCPUs(podUID string) []int64 {
 	return nil
 }
 
@@ -347,7 +360,11 @@ func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
 	return nil
 }
 
-func (cm *containerManagerImpl) GetMemory(_ klog.Logger, _, _ string) []*podresourcesapi.ContainerMemory {
+func (cm *containerManagerImpl) GetMemory(_ klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.ContainerMemory {
+	return nil
+}
+
+func (cm *containerManagerImpl) GetPodMemory(_ klog.Logger, _ string) []*podresourcesapi.ContainerMemory {
 	return nil
 }
 

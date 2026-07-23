@@ -1,0 +1,29 @@
+# Template for PodGroup member pods or regular pods used in default preemption benchmark suites.
+# Supported template parameters:
+#   - Index: Pod index (required)
+#   - podsPerGroup: Number of pods in each gang (required for PodGroup pods)
+#   - priority: Priority value (default: 1000)
+#   - cpuRequest: Container CPU request (e.g. 300m)
+#   - disruptionMode: If set ("single" or "all"), attaches the pod to its PodGroup. If empty, creates a regular pod without PodGroup.
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: gang-pod-
+spec:
+  priority: {{if .priority}}{{AddInt 0 .priority}}{{else}}1000{{end}}
+  {{if .disruptionMode}}
+  schedulingGroup:
+    podGroupName: gang-{{DivideInt .Index .podsPerGroup}}
+  {{end}}
+
+  terminationGracePeriodSeconds: 0
+  containers:
+  - image: registry.k8s.io/pause:3.10.2
+    name: pause
+    resources:
+      limits:
+        cpu: {{if .cpuRequest}}{{.cpuRequest}}{{else}}50m{{end}}
+        memory: 50Mi
+      requests:
+        cpu: {{if .cpuRequest}}{{.cpuRequest}}{{else}}50m{{end}}
+        memory: 50Mi

@@ -57,6 +57,7 @@ import (
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	v1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
+	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
@@ -447,6 +448,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		certificatesv1.ClusterTrustBundle{}.OpenAPIModelName():                                                          schema_k8sio_api_certificates_v1_ClusterTrustBundle(ref),
 		certificatesv1.ClusterTrustBundleList{}.OpenAPIModelName():                                                      schema_k8sio_api_certificates_v1_ClusterTrustBundleList(ref),
 		certificatesv1.ClusterTrustBundleSpec{}.OpenAPIModelName():                                                      schema_k8sio_api_certificates_v1_ClusterTrustBundleSpec(ref),
+		certificatesv1.PodCertificateRequest{}.OpenAPIModelName():                                                       schema_k8sio_api_certificates_v1_PodCertificateRequest(ref),
+		certificatesv1.PodCertificateRequestList{}.OpenAPIModelName():                                                   schema_k8sio_api_certificates_v1_PodCertificateRequestList(ref),
+		certificatesv1.PodCertificateRequestSpec{}.OpenAPIModelName():                                                   schema_k8sio_api_certificates_v1_PodCertificateRequestSpec(ref),
+		certificatesv1.PodCertificateRequestStatus{}.OpenAPIModelName():                                                 schema_k8sio_api_certificates_v1_PodCertificateRequestStatus(ref),
 		certificatesv1alpha1.ClusterTrustBundle{}.OpenAPIModelName():                                                    schema_k8sio_api_certificates_v1alpha1_ClusterTrustBundle(ref),
 		certificatesv1alpha1.ClusterTrustBundleList{}.OpenAPIModelName():                                                schema_k8sio_api_certificates_v1alpha1_ClusterTrustBundleList(ref),
 		certificatesv1alpha1.ClusterTrustBundleSpec{}.OpenAPIModelName():                                                schema_k8sio_api_certificates_v1alpha1_ClusterTrustBundleSpec(ref),
@@ -535,6 +540,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.EventList{}.OpenAPIModelName():                                                                           schema_k8sio_api_core_v1_EventList(ref),
 		corev1.EventSeries{}.OpenAPIModelName():                                                                         schema_k8sio_api_core_v1_EventSeries(ref),
 		corev1.EventSource{}.OpenAPIModelName():                                                                         schema_k8sio_api_core_v1_EventSource(ref),
+		corev1.EvictionResponder{}.OpenAPIModelName():                                                                   schema_k8sio_api_core_v1_EvictionResponder(ref),
 		corev1.ExecAction{}.OpenAPIModelName():                                                                          schema_k8sio_api_core_v1_ExecAction(ref),
 		corev1.FCVolumeSource{}.OpenAPIModelName():                                                                      schema_k8sio_api_core_v1_FCVolumeSource(ref),
 		corev1.FileKeySelector{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_FileKeySelector(ref),
@@ -578,6 +584,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.Node{}.OpenAPIModelName():                                                                                schema_k8sio_api_core_v1_Node(ref),
 		corev1.NodeAddress{}.OpenAPIModelName():                                                                         schema_k8sio_api_core_v1_NodeAddress(ref),
 		corev1.NodeAffinity{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_NodeAffinity(ref),
+		corev1.NodeAllocatableMappedResources{}.OpenAPIModelName():                                                      schema_k8sio_api_core_v1_NodeAllocatableMappedResources(ref),
+		corev1.NodeAllocatableOverheadResources{}.OpenAPIModelName():                                                    schema_k8sio_api_core_v1_NodeAllocatableOverheadResources(ref),
 		corev1.NodeAllocatableResourceClaimStatus{}.OpenAPIModelName():                                                  schema_k8sio_api_core_v1_NodeAllocatableResourceClaimStatus(ref),
 		corev1.NodeCondition{}.OpenAPIModelName():                                                                       schema_k8sio_api_core_v1_NodeCondition(ref),
 		corev1.NodeConfigSource{}.OpenAPIModelName():                                                                    schema_k8sio_api_core_v1_NodeConfigSource(ref),
@@ -640,6 +648,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.PodTemplate{}.OpenAPIModelName():                                                                         schema_k8sio_api_core_v1_PodTemplate(ref),
 		corev1.PodTemplateList{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_PodTemplateList(ref),
 		corev1.PodTemplateSpec{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_PodTemplateSpec(ref),
+		corev1.PodVolumeHealth{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_PodVolumeHealth(ref),
 		corev1.PortStatus{}.OpenAPIModelName():                                                                          schema_k8sio_api_core_v1_PortStatus(ref),
 		corev1.PortworxVolumeSource{}.OpenAPIModelName():                                                                schema_k8sio_api_core_v1_PortworxVolumeSource(ref),
 		corev1.PreferAvoidPodsEntry{}.OpenAPIModelName():                                                                schema_k8sio_api_core_v1_PreferAvoidPodsEntry(ref),
@@ -704,6 +713,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.TypedObjectReference{}.OpenAPIModelName():                                                                schema_k8sio_api_core_v1_TypedObjectReference(ref),
 		corev1.Volume{}.OpenAPIModelName():                                                                              schema_k8sio_api_core_v1_Volume(ref),
 		corev1.VolumeDevice{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_VolumeDevice(ref),
+		corev1.VolumeHealthCondition{}.OpenAPIModelName():                                                               schema_k8sio_api_core_v1_VolumeHealthCondition(ref),
+		corev1.VolumeHealthStatus{}.OpenAPIModelName():                                                                  schema_k8sio_api_core_v1_VolumeHealthStatus(ref),
 		corev1.VolumeMount{}.OpenAPIModelName():                                                                         schema_k8sio_api_core_v1_VolumeMount(ref),
 		corev1.VolumeMountStatus{}.OpenAPIModelName():                                                                   schema_k8sio_api_core_v1_VolumeMountStatus(ref),
 		corev1.VolumeNodeAffinity{}.OpenAPIModelName():                                                                  schema_k8sio_api_core_v1_VolumeNodeAffinity(ref),
@@ -877,6 +888,21 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		imagepolicyv1alpha1.ImageReviewContainerSpec{}.OpenAPIModelName():                                               schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewContainerSpec(ref),
 		imagepolicyv1alpha1.ImageReviewSpec{}.OpenAPIModelName():                                                        schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewSpec(ref),
 		imagepolicyv1alpha1.ImageReviewStatus{}.OpenAPIModelName():                                                      schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewStatus(ref),
+		lifecyclev1alpha1.Eviction{}.OpenAPIModelName():                                                                 schema_k8sio_api_lifecycle_v1alpha1_Eviction(ref),
+		lifecyclev1alpha1.EvictionList{}.OpenAPIModelName():                                                             schema_k8sio_api_lifecycle_v1alpha1_EvictionList(ref),
+		lifecyclev1alpha1.EvictionPodReference{}.OpenAPIModelName():                                                     schema_k8sio_api_lifecycle_v1alpha1_EvictionPodReference(ref),
+		lifecyclev1alpha1.EvictionRequest{}.OpenAPIModelName():                                                          schema_k8sio_api_lifecycle_v1alpha1_EvictionRequest(ref),
+		lifecyclev1alpha1.EvictionRequestList{}.OpenAPIModelName():                                                      schema_k8sio_api_lifecycle_v1alpha1_EvictionRequestList(ref),
+		lifecyclev1alpha1.EvictionRequestPodReference{}.OpenAPIModelName():                                              schema_k8sio_api_lifecycle_v1alpha1_EvictionRequestPodReference(ref),
+		lifecyclev1alpha1.EvictionRequestSpec{}.OpenAPIModelName():                                                      schema_k8sio_api_lifecycle_v1alpha1_EvictionRequestSpec(ref),
+		lifecyclev1alpha1.EvictionRequestStatus{}.OpenAPIModelName():                                                    schema_k8sio_api_lifecycle_v1alpha1_EvictionRequestStatus(ref),
+		lifecyclev1alpha1.EvictionRequestTarget{}.OpenAPIModelName():                                                    schema_k8sio_api_lifecycle_v1alpha1_EvictionRequestTarget(ref),
+		lifecyclev1alpha1.EvictionSpec{}.OpenAPIModelName():                                                             schema_k8sio_api_lifecycle_v1alpha1_EvictionSpec(ref),
+		lifecyclev1alpha1.EvictionStatus{}.OpenAPIModelName():                                                           schema_k8sio_api_lifecycle_v1alpha1_EvictionStatus(ref),
+		lifecyclev1alpha1.EvictionTarget{}.OpenAPIModelName():                                                           schema_k8sio_api_lifecycle_v1alpha1_EvictionTarget(ref),
+		lifecyclev1alpha1.Requester{}.OpenAPIModelName():                                                                schema_k8sio_api_lifecycle_v1alpha1_Requester(ref),
+		lifecyclev1alpha1.ResponderStatus{}.OpenAPIModelName():                                                          schema_k8sio_api_lifecycle_v1alpha1_ResponderStatus(ref),
+		lifecyclev1alpha1.TargetResponder{}.OpenAPIModelName():                                                          schema_k8sio_api_lifecycle_v1alpha1_TargetResponder(ref),
 		networkingv1.HTTPIngressPath{}.OpenAPIModelName():                                                               schema_k8sio_api_networking_v1_HTTPIngressPath(ref),
 		networkingv1.HTTPIngressRuleValue{}.OpenAPIModelName():                                                          schema_k8sio_api_networking_v1_HTTPIngressRuleValue(ref),
 		networkingv1.IPAddress{}.OpenAPIModelName():                                                                     schema_k8sio_api_networking_v1_IPAddress(ref),
@@ -1031,7 +1057,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1.DeviceToleration{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1_DeviceToleration(ref),
 		resourcev1.ExactDeviceRequest{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1_ExactDeviceRequest(ref),
 		resourcev1.NetworkDeviceData{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1_NetworkDeviceData(ref),
-		resourcev1.NodeAllocatableResourceMapping{}.OpenAPIModelName():                                                  schema_k8sio_api_resource_v1_NodeAllocatableResourceMapping(ref),
+		resourcev1.NodeAllocatableMapping{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1_NodeAllocatableMapping(ref),
+		resourcev1.NodeAllocatableOverhead{}.OpenAPIModelName():                                                         schema_k8sio_api_resource_v1_NodeAllocatableOverhead(ref),
+		resourcev1.NodeAllocatableResource{}.OpenAPIModelName():                                                         schema_k8sio_api_resource_v1_NodeAllocatableResource(ref),
 		resourcev1.OpaqueDeviceConfiguration{}.OpenAPIModelName():                                                       schema_k8sio_api_resource_v1_OpaqueDeviceConfiguration(ref),
 		resourcev1.ResourceClaim{}.OpenAPIModelName():                                                                   schema_k8sio_api_resource_v1_ResourceClaim(ref),
 		resourcev1.ResourceClaimConsumerReference{}.OpenAPIModelName():                                                  schema_k8sio_api_resource_v1_ResourceClaimConsumerReference(ref),
@@ -1053,11 +1081,14 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		v1alpha3.DeviceTaintRuleSpec{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleSpec(ref),
 		v1alpha3.DeviceTaintRuleStatus{}.OpenAPIModelName():                                                             schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleStatus(ref),
 		v1alpha3.DeviceTaintSelector{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1alpha3_DeviceTaintSelector(ref),
+		v1alpha3.PartitionTypeStatus{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1alpha3_PartitionTypeStatus(ref),
 		v1alpha3.PoolStatus{}.OpenAPIModelName():                                                                        schema_k8sio_api_resource_v1alpha3_PoolStatus(ref),
 		v1alpha3.ResourcePoolStatusRequest{}.OpenAPIModelName():                                                         schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequest(ref),
 		v1alpha3.ResourcePoolStatusRequestList{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestList(ref),
 		v1alpha3.ResourcePoolStatusRequestSpec{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestSpec(ref),
 		v1alpha3.ResourcePoolStatusRequestStatus{}.OpenAPIModelName():                                                   schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestStatus(ref),
+		v1alpha3.ShareableCapacityStatus{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1alpha3_ShareableCapacityStatus(ref),
+		v1alpha3.ShareableSummaryStatus{}.OpenAPIModelName():                                                            schema_k8sio_api_resource_v1alpha3_ShareableSummaryStatus(ref),
 		resourcev1beta1.AllocatedDeviceStatus{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref),
 		resourcev1beta1.AllocationResult{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta1_AllocationResult(ref),
 		resourcev1beta1.BasicDevice{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1beta1_BasicDevice(ref),
@@ -1088,7 +1119,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta1.DeviceTaint{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1beta1_DeviceTaint(ref),
 		resourcev1beta1.DeviceToleration{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta1_DeviceToleration(ref),
 		resourcev1beta1.NetworkDeviceData{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta1_NetworkDeviceData(ref),
-		resourcev1beta1.NodeAllocatableResourceMapping{}.OpenAPIModelName():                                             schema_k8sio_api_resource_v1beta1_NodeAllocatableResourceMapping(ref),
+		resourcev1beta1.NodeAllocatableMapping{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1beta1_NodeAllocatableMapping(ref),
+		resourcev1beta1.NodeAllocatableOverhead{}.OpenAPIModelName():                                                    schema_k8sio_api_resource_v1beta1_NodeAllocatableOverhead(ref),
+		resourcev1beta1.NodeAllocatableResource{}.OpenAPIModelName():                                                    schema_k8sio_api_resource_v1beta1_NodeAllocatableResource(ref),
 		resourcev1beta1.OpaqueDeviceConfiguration{}.OpenAPIModelName():                                                  schema_k8sio_api_resource_v1beta1_OpaqueDeviceConfiguration(ref),
 		resourcev1beta1.ResourceClaim{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta1_ResourceClaim(ref),
 		resourcev1beta1.ResourceClaimConsumerReference{}.OpenAPIModelName():                                             schema_k8sio_api_resource_v1beta1_ResourceClaimConsumerReference(ref),
@@ -1137,7 +1170,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta2.DeviceToleration{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta2_DeviceToleration(ref),
 		resourcev1beta2.ExactDeviceRequest{}.OpenAPIModelName():                                                         schema_k8sio_api_resource_v1beta2_ExactDeviceRequest(ref),
 		resourcev1beta2.NetworkDeviceData{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_NetworkDeviceData(ref),
-		resourcev1beta2.NodeAllocatableResourceMapping{}.OpenAPIModelName():                                             schema_k8sio_api_resource_v1beta2_NodeAllocatableResourceMapping(ref),
+		resourcev1beta2.NodeAllocatableMapping{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1beta2_NodeAllocatableMapping(ref),
+		resourcev1beta2.NodeAllocatableOverhead{}.OpenAPIModelName():                                                    schema_k8sio_api_resource_v1beta2_NodeAllocatableOverhead(ref),
+		resourcev1beta2.NodeAllocatableResource{}.OpenAPIModelName():                                                    schema_k8sio_api_resource_v1beta2_NodeAllocatableResource(ref),
 		resourcev1beta2.OpaqueDeviceConfiguration{}.OpenAPIModelName():                                                  schema_k8sio_api_resource_v1beta2_OpaqueDeviceConfiguration(ref),
 		resourcev1beta2.ResourceClaim{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta2_ResourceClaim(ref),
 		resourcev1beta2.ResourceClaimConsumerReference{}.OpenAPIModelName():                                             schema_k8sio_api_resource_v1beta2_ResourceClaimConsumerReference(ref),
@@ -1153,12 +1188,15 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta2.ResourceSliceSpec{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref),
 		schedulingv1.PriorityClass{}.OpenAPIModelName():                                                                 schema_k8sio_api_scheduling_v1_PriorityClass(ref),
 		schedulingv1.PriorityClassList{}.OpenAPIModelName():                                                             schema_k8sio_api_scheduling_v1_PriorityClassList(ref),
+		schedulingv1alpha3.AllCompositeDisruptionMode{}.OpenAPIModelName():                                              schema_k8sio_api_scheduling_v1alpha3_AllCompositeDisruptionMode(ref),
 		schedulingv1alpha3.AllDisruptionMode{}.OpenAPIModelName():                                                       schema_k8sio_api_scheduling_v1alpha3_AllDisruptionMode(ref),
 		schedulingv1alpha3.BasicSchedulingPolicy{}.OpenAPIModelName():                                                   schema_k8sio_api_scheduling_v1alpha3_BasicSchedulingPolicy(ref),
 		schedulingv1alpha3.CompositeBasicSchedulingPolicy{}.OpenAPIModelName():                                          schema_k8sio_api_scheduling_v1alpha3_CompositeBasicSchedulingPolicy(ref),
+		schedulingv1alpha3.CompositeDisruptionMode{}.OpenAPIModelName():                                                 schema_k8sio_api_scheduling_v1alpha3_CompositeDisruptionMode(ref),
 		schedulingv1alpha3.CompositeGangSchedulingPolicy{}.OpenAPIModelName():                                           schema_k8sio_api_scheduling_v1alpha3_CompositeGangSchedulingPolicy(ref),
 		schedulingv1alpha3.CompositePodGroup{}.OpenAPIModelName():                                                       schema_k8sio_api_scheduling_v1alpha3_CompositePodGroup(ref),
 		schedulingv1alpha3.CompositePodGroupList{}.OpenAPIModelName():                                                   schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupList(ref),
+		schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName():                                  schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSchedulingConstraints(ref),
 		schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName():                                       schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSchedulingPolicy(ref),
 		schedulingv1alpha3.CompositePodGroupSpec{}.OpenAPIModelName():                                                   schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSpec(ref),
 		schedulingv1alpha3.CompositePodGroupStatus{}.OpenAPIModelName():                                                 schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupStatus(ref),
@@ -1174,10 +1212,18 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		schedulingv1alpha3.PodGroupSpec{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha3_PodGroupSpec(ref),
 		schedulingv1alpha3.PodGroupStatus{}.OpenAPIModelName():                                                          schema_k8sio_api_scheduling_v1alpha3_PodGroupStatus(ref),
 		schedulingv1alpha3.PodGroupTemplate{}.OpenAPIModelName():                                                        schema_k8sio_api_scheduling_v1alpha3_PodGroupTemplate(ref),
+		schedulingv1alpha3.SingleCompositeDisruptionMode{}.OpenAPIModelName():                                           schema_k8sio_api_scheduling_v1alpha3_SingleCompositeDisruptionMode(ref),
 		schedulingv1alpha3.SingleDisruptionMode{}.OpenAPIModelName():                                                    schema_k8sio_api_scheduling_v1alpha3_SingleDisruptionMode(ref),
 		schedulingv1alpha3.TopologyConstraint{}.OpenAPIModelName():                                                      schema_k8sio_api_scheduling_v1alpha3_TopologyConstraint(ref),
 		schedulingv1alpha3.TypedLocalObjectReference{}.OpenAPIModelName():                                               schema_k8sio_api_scheduling_v1alpha3_TypedLocalObjectReference(ref),
 		schedulingv1alpha3.Workload{}.OpenAPIModelName():                                                                schema_k8sio_api_scheduling_v1alpha3_Workload(ref),
+		schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{}.OpenAPIModelName():                              schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupAllDisruptionMode(ref),
+		schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{}.OpenAPIModelName():                          schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupBasicSchedulingPolicy(ref),
+		schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{}.OpenAPIModelName():                                 schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupDisruptionMode(ref),
+		schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{}.OpenAPIModelName():                           schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupGangSchedulingPolicy(ref),
+		schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints{}.OpenAPIModelName():                          schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupSchedulingConstraints(ref),
+		schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{}.OpenAPIModelName():                               schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupSchedulingPolicy(ref),
+		schedulingv1alpha3.WorkloadCompositePodGroupSingleDisruptionMode{}.OpenAPIModelName():                           schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupSingleDisruptionMode(ref),
 		schedulingv1alpha3.WorkloadList{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha3_WorkloadList(ref),
 		schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}.OpenAPIModelName():                                       schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupAllDisruptionMode(ref),
 		schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}.OpenAPIModelName():                                   schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupBasicSchedulingPolicy(ref),
@@ -1189,8 +1235,36 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{}.OpenAPIModelName():                                    schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupSingleDisruptionMode(ref),
 		schedulingv1alpha3.WorkloadReference{}.OpenAPIModelName():                                                       schema_k8sio_api_scheduling_v1alpha3_WorkloadReference(ref),
 		schedulingv1alpha3.WorkloadSpec{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha3_WorkloadSpec(ref),
+		schedulingv1beta1.AllCompositeDisruptionMode{}.OpenAPIModelName():                                               schema_k8sio_api_scheduling_v1beta1_AllCompositeDisruptionMode(ref),
+		schedulingv1beta1.AllDisruptionMode{}.OpenAPIModelName():                                                        schema_k8sio_api_scheduling_v1beta1_AllDisruptionMode(ref),
+		schedulingv1beta1.BasicSchedulingPolicy{}.OpenAPIModelName():                                                    schema_k8sio_api_scheduling_v1beta1_BasicSchedulingPolicy(ref),
+		schedulingv1beta1.CompositeBasicSchedulingPolicy{}.OpenAPIModelName():                                           schema_k8sio_api_scheduling_v1beta1_CompositeBasicSchedulingPolicy(ref),
+		schedulingv1beta1.CompositeDisruptionMode{}.OpenAPIModelName():                                                  schema_k8sio_api_scheduling_v1beta1_CompositeDisruptionMode(ref),
+		schedulingv1beta1.CompositeGangSchedulingPolicy{}.OpenAPIModelName():                                            schema_k8sio_api_scheduling_v1beta1_CompositeGangSchedulingPolicy(ref),
+		schedulingv1beta1.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName():                                   schema_k8sio_api_scheduling_v1beta1_CompositePodGroupSchedulingConstraints(ref),
+		schedulingv1beta1.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName():                                        schema_k8sio_api_scheduling_v1beta1_CompositePodGroupSchedulingPolicy(ref),
+		schedulingv1beta1.CompositePodGroupTemplate{}.OpenAPIModelName():                                                schema_k8sio_api_scheduling_v1beta1_CompositePodGroupTemplate(ref),
+		schedulingv1beta1.DisruptionMode{}.OpenAPIModelName():                                                           schema_k8sio_api_scheduling_v1beta1_DisruptionMode(ref),
+		schedulingv1beta1.GangSchedulingPolicy{}.OpenAPIModelName():                                                     schema_k8sio_api_scheduling_v1beta1_GangSchedulingPolicy(ref),
+		schedulingv1beta1.PodGroup{}.OpenAPIModelName():                                                                 schema_k8sio_api_scheduling_v1beta1_PodGroup(ref),
+		schedulingv1beta1.PodGroupList{}.OpenAPIModelName():                                                             schema_k8sio_api_scheduling_v1beta1_PodGroupList(ref),
+		schedulingv1beta1.PodGroupResourceClaim{}.OpenAPIModelName():                                                    schema_k8sio_api_scheduling_v1beta1_PodGroupResourceClaim(ref),
+		schedulingv1beta1.PodGroupResourceClaimStatus{}.OpenAPIModelName():                                              schema_k8sio_api_scheduling_v1beta1_PodGroupResourceClaimStatus(ref),
+		schedulingv1beta1.PodGroupSchedulingConstraints{}.OpenAPIModelName():                                            schema_k8sio_api_scheduling_v1beta1_PodGroupSchedulingConstraints(ref),
+		schedulingv1beta1.PodGroupSchedulingPolicy{}.OpenAPIModelName():                                                 schema_k8sio_api_scheduling_v1beta1_PodGroupSchedulingPolicy(ref),
+		schedulingv1beta1.PodGroupSpec{}.OpenAPIModelName():                                                             schema_k8sio_api_scheduling_v1beta1_PodGroupSpec(ref),
+		schedulingv1beta1.PodGroupStatus{}.OpenAPIModelName():                                                           schema_k8sio_api_scheduling_v1beta1_PodGroupStatus(ref),
+		schedulingv1beta1.PodGroupTemplate{}.OpenAPIModelName():                                                         schema_k8sio_api_scheduling_v1beta1_PodGroupTemplate(ref),
 		schedulingv1beta1.PriorityClass{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1beta1_PriorityClass(ref),
 		schedulingv1beta1.PriorityClassList{}.OpenAPIModelName():                                                        schema_k8sio_api_scheduling_v1beta1_PriorityClassList(ref),
+		schedulingv1beta1.SingleCompositeDisruptionMode{}.OpenAPIModelName():                                            schema_k8sio_api_scheduling_v1beta1_SingleCompositeDisruptionMode(ref),
+		schedulingv1beta1.SingleDisruptionMode{}.OpenAPIModelName():                                                     schema_k8sio_api_scheduling_v1beta1_SingleDisruptionMode(ref),
+		schedulingv1beta1.TopologyConstraint{}.OpenAPIModelName():                                                       schema_k8sio_api_scheduling_v1beta1_TopologyConstraint(ref),
+		schedulingv1beta1.TypedLocalObjectReference{}.OpenAPIModelName():                                                schema_k8sio_api_scheduling_v1beta1_TypedLocalObjectReference(ref),
+		schedulingv1beta1.Workload{}.OpenAPIModelName():                                                                 schema_k8sio_api_scheduling_v1beta1_Workload(ref),
+		schedulingv1beta1.WorkloadList{}.OpenAPIModelName():                                                             schema_k8sio_api_scheduling_v1beta1_WorkloadList(ref),
+		schedulingv1beta1.WorkloadReference{}.OpenAPIModelName():                                                        schema_k8sio_api_scheduling_v1beta1_WorkloadReference(ref),
+		schedulingv1beta1.WorkloadSpec{}.OpenAPIModelName():                                                             schema_k8sio_api_scheduling_v1beta1_WorkloadSpec(ref),
 		storagev1.CSIDriver{}.OpenAPIModelName():                                                                        schema_k8sio_api_storage_v1_CSIDriver(ref),
 		storagev1.CSIDriverList{}.OpenAPIModelName():                                                                    schema_k8sio_api_storage_v1_CSIDriverList(ref),
 		storagev1.CSIDriverSpec{}.OpenAPIModelName():                                                                    schema_k8sio_api_storage_v1_CSIDriverSpec(ref),
@@ -1198,10 +1272,13 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		storagev1.CSINodeDriver{}.OpenAPIModelName():                                                                    schema_k8sio_api_storage_v1_CSINodeDriver(ref),
 		storagev1.CSINodeList{}.OpenAPIModelName():                                                                      schema_k8sio_api_storage_v1_CSINodeList(ref),
 		storagev1.CSINodeSpec{}.OpenAPIModelName():                                                                      schema_k8sio_api_storage_v1_CSINodeSpec(ref),
+		storagev1.CSINodeStatus{}.OpenAPIModelName():                                                                    schema_k8sio_api_storage_v1_CSINodeStatus(ref),
 		storagev1.CSIStorageCapacity{}.OpenAPIModelName():                                                               schema_k8sio_api_storage_v1_CSIStorageCapacity(ref),
 		storagev1.CSIStorageCapacityList{}.OpenAPIModelName():                                                           schema_k8sio_api_storage_v1_CSIStorageCapacityList(ref),
 		storagev1.StorageClass{}.OpenAPIModelName():                                                                     schema_k8sio_api_storage_v1_StorageClass(ref),
 		storagev1.StorageClassList{}.OpenAPIModelName():                                                                 schema_k8sio_api_storage_v1_StorageClassList(ref),
+		storagev1.StorageHealth{}.OpenAPIModelName():                                                                    schema_k8sio_api_storage_v1_StorageHealth(ref),
+		storagev1.StorageHealthCondition{}.OpenAPIModelName():                                                           schema_k8sio_api_storage_v1_StorageHealthCondition(ref),
 		storagev1.TokenRequest{}.OpenAPIModelName():                                                                     schema_k8sio_api_storage_v1_TokenRequest(ref),
 		storagev1.VolumeAttachment{}.OpenAPIModelName():                                                                 schema_k8sio_api_storage_v1_VolumeAttachment(ref),
 		storagev1.VolumeAttachmentList{}.OpenAPIModelName():                                                             schema_k8sio_api_storage_v1_VolumeAttachmentList(ref),
@@ -1229,10 +1306,13 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		storagev1beta1.CSINodeDriver{}.OpenAPIModelName():                                                               schema_k8sio_api_storage_v1beta1_CSINodeDriver(ref),
 		storagev1beta1.CSINodeList{}.OpenAPIModelName():                                                                 schema_k8sio_api_storage_v1beta1_CSINodeList(ref),
 		storagev1beta1.CSINodeSpec{}.OpenAPIModelName():                                                                 schema_k8sio_api_storage_v1beta1_CSINodeSpec(ref),
+		storagev1beta1.CSINodeStatus{}.OpenAPIModelName():                                                               schema_k8sio_api_storage_v1beta1_CSINodeStatus(ref),
 		storagev1beta1.CSIStorageCapacity{}.OpenAPIModelName():                                                          schema_k8sio_api_storage_v1beta1_CSIStorageCapacity(ref),
 		storagev1beta1.CSIStorageCapacityList{}.OpenAPIModelName():                                                      schema_k8sio_api_storage_v1beta1_CSIStorageCapacityList(ref),
 		storagev1beta1.StorageClass{}.OpenAPIModelName():                                                                schema_k8sio_api_storage_v1beta1_StorageClass(ref),
 		storagev1beta1.StorageClassList{}.OpenAPIModelName():                                                            schema_k8sio_api_storage_v1beta1_StorageClassList(ref),
+		storagev1beta1.StorageHealth{}.OpenAPIModelName():                                                               schema_k8sio_api_storage_v1beta1_StorageHealth(ref),
+		storagev1beta1.StorageHealthCondition{}.OpenAPIModelName():                                                      schema_k8sio_api_storage_v1beta1_StorageHealthCondition(ref),
 		storagev1beta1.TokenRequest{}.OpenAPIModelName():                                                                schema_k8sio_api_storage_v1beta1_TokenRequest(ref),
 		storagev1beta1.VolumeAttachment{}.OpenAPIModelName():                                                            schema_k8sio_api_storage_v1beta1_VolumeAttachment(ref),
 		storagev1beta1.VolumeAttachmentList{}.OpenAPIModelName():                                                        schema_k8sio_api_storage_v1beta1_VolumeAttachmentList(ref),
@@ -12185,7 +12265,7 @@ func schema_k8sio_api_authentication_v1_BoundObjectReference(ref common.Referenc
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "kind of the referent. Valid kinds are 'Pod' and 'Secret'.",
+							Description: "kind of the referent. Valid kinds are 'Pod', 'Secret', 'Node', 'ValidatingWebhookConfiguration', and 'MutatingWebhookConfiguration'.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -12369,6 +12449,28 @@ func schema_k8sio_api_authentication_v1_TokenRequestSpec(ref common.ReferenceCal
 						SchemaProps: spec.SchemaProps{
 							Description: "boundObjectRef is a reference to an object that the token will be bound to. The token will only be valid for as long as the bound object exists. NOTE: The API server's TokenReview endpoint will validate the BoundObjectRef, but other audiences may not. Keep ExpirationSeconds small if you want prompt revocation.",
 							Ref:         ref(authenticationv1.BoundObjectReference{}.OpenAPIModelName()),
+						},
+					},
+					"attestations": {
+						SchemaProps: spec.SchemaProps{
+							Description: "attestations is a map of well-known keys to string-slice values. The values for each key have a specific semantic meaning, which is documented on the key definition. Requesters of tokens may ask the Kubernetes API Server to attest to certain claims. The API Server may perform authorization checks depending on the key of this map.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type: []string{"array"},
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												SchemaProps: spec.SchemaProps{
+													Type:   []string{"string"},
+													Format: "",
+												},
+											},
+										},
+									},
+								},
+							},
 						},
 					},
 				},
@@ -18014,6 +18116,270 @@ func schema_k8sio_api_certificates_v1_ClusterTrustBundleSpec(ref common.Referenc
 	}
 }
 
+func schema_k8sio_api_certificates_v1_PodCertificateRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodCertificateRequest encodes a pod requesting a certificate from a given signer.\n\nKubelets use this API to implement podCertificate projected volumes",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metadata contains the object metadata.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "spec contains the details about the certificate being requested.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(certificatesv1.PodCertificateRequestSpec{}.OpenAPIModelName()),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "status contains the issued certificate, and a standard set of conditions.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(certificatesv1.PodCertificateRequestStatus{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			certificatesv1.PodCertificateRequestSpec{}.OpenAPIModelName(), certificatesv1.PodCertificateRequestStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_certificates_v1_PodCertificateRequestList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodCertificateRequestList is a collection of PodCertificateRequest objects",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metadata contains the list metadata.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "items is a collection of PodCertificateRequest objects",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(certificatesv1.PodCertificateRequest{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			certificatesv1.PodCertificateRequest{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_certificates_v1_PodCertificateRequestSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodCertificateRequestSpec describes the certificate request.  All fields are immutable after creation.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"signerName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "signerName indicates the requested signer.\n\nAll signer names beginning with `kubernetes.io` are reserved for use by the Kubernetes project.  There is currently one well-known signer documented by the Kubernetes project, `kubernetes.io/kube-apiserver-client-pod`, which will issue client certificates understood by kube-apiserver.  It is currently unimplemented.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"podName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "podName is the name of the pod into which the certificate will be mounted.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"podUID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "podUID is the UID of the pod into which the certificate will be mounted.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"serviceAccountName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "serviceAccountName is the name of the service account the pod is running as.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"serviceAccountUID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "serviceAccountUID is the UID of the service account the pod is running as.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"nodeName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nodeName is the name of the node the pod is assigned to.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"nodeUID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nodeUID is the UID of the node the pod is assigned to.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"maxExpirationSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "maxExpirationSeconds is the maximum lifetime permitted for the certificate.\n\nIf omitted, kube-apiserver will set it to 86400(24 hours). kube-apiserver will reject values shorter than 3600 (1 hour).  The maximum allowable value is 7862400 (91 days).\n\nThe signer implementation is then free to issue a certificate with any lifetime *shorter* than MaxExpirationSeconds, but no shorter than 3600 seconds (1 hour).  This constraint is enforced by kube-apiserver. `kubernetes.io` signers will never issue certificates with a lifetime longer than 24 hours.",
+							Default:     86400,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"stubPKCS10Request": {
+						SchemaProps: spec.SchemaProps{
+							Description: "A PKCS#10 certificate signing request (DER-serialized) generated by Kubelet using the subject private key.\n\nMost signer implementations will ignore the contents of the CSR except to extract the subject public key. The API server automatically verifies the CSR signature during admission, so the signer does not need to repeat the verification.  CSRs generated by kubelet are completely empty.\n\nThe subject public key must be one of RSA3072, RSA4096, ECDSAP256, ECDSAP384, ECDSAP521, or ED25519. Note that this list may be expanded in the future.\n\nSigner implementations do not need to support all key types supported by kube-apiserver and kubelet.  If a signer does not support the key type used for a given PodCertificateRequest, it must deny the request by setting a status.conditions entry with a type of \"Denied\" and a reason of \"UnsupportedKeyType\". It may also suggest a key type that it does support in the message field.",
+							Type:        []string{"string"},
+							Format:      "byte",
+						},
+					},
+					"unverifiedUserAnnotations": {
+						SchemaProps: spec.SchemaProps{
+							Description: "unverifiedUserAnnotations allow pod authors to pass additional information to the signer implementation.  Kubernetes does not restrict or validate this metadata in any way.\n\nEntries are subject to the same validation as object metadata annotations, with the addition that all keys must be domain-prefixed. No restrictions are placed on values, except an overall size limitation on the entire field.\n\nSigners should document the keys and values they support.  Signers should deny requests that contain keys they do not recognize.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"signerName", "podName", "podUID", "serviceAccountName", "serviceAccountUID", "nodeName", "nodeUID", "stubPKCS10Request"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_certificates_v1_PodCertificateRequestStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodCertificateRequestStatus describes the status of the request, and holds the certificate data if the request is issued.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditions applied to the request.\n\nThe types \"Issued\", \"Denied\", and \"Failed\" have special handling.  At most one of these conditions may be present, and they must have status \"True\".\n\nIf the request is denied with `Reason=UnsupportedKeyType`, the signer may suggest a key type that will work in the message field.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"certificateChain": {
+						SchemaProps: spec.SchemaProps{
+							Description: "certificateChain is populated with an issued certificate by the signer. This field is set via the /status subresource. Once populated, this field is immutable.\n\nIf the certificate signing request is denied, a condition of type \"Denied\" is added and this field remains empty. If the signer cannot issue the certificate, a condition of type \"Failed\" is added and this field remains empty.\n\nValidation requirements:\n 1. certificateChain must consist of one or more PEM-formatted certificates.\n 2. Each entry must be a valid PEM-wrapped, DER-encoded ASN.1 Certificate as\n    described in section 4 of RFC5280.\n\nIf more than one block is present, and the definition of the requested spec.signerName does not indicate otherwise, the first block is the issued certificate, and subsequent blocks should be treated as intermediate certificates and presented in TLS handshakes.  When projecting the chain into a pod volume, kubelet will drop any data in-between the PEM blocks, as well as any PEM block headers.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"notBefore": {
+						SchemaProps: spec.SchemaProps{
+							Description: "notBefore is the time at which the certificate becomes valid.  The value must be the same as the notBefore value in the leaf certificate in certificateChain.  This field is set via the /status subresource.  Once populated, it is immutable. The signer must set this field at the same time it sets certificateChain.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"beginRefreshAt": {
+						SchemaProps: spec.SchemaProps{
+							Description: "beginRefreshAt is the time at which the kubelet should begin trying to refresh the certificate.  This field is set via the /status subresource, and must be set at the same time as certificateChain.  Once populated, this field is immutable.\n\nThis field is only a hint.  Kubelet may start refreshing before or after this time if necessary.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"notAfter": {
+						SchemaProps: spec.SchemaProps{
+							Description: "notAfter is the time at which the certificate expires.  The value must be the same as the notAfter value in the leaf certificate in certificateChain.  This field is set via the /status subresource.  Once populated, it is immutable.  The signer must set this field at the same time it sets certificateChain.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			metav1.Condition{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_certificates_v1alpha1_ClusterTrustBundle(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -20316,6 +20682,13 @@ func schema_k8sio_api_core_v1_ClusterTrustBundleProjection(ref common.ReferenceC
 							Format:      "",
 						},
 					},
+					"user": {
+						SchemaProps: spec.SchemaProps{
+							Description: "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 				},
 				Required: []string{"path"},
 			},
@@ -20816,6 +21189,13 @@ func schema_k8sio_api_core_v1_ConfigMapVolumeSource(ref common.ReferenceCallback
 							Description: "optional specify whether the ConfigMap or its keys must be defined",
 							Type:        []string{"boolean"},
 							Format:      "",
+						},
+					},
+					"defaultUser": {
+						SchemaProps: spec.SchemaProps{
+							Description: "defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 				},
@@ -21784,6 +22164,13 @@ func schema_k8sio_api_core_v1_DownwardAPIVolumeFile(ref common.ReferenceCallback
 							Format:      "int32",
 						},
 					},
+					"user": {
+						SchemaProps: spec.SchemaProps{
+							Description: "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 				},
 				Required: []string{"path"},
 			},
@@ -21825,6 +22212,13 @@ func schema_k8sio_api_core_v1_DownwardAPIVolumeSource(ref common.ReferenceCallba
 							Format:      "int32",
 						},
 					},
+					"defaultUser": {
+						SchemaProps: spec.SchemaProps{
+							Description: "defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 				},
 			},
 		},
@@ -21851,6 +22245,13 @@ func schema_k8sio_api_core_v1_EmptyDirVolumeSource(ref common.ReferenceCallback)
 						SchemaProps: spec.SchemaProps{
 							Description: "sizeLimit is the total amount of local storage required for this EmptyDir volume. The size limit is also applicable for memory medium. The maximum usage on memory medium EmptyDir would be the minimum value between the SizeLimit specified here and the sum of memory limits of all containers in a pod. The default is nil which means that the limit is undefined. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"mode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "mode specifies the permission bits for the emptyDir directory, in numeric notation (e.g., 0755, 01777). Must be a value between 0000 and 01777. If not specified, defaults to 0777. This might be in conflict with other options that affect the file mode, like fsGroup. If fsGroup is specified, the fsGroup permissions will override the mode specified here. This field has no effect on Windows. This field is alpha and requires EmptyDirVolumeMode featuregate to be enabled.",
+							Type:        []string{"integer"},
+							Format:      "int32",
 						},
 					},
 				},
@@ -23135,6 +23536,40 @@ func schema_k8sio_api_core_v1_EventSource(ref common.ReferenceCallback) common.O
 	}
 }
 
+func schema_k8sio_api_core_v1_EvictionResponder(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionResponder allows you to specify the responder reacting to an Eviction. Responders should observe and communicate through the Eviction Resource API to help with the graceful eviction of a target (e.g. termination of a pod).",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name allows you to identify the responder responding to the Eviction.\n\nIt must be a valid domain-prefixed key (such as \"acme.io/foo\"). Domain names *.k8s.io and *.kubernetes.io are reserved. This field must be unique for each responder. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"priority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "priority for this responder. Higher priorities are selected first by the evictionrequest-controller. If there are responders with the same priority, the responder whose domain name comes first in the alphabetical higher domain order, will be picked. This means that the top domain labels are compared alphabetically first, followed by the lower domain labels. The key is compared last.\n\nThe responder that is the managing controller of the pod should set the value of this field to 10000 to allow both for preemption or fallback registration by other responders.\n\nThe minimum value is 0 and the maximum value is 100000. The interval 0-999 is reserved for responders with *.k8s.io suffix. This field is required.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"name", "priority"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-map-type": "atomic",
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_core_v1_ExecAction(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -23501,6 +23936,14 @@ func schema_k8sio_api_core_v1_GRPCAction(ref common.ReferenceCallback) common.Op
 							Format:      "",
 						},
 					},
+					"mode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "mode specifies the connection mode for the gRPC health probe. Set to \"TLS\" to use TLS without certificate verification. Set to \"Plaintext\" to use a plaintext (insecure) connection explicitly. If not specified, the probe uses a plaintext (insecure) connection.\n\nPossible enum values:\n - `\"Plaintext\"` indicates that the probe should use a plaintext (insecure) gRPC connection.\n - `\"TLS\"` indicates that the probe should connect using TLS without certificate verification.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Plaintext", "TLS"},
+						},
+					},
 				},
 				Required: []string{"port"},
 			},
@@ -23676,6 +24119,14 @@ func schema_k8sio_api_core_v1_HTTPGetAction(ref common.ReferenceCallback) common
 									},
 								},
 							},
+						},
+					},
+					"protocol": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Protocol selects the wire protocol for the probe connection. Nil defaults to HTTP/1.1.\n\nPossible enum values:\n - `\"HTTP1\"` uses HTTP/1.1 (the existing default).\n - `\"HTTP2\"` uses HTTP/2. Currently, only cleartext with prior knowledge (h2c) is supported, and must be used with scheme HTTP.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"HTTP1", "HTTP2"},
 						},
 					},
 				},
@@ -24103,6 +24554,13 @@ func schema_k8sio_api_core_v1_KeyToPath(ref common.ReferenceCallback) common.Ope
 							Description: "mode is Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
 							Type:        []string{"integer"},
 							Format:      "int32",
+						},
+					},
+					"user": {
+						SchemaProps: spec.SchemaProps{
+							Description: "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 				},
@@ -25064,6 +25522,72 @@ func schema_k8sio_api_core_v1_NodeAffinity(ref common.ReferenceCallback) common.
 	}
 }
 
+func schema_k8sio_api_core_v1_NodeAllocatableMappedResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableMappedResources describes mapped node allocatable resource allocations.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the name of the resource (e.g., cpu, memory).",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"quantity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Quantity is the total node allocatable resource capacity allocated for the claim. This claim's allocated devices is shared by all the containers referencing the claim. Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"name", "quantity"},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_core_v1_NodeAllocatableOverheadResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the name of the resource (e.g., cpu, memory).",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"perPod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerPod is the flat overhead quantity allocated per pod. Adding to each container limit allows individual containers to utilize the overhead, while the parent pod-level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"perContainer": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerContainer is the variable overhead quantity applied for each container referencing the claim. The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`. The total overhead quantity allocated for the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_core_v1_NodeAllocatableResourceClaimStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -25098,26 +25622,58 @@ func schema_k8sio_api_core_v1_NodeAllocatableResourceClaimStatus(ref common.Refe
 							},
 						},
 					},
-					"resources": {
+					"mapping": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
+							Description: "Mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(resource.Quantity{}.OpenAPIModelName()),
+										Ref: ref(corev1.NodeAllocatableMappedResources{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"overhead": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(corev1.NodeAllocatableOverheadResources{}.OpenAPIModelName()),
 									},
 								},
 							},
 						},
 					},
 				},
-				Required: []string{"resourceClaimName", "resources"},
+				Required: []string{"resourceClaimName"},
 			},
 		},
 		Dependencies: []string{
-			resource.Quantity{}.OpenAPIModelName()},
+			corev1.NodeAllocatableMappedResources{}.OpenAPIModelName(), corev1.NodeAllocatableOverheadResources{}.OpenAPIModelName()},
 	}
 }
 
@@ -26547,11 +27103,17 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimStatus(ref common.ReferenceCa
 							Ref:         ref(corev1.ModifyVolumeStatus{}.OpenAPIModelName()),
 						},
 					},
+					"healthStatus": {
+						SchemaProps: spec.SchemaProps{
+							Description: "healthStatus contains the latest controller-reported health information for the volume bound to this claim.",
+							Ref:         ref(corev1.VolumeHealthStatus{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			corev1.ModifyVolumeStatus{}.OpenAPIModelName(), corev1.PersistentVolumeClaimCondition{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+			corev1.ModifyVolumeStatus{}.OpenAPIModelName(), corev1.PersistentVolumeClaimCondition{}.OpenAPIModelName(), corev1.VolumeHealthStatus{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -27499,6 +28061,13 @@ func schema_k8sio_api_core_v1_PodCertificateProjection(ref common.ReferenceCallb
 									},
 								},
 							},
+						},
+					},
+					"user": {
+						SchemaProps: spec.SchemaProps{
+							Description: "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 				},
@@ -28829,7 +29398,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					},
 					"hostnameOverride": {
 						SchemaProps: spec.SchemaProps{
-							Description: "HostnameOverride specifies an explicit override for the pod's hostname as perceived by the pod. This field only specifies the pod's hostname and does not affect its DNS records. When this field is set to a non-empty string: - It takes precedence over the values set in `hostname` and `subdomain`. - The Pod's hostname will be set to this value. - `setHostnameAsFQDN` must be nil or set to false. - `hostNetwork` must be set to false.\n\nThis field must be a valid DNS subdomain as defined in RFC 1123 and contain at most 64 characters. Requires the HostnameOverride feature gate to be enabled.",
+							Description: "HostnameOverride specifies an explicit override for the pod's hostname as perceived by the pod. This field only specifies the pod's hostname and does not affect its DNS records. When this field is set to a non-empty string: - It takes precedence over the values set in `hostname` and `subdomain`. - The Pod's hostname will be set to this value. - `setHostnameAsFQDN` must be nil or set to false. - `hostNetwork` must be set to false.\n\nThis field must be a valid DNS subdomain as defined in RFC 1123 and contain at most 64 characters.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -28840,12 +29409,35 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							Ref:         ref(corev1.PodSchedulingGroup{}.OpenAPIModelName()),
 						},
 					},
+					"evictionResponders": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "evictionResponders reference responders that react to Evictions based on EvictionRequests. Responders should observe and communicate through the Eviction Resource API to help with the graceful termination of a pod. The responders are selected sequentially, according to their specified priority.\n\nResponders should periodically report on an eviction progress by updating the .status.responders[].heartbeatTime field of the Eviction object. If this field is not updated within the heartbeat deadline defined by the Eviction API (currently 20 minutes), the eviction is passed over to the next responder with a lower priority. If there is no other responder, the last default imperative-eviction.k8s.io/evictor responder with a priority of 100 will evict the pod using the imperative Eviction API (pods/<name>/eviction subresource).\n\nThe maximum length of the responders list is 10. Responders are not supported when the pod is part of a PodGroup (.spec.schedulingGroup is set). This field can only be set on creation and is immutable afterwards.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(corev1.EvictionResponder{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"containers"},
 			},
 		},
 		Dependencies: []string{
-			corev1.Affinity{}.OpenAPIModelName(), corev1.Container{}.OpenAPIModelName(), corev1.EphemeralContainer{}.OpenAPIModelName(), corev1.HostAlias{}.OpenAPIModelName(), corev1.LocalObjectReference{}.OpenAPIModelName(), corev1.PodDNSConfig{}.OpenAPIModelName(), corev1.PodOS{}.OpenAPIModelName(), corev1.PodReadinessGate{}.OpenAPIModelName(), corev1.PodResourceClaim{}.OpenAPIModelName(), corev1.PodSchedulingGate{}.OpenAPIModelName(), corev1.PodSchedulingGroup{}.OpenAPIModelName(), corev1.PodSecurityContext{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), corev1.Toleration{}.OpenAPIModelName(), corev1.TopologySpreadConstraint{}.OpenAPIModelName(), corev1.Volume{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
+			corev1.Affinity{}.OpenAPIModelName(), corev1.Container{}.OpenAPIModelName(), corev1.EphemeralContainer{}.OpenAPIModelName(), corev1.EvictionResponder{}.OpenAPIModelName(), corev1.HostAlias{}.OpenAPIModelName(), corev1.LocalObjectReference{}.OpenAPIModelName(), corev1.PodDNSConfig{}.OpenAPIModelName(), corev1.PodOS{}.OpenAPIModelName(), corev1.PodReadinessGate{}.OpenAPIModelName(), corev1.PodResourceClaim{}.OpenAPIModelName(), corev1.PodSchedulingGate{}.OpenAPIModelName(), corev1.PodSchedulingGroup{}.OpenAPIModelName(), corev1.PodSecurityContext{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), corev1.Toleration{}.OpenAPIModelName(), corev1.TopologySpreadConstraint{}.OpenAPIModelName(), corev1.Volume{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 
@@ -29099,7 +29691,12 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 					"nodeAllocatableResourceClaimStatuses": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-map-keys": []interface{}{
+									"resourceClaimName",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "resourceClaimName",
+								"x-kubernetes-patch-strategy":  "merge",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -29114,11 +29711,32 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							},
 						},
 					},
+					"volumeHealth": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "volumeHealth contains node-reported health for each volume the pod is using. Populated by the kubelet on the pod's node.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(corev1.PodVolumeHealth{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			corev1.ContainerStatus{}.OpenAPIModelName(), corev1.HostIP{}.OpenAPIModelName(), corev1.NodeAllocatableResourceClaimStatus{}.OpenAPIModelName(), corev1.PodCondition{}.OpenAPIModelName(), corev1.PodExtendedResourceClaimStatus{}.OpenAPIModelName(), corev1.PodIP{}.OpenAPIModelName(), corev1.PodResourceClaimStatus{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
+			corev1.ContainerStatus{}.OpenAPIModelName(), corev1.HostIP{}.OpenAPIModelName(), corev1.NodeAllocatableResourceClaimStatus{}.OpenAPIModelName(), corev1.PodCondition{}.OpenAPIModelName(), corev1.PodExtendedResourceClaimStatus{}.OpenAPIModelName(), corev1.PodIP{}.OpenAPIModelName(), corev1.PodResourceClaimStatus{}.OpenAPIModelName(), corev1.PodVolumeHealth{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -29241,6 +29859,60 @@ func schema_k8sio_api_core_v1_PodTemplateSpec(ref common.ReferenceCallback) comm
 		},
 		Dependencies: []string{
 			corev1.PodSpec{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_core_v1_PodVolumeHealth(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodVolumeHealth contains health information for a volume used by a pod, reported by the CSI node plugin via the kubelet.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name matches an entry in pod.spec.volumes.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"healthConditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"status",
+									"reason",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "status",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditions is the set of adverse conditions reported by the CSI node plugin for this volume on this node. At most 16 conditions may be reported.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(corev1.VolumeHealthCondition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"lastTransitionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "lastTransitionTime is when the current set of conditions first appeared.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			corev1.VolumeHealthCondition{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -29542,6 +30214,13 @@ func schema_k8sio_api_core_v1_ProjectedVolumeSource(ref common.ReferenceCallback
 							Description: "defaultMode are the mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
 							Type:        []string{"integer"},
 							Format:      "int32",
+						},
+					},
+					"defaultUser": {
+						SchemaProps: spec.SchemaProps{
+							Description: "defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 				},
@@ -30498,7 +31177,7 @@ func schema_k8sio_api_core_v1_ResourceStatus(ref common.ReferenceCallback) commo
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name of the resource. Must be unique within the pod and in case of non-DRA resource, match one of the resources from the pod spec. For DRA resources, the value must be \"claim:<claim_name>/<request>\". When this status is reported about a container, the \"claim_name\" and \"request\" must match one of the claims of this container.",
+							Description: "Name of the resource. Must be unique within the pod and in case of non-DRA resource, match one of the resources from the pod spec. For DRA resources, the value must be \"claim:<claim_name>/<request>\" when container.resources.claims[*].request is set or \"claim:<claim_name>\" when container.resources.claims[*].request is empty. For DRA-backed extended resources, \"claim:<claim_name>/<request>\" is used when the claim name and request name are recorded in pod.status.extendedResourceClaimStatus. When this status is reported about a container, the \"claim_name\" and \"request\" must match one of the claims of this container.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -31210,6 +31889,13 @@ func schema_k8sio_api_core_v1_SecretVolumeSource(ref common.ReferenceCallback) c
 							Format:      "",
 						},
 					},
+					"defaultUser": {
+						SchemaProps: spec.SchemaProps{
+							Description: "defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 				},
 			},
 		},
@@ -31560,6 +32246,13 @@ func schema_k8sio_api_core_v1_ServiceAccountTokenProjection(ref common.Reference
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"user": {
+						SchemaProps: spec.SchemaProps{
+							Description: "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 				},
@@ -32777,6 +33470,89 @@ func schema_k8sio_api_core_v1_VolumeDevice(ref common.ReferenceCallback) common.
 				Required: []string{"name", "devicePath"},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_core_v1_VolumeHealthCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "VolumeHealthCondition represents an adverse health condition reported for a volume.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "status is the machine-parseable health category. Possible values: - \"Inaccessible\": the volume cannot be accessed. - \"DataLoss\": data loss has been detected on the volume. - \"Degraded\": the volume is functioning with reduced capability.\n\nPossible enum values:\n - `\"DataLoss\"` indicates data loss has been detected on the volume.\n - `\"Degraded\"` indicates the volume is functioning but with reduced capability.\n - `\"Inaccessible\"` indicates the volume cannot be accessed.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"DataLoss", "Degraded", "Inaccessible"},
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "reason is a brief CamelCase machine-parseable reason. Together with status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 bytes.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "message is a human-readable description. Maximum permitted length of a message is 1024 bytes.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"status", "reason"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_core_v1_VolumeHealthStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "VolumeHealthStatus contains health information for a volume reported by the CSI controller plugin.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"healthConditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"status",
+									"reason",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "status",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditions is the set of adverse conditions reported by the CSI controller plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(corev1.VolumeHealthCondition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"lastTransitionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "lastTransitionTime is when the current set of conditions first appeared.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			corev1.VolumeHealthCondition{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -40926,6 +41702,693 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewStatus(ref common.Referenc
 	}
 }
 
+func schema_k8sio_api_lifecycle_v1alpha1_Eviction(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Eviction initiates an eviction process, which should ideally result in a graceful eviction of a .spec.target (e.g. termination of a pod).\n\nThe evictionrequest-controller observes intents of all EvictionRequests and transforms them into Evictions. It manages the Eviction lifecycle. Requesters are preserved in .status.requesters even after they have withdrawn their request. If all requesters withdraw their eviction intent for a common target, the eviction will be canceled. Once all EvictionRequest corresponding to this Eviction .spec.target have been removed, this Eviction object will eventually be garbage collected.\n\nIf the target is a pod, the .status.targetResponders is populated from Pod's .spec.evictionResponders.\n\nResponders should observe and communicate through the .status to help with the eviction of the target when they see their state == Active in .status.targetResponders. ResponderStatus struct should then be periodically updated to indicate the progress or completion of the eviction process by each responder in .status.responders. If .status.responders[].heartbeatTime is not updated within the heartbeat deadline defined by the Eviction API (currently 20 minutes), the eviction is passed over to the next responder with a lower priority.\n\nIf there are no other responders and the target is a pod, the last default imperative-eviction.k8s.io/evictor responder with a priority of 100 will evict the pod using the imperative Eviction API (pods/<name>/eviction subresource).",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata. .metadata.name set by the evictionrequest-controller is purely informative and subject to change. .spec.target field should be used to identify the target precisesly.\n\nThe requester and responder names will be used as label keys and added to the labels of the eviction in one of the following formats: 1. acme.io/foo: \"requester\" 2. acme.io/foo: \"responder\" 3. acme.io/foo: \"requester-responder\"\n\nPlease see EvictionParticipantRole for available role label values.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "spec defines the eviction specification. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Default:     map[string]interface{}{},
+							Ref:         ref(lifecyclev1alpha1.EvictionSpec{}.OpenAPIModelName()),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "status represents the most recently observed status of the eviction. Populated by responders and evictionrequest-controller. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Default:     map[string]interface{}{},
+							Ref:         ref(lifecyclev1alpha1.EvictionStatus{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			lifecyclev1alpha1.EvictionSpec{}.OpenAPIModelName(), lifecyclev1alpha1.EvictionStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_lifecycle_v1alpha1_EvictionList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionList contains a list of Eviction resources.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metadata is the standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "items is the list of Evictions.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(lifecyclev1alpha1.Eviction{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			lifecyclev1alpha1.Eviction{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_lifecycle_v1alpha1_EvictionPodReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionPodReference contains enough information to locate the referenced pod inside the same namespace.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name of the target. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"uid": {
+						SchemaProps: spec.SchemaProps{
+							Description: "uid of the target. It can be found in .metadata.uid of the target and is a lowercase UUID in 8-4-4-4-12 format. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "uid"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_lifecycle_v1alpha1_EvictionRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionRequest defines a request that should ideally result in a graceful eviction of a .spec.target (e.g. termination of a pod).\n\nThe evictionrequest-controller observes intents of all EvictionRequests and transforms them into Evictions.\n  - .spec.requester is set as a label on the Eviction for easier lookup.\n  - Each target can have a set of responders assigned to it. Eviction objects are observed by\n    these responders, who implement the eviction logic and update the Eviction's status with\n    progress.\n\nThere is many-to-many relationship between EvictionRequests and Evictions in general. And many-to-one if the target is a  pod.\n\nIf all requesters withdraw their eviction intent for a common target, the eviction will be canceled. Deleting an EvictionRequest also counts as a withdrawal. Once all EvictionRequest of a target are removed, the corresponding Evictions are eventually garbage collected.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "spec defines the eviction request specification. https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Default:     map[string]interface{}{},
+							Ref:         ref(lifecyclev1alpha1.EvictionRequestSpec{}.OpenAPIModelName()),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "status represents the most recently observed status of the eviction request. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Default:     map[string]interface{}{},
+							Ref:         ref(lifecyclev1alpha1.EvictionRequestStatus{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			lifecyclev1alpha1.EvictionRequestSpec{}.OpenAPIModelName(), lifecyclev1alpha1.EvictionRequestStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_lifecycle_v1alpha1_EvictionRequestList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionRequestList contains a list of EvictionRequests resources.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metadata is the standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "items is the list of EvictionRequests.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(lifecyclev1alpha1.EvictionRequest{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			lifecyclev1alpha1.EvictionRequest{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_lifecycle_v1alpha1_EvictionRequestPodReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionRequestPodReference contains enough information to locate the referenced pod inside the same namespace.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name of the target. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"uid": {
+						SchemaProps: spec.SchemaProps{
+							Description: "uid of the target. It can be found in .metadata.uid of the target and is a lowercase UUID in 8-4-4-4-12 format. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "uid"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_lifecycle_v1alpha1_EvictionRequestSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionRequestSpec is a specification of an EvictionRequest.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"target": {
+						SchemaProps: spec.SchemaProps{
+							Description: "target contains a reference to an object (e.g. a pod) that should be evicted. This field is required and immutable.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(lifecyclev1alpha1.EvictionRequestTarget{}.OpenAPIModelName()),
+						},
+					},
+					"requester": {
+						SchemaProps: spec.SchemaProps{
+							Description: "requester allows you to identify the entity, that requested the eviction of the target.\n\nIt must be a valid domain-prefixed key (such as \"acme.io/foo\"). Domain names *.k8s.io and *.kubernetes.io are reserved. This field is required and immutable.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"intent": {
+						SchemaProps: spec.SchemaProps{
+							Description: "intent specifies the action that should be taken for the specified target.\n\n- Eviction means that the requester is interested in the eviction of the target. - Withdrawn means that the requester is no longer interested in the eviction of the target.\n  If all requesters' intents are withdrawn for a common target, the eviction will be canceled.\n  Cancellation consequences:\n  - Inactive responders will never run.\n  - Active responders are expected to cancel the eviction.\n  - Completed or Interrupted responders should not take any action.\n\nPossible enum values:\n - `\"Eviction\"` means that the requester is interested in the eviction of the target.\n - `\"Withdrawn\"` means that the requester is no longer interested in the eviction of the target. If all requesters' intents are withdrawn for a common target, the eviction will be canceled. Cancellation consequences: - Inactive responders will never run. - Active responders are expected to cancel the eviction. - Completed or Interrupted responders should not take any action.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Eviction", "Withdrawn"},
+						},
+					},
+				},
+				Required: []string{"target", "requester", "intent"},
+			},
+		},
+		Dependencies: []string{
+			lifecyclev1alpha1.EvictionRequestTarget{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_lifecycle_v1alpha1_EvictionRequestStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionRequestStatus represents the last observed status of the eviction request.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditions contain information about the eviction request.\n\nEvictionRequest specific conditions are: TargetEvicted or Failed (managed by evictionrequest-controller). - Failed means that the eviction request is no longer being processed\n  by any eviction responder. This can happen if the request is canceled or if no responder\n  managed to evict the target (e.g. terminate or delete a pod).\n- TargetEvicted means that the target has been evicted (e.g. a pod has been terminated or deleted).\n\nThese conditions can be reset if the eviction was unsuccessful and a new Eviction intent has been submitted.\n\nThe maximum length of the conditions list is 100.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "observedGeneration is EvictionRequest's .metadata.generation observed by the evictionrequest-controller. The observed generation value cannot be negative and can only be incremented. The minimum value is 1. This field is managed by evictionrequest-controller.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			metav1.Condition{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_lifecycle_v1alpha1_EvictionRequestTarget(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionRequestTarget contains a reference to an object that should be evicted.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"pod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "pod references a pod that is subject to eviction/termination. Pods that are part of a PodGroup (.spec.schedulingGroup is set) are not supported.",
+							Ref:         ref(lifecyclev1alpha1.EvictionRequestPodReference{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"pod": "Pod",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			lifecyclev1alpha1.EvictionRequestPodReference{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_lifecycle_v1alpha1_EvictionSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionSpec is a specification of an Eviction.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"target": {
+						SchemaProps: spec.SchemaProps{
+							Description: "target contains a reference to an object (e.g. a pod) that should be evicted. This field is required and immutable.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(lifecyclev1alpha1.EvictionTarget{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"target"},
+			},
+		},
+		Dependencies: []string{
+			lifecyclev1alpha1.EvictionTarget{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_lifecycle_v1alpha1_EvictionStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionStatus represents the last observed status of the eviction request.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditions contain information about the eviction request.\n\nEviction specific conditions are: TargetEvicted or Failed (managed by evictionrequest-controller). - Failed means that the eviction request is no longer being processed\n  by any eviction responder. This can happen if the request is canceled or if no responder\n  managed to evict the target (e.g. terminate or delete a pod).\n- TargetEvicted means that the target has been evicted (e.g. a pod has been terminated or deleted).\n\n\tThe maximum length of the conditions list is 100.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "observedGeneration is Eviction's .metadata.generation observed by the evictionrequest-controller. The observed generation value cannot be negative and can only be incremented. The minimum value is 1. This field is managed by evictionrequest-controller.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"requesters": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "requesters allow you to identify the entities, that requested the eviction of the target. If all the requesters withdraw their eviction intent, the eviction will be canceled.\n\nThe maximum length of the requesters list is 100. If this limit is exceeded, requesters with Withdrawn intent should be dropped first.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(lifecyclev1alpha1.Requester{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"targetResponders": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "targetResponders reference responders that should eventually respond to this eviction to help with the graceful eviction of a target. These responders are selected sequentially, according to their specified priority by setting the Active state to the TargetResponder .state field. The maximum number of active responders allowed is 1. Eventually each responder can end up in an Interrupted, Canceled or, Completed state. Responders should observe these states in order to navigate their lifecycle.\n\nIf the target is a pod, the field is populated from Pod's .spec.evictionResponders. Default responders may be added to the list according to the target.\n\nDefault responders: - imperative-eviction.k8s.io/evictor responder with a priority of 100 is added to the list if the\n  target is a pod. It will call the imperative Eviction API (pods/<name>/eviction subresource).\n  This call may not succeed due to PodDisruptionBudgets, which may block the pod termination.\n  It will update the responder message and try again with a backoff.\n\nThe maximum length of the responders list is 11. The length and keys of the list cannot change once set. This field is managed by evictionrequest-controller.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(lifecyclev1alpha1.TargetResponder{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"responders": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "responders represents the eviction process status of each declared responder.\n\nThe responder list should be the same length and have the same .name fields as .status.targetResponders. Only responders with .name that have Active state in .targetResponders[].state should be updated and can be mutated. First initialization of the list is allowed.\n\nEach ResponderStatus is initialized by evictionrequest-controller and then managed by the designated responder.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(lifecyclev1alpha1.ResponderStatus{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			lifecyclev1alpha1.Requester{}.OpenAPIModelName(), lifecyclev1alpha1.ResponderStatus{}.OpenAPIModelName(), lifecyclev1alpha1.TargetResponder{}.OpenAPIModelName(), metav1.Condition{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_lifecycle_v1alpha1_EvictionTarget(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EvictionTarget contains a reference to an object that should be evicted.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"pod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "pod references a pod that is subject to eviction/termination. Pods that are part of a PodGroup (.spec.schedulingGroup is set) are not supported.",
+							Ref:         ref(lifecyclev1alpha1.EvictionPodReference{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"pod": "Pod",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			lifecyclev1alpha1.EvictionPodReference{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_lifecycle_v1alpha1_Requester(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Requester allows you to identify the entity, that requested the eviction of the target.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name allows you to identify the entity, that requested the eviction of the target.\n\nIt must be a valid domain-prefixed key (such as \"acme.io/foo\"). This field must be unique for each requester. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"intent": {
+						SchemaProps: spec.SchemaProps{
+							Description: "intent specifies the action that should be taken for the specified target.\n\n- Eviction means that the requester is interested in the eviction of the target. - Withdrawn means that the requester is no longer interested in the eviction of the target.\n  If all requesters' intents are withdrawn, the eviction will be canceled.\n  Cancellation consequences:\n  - Inactive responders will never run.\n  - Active responders are expected to cancel the eviction.\n  - Completed or Interrupted responders should not take any action.\n\nPossible enum values:\n - `\"Eviction\"` means that the requester is interested in the eviction of the target.\n - `\"Withdrawn\"` means that the requester is no longer interested in the eviction of the target. If all requesters' intents are withdrawn, the eviction will be canceled. Cancellation consequences: - Inactive responders will never run. - Active responders are expected to cancel the eviction. - Completed or Interrupted responders should not take any action.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Eviction", "Withdrawn"},
+						},
+					},
+				},
+				Required: []string{"name", "intent"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-map-type": "atomic",
+				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_lifecycle_v1alpha1_ResponderStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResponderStatus represents the last observed status of the eviction process of the responder. It should be only updated by the designated responder whose name is .name field.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name allows you to identify the responder reacting to the Eviction.\n\nIt must be a valid domain-prefixed key (such as \"acme.io/foo\"). This field is initialized by Kubernetes and must be unique for each responder. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"startTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "startTime tracks the time at which this responder was designated as active and should start processing the eviction request. It should reflect the present time when set. This field is initialized by Kubernetes when this responder becomes active. This field becomes immutable once set.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"heartbeatTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "heartbeatTime is the last time at which the eviction process was reported to be in progress by the responder. It should reflect the present time when set. Responders should avoid heartbeats more frequent than 20 seconds to avoid overloading the control-plane.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"expectedCompletionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "expectedCompletionTime is the time at which the eviction process step is expected to end for the responder. The time cannot be set to the past. May be omitted if no estimate can be made.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"completionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "completionTime tracks the time at which the Responder stopped processing the eviction request. Completion means that the responders has either fully or partially completed the eviction process, which may have resulted in target eviction (e.g. pod termination). It should reflect the present time when set. This field becomes immutable once set.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "message provides human-readable details about the state of the responder and the eviction process. Maximum length is 4000 characters.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-map-type": "granular",
+				},
+			},
+		},
+		Dependencies: []string{
+			metav1.Time{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_lifecycle_v1alpha1_TargetResponder(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TargetResponder allows you to specify the responder reacting to the Eviction. Responders should observe and communicate through the Eviction API (see .state) to help with the graceful eviction of a target (e.g. termination of a pod).",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name allows you to identify the responder reacting to the Eviction.\n\nIt must be a valid domain-prefixed key (such as \"acme.io/foo\"). This field must be unique for each responder. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"priority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "priority for this responder. Higher priorities are selected first by the evictionrequest-controller. If there are responders with the same priority, the responder whose domain name comes first in the alphabetical higher domain order, will be picked. This means that the top domain labels are compared alphabetically first, followed by the lower domain labels. The key is compared last.\n\nThe responder that is the managing controller of the pod should set the value of this field to 10000 to allow both for preemption or fallback registration by other responders.\n\nThe minimum value is 0 and the maximum value is 100000. The interval 0-999 is reserved for responders with *.k8s.io suffix. This field is required and immutable.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"state": {
+						SchemaProps: spec.SchemaProps{
+							Description: "state specifies a state that is assigned by the evictionrequest-controller. Responders should observe this state in order to navigate their lifecycle. - Inactive means that the responder should not yet process this eviction request. - Active means that the responder is either running or expected to start soon.\n  Also, startTime has been set in the ResponderStatus by the evictionrequest-controller.\n\n  An active responder should currently interact with the eviction process by updating\n  .status.responders, where .name is the active responder name. ResponderStatus fields\n  should be periodically updated to indicate the progress or completion of the eviction process.\n  If .status.responders[].heartbeatTime field is not updated within the heartbeat deadline defined\n  by the Eviction API (currently 20 minutes), the eviction is passed over to the next responder\n\t with a lower priority. Only one responder can be active at a time.\n- Interrupted means that the responder has failed to start or failed to update\n  heartbeatTime in ResponderStatus in a timely manner.\n- Canceled means that the responder has been canceled. In other words, there\tis no\n  EvictionRequest with the same target and Eviction intent in .spec.intent.\n- Completed means that the responder has successfully completed and set completionTime\n  in ResponderStatus.\n\nPlease refer to the ResponderStatus in .status.responders for more details on each responder.\n\nPossible enum values:\n - `\"Active\"` means that the responder is either running or expected to start soon. Also, startTime has been set in the ResponderStatus by the evictionrequest-controller. An active responder should currently interact with the eviction process by updating .status.responders, where .name is the active responder name. ResponderStatus fields should be periodically updated to indicate the progress or completion of the eviction process. If .status.responders[].heartbeatTime field is not updated within the heartbeat deadline defined by the Eviction API (currently 20 minutes), the eviction is passed over to the next responder with a lower priority. Only one responder can be active at a time.\n - `\"Canceled\"` means that the responder has been canceled. In other words, there is no EvictionRequest with the same target and Eviction intent in .spec.intent.\n - `\"Completed\"` means that the responder has successfully completed and set completionTime in ResponderStatus.\n - `\"Inactive\"` means that the responder should not yet process this eviction request.\n - `\"Interrupted\"` means that the responder has failed to start or failed to update heartbeatTime in ResponderStatus in a timely manner.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Active", "Canceled", "Completed", "Inactive", "Interrupted"},
+						},
+					},
+				},
+				Required: []string{"name", "priority", "state"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-map-type": "atomic",
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_networking_v1_HTTPIngressPath(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -46954,15 +48417,15 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 							Format:      "",
 						},
 					},
-					"nodeAllocatableResourceMappings": {
+					"nodeAllocatableResources": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NodeAllocatableResourceMappings defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
+							Description: "NodeAllocatableResources defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(resourcev1.NodeAllocatableResourceMapping{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.NodeAllocatableResource{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -46973,7 +48436,7 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1.DeviceAttribute{}.OpenAPIModelName(), resourcev1.DeviceCapacity{}.OpenAPIModelName(), resourcev1.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1.DeviceTaint{}.OpenAPIModelName(), resourcev1.NodeAllocatableResourceMapping{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1.DeviceAttribute{}.OpenAPIModelName(), resourcev1.DeviceCapacity{}.OpenAPIModelName(), resourcev1.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1.DeviceTaint{}.OpenAPIModelName(), resourcev1.NodeAllocatableResource{}.OpenAPIModelName()},
 	}
 }
 
@@ -48332,23 +49795,29 @@ func schema_k8sio_api_resource_v1_NetworkDeviceData(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_resource_v1_NodeAllocatableResourceMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1_NodeAllocatableMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "NodeAllocatableResourceMapping defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource.",
+				Description: "NodeAllocatableMapping defines how a DRA allocation directly translates into a node allocatable resource quantity. The mapping can be derived from either the count of allocated devices (via deviceMultiplier) or the specific capacity consumed (via capacityKey and capacityMultiplier). These options are mutually exclusive. Kubelet adds this mapped resource quantity from claim to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"capacityKey": {
 						SchemaProps: spec.SchemaProps{
-							Description: "CapacityKey references a capacity name defined as a key in the `spec.devices[*].capacity` map. When this field is set, the value associated with this key in the `status.allocation.devices.results[*].consumedCapacity` map (for a specific claim allocation) determines the base quantity for the node allocatable resource. If `allocationMultiplier` is also set, it is multiplied with the base quantity. For example, if `spec.devices[*].capacity` has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the node allocatable resource mapping will be \"4Gi\", and `allocationMultiplier` should be omitted or set to \"1\".",
+							Description: "CapacityKey references a capacity name defined as a key in the `spec.devices[*].capacity` map. When this field is set, the value associated with this key in the `status.allocation.devices.results[*].consumedCapacity` map (for a specific claim allocation) determines the base quantity for the node allocatable resource. `capacityMultiplier` must also be set and is multiplied with the base quantity. For example, if `spec.devices[*].capacity` has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the node allocatable resource mapping will be \"4Gi\". The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
-					"allocationMultiplier": {
+					"capacityMultiplier": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AllocationMultiplier is used as a multiplier for the allocated device count or the allocated capacity in the claim. It defaults to 1 if not specified. How the field is used also depends on whether `capacityKey` is set. 1.  If `capacityKey` is NOT set: `allocationMultiplier` multiplies the device count allocated to the claim.\n\t   a. A DRA driver representing each CPU core as a device would have\n       {ResourceName: \"cpu\", allocationMultiplier: \"2\"} in its\n       `nodeAllocatableResourceMappings`. If 4 devices are allocated to the claim,\n\t\t  4 * 2 CPUs would be considered as allocated and subtracted from the node's capacity.\n    b. A GPU device that needs additional node memory per GPU allocation would\n       have {ResourceName: \"memory\", allocationMultiplier: \"2Gi\"}.  Each allocated\n\t\t  GPU device instance of this type will account for 2Gi of memory.\n\n2.  If `capacityKey` IS set: `allocationMultiplier` is multiplied by the amount of that capacity consumed.\n\t   The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `allocationMultiplier`.\n    For example, if a Device's capacity \"dra.example.com/cores\" is consumed,\n    and each \"core\" provides 2 \"cpu\"s, the mapping would be:\n    {ResourceName: \"cpu\", capacityKey: \"dra.example.com/cores\", allocationMultiplier: \"2\"}.\n    If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16.",
+							Description: "CapacityMultiplier is used as a multiplier for the allocated capacity consumed. It is only valid if `capacityKey` is set. The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`. For example, if a Device's capacity \"dra.example.com/cores\" is consumed, and each \"core\" provides 2 \"cpu\"s, the mapping would be: {ResourceName: \"cpu\", capacityKey: \"dra.example.com/cores\", capacityMultiplier: \"2\"}. If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"deviceMultiplier": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DeviceMultiplier is used as a multiplier for the allocated device count in the claim. The final node allocatable resource amount is `deviceCount` * `deviceMultiplier`. For example, a DRA driver representing each cache complex (CCX) as a device would have {ResourceName: \"cpu\", deviceMultiplier: \"8\"} in its `nodeAllocatableResources`. If 2 devices (CCX) are allocated to the claim, 2 * 8 = 16 CPUs would be considered as allocated. It is only valid when `capacityKey` and `capacityMultiplier` are not set.",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
@@ -48357,6 +49826,60 @@ func schema_k8sio_api_resource_v1_NodeAllocatableResourceMapping(ref common.Refe
 		},
 		Dependencies: []string{
 			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1_NodeAllocatableOverhead(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableOverhead defines auxiliary resource overheads incurred when allocating a device. Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both. Kubelet accounts for this overhead by adding it to both the pod-level and container-level cgroups of referencing containers.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"perPod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerPod is overhead applied once per pod referencing the claim on this node. This is a flat overhead incurred for every pod referencing the claim.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"perContainer": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerContainer is applied per container reference to the claim. This models overhead scaling linearly with the number of containers actively using the device. When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1_NodeAllocatableResource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableResource defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource. At least one of Mapping or Overhead must be specified. Not specifying either is an invalid configuration.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"mapping": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Mapping is used when the device directly models a node allocatable resource like standard CPU or memory (e.g., with a CPU DRA driver). The calculated quantity is accounted for exactly once per claim instance on the node. To prevent node cgroup isolation friction, the scheduler explicitly blocks sharing mapped device claims across multiple pods.",
+							Ref:         ref(resourcev1.NodeAllocatableMapping{}.OpenAPIModelName()),
+						},
+					},
+					"overhead": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Overhead contains fields for modeling auxiliary overhead incurred on node allocatable resources when allocating devices that are not themselves modeling a node allocatable resource (e.g., host memory overhead for GPUs). Sharing overhead-mapped claims across multiple pods is allowed. The node allocatable overhead is accounted for individually for each pod referencing the claim. Overhead is always subtracted from the node's allocatable capacity for the resource, even when mapping is specified for the same resource. Eg: If a device models memory capacity per socket as a consumable capacity pool via Mapping (with CapacityKey), any overhead specified for the same resource will be subtracted from the node's general allocatable capacity and not from the per-socket capacity pool in Mapping.",
+							Ref:         ref(resourcev1.NodeAllocatableOverhead{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resourcev1.NodeAllocatableMapping{}.OpenAPIModelName(), resourcev1.NodeAllocatableOverhead{}.OpenAPIModelName()},
 	}
 }
 
@@ -48756,7 +50279,7 @@ func schema_k8sio_api_resource_v1_ResourcePool(ref common.ReferenceCallback) com
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name is used to identify the pool. For node-local devices, this is often the node name, but this is not required.\n\nIt must not be longer than 253 characters and must consist of one or more DNS sub-domains separated by slashes. This field is immutable.",
+							Description: "Name is used to identify the pool. For node-local devices, this is often the node name, but this is not required. A field selector can be used to list only ResourceSlice objects belonging to a certain pool.\n\nIt must not be longer than 253 characters and must consist of one or more DNS sub-domains separated by slashes. This field is immutable.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -48962,6 +50485,13 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 									},
 								},
 							},
+						},
+					},
+					"partitionTypeAttribute": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every partitionable device in the slice must carry the attribute and devices sharing a value must share the same ConsumesCounters cost.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
@@ -49264,6 +50794,48 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaintSelector(ref common.Reference
 	}
 }
 
+func schema_k8sio_api_resource_v1alpha3_PartitionTypeStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PartitionTypeStatus reports allocatability for a single partition type, identified by the value of a grouping attribute.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"attribute": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Attribute is the fully qualified name of the device attribute whose value groups this entry. It is the PartitionTypeAttribute declared by the devices' own slice, or the default named in the request when their slice declares none.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type is the partition type value (e.g. \"Full\" or \"Half\").",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"total": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Total is the number of devices of this partition type in the pool.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"allocatable": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Allocatable is the number of additional devices of this partition type that could still be allocated given current shared-counter consumption.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"attribute", "type", "total", "allocatable"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_resource_v1alpha3_PoolStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -49342,10 +50914,36 @@ func schema_k8sio_api_resource_v1alpha3_PoolStatus(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
+					"partitionSummary": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "PartitionSummary reports allocatability per (attribute, partition type) for a partitionable pool that publishes SharedCounters. Each entry names the grouping attribute it was resolved from: the PartitionTypeAttribute declared by a device's own slice, or for devices whose slice declares none, the default named in the request. A pool that mixes partitions declared under different attributes reports each independently. When no slice declares an attribute and the request names no default, the pool reports no partition summary.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(v1alpha3.PartitionTypeStatus{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"shareableSummary": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ShareableSummary reports aggregate capacity for a pool that contains devices with AllowMultipleAllocations. It is populated only when at least one device in the pool is shareable.",
+							Ref:         ref(v1alpha3.ShareableSummaryStatus{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"driver", "poolName", "generation"},
 			},
 		},
+		Dependencies: []string{
+			v1alpha3.PartitionTypeStatus{}.OpenAPIModelName(), v1alpha3.ShareableSummaryStatus{}.OpenAPIModelName()},
 	}
 }
 
@@ -49479,6 +51077,13 @@ func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestSpec(ref common
 							Format:      "int32",
 						},
 					},
+					"defaultPartitionTypeAttribute": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DefaultPartitionTypeAttribute optionally names a device attribute (by its fully qualified name, e.g. \"gpu.example.com/profile\") to use as the default grouping attribute for partitionable devices whose slice has not declared one themselves.\n\nA slice's own PartitionTypeAttribute always takes precedence. This default applies only to devices whose slice does not declare one, so that a request can still get an accurate partitionSummary from a driver that has not been updated to declare it. When neither the slice nor this default names an attribute, a partitionable pool reports no partitionSummary.\n\nMust include the domain qualifier.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"driver"},
 			},
@@ -49547,6 +51152,95 @@ func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestStatus(ref comm
 		},
 		Dependencies: []string{
 			v1alpha3.PoolStatus{}.OpenAPIModelName(), metav1.Condition{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_ShareableCapacityStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ShareableCapacityStatus reports aggregate amounts for a single shareable capacity key.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the capacity name.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"total": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Total is the sum of this capacity across shareable devices in the pool.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"consumed": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Consumed is the amount drawn by current allocations.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"available": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Available is Total minus Consumed, never negative.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"name", "total", "consumed", "available"},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_ShareableSummaryStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ShareableSummaryStatus reports aggregate capacity for a pool that contains devices with AllowMultipleAllocations.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"fullyAvailableDevices": {
+						SchemaProps: spec.SchemaProps{
+							Description: "FullyAvailableDevices is the number of shareable devices with no capacity consumed.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"partiallyAvailableDevices": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PartiallyAvailableDevices is the number of shareable devices with some but not all capacity consumed.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"capacity": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Capacity reports aggregate total, consumed, and available amounts per shareable capacity key across the pool.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(v1alpha3.ShareableCapacityStatus{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"fullyAvailableDevices", "partiallyAvailableDevices"},
+			},
+		},
+		Dependencies: []string{
+			v1alpha3.ShareableCapacityStatus{}.OpenAPIModelName()},
 	}
 }
 
@@ -49807,15 +51501,15 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
-					"nodeAllocatableResourceMappings": {
+					"nodeAllocatableResources": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NodeAllocatableResourceMappings defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
+							Description: "NodeAllocatableResources defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(resourcev1beta1.NodeAllocatableResourceMapping{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.NodeAllocatableResource{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49825,7 +51519,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta1.DeviceAttribute{}.OpenAPIModelName(), resourcev1beta1.DeviceCapacity{}.OpenAPIModelName(), resourcev1beta1.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1beta1.DeviceTaint{}.OpenAPIModelName(), resourcev1beta1.NodeAllocatableResourceMapping{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta1.DeviceAttribute{}.OpenAPIModelName(), resourcev1beta1.DeviceCapacity{}.OpenAPIModelName(), resourcev1beta1.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1beta1.DeviceTaint{}.OpenAPIModelName(), resourcev1beta1.NodeAllocatableResource{}.OpenAPIModelName()},
 	}
 }
 
@@ -51180,23 +52874,29 @@ func schema_k8sio_api_resource_v1beta1_NetworkDeviceData(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_resource_v1beta1_NodeAllocatableResourceMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1beta1_NodeAllocatableMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "NodeAllocatableResourceMapping defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource.",
+				Description: "NodeAllocatableMapping defines how a DRA allocation directly translates into a node allocatable resource quantity. The mapping can be derived from either the count of allocated devices or the specific capacity consumed. These options are mutually exclusive. Kubelet adds this mapped resource quantity from claim to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"capacityKey": {
 						SchemaProps: spec.SchemaProps{
-							Description: "CapacityKey references a capacity name defined as a key in the `spec.devices[*].capacity` map. When this field is set, the value associated with this key in the `status.allocation.devices.results[*].consumedCapacity` map (for a specific claim allocation) determines the base quantity for the node allocatable resource. If `allocationMultiplier` is also set, it is multiplied with the base quantity. For example, if `spec.devices[*].capacity` has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the node allocatable resource mapping will be \"4Gi\", and `allocationMultiplier` should be omitted or set to \"1\".",
+							Description: "CapacityKey references a capacity name defined as a key in the `spec.devices[*].capacity` map. When this field is set, the value associated with this key in the `status.allocation.devices.results[*].consumedCapacity` map (for a specific claim allocation) determines the base quantity for the node allocatable resource. `capacityMultiplier` must also be set and is multiplied with the base quantity. For example, if `spec.devices[*].capacity` has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the node allocatable resource mapping will be \"4Gi\". The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
-					"allocationMultiplier": {
+					"capacityMultiplier": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AllocationMultiplier is used as a multiplier for the allocated device count or the allocated capacity in the claim. It defaults to 1 if not specified. How the field is used also depends on whether `capacityKey` is set. 1.  If `capacityKey` is NOT set: `allocationMultiplier` multiplies the device count allocated to the claim.\n\t   a. A DRA driver representing each CPU core as a device would have\n       {ResourceName: \"cpu\", allocationMultiplier: \"2\"} in its\n       `nodeAllocatableResourceMappings`. If 4 devices are allocated to the claim,\n\t\t  4 * 2 CPUs would be considered as allocated and subtracted from the node's capacity.\n    b. A GPU device that needs additional node memory per GPU allocation would\n       have {ResourceName: \"memory\", allocationMultiplier: \"2Gi\"}.  Each allocated\n\t\t  GPU device instance of this type will account for 2Gi of memory.\n\n2.  If `capacityKey` IS set: `allocationMultiplier` is multiplied by the amount of that capacity consumed.\n\t   The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `allocationMultiplier`.\n    For example, if a Device's capacity \"dra.example.com/cores\" is consumed,\n    and each \"core\" provides 2 \"cpu\"s, the mapping would be:\n    {ResourceName: \"cpu\", capacityKey: \"dra.example.com/cores\", allocationMultiplier: \"2\"}.\n    If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16.",
+							Description: "CapacityMultiplier is used as a multiplier for the allocated capacity consumed. It is only valid if `capacityKey` is set. The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`. For example, if a Device's capacity \"dra.example.com/cores\" is consumed, and each \"core\" provides 2 \"cpu\"s, the mapping would be: {ResourceName: \"cpu\", capacityKey: \"dra.example.com/cores\", capacityMultiplier: \"2\"}. If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"deviceMultiplier": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DeviceMultiplier is used as a multiplier for the allocated device count in the claim. The final node allocatable resource amount is `deviceCount` * `deviceMultiplier`. For example, a DRA driver representing each cache complex (CCX) as a device would have {ResourceName: \"cpu\", deviceMultiplier: \"8\"} in its `nodeAllocatableResources`. If 2 devices (CCX) are allocated to the claim, 2 * 8 = 16 CPUs would be considered as allocated. It is only valid when `capacityKey` and `capacityMultiplier` are not set.",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
@@ -51205,6 +52905,60 @@ func schema_k8sio_api_resource_v1beta1_NodeAllocatableResourceMapping(ref common
 		},
 		Dependencies: []string{
 			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_NodeAllocatableOverhead(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableOverhead defines auxiliary resource overheads incurred when allocating a device. Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both. Kubelet accounts for this overhead by adding it to both the pod-level and container-level cgroups of referencing containers.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"perPod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerPod is overhead applied once per pod referencing the claim on this node. This is a flat overhead incurred for every pod referencing the claim.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"perContainer": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerContainer is applied per container reference to the claim. This models overhead scaling linearly with the number of containers actively using the device. When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_NodeAllocatableResource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableResource defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource. At least one of Mapping or Overhead must be specified. Not specifying either is an invalid configuration.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"mapping": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Mapping is used when the device directly models a node allocatable resource like standard CPU or memory (e.g., with a CPU DRA driver). The calculated quantity is accounted for exactly once per claim instance on the node. To prevent node cgroup isolation friction, the scheduler explicitly blocks sharing mapped device claims across multiple pods.",
+							Ref:         ref(resourcev1beta1.NodeAllocatableMapping{}.OpenAPIModelName()),
+						},
+					},
+					"overhead": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Overhead contains fields for modeling auxiliary overhead incurred on node allocatable resources when allocating devices that are not themselves modeling a node allocatable resource (e.g., host memory overhead for GPUs). Sharing overhead-mapped claims across multiple pods is allowed. The node allocatable overhead is accounted for individually for each pod referencing the claim. Overhead is always subtracted from the node's allocatable capacity for the resource, even when mapping is specified for the same resource. Eg: If a device models memory capacity per socket as a consumable capacity pool via Mapping (with CapacityKey), any overhead specified for the same resource will be subtracted from the node's general allocatable capacity and not from the per-socket capacity pool in Mapping.",
+							Ref:         ref(resourcev1beta1.NodeAllocatableOverhead{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resourcev1beta1.NodeAllocatableMapping{}.OpenAPIModelName(), resourcev1beta1.NodeAllocatableOverhead{}.OpenAPIModelName()},
 	}
 }
 
@@ -51604,7 +53358,7 @@ func schema_k8sio_api_resource_v1beta1_ResourcePool(ref common.ReferenceCallback
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name is used to identify the pool. For node-local devices, this is often the node name, but this is not required.\n\nIt must not be longer than 253 characters and must consist of one or more DNS sub-domains separated by slashes. This field is immutable.",
+							Description: "Name is used to identify the pool. For node-local devices, this is often the node name, but this is not required. A field selector can be used to list only ResourceSlice objects belonging to a certain pool.\n\nIt must not be longer than 253 characters and must consist of one or more DNS sub-domains separated by slashes. This field is immutable.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -51810,6 +53564,13 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 									},
 								},
 							},
+						},
+					},
+					"partitionTypeAttribute": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every partitionable device in the slice must carry the attribute and devices sharing a value must share the same ConsumesCounters cost.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
@@ -52276,15 +54037,15 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 							Format:      "",
 						},
 					},
-					"nodeAllocatableResourceMappings": {
+					"nodeAllocatableResources": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NodeAllocatableResourceMappings defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
+							Description: "NodeAllocatableResources defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref(resourcev1beta2.NodeAllocatableResourceMapping{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.NodeAllocatableResource{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52295,7 +54056,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta2.DeviceAttribute{}.OpenAPIModelName(), resourcev1beta2.DeviceCapacity{}.OpenAPIModelName(), resourcev1beta2.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1beta2.DeviceTaint{}.OpenAPIModelName(), resourcev1beta2.NodeAllocatableResourceMapping{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta2.DeviceAttribute{}.OpenAPIModelName(), resourcev1beta2.DeviceCapacity{}.OpenAPIModelName(), resourcev1beta2.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1beta2.DeviceTaint{}.OpenAPIModelName(), resourcev1beta2.NodeAllocatableResource{}.OpenAPIModelName()},
 	}
 }
 
@@ -53654,23 +55415,29 @@ func schema_k8sio_api_resource_v1beta2_NetworkDeviceData(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_resource_v1beta2_NodeAllocatableResourceMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1beta2_NodeAllocatableMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "NodeAllocatableResourceMapping defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource.",
+				Description: "NodeAllocatableMapping defines how a DRA allocation directly translates into a node allocatable resource quantity. The mapping can be derived from either the count of allocated devices (via deviceMultiplier) or the specific capacity consumed (via capacityKey and capacityMultiplier). These options are mutually exclusive. Kubelet adds this mapped resource quantity from claim to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"capacityKey": {
 						SchemaProps: spec.SchemaProps{
-							Description: "CapacityKey references a capacity name defined as a key in the `spec.devices[*].capacity` map. When this field is set, the value associated with this key in the `status.allocation.devices.results[*].consumedCapacity` map (for a specific claim allocation) determines the base quantity for the node allocatable resource. If `allocationMultiplier` is also set, it is multiplied with the base quantity. For example, if `spec.devices[*].capacity` has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the node allocatable resource mapping will be \"4Gi\", and `allocationMultiplier` should be omitted or set to \"1\".",
+							Description: "CapacityKey references a capacity name defined as a key in the `spec.devices[*].capacity` map. When this field is set, the value associated with this key in the `status.allocation.devices.results[*].consumedCapacity` map (for a specific claim allocation) determines the base quantity for the node allocatable resource. `capacityMultiplier` must also be set and is multiplied with the base quantity. For example, if `spec.devices[*].capacity` has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the node allocatable resource mapping will be \"4Gi\". The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
-					"allocationMultiplier": {
+					"capacityMultiplier": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AllocationMultiplier is used as a multiplier for the allocated device count or the allocated capacity in the claim. It defaults to 1 if not specified. How the field is used also depends on whether `capacityKey` is set. 1.  If `capacityKey` is NOT set: `allocationMultiplier` multiplies the device count allocated to the claim.\n\t   a. A DRA driver representing each CPU core as a device would have\n       {ResourceName: \"cpu\", allocationMultiplier: \"2\"} in its\n       `nodeAllocatableResourceMappings`. If 4 devices are allocated to the claim,\n\t\t  4 * 2 CPUs would be considered as allocated and subtracted from the node's capacity.\n    b. A GPU device that needs additional node memory per GPU allocation would\n       have {ResourceName: \"memory\", allocationMultiplier: \"2Gi\"}.  Each allocated\n\t\t  GPU device instance of this type will account for 2Gi of memory.\n\n2.  If `capacityKey` IS set: `allocationMultiplier` is multiplied by the amount of that capacity consumed.\n\t   The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `allocationMultiplier`.\n    For example, if a Device's capacity \"dra.example.com/cores\" is consumed,\n    and each \"core\" provides 2 \"cpu\"s, the mapping would be:\n    {ResourceName: \"cpu\", capacityKey: \"dra.example.com/cores\", allocationMultiplier: \"2\"}.\n    If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16.",
+							Description: "CapacityMultiplier is used as a multiplier for the allocated capacity consumed. It is only valid if `capacityKey` is set. The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`. For example, if a Device's capacity \"dra.example.com/cores\" is consumed, and each \"core\" provides 2 \"cpu\"s, the mapping would be: {ResourceName: \"cpu\", capacityKey: \"dra.example.com/cores\", capacityMultiplier: \"2\"}. If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"deviceMultiplier": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DeviceMultiplier is used as a multiplier for the allocated device count in the claim. The final node allocatable resource amount is `deviceCount` * `deviceMultiplier`. For example, a DRA driver representing each cache complex (CCX) as a device would have {ResourceName: \"cpu\", deviceMultiplier: \"8\"} in its `nodeAllocatableResources`. If 2 devices (CCX) are allocated to the claim, 2 * 8 = 16 CPUs would be considered as allocated. It is only valid when `capacityKey` and `capacityMultiplier` are not set.",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
@@ -53679,6 +55446,60 @@ func schema_k8sio_api_resource_v1beta2_NodeAllocatableResourceMapping(ref common
 		},
 		Dependencies: []string{
 			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_NodeAllocatableOverhead(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableOverhead defines auxiliary resource overheads incurred when allocating a device. Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both. Kubelet accounts for this overhead by adding it to both the pod-level and container-level cgroups of referencing containers.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"perPod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerPod is overhead applied once per pod referencing the claim on this node. This is a flat overhead incurred for every pod referencing the claim.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"perContainer": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerContainer is applied per container reference to the claim. This models overhead scaling linearly with the number of containers actively using the device. When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_NodeAllocatableResource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableResource defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource. At least one of Mapping or Overhead must be specified. Not specifying either is an invalid configuration.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"mapping": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Mapping is used when the device directly models a node allocatable resource like standard CPU or memory (e.g., with a CPU DRA driver). The calculated quantity is accounted for exactly once per claim instance on the node. To prevent node cgroup isolation friction, the scheduler explicitly blocks sharing mapped device claims across multiple pods.",
+							Ref:         ref(resourcev1beta2.NodeAllocatableMapping{}.OpenAPIModelName()),
+						},
+					},
+					"overhead": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Overhead contains fields for modeling auxiliary overhead incurred on node allocatable resources when allocating devices that are not themselves modeling a node allocatable resource (e.g., host memory overhead for GPUs). Sharing overhead-mapped claims across multiple pods is allowed. The node allocatable overhead is accounted for individually for each pod referencing the claim. Overhead is always subtracted from the node's allocatable capacity for the resource, even when mapping is specified for the same resource. Eg: If a device models memory capacity per socket as a consumable capacity pool via Mapping (with CapacityKey), any overhead specified for the same resource will be subtracted from the node's general allocatable capacity and not from the per-socket capacity pool in Mapping.",
+							Ref:         ref(resourcev1beta2.NodeAllocatableOverhead{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resourcev1beta2.NodeAllocatableMapping{}.OpenAPIModelName(), resourcev1beta2.NodeAllocatableOverhead{}.OpenAPIModelName()},
 	}
 }
 
@@ -54078,7 +55899,7 @@ func schema_k8sio_api_resource_v1beta2_ResourcePool(ref common.ReferenceCallback
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name is used to identify the pool. For node-local devices, this is often the node name, but this is not required.\n\nIt must not be longer than 253 characters and must consist of one or more DNS sub-domains separated by slashes. This field is immutable.",
+							Description: "Name is used to identify the pool. For node-local devices, this is often the node name, but this is not required. A field selector can be used to list only ResourceSlice objects belonging to a certain pool.\n\nIt must not be longer than 253 characters and must consist of one or more DNS sub-domains separated by slashes. This field is immutable.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -54286,6 +56107,13 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 							},
 						},
 					},
+					"partitionTypeAttribute": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PartitionTypeAttribute names a string device attribute (by fully qualified name, e.g. \"gpu.example.com/profile\") whose value labels each device with its partition type, such as \"Full\" or \"Half\" for a MIG-style GPU.\n\nWhen set, every partitionable device in the slice must carry the attribute and devices sharing a value must share the same ConsumesCounters cost.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"driver", "pool"},
 			},
@@ -54411,6 +56239,17 @@ func schema_k8sio_api_scheduling_v1_PriorityClassList(ref common.ReferenceCallba
 	}
 }
 
+func schema_k8sio_api_scheduling_v1alpha3_AllCompositeDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AllCompositeDisruptionMode means that children of a CompositePodGroup can only be disrupted or preempted together.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_scheduling_v1alpha3_AllDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -54441,6 +56280,45 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositeBasicSchedulingPolicy(ref com
 				Type:        []string{"object"},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_CompositeDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositeDisruptionMode defines how individual entities within a composite pod group can be disrupted. Exactly one mode must be set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"single": {
+						SchemaProps: spec.SchemaProps{
+							Description: "single specifies that children groups can be disrupted independently from each other.",
+							Ref:         ref(schedulingv1alpha3.SingleCompositeDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+					"all": {
+						SchemaProps: spec.SchemaProps{
+							Description: "all specifies that all children groups can only be disrupted together.",
+							Ref:         ref(schedulingv1alpha3.AllCompositeDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"all":    "All",
+								"single": "Single",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.AllCompositeDisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.SingleCompositeDisruptionMode{}.OpenAPIModelName()},
 	}
 }
 
@@ -54567,6 +56445,39 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupList(ref common.Refer
 	}
 }
 
+func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSchedulingConstraints(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositePodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a CompositePodGroup.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"topology": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "topology defines the topology constraints for the composite pod group. Currently only a single topology constraint can be specified. This may change in the future.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1alpha3.TopologyConstraint{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.TopologyConstraint{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -54633,6 +56544,19 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSpec(ref common.Refer
 							Ref:         ref(schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
+					"schedulingConstraints": {
+						SchemaProps: spec.SchemaProps{
+							Description: "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable.",
+							Ref:         ref(schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName()),
+						},
+					},
+					"disruptionMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "disruptionMode defines the mode in which a given CompositePodGroup can be disrupted. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. One of Single, All. Defaults to Single if unset. This field is immutable.",
+							Default:     map[string]interface{}{"single": map[string]interface{}{}},
+							Ref:         ref(schedulingv1alpha3.CompositeDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
 					"priorityClassName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "priorityClassName defines the priority that should be considered when scheduling this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the composite pod group's priority will be zero). This field is immutable.",
@@ -54647,12 +56571,20 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSpec(ref common.Refer
 							Format:      "int32",
 						},
 					},
+					"preemptionPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset. When Priority Admission Controller is enabled, it populates this field from PriorityClassName, and defaults to PreemptLowerPriority if value is unset in PriorityClass. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.\n\n\nPossible enum values:\n - `\"Never\"` means that pod never preempts other pods with lower priority.\n - `\"PreemptLowerPriority\"` means that pod can preempt other pods with lower priority.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Never", "PreemptLowerPriority"},
+						},
+					},
 				},
 				Required: []string{"workloadRef", "schedulingPolicy"},
 			},
 		},
 		Dependencies: []string{
-			schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.WorkloadReference{}.OpenAPIModelName()},
+			schedulingv1alpha3.CompositeDisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.WorkloadReference{}.OpenAPIModelName()},
 	}
 }
 
@@ -54716,6 +56648,18 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupTemplate(ref common.R
 							Ref:         ref(schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
+					"schedulingConstraints": {
+						SchemaProps: spec.SchemaProps{
+							Description: "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate. This field is immutable.",
+							Ref:         ref(schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName()),
+						},
+					},
+					"disruptionMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "disruptionMode defines the mode in which a given CompositePodGroup can be disrupted. One of Single, All. This field is immutable.",
+							Ref:         ref(schedulingv1alpha3.CompositeDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
 					"priorityClassName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "priorityClassName indicates the priority that should be considered when scheduling a composite pod group created from this template. If no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, composite pod groups created from this template will have the priority set to zero. This field is immutable.",
@@ -54728,6 +56672,14 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupTemplate(ref common.R
 							Description: "priority is the value of priority of composite pod groups created from this template. Various system components use this field to find the priority of the composite pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
 							Type:        []string{"integer"},
 							Format:      "int32",
+						},
+					},
+					"preemptionPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.\n\n\nPossible enum values:\n - `\"Never\"` means that pod never preempts other pods with lower priority.\n - `\"PreemptLowerPriority\"` means that pod can preempt other pods with lower priority.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Never", "PreemptLowerPriority"},
 						},
 					},
 					"podGroupTemplates": {
@@ -54777,7 +56729,7 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupTemplate(ref common.R
 			},
 		},
 		Dependencies: []string{
-			schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.CompositePodGroupTemplate{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupTemplate{}.OpenAPIModelName()},
+			schedulingv1alpha3.CompositeDisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.CompositePodGroupTemplate{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupTemplate{}.OpenAPIModelName()},
 	}
 }
 
@@ -55323,6 +57275,17 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupTemplate(ref common.ReferenceC
 	}
 }
 
+func schema_k8sio_api_scheduling_v1alpha3_SingleCompositeDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SingleCompositeDisruptionMode means that individual children of a CompositePodGroup can be disrupted or preempted independently.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_scheduling_v1alpha3_SingleDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -55434,6 +57397,170 @@ func schema_k8sio_api_scheduling_v1alpha3_Workload(ref common.ReferenceCallback)
 		},
 		Dependencies: []string{
 			schedulingv1alpha3.WorkloadSpec{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupAllDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadCompositePodGroupAllDisruptionMode indicates that all child groups must be disrupted together.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupBasicSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadCompositePodGroupBasicSchedulingPolicy indicates that the child groups of a composite group should be scheduled independently.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadCompositePodGroupDisruptionMode defines how the child groups of a composite group can be disrupted. Exactly one mode must be set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"single": {
+						SchemaProps: spec.SchemaProps{
+							Description: "single specifies that child groups can be disrupted independently from each other.",
+							Ref:         ref(schedulingv1alpha3.WorkloadCompositePodGroupSingleDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+					"all": {
+						SchemaProps: spec.SchemaProps{
+							Description: "all specifies that all child groups must be disrupted together.",
+							Ref:         ref(schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"all":    "All",
+								"single": "Single",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.WorkloadCompositePodGroupSingleDisruptionMode{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupGangSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadCompositePodGroupGangSchedulingPolicy defines the parameters for gang scheduling of a composite group's child groups.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"minGroupCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "minGroupCount is the minimum number of child groups that must be schedulable at the same time for the scheduler to admit the entire composite group. This field is optional. If it is not specified, the controller should inject a context-specific sane default (e.g., the number of child groups). If set, it must be a positive integer.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupSchedulingConstraints(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadCompositePodGroupSchedulingConstraints defines composite-level scheduling constraints, such as topology, for a CompositePodGroup (a group of groups) managed by a workload controller.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"topology": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "topology specifies desired topological placements for all child groups within the composite group. If unset, no topology placement is requested.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1alpha3.TopologyConstraint{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.TopologyConstraint{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadCompositePodGroupSchedulingPolicy defines the scheduling policy for a CompositePodGroup (a group of groups) managed by a workload controller. Exactly one policy must be set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"basic": {
+						SchemaProps: spec.SchemaProps{
+							Description: "basic specifies that the child groups of this composite group should be scheduled independently.",
+							Ref:         ref(schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+					"gang": {
+						SchemaProps: spec.SchemaProps{
+							Description: "gang specifies that the child groups of this composite group should be scheduled using all-or-nothing semantics.",
+							Ref:         ref(schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"basic": "Basic",
+								"gang":  "Gang",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadCompositePodGroupSingleDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadCompositePodGroupSingleDisruptionMode indicates that child groups can be disrupted independently.",
+				Type:        []string{"object"},
+			},
+		},
 	}
 }
 
@@ -55780,6 +57907,832 @@ func schema_k8sio_api_scheduling_v1alpha3_WorkloadSpec(ref common.ReferenceCallb
 	}
 }
 
+func schema_k8sio_api_scheduling_v1beta1_AllCompositeDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AllCompositeDisruptionMode means that children of a CompositePodGroup can only be disrupted or preempted together.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_AllDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AllDisruptionMode specifies that children can only be disrupted together.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_BasicSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "BasicSchedulingPolicy indicates that standard Kubernetes scheduling behavior should be used.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_CompositeBasicSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositeBasicSchedulingPolicy indicates that the groups belonging to the composite group should be scheduled independently.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_CompositeDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositeDisruptionMode defines how individual entities within a composite pod group can be disrupted. Exactly one mode must be set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"single": {
+						SchemaProps: spec.SchemaProps{
+							Description: "single specifies that children groups can be disrupted independently from each other.",
+							Ref:         ref(schedulingv1beta1.SingleCompositeDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+					"all": {
+						SchemaProps: spec.SchemaProps{
+							Description: "all specifies that all children groups can only be disrupted together.",
+							Ref:         ref(schedulingv1beta1.AllCompositeDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"all":    "All",
+								"single": "Single",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1beta1.AllCompositeDisruptionMode{}.OpenAPIModelName(), schedulingv1beta1.SingleCompositeDisruptionMode{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_CompositeGangSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositeGangSchedulingPolicy indicates that the groups belonging to the composite group should be scheduled using all-or-nothing semantics.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"minGroupCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "minGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"minGroupCount"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_CompositePodGroupSchedulingConstraints(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositePodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a CompositePodGroup.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"topology": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "topology defines the topology constraints for the composite pod group. Currently only a single topology constraint can be specified. This may change in the future.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1beta1.TopologyConstraint{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1beta1.TopologyConstraint{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_CompositePodGroupSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"basic": {
+						SchemaProps: spec.SchemaProps{
+							Description: "basic specifies that the groups of this composite group should be scheduled independently. This field is immutable.",
+							Ref:         ref(schedulingv1beta1.CompositeBasicSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+					"gang": {
+						SchemaProps: spec.SchemaProps{
+							Description: "gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics.",
+							Ref:         ref(schedulingv1beta1.CompositeGangSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"basic": "Basic",
+								"gang":  "Gang",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1beta1.CompositeBasicSchedulingPolicy{}.OpenAPIModelName(), schedulingv1beta1.CompositeGangSchedulingPolicy{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_CompositePodGroupTemplate(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositePodGroupTemplate represents a template for a CompositePodGroup with a scheduling policy.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is a unique identifier for the CompositePodGroupTemplate within the Workload. It must be a DNS label. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"schedulingPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "schedulingPolicy defines the scheduling policy for this template.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(schedulingv1beta1.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+					"schedulingConstraints": {
+						SchemaProps: spec.SchemaProps{
+							Description: "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate. This field is immutable.",
+							Ref:         ref(schedulingv1beta1.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName()),
+						},
+					},
+					"disruptionMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "disruptionMode defines the mode in which a given CompositePodGroup can be disrupted. One of Single, All. This field is immutable.",
+							Ref:         ref(schedulingv1beta1.CompositeDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+					"priorityClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "priorityClassName indicates the priority that should be considered when scheduling a composite pod group created from this template. If no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, composite pod groups created from this template will have the priority set to zero. This field is immutable.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"priority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "priority is the value of priority of composite pod groups created from this template. Various system components use this field to find the priority of the composite pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"preemptionPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.\n\n\nPossible enum values:\n - `\"Never\"` means that pod never preempts other pods with lower priority.\n - `\"PreemptLowerPriority\"` means that pod can preempt other pods with lower priority.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Never", "PreemptLowerPriority"},
+						},
+					},
+					"podGroupTemplates": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "podGroupTemplates is the list of templates for children PodGroups. The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates or PodGroupTemplates must be set.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1beta1.PodGroupTemplate{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"compositePodGroupTemplates": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "compositePodGroupTemplates is the list of templates for children CompositePodGroups. The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates or PodGroupTemplates must be set.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1beta1.CompositePodGroupTemplate{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name", "schedulingPolicy"},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1beta1.CompositeDisruptionMode{}.OpenAPIModelName(), schedulingv1beta1.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1beta1.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1beta1.CompositePodGroupTemplate{}.OpenAPIModelName(), schedulingv1beta1.PodGroupTemplate{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_DisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DisruptionMode defines how individual entities within a group can be disrupted. Exactly one mode can be set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"single": {
+						SchemaProps: spec.SchemaProps{
+							Description: "single specifies that children can be disrupted independently from each other.",
+							Ref:         ref(schedulingv1beta1.SingleDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+					"all": {
+						SchemaProps: spec.SchemaProps{
+							Description: "all specifies that all children can only be disrupted together.",
+							Ref:         ref(schedulingv1beta1.AllDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"all":    "All",
+								"single": "Single",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1beta1.AllDisruptionMode{}.OpenAPIModelName(), schedulingv1beta1.SingleDisruptionMode{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_GangSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "GangSchedulingPolicy defines the parameters for gang scheduling.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"minCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "minCount is the minimum number of pods that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer. This field is mutable to support workload scaling.\n\nNote that the scheduler operates on an eventually consistent model. Updates to minCount may not be immediately reflected in scheduling decisions due to propagation delays. If minCount is updated while a scheduling cycle is in progress for that group, the new value may not take effect until the next cycle. Moreover, minCount is only enforced during scheduling, meaning that modifications to this field do not affect already-scheduled pods, applying only to those evaluated in future cycles.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"minCount"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_PodGroup(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroup represents a runtime instance of pods grouped together. PodGroups are created by workload controllers (Job, LWS, JobSet, etc...) from Workload.podGroupTemplates. PodGroup API enablement is toggled by the GenericWorkload feature gate.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "spec defines the desired state of the PodGroup.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(schedulingv1beta1.PodGroupSpec{}.OpenAPIModelName()),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "status represents the current observed state of the PodGroup.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(schedulingv1beta1.PodGroupStatus{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1beta1.PodGroupSpec{}.OpenAPIModelName(), schedulingv1beta1.PodGroupStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_PodGroupList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupList contains a list of PodGroup resources.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of PodGroups.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1beta1.PodGroup{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1beta1.PodGroup{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_PodGroupResourceClaim(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupResourceClaim references exactly one ResourceClaim, either directly or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim for the PodGroup.\n\nIt adds a name to it that uniquely identifies the ResourceClaim inside the PodGroup. Pods that need access to the ResourceClaim define a matching reference in its own Spec.ResourceClaims. The Pod's claim must match all fields of the PodGroup's claim exactly.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name uniquely identifies this resource claim inside the PodGroup. This must be a DNS_LABEL.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"resourceClaimName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "resourceClaimName is the name of a ResourceClaim object in the same namespace as this PodGroup. The ResourceClaim will be reserved for the PodGroup instead of its individual pods.\n\nExactly one of ResourceClaimName and ResourceClaimTemplateName must be set.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"resourceClaimTemplateName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "resourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace as this PodGroup.\n\nThe template will be used to create a new ResourceClaim, which will be bound to this PodGroup. When this PodGroup is deleted, the ResourceClaim will also be deleted. The PodGroup name and resource name, along with a generated component, will be used to form a unique name for the ResourceClaim, which will be recorded in podgroup.status.resourceClaimStatuses.\n\nThis field is immutable and no changes will be made to the corresponding ResourceClaim by the control plane after creating the ResourceClaim.\n\nExactly one of ResourceClaimName and ResourceClaimTemplateName must be set.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_PodGroupResourceClaimStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupResourceClaimStatus is stored in the PodGroupStatus for each PodGroupResourceClaim which references a ResourceClaimTemplate. It stores the generated name for the corresponding ResourceClaim.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name uniquely identifies this resource claim inside the PodGroup. This must match the name of an entry in podgroup.spec.resourceClaims, which implies that the string must be a DNS_LABEL.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"resourceClaimName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "resourceClaimName is the name of the ResourceClaim that was generated for the PodGroup in the namespace of the PodGroup. If this is unset, then generating a ResourceClaim was not necessary. The podgroup.spec.resourceClaims entry can be ignored in this case.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_PodGroupSchedulingConstraints(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a PodGroup.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"topology": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "topology defines the topology constraints for the pod group. Currently only a single topology constraint can be specified. This may change in the future.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1beta1.TopologyConstraint{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1beta1.TopologyConstraint{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_PodGroupSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup. Exactly one policy must be set. The policy is chosen at creation time by setting either the Basic or Gang field. The PodGroup may not change policy after creation. Fields within chosen policy may be updated after creation when their individual fields allow it.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"basic": {
+						SchemaProps: spec.SchemaProps{
+							Description: "basic specifies that the pods in this group should be scheduled using standard Kubernetes scheduling behavior. Setting this field at group creation time opts this group to basic scheduling; this field cannot be changed afterward.",
+							Ref:         ref(schedulingv1beta1.BasicSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+					"gang": {
+						SchemaProps: spec.SchemaProps{
+							Description: "gang specifies that the pods in this group should be scheduled using all-or-nothing semantics. Setting this field at group creation time opts this group to gang scheduling; this field cannot be set or unset afterward. The minCount field within Gang scheduling policy remains mutable after group creation.",
+							Ref:         ref(schedulingv1beta1.GangSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"basic": "Basic",
+								"gang":  "Gang",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1beta1.BasicSchedulingPolicy{}.OpenAPIModelName(), schedulingv1beta1.GangSchedulingPolicy{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_PodGroupSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupSpec defines the desired state of a PodGroup.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"parentCompositePodGroupName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "parentCompositePodGroupName contains the name of the parent composite pod group within the same namespace as this pod group. If it's nil, then this pod group is a root of a workload's hierarchy. This field is used only when the CompositePodGroup feature gate is enabled. This field is immutable.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"workloadRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "workloadRef references an optional PodGroup template within the Workload object that was used to create the PodGroup. This field is immutable.",
+							Ref:         ref(schedulingv1beta1.WorkloadReference{}.OpenAPIModelName()),
+						},
+					},
+					"schedulingPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "schedulingPolicy defines the scheduling policy for this instance of the PodGroup. Controllers are expected to fill this field by copying it from a PodGroupTemplate.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(schedulingv1beta1.PodGroupSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+					"schedulingConstraints": {
+						SchemaProps: spec.SchemaProps{
+							Description: "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup. Controllers are expected to fill this field by copying it from a PodGroupTemplate. This field is immutable. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.",
+							Ref:         ref(schedulingv1beta1.PodGroupSchedulingConstraints{}.OpenAPIModelName()),
+						},
+					},
+					"resourceClaims": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge,retainKeys",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "resourceClaims defines which ResourceClaims may be shared among Pods in the group. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate.\n\nThis is an alpha-level field and requires that the DRAWorkloadResourceClaims feature gate is enabled.\n\nThis field is immutable.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1beta1.PodGroupResourceClaim{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"disruptionMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "disruptionMode defines the mode in which a given PodGroup can be disrupted. Controllers are expected to fill this field by copying it from a PodGroupTemplate. One of Single, All. Defaults to Single if unset. This field is immutable.",
+							Default:     map[string]interface{}{"single": map[string]interface{}{}},
+							Ref:         ref(schedulingv1beta1.DisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+					"priorityClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "priorityClassName defines the priority that should be considered when scheduling this pod group. Controllers are expected to fill this field by copying it from a PodGroupTemplate. Otherwise, it is validated and resolved similarly to the PriorityClassName on PodGroupTemplate (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the pod group's priority will be zero). This field is immutable.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"priority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "priority is the value of priority of this pod group. Various system components use this field to find the priority of the pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"preemptionPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset. When Priority Admission Controller is enabled, it populates this field from PriorityClassName, and defaults to PreemptLowerPriority if value is unset in PriorityClass. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.\n\n\nPossible enum values:\n - `\"Never\"` means that pod never preempts other pods with lower priority.\n - `\"PreemptLowerPriority\"` means that pod can preempt other pods with lower priority.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Never", "PreemptLowerPriority"},
+						},
+					},
+				},
+				Required: []string{"schedulingPolicy"},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1beta1.DisruptionMode{}.OpenAPIModelName(), schedulingv1beta1.PodGroupResourceClaim{}.OpenAPIModelName(), schedulingv1beta1.PodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1beta1.PodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1beta1.WorkloadReference{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_PodGroupStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupStatus represents information about the status of a pod group.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditions represent the latest observations of the PodGroup's state.\n\nKnown condition types: - \"PodGroupInitiallyScheduled\": Indicates whether the scheduling requirement has been satisfied. Once this condition transitions to True, it serves as a terminal state and will never revert to False, even if pods are subsequently evicted and group constraints are no longer met. - \"DisruptionTarget\": Indicates whether the PodGroup is about to be terminated\n  due to disruption such as preemption.\n\nKnown reasons for the PodGroupInitiallyScheduled condition: - \"Unschedulable\": The PodGroup cannot be scheduled due to resource constraints,\n  affinity/anti-affinity rules, or insufficient capacity for the gang.\n- \"SchedulerError\": The PodGroup cannot be scheduled due to some internal error\n  that happened during scheduling, for example due to nodeAffinity parsing errors.\n\nKnown reasons for the DisruptionTarget condition: - \"PreemptionByScheduler\": The PodGroup was preempted by the scheduler to make room for\n  higher-priority PodGroups or Pods.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"resourceClaimStatuses": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge,retainKeys",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "resourceClaimStatuses is status of resource claims.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1beta1.PodGroupResourceClaimStatus{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1beta1.PodGroupResourceClaimStatus{}.OpenAPIModelName(), metav1.Condition{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_PodGroupTemplate(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupTemplate represents a template for a set of pods with a scheduling policy.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is a unique identifier for the PodGroupTemplate within the Workload. It must be a DNS label. This field is immutable.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"schedulingPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "schedulingPolicy defines the scheduling policy for this PodGroupTemplate.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(schedulingv1beta1.PodGroupSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+					"schedulingConstraints": {
+						SchemaProps: spec.SchemaProps{
+							Description: "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled. This field is immutable.",
+							Ref:         ref(schedulingv1beta1.PodGroupSchedulingConstraints{}.OpenAPIModelName()),
+						},
+					},
+					"resourceClaims": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge,retainKeys",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "resourceClaims defines which ResourceClaims may be shared among Pods in the group. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate.\n\nThis is an alpha-level field and requires that the DRAWorkloadResourceClaims feature gate is enabled.\n\nThis field is immutable.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1beta1.PodGroupResourceClaim{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"disruptionMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "disruptionMode defines the mode in which a given PodGroup can be disrupted. One of Single, All. This field is immutable.",
+							Ref:         ref(schedulingv1beta1.DisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+					"priorityClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "priorityClassName indicates the priority that should be considered when scheduling a pod group created from this template. This field is immutable.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"priority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "priority is the value of priority of pod groups created from this template. Various system components use this field to find the priority of the pod group. The higher the value, the higher the priority. This field is immutable.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"preemptionPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "preemptionPolicy is the Policy for preempting pods/podgroups with lower priority. One of Never, PreemptLowerPriority. This field is immutable. This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.\n\n\nPossible enum values:\n - `\"Never\"` means that pod never preempts other pods with lower priority.\n - `\"PreemptLowerPriority\"` means that pod can preempt other pods with lower priority.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Never", "PreemptLowerPriority"},
+						},
+					},
+				},
+				Required: []string{"name", "schedulingPolicy"},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1beta1.DisruptionMode{}.OpenAPIModelName(), schedulingv1beta1.PodGroupResourceClaim{}.OpenAPIModelName(), schedulingv1beta1.PodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1beta1.PodGroupSchedulingPolicy{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_scheduling_v1beta1_PriorityClass(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -55893,6 +58846,274 @@ func schema_k8sio_api_scheduling_v1beta1_PriorityClassList(ref common.ReferenceC
 		},
 		Dependencies: []string{
 			schedulingv1beta1.PriorityClass{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_SingleCompositeDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SingleCompositeDisruptionMode means that individual children of a CompositePodGroup can be disrupted or preempted independently.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_SingleDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SingleDisruptionMode specifies that children can be disrupted independently.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_TopologyConstraint(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TopologyConstraint defines a topology constraint for a PodGroup.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Description: "key specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Examples: \"topology.kubernetes.io/rack\"",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"key"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_TypedLocalObjectReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TypedLocalObjectReference allows to reference typed object inside the same namespace.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"apiGroup": {
+						SchemaProps: spec.SchemaProps{
+							Description: "apiGroup is the group for the resource being referenced. If apiGroup is empty, the specified Kind must be in the core API group. For any other third-party types, setting apiGroup is required. It must be a DNS subdomain.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "kind is the type of resource being referenced. It must be a path segment name.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is the name of resource being referenced. It must be a path segment name.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"kind", "name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_Workload(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Workload allows for expressing scheduling constraints that should be used when managing the lifecycle of workloads from the scheduling perspective, including scheduling, preemption, eviction and other phases. Workload API enablement is toggled by the GenericWorkload feature gate.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "spec defines the desired behavior of a Workload.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(schedulingv1beta1.WorkloadSpec{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1beta1.WorkloadSpec{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_WorkloadList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadList contains a list of Workload resources.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metadata is the standard list metadata.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "items is the list of Workloads.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1beta1.Workload{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1beta1.Workload{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_WorkloadReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadReference references the Workload object together with the template that was used to create a particular PodGroup.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"workloadName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "workloadName is the name of the Workload object that contains a template that was used when creating a pod group. It must be a DNS name. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"templateName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "templateName is the name of a template within the Workload object that was used to create a pod group. It must be a DNS label. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"workloadName", "templateName"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1beta1_WorkloadSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadSpec defines the desired state of a Workload.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"controllerRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "controllerRef is an optional reference to the controlling object, such as a Deployment or Job. This field is intended for use by tools like CLIs to provide a link back to the original workload definition. This field is immutable.",
+							Ref:         ref(schedulingv1beta1.TypedLocalObjectReference{}.OpenAPIModelName()),
+						},
+					},
+					"podGroupTemplates": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "podGroupTemplates is the list of templates that make up the Workload. The maximum number of templates is 8. Templates cannot be added or removed after the workload is created. Existing templates may still be updated where their individual fields allow it. Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1beta1.PodGroupTemplate{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"compositePodGroupTemplates": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "compositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload. The maximum number of templates is 8. This field is immutable. Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.\n\nThis field is used only when the CompositePodGroup feature gate is enabled.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1beta1.CompositePodGroupTemplate{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1beta1.CompositePodGroupTemplate{}.OpenAPIModelName(), schedulingv1beta1.PodGroupTemplate{}.OpenAPIModelName(), schedulingv1beta1.TypedLocalObjectReference{}.OpenAPIModelName()},
 	}
 }
 
@@ -56092,7 +59313,7 @@ func schema_k8sio_api_storage_v1_CSIDriverSpec(ref common.ReferenceCallback) com
 					},
 					"preventPodSchedulingIfMissing": {
 						SchemaProps: spec.SchemaProps{
-							Description: "preventPodSchedulingIfMissing indicates that the CSI driver wants to prevent pod scheduling if the CSI driver on the node is missing.\n\nEnabling this option will prevent the scheduler (or any other component which embeds default scheduler such as cluster-autoscaler) from scheduling pods to nodes where CSI driver is not installed.\n\nFor components(such as cluster-autoscaler) that embed the scheduler and run pod placement simulations using scheduler plugins, they MUST be aware of CSI driver registration information via CSINode object. They must create simulated CSINode objects in addition to Node objects during scheduling simulation, otherwise if PreventPodSchedulingIfMissing is enabled globally for CSIDriver object, any newly created node may be rejected by the scheduler because of missing CSI driver information from the node.\n\nThis is an alpha feature and requires the VolumeLimitScaling feature gate to be enabled. Default is \"false\".",
+							Description: "preventPodSchedulingIfMissing indicates that the CSI driver wants to prevent pod scheduling if the CSI driver on the node is missing.\n\nEnabling this option will prevent the scheduler (or any other component which embeds default scheduler such as cluster-autoscaler) from scheduling pods to nodes where CSI driver is not installed.\n\nFor components(such as cluster-autoscaler) that embed the scheduler and run pod placement simulations using scheduler plugins, they MUST be aware of CSI driver registration information via CSINode object. They must create simulated CSINode objects in addition to Node objects during scheduling simulation, otherwise if PreventPodSchedulingIfMissing is enabled globally for CSIDriver object, any newly created node may be rejected by the scheduler because of missing CSI driver information from the node.\n\nThis is a beta feature and requires the VolumeLimitScaling feature gate to be enabled. Default is \"false\".",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -56140,12 +59361,19 @@ func schema_k8sio_api_storage_v1_CSINode(ref common.ReferenceCallback) common.Op
 							Ref:         ref(storagev1.CSINodeSpec{}.OpenAPIModelName()),
 						},
 					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "status contains health and status information for the node's storage.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(storagev1.CSINodeStatus{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
-			storagev1.CSINodeSpec{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+			storagev1.CSINodeSpec{}.OpenAPIModelName(), storagev1.CSINodeStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -56292,6 +59520,44 @@ func schema_k8sio_api_storage_v1_CSINodeSpec(ref common.ReferenceCallback) commo
 		},
 		Dependencies: []string{
 			storagev1.CSINodeDriver{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_storage_v1_CSINodeStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CSINodeStatus contains health and status information for storage on a node.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"storageHealth": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "storageHealth contains backend health reports for CSI drivers registered on the node.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(storagev1.StorageHealth{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			storagev1.StorageHealth{}.OpenAPIModelName()},
 	}
 }
 
@@ -56575,6 +59841,110 @@ func schema_k8sio_api_storage_v1_StorageClassList(ref common.ReferenceCallback) 
 		},
 		Dependencies: []string{
 			storagev1.StorageClass{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_storage_v1_StorageHealth(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "StorageHealth contains storage backend health reported by a CSI driver on a node.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is the CSI driver name, matching CSINodeDriver.name.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"healthConditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "healthConditions are the adverse storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(storagev1.StorageHealthCondition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			storagev1.StorageHealthCondition{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_storage_v1_StorageHealthCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "StorageHealthCondition represents an adverse health condition reported by a CSI driver for its storage backend on a node.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "status is the health status category. One of \"StorageUnreachable\", \"StorageDegraded\".\n\nPossible enum values:\n - `\"StorageDegraded\"` indicates the storage backend is functioning with reduced capability.\n - `\"StorageUnreachable\"` indicates the storage backend is unreachable.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"StorageDegraded", "StorageUnreachable"},
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "reason is a brief CamelCase machine-parseable reason. Maximum permitted length of a reason is 256 characters.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "message is a human-readable description. Maximum permitted length of a message is 1024 characters.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"accessMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "accessMode is the access mode affected. Nil means all access modes are affected.\n\nPossible enum values:\n - `\"ReadOnlyMany\"` can be mounted in read-only mode to many hosts\n - `\"ReadWriteMany\"` can be mounted in read/write mode to many hosts\n - `\"ReadWriteOnce\"` can be mounted in read/write mode to exactly 1 host\n - `\"ReadWriteOncePod\"` can be mounted in read/write mode to exactly 1 pod cannot be used in combination with other access modes",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"ReadOnlyMany", "ReadWriteMany", "ReadWriteOnce", "ReadWriteOncePod"},
+						},
+					},
+					"volumeMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "volumeMode is the volume mode affected. Nil means both are affected.\n\nPossible enum values:\n - `\"Block\"` means the volume will not be formatted with a filesystem and will remain a raw block device.\n - `\"Filesystem\"` means the volume will be or is formatted with a filesystem.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Block", "Filesystem"},
+						},
+					},
+					"lastTransitionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "lastTransitionTime is when this condition first appeared at its current state.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"status", "reason"},
+			},
+		},
+		Dependencies: []string{
+			metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -57664,7 +61034,7 @@ func schema_k8sio_api_storage_v1beta1_CSIDriverSpec(ref common.ReferenceCallback
 					},
 					"preventPodSchedulingIfMissing": {
 						SchemaProps: spec.SchemaProps{
-							Description: "preventPodSchedulingIfMissing indicates that the CSI driver wants to prevent pod scheduling if the CSI driver on the node is missing.\n\nEnabling this option will prevent the scheduler (or any other component which embeds default scheduler such as cluster-autoscaler) from scheduling pods to nodes where CSI driver is not installed.\n\nFor components(such as cluster-autoscaler) that embed the scheduler and run pod placement simulations using scheduler plugins, they MUST be aware of CSI driver registration information via CSINode object. They must create simulated CSINode objects in addition to Node objects during scheduling simulation, otherwise if PreventPodSchedulingIfMissing is enabled globally for CSIDriver object, any newly created node may be rejected by the scheduler because of missing CSI driver information from the node.\n\nThis is an alpha feature and requires the VolumeLimitScaling feature gate to be enabled. Default is \"false\".",
+							Description: "preventPodSchedulingIfMissing indicates that the CSI driver wants to prevent pod scheduling if the CSI driver on the node is missing.\n\nEnabling this option will prevent the scheduler (or any other component which embeds default scheduler such as cluster-autoscaler) from scheduling pods to nodes where CSI driver is not installed.\n\nFor components(such as cluster-autoscaler) that embed the scheduler and run pod placement simulations using scheduler plugins, they MUST be aware of CSI driver registration information via CSINode object. They must create simulated CSINode objects in addition to Node objects during scheduling simulation, otherwise if PreventPodSchedulingIfMissing is enabled globally for CSIDriver object, any newly created node may be rejected by the scheduler because of missing CSI driver information from the node.\n\nThis is a beta feature and requires the VolumeLimitScaling feature gate to be enabled. Default is \"false\".",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -57712,12 +61082,19 @@ func schema_k8sio_api_storage_v1beta1_CSINode(ref common.ReferenceCallback) comm
 							Ref:         ref(storagev1beta1.CSINodeSpec{}.OpenAPIModelName()),
 						},
 					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "status contains health and status information for the node's storage.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(storagev1beta1.CSINodeStatus{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
-			storagev1beta1.CSINodeSpec{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+			storagev1beta1.CSINodeSpec{}.OpenAPIModelName(), storagev1beta1.CSINodeStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -57864,6 +61241,44 @@ func schema_k8sio_api_storage_v1beta1_CSINodeSpec(ref common.ReferenceCallback) 
 		},
 		Dependencies: []string{
 			storagev1beta1.CSINodeDriver{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_storage_v1beta1_CSINodeStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CSINodeStatus contains health and status information for storage on a node.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"storageHealth": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "storageHealth contains backend health reports for CSI drivers registered on the node.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(storagev1beta1.StorageHealth{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			storagev1beta1.StorageHealth{}.OpenAPIModelName()},
 	}
 }
 
@@ -58146,6 +61561,110 @@ func schema_k8sio_api_storage_v1beta1_StorageClassList(ref common.ReferenceCallb
 		},
 		Dependencies: []string{
 			storagev1beta1.StorageClass{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_storage_v1beta1_StorageHealth(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "StorageHealth contains storage backend health reported by a CSI driver on a node.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is the CSI driver name, matching CSINodeDriver.name.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"healthConditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "healthConditions are the adverse storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(storagev1beta1.StorageHealthCondition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			storagev1beta1.StorageHealthCondition{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_storage_v1beta1_StorageHealthCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "StorageHealthCondition represents an adverse health condition reported by a CSI driver for its storage backend on a node.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "status is the health status category. One of \"StorageUnreachable\", \"StorageDegraded\".\n\nPossible enum values:\n - `\"StorageDegraded\"` indicates the storage backend is functioning with reduced capability.\n - `\"StorageUnreachable\"` indicates the storage backend is unreachable.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"StorageDegraded", "StorageUnreachable"},
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "reason is a brief CamelCase machine-parseable reason. Maximum permitted length of a reason is 256 characters.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "message is a human-readable description. Maximum permitted length of a message is 1024 characters.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"accessMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "accessMode is the access mode affected. Nil means all access modes are affected.\n\nPossible enum values:\n - `\"ReadOnlyMany\"` can be mounted in read-only mode to many hosts\n - `\"ReadWriteMany\"` can be mounted in read/write mode to many hosts\n - `\"ReadWriteOnce\"` can be mounted in read/write mode to exactly 1 host\n - `\"ReadWriteOncePod\"` can be mounted in read/write mode to exactly 1 pod cannot be used in combination with other access modes",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"ReadOnlyMany", "ReadWriteMany", "ReadWriteOnce", "ReadWriteOncePod"},
+						},
+					},
+					"volumeMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "volumeMode is the volume mode affected. Nil means both are affected.\n\nPossible enum values:\n - `\"Block\"` means the volume will not be formatted with a filesystem and will remain a raw block device.\n - `\"Filesystem\"` means the volume will be or is formatted with a filesystem.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Block", "Filesystem"},
+						},
+					},
+					"lastTransitionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "lastTransitionTime is when this condition first appeared at its current state.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"status", "reason"},
+			},
+		},
+		Dependencies: []string{
+			metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -69226,7 +72745,7 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.R
 					},
 					"nodePortAddresses": {
 						SchemaProps: spec.SchemaProps{
-							Description: "nodePortAddresses is a list of CIDR ranges that contain valid node IPs, or alternatively, the single string 'primary'. If set to a list of CIDRs, connections to NodePort services will only be accepted on node IPs in one of the indicated ranges. If set to 'primary', NodePort services will only be accepted on the node's primary IPv4 and/or IPv6 address according to the Node object. If unset, NodePort connections will be accepted on all local IPs.",
+							Description: "nodePortAddresses is a list of CIDR ranges and/or keywords that expand to CIDR ranges. NodePort services are only accessible on node IPs covered by the list. Supported keywords: 'primary' (the Node object's primary IPv4 and/or IPv6 addresses), 'localhost' (127.0.0.0/8 and ::1/128), and 'all' (0.0.0.0/0 and ::/0). Any combination of valid keywords and CIDRs may be included in the list.\n\nServing NodePorts on loopback IPs is only supported in iptables mode (IPv4 only, see iptables.localhostNodePorts), and, only for TCP, in nftables mode when the KubeProxyNFTablesLocalhostNodePorts feature gate is enabled and the list explicitly includes loopback (e.g. 'localhost').\n\nIf unset, this defaults to 'all' in iptables and ipvs mode, and to 'primary' in nftables mode.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -73204,6 +76723,21 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							},
 						},
 					},
+					"defaultPodSysctls": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DefaultPodSysctls is a set of default sysctls that will be applied to all pods. It can be overridden by sysctls set in pod spec.securityContext.sysctls. Support namespaced groups: `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`, `net.*`, `kernel.domainname`, and `user.*`. For example: {\"net.ipv4.ip_forward\": \"1\", \"kernel.shmall\": \"1048576\"}",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
 					"volumePluginDir": {
 						SchemaProps: spec.SchemaProps{
 							Description: "volumePluginDir is the full path of the directory in which to search for additional third party volume plugins. Default: \"/usr/libexec/kubernetes/kubelet-plugins/volume/exec/\"",
@@ -73314,7 +76848,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"memoryThrottlingFactor": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MemoryThrottlingFactor specifies the factor multiplied by the memory limit or node allocatable memory when setting the cgroupv2 memory.high value to enforce MemoryQoS. Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure while increasing will put less reclaim pressure. See https://kep.k8s.io/2570 for more details. Default: 0.9",
+							Description: "MemoryThrottlingFactor specifies the factor multiplied by the memory limit or node allocatable memory when setting the cgroupv2 memory.high value to enforce MemoryQoS. Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure while increasing will put less reclaim pressure. If nil, memory.high is not set. See https://kep.k8s.io/2570 for more details. Default: nil",
 							Type:        []string{"number"},
 							Format:      "double",
 						},

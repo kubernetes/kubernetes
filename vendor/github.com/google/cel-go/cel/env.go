@@ -18,6 +18,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
+	"strings"
 	"sync"
 
 	"github.com/google/cel-go/checker"
@@ -139,6 +141,7 @@ type Env struct {
 	provider        types.Provider
 	features        map[int]bool
 	appliedFeatures map[int]bool
+	limits          map[limitID]int
 	libraries       map[string]SingletonLibrary
 	validators      []ASTValidator
 	costOptions     []checker.CostOption
@@ -179,6 +182,16 @@ func (e *Env) ToConfig(name string) (*env.Config, error) {
 	}
 	for _, typeName := range e.Container.AliasSet() {
 		conf.AddImports(env.NewImport(typeName))
+	}
+
+	// Serialize features
+	for featID, enabled := range e.features {
+		featName, found := featureNameByID(featID)
+		if !found {
+			// If the feature isn't named, it isn't intended to be publicly exposed
+			continue
+		}
+		conf.AddFeatures(env.NewFeature(featName, enabled))
 	}
 
 	libOverloads := map[string][]string{}
@@ -241,7 +254,7 @@ func (e *Env) ToConfig(name string) (*env.Config, error) {
 		fields := e.contextProto.Fields()
 		for i := 0; i < fields.Len(); i++ {
 			field := fields.Get(i)
-			variable, err := fieldToVariable(field)
+			variable, err := fieldToVariable(field, e.HasFeature(featureJSONFieldNames))
 			if err != nil {
 				return nil, fmt.Errorf("could not serialize context field variable %q, reason: %w", field.FullName(), err)
 			}
@@ -276,15 +289,44 @@ func (e *Env) ToConfig(name string) (*env.Config, error) {
 		}
 	}
 
-	// Serialize features
-	for featID, enabled := range e.features {
-		featName, found := featureNameByID(featID)
-		if !found {
-			// If the feature isn't named, it isn't intended to be publicly exposed
+	for id, val := range e.limits {
+		limitName, found := limitNameByID(id)
+		if !found || val == 0 {
+			// skip if explicitly defaulted or not supported in config
 			continue
 		}
-		conf.AddFeatures(env.NewFeature(featName, enabled))
+		conf.AddLimits(env.NewLimit(limitName, val))
 	}
+
+	// Sort repeated fields in config where reasonable to make the export
+	// stable.
+	slices.SortFunc(conf.Imports, func(a *env.Import, b *env.Import) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	slices.SortFunc(conf.Extensions, func(a *env.Extension, b *env.Extension) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	slices.SortFunc(conf.Variables, func(a *env.Variable, b *env.Variable) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	slices.SortFunc(conf.Functions, func(a *env.Function, b *env.Function) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	slices.SortFunc(conf.Validators, func(a *env.Validator, b *env.Validator) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	slices.SortFunc(conf.Features, func(a *env.Feature, b *env.Feature) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	slices.SortFunc(conf.Limits, func(a *env.Limit, b *env.Limit) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 
 	return conf, nil
 }
@@ -319,7 +361,7 @@ func NewEnv(opts ...EnvOption) (*Env, error) {
 // See the EnvOption helper functions for the options that can be used to configure the
 // environment.
 func NewCustomEnv(opts ...EnvOption) (*Env, error) {
-	registry, err := types.NewRegistry()
+	registry, err := types.NewProtoRegistry()
 	if err != nil {
 		return nil, err
 	}
@@ -333,6 +375,7 @@ func NewCustomEnv(opts ...EnvOption) (*Env, error) {
 		provider:         registry,
 		features:         map[int]bool{},
 		appliedFeatures:  map[int]bool{},
+		limits:           map[limitID]int{},
 		libraries:        map[string]SingletonLibrary{},
 		validators:       []ASTValidator{},
 		progOpts:         []ProgramOption{},
@@ -393,6 +436,15 @@ func (e *Env) Check(ast *Ast) (*Ast, *Issues) {
 	return ast, nil
 }
 
+// configuredExpressionSizeLimit returns the effective expression size code point limit.
+// A zero value means "use the parser default".
+func (e *Env) configuredExpressionSizeLimit() int {
+	if l := e.limits[limitCodePointSize]; l != 0 {
+		return l
+	}
+	return 100_000
+}
+
 // Compile combines the Parse and Check phases CEL program compilation to produce an Ast and
 // associated issues.
 //
@@ -402,7 +454,11 @@ func (e *Env) Check(ast *Ast) (*Ast, *Issues) {
 //
 // Note, for parse-only uses of CEL use Parse.
 func (e *Env) Compile(txt string) (*Ast, *Issues) {
-	return e.CompileSource(common.NewTextSource(txt))
+	src, err := common.NewTextSourceWithLimit(txt, e.configuredExpressionSizeLimit())
+	if err != nil {
+		return nil, ErrorAsIssues(err)
+	}
+	return e.CompileSource(src)
 }
 
 // CompileSource combines the Parse and Check phases CEL program compilation to produce an Ast and
@@ -497,6 +553,10 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 	for k, v := range e.appliedFeatures {
 		appliedFeaturesCopy[k] = v
 	}
+	limitsCopy := make(map[limitID]int, len(e.limits))
+	for k, v := range e.limits {
+		limitsCopy[k] = v
+	}
 	funcsCopy := make(map[string]*decls.FunctionDecl, len(e.functions))
 	for k, v := range e.functions {
 		funcsCopy[k] = v
@@ -507,6 +567,7 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 	}
 	validatorsCopy := make([]ASTValidator, len(e.validators))
 	copy(validatorsCopy, e.validators)
+
 	costOptsCopy := make([]checker.CostOption, len(e.costOptions))
 	copy(costOptsCopy, e.costOptions)
 
@@ -519,6 +580,7 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 		progOpts:        progOptsCopy,
 		adapter:         adapter,
 		features:        featuresCopy,
+		limits:          limitsCopy,
 		appliedFeatures: appliedFeaturesCopy,
 		libraries:       libsCopy,
 		validators:      validatorsCopy,
@@ -601,7 +663,10 @@ func (e *Env) Validators() []ASTValidator {
 // This form of Parse creates a Source value for the input `txt` and forwards to the
 // ParseSource method.
 func (e *Env) Parse(txt string) (*Ast, *Issues) {
-	src := common.NewTextSource(txt)
+	src, err := common.NewTextSourceWithLimit(txt, e.configuredExpressionSizeLimit())
+	if err != nil {
+		return nil, ErrorAsIssues(err)
+	}
 	return e.ParseSource(src)
 }
 
@@ -785,9 +850,30 @@ func (e *Env) configure(opts []EnvOption) (*Env, error) {
 	if e.HasFeature(featureIdentEscapeSyntax) {
 		prsrOpts = append(prsrOpts, parser.EnableIdentEscapeSyntax(true))
 	}
+	if l := e.limits[limitParseErrorRecovery]; l != 0 {
+		prsrOpts = append(prsrOpts, parser.ErrorRecoveryLimit(l))
+	}
+	if l := e.limits[limitCodePointSize]; l != 0 {
+		prsrOpts = append(prsrOpts, parser.ExpressionSizeCodePointLimit(l))
+	}
+	if l := e.limits[limitParseRecursionDepth]; l != 0 {
+		prsrOpts = append(prsrOpts, parser.MaxRecursionDepth(l))
+	}
 	e.prsr, err = parser.NewParser(prsrOpts...)
 	if err != nil {
 		return nil, err
+	}
+
+	// Enable JSON field names is using a proto-based *types.Registry
+	if e.HasFeature(featureJSONFieldNames) {
+		reg, isReg := e.provider.(*types.Registry)
+		if !isReg {
+			return nil, fmt.Errorf("JSONFieldNames() option is only compatible with *types.Registry providers")
+		}
+		err := reg.WithJSONFieldNames(true)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Ensure that the checker init happens eagerly rather than lazily.
@@ -808,6 +894,8 @@ func (e *Env) initChecker() (*checker.Env, error) {
 		chkOpts = append(chkOpts,
 			checker.CrossTypeNumericComparisons(
 				e.HasFeature(featureCrossTypeNumericComparisons)))
+		chkOpts = append(chkOpts,
+			checker.JSONFieldNames(e.HasFeature(featureJSONFieldNames)))
 
 		ce, err := checker.NewEnv(e.Container, e.provider, chkOpts...)
 		if err != nil {
@@ -875,6 +963,16 @@ type Error = common.Error
 type Issues struct {
 	errs *common.Errors
 	info *celast.SourceInfo
+}
+
+// ErrorAsIssues wraps a Golang error into a CEL common error and issue set.
+//
+// This is a convenience method for early returning from an expression validation call path due to
+// internal state or configuration which is unrelated to the source being validated.
+func ErrorAsIssues(err error) *Issues {
+	errs := common.NewErrors(common.NewTextSource(""))
+	errs.ReportErrorString(common.NoLocation, err.Error())
+	return NewIssues(errs)
 }
 
 // NewIssues returns an Issues struct from a common.Errors object.
@@ -985,9 +1083,10 @@ func (p *interopCELTypeProvider) FindStructFieldType(structType, fieldName strin
 			return nil, false
 		}
 		return &types.FieldType{
-			Type:    t,
-			IsSet:   ft.IsSet,
-			GetFrom: ft.GetFrom,
+			Type:        t,
+			IsSet:       ft.IsSet,
+			GetFrom:     ft.GetFrom,
+			IsJSONField: ft.IsJSONField,
 		}, true
 	}
 	return nil, false

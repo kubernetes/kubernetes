@@ -38,7 +38,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -50,14 +49,13 @@ import (
 // the CI job definitions to see how many GPU(s) are available in the environment
 // Currently the CI jobs have 2 nodes each with 4 Nvidia T4's across both GCE and AWS harness(es).
 
-var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Sanity test using nvidia-smi", func() {
+var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Sanity test using nvidia-smi", framework.WithProvider("aws", "gce"), func() {
 
 	f := framework.NewDefaultFramework("nvidia-gpu1")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
 
 	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("aws", "gce")
 		podClient = e2epod.NewPodClient(f)
 	})
 
@@ -79,14 +77,13 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Sanity tes
 	})
 })
 
-var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using a Pod", func() {
+var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using a Pod", framework.WithProvider("aws", "gce"), func() {
 
 	f := framework.NewDefaultFramework("nvidia-gpu2")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
 
 	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("aws", "gce")
 		podClient = e2epod.NewPodClient(f)
 	})
 
@@ -110,14 +107,10 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using
 	})
 })
 
-var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using a Job", func() {
+var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using a Job", framework.WithProvider("aws", "gce"), func() {
 
 	f := framework.NewDefaultFramework("nvidia-gpu2")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-
-	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("aws", "gce")
-	})
 
 	f.It("should run gpu based jobs", func(ctx context.Context) {
 		SetupEnvironmentAndSkipIfNeeded(ctx, f, f.ClientSet)

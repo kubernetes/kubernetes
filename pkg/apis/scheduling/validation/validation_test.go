@@ -188,8 +188,11 @@ func TestValidateWorkload(t *testing.T) {
 		"no controllerRef": mkWorkload(func(w *scheduling.Workload) {
 			w.Spec.ControllerRef = nil
 		}),
-		"no scheduling constraints": mkWorkload(func(w *scheduling.Workload) {
+		"no pod group scheduling constraints": mkWorkload(func(w *scheduling.Workload) {
 			w.Spec.PodGroupTemplates[1].SchedulingConstraints = nil
+		}),
+		"no composite pod group scheduling constraints": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.CompositePodGroupTemplates[1].SchedulingConstraints = nil
 		}),
 	}
 	for name, workload := range successCases {
@@ -205,14 +208,7 @@ func TestValidateWorkload(t *testing.T) {
 	}{
 		"composite pod group template has no children": {
 			workload: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
-					{
-						Name: "main",
-						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
-							Gang: &scheduling.CompositeGangSchedulingPolicy{MinGroupCount: 1},
-						},
-					},
-				}
+				w.Spec.CompositePodGroupTemplates[0].PodGroupTemplates = nil
 			}),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0), "main", "must have at least one child PodGroupTemplate or CompositePodGroupTemplate"),
@@ -220,19 +216,12 @@ func TestValidateWorkload(t *testing.T) {
 		},
 		"composite pod group template nested child has no children": {
 			workload: mkWorkload(func(w *scheduling.Workload) {
-				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+				w.Spec.CompositePodGroupTemplates[0].PodGroupTemplates = nil
+				w.Spec.CompositePodGroupTemplates[0].CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
 					{
-						Name: "main",
+						Name: "sub",
 						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
 							Gang: &scheduling.CompositeGangSchedulingPolicy{MinGroupCount: 1},
-						},
-						CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
-							{
-								Name: "sub",
-								SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
-									Gang: &scheduling.CompositeGangSchedulingPolicy{MinGroupCount: 1},
-								},
-							},
 						},
 					},
 				}
@@ -452,6 +441,55 @@ func mkWorkload(tweaks ...func(w *scheduling.Workload)) *scheduling.Workload {
 				SchedulingConstraints: &scheduling.PodGroupSchedulingConstraints{
 					Topology: []scheduling.TopologyConstraint{
 						{Key: "foo"},
+					},
+				},
+			}},
+			CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{{
+				Name: "compositegroup1",
+				SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+					Basic: &scheduling.CompositeBasicSchedulingPolicy{},
+				},
+				SchedulingConstraints: &scheduling.CompositePodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{
+						{Key: "foo"},
+					},
+				},
+				PodGroupTemplates: []scheduling.PodGroupTemplate{
+					{
+						Name: "childgroup1",
+						SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+							Basic: &scheduling.BasicSchedulingPolicy{},
+						},
+						SchedulingConstraints: &scheduling.PodGroupSchedulingConstraints{
+							Topology: []scheduling.TopologyConstraint{
+								{Key: "foo"},
+							},
+						},
+					},
+				},
+			}, {
+				Name: "compositegroup2",
+				SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+					Gang: &scheduling.CompositeGangSchedulingPolicy{
+						MinGroupCount: 2,
+					},
+				},
+				SchedulingConstraints: &scheduling.CompositePodGroupSchedulingConstraints{
+					Topology: []scheduling.TopologyConstraint{
+						{Key: "foo"},
+					},
+				},
+				PodGroupTemplates: []scheduling.PodGroupTemplate{
+					{
+						Name: "childgroup2",
+						SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+							Basic: &scheduling.BasicSchedulingPolicy{},
+						},
+						SchedulingConstraints: &scheduling.PodGroupSchedulingConstraints{
+							Topology: []scheduling.TopologyConstraint{
+								{Key: "foo"},
+							},
+						},
 					},
 				},
 			}},
@@ -813,6 +851,9 @@ func TestValidateCompositePodGroup(t *testing.T) {
 				Basic: &scheduling.CompositeBasicSchedulingPolicy{},
 			}
 		}),
+		"no scheduling constraints": mkCompositePodGroup(func(cpg *scheduling.CompositePodGroup) {
+			cpg.Spec.SchedulingConstraints = nil
+		}),
 	}
 	for name, cpg := range successCases {
 		errs := ValidateCompositePodGroup(cpg)
@@ -1108,6 +1149,11 @@ func mkCompositePodGroup(tweaks ...func(cpg *scheduling.CompositePodGroup)) *sch
 			SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
 				Gang: &scheduling.CompositeGangSchedulingPolicy{
 					MinGroupCount: 5,
+				},
+			},
+			SchedulingConstraints: &scheduling.CompositePodGroupSchedulingConstraints{
+				Topology: []scheduling.TopologyConstraint{
+					{Key: "foo"},
 				},
 			},
 		},

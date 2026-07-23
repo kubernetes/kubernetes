@@ -50,16 +50,57 @@ var (
 					MinGroupCount: 5,
 				},
 			},
+			DisruptionMode: &scheduling.CompositeDisruptionMode{
+				Single: &scheduling.SingleCompositeDisruptionMode{},
+			},
 		},
 	}
 
-	fieldImmutableError    = "field is immutable"
-	minCountError          = "must be greater than or equal to 1"
-	subdomainNameError     = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
-	maximumError           = "must be less than or equal to"
-	oneOfError             = "must specify one of: `basic`, `gang`"
-	multipleFieldsSetError = "must specify exactly one of: `basic`, `gang`"
+	fieldImmutableError             = "field is immutable"
+	minCountError                   = "must be greater than or equal to 1"
+	subdomainNameError              = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
+	maximumError                    = "must be less than or equal to"
+	oneOfError                      = "must specify one of: `basic`, `gang`"
+	multipleSchedulingPoliciesError = "must specify exactly one of: `basic`, `gang`"
+	multipleDisruptionModesError    = "must specify exactly one of: `single`, `all`"
+	supportedPoliciesError          = `supported values: "Never", "PreemptLowerPriority"`
+	forbiddenError                  = "Forbidden"
 )
+
+func compositePodGroupWithSchedulingConstraints(keys ...string) *scheduling.CompositePodGroup {
+	result := cpg.DeepCopy()
+	result.Spec.SchedulingConstraints = &scheduling.CompositePodGroupSchedulingConstraints{
+		Topology: []scheduling.TopologyConstraint{},
+	}
+	for _, key := range keys {
+		constraint := scheduling.TopologyConstraint{Key: key}
+		result.Spec.SchedulingConstraints.Topology = append(result.Spec.SchedulingConstraints.Topology, constraint)
+	}
+	return result
+}
+
+func cpgWithDisruptionModeAll() *scheduling.CompositePodGroup {
+	cpg := cpg.DeepCopy()
+	cpg.Spec.DisruptionMode = &scheduling.CompositeDisruptionMode{
+		All: &scheduling.AllCompositeDisruptionMode{},
+	}
+	return cpg
+}
+
+func cpgWithDisruptionModeBoth() *scheduling.CompositePodGroup {
+	cpg := cpg.DeepCopy()
+	cpg.Spec.DisruptionMode = &scheduling.CompositeDisruptionMode{
+		Single: &scheduling.SingleCompositeDisruptionMode{},
+		All:    &scheduling.AllCompositeDisruptionMode{},
+	}
+	return cpg
+}
+
+func cpgWithPreemptionPolicy(policy scheduling.PreemptionPolicy) *scheduling.CompositePodGroup {
+	cpg := cpg.DeepCopy()
+	cpg.Spec.PreemptionPolicy = &policy
+	return cpg
+}
 
 func TestStrategy(t *testing.T) {
 	strategy := NewStrategy()
@@ -84,9 +125,10 @@ func TestStrategyCreate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 
 	testCases := map[string]struct {
-		obj                   *scheduling.CompositePodGroup
-		expectObj             *scheduling.CompositePodGroup
-		expectValidationError string
+		obj                            *scheduling.CompositePodGroup
+		expectObj                      *scheduling.CompositePodGroup
+		enablePodGroupPreemptionPolicy bool
+		expectValidationError          string
 	}{
 		"simple": {
 			obj:       cpg,
@@ -114,7 +156,7 @@ func TestStrategyCreate(t *testing.T) {
 				c.Spec.SchedulingPolicy.Basic = &scheduling.CompositeBasicSchedulingPolicy{}
 				return c
 			}(),
-			expectValidationError: multipleFieldsSetError,
+			expectValidationError: multipleSchedulingPoliciesError,
 		},
 		"validation error - neither basic nor gang specified": {
 			obj: func() *scheduling.CompositePodGroup {
@@ -172,6 +214,45 @@ func TestStrategyCreate(t *testing.T) {
 			}(),
 			expectValidationError: maximumError,
 		},
+		"multiple topology constraints": {
+			obj:                   compositePodGroupWithSchedulingConstraints("foo", "bar"),
+			expectValidationError: "must have at most 1 item",
+		},
+		"invalid topology key": {
+			obj:                   compositePodGroupWithSchedulingConstraints("foo-"),
+			expectValidationError: "Invalid value: \"foo-\"",
+		},
+		"disruption mode all": {
+			obj:       cpgWithDisruptionModeAll(),
+			expectObj: cpgWithDisruptionModeAll(),
+		},
+		"both disruption modes set": {
+			obj:                   cpgWithDisruptionModeBoth(),
+			expectValidationError: multipleDisruptionModesError,
+		},
+		"podgroup preemptionPolicy disabled - drop preemptionPolicy": {
+			obj:       cpgWithPreemptionPolicy(scheduling.PreemptNever),
+			expectObj: cpg,
+		},
+		"podgroup preemptionPolicy disabled - drop invalid preemptionPolicy": {
+			obj:       cpgWithPreemptionPolicy(scheduling.PreemptionPolicy("Invalid")),
+			expectObj: cpg,
+		},
+		"podgroup preemptionPolicy enabled - preserve preemptionPolicy (Never)": {
+			obj:                            cpgWithPreemptionPolicy(scheduling.PreemptNever),
+			expectObj:                      cpgWithPreemptionPolicy(scheduling.PreemptNever),
+			enablePodGroupPreemptionPolicy: true,
+		},
+		"podgroup preemptionPolicy enabled - preserve preemptionPolicy (PreemptLowerPriority)": {
+			obj:                            cpgWithPreemptionPolicy(scheduling.PreemptLowerPriority),
+			expectObj:                      cpgWithPreemptionPolicy(scheduling.PreemptLowerPriority),
+			enablePodGroupPreemptionPolicy: true,
+		},
+		"podgroup preemptionPolicy enabled - invalid preemptionPolicy": {
+			obj:                            cpgWithPreemptionPolicy(scheduling.PreemptionPolicy("Invalid")),
+			enablePodGroupPreemptionPolicy: true,
+			expectValidationError:          supportedPoliciesError,
+		},
 	}
 
 	for name, tc := range testCases {
@@ -180,6 +261,7 @@ func TestStrategyCreate(t *testing.T) {
 				features.GenericWorkload:                 true,
 				features.CompositePodGroup:               true,
 				features.TopologyAwareWorkloadScheduling: true,
+				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			newCpg := tc.obj.DeepCopy()
 
@@ -218,9 +300,10 @@ func TestStrategyCreate(t *testing.T) {
 func TestStrategyUpdate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 	testCases := map[string]struct {
-		oldObj                *scheduling.CompositePodGroup
-		newObj                *scheduling.CompositePodGroup
-		expectValidationError string
+		oldObj                         *scheduling.CompositePodGroup
+		newObj                         *scheduling.CompositePodGroup
+		enablePodGroupPreemptionPolicy bool
+		expectValidationErrors         []string
 	}{
 		"no changes": {
 			oldObj: cpg,
@@ -233,7 +316,7 @@ func TestStrategyUpdate(t *testing.T) {
 				newCpg.Name += "bar"
 				return newCpg
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"updating workload ref not allowed": {
 			oldObj: cpg,
@@ -245,7 +328,7 @@ func TestStrategyUpdate(t *testing.T) {
 				}
 				return newCpg
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"changing parentCompositePodGroupName from nil not allowed": {
 			oldObj: cpg,
@@ -255,7 +338,7 @@ func TestStrategyUpdate(t *testing.T) {
 				newCpg.Spec.ParentCompositePodGroupName = &parent
 				return newCpg
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"changing parentCompositePodGroupName from non-nil not allowed": {
 			oldObj: func() *scheduling.CompositePodGroup {
@@ -270,7 +353,7 @@ func TestStrategyUpdate(t *testing.T) {
 				newCpg.Spec.ParentCompositePodGroupName = &parent
 				return newCpg
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"changing min group count in gang scheduling policy not allowed": {
 			oldObj: cpg,
@@ -279,7 +362,7 @@ func TestStrategyUpdate(t *testing.T) {
 				newCpg.Spec.SchedulingPolicy.Gang.MinGroupCount = 4
 				return newCpg
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"changing scheduling policy not allowed": {
 			oldObj: cpg,
@@ -290,7 +373,12 @@ func TestStrategyUpdate(t *testing.T) {
 				}
 				return newCpg
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
+		},
+		"changing disruption mode not allowed": {
+			oldObj:                 cpg,
+			newObj:                 cpgWithDisruptionModeAll(),
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"priority class name update": {
 			oldObj: cpg,
@@ -299,7 +387,7 @@ func TestStrategyUpdate(t *testing.T) {
 				cpg.Spec.PriorityClassName = "high-priority"
 				return cpg
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"priority update": {
 			oldObj: cpg,
@@ -308,7 +396,7 @@ func TestStrategyUpdate(t *testing.T) {
 				cpg.Spec.Priority = new(int32(2000))
 				return cpg
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"parentCompositePodGroupName update not allowed": {
 			oldObj: cpg,
@@ -317,7 +405,33 @@ func TestStrategyUpdate(t *testing.T) {
 				newCpg.Spec.ParentCompositePodGroupName = new("parent1")
 				return newCpg
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
+		},
+		"changing preemptionPolicy not allowed with podgroup preemptionPolicy disabled": {
+			oldObj:                 cpgWithPreemptionPolicy(scheduling.PreemptNever),
+			newObj:                 cpgWithPreemptionPolicy(scheduling.PreemptLowerPriority),
+			expectValidationErrors: []string{forbiddenError, fieldImmutableError},
+		},
+		"changing preemptionPolicy not allowed with podgroup preemptionPolicy enabled": {
+			oldObj:                         cpgWithPreemptionPolicy(scheduling.PreemptNever),
+			newObj:                         cpgWithPreemptionPolicy(scheduling.PreemptLowerPriority),
+			enablePodGroupPreemptionPolicy: true,
+			expectValidationErrors:         []string{fieldImmutableError},
+		},
+		"changing scheduling constraints not allowed": {
+			oldObj:                 compositePodGroupWithSchedulingConstraints("foo"),
+			newObj:                 compositePodGroupWithSchedulingConstraints(),
+			expectValidationErrors: []string{fieldImmutableError},
+		},
+		"changing topology constraints not allowed": {
+			oldObj:                 compositePodGroupWithSchedulingConstraints("foo"),
+			newObj:                 compositePodGroupWithSchedulingConstraints(),
+			expectValidationErrors: []string{fieldImmutableError},
+		},
+		"changing topology key not allowed": {
+			oldObj:                 compositePodGroupWithSchedulingConstraints("foo"),
+			newObj:                 compositePodGroupWithSchedulingConstraints("foobar"),
+			expectValidationErrors: []string{fieldImmutableError},
 		},
 	}
 
@@ -327,6 +441,7 @@ func TestStrategyUpdate(t *testing.T) {
 				features.GenericWorkload:                 true,
 				features.CompositePodGroup:               true,
 				features.TopologyAwareWorkloadScheduling: true,
+				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 			})
 			oldCpg := tc.oldObj.DeepCopy()
 			newCpg := tc.newObj.DeepCopy()
@@ -337,18 +452,20 @@ func TestStrategyUpdate(t *testing.T) {
 			errs := strategy.ValidateUpdate(ctx, newCpg, oldCpg)
 			errs = strategy.ValidateDeclaratively(ctx, newCpg, oldCpg, errs, operation.Update, strategy.DeclarativeValidationConfig(ctx, newCpg, oldCpg))
 			if len(errs) != 0 {
-				if tc.expectValidationError == "" {
+				if len(tc.expectValidationErrors) == 0 {
 					t.Fatalf("unexpected error(s): %v", errs)
 				}
-				if len(errs) != 1 {
-					t.Fatalf("exactly one error expected")
+				if len(errs) != len(tc.expectValidationErrors) {
+					t.Fatalf("expected %d errors, got %d", len(tc.expectValidationErrors), len(errs))
 				}
-				if errMsg := errs[0].Error(); !strings.Contains(errMsg, tc.expectValidationError) {
-					t.Fatalf("error %#v does not contain the expected message %q", errMsg, tc.expectValidationError)
+				for i, err := range errs {
+					if !strings.Contains(err.Error(), tc.expectValidationErrors[i]) {
+						t.Fatalf("error %#v does not contain the expected message %q", err.Error(), tc.expectValidationErrors[i])
+					}
 				}
 				return
 			}
-			if tc.expectValidationError != "" {
+			if len(tc.expectValidationErrors) != 0 {
 				t.Fatal("expected validation error(s), got none")
 			}
 		})

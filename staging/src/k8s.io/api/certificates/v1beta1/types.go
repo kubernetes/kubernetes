@@ -363,6 +363,8 @@ type ClusterTrustBundleList struct {
 
 // +genclient
 // +k8s:prerelease-lifecycle-gen:introduced=1.35
+// +k8s:prerelease-lifecycle-gen:deprecated=1.37
+// +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,PodCertificateRequest
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodCertificateRequest encodes a pod requesting a certificate from a given
@@ -626,6 +628,8 @@ const (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.35
+// +k8s:prerelease-lifecycle-gen:deprecated=1.37
+// +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,PodCertificateRequestList
 
 // PodCertificateRequestList is a collection of PodCertificateRequest objects
 type PodCertificateRequestList struct {

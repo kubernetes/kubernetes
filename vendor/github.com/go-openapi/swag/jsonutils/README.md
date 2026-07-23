@@ -1,11 +1,11 @@
- # jsonutils
+# jsonutils
 
 `jsonutils` exposes a few tools to work with JSON:
 
 - a fast, simple `Concat` to concatenate (not merge) JSON objects and arrays
 - `FromDynamicJSON` to convert a data structure into a "dynamic JSON" data structure
 - `ReadJSON` and `WriteJSON` behave like `json.Unmarshal` and `json.Marshal`,
-   with the ability to use another underlying serialization library through an `Adapter` 
+   with the ability to use another underlying serialization library through an `Adapter`
    configured at runtime
 - a `JSONMapSlice` structure that may be used to store JSON objects with the order of keys maintained
 
@@ -64,7 +64,7 @@ find a registered implementation that support ordered keys in objects.
 Our standard library implementation supports this.
 
 As of `v0.25.0`, we support through such an adapter the popular `mailru/easyjson`
-library, which kicks in when the passed values support the `easyjson.Unmarshaler` 
+library, which kicks in when the passed values support the `easyjson.Unmarshaler`
 or `easyjson.Marshaler` interfaces.
 
 In the future, we plan to add more similar libraries that compete on the go JSON
@@ -77,8 +77,9 @@ In package `github.com/go-openapi/swag/easyjson/adapters`, several adapters are 
 Each adapter is an independent go module. Hence you'll pick its dependencies only if you import it.
 
 At this moment we provide:
-* `stdlib`: JSON adapter based on the standard library
-* `easyjson`: JSON adapter based on the `github.com/mailru/easyjson`
+
+- `stdlib`: JSON adapter based on the standard library
+- `easyjson`: JSON adapter based on the `github.com/mailru/easyjson`
 
 The adapters provide the basic `Marshal` and `Unmarshal` capabilities, plus an implementation
 of the `MapSlice` pattern.

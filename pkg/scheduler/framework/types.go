@@ -28,8 +28,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -213,11 +213,6 @@ type NodeInfo struct {
 
 	// DeclaredFeatures is a set of features published by the node
 	DeclaredFeatures ndf.FeatureSet
-
-	// NodeAllocatableDRAClaimStates tracks the state of claims requesting node-allocatable resources
-	// (resources published in Node.Status.Allocatable like cpu, memory. etc.).
-	// This is used to enforce sharing policies for these claims on the node.
-	NodeAllocatableDRAClaimStates map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState
 }
 
 func (n *NodeInfo) GetPods() []fwk.PodInfo {
@@ -265,10 +260,6 @@ func (n *NodeInfo) GetNodeDeclaredFeatures() ndf.FeatureSet {
 	return n.DeclaredFeatures
 }
 
-func (n *NodeInfo) GetNodeAllocatableDRAClaimState() map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState {
-	return n.NodeAllocatableDRAClaimStates
-}
-
 // NodeInfo implements KMetadata, so for example klog.KObjSlice(nodes) works
 // when nodes is a []*NodeInfo.
 var _ klog.KMetadata = &NodeInfo{}
@@ -307,16 +298,15 @@ func (n *NodeInfo) Snapshot() fwk.NodeInfo {
 // SnapshotConcrete returns a copy of this node, Except that ImageStates is copied without the Nodes field.
 func (n *NodeInfo) SnapshotConcrete() *NodeInfo {
 	clone := &NodeInfo{
-		node:                          n.node,
-		Requested:                     n.Requested.Clone(),
-		NonZeroRequested:              n.NonZeroRequested.Clone(),
-		Allocatable:                   n.Allocatable.Clone(),
-		UsedPorts:                     make(fwk.HostPortInfo),
-		ImageStates:                   make(map[string]*fwk.ImageStateSummary),
-		PVCRefCounts:                  make(map[string]int),
-		Generation:                    n.Generation,
-		DeclaredFeatures:              n.DeclaredFeatures.Clone(),
-		NodeAllocatableDRAClaimStates: make(map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState),
+		node:             n.node,
+		Requested:        n.Requested.Clone(),
+		NonZeroRequested: n.NonZeroRequested.Clone(),
+		Allocatable:      n.Allocatable.Clone(),
+		UsedPorts:        make(fwk.HostPortInfo),
+		ImageStates:      make(map[string]*fwk.ImageStateSummary),
+		PVCRefCounts:     make(map[string]int),
+		Generation:       n.Generation,
+		DeclaredFeatures: n.DeclaredFeatures.Clone(),
 	}
 	if len(n.Pods) > 0 {
 		clone.Pods = append([]fwk.PodInfo(nil), n.Pods...)
@@ -347,9 +337,7 @@ func (n *NodeInfo) SnapshotConcrete() *NodeInfo {
 	for key, value := range n.PVCRefCounts {
 		clone.PVCRefCounts[key] = value
 	}
-	for key, value := range n.NodeAllocatableDRAClaimStates {
-		clone.NodeAllocatableDRAClaimStates[key] = value.Snapshot()
-	}
+
 	return clone
 }
 
@@ -462,42 +450,6 @@ func (n *NodeInfo) update(podInfo fwk.PodInfo, sign int64) {
 	n.updatePVCRefCounts(podInfo.GetPod(), sign > 0)
 
 	n.Generation = nextGeneration()
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
-		n.updateNodeAllocatableDRAClaimState(podInfo, sign)
-	}
-}
-
-// updateNodeAllocatableDRAClaimState updates the NodeInfo based on DRA node allocatable resource claims in the pod.
-func (n *NodeInfo) updateNodeAllocatableDRAClaimState(podInfo fwk.PodInfo, sign int64) {
-	pod := podInfo.GetPod()
-
-	if n.NodeAllocatableDRAClaimStates == nil && len(pod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
-		n.NodeAllocatableDRAClaimStates = make(map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState, len(pod.Status.NodeAllocatableResourceClaimStatuses))
-	}
-
-	for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
-		resourceClaimNamespacedName := types.NamespacedName{
-			Namespace: pod.Namespace,
-			Name:      claimStatus.ResourceClaimName,
-		}
-
-		if _, exists := n.NodeAllocatableDRAClaimStates[resourceClaimNamespacedName]; !exists {
-			n.NodeAllocatableDRAClaimStates[resourceClaimNamespacedName] = &fwk.NodeAllocatableDRAClaimState{
-				ConsumerPods: sets.New[types.UID](),
-			}
-		}
-		state := n.NodeAllocatableDRAClaimStates[resourceClaimNamespacedName]
-
-		if sign > 0 {
-			state.ConsumerPods.Insert(pod.UID)
-		} else {
-			state.ConsumerPods.Delete(pod.UID)
-			if state.ConsumerPods.Len() == 0 {
-				delete(n.NodeAllocatableDRAClaimStates, resourceClaimNamespacedName)
-			}
-		}
-	}
 }
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.
@@ -1061,7 +1013,7 @@ func (pgqi *QueuedPodGroupInfo) SetFlushTimestamp(t time.Time) {
 }
 
 // AddPodGroup adds a pod group to the queued pod group info hierarchy.
-func (pgqi *QueuedPodGroupInfo) AddPodGroup(pg *schedulingv1alpha3.PodGroup) {
+func (pgqi *QueuedPodGroupInfo) AddPodGroup(pg *schedulingv1beta1.PodGroup) {
 	// We only add non-root pod groups to the hierarchy, because the root
 	// pod group is already present in the hierarchy.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) || pg.Spec.ParentCompositePodGroupName == nil {
@@ -1087,7 +1039,7 @@ func (pgqi *QueuedPodGroupInfo) AddPodGroup(pg *schedulingv1alpha3.PodGroup) {
 }
 
 // UpdatePodGroup updates a pod group in the queued pod group info hierarchy.
-func (pgqi *QueuedPodGroupInfo) UpdatePodGroup(pg *schedulingv1alpha3.PodGroup) {
+func (pgqi *QueuedPodGroupInfo) UpdatePodGroup(pg *schedulingv1beta1.PodGroup) {
 	node, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, pg.Name)
 	if node != nil && node.GetPodGroup() != nil {
 		node.PodGroup = pg
@@ -1096,7 +1048,7 @@ func (pgqi *QueuedPodGroupInfo) UpdatePodGroup(pg *schedulingv1alpha3.PodGroup) 
 
 // RemovePodGroup removes a pod group from the queued pod group info hierarchy.
 // It returns a slice of all pods within the hierarchy of the removed pod group.
-func (pgqi *QueuedPodGroupInfo) RemovePodGroup(pg *schedulingv1alpha3.PodGroup) []*QueuedPodInfo {
+func (pgqi *QueuedPodGroupInfo) RemovePodGroup(pg *schedulingv1beta1.PodGroup) []*QueuedPodInfo {
 	node, parent := findNodeAndParent(pgqi.PodGroupInfo, nil, pg.Name)
 	if node == nil {
 		return nil
@@ -1193,7 +1145,7 @@ func (pgqi *QueuedPodGroupInfo) deleteSubtreePods(curr *PodGroupInfo) []*QueuedP
 	return removedPods
 }
 
-func newQueuedPodGroupInfo(pg *schedulingv1alpha3.PodGroup) *QueuedPodGroupInfo {
+func newQueuedPodGroupInfo(pg *schedulingv1beta1.PodGroup) *QueuedPodGroupInfo {
 	return &QueuedPodGroupInfo{
 		PodGroupInfo: &PodGroupInfo{
 			Namespace: pg.Namespace,
@@ -1219,9 +1171,10 @@ type PodGroupInfo struct {
 	// It can be useful to also retrieve the scheduled (assumed or assigned) pods.
 	// PodGroupManager.PodGroupState can be used for that.
 	// The order of the pods is deterministic and based on signature, priority and timestamp.
+	// Only leaf pod groups have unscheduled pods.
 	UnscheduledPods []*v1.Pod
 	// PodGroup is a PodGroup API object.
-	PodGroup *schedulingv1alpha3.PodGroup
+	PodGroup *schedulingv1beta1.PodGroup
 	// CompositePodGroup is a CompositePodGroup API object.
 	// It should be set only when CompositePodGroup feature is enabled.
 	CompositePodGroup *schedulingv1alpha3.CompositePodGroup
@@ -1245,16 +1198,37 @@ func (pgi *PodGroupInfo) GetKey() string {
 	return fmt.Sprintf("%s/%s/%s", pgi.Type, pgi.Namespace, pgi.Name)
 }
 
+// GetUnscheduledPods returns the unscheduled pods for this pod group.
+// For composite pod groups, this method recursively aggregates the unscheduled pods
+// from all leaf pod groups in the hierarchy.
 func (pgi *PodGroupInfo) GetUnscheduledPods() []*v1.Pod {
-	return pgi.UnscheduledPods
+	if pgi.PodGroup != nil {
+		return pgi.UnscheduledPods
+	}
+	var pods []*v1.Pod
+	for _, child := range pgi.Children {
+		pods = append(pods, child.GetUnscheduledPods()...)
+	}
+	return pods
 }
 
-func (pgi *PodGroupInfo) GetPodGroup() *schedulingv1alpha3.PodGroup {
+func (pgi *PodGroupInfo) GetPodGroup() *schedulingv1beta1.PodGroup {
 	return pgi.PodGroup
 }
 
 func (pgi *PodGroupInfo) GetCompositePodGroup() *schedulingv1alpha3.CompositePodGroup {
 	return pgi.CompositePodGroup
+}
+
+func (pgi *PodGroupInfo) GetChildren() []fwk.PodGroupInfo {
+	if len(pgi.Children) == 0 {
+		return nil
+	}
+	children := make([]fwk.PodGroupInfo, len(pgi.Children))
+	for i, child := range pgi.GetChildGroups() {
+		children[i] = child
+	}
+	return children
 }
 
 func (pgi *PodGroupInfo) GetCreationTimestamp() time.Time {
@@ -1264,14 +1238,15 @@ func (pgi *PodGroupInfo) GetCreationTimestamp() time.Time {
 	return pgi.CompositePodGroup.CreationTimestamp.Time
 }
 
-func (pgi *PodGroupInfo) GetChildren() []*PodGroupInfo {
+func (pgi *PodGroupInfo) GetChildGroups() []*PodGroupInfo {
 	if pgi.CompositePodGroup == nil {
 		// Only CompositePodGroups have children groups.
 		return nil
 	}
 	result := make([]*PodGroupInfo, len(pgi.Children))
 	copy(result, pgi.Children)
-	// Sort the children by creation timestamp.
+	// Sort the children by creation timestamp. If timestamps are equal, compare the child groups
+	// by their names to have a tie-breaker that enforces deterministic order.
 	slices.SortFunc(result, func(a, b *PodGroupInfo) int {
 		aTime := a.GetCreationTimestamp()
 		bTime := b.GetCreationTimestamp()
@@ -1279,6 +1254,11 @@ func (pgi *PodGroupInfo) GetChildren() []*PodGroupInfo {
 			return -1
 		}
 		if aTime.After(bTime) {
+			return 1
+		}
+		if a.Name < b.Name {
+			return -1
+		} else if a.Name > b.Name {
 			return 1
 		}
 		return 0
@@ -1680,14 +1660,13 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 // the returned object.
 func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 	ni := &NodeInfo{
-		Requested:                     &Resource{},
-		NonZeroRequested:              &Resource{},
-		Allocatable:                   &Resource{},
-		Generation:                    nextGeneration(),
-		UsedPorts:                     make(fwk.HostPortInfo),
-		ImageStates:                   make(map[string]*fwk.ImageStateSummary),
-		PVCRefCounts:                  make(map[string]int),
-		NodeAllocatableDRAClaimStates: make(map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState),
+		Requested:        &Resource{},
+		NonZeroRequested: &Resource{},
+		Allocatable:      &Resource{},
+		Generation:       nextGeneration(),
+		UsedPorts:        make(fwk.HostPortInfo),
+		ImageStates:      make(map[string]*fwk.ImageStateSummary),
+		PVCRefCounts:     make(map[string]int),
 	}
 	for _, pod := range pods {
 		ni.AddPod(pod)

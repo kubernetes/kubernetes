@@ -570,6 +570,7 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 		// better to wait. This does not matter yet as long the incomplete pool
 		// has some matching device.
 		requestData.allDevices = make([]deviceWithID, 0, resourceapi.AllocationResultsMaxSize)
+		emptyConsumedCapacity := NewConsumedCapacity() // reusable: CmpRequestOverCapacity clones/reads only
 		for _, pool := range pools {
 			if pool.IsIncomplete {
 				return requestData, fmt.Errorf("claim %s, request %s: asks for all devices, but resource pool %s is currently being updated", klog.KObj(claim), request.name(), pool.PoolID)
@@ -591,16 +592,16 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 							pool:   pool,
 						}
 						if alloc.features.ConsumableCapacity {
-							// Next validate whether resource request over capacity
-							device := slice.Spec.Devices[deviceIndex]
-							success, err := alloc.CmpRequestOverCapacity(requestData.request, slice, device)
+							// Static capacity only: remaining capacity is checked in allocateDevice
+							// so capacity-blocked matching devices stay in allDevices and All fails.
+							apiDevice := slice.Spec.Devices[deviceIndex]
+							success, err := CmpRequestOverCapacity(emptyConsumedCapacity, requestData.request.capacities(),
+								apiDevice.AllowMultipleAllocations, apiDevice.Capacity, emptyConsumedCapacity, alloc.features.FractionalCapacityRange)
 							if err != nil {
-								alloc.logger.V(7).Info("Skip comparing device capacity request",
-									"device", device, "request", requestData.request.name(), "err", err)
-								continue
+								return requestData, fmt.Errorf("claim %s, request %s: checking capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), apiDevice.Name, err)
 							}
 							if !success {
-								alloc.logger.V(7).Info("Device capacity not enough", "device", device)
+								alloc.logger.V(7).Info("Device static capacity insufficient", "device", apiDevice)
 								continue
 							}
 						}
@@ -1137,9 +1138,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool, st
 					device := slice.Spec.Devices[deviceIndex]
 					success, err := alloc.CmpRequestOverCapacity(requestData.request, slice, device)
 					if err != nil {
-						alloc.logger.V(7).Info("Skip comparing device capacity request",
-							"device", deviceID, "request", requestData.request.name(), "err", err)
-						continue
+						return false, fmt.Errorf("claim %s, request %s: checking capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), deviceID, err)
 					}
 					if !success {
 						alloc.logger.V(7).Info("Device capacity not enough", "device", deviceID)
@@ -1437,12 +1436,11 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	if alloc.features.ConsumableCapacity {
 		// Validate whether resource request over capacity
 		success, err := alloc.CmpRequestOverCapacity(requestData.request, device.slice, *device.Device)
-		// The error should not occur at this point as it should be detected in the previous step.
 		if err != nil {
-			alloc.logger.V(7).Info("Failed to compare device capacity request on allocateDevice",
-				"device", device, "request", requestData.request.name(), "err", err)
+			// The overflow guard already ran during validation, so an error here is
+			// unexpected. Roll back and surface it rather than swallowing it.
 			alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
-			return false, nil, nil
+			return false, nil, fmt.Errorf("claim %s, request %s: rechecking capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), device.id, err)
 		}
 		if !success {
 			alloc.logger.V(7).Info("Device capacity not enough", "device", device)
@@ -1451,7 +1449,11 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		}
 
 		if allowMultipleAllocations {
-			consumedCapacity = GetConsumedCapacityFromRequest(request.capacities(), device.Capacity, alloc.features.FractionalCapacityRange)
+			consumedCapacity, err = GetConsumedCapacityFromRequest(request.capacities(), device.Capacity, alloc.features.FractionalCapacityRange)
+			if err != nil {
+				alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
+				return false, nil, fmt.Errorf("claim %s, request %s: computing consumed capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), device.id, err)
+			}
 			shareID = GenerateNewShareID()
 			alloc.logger.V(7).Info("Device capacity allocated", "device", device.id,
 				"consumed capacity", klog.Format(consumedCapacity))

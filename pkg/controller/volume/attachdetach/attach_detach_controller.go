@@ -193,7 +193,7 @@ func NewAttachDetachController(
 		adc.csiMigratedPluginManager,
 		adc.intreeToCSITranslator)
 
-	podInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
+	_, err := podInformer.Informer().AddEventHandlerWithOptions(kcache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			adc.podAdd(logger, obj)
 		},
@@ -203,7 +203,10 @@ func NewAttachDetachController(
 		DeleteFunc: func(obj interface{}) {
 			adc.podDelete(logger, obj)
 		},
-	})
+	}, kcache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("could not add pod event handler: %w", err)
+	}
 
 	// This custom indexer will index pods by its PVC keys. Then we don't need
 	// to iterate all pods every time to find pods which reference given PVC.
@@ -211,7 +214,7 @@ func NewAttachDetachController(
 		return nil, fmt.Errorf("could not initialize attach detach controller: %w", err)
 	}
 
-	nodeInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
+	_, err = nodeInformer.Informer().AddEventHandlerWithOptions(kcache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			adc.nodeAdd(logger, obj)
 		},
@@ -221,16 +224,22 @@ func NewAttachDetachController(
 		DeleteFunc: func(obj interface{}) {
 			adc.nodeDelete(logger, obj)
 		},
-	})
+	}, kcache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("could not add node event handler: %w", err)
+	}
 
-	pvcInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
+	_, err = pvcInformer.Informer().AddEventHandlerWithOptions(kcache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			adc.enqueuePVC(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			adc.enqueuePVC(new)
 		},
-	})
+	}, kcache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("could not add pvc event handler: %w", err)
+	}
 
 	return adc, nil
 }

@@ -4294,9 +4294,10 @@ func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, ku
 	newCfg.FeatureGates["CPUManagerPolicyBetaOptions"] = kubeletArguments.enableCPUManagerOptions
 	newCfg.FeatureGates["CPUManagerPolicyAlphaOptions"] = kubeletArguments.enableCPUManagerOptions
 	newCfg.FeatureGates["PodLevelResources"] = kubeletArguments.enablePodLevelResources
-	// InPlacePodLevelResourcesVerticalScaling and PodLevelResourcesFixKubeletQOSClass are only supported when PodLevelResources is enabled
+	// InPlacePodLevelResourcesVerticalScaling, PodLevelResourcesFixDefaulting and PodLevelResourcesFixKubeletQOSClass are only supported when PodLevelResources is enabled
 	if !kubeletArguments.enablePodLevelResources {
 		newCfg.FeatureGates["InPlacePodLevelResourcesVerticalScaling"] = kubeletArguments.enablePodLevelResources
+		newCfg.FeatureGates["PodLevelResourcesFixDefaulting"] = kubeletArguments.enablePodLevelResources
 		newCfg.FeatureGates["PodLevelResourcesFixKubeletQOSClass"] = kubeletArguments.enablePodLevelResources
 	}
 	newCfg.FeatureGates["PodLevelResourceManagers"] = kubeletArguments.enablePodLevelResourceManagers

@@ -28,7 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
@@ -110,6 +111,14 @@ type stateData struct {
 
 	// nodeAllocations caches the result of Filter for the nodes, its key is node name.
 	nodeAllocations map[string]nodeAllocation
+
+	// claimHasNodeAllocatableMappedDevice stores whether a claim's allocation is mapped.
+	// A claim is mapped if it is allocated a device that models a node-allocatable
+	// resource (like cpu, memory) via the NodeAllocatableResources.Mapping field in the
+	// Device spec inside the ResourceSlice.
+	// This map is used in the Filter phase to prevent sharing these mapped claims across pods.
+	// Populated in PreFilter and read in Filter.
+	claimHasNodeAllocatableMappedDevice map[types.UID]bool
 }
 
 func (d *stateData) Clone() fwk.StateData {
@@ -121,14 +130,15 @@ func (d *stateData) Clone() fwk.StateData {
 // method to update the value.
 type podGroupStateData struct {
 	// pendingAllocations stores the UIDs of ResourceClaims that are currently
-	// pending for *this* PodGroup scheduling cycle. The DRAManager continues to
+	// pending for *this* PodGroup scheduling cycle, mapped to the set of Pod UIDs of
+	// the pods sharing the pending allocation. The DRAManager continues to
 	// track inter-cycle sharing of pending allocations, including the
 	// allocations themselves and how many Pods are sharing them.
 	//
 	// It does not need to be protected by a lock because a PodGroup's
 	// CycleState is only available during synchronous scheduling phases and is
 	// cleared before asynchronous phases begin.
-	pendingAllocations sets.Set[types.UID]
+	pendingAllocations map[types.UID]sets.Set[types.UID]
 
 	// podsStateData stores the stateData of each pod in the PodGroup.
 	podsStateData map[types.NamespacedName]*stateData
@@ -257,7 +267,7 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		// A new or updated node may make pods schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeAllocatable}},
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
-		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterClaimChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update | fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterClaimChange},
 		// Adding the ResourceClaim name to the pod status makes pods waiting for their ResourceClaim schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate},
 		// A pod might be waiting for a class to get created or modified.
@@ -283,15 +293,49 @@ func (pl *DynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status
 	return nil
 }
 
-// isSchedulableAfterClaimChange is invoked for add and update claim events reported by
+// isSchedulableAfterClaimChange is invoked for add/update/delete claim events reported by
 // an informer. It checks whether that change made a previously unschedulable
 // pod schedulable. It errs on the side of letting a pod scheduling attempt
-// happen. The delete claim event will not invoke it, so newObj will never be nil.
+// happen.
 func (pl *DynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	if newObj == nil {
+		if _, ok := (oldObj).(cache.DeletedFinalStateUnknown); ok {
+			// Normally we should have seen an update event where the allocation got removed.
+			// In that case, the deleted object will have no allocation and we could skip queuing. However,
+			// here we are told that the final state of the deleted ResourceClaim is unknown, so
+			// the content of the ResourceClaim is unknown. It might not even be available at all.
+			// We could have missed the updates which add and remove the allocation, so play it safe
+			// and check pending pods.
+			logger.V(6).Info("claim with structured parameters got deleted, final state unknown")
+			return fwk.Queue, nil
+		}
+	}
+
 	originalClaim, modifiedClaim, err := schedutil.As[*resourceapi.ResourceClaim](oldObj, newObj)
 	if err != nil {
 		// Shouldn't happen.
 		return fwk.Queue, fmt.Errorf("unexpected object in isSchedulableAfterClaimChange: %w", err)
+	}
+
+	if modifiedClaim == nil {
+		// ResourceClaim deleted, final state is known (checked above)
+		// In this case we expect the allocation to be nil, but checking is cheap,
+		// so let's make sure.
+		//
+		// Note that this relies on not missing the "allocation removed" update event.
+		// With normal informers, that could be missed because "allocation added"
+		// and "allocation removed" could be joined into a single update event
+		// which then looks like an unrelated change (allocation nil before and after).
+		// But we use an assume cache and should be the only entity which adds
+		// the allocation, so we are guaranteed to not miss the "allocation added"
+		// event and thus will also see the "allocation removed".
+		if originalClaim.Status.Allocation == nil {
+			logger.V(6).Info("claim with structured parameters got deleted, had no allocation")
+			return fwk.QueueSkip, nil
+		}
+		// This is unusual and should not happen in practice.
+		logger.V(6).Info("claim with structured parameters got deleted, had an allocation")
+		return fwk.Queue, nil
 	}
 
 	usesClaim := false
@@ -459,7 +503,9 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 	// anything for it. We just initialize an empty state to record that
 	// observation for the other functions. This gets updated below
 	// if we get that far.
-	s := &stateData{}
+	s := &stateData{
+		nodeAllocations: make(map[string]nodeAllocation),
+	}
 	state.Write(stateKey, s)
 
 	podGroupState, err := getOrCreatePodGroupStateData(state)
@@ -534,7 +580,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			// GenericWorkload feature gate. Sharing claims this way more
 			// broadly may have benefits:
 			// https://github.com/kubernetes/kubernetes/issues/137932
-			if podGroupState != nil && podGroupState.pendingAllocations.Has(claim.UID) {
+			if podGroupState != nil && podGroupState.pendingAllocations[claim.UID] != nil {
 				if pendingAllocation := pl.draManager.ResourceClaims().GetPendingAllocation(claim.UID); pendingAllocation != nil {
 					s.informationsForClaim[index].allocation = pendingAllocation
 					nodeSelector, err := nodeSelectorFromAllocation(pendingAllocation)
@@ -590,6 +636,40 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 				default:
 					return nil, statusUnschedulable(logger, fmt.Sprintf("resource claim %s, request %s: unknown request type", klog.KObj(claim), request.Name))
 				}
+			}
+		}
+	}
+
+	// Pre-compute whether each claim has a node-allocatable mapped device.
+	// This is stored in CycleState and used during the Filter phase to determine
+	// whether a pod is sharing a direct mapped claim from another pod.
+	if pl.fts.EnableDRANodeAllocatableResources {
+		s.claimHasNodeAllocatableMappedDevice = make(map[types.UID]bool)
+		for index, claim := range claims.all() {
+			allocation := claim.Status.Allocation
+			if allocation == nil {
+				// If the claim is not yet committed to the API server (no claim.Status.Allocation),
+				// we must check if there is a pending allocation from a previous pod in this
+				// scheduling cycle.
+				allocation = s.informationsForClaim[index].allocation
+			}
+			if allocation != nil {
+				isMapped := false
+				for _, result := range allocation.Devices.Results {
+					device, err := getDeviceFromManager(pl.draManager, &result)
+					if err == nil && device != nil && device.NodeAllocatableResources != nil {
+						for _, mapping := range device.NodeAllocatableResources {
+							if mapping.Mapping != nil {
+								isMapped = true
+								break
+							}
+						}
+					}
+					if isMapped {
+						break
+					}
+				}
+				s.claimHasNodeAllocatableMappedDevice[claim.UID] = isMapped
 			}
 		}
 	}
@@ -665,7 +745,6 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			return nil, statusError(logger, err)
 		}
 		s.allocator = allocator
-		s.nodeAllocations = make(map[string]nodeAllocation)
 	}
 	s.claims = claims
 	return nil, nil
@@ -784,6 +863,15 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		return nil
 	}
 
+	var podGroupState *podGroupStateData
+	if pl.fts.EnableDRANodeAllocatableResources {
+		var err error
+		podGroupState, err = getPodGroupStateData(cs)
+		if err != nil {
+			return statusError(klog.FromContext(ctx), err)
+		}
+	}
+
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 	nodeExtendedResourceClaim, containerResourceRequestMappings, status := pl.filterExtendedResources(state, pod, nodeInfo, logger)
@@ -807,14 +895,8 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			continue
 		}
 
-		if claim.Status.Allocation == nil {
-			// The claim is not allocated yet, don't have to check
-			// anything else.
-			continue
-		}
-
 		// The claim is allocated, check whether it is ready for binding.
-		if pl.fts.EnableDRADeviceBindingConditions && pl.fts.EnableDRAResourceClaimDeviceStatus {
+		if claim.Status.Allocation != nil && pl.fts.EnableDRADeviceBindingConditions && pl.fts.EnableDRAResourceClaimDeviceStatus {
 			ready, err := pl.isClaimReadyForBinding(claim)
 			// If the claim is not ready yet (ready false, no error) and binding has timed out
 			// or binding has failed (err non-nil), then the scheduler should consider deallocating this
@@ -828,9 +910,18 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			}
 		}
 
-		// The claim is allocated, check if its a node-allocatable resource claim that is already allocated.
+		// Check if it's a node-allocatable resource claim that is already allocated.
 		if pl.fts.EnableDRANodeAllocatableResources {
-			status := pl.validateNodeAllocatableDRAClaimSharing(pod, nodeInfo, claim)
+			allocation := claim.Status.Allocation
+			if allocation == nil {
+				// Check if there is a pending allocation from a previous pod in this cycle.
+				allocation = state.informationsForClaim[index].allocation
+			}
+			if allocation == nil {
+				// Not allocated yet, and no pending allocation. Skip.
+				continue
+			}
+			status := pl.validateNodeAllocatableDRAClaimSharing(pod, claim, state, podGroupState)
 			if status != nil {
 				return status
 			}
@@ -839,6 +930,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	// Use allocator to check the node and cache the result in case that the node is picked.
 	var allocations []resourceapi.AllocationResult
 	var nodeAllocatableClaimStatus []v1.NodeAllocatableResourceClaimStatus
+	allocationsMap := make(map[types.UID]*resourceapi.AllocationResult)
 	if state.allocator != nil {
 		allocCtx := ctx
 		if loggerV := logger.V(5); loggerV.Enabled() {
@@ -868,6 +960,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			}
 			if state.informationsForClaim[index].allocation != nil {
 				pendingResult = append(pendingResult, *state.informationsForClaim[index].allocation)
+				allocationsMap[claim.UID] = state.informationsForClaim[index].allocation
 				continue
 			}
 			claimsToAllocate = append(claimsToAllocate, claim)
@@ -906,27 +999,26 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			return statusUnschedulable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
 		}
 
-		if pl.fts.EnableDRANodeAllocatableResources {
-			allocationsMap := make(map[types.UID]*resourceapi.AllocationResult)
-			for i, claim := range claimsToAllocate {
-				allocationsMap[claim.UID] = &allocationResult[i]
-			}
-			for i, claim := range state.claims.toAllocate() {
-				if state.informationsForClaim[i].allocation != nil {
-					allocationsMap[claim.UID] = state.informationsForClaim[i].allocation
-				}
-			}
-			nodeAllocatableClaimStatus, status = pl.calculateAndCheckNodeAllocatableResources(ctx, state, pod, nodeInfo, allocationsMap)
-			if status != nil {
-				return status
-			}
-		}
 		// Reserve uses this information.
 		allocations = append(allocationResult, pendingResult...)
+
+		// allocations contains allocationResult followed by pendingResult.
+		// The first len(claimsToAllocate) elements match claimsToAllocate.
+		for i, claim := range claimsToAllocate {
+			allocationsMap[claim.UID] = &allocations[i]
+		}
+	}
+
+	if pl.fts.EnableDRANodeAllocatableResources {
+		var status *fwk.Status
+		nodeAllocatableClaimStatus, status = pl.calculateAndCheckNodeAllocatableResources(ctx, state, pod, nodeInfo, allocationsMap)
+		if status != nil {
+			return status
+		}
 	}
 
 	// Store information in state while holding the mutex.
-	if state.allocator != nil || len(unavailableClaims) > 0 {
+	if state.allocator != nil || len(unavailableClaims) > 0 || len(nodeAllocatableClaimStatus) > 0 {
 		state.mutex.Lock()
 		defer state.mutex.Unlock()
 	}
@@ -946,7 +1038,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		return statusUnschedulable(logger, "resourceclaim not available on the node", "pod", klog.KObj(pod))
 	}
 
-	if state.allocator != nil {
+	if state.allocator != nil || len(nodeAllocatableClaimStatus) > 0 {
 		state.nodeAllocations[node.Name] = nodeAllocation{
 			allocationResults:                    allocations,
 			extendedResourceClaim:                nodeExtendedResourceClaim,
@@ -1341,7 +1433,10 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 			allocIndex++
 
 			if podGroupState != nil {
-				podGroupState.pendingAllocations.Insert(claim.UID)
+				if _, ok := podGroupState.pendingAllocations[claim.UID]; !ok {
+					podGroupState.pendingAllocations[claim.UID] = sets.New[types.UID]()
+				}
+				podGroupState.pendingAllocations[claim.UID].Insert(pod.UID)
 			}
 		}
 	}
@@ -1409,7 +1504,7 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 			// completes for all the Pods sharing that pending allocation and
 			// they can be Reserved again in another cycle.
 			if pgStateData != nil {
-				pgStateData.pendingAllocations.Delete(claim.UID)
+				delete(pgStateData.pendingAllocations, claim.UID)
 			}
 		}
 
@@ -1673,7 +1768,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, pod
 					// the Pods sharing that pending allocation and they can be
 					// Reserved again in another cycle.
 					if podGroupState != nil {
-						podGroupState.pendingAllocations.Delete(claim.UID)
+						delete(podGroupState.pendingAllocations, claim.UID)
 					}
 					logger.V(5).Info("Removed claim from in-flight claims", "claim", klog.KObj(claim), "uid", claimUID, "resourceVersion", resourceVersion, "allocation", klog.Format(allocation))
 				}

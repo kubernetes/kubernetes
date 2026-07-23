@@ -8,7 +8,7 @@ description: >-
 
 ## Metrics (v1.37)
 
-<!-- (auto-generated 2026 Jul 15) -->
+<!-- (auto-generated 2026 Jul 17) -->
 <!-- (auto-generated v1.37) -->
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
 components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
@@ -250,7 +250,7 @@ Stable metrics observe strict API contracts and no labels can be added or remove
 	<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="stable">
 	<div class="metric_name">scheduler_preemption_victims</div>
-	<div class="metric_help">Number of selected preemption victims</div>
+	<div class="metric_help">Number of selected preemption victims for preemption initiated by a single pod</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">STABLE</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
@@ -620,12 +620,26 @@ Beta metrics observe a looser API contract than its stable counterparts. No labe
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">extension_point</span><span class="metric_label">plugin</span><span class="metric_label">profile</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">scheduler_plugin_execution_duration_seconds</div>
+	<div class="metric_help">Duration for running a plugin at a specific extension point.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">extension_point</span><span class="metric_label">plugin</span><span class="metric_label">status</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">scheduler_pod_scheduling_sli_duration_seconds</div>
 	<div class="metric_help">E2e latency for a pod being scheduled, from the time the pod enters the scheduling queue and might involve multiple scheduling attempts.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">attempts</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="beta">
+	<div class="metric_name">scheduler_scheduling_algorithm_duration_seconds</div>
+	<div class="metric_help">Scheduling algorithm latency in seconds</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">BETA</span></li>
+	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
+	<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="beta">
 	<div class="metric_name">scheduler_unschedulable_pods</div>
 	<div class="metric_help">The number of unschedulable pods broken down by plugin name. A pod will increment the gauge for all plugins that caused it to not schedule and so this metric have meaning only when broken down by plugin.</div>
@@ -1327,20 +1341,6 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="timingratiohistogram"><label class="metric_detail">Type:</label> <span class="metric_type">TimingRatioHistogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">phase</span><span class="metric_label">request_kind</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">apiserver_flowcontrol_request_concurrency_in_use</div>
-	<div class="metric_help">Concurrency (number of seats) occupied by the currently executing (initial stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness subsystem</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">flow_schema</span><span class="metric_label">priority_level</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li><li class="metric_deprecated_version"><label class="metric_detail">Deprecated Versions:</label><span>1.31.0</span></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">apiserver_flowcontrol_request_concurrency_limit</div>
-	<div class="metric_help">Nominal number of execution seats configured for each priority level</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">priority_level</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li><li class="metric_deprecated_version"><label class="metric_detail">Deprecated Versions:</label><span>1.30.0</span></li></ul>
-	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">apiserver_flowcontrol_request_dispatch_no_accommodation_total</div>
 	<div class="metric_help">Number of times a dispatch attempt resulted in a non accommodation due to lack of available seats</div>
 	<ul>
@@ -1544,13 +1544,6 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">component</span><span class="metric_label">group</span><span class="metric_label">resource</span><span class="metric_label">scope</span><span class="metric_label">subresource</span><span class="metric_label">verb</span><span class="metric_label">version</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">apiserver_request_slo_duration_seconds</div>
-	<div class="metric_help">Response latency distribution (not counting webhook duration and priority & fairness queue wait times) in seconds for each verb, group, version, resource, subresource, scope and component.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">component</span><span class="metric_label">group</span><span class="metric_label">resource</span><span class="metric_label">scope</span><span class="metric_label">subresource</span><span class="metric_label">verb</span><span class="metric_label">version</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li><li class="metric_deprecated_version"><label class="metric_detail">Deprecated Versions:</label><span>1.27.0</span></li></ul>
-	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">apiserver_request_terminations_total</div>
 	<div class="metric_help">Number of requests which apiserver terminated in self-defense.</div>
 	<ul>
@@ -1613,13 +1606,6 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">apiserver_storage_db_total_size_in_bytes</div>
-	<div class="metric_help">Total size of the storage database file physically allocated in bytes.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">endpoint</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-apiserver (/metrics)</li></ul></li><li class="metric_deprecated_version"><label class="metric_detail">Deprecated Versions:</label><span>1.28.0</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">apiserver_storage_decode_errors_total</div>
 	<div class="metric_help">Number of stored object decode errors split by object type</div>
@@ -2776,6 +2762,13 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">retry_trigger</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">kubelet_pod_deferred_resize_duration_seconds</div>
+	<div class="metric_help">Duration in seconds that a pod resize remains deferred before completion. Label 'priority_bucket' classifies the pod priority (system-critical, high, medium, normal, low, very-low, unknown). Label 'resolution' describes how the deferred resize was resolved (accepted, reverted, terminated).</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">priority_bucket</span><span class="metric_label">resolution</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">kubelet_pod_in_progress_resizes</div>
 	<div class="metric_help">Number of in-progress resizes for pods.</div>
 	<ul>
@@ -2791,11 +2784,11 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">reason_detail</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">kubelet_pod_pending_resizes</div>
-	<div class="metric_help">Number of pending resizes for pods.</div>
+	<div class="metric_help">Number of pending resizes for pods. Label 'priority_bucket' classifies the pod priority (system-critical, high, medium, normal, low, very-low, unknown). Label 'reason' describes the state (deferred, infeasible).</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">reason</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">priority_bucket</span><span class="metric_label">reason</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">kubelet_pod_resize_duration_milliseconds</div>
 	<div class="metric_help">Duration in milliseconds to actuate a pod resize</div>
@@ -3107,13 +3100,6 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">kubelet_volume_stats_capacity_bytes</div>
 	<div class="metric_help">Capacity in bytes of the volume</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="custom"><label class="metric_detail">Type:</label> <span class="metric_type">Custom</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">namespace</span><span class="metric_label">persistentvolumeclaim</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kubelet (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">kubelet_volume_stats_health_status_abnormal</div>
-	<div class="metric_help">Abnormal volume health status. The count is either 1 or 0. 1 indicates the volume is unhealthy, 0 indicates volume is healthy</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="custom"><label class="metric_detail">Type:</label> <span class="metric_type">Custom</span></li>
@@ -3819,13 +3805,6 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="gauge"><label class="metric_detail">Type:</label> <span class="metric_type">Gauge</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">call_type</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">scheduler_plugin_execution_duration_seconds</div>
-	<div class="metric_help">Duration for running a plugin at a specific extension point.</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">extension_point</span><span class="metric_label">plugin</span><span class="metric_label">status</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">scheduler_pod_scheduled_after_flush_total</div>
 	<div class="metric_help">Number of pods that were successfully scheduled after being flushed from unschedulableEntities due to timeout. This metric helps detect potential queueing hint misconfigurations or event handling issues.</div>
 	<ul>
@@ -3854,12 +3833,26 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">profile</span><span class="metric_label">result</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">scheduler_preemption_evaluation_duration_seconds</div>
+	<div class="metric_help">Duration in seconds for identifying the target preemption victims.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">preemptor</span><span class="metric_label">result</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">scheduler_preemption_execution_duration_seconds</div>
+	<div class="metric_help">Duration in seconds for preempting the target preemption victims. With async preemption enabled, preemption execution does not block the scheduling of other pods.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">preemptor</span><span class="metric_label">result</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">scheduler_preemption_goroutines_duration_seconds</div>
 	<div class="metric_help">Duration in seconds for running goroutines for the preemption.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">result</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">result</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li><li class="metric_deprecated_version"><label class="metric_detail">Deprecated Versions:</label><span>1.37.0</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">scheduler_preemption_goroutines_execution_total</div>
 	<div class="metric_help">Number of preemption goroutines executed.</div>
@@ -3868,19 +3861,26 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">result</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">scheduler_preemption_pdb_violations_total</div>
+	<div class="metric_help">Total number of pod disruption budget violations caused by preemption.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">preemptor</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">scheduler_preemption_workload_disruptions</div>
+	<div class="metric_help">Number of workload preemption units being preempted. A single preemption unit can be all pods in a pod group (in case of DisruptionMode=all), or a single pod (in case of DisruptionMode=single).</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">preemptor</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">scheduler_queueing_hint_execution_duration_seconds</div>
 	<div class="metric_help">Duration for running a queueing hint function of a plugin.</div>
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">event</span><span class="metric_label">hint</span><span class="metric_label">plugin</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
-	</div><div class="metric" data-stability="alpha">
-	<div class="metric_name">scheduler_scheduling_algorithm_duration_seconds</div>
-	<div class="metric_help">Scheduling algorithm latency in seconds</div>
-	<ul>
-	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
-	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
-	<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">scheduler_store_schedule_results_duration_seconds</div>
 	<div class="metric_help">Latency for getting a no.</div>
@@ -3902,6 +3902,20 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
 	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">operation</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">scheduler_workload_preemption_attempts_total</div>
+	<div class="metric_help">Total preemption attempts initiated by workload (including pod groups) in the cluster till now.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="counter"><label class="metric_detail">Type:</label> <span class="metric_type">Counter</span></li>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">result</span></li><li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
+	</div><div class="metric" data-stability="alpha">
+	<div class="metric_name">scheduler_workload_preemption_victims</div>
+	<div class="metric_help">Number of pod preemption victims caused by workload preemption.</div>
+	<ul>
+	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
+	<li data-type="histogram"><label class="metric_detail">Type:</label> <span class="metric_type">Histogram</span></li>
+	<li class="metric_component_endpoints"><label class="metric_detail">Components:</label><ul><li>kube-scheduler (/metrics)</li></ul></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">scrape_error</div>
 	<div class="metric_help">1 if there was an error while getting container metrics, 0 otherwise</div>

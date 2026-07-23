@@ -119,10 +119,11 @@ func mkCSIDriver(tweaks ...func(csi *storage.CSIDriver)) storage.CSIDriver {
 			Name: "valid-obj",
 		},
 		Spec: storage.CSIDriverSpec{
-			AttachRequired:  &falsePtr,
-			PodInfoOnMount:  &falsePtr,
-			StorageCapacity: &falsePtr,
-			SELinuxMount:    &falsePtr,
+			AttachRequired:                &falsePtr,
+			PodInfoOnMount:                &falsePtr,
+			StorageCapacity:               &falsePtr,
+			SELinuxMount:                  &falsePtr,
+			PreventPodSchedulingIfMissing: &falsePtr,
 		},
 	}
 	for _, tweak := range tweaks {

@@ -1908,6 +1908,43 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: storage_list_duration_seconds
+  namespace: apiserver
+  help: Latency of the storage layer GetList call in seconds, including object decode,
+    split by whether etcd RangeStream was used.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  - streamed
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 1.25
+  - 1.5
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 8
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: apiserver_storage_list_evaluated_objects_total
   help: Number of objects tested in the course of serving a LIST request from storage
   type: Counter
@@ -2200,6 +2237,34 @@
   labels:
   - group
   - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: dispatch_duration_seconds
+  subsystem: watch_events
+  namespace: apiserver
+  help: Histogram of watch event dispatch latency broken by resource type and pipeline
+    stage. The 'total' stage is the end-to-end latency of a delivered event.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  - stage
+  buckets:
+  - 0.0001
+  - 0.0005
+  - 0.001
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
@@ -2503,6 +2568,17 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics/resource
+- name: csi_node_storage_health_status
+  help: CSI node storage backend health conditions currently reported (1 = present).
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - driver_name
+  - reason
+  - status
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: operations_seconds
   subsystem: csi
   help: Container Storage Interface operation duration with gRPC error code status
@@ -2659,12 +2735,14 @@
     endpoint: /metrics
 - name: resourceclaim_creates_total
   subsystem: dynamic_resource_allocation
-  help: Number of ResourceClaims creation requests, categorized by creation status
-    and admin access
+  help: Number of ResourceClaims creation requests, categorized by creation status,
+    admin access, and owning API group and kind (either Pod or scheduling.k8s.io/PodGroup)
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - admin_access
+  - owner_api_group
+  - owner_api_kind
   - status
   componentEndpoints:
   - component: kube-controller-manager
@@ -4089,6 +4167,38 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: pod_deferred_resize_duration_seconds
+  subsystem: kubelet
+  help: 'Duration in seconds that a pod resize remains deferred before completion.
+    Label ''priority_bucket'' classifies the pod priority (system-critical: >=2000000000,
+    high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1,
+    very-low: <=-1000, unknown: nil pod). Label ''resolution'' describes how the deferred
+    resize was resolved (accepted, reverted, terminated).'
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - priority_bucket
+  - resolution
+  buckets:
+  - 5
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
+  - 90
+  - 120
+  - 150
+  - 180
+  - 300
+  - 600
+  - 1200
+  - 1800
+  - 3600
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: pod_in_progress_resizes
   subsystem: kubelet
   help: Number of in-progress resizes for pods.
@@ -4107,13 +4217,78 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: pod_level_resources_admission_total
+  subsystem: kubelet
+  help: Total number of pods admitted during Kubelet admission, categorized by resource
+    configuration mode (pod_and_container_level, pod_level, container_level, or empty
+    for unconfigured/BestEffort) and QoS class.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - config_mode
+  - qos_class
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: pod_pending_resizes
   subsystem: kubelet
-  help: Number of pending resizes for pods.
+  help: 'Number of pending resizes for pods. Label ''priority_bucket'' classifies
+    the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium:
+    1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod).
+    Label ''reason'' describes the state (deferred, infeasible).'
   type: Gauge
   stabilityLevel: ALPHA
   labels:
+  - priority_bucket
   - reason
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: pod_requests_get_total
+  subsystem: kubelet
+  help: Number of requests to the PodsAPI Get endpoint. Broken down by server api
+    version and status code.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - server_api_version
+  - status_code
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: pod_requests_list_total
+  subsystem: kubelet
+  help: Number of requests to the PodsAPI List endpoint. Broken down by server api
+    version and status code.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - server_api_version
+  - status_code
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: pod_requests_total
+  subsystem: kubelet
+  help: Cumulative number of requests to the PodsAPI endpoint. Broken down by server
+    api version and status code.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - server_api_version
+  - status_code
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: pod_requests_watch_total
+  subsystem: kubelet
+  help: Number of requests to the PodsAPI Watch endpoint. Broken down by server api
+    version and status code.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - server_api_version
+  - status_code
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
@@ -4748,17 +4923,6 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: kubelet_volume_stats_health_status_abnormal
-  help: Abnormal volume health status. The count is either 1 or 0. 1 indicates the
-    volume is unhealthy, 0 indicates volume is healthy
-  type: Custom
-  stabilityLevel: ALPHA
-  labels:
-  - namespace
-  - persistentvolumeclaim
-  componentEndpoints:
-  - component: kubelet
-    endpoint: /metrics
 - name: kubelet_volume_stats_inodes
   help: Maximum number of inodes in the volume
   type: Custom
@@ -4963,6 +5127,37 @@
   - 240
   - 270
   - 300
+  componentEndpoints:
+  - component: kube-proxy
+    endpoint: /metrics
+- name: nftables_localhost_nodeport_listener_creation_failures_total
+  subsystem: kubeproxy
+  help: Number of localhost NodePort userspace proxy listener creation failures.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - ip_family
+  componentEndpoints:
+  - component: kube-proxy
+    endpoint: /metrics
+- name: nftables_localhost_nodeport_listeners
+  subsystem: kubeproxy
+  help: Number of active localhost NodePort userspace proxy listeners.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - ip_family
+  componentEndpoints:
+  - component: kube-proxy
+    endpoint: /metrics
+- name: kubeproxy_nftables_localhost_nodeport_rejected_packets_total
+  help: Number of packets rejected on localhost NodePorts. UDP and SCTP are always
+    rejected; TCP is rejected when the localhost NodePort proxy is not running
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - ip_family
+  - protocol
   componentEndpoints:
   - component: kube-proxy
     endpoint: /metrics
@@ -6137,10 +6332,15 @@
     endpoint: /metrics
 - name: route_sync_total
   subsystem: route_controller
-  help: A metric counting the amount of times routes have been synced with the cloud
-    provider.
+  help: A metric counting the number of route reconciles with the cloud provider,
+    labeled by the trigger (periodic or node_change) and the outcome (error if the
+    reconcile failed, changed if at least one route was created or deleted, otherwise
+    noop).
   type: Counter
   stabilityLevel: ALPHA
+  labels:
+  - outcome
+  - trigger
   componentEndpoints:
   - component: cloud-controller-manager
     endpoint: /metrics
@@ -6278,6 +6478,16 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
+- name: generated_placements_total
+  subsystem: scheduler
+  help: Number of candidate placements generated when scheduling pod groups.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - profile
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
 - name: get_node_hint_duration_seconds
   subsystem: scheduler
   help: Latency for getting a node hint.
@@ -6319,6 +6529,48 @@
   stabilityLevel: ALPHA
   labels:
   - call_type
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: placement_evaluation_duration_seconds
+  subsystem: scheduler
+  help: Latency in seconds of evaluating a single candidate placement when scheduling
+    pod groups, by result. 'feasible' means the pod group fit into the placement,
+    while 'infeasible' means it did not.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - profile
+  - result
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: placement_evaluations_total
+  subsystem: scheduler
+  help: Number of candidate placements evaluated when scheduling pod groups, by result.
+    'feasible' means the pod group fit into the placement, while 'infeasible' means
+    it did not.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - profile
+  - result
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
@@ -7352,6 +7604,10 @@
   - 30
   - 45
   - 60
+  - 90
+  - 120
+  - 180
+  - 300
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics

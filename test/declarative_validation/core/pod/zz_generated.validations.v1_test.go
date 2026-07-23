@@ -61,8 +61,73 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.evictionResponders": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.evictionResponders[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"spec.evictionResponders[*].name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.evictionResponders[*].priority": {
+				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.schedulingGroup": {
+				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
+			},
 			"spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
+			"status.nodeAllocatableResourceClaimStatuses[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.nodeAllocatableResourceClaimStatuses[*].containers[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.nodeAllocatableResourceClaimStatuses[*].mapping[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.nodeAllocatableResourceClaimStatuses[*].mapping[*].name": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.nodeAllocatableResourceClaimStatuses[*].mapping[*].quantity": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.nodeAllocatableResourceClaimStatuses[*].overhead[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.nodeAllocatableResourceClaimStatuses[*].overhead[*].name": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.nodeAllocatableResourceClaimStatuses[*].resourceClaimName": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.volumeHealth[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.volumeHealth[*].healthConditions": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"status.volumeHealth[*].healthConditions[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.volumeHealth[*].healthConditions[*].message": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
+			"status.volumeHealth[*].healthConditions[*].reason": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
+			"status.volumeHealth[*].healthConditions[*].status": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.volumeHealth[*].name": {
+				{ErrorType: "FieldValueRequired"},
 			},
 		},
 	)

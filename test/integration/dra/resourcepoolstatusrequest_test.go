@@ -27,6 +27,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -48,8 +49,11 @@ func TestResourcePoolStatusRequest(t *testing.T) {
 	}{
 		"feature-enabled": {
 			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation: true,
-				features.DRAResourcePoolStatus:     true,
+				features.DynamicResourceAllocation:   true,
+				features.DRAResourcePoolStatus:       true,
+				features.DRAPartitionableDevices:     true,
+				features.DRAPartitionableDevicesType: true,
+				features.DRAConsumableCapacity:       true,
 			},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("ProcessRequest", testProcessResourcePoolStatusRequest)
@@ -57,6 +61,8 @@ func TestResourcePoolStatusRequest(t *testing.T) {
 				tCtx.Run("LimitTruncation", testLimitTruncation)
 				tCtx.Run("FilterByPoolName", testFilterByPoolName)
 				tCtx.Run("ValidationErrors", testValidationErrors)
+				tCtx.Run("PartitionSummary", testPartitionSummary)
+				tCtx.Run("ShareableSummary", testShareableSummary)
 				// Note: RBAC enforcement is standard Kubernetes behavior tested in
 				// test/integration/auth/. The test API server uses AlwaysAllow authorizer.
 			},
@@ -135,6 +141,7 @@ func (c *resourcePoolStatusRequestControllerSingleton) start(tCtx ktesting.TCont
 		c.informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
 		c.informerFactory.Resource().V1().ResourceSlices(),
 		c.informerFactory.Resource().V1().ResourceClaims(),
+		c.informerFactory.Resource().V1().DeviceTaintRules(),
 	)
 	tCtx.ExpectNoError(err, "create ResourcePoolStatusRequest controller")
 
@@ -258,6 +265,155 @@ func testProcessResourcePoolStatusRequest(tCtx ktesting.TContext) {
 	}
 	if pool.ResourceSliceCount == nil || *pool.ResourceSliceCount != 1 {
 		tCtx.Errorf("expected slice count 1, got %v", pool.ResourceSliceCount)
+	}
+}
+
+// testPartitionSummary verifies a two-slice partitionable pool (a counter slice
+// and a device slice, only the device slice declaring the PartitionTypeAttribute
+// since the counter slice carries no counter-consuming devices) yields a typed
+// partitionSummary and no counterSets.
+func testPartitionSummary(tCtx ktesting.TContext) {
+	startResourcePoolStatusRequestController(tCtx)
+
+	driverName := "partition.example.com"
+	poolName := "gpu-pool"
+	nodeName := "gpu-node"
+	fqn := resourceapi.FullyQualifiedName(driverName + "/profile")
+
+	partitionDevice := func(name, profile, cost string) resourceapi.Device {
+		return resourceapi.Device{
+			Name:       name,
+			Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"profile": {StringValue: new(profile)}},
+			ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
+				CounterSet: "gpu-0",
+				Counters:   map[string]resourceapi.Counter{"memory": {Value: resource.MustParse(cost)}},
+			}},
+		}
+	}
+
+	counterSlice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "partition-counters"},
+		Spec: resourceapi.ResourceSliceSpec{
+			Driver:   driverName,
+			Pool:     resourceapi.ResourcePool{Name: poolName, ResourceSliceCount: 2, Generation: 1},
+			NodeName: &nodeName,
+			SharedCounters: []resourceapi.CounterSet{{
+				Name:     "gpu-0",
+				Counters: map[string]resourceapi.Counter{"memory": {Value: resource.MustParse("80Gi")}},
+			}},
+		},
+	}
+	deviceSlice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "partition-devices"},
+		Spec: resourceapi.ResourceSliceSpec{
+			Driver:                 driverName,
+			Pool:                   resourceapi.ResourcePool{Name: poolName, ResourceSliceCount: 2, Generation: 1},
+			NodeName:               &nodeName,
+			PartitionTypeAttribute: &fqn,
+			Devices: []resourceapi.Device{
+				partitionDevice("full-0", "Full", "80Gi"),
+				partitionDevice("half-0", "Half", "40Gi"),
+				partitionDevice("half-1", "Half", "40Gi"),
+			},
+		},
+	}
+	for _, s := range []*resourceapi.ResourceSlice{counterSlice, deviceSlice} {
+		created := must(tCtx, tCtx.Client().ResourceV1().ResourceSlices().Create, s, metav1.CreateOptions{})
+		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+			deleteAndWait(tCtx, tCtx.Client().ResourceV1().ResourceSlices().Delete, tCtx.Client().ResourceV1().ResourceSlices().Get, created.Name)
+		})
+	}
+
+	request := &resourcev1alpha3.ResourcePoolStatusRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-request-partition"},
+		Spec:       resourcev1alpha3.ResourcePoolStatusRequestSpec{Driver: driverName},
+	}
+	request = must(tCtx, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Create, request, metav1.CreateOptions{})
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		deleteAndWait(tCtx, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Delete, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Get, request.Name)
+	})
+
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*resourcev1alpha3.ResourcePoolStatusRequest, error) {
+		return tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Get(tCtx, request.Name, metav1.GetOptions{})
+	}).WithTimeout(30*time.Second).Should(
+		gomega.HaveField("Status.Pools", gomega.HaveLen(1)),
+		"partitionable pool should be processed",
+	)
+
+	request = must(tCtx, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Get, request.Name, metav1.GetOptions{})
+	pool := request.Status.Pools[0]
+	if pool.ValidationError != nil {
+		tCtx.Fatalf("unexpected validationError: %s", *pool.ValidationError)
+	}
+	got := map[string][2]int32{}
+	for _, p := range pool.PartitionSummary {
+		got[p.Type] = [2]int32{ptr.Deref(p.Total, 0), ptr.Deref(p.Allocatable, 0)}
+	}
+	if got["Full"] != [2]int32{1, 1} {
+		tCtx.Errorf("Full {total,allocatable} = %v, want [1 1]", got["Full"])
+	}
+	if got["Half"] != [2]int32{2, 2} {
+		tCtx.Errorf("Half {total,allocatable} = %v, want [2 2]", got["Half"])
+	}
+}
+
+// testShareableSummary verifies a pool of shareable devices yields a
+// shareableSummary with the aggregate capacity and device counts.
+func testShareableSummary(tCtx ktesting.TContext) {
+	startResourcePoolStatusRequestController(tCtx)
+
+	driverName := "shareable.example.com"
+	poolName := "shareable-pool"
+	nodeName := "shareable-node"
+
+	shareableDevice := func(name string) resourceapi.Device {
+		return resourceapi.Device{
+			Name:                     name,
+			AllowMultipleAllocations: new(true),
+			Capacity:                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"memory": {Value: resource.MustParse("40Gi")}},
+		}
+	}
+	slice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "shareable-slice"},
+		Spec: resourceapi.ResourceSliceSpec{
+			Driver:   driverName,
+			Pool:     resourceapi.ResourcePool{Name: poolName, ResourceSliceCount: 1, Generation: 1},
+			NodeName: &nodeName,
+			Devices:  []resourceapi.Device{shareableDevice("gpu-0"), shareableDevice("gpu-1")},
+		},
+	}
+	slice = must(tCtx, tCtx.Client().ResourceV1().ResourceSlices().Create, slice, metav1.CreateOptions{})
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		deleteAndWait(tCtx, tCtx.Client().ResourceV1().ResourceSlices().Delete, tCtx.Client().ResourceV1().ResourceSlices().Get, slice.Name)
+	})
+
+	request := &resourcev1alpha3.ResourcePoolStatusRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-request-shareable"},
+		Spec:       resourcev1alpha3.ResourcePoolStatusRequestSpec{Driver: driverName},
+	}
+	request = must(tCtx, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Create, request, metav1.CreateOptions{})
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		deleteAndWait(tCtx, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Delete, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Get, request.Name)
+	})
+
+	tCtx.Eventually(func(tCtx ktesting.TContext) (*resourcev1alpha3.ResourcePoolStatusRequest, error) {
+		return tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Get(tCtx, request.Name, metav1.GetOptions{})
+	}).WithTimeout(30*time.Second).Should(
+		gomega.HaveField("Status.Pools", gomega.HaveLen(1)),
+		"shareable pool should be processed",
+	)
+
+	request = must(tCtx, tCtx.Client().ResourceV1alpha3().ResourcePoolStatusRequests().Get, request.Name, metav1.GetOptions{})
+	pool := request.Status.Pools[0]
+	if pool.ShareableSummary == nil {
+		tCtx.Fatalf("expected a shareableSummary, got nil (pool %+v)", pool)
+	}
+	sh := pool.ShareableSummary
+	if ptr.Deref(sh.FullyAvailableDevices, 0) != 2 || ptr.Deref(sh.PartiallyAvailableDevices, 0) != 0 {
+		tCtx.Errorf("full/partial devices = %d/%d, want 2/0", ptr.Deref(sh.FullyAvailableDevices, 0), ptr.Deref(sh.PartiallyAvailableDevices, 0))
+	}
+	if len(sh.Capacity) != 1 || sh.Capacity[0].Total.Cmp(resource.MustParse("80Gi")) != 0 {
+		tCtx.Errorf("capacity = %+v, want a single memory key totaling 80Gi", sh.Capacity)
 	}
 }
 

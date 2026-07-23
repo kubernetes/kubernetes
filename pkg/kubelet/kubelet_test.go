@@ -455,7 +455,9 @@ func newTestKubeletWithImageList(
 		kubelet.hostutil,
 		kubelet.getPodsDir(),
 		kubelet.recorder,
-		volumetest.NewBlockVolumePathHandler())
+		volumetest.NewBlockVolumePathHandler(),
+		kubelet.statusManager,
+		0)
 
 	kubelet.pluginManager = pluginmanager.NewPluginManager(
 		kubelet.getPluginsRegistrationDir(), /* sockDir */
@@ -539,6 +541,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		nil,
 		kubeCfg.CPUCFSQuota,
 		kubeCfg.CPUCFSQuotaPeriod,
+		kubeCfg.DefaultPodSysctls,
 		runtimeSvc,
 		imageSvc,
 		kubelet.containerManager,
@@ -547,7 +550,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		false,
 		kubeCfg.MemorySwap.SwapBehavior,
 		kubelet.containerManager.GetNodeAllocatableAbsolute,
-		*kubeCfg.MemoryThrottlingFactor,
+		kubeCfg.MemoryThrottlingFactor,
 		kubeCfg.MemoryReservationPolicy,
 		kubelet.podStartupLatencyTracker,
 		tracerProvider,
@@ -1906,6 +1909,10 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 		}},
 	}
 
+	// Set up allocation for the pod before HandlePodUpdates
+	err := kubelet.allocationManager.SetAllocatedResources(klog.FromContext(tCtx), pods[0])
+	require.NoError(t, err)
+
 	// Let the pod worker sets the status to fail after this sync.
 	kubelet.HandlePodUpdates(tCtx, pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
@@ -1958,6 +1965,11 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 	}
 
 	kubelet.podManager.SetPods(pods)
+
+	// Set up allocation for the pod before HandlePodUpdates
+	err := kubelet.allocationManager.SetAllocatedResources(klog.FromContext(tCtx), pods[0])
+	require.NoError(t, err)
+
 	kubelet.HandlePodUpdates(tCtx, pods)
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
 	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
@@ -4926,11 +4938,284 @@ func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
 	}
 }
 
+func TestHandlePodUpdates_VolumeResize(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	tCtx := ktesting.Init(t)
+
+	logger := klog.FromContext(tCtx)
+
+	quantity100Mi := resource.MustParse("100Mi")
+	quantity200Mi := resource.MustParse("200Mi")
+
+	tests := []struct {
+		name                         string
+		enableMemoryVolumeResizeGate bool
+		initialVolumes               []v1.Volume
+		resizedVolumes               []v1.Volume
+		expectResizeAction           bool
+	}{
+		{
+			name:                         "feature gate disabled: memory volume size limit changed",
+			enableMemoryVolumeResizeGate: false,
+			initialVolumes: []v1.Volume{
+				{
+					Name: "vol-1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &quantity100Mi,
+						},
+					},
+				},
+			},
+			resizedVolumes: []v1.Volume{
+				{
+					Name: "vol-1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &quantity200Mi,
+						},
+					},
+				},
+			},
+			expectResizeAction: false,
+		},
+		{
+			name:                         "feature gate enabled: memory volume size limit increased",
+			enableMemoryVolumeResizeGate: true,
+			initialVolumes: []v1.Volume{
+				{
+					Name: "vol-1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &quantity100Mi,
+						},
+					},
+				},
+			},
+			resizedVolumes: []v1.Volume{
+				{
+					Name: "vol-1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &quantity200Mi,
+						},
+					},
+				},
+			},
+			expectResizeAction: true,
+		},
+		{
+			name:                         "feature gate enabled: memory volume size limit decreased",
+			enableMemoryVolumeResizeGate: true,
+			initialVolumes: []v1.Volume{
+				{
+					Name: "vol-1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &quantity200Mi,
+						},
+					},
+				},
+			},
+			resizedVolumes: []v1.Volume{
+				{
+					Name: "vol-1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &quantity100Mi,
+						},
+					},
+				},
+			},
+			expectResizeAction: true,
+		},
+		{
+			name:                         "feature gate enabled: memory volume size limit unchanged",
+			enableMemoryVolumeResizeGate: true,
+			initialVolumes: []v1.Volume{
+				{
+					Name: "vol-1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &quantity100Mi,
+						},
+					},
+				},
+			},
+			resizedVolumes: []v1.Volume{
+				{
+					Name: "vol-1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &quantity100Mi,
+						},
+					},
+				},
+			},
+			expectResizeAction: false,
+		},
+		{
+			name:                         "feature gate enabled: non-memory backed emptyDir volume limit changed",
+			enableMemoryVolumeResizeGate: true,
+			initialVolumes: []v1.Volume{
+				{
+					Name: "vol-1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumDefault,
+							SizeLimit: &quantity100Mi,
+						},
+					},
+				},
+			},
+			resizedVolumes: []v1.Volume{
+				{
+					Name: "vol-1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumDefault,
+							SizeLimit: &quantity200Mi,
+						},
+					},
+				},
+			},
+			expectResizeAction: false,
+		},
+		{
+			name:                         "feature gate enabled: pod with no volumes",
+			enableMemoryVolumeResizeGate: true,
+			initialVolumes:               nil,
+			resizedVolumes:               nil,
+			expectResizeAction:           false,
+		},
+		{
+			name:                         "feature gate enabled: disk-backed emptyDir volume limit changed (implicit default medium)",
+			enableMemoryVolumeResizeGate: true,
+			initialVolumes: []v1.Volume{
+				{
+					Name: "vol-1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							SizeLimit: &quantity100Mi,
+						},
+					},
+				},
+			},
+			resizedVolumes: []v1.Volume{
+				{
+					Name: "vol-1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							SizeLimit: &quantity200Mi,
+						},
+					},
+				},
+			},
+			expectResizeAction: false,
+		},
+		{
+			name:                         "feature gate enabled: multiple volumes, one memory-backed limit changed",
+			enableMemoryVolumeResizeGate: true,
+			initialVolumes: []v1.Volume{
+				{
+					Name: "vol-1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &quantity100Mi,
+						},
+					},
+				},
+				{
+					Name: "vol-2",
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{
+							Path: "/tmp",
+						},
+					},
+				},
+			},
+			resizedVolumes: []v1.Volume{
+				{
+					Name: "vol-1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &quantity200Mi,
+						},
+					},
+				},
+				{
+					Name: "vol-2",
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{
+							Path: "/tmp",
+						},
+					},
+				},
+			},
+			expectResizeAction: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, tt.enableMemoryVolumeResizeGate)
+
+			testPod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					UID:  "12345",
+				},
+			}
+			initialPod := testPod.DeepCopy()
+			resizedPod := testPod.DeepCopy()
+
+			initialPod.Spec.Volumes = tt.initialVolumes
+			resizedPod.Spec.Volumes = tt.resizedVolumes
+
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			t.Cleanup(func() { testKubelet.Cleanup() })
+			kubelet := testKubelet.kubelet
+
+			kubelet.podManager.AddPod(initialPod)
+			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, initialPod))
+			kubelet.HandlePodUpdates(tCtx, []*v1.Pod{resizedPod})
+
+			allocatedPod, wasUpdated := kubelet.allocationManager.UpdatePodFromAllocation(resizedPod.DeepCopy())
+			assert.Equal(t, tt.expectResizeAction, wasUpdated)
+			assert.Equal(t, tt.expectResizeAction, kubelet.allocationManager.HasPendingResizes())
+
+			if tt.expectResizeAction {
+				// Reverted back to the initial (old) limit!
+				assert.Equal(t, initialPod.Spec.Volumes[0].EmptyDir.SizeLimit.Value(), allocatedPod.Spec.Volumes[0].EmptyDir.SizeLimit.Value())
+			} else if len(resizedPod.Spec.Volumes) > 0 && resizedPod.Spec.Volumes[0].EmptyDir != nil && resizedPod.Spec.Volumes[0].EmptyDir.SizeLimit != nil {
+				// Remains at the updated (new) limit!
+				require.NotEmpty(t, allocatedPod.Spec.Volumes)
+				assert.Equal(t, resizedPod.Spec.Volumes[0].EmptyDir.SizeLimit.Value(), allocatedPod.Spec.Volumes[0].EmptyDir.SizeLimit.Value())
+			}
+		})
+	}
+}
+
 func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
 	logger, tCtx := ktesting.NewTestContext(t)
 
 	testKubelet := newTestKubeletExcludeAdmitHandlers(t, false /* controllerAttachDetachEnabled */, true /*enableResizing*/)
@@ -5015,35 +5300,81 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 		},
 	}
 
+	terminalPodNoAllocation := makePodWithResources("terminal-pod-no-alloc", v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem})
+	terminalPodNoAllocation.Status.Phase = v1.PodFailed
+
 	testCases := []struct {
 		name                     string
 		oldPod                   *v1.Pod
 		newPod                   *v1.Pod
+		setAllocation            bool
 		shouldRetryPendingResize bool
 	}{
 		{
 			name:                     "requests are increasing",
 			oldPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: highCPU, v1.ResourceMemory: highMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
 			newPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: enormousCPU, v1.ResourceMemory: enormousMem}, v1.ResourceList{v1.ResourceCPU: highCPU, v1.ResourceMemory: highMem}),
+			setAllocation:            true,
 			shouldRetryPendingResize: false,
 		},
 		{
 			name:                     "requests are unchanged",
 			oldPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
 			newPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: enormousCPU, v1.ResourceMemory: enormousMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
+			setAllocation:            true,
 			shouldRetryPendingResize: false,
 		},
 		{
 			name:                     "requests are decreasing",
 			oldPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}, v1.ResourceList{v1.ResourceCPU: highCPU, v1.ResourceMemory: highMem}),
 			newPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: enormousCPU, v1.ResourceMemory: enormousMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
+			setAllocation:            true,
 			shouldRetryPendingResize: true,
 		},
 		{
 			name:                     "pod is marked as terminal",
 			oldPod:                   makePodWithResources("terminal-pod", v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
 			newPod:                   terminalPod,
+			setAllocation:            true,
 			shouldRetryPendingResize: true,
+		},
+		{
+			name:                     "pod is marked as terminal with allocation already purged",
+			oldPod:                   makePodWithResources("terminal-pod-no-alloc", v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
+			newPod:                   terminalPodNoAllocation,
+			setAllocation:            false,
+			shouldRetryPendingResize: true,
+		},
+		{
+			name: "requests decreasing due to DRA claim mapping reduction",
+			oldPod: func() *v1.Pod {
+				p := makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: lowCPU}, v1.ResourceList{v1.ResourceCPU: lowCPU})
+				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "claim-1",
+						Containers:        []string{"c1"},
+						Mapping: []v1.NodeAllocatableMappedResources{
+							{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("500m"))},
+						},
+					},
+				}
+				return p
+			}(),
+			newPod: func() *v1.Pod {
+				p := makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: lowCPU}, v1.ResourceList{v1.ResourceCPU: lowCPU})
+				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "claim-1",
+						Containers:        []string{"c1"},
+						Mapping: []v1.NodeAllocatableMappedResources{
+							{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("100m"))},
+						},
+					},
+				}
+				return p
+			}(),
+			shouldRetryPendingResize: true,
+			setAllocation:            true,
 		},
 	}
 
@@ -5054,7 +5385,9 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 			kubelet.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 
 			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, pendingResizeAllocated))
-			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, tc.oldPod))
+			if tc.setAllocation {
+				require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, tc.oldPod))
+			}
 
 			// We only expect status resources to change in HandlePodReconcile.
 			tc.oldPod.Spec = tc.newPod.Spec
@@ -5063,9 +5396,14 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 			kubelet.podManager.AddPod(tc.oldPod)
 			kubelet.allocationManager.PushPendingResize(logger, pendingResizeDesired.UID)
 
-			kubelet.statusManager.ClearPodResizePendingCondition(pendingResizeDesired.UID)
+			kubelet.statusManager.ClearPodResizePendingCondition(pendingResizeDesired.UID, metrics.DeferredResizeResolutionAccepted)
 			kubelet.HandlePodReconcile(tCtx, []*v1.Pod{tc.newPod})
 			require.Equal(t, tc.shouldRetryPendingResize, kubelet.statusManager.IsPodResizeDeferred(pendingResizeDesired.UID))
+
+			if !tc.setAllocation {
+				require.False(t, kubelet.allocationManager.HasPodAllocatedResources(tc.newPod.UID),
+					"non-allocated pod should not have allocation set after reconcile")
+			}
 
 			kubelet.allocationManager.RemovePod(logger, pendingResizeDesired.UID)
 			kubelet.podManager.RemovePod((pendingResizeDesired))
@@ -5221,6 +5559,7 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			}
 
 			kubelet.statusManager.SetPodStatus(logger, tc.newPod, v1.PodStatus{Phase: v1.PodRunning})
+			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, tc.newPod))
 			kubelet.HandlePodUpdates(tCtx, []*v1.Pod{tc.newPod})
 			if tc.expectEvent {
 				select {

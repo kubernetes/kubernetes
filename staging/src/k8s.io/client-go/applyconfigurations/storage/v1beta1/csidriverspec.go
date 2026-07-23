@@ -193,7 +193,7 @@ type CSIDriverSpecApplyConfiguration struct {
 	// newly created node may be rejected by the scheduler because of missing CSI driver
 	// information from the node.
 	//
-	// This is an alpha feature and requires the VolumeLimitScaling feature gate to be enabled.
+	// This is a beta feature and requires the VolumeLimitScaling feature gate to be enabled.
 	// Default is "false".
 	PreventPodSchedulingIfMissing *bool `json:"preventPodSchedulingIfMissing,omitempty"`
 }

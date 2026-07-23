@@ -121,6 +121,13 @@ func (c *CycleState) GetPlacementCycleState() fwk.PlacementCycleState {
 	return c.placementCycleState
 }
 
+// GetParentPlacementCycleState implements [fwk.PodGroupCycleState.GetParentPlacementCycleState].
+// We can reuse the same placementCycleState field as GetPlacementCycleState, as it implements a different interface
+// and the two are mutually exclusive.
+func (c *CycleState) GetParentPlacementCycleState() fwk.PlacementCycleState {
+	return c.placementCycleState
+}
+
 func (c *CycleState) SetPlacementCycleState(placementCycleState fwk.PlacementCycleState) {
 	c.placementCycleState = placementCycleState
 }

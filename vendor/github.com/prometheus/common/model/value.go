@@ -259,13 +259,13 @@ func (s Scalar) String() string {
 // MarshalJSON implements json.Marshaler.
 func (s Scalar) MarshalJSON() ([]byte, error) {
 	v := strconv.FormatFloat(float64(s.Value), 'f', -1, 64)
-	return json.Marshal([...]interface{}{s.Timestamp, v})
+	return json.Marshal([...]any{s.Timestamp, v})
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
 func (s *Scalar) UnmarshalJSON(b []byte) error {
 	var f string
-	v := [...]interface{}{&s.Timestamp, &f}
+	v := [...]any{&s.Timestamp, &f}
 
 	if err := json.Unmarshal(b, &v); err != nil {
 		return err
@@ -291,12 +291,12 @@ func (s *String) String() string {
 
 // MarshalJSON implements json.Marshaler.
 func (s String) MarshalJSON() ([]byte, error) {
-	return json.Marshal([]interface{}{s.Timestamp, s.Value})
+	return json.Marshal([]any{s.Timestamp, s.Value})
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
 func (s *String) UnmarshalJSON(b []byte) error {
-	v := [...]interface{}{&s.Timestamp, &s.Value}
+	v := [...]any{&s.Timestamp, &s.Value}
 	return json.Unmarshal(b, &v)
 }
 

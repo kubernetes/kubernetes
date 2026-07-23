@@ -44,6 +44,13 @@ const (
 	// Assigns each kube-apiserver an ID in a cluster.
 	APIServerIdentity featuregate.Feature = "APIServerIdentity"
 
+	// owner: @pmengelbert
+	// kep: https://kep.k8s.io/6060
+	//
+	// Controls whether the apiserver supports dispensing tokens for authenticating
+	// the Kubernetes API Server and Aggregated API Servers to webhooks.
+	APIServerWebhookAuthenticationToken featuregate.Feature = "APIServerWebhookAuthenticationToken"
+
 	// owner: @linxiulei
 	//
 	// Enables serving watch requests in separate goroutines.
@@ -61,7 +68,7 @@ const (
 	// Allow user.DefaultInfo.UID to be set from x509 cert during cert auth.
 	AllowParsingUserUIDFromCertAuth featuregate.Feature = "AllowParsingUserUIDFromCertAuth"
 
-	// owner: @stlaz @tkashem @dgrisonnet
+	// owner: @stlaz @tkashem @dgrisonnet @ibihim
 	// kep: https://kep.k8s.io/3926
 	//
 	// Enables the cluster admin to identify resources that fail to
@@ -321,6 +328,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	APIServerWebhookAuthenticationToken: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	APIServingWithRoutine: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -337,6 +348,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	AllowUnsafeMalformedObjectDeletion: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	CBORServingAndStorage: {
@@ -345,6 +357,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	ConcurrentWatchObjectDecode: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	ConsistentListFromCacheSkipTimeoutFallback: {

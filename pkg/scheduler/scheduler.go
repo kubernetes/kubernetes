@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/informers/internalinterfaces"
 	clientset "k8s.io/client-go/kubernetes"
 	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	restclient "k8s.io/client-go/rest"
@@ -564,9 +565,11 @@ func (sched *Scheduler) Run(ctx context.Context) {
 
 // NewInformerFactory creates a SharedInformerFactory and initializes a scheduler specific
 // in-place podInformer.
-func NewInformerFactory(cs clientset.Interface, resyncPeriod time.Duration) informers.SharedInformerFactory {
-	informerFactory := informers.NewSharedInformerFactory(cs, resyncPeriod)
-	informerFactory.InformerFor(&v1.Pod{}, newPodInformer)
+func NewInformerFactory(cs clientset.Interface, resyncPeriod time.Duration, informerName *cache.InformerName) informers.SharedInformerFactory {
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(cs, resyncPeriod, informers.WithInformerName(informerName))
+	informerFactory.InformerFor(&v1.Pod{}, func(cs clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+		return newPodInformer(cs, resyncPeriod, informerName)
+	})
 	return informerFactory
 }
 
@@ -646,12 +649,17 @@ func unionedGVKs(queueingHintsPerProfile internalqueue.QueueingHintMapPerProfile
 
 // newPodInformer creates a shared index informer that returns only non-terminal pods.
 // The PodInformer allows indexers to be added, but note that only non-conflict indexers are allowed.
-func newPodInformer(cs clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newPodInformer(cs clientset.Interface, resyncPeriod time.Duration, informerName *cache.InformerName) cache.SharedIndexInformer {
 	selector := fmt.Sprintf("status.phase!=%v,status.phase!=%v", v1.PodSucceeded, v1.PodFailed)
 	tweakListOptions := func(options *metav1.ListOptions) {
 		options.FieldSelector = selector
 	}
-	informer := coreinformers.NewFilteredPodInformer(cs, metav1.NamespaceAll, resyncPeriod, cache.Indexers{}, tweakListOptions)
+	informer := coreinformers.NewPodInformerWithOptions(cs, metav1.NamespaceAll, internalinterfaces.InformerOptions{
+		ResyncPeriod:     resyncPeriod,
+		Indexers:         cache.Indexers{},
+		TweakListOptions: tweakListOptions,
+		InformerName:     informerName,
+	})
 
 	// Dropping `.metadata.managedFields` to improve memory usage.
 	// The Extract workflow (i.e. `ExtractPod`) should be unused.

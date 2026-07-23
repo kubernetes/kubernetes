@@ -151,6 +151,9 @@ type Runtime interface {
 	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *PodStatus) bool
 	// UpdateActuatedPodLevelResources updates pod-level resources in actuatedState
 	UpdateActuatedPodLevelResources(logger klog.Logger, actuatedPod *v1.Pod) error
+	// InitializeActuatedPod initializes actuated container resources and emptyDir volume size limits for the given pod,
+	// if they are not already set.
+	InitializeActuatedPod(logger klog.Logger, allocatedPod *v1.Pod)
 }
 
 var (
@@ -438,6 +441,17 @@ type LinuxContainerUser struct {
 // When there are multiple containers' statuses with the same name, the first match will be returned.
 func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *Status {
 	for _, containerStatus := range podStatus.ContainerStatuses {
+		if containerStatus.Name == containerName {
+			return containerStatus
+		}
+	}
+	return nil
+}
+
+// FindActiveContainerStatusByName returns active container status in the pod status with the given name.
+// When there are multiple containers' statuses with the same name, the first match will be returned.
+func (podStatus *PodStatus) FindActiveContainerStatusByName(containerName string) *Status {
+	for _, containerStatus := range podStatus.ActiveContainerStatuses {
 		if containerStatus.Name == containerName {
 			return containerStatus
 		}

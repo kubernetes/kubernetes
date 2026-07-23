@@ -28,6 +28,11 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/scheduling/v1alpha3";
 
+// AllCompositeDisruptionMode means that children of a CompositePodGroup can only be
+// disrupted or preempted together.
+message AllCompositeDisruptionMode {
+}
+
 // AllDisruptionMode specifies that children can only be disrupted together.
 message AllDisruptionMode {
 }
@@ -40,6 +45,26 @@ message BasicSchedulingPolicy {
 // CompositeBasicSchedulingPolicy indicates that the groups belonging to the composite group
 // should be scheduled independently.
 message CompositeBasicSchedulingPolicy {
+}
+
+// CompositeDisruptionMode defines how individual entities within a composite pod group can be disrupted.
+// Exactly one mode must be set.
+//
+// +union
+message CompositeDisruptionMode {
+  // single specifies that children groups can be disrupted independently from each other.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional SingleCompositeDisruptionMode single = 1;
+
+  // all specifies that all children groups can only be disrupted together.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional AllCompositeDisruptionMode all = 2;
 }
 
 // CompositeGangSchedulingPolicy indicates that the groups belonging to the composite group
@@ -86,6 +111,19 @@ message CompositePodGroupList {
 
   // Items is the list of CompositePodGroups.
   repeated CompositePodGroup items = 2;
+}
+
+// CompositePodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a CompositePodGroup.
+message CompositePodGroupSchedulingConstraints {
+  // topology defines the topology constraints for the composite pod group.
+  // Currently only a single topology constraint can be specified. This may change in the future.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:maxItems=1
+  // +listType=atomic
+  // +k8s:listType=atomic
+  repeated TopologyConstraint topology = 1;
 }
 
 // CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup.
@@ -144,6 +182,26 @@ message CompositePodGroupSpec {
   // +k8s:immutable
   optional CompositePodGroupSchedulingPolicy schedulingPolicy = 3;
 
+  // schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup.
+  // Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+  // This field is immutable.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:immutable
+  optional CompositePodGroupSchedulingConstraints schedulingConstraints = 4;
+
+  // disruptionMode defines the mode in which a given CompositePodGroup can be disrupted.
+  // Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+  // One of Single, All. Defaults to Single if unset.
+  // This field is immutable.
+  //
+  // +default={"single": {}}
+  // +optional
+  // +k8s:optional
+  // +k8s:immutable
+  optional CompositeDisruptionMode disruptionMode = 5;
+
   // priorityClassName defines the priority that should be considered when scheduling this CompositePodGroup.
   // Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
   // If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods
@@ -155,7 +213,7 @@ message CompositePodGroupSpec {
   // +k8s:optional
   // +k8s:format=k8s-long-name
   // +k8s:immutable
-  optional string priorityClassName = 4;
+  optional string priorityClassName = 6;
 
   // priority is the value of priority of this composite pod group. Various system components
   // use this field to find the priority of the composite pod group. When Priority Admission
@@ -168,7 +226,21 @@ message CompositePodGroupSpec {
   // +k8s:optional
   // +k8s:immutable
   // +k8s:maximum=1000000000 # HighestUserDefinablePriority
-  optional int32 priority = 5;
+  optional int32 priority = 7;
+
+  // preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+  // One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset.
+  // When Priority Admission Controller is enabled, it populates this field from PriorityClassName,
+  // and defaults to PreemptLowerPriority if value is unset in PriorityClass.
+  // This field is immutable.
+  // This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
+  //
+  // +featureGate=PodGroupPreemptionPolicy
+  // +optional
+  // +k8s:immutable
+  // +k8s:ifDisabled("PodGroupPreemptionPolicy")=+k8s:forbidden
+  // +k8s:ifEnabled("PodGroupPreemptionPolicy")=+k8s:optional
+  optional string preemptionPolicy = 8;
 }
 
 // CompositePodGroupStatus represents information about the status of a composite pod group.
@@ -222,6 +294,23 @@ message CompositePodGroupTemplate {
   // +required
   optional CompositePodGroupSchedulingPolicy schedulingPolicy = 2;
 
+  // schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroupTemplate.
+  // This field is immutable.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:immutable
+  optional CompositePodGroupSchedulingConstraints schedulingConstraints = 3;
+
+  // disruptionMode defines the mode in which a given CompositePodGroup can be disrupted.
+  // One of Single, All.
+  // This field is immutable.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:immutable
+  optional CompositeDisruptionMode disruptionMode = 4;
+
   // priorityClassName indicates the priority that should be considered when scheduling
   // a composite pod group created from this template. If no priority class is specified,
   // admission control can set this to the global default priority class if it exists.
@@ -233,7 +322,7 @@ message CompositePodGroupTemplate {
   // +k8s:optional
   // +k8s:format=k8s-long-name
   // +k8s:immutable
-  optional string priorityClassName = 3;
+  optional string priorityClassName = 5;
 
   // priority is the value of priority of composite pod groups created from this template.
   // Various system components use this field to find the priority of the composite pod group.
@@ -246,7 +335,19 @@ message CompositePodGroupTemplate {
   // +k8s:optional
   // +k8s:maximum=1000000000 # HighestUserDefinablePriority
   // +k8s:immutable
-  optional int32 priority = 4;
+  optional int32 priority = 6;
+
+  // preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+  // One of Never, PreemptLowerPriority.
+  // This field is immutable.
+  // This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
+  //
+  // +featureGate=PodGroupPreemptionPolicy
+  // +optional
+  // +k8s:immutable
+  // +k8s:ifDisabled("PodGroupPreemptionPolicy")=+k8s:forbidden
+  // +k8s:ifEnabled("PodGroupPreemptionPolicy")=+k8s:optional
+  optional string preemptionPolicy = 7;
 
   // podGroupTemplates is the list of templates for children PodGroups.
   // The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates
@@ -261,7 +362,7 @@ message CompositePodGroupTemplate {
   // +k8s:maxItems=8
   // +k8s:update=NoAddItem
   // +k8s:update=NoRemoveItem
-  repeated PodGroupTemplate podGroupTemplates = 5;
+  repeated PodGroupTemplate podGroupTemplates = 8;
 
   // compositePodGroupTemplates is the list of templates for children CompositePodGroups.
   // The maximum number of templates is 8. At least one entry in CompositePodGroupTemplates
@@ -276,7 +377,7 @@ message CompositePodGroupTemplate {
   // +k8s:maxItems=8
   // +k8s:update=NoAddItem
   // +k8s:update=NoRemoveItem
-  repeated CompositePodGroupTemplate compositePodGroupTemplates = 6;
+  repeated CompositePodGroupTemplate compositePodGroupTemplates = 9;
 }
 
 // DisruptionMode defines how individual entities within a group can be disrupted.
@@ -484,7 +585,7 @@ message PodGroupSpec {
   // +k8s:ifEnabled(CompositePodGroup)=+k8s:optional
   // +k8s:immutable
   // +k8s:format=k8s-long-name
-  // +k8s:dependentRequired("workloadRef")
+  // +k8s:alpha(since: "1.37")=+k8s:dependentRequired("workloadRef")
   optional string parentCompositePodGroupName = 1;
 
   // workloadRef references an optional PodGroup template within the Workload
@@ -728,6 +829,11 @@ message PodGroupTemplate {
   optional string preemptionPolicy = 8;
 }
 
+// SingleCompositeDisruptionMode means that individual children of a CompositePodGroup
+// can be disrupted or preempted independently.
+message SingleCompositeDisruptionMode {
+}
+
 // SingleDisruptionMode specifies that children can be disrupted independently.
 message SingleDisruptionMode {
 }
@@ -789,6 +895,160 @@ message Workload {
   //
   // +required
   optional WorkloadSpec spec = 2;
+}
+
+// WorkloadCompositePodGroupAllDisruptionMode indicates that all child groups
+// must be disrupted together.
+message WorkloadCompositePodGroupAllDisruptionMode {
+}
+
+// WorkloadCompositePodGroupBasicSchedulingPolicy indicates that the child groups
+// of a composite group should be scheduled independently.
+message WorkloadCompositePodGroupBasicSchedulingPolicy {
+}
+
+// WorkloadCompositePodGroupDisruptionMode defines how the child groups of a
+// composite group can be disrupted. Exactly one mode must be set.
+//
+// ---
+//
+// This is a reusable building block meant to be embedded in a composite
+// controller's own API, next to its other scheduling fields. It is the
+// group-of-groups analogue of WorkloadPodGroupDisruptionMode. It's recommended
+// to freeze the field after creation (+k8s:immutable), since the selected mode
+// is immutable in the compiled Workload. For example,
+//
+// 	type JobSetSchedulingConfiguration struct {
+// 		// DisruptionMode defines the mode in which this JobSet's child groups
+// 		// can be disrupted.
+// 		// One of Single, All.
+// 		// This field is immutable after creation: it may not be added or removed,
+// 		// and the selected mode may not be changed.
+// 		// +optional
+// 		// +k8s:optional
+// 		// +k8s:immutable
+// 		DisruptionMode *schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,N,opt,name=disruptionMode"`
+//
+// 		// other scheduling fields
+// 	}
+//
+// +union
+message WorkloadCompositePodGroupDisruptionMode {
+  // single specifies that child groups can be disrupted independently from
+  // each other.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional WorkloadCompositePodGroupSingleDisruptionMode single = 1;
+
+  // all specifies that all child groups must be disrupted together.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional WorkloadCompositePodGroupAllDisruptionMode all = 2;
+}
+
+// WorkloadCompositePodGroupGangSchedulingPolicy defines the parameters for gang
+// scheduling of a composite group's child groups.
+message WorkloadCompositePodGroupGangSchedulingPolicy {
+  // minGroupCount is the minimum number of child groups that must be
+  // schedulable at the same time for the scheduler to admit the entire
+  // composite group.
+  // This field is optional. If it is not specified, the controller
+  // should inject a context-specific sane default (e.g., the number of
+  // child groups).
+  // If set, it must be a positive integer.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:minimum=1
+  optional int32 minGroupCount = 1;
+}
+
+// WorkloadCompositePodGroupSchedulingConstraints defines composite-level
+// scheduling constraints, such as topology, for a CompositePodGroup (a group of
+// groups) managed by a workload controller.
+//
+// ---
+//
+// This is a reusable building block meant to be embedded in a composite
+// controller's own API, next to its other scheduling fields. It is the
+// group-of-groups analogue of WorkloadPodGroupSchedulingConstraints. It's
+// recommended to freeze the field after creation (+k8s:immutable), since
+// constraints are immutable in the compiled Workload. For example,
+//
+// 	type JobSetSchedulingConfiguration struct {
+// 		// SchedulingConstraints defines scheduling constraints (e.g. topology)
+// 		// for this JobSet.
+// 		// This field is immutable after creation.
+// 		// +optional
+// 		// +k8s:optional
+// 		// +k8s:immutable
+// 		SchedulingConstraints *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,N,opt,name=schedulingConstraints"`
+//
+// 		// other scheduling fields
+// 	}
+message WorkloadCompositePodGroupSchedulingConstraints {
+  // topology specifies desired topological placements for all child groups
+  // within the composite group.
+  // If unset, no topology placement is requested.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:maxItems=1
+  // +listType=atomic
+  // +k8s:listType=atomic
+  repeated TopologyConstraint topology = 1;
+}
+
+// WorkloadCompositePodGroupSchedulingPolicy defines the scheduling policy for a
+// CompositePodGroup (a group of groups) managed by a workload controller.
+// Exactly one policy must be set.
+//
+// ---
+//
+// This is a reusable building block meant to be embedded in a composite
+// controller's own API, next to its other scheduling fields. It is the
+// group-of-groups analogue of WorkloadPodGroupSchedulingPolicy. The composite
+// scheduling policy is immutable, so it's recommended to freeze the whole
+// field after creation (+k8s:immutable). For example,
+//
+// 	type JobSetSchedulingConfiguration struct {
+// 		// SchedulingPolicy defines the scheduling policy for this JobSet.
+// 		// Exactly one of Basic or Gang must be set.
+// 		// This field is immutable after creation.
+// 		// +optional
+// 		// +k8s:optional
+// 		// +k8s:immutable
+// 		SchedulingPolicy *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty" protobuf:"bytes,N,opt,name=schedulingPolicy"`
+//
+// 		// other scheduling fields
+// 	}
+//
+// +union
+message WorkloadCompositePodGroupSchedulingPolicy {
+  // basic specifies that the child groups of this composite group should be
+  // scheduled independently.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional WorkloadCompositePodGroupBasicSchedulingPolicy basic = 1;
+
+  // gang specifies that the child groups of this composite group should be
+  // scheduled using all-or-nothing semantics.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional WorkloadCompositePodGroupGangSchedulingPolicy gang = 2;
+}
+
+// WorkloadCompositePodGroupSingleDisruptionMode indicates that child groups
+// can be disrupted independently.
+message WorkloadCompositePodGroupSingleDisruptionMode {
 }
 
 // WorkloadList contains a list of Workload resources.

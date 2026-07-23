@@ -613,7 +613,23 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			ResourceClaimName: "myclaim",
 			Containers:        []string{"mycontainer"},
-			Resources:         map[api.ResourceName]resource.Quantity{api.ResourceCPU: resource.MustParse("1")},
+			Mapping: []api.NodeAllocatableMappedResources{{
+				Name:     api.ResourceCPU,
+				Quantity: new(resource.MustParse("1")),
+			}},
+		},
+	}
+
+	nodeAllocatableOverheadResourceClaimPod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
+	nodeAllocatableOverheadResourceClaimPod.Status.NodeAllocatableResourceClaimStatuses = []api.NodeAllocatableResourceClaimStatus{
+		{
+			ResourceClaimName: "myclaim",
+			Containers:        []string{"mycontainer"},
+			Overhead: []api.NodeAllocatableOverheadResources{{
+				Name:         api.ResourceMemory,
+				PerPod:       new(resource.MustParse("1Gi")),
+				PerContainer: new(resource.MustParse("500Mi")),
+			}},
 		},
 	}
 
@@ -1180,6 +1196,12 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "forbid update of pod's node allocatable resource claim status",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(nodeAllocatableResourceClaimPod, claimpod, podKind, nodeAllocatableResourceClaimPod.Namespace, nodeAllocatableResourceClaimPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "cannot update node allocatable resource claim statuses",
+		},
+		{
+			name:       "forbid update of pod's node allocatable overhead resource claim status",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(nodeAllocatableOverheadResourceClaimPod, claimpod, podKind, nodeAllocatableOverheadResourceClaimPod.Namespace, nodeAllocatableOverheadResourceClaimPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
 			err:        "cannot update node allocatable resource claim statuses",
 		},
 
@@ -1857,6 +1879,88 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "allowed delete node CSINode",
 			attributes: admission.NewAttributesRecord(nil, nil, csiNodeKind, nodeInfo.Namespace, nodeInfo.Name, csiNodeResource, "", admission.Delete, &metav1.UpdateOptions{}, false, mynode),
 			err:        "",
+		},
+		{
+			name: "disallowed update CSINode status - feature disabled",
+			attributes: admission.NewAttributesRecord(
+				&storage.CSINode{
+					ObjectMeta: metav1.ObjectMeta{Name: "mynode"},
+					Spec:       nodeInfo.Spec,
+					Status: storage.CSINodeStatus{
+						StorageHealth: []storage.StorageHealth{
+							{Name: "com.example.csi/mydriver", HealthConditions: []storage.StorageHealthCondition{{Status: storage.StorageDegraded, Reason: "DiskSlow"}}},
+						},
+					},
+				},
+				nodeInfo,
+				csiNodeKind, nodeInfo.Namespace, nodeInfo.Name, csiNodeResource, "status",
+				admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err: "CSIVolumeHealth feature gate is disabled",
+		},
+		{
+			name: "allowed update own CSINode status",
+			attributes: admission.NewAttributesRecord(
+				&storage.CSINode{
+					ObjectMeta: metav1.ObjectMeta{Name: "mynode"},
+					Spec:       nodeInfo.Spec,
+					Status: storage.CSINodeStatus{
+						StorageHealth: []storage.StorageHealth{
+							{Name: "com.example.csi/mydriver", HealthConditions: []storage.StorageHealthCondition{{Status: storage.StorageDegraded, Reason: "DiskSlow"}}},
+						},
+					},
+				},
+				nodeInfo,
+				csiNodeKind, nodeInfo.Namespace, nodeInfo.Name, csiNodeResource, "status",
+				admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			features: feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.CSIVolumeHealth, true)
+			},
+			err: "",
+		},
+		{
+			name: "disallowed update another node's CSINode status",
+			attributes: admission.NewAttributesRecord(
+				nodeInfoWrongName, nodeInfoWrongName,
+				csiNodeKind, nodeInfoWrongName.Namespace, nodeInfoWrongName.Name, csiNodeResource, "status",
+				admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			features: feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.CSIVolumeHealth, true)
+			},
+			err: "forbidden: ",
+		},
+		{
+			name: "disallowed modify CSINode Spec via status",
+			attributes: admission.NewAttributesRecord(
+				&storage.CSINode{
+					ObjectMeta: metav1.ObjectMeta{Name: "mynode"},
+					Spec: storage.CSINodeSpec{
+						Drivers: []storage.CSINodeDriver{
+							{
+								Name:         "com.example.csi/evil",
+								NodeID:       "evil",
+								TopologyKeys: []string{"evil"},
+							},
+						},
+					},
+					Status: storage.CSINodeStatus{
+						StorageHealth: []storage.StorageHealth{
+							{Name: "com.example.csi/mydriver", HealthConditions: []storage.StorageHealthCondition{{Status: storage.StorageDegraded, Reason: "DiskSlow"}}},
+						},
+					},
+				},
+				nodeInfo,
+				csiNodeKind, nodeInfo.Namespace, nodeInfo.Name, csiNodeResource, "status",
+				admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			features: feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.CSIVolumeHealth, true)
+			},
+			err: "forbidden: ",
 		},
 		// CSR
 		{

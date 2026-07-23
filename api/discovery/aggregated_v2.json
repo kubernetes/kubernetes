@@ -699,6 +699,41 @@
                 "update",
                 "watch"
               ]
+            },
+            {
+              "resource": "podcertificaterequests",
+              "responseKind": {
+                "group": "",
+                "kind": "PodCertificateRequest",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "podcertificaterequest",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "PodCertificateRequest",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
             }
           ],
           "version": "v1"
@@ -1099,6 +1134,21 @@
               },
               "scope": "Cluster",
               "singularResource": "csinode",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "CSINode",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
               "verbs": [
                 "create",
                 "delete",
@@ -1574,6 +1624,67 @@
             }
           ],
           "version": "v1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "podgroups",
+              "responseKind": {
+                "group": "",
+                "kind": "PodGroup",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "podgroup",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "PodGroup",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "workloads",
+              "responseKind": {
+                "group": "",
+                "kind": "Workload",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "workload",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1beta1"
         },
         {
           "freshness": "Current",
@@ -2497,6 +2608,89 @@
             }
           ],
           "version": "v1beta1"
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "name": "lifecycle.k8s.io"
+      },
+      "versions": [
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "evictionrequests",
+              "responseKind": {
+                "group": "",
+                "kind": "EvictionRequest",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "evictionrequest",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "EvictionRequest",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "evictions",
+              "responseKind": {
+                "group": "",
+                "kind": "Eviction",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "eviction",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "Eviction",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1alpha1"
         }
       ]
     }

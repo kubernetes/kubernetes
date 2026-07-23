@@ -130,6 +130,10 @@ var (
 	// their dependency on specific feature gates and the corresponding API groups.
 	DynamicResourceAllocation = framework.WithFeature(framework.ValidFeatures.Add("DynamicResourceAllocation"))
 
+	// Owner: sig-storage
+	// EmptyDirVolumeMode is used for tests that require the EmptyDirVolumeMode feature gate.
+	EmptyDirVolumeMode = framework.WithFeature(framework.ValidFeatures.Add("EmptyDirVolumeMode"))
+
 	// Owner: sig-node
 	// EnvFiles is used for testing the EnvFiles feature (file-based environment variables).
 	EnvFiles = framework.WithFeature(framework.ValidFeatures.Add("EnvFiles"))
@@ -242,6 +246,10 @@ var (
 	// Owner: sig-node
 	// TODO: document the feature (when to use this feature for a test)
 	LocalStorageCapacityIsolationQuota = framework.WithFeature(framework.ValidFeatures.Add("LocalStorageCapacityIsolationQuota"))
+
+	// Owner: sig-network
+	// Marks tests that require the service proxy to support localhost NodePort services
+	LocalhostNodePorts = framework.WithFeature(framework.ValidFeatures.Add("LocalhostNodePorts"))
 
 	// owning-sig: sig-node
 	// Marks a disruptive test for lock contention

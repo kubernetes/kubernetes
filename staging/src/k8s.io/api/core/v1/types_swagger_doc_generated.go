@@ -235,6 +235,7 @@ var map_ClusterTrustBundleProjection = map[string]string{
 	"labelSelector": "Select all ClusterTrustBundles that match this label selector.  Only has effect if signerName is set.  Mutually-exclusive with name.  If unset, interpreted as \"match nothing\".  If set but empty, interpreted as \"match everything\".",
 	"optional":      "If true, don't block pod startup if the referenced ClusterTrustBundle(s) aren't available.  If using name, then the named ClusterTrustBundle is allowed not to exist.  If using signerName, then the combination of signerName and labelSelector is allowed to match zero ClusterTrustBundles.",
 	"path":          "Relative path from the volume root to write the bundle.",
+	"user":          "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
 }
 
 func (ClusterTrustBundleProjection) SwaggerDoc() map[string]string {
@@ -342,6 +343,7 @@ var map_ConfigMapVolumeSource = map[string]string{
 	"items":       "items if unspecified, each key-value pair in the Data field of the referenced ConfigMap will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the ConfigMap, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
 	"defaultMode": "defaultMode is optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
 	"optional":    "optional specify whether the ConfigMap or its keys must be defined",
+	"defaultUser": "defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
 }
 
 func (ConfigMapVolumeSource) SwaggerDoc() map[string]string {
@@ -546,6 +548,7 @@ var map_DownwardAPIVolumeFile = map[string]string{
 	"fieldRef":         "Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported.",
 	"resourceFieldRef": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.",
 	"mode":             "Optional: mode bits used to set permissions on this file, must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+	"user":             "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
 }
 
 func (DownwardAPIVolumeFile) SwaggerDoc() map[string]string {
@@ -556,6 +559,7 @@ var map_DownwardAPIVolumeSource = map[string]string{
 	"":            "DownwardAPIVolumeSource represents a volume containing downward API info. Downward API volumes support ownership management and SELinux relabeling.",
 	"items":       "Items is a list of downward API volume file",
 	"defaultMode": "Optional: mode bits to use on created files by default. Must be a Optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+	"defaultUser": "defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
 }
 
 func (DownwardAPIVolumeSource) SwaggerDoc() map[string]string {
@@ -566,6 +570,7 @@ var map_EmptyDirVolumeSource = map[string]string{
 	"":          "Represents an empty directory for a pod. Empty directory volumes support ownership management and SELinux relabeling.",
 	"medium":    "medium represents what type of storage medium should back this directory. The default is \"\" which means to use the node's default medium. Must be an empty string (default) or Memory. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
 	"sizeLimit": "sizeLimit is the total amount of local storage required for this EmptyDir volume. The size limit is also applicable for memory medium. The maximum usage on memory medium EmptyDir would be the minimum value between the SizeLimit specified here and the sum of memory limits of all containers in a pod. The default is nil which means that the limit is undefined. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
+	"mode":      "mode specifies the permission bits for the emptyDir directory, in numeric notation (e.g., 0755, 01777). Must be a value between 0000 and 01777. If not specified, defaults to 0777. This might be in conflict with other options that affect the file mode, like fsGroup. If fsGroup is specified, the fsGroup permissions will override the mode specified here. This field has no effect on Windows. This field is alpha and requires EmptyDirVolumeMode featuregate to be enabled.",
 }
 
 func (EmptyDirVolumeSource) SwaggerDoc() map[string]string {
@@ -766,6 +771,16 @@ func (EventSource) SwaggerDoc() map[string]string {
 	return map_EventSource
 }
 
+var map_EvictionResponder = map[string]string{
+	"":         "EvictionResponder allows you to specify the responder reacting to an Eviction. Responders should observe and communicate through the Eviction Resource API to help with the graceful eviction of a target (e.g. termination of a pod).",
+	"name":     "name allows you to identify the responder responding to the Eviction.\n\nIt must be a valid domain-prefixed key (such as \"acme.io/foo\"). Domain names *.k8s.io and *.kubernetes.io are reserved. This field must be unique for each responder. This field is required.",
+	"priority": "priority for this responder. Higher priorities are selected first by the evictionrequest-controller. If there are responders with the same priority, the responder whose domain name comes first in the alphabetical higher domain order, will be picked. This means that the top domain labels are compared alphabetically first, followed by the lower domain labels. The key is compared last.\n\nThe responder that is the managing controller of the pod should set the value of this field to 10000 to allow both for preemption or fallback registration by other responders.\n\nThe minimum value is 0 and the maximum value is 100000. The interval 0-999 is reserved for responders with *.k8s.io suffix. This field is required.",
+}
+
+func (EvictionResponder) SwaggerDoc() map[string]string {
+	return map_EvictionResponder
+}
+
 var map_ExecAction = map[string]string{
 	"":        "ExecAction describes a \"run in container\" action.",
 	"command": "Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.",
@@ -852,6 +867,7 @@ var map_GRPCAction = map[string]string{
 	"":        "GRPCAction specifies an action involving a GRPC service.",
 	"port":    "Port number of the gRPC service. Number must be in the range 1 to 65535.",
 	"service": "Service is the name of the service to place in the gRPC HealthCheckRequest (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).\n\nIf this is not specified, the default behavior is defined by gRPC.",
+	"mode":    "mode specifies the connection mode for the gRPC health probe. Set to \"TLS\" to use TLS without certificate verification. Set to \"Plaintext\" to use a plaintext (insecure) connection explicitly. If not specified, the probe uses a plaintext (insecure) connection.",
 }
 
 func (GRPCAction) SwaggerDoc() map[string]string {
@@ -899,6 +915,7 @@ var map_HTTPGetAction = map[string]string{
 	"host":        "Host name to connect to, defaults to the pod IP. You probably want to set \"Host\" in httpHeaders instead.",
 	"scheme":      "Scheme to use for connecting to the host. Defaults to HTTP.",
 	"httpHeaders": "Custom headers to set in the request. HTTP allows repeated headers.",
+	"protocol":    "Protocol selects the wire protocol for the probe connection. Nil defaults to HTTP/1.1.",
 }
 
 func (HTTPGetAction) SwaggerDoc() map[string]string {
@@ -1006,6 +1023,7 @@ var map_KeyToPath = map[string]string{
 	"key":  "key is the key to project.",
 	"path": "path is the relative path of the file to map the key to. May not be an absolute path. May not contain the path element '..'. May not start with the string '..'.",
 	"mode": "mode is Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+	"user": "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
 }
 
 func (KeyToPath) SwaggerDoc() map[string]string {
@@ -1234,11 +1252,33 @@ func (NodeAffinity) SwaggerDoc() map[string]string {
 	return map_NodeAffinity
 }
 
+var map_NodeAllocatableMappedResources = map[string]string{
+	"":         "NodeAllocatableMappedResources describes mapped node allocatable resource allocations.",
+	"name":     "Name is the name of the resource (e.g., cpu, memory).",
+	"quantity": "Quantity is the total node allocatable resource capacity allocated for the claim. This claim's allocated devices is shared by all the containers referencing the claim. Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.",
+}
+
+func (NodeAllocatableMappedResources) SwaggerDoc() map[string]string {
+	return map_NodeAllocatableMappedResources
+}
+
+var map_NodeAllocatableOverheadResources = map[string]string{
+	"":             "NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.",
+	"name":         "Name is the name of the resource (e.g., cpu, memory).",
+	"perPod":       "PerPod is the flat overhead quantity allocated per pod. Adding to each container limit allows individual containers to utilize the overhead, while the parent pod-level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.",
+	"perContainer": "PerContainer is the variable overhead quantity applied for each container referencing the claim. The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`. The total overhead quantity allocated for the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.",
+}
+
+func (NodeAllocatableOverheadResources) SwaggerDoc() map[string]string {
+	return map_NodeAllocatableOverheadResources
+}
+
 var map_NodeAllocatableResourceClaimStatus = map[string]string{
 	"":                  "NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.",
 	"resourceClaimName": "ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.",
 	"containers":        "Containers lists the names of all containers in this pod that reference the claim.",
-	"resources":         "Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.",
+	"mapping":           "Mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
+	"overhead":          "Overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
 }
 
 func (NodeAllocatableResourceClaimStatus) SwaggerDoc() map[string]string {
@@ -1540,6 +1580,7 @@ var map_PersistentVolumeClaimStatus = map[string]string{
 	"allocatedResourceStatuses":        "allocatedResourceStatuses stores status of resource being resized for the given PVC. Key names follow standard Kubernetes label syntax. Valid values are either:\n\t* Un-prefixed keys:\n\t\t- storage - the capacity of the volume.\n\t* Custom resources must use implementation-defined prefixed names such as \"example.com/my-custom-resource\"\nApart from above values - keys that are unprefixed or have kubernetes.io prefix are considered reserved and hence may not be used.\n\nClaimResourceStatus can be in any of following states:\n\t- ControllerResizeInProgress:\n\t\tState set when resize controller starts resizing the volume in control-plane.\n\t- ControllerResizeFailed:\n\t\tState set when resize has failed in resize controller with a terminal error.\n\t- NodeResizePending:\n\t\tState set when resize controller has finished resizing the volume but further resizing of\n\t\tvolume is needed on the node.\n\t- NodeResizeInProgress:\n\t\tState set when kubelet starts resizing the volume.\n\t- NodeResizeFailed:\n\t\tState set when resizing has failed in kubelet with a terminal error. Transient errors don't set\n\t\tNodeResizeFailed.\nFor example: if expanding a PVC for more capacity - this field can be one of the following states:\n\t- pvc.status.allocatedResourceStatus['storage'] = \"ControllerResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"ControllerResizeFailed\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizePending\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizeFailed\"\nWhen this field is not set, it means that no resize operation is in progress for the given PVC.\n\nA controller that receives PVC update with previously unknown resourceName or ClaimResourceStatus should ignore the update for the purpose it was designed. For example - a controller that only is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid resources associated with PVC.",
 	"currentVolumeAttributesClassName": "currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using. When unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim",
 	"modifyVolumeStatus":               "ModifyVolumeStatus represents the status object of ControllerModifyVolume operation. When this is unset, there is no ModifyVolume operation being attempted.",
+	"healthStatus":                     "healthStatus contains the latest controller-reported health information for the volume bound to this claim.",
 }
 
 func (PersistentVolumeClaimStatus) SwaggerDoc() map[string]string {
@@ -1712,6 +1753,7 @@ var map_PodCertificateProjection = map[string]string{
 	"keyPath":              "Write the key at this path in the projected volume.\n\nMost applications should use credentialBundlePath.  When using keyPath and certificateChainPath, your application needs to check that the key and leaf certificate are consistent, because it is possible to read the files mid-rotation.",
 	"certificateChainPath": "Write the certificate chain at this path in the projected volume.\n\nMost applications should use credentialBundlePath.  When using keyPath and certificateChainPath, your application needs to check that the key and leaf certificate are consistent, because it is possible to read the files mid-rotation.",
 	"userAnnotations":      "userAnnotations allow pod authors to pass additional information to the signer implementation.  Kubernetes does not restrict or validate this metadata in any way.\n\nThese values are copied verbatim into the `spec.unverifiedUserAnnotations` field of the PodCertificateRequest objects that Kubelet creates.\n\nEntries are subject to the same validation as object metadata annotations, with the addition that all keys must be domain-prefixed. No restrictions are placed on values, except an overall size limitation on the entire field.\n\nSigners should document the keys and values they support. Signers should deny requests that contain keys they do not recognize.",
+	"user":                 "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
 }
 
 func (PodCertificateProjection) SwaggerDoc() map[string]string {
@@ -1962,8 +2004,9 @@ var map_PodSpec = map[string]string{
 	"schedulingGates":               "SchedulingGates is an opaque list of values that if specified will block scheduling the pod. If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the scheduler will not attempt to schedule the pod.\n\nSchedulingGates can only be set at pod creation time, and be removed only afterwards.",
 	"resourceClaims":                "ResourceClaims defines which ResourceClaims must be allocated and reserved before the Pod is allowed to start. The resources will be made available to those containers which consume them by name.\n\nThis is a stable field but requires that the DynamicResourceAllocation feature gate is enabled.\n\nThis field is immutable.",
 	"resources":                     "Resources is the total amount of CPU and Memory resources required by all containers in the pod. It supports specifying Requests and Limits for \"cpu\", \"memory\" and \"hugepages-\" resource names only. ResourceClaims are not supported.\n\nThis field enables fine-grained control over resource allocation for the entire pod, allowing resource sharing among containers in a pod.\n\nThis is an alpha field and requires enabling the PodLevelResources feature gate.",
-	"hostnameOverride":              "HostnameOverride specifies an explicit override for the pod's hostname as perceived by the pod. This field only specifies the pod's hostname and does not affect its DNS records. When this field is set to a non-empty string: - It takes precedence over the values set in `hostname` and `subdomain`. - The Pod's hostname will be set to this value. - `setHostnameAsFQDN` must be nil or set to false. - `hostNetwork` must be set to false.\n\nThis field must be a valid DNS subdomain as defined in RFC 1123 and contain at most 64 characters. Requires the HostnameOverride feature gate to be enabled.",
+	"hostnameOverride":              "HostnameOverride specifies an explicit override for the pod's hostname as perceived by the pod. This field only specifies the pod's hostname and does not affect its DNS records. When this field is set to a non-empty string: - It takes precedence over the values set in `hostname` and `subdomain`. - The Pod's hostname will be set to this value. - `setHostnameAsFQDN` must be nil or set to false. - `hostNetwork` must be set to false.\n\nThis field must be a valid DNS subdomain as defined in RFC 1123 and contain at most 64 characters.",
 	"schedulingGroup":               "SchedulingGroup provides a reference to the immediate scheduling runtime grouping object that this Pod belongs to. This field is used by the scheduler to identify the group and apply the correct group scheduling policies. The association with a group also impacts other lifecycle aspects of a Pod that are relevant in a wider context of scheduling like preemption, resource attachment, etc. If not specified, the Pod is treated as a single unit in all of these aspects. The group object referenced by this field may not exist at the time the Pod is created. This field is immutable, but a group object with the same name may be recreated with different policies. Doing this during pod scheduling may result in the placement not conforming to the expected policies.",
+	"evictionResponders":            "evictionResponders reference responders that react to Evictions based on EvictionRequests. Responders should observe and communicate through the Eviction Resource API to help with the graceful termination of a pod. The responders are selected sequentially, according to their specified priority.\n\nResponders should periodically report on an eviction progress by updating the .status.responders[].heartbeatTime field of the Eviction object. If this field is not updated within the heartbeat deadline defined by the Eviction API (currently 20 minutes), the eviction is passed over to the next responder with a lower priority. If there is no other responder, the last default imperative-eviction.k8s.io/evictor responder with a priority of 100 will evict the pod using the imperative Eviction API (pods/<name>/eviction subresource).\n\nThe maximum length of the responders list is 10. Responders are not supported when the pod is part of a PodGroup (.spec.schedulingGroup is set). This field can only be set on creation and is immutable afterwards.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {
@@ -1993,6 +2036,7 @@ var map_PodStatus = map[string]string{
 	"allocatedResources":                   "AllocatedResources is the total requests allocated for this pod by the node. If pod-level requests are not set, this will be the total requests aggregated across containers in the pod.",
 	"resources":                            "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources",
 	"nodeAllocatableResourceClaimStatuses": "NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources that were allocated for this pod through DRA claims. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages.",
+	"volumeHealth":                         "volumeHealth contains node-reported health for each volume the pod is using. Populated by the kubelet on the pod's node.",
 }
 
 func (PodStatus) SwaggerDoc() map[string]string {
@@ -2027,6 +2071,17 @@ var map_PodTemplateSpec = map[string]string{
 
 func (PodTemplateSpec) SwaggerDoc() map[string]string {
 	return map_PodTemplateSpec
+}
+
+var map_PodVolumeHealth = map[string]string{
+	"":                   "PodVolumeHealth contains health information for a volume used by a pod, reported by the CSI node plugin via the kubelet.",
+	"name":               "name matches an entry in pod.spec.volumes.",
+	"healthConditions":   "conditions is the set of adverse conditions reported by the CSI node plugin for this volume on this node. At most 16 conditions may be reported.",
+	"lastTransitionTime": "lastTransitionTime is when the current set of conditions first appeared.",
+}
+
+func (PodVolumeHealth) SwaggerDoc() map[string]string {
+	return map_PodVolumeHealth
 }
 
 var map_PortStatus = map[string]string{
@@ -2112,6 +2167,7 @@ var map_ProjectedVolumeSource = map[string]string{
 	"":            "Represents a projected volume source",
 	"sources":     "sources is the list of volume projections. Each entry in this list handles one source.",
 	"defaultMode": "defaultMode are the mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+	"defaultUser": "defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
 }
 
 func (ProjectedVolumeSource) SwaggerDoc() map[string]string {
@@ -2322,7 +2378,7 @@ func (ResourceRequirements) SwaggerDoc() map[string]string {
 
 var map_ResourceStatus = map[string]string{
 	"":          "ResourceStatus represents the status of a single resource allocated to a Pod.",
-	"name":      "Name of the resource. Must be unique within the pod and in case of non-DRA resource, match one of the resources from the pod spec. For DRA resources, the value must be \"claim:<claim_name>/<request>\". When this status is reported about a container, the \"claim_name\" and \"request\" must match one of the claims of this container.",
+	"name":      "Name of the resource. Must be unique within the pod and in case of non-DRA resource, match one of the resources from the pod spec. For DRA resources, the value must be \"claim:<claim_name>/<request>\" when container.resources.claims[*].request is set or \"claim:<claim_name>\" when container.resources.claims[*].request is empty. For DRA-backed extended resources, \"claim:<claim_name>/<request>\" is used when the claim name and request name are recorded in pod.status.extendedResourceClaimStatus. When this status is reported about a container, the \"claim_name\" and \"request\" must match one of the claims of this container.",
 	"resources": "List of unique resources health. Each element in the list contains an unique resource ID and its health. At a minimum, for the lifetime of a Pod, resource ID must uniquely identify the resource allocated to the Pod on the Node. If other Pod on the same Node reports the status with the same resource ID, it must be the same resource they share. See ResourceID type definition for a specific format it has in various use cases.",
 }
 
@@ -2476,6 +2532,7 @@ var map_SecretVolumeSource = map[string]string{
 	"items":       "items If unspecified, each key-value pair in the Data field of the referenced Secret will be projected into the volume as a file whose name is the key and content is the value. If specified, the listed keys will be projected into the specified paths, and unlisted keys will not be present. If a key is specified which is not present in the Secret, the volume setup will error unless it is marked optional. Paths must be relative and may not contain the '..' path or start with '..'.",
 	"defaultMode": "defaultMode is Optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
 	"optional":    "optional field specify whether the Secret or its keys must be defined",
+	"defaultUser": "defaultUser is Optional: The owner UID of the created files by default. The defaultUser field is only used as a fallback when the item-level user field is unset. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
 }
 
 func (SecretVolumeSource) SwaggerDoc() map[string]string {
@@ -2549,6 +2606,7 @@ var map_ServiceAccountTokenProjection = map[string]string{
 	"audience":          "audience is the intended audience of the token. A recipient of a token must identify itself with an identifier specified in the audience of the token, and otherwise should reject the token. The audience defaults to the identifier of the apiserver.",
 	"expirationSeconds": "expirationSeconds is the requested duration of validity of the service account token. As the token approaches expiration, the kubelet volume plugin will proactively rotate the service account token. The kubelet will start trying to rotate the token if the token is older than 80 percent of its time to live or if the token is older than 24 hours.Defaults to 1 hour and must be at least 10 minutes.",
 	"path":              "path is the path relative to the mount point of the file to project the token into.",
+	"user":              "user is Optional: The owner UID of the created file. If specified, the item-level user field takes precedence over defaultUser. (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
 }
 
 func (ServiceAccountTokenProjection) SwaggerDoc() map[string]string {
@@ -2790,6 +2848,27 @@ var map_VolumeDevice = map[string]string{
 
 func (VolumeDevice) SwaggerDoc() map[string]string {
 	return map_VolumeDevice
+}
+
+var map_VolumeHealthCondition = map[string]string{
+	"":        "VolumeHealthCondition represents an adverse health condition reported for a volume.",
+	"status":  "status is the machine-parseable health category. Possible values: - \"Inaccessible\": the volume cannot be accessed. - \"DataLoss\": data loss has been detected on the volume. - \"Degraded\": the volume is functioning with reduced capability.",
+	"reason":  "reason is a brief CamelCase machine-parseable reason. Together with status it forms the unique identity of a condition entry. Maximum permitted length of a reason is 256 bytes.",
+	"message": "message is a human-readable description. Maximum permitted length of a message is 1024 bytes.",
+}
+
+func (VolumeHealthCondition) SwaggerDoc() map[string]string {
+	return map_VolumeHealthCondition
+}
+
+var map_VolumeHealthStatus = map[string]string{
+	"":                   "VolumeHealthStatus contains health information for a volume reported by the CSI controller plugin.",
+	"healthConditions":   "conditions is the set of adverse conditions reported by the CSI controller plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
+	"lastTransitionTime": "lastTransitionTime is when the current set of conditions first appeared.",
+}
+
+func (VolumeHealthStatus) SwaggerDoc() map[string]string {
+	return map_VolumeHealthStatus
 }
 
 var map_VolumeMount = map[string]string{

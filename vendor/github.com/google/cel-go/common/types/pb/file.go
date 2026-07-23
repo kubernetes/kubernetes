@@ -32,7 +32,7 @@ func newFileDescription(fileDesc protoreflect.FileDescriptor, pbdb *Db) (*FileDe
 	}
 	types := make(map[string]*TypeDescription)
 	for name, msgType := range metadata.msgTypes {
-		types[name] = newTypeDescription(name, msgType, pbdb.extensions)
+		types[name] = newTypeDescription(name, msgType, pbdb)
 	}
 	fileExtMap := make(extensionMap)
 	for typeName, extensions := range metadata.msgExtensionMap {
@@ -42,12 +42,13 @@ func newFileDescription(fileDesc protoreflect.FileDescriptor, pbdb *Db) (*FileDe
 		}
 		for _, ext := range extensions {
 			extDesc := dynamicpb.NewExtensionType(ext).TypeDescriptor()
-			messageExtMap[string(ext.FullName())] = newFieldDescription(extDesc)
+			messageExtMap[string(ext.FullName())] = newFieldDescription(extDesc, pbdb.jsonFieldNames)
 		}
 		fileExtMap[typeName] = messageExtMap
 	}
 	return &FileDescription{
 		name:  fileDesc.Path(),
+		desc:  fileDesc,
 		types: types,
 		enums: enums,
 	}, fileExtMap
@@ -56,6 +57,7 @@ func newFileDescription(fileDesc protoreflect.FileDescriptor, pbdb *Db) (*FileDe
 // FileDescription holds a map of all types and enum values declared within a proto file.
 type FileDescription struct {
 	name  string
+	desc  protoreflect.FileDescriptor
 	types map[string]*TypeDescription
 	enums map[string]*EnumValueDescription
 }
@@ -68,6 +70,7 @@ func (fd *FileDescription) Copy(pbdb *Db) *FileDescription {
 	}
 	return &FileDescription{
 		name:  fd.name,
+		desc:  fd.desc,
 		types: typesCopy,
 		enums: fd.enums,
 	}
@@ -76,6 +79,11 @@ func (fd *FileDescription) Copy(pbdb *Db) *FileDescription {
 // GetName returns the fully qualified file path for the file.
 func (fd *FileDescription) GetName() string {
 	return fd.name
+}
+
+// FileDescriptor returns the proto file descriptor associated with the file representation.
+func (fd *FileDescription) FileDescriptor() protoreflect.FileDescriptor {
+	return fd.desc
 }
 
 // GetEnumDescription returns an EnumDescription for a qualified enum value

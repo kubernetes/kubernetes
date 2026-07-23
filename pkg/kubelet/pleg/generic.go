@@ -358,7 +358,7 @@ func (g *GenericPLEG) reconcilePodRecord(ctx context.Context, pid types.UID) {
 	// inspecting the pod and getting the PodStatus to update the cache
 	// serially may take a while. We should be aware of this and
 	// parallelize if needed.
-	status, updated, err := g.updateCache(ctx, pod, pid)
+	status, err := g.updateCache(ctx, pod, pid)
 	if err != nil {
 		// Rely on updateCache calling GetPodStatus to log the actual error.
 		logger.V(4).Info("PLEG: Ignoring events for pod", "pod", klog.KRef(pod.Namespace, pod.Name), "err", err)
@@ -367,10 +367,6 @@ func (g *GenericPLEG) reconcilePodRecord(ctx context.Context, pid types.UID) {
 		g.podsToReinspect.Store(pid, empty)
 
 		return
-	} else if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
-		if !updated {
-			return
-		}
 	}
 
 	if len(events) == 0 {
@@ -509,17 +505,15 @@ func (g *GenericPLEG) getPodIPs(pid types.UID, status *kubecontainer.PodStatus) 
 	return oldStatus.IPs
 }
 
-// updateCache tries to update the pod status in the kubelet cache and returns true if the
-// pod status was actually updated in the cache. It will return false if the pod status
-// was ignored by the cache.
-func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, pid types.UID) (*kubecontainer.PodStatus, bool, error) {
+// updateCache tries to update the pod status in the kubelet cache.
+func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, pid types.UID) (*kubecontainer.PodStatus, error) {
 	logger := klog.FromContext(ctx)
 	if pod == nil {
 		// The pod is missing in the current relist. This means that
 		// the pod has no visible (active or inactive) containers.
 		logger.V(4).Info("PLEG: Delete status for pod", "podUID", string(pid))
 		g.cache.Delete(pid)
-		return nil, true, nil
+		return nil, nil
 	}
 
 	timestamp := pod.Timestamp
@@ -546,21 +540,8 @@ func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, p
 		status.IPs = g.getPodIPs(pid, status)
 	}
 
-	// When we use Generic PLEG only, the PodStatus is saved in the cache without
-	// any validation of the existing status against the current timestamp.
-	// This works well when there is only Generic PLEG setting the PodStatus in the cache however,
-	// if we have multiple entities, such as Evented PLEG, while trying to set the PodStatus in the
-	// cache we may run into the racy timestamps given each of them were to calculate the timestamps
-	// in their respective execution flow. While Generic PLEG calculates this timestamp and gets
-	// the PodStatus, we can only calculate the corresponding timestamp in
-	// Evented PLEG after the event has been received by the Kubelet.
-	// For more details refer to:
-	// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/3386-kubelet-evented-pleg#timestamp-of-the-pod-status
-	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) && isEventedPLEGInUse() && status != nil {
-		timestamp = status.TimeStamp
-	}
-
-	return status, g.cache.Set(pod.ID, status, err, timestamp), err
+	g.cache.Set(pod.ID, status, err, timestamp)
+	return status, err
 }
 
 func (g *GenericPLEG) RequestReinspect(podUID types.UID) {

@@ -19,6 +19,7 @@ package cache
 import (
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -139,13 +140,13 @@ type Cache interface {
 	RemovePodGroupMember(pod *v1.Pod)
 
 	// AddPodGroup adds a pod group object to the cache.
-	AddPodGroup(podGroup *schedulingv1alpha3.PodGroup)
+	AddPodGroup(podGroup *schedulingv1beta1.PodGroup)
 
 	// UpdatePodGroup updates a pod group object in the cache.
-	UpdatePodGroup(logger klog.Logger, oldPodGroup, newPodGroup *schedulingv1alpha3.PodGroup)
+	UpdatePodGroup(logger klog.Logger, oldPodGroup, newPodGroup *schedulingv1beta1.PodGroup)
 
 	// RemovePodGroup removes a pod group object from the cache.
-	RemovePodGroup(logger klog.Logger, podGroup *schedulingv1alpha3.PodGroup)
+	RemovePodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup)
 
 	// AddCompositePodGroup adds a composite pod group to the cache.
 	AddCompositePodGroup(logger klog.Logger, cpg *schedulingv1alpha3.CompositePodGroup)

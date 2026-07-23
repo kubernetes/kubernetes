@@ -211,6 +211,10 @@
           "version": "v1"
         },
         {
+          "groupVersion": "scheduling.k8s.io/v1beta1",
+          "version": "v1beta1"
+        },
+        {
           "groupVersion": "scheduling.k8s.io/v1alpha3",
           "version": "v1alpha3"
         }
@@ -328,6 +332,19 @@
         {
           "groupVersion": "storagemigration.k8s.io/v1beta1",
           "version": "v1beta1"
+        }
+      ]
+    },
+    {
+      "name": "lifecycle.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "lifecycle.k8s.io/v1alpha1",
+        "version": "v1alpha1"
+      },
+      "versions": [
+        {
+          "groupVersion": "lifecycle.k8s.io/v1alpha1",
+          "version": "v1alpha1"
         }
       ]
     }

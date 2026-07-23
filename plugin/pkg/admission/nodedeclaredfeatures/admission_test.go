@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -33,8 +34,10 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/dranodeallocatableresources"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
+	apisresource "k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -260,6 +263,471 @@ func TestAdmission(t *testing.T) {
 			informerFactory.Start(stopCh)
 			informerFactory.WaitForCacheSync(stopCh)
 			attrs := admission.NewAttributesRecord(tc.pod, tc.oldPod, core.Kind("Pod").WithVersion("v1"), tc.pod.Namespace, tc.pod.Name, core.Resource("pods").WithVersion("v1"), tc.subresource, admission.Update, &metav1.UpdateOptions{}, false, nil)
+			err = target.Validate(context.Background(), attrs, nil)
+
+			if tc.expectErr {
+				require.Error(t, err)
+				if tc.errContains != "" {
+					assert.Contains(t, err.Error(), tc.errContains)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
+	nodeNameWithFeature := "node-with-feature"
+	nodeNameWithFeature2 := "node-with-feature-2"
+	nodeNameWithoutFeature := "node-without-feature"
+
+	nodeWithFeature := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   nodeNameWithFeature,
+			Labels: map[string]string{"pool": "pool1"},
+		},
+		Status: v1.NodeStatus{
+			DeclaredFeatures: []string{dranodeallocatableresources.DRANodeAllocatableResourcesFeature},
+			NodeInfo:         v1.NodeSystemInfo{KubeletVersion: "1.37.0"},
+		},
+	}
+	nodeWithFeature2 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   nodeNameWithFeature2,
+			Labels: map[string]string{"pool": "pool1"},
+		},
+		Status: v1.NodeStatus{
+			DeclaredFeatures: []string{dranodeallocatableresources.DRANodeAllocatableResourcesFeature},
+			NodeInfo:         v1.NodeSystemInfo{KubeletVersion: "1.37.0"},
+		},
+	}
+	nodeWithoutFeature := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   nodeNameWithoutFeature,
+			Labels: map[string]string{"pool": "pool2"},
+		},
+		Status: v1.NodeStatus{
+			DeclaredFeatures: []string{},
+			NodeInfo:         v1.NodeSystemInfo{KubeletVersion: "1.35.0"},
+		},
+	}
+
+	trueVal := true
+	nodeSelectorMatchNode := &core.NodeSelector{
+		NodeSelectorTerms: []core.NodeSelectorTerm{
+			{
+				MatchExpressions: []core.NodeSelectorRequirement{
+					{
+						Key:      "pool",
+						Operator: core.NodeSelectorOpIn,
+						Values:   []string{"pool1"},
+					},
+				},
+			},
+		},
+	}
+	devSelectorDoesNoeMatchNode := &core.NodeSelector{
+		NodeSelectorTerms: []core.NodeSelectorTerm{
+			{
+				MatchExpressions: []core.NodeSelectorRequirement{
+					{
+						Key:      "pool",
+						Operator: core.NodeSelectorOpIn,
+						Values:   []string{"pool2"},
+					},
+				},
+			},
+		},
+	}
+
+	oneQuantity := resource.MustParse("1")
+	nodeAllocatable := apisresource.NodeAllocatableResource{
+		Mapping: &apisresource.NodeAllocatableMapping{
+			DeviceMultiplier: &oneQuantity,
+		},
+	}
+
+	testCases := []struct {
+		name                   string
+		slice                  *apisresource.ResourceSlice
+		nodes                  []runtime.Object
+		draFeatureGateDisabled bool
+		expectErr              bool
+		errContains            string
+		operation              admission.Operation
+	}{
+		{
+			name: "DRANodeAllocatableResources gate disabled, skip validation",
+			slice: &apisresource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-dra-gate-off"},
+				Spec: apisresource.ResourceSliceSpec{
+					Driver:   "test-driver",
+					NodeName: &nodeNameWithoutFeature,
+					Devices: []apisresource.Device{
+						{
+							Name: "dev-0",
+							NodeAllocatableResources: map[v1.ResourceName]apisresource.NodeAllocatableResource{
+								v1.ResourceCPU: nodeAllocatable,
+							},
+						},
+					},
+				},
+			},
+			nodes:                  []runtime.Object{nodeWithoutFeature},
+			draFeatureGateDisabled: true,
+			expectErr:              false,
+			operation:              admission.Create,
+		},
+		{
+			name: "mo mappings, no node validation needed",
+			slice: &apisresource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-without-mappings"},
+				Spec: apisresource.ResourceSliceSpec{
+					Driver:   "test-driver",
+					NodeName: &nodeNameWithoutFeature,
+					Devices: []apisresource.Device{
+						{
+							Name: "dev-0",
+						},
+					},
+				},
+			},
+			nodes:     []runtime.Object{nodeWithoutFeature},
+			expectErr: false,
+			operation: admission.Create,
+		},
+		{
+			name: "node supports feature",
+			slice: &apisresource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-with-mappings"},
+				Spec: apisresource.ResourceSliceSpec{
+					Driver:   "test-driver",
+					NodeName: &nodeNameWithFeature,
+					Devices: []apisresource.Device{
+						{
+							Name: "dev-0",
+							NodeAllocatableResources: map[v1.ResourceName]apisresource.NodeAllocatableResource{
+								v1.ResourceCPU: nodeAllocatable,
+							},
+						},
+					},
+				},
+			},
+			nodes: []runtime.Object{nodeWithFeature},
+
+			expectErr: false,
+			operation: admission.Create,
+		},
+		{
+			name: "node does not support feature",
+			slice: &apisresource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-no-feature-node"},
+				Spec: apisresource.ResourceSliceSpec{
+					Driver:   "test-driver",
+					NodeName: &nodeNameWithoutFeature,
+					Devices: []apisresource.Device{
+						{
+							Name: "dev-0",
+							NodeAllocatableResources: map[v1.ResourceName]apisresource.NodeAllocatableResource{
+								v1.ResourceCPU: nodeAllocatable,
+							},
+						},
+					},
+				},
+			},
+			nodes:       []runtime.Object{nodeWithoutFeature},
+			expectErr:   true,
+			errContains: "does not support DRANodeAllocatableResources feature",
+			operation:   admission.Create,
+		},
+		{
+			name: "node name is nil",
+			slice: &apisresource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-no-node"},
+				Spec: apisresource.ResourceSliceSpec{
+					Driver:   "test-driver",
+					NodeName: nil,
+					Devices: []apisresource.Device{
+						{
+							Name: "dev-0",
+							NodeAllocatableResources: map[v1.ResourceName]apisresource.NodeAllocatableResource{
+								v1.ResourceCPU: nodeAllocatable,
+							},
+						},
+					},
+				},
+			},
+			nodes:       []runtime.Object{},
+			expectErr:   true,
+			errContains: "does not map to any nodes",
+			operation:   admission.Create,
+		},
+		{
+			name: "target node not found",
+			slice: &apisresource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-with-mappings"},
+				Spec: apisresource.ResourceSliceSpec{
+					Driver:   "test-driver",
+					NodeName: &nodeNameWithFeature,
+					Devices: []apisresource.Device{
+						{
+							Name: "dev-0",
+							NodeAllocatableResources: map[v1.ResourceName]apisresource.NodeAllocatableResource{
+								v1.ResourceCPU: nodeAllocatable,
+							},
+						},
+					},
+				},
+			},
+			nodes:       []runtime.Object{},
+			expectErr:   true,
+			errContains: "node \"node-with-feature\" not found",
+			operation:   admission.Create,
+		},
+		{
+			name: "node selector in device matches node that has feature",
+			slice: &apisresource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-with-selector-match"},
+				Spec: apisresource.ResourceSliceSpec{
+					Driver:       "test-driver",
+					NodeSelector: nodeSelectorMatchNode,
+					Devices: []apisresource.Device{
+						{
+							Name: "dev-0",
+							NodeAllocatableResources: map[v1.ResourceName]apisresource.NodeAllocatableResource{
+								v1.ResourceCPU: nodeAllocatable,
+							},
+						},
+					},
+				},
+			},
+			nodes:     []runtime.Object{nodeWithFeature, nodeWithFeature2, nodeWithoutFeature},
+			expectErr: false,
+			operation: admission.Create,
+		},
+		{
+			name: "nodeSelector matches node the does not support feature",
+			slice: &apisresource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-with-selector-no-match"},
+				Spec: apisresource.ResourceSliceSpec{
+					Driver:       "test-driver",
+					NodeSelector: devSelectorDoesNoeMatchNode,
+					Devices: []apisresource.Device{
+						{
+							Name: "dev-0",
+							NodeAllocatableResources: map[v1.ResourceName]apisresource.NodeAllocatableResource{
+								v1.ResourceCPU: nodeAllocatable,
+							},
+						},
+					},
+				},
+			},
+			nodes:       []runtime.Object{nodeWithFeature, nodeWithoutFeature},
+			expectErr:   true,
+			errContains: "does not support DRANodeAllocatableResources feature",
+			operation:   admission.Create,
+		},
+		{
+			name: "slice-level AllNodes is true in slice, one node does not support feature",
+			slice: &apisresource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-with-all-nodes"},
+				Spec: apisresource.ResourceSliceSpec{
+					Driver:   "test-driver",
+					AllNodes: &trueVal,
+					Devices: []apisresource.Device{
+						{
+							Name: "dev-0",
+							NodeAllocatableResources: map[v1.ResourceName]apisresource.NodeAllocatableResource{
+								v1.ResourceCPU: nodeAllocatable,
+							},
+						},
+					},
+				},
+			},
+			nodes:       []runtime.Object{nodeWithFeature, nodeWithoutFeature},
+			expectErr:   true,
+			errContains: "does not support DRANodeAllocatableResources feature",
+			operation:   admission.Create,
+		},
+		{
+			name: "slice-level AllNodes is true, all nodes support feature",
+			slice: &apisresource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-with-all-nodes"},
+				Spec: apisresource.ResourceSliceSpec{
+					Driver:   "test-driver",
+					AllNodes: &trueVal,
+					Devices: []apisresource.Device{
+						{
+							Name: "dev-0",
+							NodeAllocatableResources: map[v1.ResourceName]apisresource.NodeAllocatableResource{
+								v1.ResourceCPU: nodeAllocatable,
+							},
+						},
+					},
+				},
+			},
+			nodes:     []runtime.Object{nodeWithFeature, nodeWithFeature2},
+			expectErr: false,
+			operation: admission.Create,
+		},
+		{
+			name: "device-level node name supports feature",
+			slice: &apisresource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-per-device-nodename"},
+				Spec: apisresource.ResourceSliceSpec{
+					Driver:                 "test-driver",
+					PerDeviceNodeSelection: &trueVal,
+					Devices: []apisresource.Device{
+						{
+							Name:     "dev-0",
+							NodeName: &nodeNameWithFeature,
+							NodeAllocatableResources: map[v1.ResourceName]apisresource.NodeAllocatableResource{
+								v1.ResourceCPU: nodeAllocatable,
+							},
+						},
+					},
+				},
+			},
+			nodes:     []runtime.Object{nodeWithFeature},
+			expectErr: false,
+			operation: admission.Create,
+		},
+		{
+			name: "device-level nodeName does not support feature",
+			slice: &apisresource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-per-device-nodename-no-feature"},
+				Spec: apisresource.ResourceSliceSpec{
+					Driver:                 "test-driver",
+					PerDeviceNodeSelection: &trueVal,
+					Devices: []apisresource.Device{
+						{
+							Name:     "dev-0",
+							NodeName: &nodeNameWithoutFeature,
+							NodeAllocatableResources: map[v1.ResourceName]apisresource.NodeAllocatableResource{
+								v1.ResourceCPU: nodeAllocatable,
+							},
+						},
+					},
+				},
+			},
+			nodes:       []runtime.Object{nodeWithoutFeature},
+			expectErr:   true,
+			errContains: "does not support DRANodeAllocatableResources feature",
+			operation:   admission.Create,
+		},
+		{
+			name: "device-level node selector matches matches nodes that support feature",
+			slice: &apisresource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-per-device-nodeselector"},
+				Spec: apisresource.ResourceSliceSpec{
+					Driver:                 "test-driver",
+					PerDeviceNodeSelection: &trueVal,
+					Devices: []apisresource.Device{
+						{
+							Name:         "dev-0",
+							NodeSelector: nodeSelectorMatchNode,
+							NodeAllocatableResources: map[v1.ResourceName]apisresource.NodeAllocatableResource{
+								v1.ResourceCPU: nodeAllocatable,
+							},
+						},
+					},
+				},
+			},
+			nodes:     []runtime.Object{nodeWithFeature, nodeWithFeature2, nodeWithoutFeature},
+			expectErr: false,
+			operation: admission.Create,
+		},
+		{
+			name: "device-level node selector matches node that does not support feature",
+			slice: &apisresource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-per-device-nodeselector-no-match"},
+				Spec: apisresource.ResourceSliceSpec{
+					Driver:                 "test-driver",
+					PerDeviceNodeSelection: &trueVal,
+					Devices: []apisresource.Device{
+						{
+							Name:         "dev-0",
+							NodeSelector: devSelectorDoesNoeMatchNode,
+							NodeAllocatableResources: map[v1.ResourceName]apisresource.NodeAllocatableResource{
+								v1.ResourceCPU: nodeAllocatable,
+							},
+						},
+					},
+				},
+			},
+			nodes: []runtime.Object{nodeWithFeature, nodeWithoutFeature}, expectErr: true,
+			errContains: "does not support DRANodeAllocatableResources feature",
+			operation:   admission.Create,
+		},
+		{
+			name: "device-level AllNodes is true, one node does not support feature",
+			slice: &apisresource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-per-device-allnodes"},
+				Spec: apisresource.ResourceSliceSpec{
+					Driver:                 "test-driver",
+					PerDeviceNodeSelection: &trueVal,
+					Devices: []apisresource.Device{
+						{
+							Name:     "dev-0",
+							AllNodes: &trueVal,
+							NodeAllocatableResources: map[v1.ResourceName]apisresource.NodeAllocatableResource{
+								v1.ResourceCPU: nodeAllocatable,
+							},
+						},
+					},
+				},
+			},
+			nodes:       []runtime.Object{nodeWithFeature, nodeWithoutFeature},
+			expectErr:   true,
+			errContains: "does not support DRANodeAllocatableResources feature",
+			operation:   admission.Create,
+		},
+		{
+			name: "device-level AllNodes is true, all nodes support feature",
+			slice: &apisresource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-per-device-allnodes"},
+				Spec: apisresource.ResourceSliceSpec{
+					Driver:                 "test-driver",
+					PerDeviceNodeSelection: &trueVal,
+					Devices: []apisresource.Device{
+						{
+							Name:     "dev-0",
+							AllNodes: &trueVal,
+							NodeAllocatableResources: map[v1.ResourceName]apisresource.NodeAllocatableResource{
+								v1.ResourceCPU: nodeAllocatable,
+							},
+						},
+					},
+				},
+			},
+			nodes:     []runtime.Object{nodeWithFeature, nodeWithFeature2},
+			expectErr: false,
+			operation: admission.Create,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, !tc.draFeatureGateDisabled)
+
+			client := fake.NewClientset(tc.nodes...)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+			target, err := NewPlugin()
+			require.NoError(t, err)
+
+			target.SetExternalKubeInformerFactory(informerFactory)
+			target.InspectFeatureGates(utilfeature.DefaultFeatureGate)
+			err = target.ValidateInitialization()
+			require.NoError(t, err)
+
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			informerFactory.Start(stopCh)
+			informerFactory.WaitForCacheSync(stopCh)
+
+			attrs := admission.NewAttributesRecord(tc.slice, nil, apisresource.Kind("ResourceSlice").WithVersion("v1"), tc.slice.Namespace, tc.slice.Name, apisresource.Resource("resourceslices").WithVersion("v1"), "", tc.operation, &metav1.CreateOptions{}, false, nil)
 			err = target.Validate(context.Background(), attrs, nil)
 
 			if tc.expectErr {

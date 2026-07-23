@@ -34,11 +34,39 @@ import (
 )
 
 // TestTypeInformer provides access to a shared informer and lister for
-// TestTypes.
+// TestTypes. Prefer using the type-safe variant (see [TypedTestTypeInformer]).
 type TestTypeInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() examplev1.TestTypeLister
 }
+
+// TypedTestTypeInformer provides access to a shared informer and lister for
+// TestTypes, including the type-safe TypedInformer variant.
+// It is a superset of TestTypeInformer.
+type TypedTestTypeInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() TestTypeIndexInformer
+	Lister() examplev1.TestTypeLister
+}
+
+// TestTypeIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type TestTypeIndexInformer cache.TypedSharedIndexInformer[*apisexamplev1.TestType]
+
+// TestTypeHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for TestType.
+type TestTypeHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apisexamplev1.TestType]
+
+// TestTypeDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for TestType.
+type TestTypeDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apisexamplev1.TestType]
+
+// TestTypeFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for TestType.
+type TestTypeFilteringHandler = cache.TypedFilteringResourceEventHandler[*apisexamplev1.TestType]
+
+// TestTypeIndexers is a specialization of [cache.TypedIndexers] for TestType.
+type TestTypeIndexers = cache.TypedIndexers[*apisexamplev1.TestType]
+
+// DeletedTestType is a specialization of [cache.DeletedObject] for TestType.
+type DeletedTestType = cache.DeletedObject[*apisexamplev1.TestType]
 
 type testTypeInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +77,49 @@ type testTypeInformer struct {
 // NewTestTypeInformer constructs a new informer for TestType type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedTestTypeInformer]).
 func NewTestTypeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewTestTypeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedTestTypeInformer constructs a new informer for TestType type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedTestTypeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers TestTypeIndexers) TestTypeIndexInformer {
+	return NewTypedTestTypeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredTestTypeInformer constructs a new informer for TestType type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredTestTypeInformer]).
 func NewFilteredTestTypeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewTestTypeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedTestTypeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredTestTypeInformer constructs a new informer for TestType type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredTestTypeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers TestTypeIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) TestTypeIndexInformer {
+	return NewTypedTestTypeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewTestTypeInformerWithOptions constructs a new informer for TestType type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedTestTypeInformerWithOptions]).
 func NewTestTypeInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedTestTypeInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedTestTypeInformerWithOptions constructs a new informer for TestType type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedTestTypeInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) TestTypeIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "example.crd.code-generator.k8s.io", Version: "v1", Resource: "testtypes"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apisexamplev1.TestType](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,17 +152,57 @@ func NewTestTypeInformerWithOptions(client versioned.Interface, namespace string
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *testTypeInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewTestTypeInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedTestTypeInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *testTypeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apisexamplev1.TestType{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *testTypeInformer) TypedInformer() TestTypeIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apisexamplev1.TestType](f.factory.InformerFor(&apisexamplev1.TestType{}, f.defaultInformer))
 }
 
 func (f *testTypeInformer) Lister() examplev1.TestTypeLister {
 	return examplev1.NewTestTypeLister(f.Informer().GetIndexer())
+}
+
+// ToTypedTestTypeInformer converts an untyped informer into a TypedTestTypeInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *TestType. If that is not the case, calling type-safe methods of the returned
+// TypedTestTypeInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedTestTypeInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedTestTypeInformer(informer TestTypeInformer) TypedTestTypeInformer {
+	if informer, ok := informer.(TypedTestTypeInformer); ok {
+		return informer
+	}
+	return &testTypeTypedInformerAdapter{informer}
+}
+
+type testTypeTypedInformerAdapter struct {
+	TestTypeInformer
+}
+
+func (a *testTypeTypedInformerAdapter) TypedInformer() TestTypeIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apisexamplev1.TestType](a.Informer())
+}
+
+// ToTestTypeIndexInformer converts an untyped informer into a TestTypeIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *TestType. If that is not the case, calling type-safe methods of the returned
+// TestTypeIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a TestTypeIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTestTypeIndexInformer(informer cache.SharedIndexInformer) TestTypeIndexInformer {
+	if informer, ok := informer.(TestTypeIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apisexamplev1.TestType](informer)
 }

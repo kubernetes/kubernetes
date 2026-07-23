@@ -29,6 +29,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -698,7 +699,7 @@ func Test_AddPodGroupMember(t *testing.T) {
 
 	tests := []struct {
 		name                    string
-		initPodGroup            *schedulingv1alpha3.PodGroup
+		initPodGroup            *schedulingv1beta1.PodGroup
 		pod                     *v1.Pod
 		genericWorkloadEnabled  bool
 		expectInUnscheduledPods bool
@@ -885,7 +886,7 @@ func Test_RemovePodGroupMember(t *testing.T) {
 	tests := []struct {
 		name                     string
 		initPods                 []*v1.Pod
-		initPodGroup             *schedulingv1alpha3.PodGroup
+		initPodGroup             *schedulingv1beta1.PodGroup
 		podToDelete              *v1.Pod
 		expectPodGroupStateCount int
 		genericWorkloadEnabled   bool
@@ -982,22 +983,22 @@ func Test_AddPodGroup(t *testing.T) {
 		compositePodGroupEnabled bool
 		initPod                  *v1.Pod // From old tests
 		initialCPGs              []*schedulingv1alpha3.CompositePodGroup
-		podGroupsToAdd           []*schedulingv1alpha3.PodGroup
-		wantPodGroups            map[fwk.EntityKey]*schedulingv1alpha3.PodGroup
+		podGroupsToAdd           []*schedulingv1beta1.PodGroup
+		wantPodGroups            map[fwk.EntityKey]*schedulingv1beta1.PodGroup
 		wantChildren             map[fwk.EntityKey]sets.Set[fwk.EntityKey]
 	}{
 		{
 			name:                     "add pod group with GenericWorkload disabled should be no-op",
-			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{podGroup},
+			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{podGroup},
 			genericWorkloadEnabled:   false,
 			compositePodGroupEnabled: true,
 		},
 		{
 			name:                     "add pod group",
-			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{podGroup},
+			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{podGroup},
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
 				fwk.PodGroupKey("ns", "pg"): podGroup,
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
@@ -1005,10 +1006,10 @@ func Test_AddPodGroup(t *testing.T) {
 		{
 			name:                     "add pod group when state already exists (from pod group members)",
 			initPod:                  pod,
-			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{podGroup},
+			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{podGroup},
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
 				fwk.PodGroupKey("ns", "pg"): podGroup,
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
@@ -1017,8 +1018,8 @@ func Test_AddPodGroup(t *testing.T) {
 			name:                     "add single pod group (hierarchical)",
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
-			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{pg1},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{pg1},
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
 				fwk.PodGroupKey("ns1", "pg1"): pg1,
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
@@ -1027,8 +1028,8 @@ func Test_AddPodGroup(t *testing.T) {
 			name:                     "add multiple pod groups (hierarchical)",
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
-			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{pg1, pg2},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{pg1, pg2},
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
 				fwk.PodGroupKey("ns1", "pg1"): pg1,
 				fwk.PodGroupKey("ns1", "pg2"): pg2,
 			},
@@ -1038,8 +1039,8 @@ func Test_AddPodGroup(t *testing.T) {
 			name:                     "add pod group with parent",
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
-			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{pg3WithParent},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{pg3WithParent},
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
 				fwk.PodGroupKey("ns1", "pg3"): pg3WithParent,
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
@@ -1050,8 +1051,8 @@ func Test_AddPodGroup(t *testing.T) {
 			name:                     "add pod group with parent, parent already in children",
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
-			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{pg3WithParent, pg4WithParent},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{pg3WithParent, pg4WithParent},
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
 				fwk.PodGroupKey("ns1", "pg3"): pg3WithParent,
 				fwk.PodGroupKey("ns1", "pg4"): pg4WithParent,
 			},
@@ -1067,8 +1068,8 @@ func Test_AddPodGroup(t *testing.T) {
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
 			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpgChild},
-			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{pg3WithParent},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{pg3WithParent},
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
 				fwk.PodGroupKey("ns1", "pg3"): pg3WithParent,
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
@@ -1082,8 +1083,8 @@ func Test_AddPodGroup(t *testing.T) {
 			name:                     "add pod group with parent when CompositePodGroup disabled",
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: false,
-			podGroupsToAdd:           []*schedulingv1alpha3.PodGroup{pg3WithParent},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{pg3WithParent},
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
 				fwk.PodGroupKey("ns1", "pg3"): pg3WithParent,
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
@@ -1113,7 +1114,7 @@ func Test_AddPodGroup(t *testing.T) {
 				return
 			}
 
-			gotPodGroups := make(map[fwk.EntityKey]*schedulingv1alpha3.PodGroup)
+			gotPodGroups := make(map[fwk.EntityKey]*schedulingv1beta1.PodGroup)
 			for k, pgs := range cache.podGroupStates {
 				if pgs.podGroup != nil {
 					gotPodGroups[k] = pgs.podGroup
@@ -1143,11 +1144,11 @@ func Test_UpdatePodGroup(t *testing.T) {
 
 	tests := []struct {
 		name                   string
-		initPodGroup           *schedulingv1alpha3.PodGroup
-		oldPodGroup            *schedulingv1alpha3.PodGroup
-		newPodGroup            *schedulingv1alpha3.PodGroup
+		initPodGroup           *schedulingv1beta1.PodGroup
+		oldPodGroup            *schedulingv1beta1.PodGroup
+		newPodGroup            *schedulingv1beta1.PodGroup
 		genericWorkloadEnabled bool
-		expectPodGroup         *schedulingv1alpha3.PodGroup
+		expectPodGroup         *schedulingv1beta1.PodGroup
 	}{
 		{
 			name:                   "update pod group with GenericWorkload disabled should be no-op",
@@ -1204,12 +1205,12 @@ func Test_RemovePodGroup(t *testing.T) {
 		genericWorkloadEnabled   bool
 		compositePodGroupEnabled bool
 		initPod                  *v1.Pod // From old tests
-		initialPodGroups         []*schedulingv1alpha3.PodGroup
+		initialPodGroups         []*schedulingv1beta1.PodGroup
 		initialCPGs              []*schedulingv1alpha3.CompositePodGroup
-		podGroupToDelete         *schedulingv1alpha3.PodGroup
+		podGroupToDelete         *schedulingv1beta1.PodGroup
 		expectStateExists        string // "true", "false", or "" to skip
 		expectPodsCount          int
-		wantPodGroups            map[fwk.EntityKey]*schedulingv1alpha3.PodGroup
+		wantPodGroups            map[fwk.EntityKey]*schedulingv1beta1.PodGroup
 		wantChildren             map[fwk.EntityKey]sets.Set[fwk.EntityKey]
 	}{
 		{
@@ -1221,7 +1222,7 @@ func Test_RemovePodGroup(t *testing.T) {
 		{
 			name:                     "remove pod group with GenericWorkload enabled",
 			podGroupToDelete:         podGroup,
-			initialPodGroups:         []*schedulingv1alpha3.PodGroup{podGroup},
+			initialPodGroups:         []*schedulingv1beta1.PodGroup{podGroup},
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
 			expectStateExists:        "false",
@@ -1229,7 +1230,7 @@ func Test_RemovePodGroup(t *testing.T) {
 		{
 			name:                     "remove pod group when it still has pod members",
 			initPod:                  pod,
-			initialPodGroups:         []*schedulingv1alpha3.PodGroup{podGroup},
+			initialPodGroups:         []*schedulingv1beta1.PodGroup{podGroup},
 			podGroupToDelete:         podGroup,
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
@@ -1240,9 +1241,9 @@ func Test_RemovePodGroup(t *testing.T) {
 			name:                     "delete pod group with parent, parent has other pod group children",
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
-			initialPodGroups:         []*schedulingv1alpha3.PodGroup{pg3WithParent, pg4WithParent},
+			initialPodGroups:         []*schedulingv1beta1.PodGroup{pg3WithParent, pg4WithParent},
 			podGroupToDelete:         pg3WithParent,
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{
+			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
 				fwk.PodGroupKey("ns1", "pg4"): pg4WithParent,
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
@@ -1253,10 +1254,10 @@ func Test_RemovePodGroup(t *testing.T) {
 			name:                     "delete pod group with parent, parent has other composite pod group children",
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
-			initialPodGroups:         []*schedulingv1alpha3.PodGroup{pg3WithParent},
+			initialPodGroups:         []*schedulingv1beta1.PodGroup{pg3WithParent},
 			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpgChild},
 			podGroupToDelete:         pg3WithParent,
-			wantPodGroups:            map[fwk.EntityKey]*schedulingv1alpha3.PodGroup{},
+			wantPodGroups:            map[fwk.EntityKey]*schedulingv1beta1.PodGroup{},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				cpg1Key: sets.New(fwk.CompositePodGroupKey("ns1", "cpgChild")),
 			},
@@ -1305,7 +1306,7 @@ func Test_RemovePodGroup(t *testing.T) {
 			}
 
 			if tt.wantPodGroups != nil {
-				gotPodGroups := make(map[fwk.EntityKey]*schedulingv1alpha3.PodGroup)
+				gotPodGroups := make(map[fwk.EntityKey]*schedulingv1beta1.PodGroup)
 				for k, pgs := range cache.podGroupStates {
 					if pgs.podGroup != nil {
 						gotPodGroups[k] = pgs.podGroup
@@ -3319,7 +3320,7 @@ func Test_AddCompositePodGroup(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		initialPGs   []*schedulingv1alpha3.PodGroup
+		initialPGs   []*schedulingv1beta1.PodGroup
 		cpgsToAdd    []*schedulingv1alpha3.CompositePodGroup
 		wantCPGs     map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup
 		wantChildren map[fwk.EntityKey]sets.Set[fwk.EntityKey]
@@ -3349,7 +3350,7 @@ func Test_AddCompositePodGroup(t *testing.T) {
 		},
 		{
 			name:       "add composite pod group with parent, parent already has pod group child",
-			initialPGs: []*schedulingv1alpha3.PodGroup{pgChild},
+			initialPGs: []*schedulingv1beta1.PodGroup{pgChild},
 			cpgsToAdd:  []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent},
 			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
 				fwk.CompositePodGroupKey("ns1", "cpg3"): cpg3WithParent,
@@ -3413,7 +3414,7 @@ func Test_RemoveCompositePodGroup(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		initialPGs   []*schedulingv1alpha3.PodGroup
+		initialPGs   []*schedulingv1beta1.PodGroup
 		initialCPGs  []*schedulingv1alpha3.CompositePodGroup
 		cpgToDelete  *schedulingv1alpha3.CompositePodGroup
 		wantCPGs     map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup
@@ -3428,7 +3429,7 @@ func Test_RemoveCompositePodGroup(t *testing.T) {
 		},
 		{
 			name:        "delete composite pod group with parent, parent has both other pg and cpg children",
-			initialPGs:  []*schedulingv1alpha3.PodGroup{pgChild},
+			initialPGs:  []*schedulingv1beta1.PodGroup{pgChild},
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent, cpg4WithParent},
 			cpgToDelete: cpg3WithParent,
 			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
@@ -3443,7 +3444,7 @@ func Test_RemoveCompositePodGroup(t *testing.T) {
 		},
 		{
 			name:        "delete mid cpg from root-mid-leaf hierarchy",
-			initialPGs:  []*schedulingv1alpha3.PodGroup{pgLeaf},
+			initialPGs:  []*schedulingv1beta1.PodGroup{pgLeaf},
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpg1, cpgMid},
 			cpgToDelete: cpgMid,
 			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
@@ -3515,7 +3516,7 @@ func Test_BuildHierarchySnapshotFromPod(t *testing.T) {
 	tests := []struct {
 		name                     string
 		pod                      *v1.Pod
-		initialPGs               []*schedulingv1alpha3.PodGroup
+		initialPGs               []*schedulingv1beta1.PodGroup
 		initialCPGs              []*schedulingv1alpha3.CompositePodGroup
 		genericWorkloadEnabled   bool
 		compositePodGroupEnabled bool
@@ -3538,7 +3539,7 @@ func Test_BuildHierarchySnapshotFromPod(t *testing.T) {
 		{
 			name:                   "simple pod group",
 			pod:                    pod1,
-			initialPGs:             []*schedulingv1alpha3.PodGroup{pg1},
+			initialPGs:             []*schedulingv1beta1.PodGroup{pg1},
 			genericWorkloadEnabled: true,
 			wantPGKeys: []fwk.EntityKey{
 				fwk.PodGroupKey("ns1", "pg1"),
@@ -3547,7 +3548,7 @@ func Test_BuildHierarchySnapshotFromPod(t *testing.T) {
 		{
 			name:                     "pod group with parent CPG",
 			pod:                      pod2,
-			initialPGs:               []*schedulingv1alpha3.PodGroup{pg2},
+			initialPGs:               []*schedulingv1beta1.PodGroup{pg2},
 			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpg1},
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
@@ -3561,7 +3562,7 @@ func Test_BuildHierarchySnapshotFromPod(t *testing.T) {
 		{
 			name:                     "pod group with parent CPG hierarchy",
 			pod:                      pod3,
-			initialPGs:               []*schedulingv1alpha3.PodGroup{pg3},
+			initialPGs:               []*schedulingv1beta1.PodGroup{pg3},
 			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpg2, cpg3},
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
@@ -3576,7 +3577,7 @@ func Test_BuildHierarchySnapshotFromPod(t *testing.T) {
 		{
 			name:                     "cycle detection in hierarchy",
 			pod:                      podCycle,
-			initialPGs:               []*schedulingv1alpha3.PodGroup{pgCycle},
+			initialPGs:               []*schedulingv1beta1.PodGroup{pgCycle},
 			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpgCycle1, cpgCycle2},
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
@@ -3585,7 +3586,7 @@ func Test_BuildHierarchySnapshotFromPod(t *testing.T) {
 		{
 			name:                     "pod group with parent CPG but feature disabled",
 			pod:                      pod2,
-			initialPGs:               []*schedulingv1alpha3.PodGroup{pg2},
+			initialPGs:               []*schedulingv1beta1.PodGroup{pg2},
 			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpg1},
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: false,

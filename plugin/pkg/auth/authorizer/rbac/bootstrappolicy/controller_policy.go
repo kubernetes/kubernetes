@@ -265,6 +265,8 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceslices").RuleOrDie(),
 					// Read ResourceClaims to calculate allocation counts
 					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
+					// Read DeviceTaintRules to count tainted devices as unavailable
+					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie(),
 					eventsRule(),
 				},
 			})

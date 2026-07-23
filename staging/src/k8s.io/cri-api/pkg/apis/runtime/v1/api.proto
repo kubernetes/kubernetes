@@ -163,6 +163,25 @@ service RuntimeService {
     // CheckpointContainer checkpoints a container
     rpc CheckpointContainer(CheckpointContainerRequest) returns (CheckpointContainerResponse) {}
 
+    // CheckpointPod creates a Pod-level checkpoint. The caller must set a
+    // deadline on the call. If the pod sandbox does not exist, the deadline is
+    // exceeded, or the checkpoint operation fails, the call returns an error.
+    // The pod sandbox and containers must be running when the call starts. The
+    // runtime must pause every selected container before capturing any of
+    // them, keep all selected containers paused until every selected
+    // container has been captured, and resume all of them before returning on
+    // success, error, or deadline expiry. This produces one consistent
+    // pod-wide cut while ensuring the runtime never returns a frozen pod.
+    rpc CheckpointPod(CheckpointPodRequest) returns (CheckpointPodResponse) {}
+
+    // RestorePod prepares a pod sandbox and containers from a checkpoint. The
+    // caller must set a deadline on the call. On success, every returned
+    // container must be in the CREATED state and must not have executed the
+    // restored process; the caller invokes its pre-start hooks and then calls
+    // StartContainer for each returned ID. On error, the runtime must remove
+    // any sandbox and containers created by the call before returning.
+    rpc RestorePod(RestorePodRequest) returns (RestorePodResponse) {}
+
     // GetContainerEvents gets container events from the CRI runtime
     rpc GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
 
@@ -2145,6 +2164,96 @@ message CheckpointContainerRequest {
 }
 
 message CheckpointContainerResponse {}
+
+message CheckpointPodRequest {
+    // ID of the pod sandbox to be checkpointed.
+    string pod_sandbox_id = 1;
+    // Absolute path to an existing, empty directory where the runtime must
+    // write the checkpoint. The caller owns the directory, makes it writable by
+    // the runtime, and should restrict access to the caller and runtime. The
+    // runtime must not remove the directory. A Pod checkpoint is a collection
+    // of runtime-defined files; their layout and format are opaque to the
+    // caller. The runtime must not write outside this directory and must remove
+    // partial artifacts before returning an error.
+    string output_path = 2;
+    // IDs of the containers to include in the checkpoint. The list must be
+    // non-empty, must not contain duplicates, and must contain exactly the
+    // running containers selected by the caller. Every container must belong to
+    // `pod_sandbox_id` and be running; otherwise the runtime must fail the
+    // request without producing a checkpoint.
+    repeated string container_ids = 3;
+    // Optional opaque runtime-specific checkpoint options supplied by the CRI
+    // caller. Keys are interpreted in the scope of the pod sandbox's runtime
+    // handler. Kubernetes does not expose these options in its alpha API and
+    // kubelet sends an empty map. Direct CRI callers may set keys documented by
+    // the selected runtime. The runtime must reject unsupported or invalid keys
+    // and values rather than silently ignore them. Options must not contain
+    // secrets.
+    map<string, string> options = 4;
+}
+
+// Empty: the checkpoint is written under the request's `output_path` directory,
+// which the caller provided and already knows, so there is no separate location
+// or object name to return.
+message CheckpointPodResponse {}
+
+message RestorePodRequest {
+    // Absolute path to the directory containing the checkpoint data to restore.
+    // The runtime must not modify the checkpoint data. The data format and
+    // layout are runtime-defined.
+    string checkpoint_path = 1;
+    // Pod sandbox configuration supplied by the kubelet, with node-local restore-time
+    // updates (new Pod UID, cgroup parent path, log directory). Pod-spec equality between
+    // the live Pod and status.checkpointedPodTemplate of the referenced PodCheckpoint is
+    // enforced at API-server admission (and re-checked by the kubelet before this call);
+    // arbitrary user overrides are not permitted.
+    PodSandboxConfig config = 2;
+    // Runtime handler to use for restoring the pod sandbox and its containers.
+    // The handler selects the configured runtime implementation that interprets
+    // the runtime-specific checkpoint data. The selected handler must be
+    // compatible with the checkpoint; the runtime must reject a checkpoint it
+    // cannot restore. An empty value selects the default handler, as for
+    // RunPodSandboxRequest. The runtime must reject an unknown non-empty handler.
+    string runtime_handler = 3;
+    // Optional opaque runtime-specific restore options supplied by the CRI
+    // caller. Keys are interpreted in the scope of `runtime_handler`.
+    // Kubernetes does not expose these options in its alpha API and kubelet
+    // sends an empty map. Direct CRI callers may set keys documented by the
+    // selected runtime. The runtime must reject unsupported or invalid keys and
+    // values rather than silently ignore them. Options must not contain secrets.
+    map<string, string> options = 4;
+    // Complete restore-time configurations for all containers represented by
+    // the checkpoint. The list must be non-empty. Every entry must have a
+    // non-empty, unique metadata name, and those names must be the exact set of
+    // container names in the checkpoint. The runtime must match containers by
+    // metadata name. The checkpoint is authoritative for filesystem and
+    // process state. Image, command, args, working directory, environment, and
+    // process credentials describe the expected checkpointed process; they
+    // must not start or mutate it, and any mismatch the runtime can validate
+    // must fail the restore. The runtime applies restore-time settings outside
+    // checkpoint-owned process state, including labels, annotations, mounts,
+    // devices, Linux resources, logging, and security constraints, and must
+    // fail settings incompatible with the checkpoint.
+    repeated ContainerConfig container_configs = 5;
+}
+
+message RestoredContainer {
+    // Name from the restored container's ContainerMetadata. This identifies
+    // which requested container configuration produced the runtime ID.
+    string name = 1;
+    // Non-empty runtime ID of the restored container.
+    string container_id = 2;
+}
+
+message RestorePodResponse {
+    // Non-empty ID of the restored pod sandbox.
+    string pod_sandbox_id = 1;
+    // Restored containers in CREATED state, without having executed the
+    // restored process (see RestorePod). This must contain exactly one entry
+    // for every request.container_configs entry. Names and container IDs
+    // must each be non-empty and unique.
+    repeated RestoredContainer restored_containers = 2;
+}
 
 message GetEventsRequest {}
 

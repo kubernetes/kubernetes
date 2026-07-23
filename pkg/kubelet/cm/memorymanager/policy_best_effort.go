@@ -39,11 +39,16 @@ const policyTypeBestEffort policyType = "BestEffort"
 // bestEffortPolicy is implementation of the policy interface for the BestEffort policy
 type bestEffortPolicy struct {
 	static *staticPolicy
+	// affinity is the same Store used by the static policy, but typed as an
+	// AuthoritativeStore so the policy can ask whether a container's hint is
+	// authoritative (Windows: the container follows the CPU manager's NUMA
+	// decision) and therefore must not be extended to additional NUMA nodes.
+	affinity topologymanager.AuthoritativeStore
 }
 
 var _ Policy = &bestEffortPolicy{}
 
-func NewPolicyBestEffort(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
+func NewPolicyBestEffort(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.AuthoritativeStore) (Policy, error) {
 	p, err := NewPolicyStatic(logger, machineInfo, reserved, affinity)
 
 	if err != nil {
@@ -51,7 +56,8 @@ func NewPolicyBestEffort(logger klog.Logger, machineInfo *cadvisorapi.MachineInf
 	}
 
 	return &bestEffortPolicy{
-		static: p.(*staticPolicy),
+		static:   p.(*staticPolicy),
+		affinity: affinity,
 	}, nil
 }
 
@@ -64,6 +70,12 @@ func (p *bestEffortPolicy) Start(logger klog.Logger, s state.State) error {
 }
 
 func (p *bestEffortPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) (rerr error) {
+	// On Windows the container follows the CPU manager's NUMA decision when its
+	// affinity hint is authoritative (it owns exclusive CPUs). In that case the
+	// static policy must not extend the hint to additional NUMA nodes (memory
+	// placement follows CPU affinity), so signal that through skipExtend before
+	// delegating. Otherwise the static policy extends the hint as usual.
+	p.static.skipExtend = p.affinity.IsHintAuthoritative(string(pod.UID), container.Name)
 	return p.static.Allocate(ctx, s, pod, container, operation)
 }
 

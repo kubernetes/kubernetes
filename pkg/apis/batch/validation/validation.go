@@ -718,12 +718,14 @@ func validateJobScheduling(spec, oldSpec *batch.JobSpec, fldPath *field.Path) fi
 	// Build the same logical workload tree the Job controller compiles, so
 	// validation and the controller never drift.
 	input := jobutil.WorkloadInputForJobInternal(spec.Scheduling)
-	item := jobutil.WorkloadItemForJob("job", spec.Template.Spec.PriorityClassName, spec.Parallelism, input)
+	item := jobutil.WorkloadItemForJob("job", spec.Template.Spec.PriorityClassName, spec.Parallelism, input, fldPath)
 
 	var oldItem *workloadbuilder.WorkloadItem
 	if oldSpec != nil {
 		oldInput := jobutil.WorkloadInputForJobInternal(oldSpec.Scheduling)
-		oldItem = jobutil.WorkloadItemForJob("job", oldSpec.Template.Spec.PriorityClassName, oldSpec.Parallelism, oldInput) // +k8s:verify-mutation:reason=clone
+		// The old item's Path is unused: Validate reports errors at the new item's
+		// Path, so it is left nil here.
+		oldItem = jobutil.WorkloadItemForJob("job", oldSpec.Template.Spec.PriorityClassName, oldSpec.Parallelism, oldInput, nil) // +k8s:verify-mutation:reason=clone
 	}
 
 	return workloadbuilder.NewBuilder(item, workloadbuilder.BuildOptions{
@@ -734,7 +736,7 @@ func validateJobScheduling(spec, oldSpec *batch.JobSpec, fldPath *field.Path) fi
 		// checks against the resolved config; it neither compiles the Workload
 		// nor needs an owner.
 		DisableDeclarativeValidation: true,
-	}).Validate(context.Background(), fldPath, workloadbuilder.ValidationInput{OldRoot: oldItem})
+	}).Validate(context.Background(), workloadbuilder.ValidationInput{OldRoot: oldItem})
 }
 
 func validatePodTemplateUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {

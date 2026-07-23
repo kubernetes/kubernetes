@@ -1151,6 +1151,100 @@ func (r *remoteRuntimeService) CheckpointContainer(ctx context.Context, options 
 	return nil
 }
 
+// CheckpointPod triggers a checkpoint of the given CheckpointPodRequest
+func (r *remoteRuntimeService) CheckpointPod(ctx context.Context, options *runtimeapi.CheckpointPodRequest) error {
+	logger := klog.FromContext(ctx)
+	logger.V(10).Info(
+		"[RemoteRuntimeService] CheckpointPod",
+		"options",
+		options,
+	)
+	if options == nil {
+		return errors.New("CheckpointPod requires non-nil CheckpointPodRequest parameter")
+	}
+
+	// The checkpoint is bounded by the caller's context deadline (the kubelet
+	// sets it from PodCheckpoint.spec.timeoutSeconds, clamped to its configured
+	// ceiling) rather than a request field (KEP-5823). The default runtime
+	// request timeout applies only when the caller did not set a deadline.
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+		defer cancel()
+	}
+
+	_, err := r.runtimeClient.CheckpointPod(
+		ctx,
+		options,
+	)
+
+	if err != nil {
+		logger.Error(
+			err,
+			"CheckpointPod from runtime service failed",
+			"podSandboxID",
+			options.PodSandboxId,
+		)
+		return err
+	}
+	logger.V(10).Info(
+		"[RemoteRuntimeService] CheckpointPod Response",
+		"podSandboxID",
+		options.PodSandboxId,
+	)
+
+	return nil
+}
+
+// RestorePod restores a pod sandbox from a checkpoint
+func (r *remoteRuntimeService) RestorePod(ctx context.Context, options *runtimeapi.RestorePodRequest) (*runtimeapi.RestorePodResponse, error) {
+	logger := klog.FromContext(ctx)
+	logger.V(10).Info(
+		"[RemoteRuntimeService] RestorePod",
+		"options",
+		options,
+	)
+	if options == nil {
+		return nil, errors.New("RestorePod requires non-nil RestorePodRequest parameter")
+	}
+
+	// As with CheckpointPod, the restore is bounded by the caller's context
+	// deadline rather than a request field (KEP-5823). The default runtime
+	// request timeout applies only when the caller did not set a deadline.
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+		defer cancel()
+	}
+
+	resp, err := r.runtimeClient.RestorePod(
+		ctx,
+		options,
+	)
+
+	if err != nil {
+		logger.Error(
+			err,
+			"RestorePod from runtime service failed",
+			"checkpointPath",
+			options.CheckpointPath,
+		)
+		return nil, err
+	}
+	if resp == nil {
+		return nil, errors.New("RestorePod runtime service returned a nil response")
+	}
+	logger.V(10).Info(
+		"[RemoteRuntimeService] RestorePod Response",
+		"podSandboxID",
+		resp.PodSandboxId,
+		"restoredContainerCount",
+		len(resp.RestoredContainers),
+	)
+
+	return resp, nil
+}
+
 func (r *remoteRuntimeService) GetContainerEvents(ctx context.Context, containerEventsCh chan *runtimeapi.ContainerEventResponse, connectionEstablishedCallback func(runtimeapi.RuntimeService_GetContainerEventsClient)) error {
 	containerEventsStreamingClient, err := r.runtimeClient.GetContainerEvents(ctx, &runtimeapi.GetEventsRequest{})
 	logger := klog.FromContext(ctx)

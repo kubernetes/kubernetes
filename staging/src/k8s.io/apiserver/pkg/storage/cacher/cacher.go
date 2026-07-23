@@ -342,6 +342,7 @@ type Cacher struct {
 	// expiredBookmarkWatchers is a list of watchers that were expired and need to be schedule for a next bookmark event
 	expiredBookmarkWatchers []*cacheWatcher
 	compactor               *compactor
+	watcherMetrics          *metrics.WatcherMetricsObservers
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -414,6 +415,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		clock:            config.Clock,
 		timer:            time.NewTimer(time.Duration(0)),
 		bookmarkWatchers: newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
+		watcherMetrics:   metrics.NewWatcherMetricsObservers(config.GroupResource),
 	}
 
 	// Ensure that timer is stopped.
@@ -442,7 +444,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	listerWatcher := NewListerWatcher(config.Storage, resourcePrefix, config.NewListFunc, contextMetadata)
 	reflectorName := "storage/cacher.go:" + resourcePrefix
 
-	reflector := cache.NewNamedReflector(reflectorName, listerWatcher, obj, watchCache, 0)
+	reflector := cache.NewNamedReflector(reflectorName, listerWatcher, nil, watchCache, 0)
 	// Configure reflector's pager to for an appropriate pagination chunk size for fetching data from
 	// storage. The pager falls back to full list if paginated list calls fail due to an "Expired" error.
 	reflector.WatchListPageSize = storageWatchListPageSize
@@ -604,6 +606,8 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		deadline,
 		pred.AllowWatchBookmarks,
 		c.groupResource,
+		c.watcherMetrics,
+		c.clock,
 		identifier,
 	)
 
@@ -686,6 +690,10 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 }
 
 func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+	ctx, span := tracing.Start(ctx, "cacher.Get",
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+		attribute.String("key", key),
+		attribute.String("resource-version", opts.ResourceVersion))
 	key, err := c.prepareKey(key, false)
 	if err != nil {
 		return err
@@ -704,6 +712,8 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	if err != nil {
 		return err
 	}
+	// Get long processing is >500ms, however wait for fresh cache timeout is 3s so want to avoid traces just showing waits.
+	defer span.End(500 * time.Millisecond)
 
 	if exists {
 		elem, ok := obj.(*store.Element)
@@ -1325,10 +1335,17 @@ func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, 
 		//
 		// In this very rare scenario, the worst case will be that this
 		// request will wait for 3 seconds before it fails.
+		span := tracing.SpanFromContext(ctx)
 		consistentReadSupported := delegator.ConsistentReadSupported()
 		c.watchCache.RLock()
+		span.AddEvent("watchCache locked acquired")
 		defer c.watchCache.RUnlock()
-		return c.watchCache.waitUntilFreshLocked(ctx, consistentReadSupported, requestedWatchRV)
+		err := c.watchCache.waitUntilFreshLocked(ctx, consistentReadSupported, requestedWatchRV)
+		if err != nil {
+			return err
+		}
+		span.AddEvent("watchCache fresh enough")
+		return nil
 	}
 	return nil
 }
@@ -1359,10 +1376,14 @@ func (c *Cacher) setInitialEventsEndBookmarkIfRequested(cacheInterval *watchCach
 }
 
 func (c *Cacher) getKeys(ctx context.Context) ([]string, error) {
+	ctx, span := tracing.Start(ctx, "cacher.getKeys",
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)))
+	defer span.End(500 * time.Millisecond)
 	rev, err := c.storage.GetCurrentResourceVersion(ctx)
 	if err != nil {
 		return nil, err
 	}
+	span.AddEvent("GetCurrentResourceVersion succeed", attribute.Int64("resource-version", int64(rev)))
 	return c.watchCache.WaitUntilFreshAndGetKeys(ctx, rev)
 }
 

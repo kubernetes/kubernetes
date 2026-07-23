@@ -105,9 +105,6 @@ type CycleState interface {
 	// Returns nil if this pod is not being scheduled within a placement context.
 	// This should be only used when GenericWorkload feature flag is enabled.
 	GetPlacementCycleState() PlacementCycleState
-	// SetPlacementCycleState sets the cycle state of the current Placement for a Pod.
-	// This should be only used when GenericWorkload feature flag is enabled.
-	SetPlacementCycleState(PlacementCycleState)
 }
 
 // PlacementCycleState provides a mechanism for plugins to store and retrieve arbitrary data
@@ -161,4 +158,8 @@ type PodGroupCycleState interface {
 	//
 	// See PodGroupCycleState for notes on concurrency.
 	Delete(key StateKey)
+
+	// GetParentPlacementCycleState returns PlacementCycleState of the parent composite pod group.
+	// If there is no parent, returns nil.
+	GetParentPlacementCycleState() PlacementCycleState
 }

@@ -206,8 +206,7 @@ linters:
         path: "staging/src/k8s.io/api/core/v1/types.go"
       - text: "type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/core/v1/types.go"
-      - text: "field NodeAllocatableResourceClaimStatus.Resources should not use a map type, use a list type with a unique name/identifier instead"
-        path: "staging/src/k8s.io/api/core/v1/types.go"
+      
       
       ## For the Secret.Data and ConfigMap.BinaryData fields in the core API.
       - text: "field (Secret.Data|ConfigMap.BinaryData) should not use a map type, use a list type with a unique name/identifier instead"
@@ -215,18 +214,20 @@ linters:
       
         
       ## For map fields in the resource API (across all versions).
-      - text: "field (CounterSet|DeviceCounterConsumption).Counters should not use a map type, use a list type with a unique name/identifier instead"
-        path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
+      - text: "field (CounterSet|CounterSetStatus|DeviceCounterConsumption).Counters should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/resource/(v1|v1alpha3|v1beta1|v1beta2)/types.go"
       - text: "field BasicDevice.(Attributes|Capacity) should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/resource/v1beta1/types.go"
       - text: "field Device.(Attributes|Capacity) should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/resource/(v1|v1beta2)/types.go"
       - text: "field (CapacityRequirements.Requests|DeviceRequestAllocationResult.ConsumedCapacity) should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/resource/(v1|v1beta1|v1beta2)/types.go"
-      - text: "nomaps: field Device.NodeAllocatableResourceMappings should not use a map type, use a list type with a unique name/identifier instead"
+      - text: "nomaps: field Device.NodeAllocatableResources should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/resource/(v1|v1beta2)/types.go"
-      - text: "nomaps: field BasicDevice.NodeAllocatableResourceMappings should not use a map type, use a list type with a unique name/identifier instead"
+      - text: "nomaps: field BasicDevice.NodeAllocatableResources should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/resource/v1beta1/types.go"
+      - text: "nomaps: field TokenRequestSpec.Attestations should not use a map type, use a list type with a unique name/identifier instead"
+        path: "staging/src/k8s.io/api/authentication/v1/types.go"
       
       # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
       # The nonpointerstructs linter is included here as well as these two should be enabled hand-in-hand on each API group.
@@ -246,22 +247,34 @@ linters:
       # The (PodGroupSpec|PodGroupTemplate|CompositePodGroupSpec|CompositePodGroupTemplate).SchedulingPolicy field is a union type, but nonpointerstructs does not understand unions today.
       # Validation makes this require at least one of the fields within to be set.
       - text: "nonpointerstructs: field (PodGroupSpec|PodGroupTemplate|CompositePodGroupSpec|CompositePodGroupTemplate)\\.SchedulingPolicy is a non-pointer struct with no required fields\\..*"
-        path: "staging/src/k8s.io/api/scheduling/v1alpha3/types\\.go"
+        path: "staging/src/k8s.io/api/scheduling/(v1alpha3|v1beta1)/types\\.go"
       
       # Workload.Spec no longer has any strictly required fields due to the introduction of the
       # CompositePodGroup API. The template fields have been refactored into a union where either
       # podGroupTemplates or compositePodGroupTemplates must be provided (enforced via validation).
       - text: "nonpointerstructs: field Workload\\.Spec is a non-pointer struct with no required fields\\..*"
-        path: "staging/src/k8s.io/api/scheduling/v1alpha3/types\\.go"
+        path: "staging/src/k8s.io/api/scheduling/(v1alpha3|v1beta1)/types\\.go"
       
       # WorkloadSpec.CompositePodGroupTemplates is a union member that is conditionally optional (+k8s:ifEnabled("CompositePodGroup")=+k8s:optional), but the linter requires a static +k8s:optional tag.
       - text: "dependenttags: field WorkloadSpec\\.CompositePodGroupTemplates with marker \\+k8s:unionMember is missing required marker.*"
-        path: "staging/src/k8s.io/api/scheduling/v1alpha3/types\\.go"
+        path: "staging/src/k8s.io/api/scheduling/(v1alpha3|v1beta1)/types\\.go"
       
       # NoReferences - Existing fields that use Reference/References suffixes instead of Ref/Refs.
       # These fields use the Reference suffix, but renaming them would be a breaking change, so they are allowlisted.
       - text: 'noreferences: naming convention "reference-to-ref": field (SerializedReference|ImageVolumeSource)\.Reference:'
         path: "staging/src/k8s.io/api/core/v1/types.go"
+      
+      # The EvictionRequest.Spec.Target and Eviction.Spec.Target fields are of a union type and nonpointerstructs does not understand unions today.
+      # Validation makes this require at least one of the fields within to be set.
+      - text: "nonpointerstructs: field EvictionRequestSpec.Target is a non-pointer struct with no required fields."
+        path: "staging/src/k8s.io/api/lifecycle/v1alpha1/types.go"
+      - text: "nonpointerstructs: field EvictionSpec.Target is a non-pointer struct with no required fields."
+        path: "staging/src/k8s.io/api/lifecycle/v1alpha1/types.go"
+      # Status is conventionally a non-pointer.
+      - text: "optionalfields: field EvictionRequest.Status should be a pointer."
+        path: "staging/src/k8s.io/api/lifecycle/v1alpha1/types.go"
+      - text: "optionalfields: field Eviction.Status should be a pointer."
+        path: "staging/src/k8s.io/api/lifecycle/v1alpha1/types.go"
 
       - linters:
         - forbidigo
@@ -322,12 +335,8 @@ linters:
             # Packages matched here do not have to be listed above because
             # "contextual" implies "structured".
             contextual k8s.io/api/.*
-            contextual k8s.io/apimachinery/pkg/util/runtime/.*
-            contextual k8s.io/client-go/metadata/.*
-            contextual k8s.io/client-go/rest/.*
-            contextual k8s.io/client-go/tools/cache/.*
-            contextual k8s.io/client-go/tools/events/.*
-            contextual k8s.io/client-go/tools/record/.*
+            contextual k8s.io/apimachinery/.*
+            contextual k8s.io/client-go/.*
             contextual k8s.io/component-base/featuregate/*
             contextual k8s.io/component-helpers/.*
             contextual k8s.io/cri-api/.*
@@ -362,6 +371,11 @@ linters:
             contextual k8s.io/kubernetes/test/e2e/dra/.*
             contextual k8s.io/kubernetes/test/images/sample-device-plugin/.*
             contextual k8s.io/kubernetes/pkg/kubelet/.*
+            
+            # https://github.com/kubernetes/kubernetes/pull/129336 pending,
+            # unclear whether it'll ever get merged (more discussion around
+            # API design needed).
+            -contextual k8s.io/client-go/plugin/pkg/client/auth/.*
       sorted:
         # Installed there by hack/verify-golangci-lint.sh.
         path: _output/local/bin/sorted.so
