@@ -607,6 +607,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		pred.AllowWatchBookmarks,
 		c.groupResource,
 		c.watcherMetrics,
+		c.clock,
 		identifier,
 	)
 

@@ -2546,6 +2546,7 @@ func TestForgetWatcher(t *testing.T) {
 		true,
 		schema.GroupResource{Resource: "pods"},
 		metrics.NewNoopWatcherMetricsObservers(),
+		testingclock.NewFakeClock(time.Now()),
 		"1",
 	)
 	forgetWatcherFn = forgetWatcher(cacher, w, 0, namespacedName{}, "", false)

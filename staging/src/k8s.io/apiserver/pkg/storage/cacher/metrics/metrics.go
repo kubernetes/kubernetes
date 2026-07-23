@@ -38,17 +38,24 @@ const (
 // value on the dispatchStageDuration metric.
 //
 // StageTotal is the end-to-end latency of a successfully delivered event.
+// The remaining stages measure individual segments of that path.
 type DispatchStage int
 
 const (
 	// StageTotal: end-to-end, etcd decode -> written to the result channel.
 	StageTotal DispatchStage = iota
 
+	// StageCacheToWatcher: watch.Event built -> written to watcher's result channel.
+	// Captures time spent blocked handing the event off to the client,
+	// i.e. downstream (result channel) backpressure.
+	StageCacheToWatcher
+
 	numDispatchStages
 )
 
 var dispatchStageName = [numDispatchStages]string{
-	StageTotal: "total",
+	StageTotal:          "total",
+	StageCacheToWatcher: "cache_to_watcher",
 }
 
 /*
