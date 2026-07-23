@@ -2053,12 +2053,15 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.T) {
 	now := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	p := st.MakePod().Name("pod1").Namespace("ns1").UID("1").Label("foo", "bar").Obj()
+	gatedPod := st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()
 	tests := []struct {
 		name    string
 		podInfo *framework.QueuedPodInfo
 		hint    fwk.QueueingHintFn
 		// duration is the duration that the Pod has been in the unschedulable queue.
 		duration time.Duration
+		// triggerEvent is the event to trigger the move. If unset, defaults to nodeAdd.
+		triggerEvent *fwk.ClusterEvent
 		// expectedQ is the queue name (activeQ, backoffQ, or unschedulablePods) that this Pod should be quened to.
 		expectedQ string
 	}{
@@ -2090,6 +2093,33 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 			name:      "Skip queues pod to unschedulablePods",
 			podInfo:   &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")},
 			hint:      queueHintReturnSkip,
+			expectedQ: unschedulableQ,
+		},
+		{
+			name:         "Queue queues pod to backoffQ if Pod is not gated and the event is wildcard",
+			podInfo:      &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")},
+			triggerEvent: &framework.EventUnschedulableTimeout,
+			hint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+				return fwk.Queue, fmt.Errorf("QueueingHintFn should not be called as trigger event is wildcard")
+			},
+			expectedQ: backoffQ,
+		},
+		{
+			name:         "Queue queues pod to backoffQ when Pod is no longer gated and the event is wildcard",
+			podInfo:      setQueuedPodInfoGated(&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p)}, "foo", []fwk.ClusterEvent{framework.EventUnscheduledPodUpdate}),
+			triggerEvent: &framework.EventUnschedulableTimeout,
+			hint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+				return fwk.Queue, fmt.Errorf("QueueingHintFn should not be called as trigger event is wildcard")
+			},
+			expectedQ: backoffQ,
+		},
+		{
+			name:         "Queue queues pod to unschedulableQ when Pod is gated and the event is wildcard",
+			podInfo:      setQueuedPodInfoGated(&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(gatedPod)}, "foo", []fwk.ClusterEvent{framework.EventUnscheduledPodUpdate}),
+			triggerEvent: &framework.EventUnschedulableTimeout,
+			hint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+				return fwk.Queue, fmt.Errorf("QueueingHintFn should not be called as trigger event is wildcard")
+			},
 			expectedQ: unschedulableQ,
 		},
 		{
@@ -2137,19 +2167,29 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 			}}
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m), WithClock(cl), WithPreEnqueuePluginMap(preEnqM))
 			q.Add(ctx, test.podInfo.Pod)
-			if p, err := q.Pop(logger); err != nil {
-				t.Errorf("Pop failed: %v", err)
-			} else if diff := cmp.Diff(test.podInfo.Pod, p.Pod); diff != "" {
-				t.Errorf("Unexpected pod after Pop (-want, +got):\n%s", diff)
-			}
-			// add to unsched pod pool
-			err := q.AddUnschedulableIfNotPresent(logger, test.podInfo, q.SchedulingCycle())
-			if err != nil {
-				t.Fatalf("unexpected error from AddUnschedulableIfNotPresent: %v", err)
+			if q.activeQ.len() > 0 {
+				if p, err := q.Pop(logger); err != nil {
+					t.Errorf("Pop failed: %v", err)
+				} else if diff := cmp.Diff(test.podInfo.Pod, p.Pod); diff != "" {
+					t.Errorf("Unexpected pod after Pop (-want, +got):\n%s", diff)
+				}
+				// add to unsched pod pool
+				err := q.AddUnschedulableIfNotPresent(logger, test.podInfo, q.SchedulingCycle())
+				if err != nil {
+					t.Fatalf("unexpected error from AddUnschedulableIfNotPresent: %v", err)
+				}
+			} else {
+				// The pod was already moved to unschedulablePods because it's gated.
+				// Update it with the test's configured podInfo to ensure custom test fields are set.
+				q.unschedulablePods.addOrUpdate(test.podInfo, test.podInfo.Gated(), "test-setup")
 			}
 			cl.Step(test.duration)
 
-			q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, nil, nil)
+			event := nodeAdd
+			if test.triggerEvent != nil {
+				event = *test.triggerEvent
+			}
+			q.MoveAllToActiveOrBackoffQueue(logger, event, nil, nil, nil)
 
 			if q.backoffQ.len() == 0 && test.expectedQ == backoffQ {
 				t.Fatalf("expected pod to be queued to backoffQ, but it was not")
@@ -3260,6 +3300,210 @@ func TestFlushUnschedulablePodsLeftoverSetsFlag(t *testing.T) {
 	}
 	if internalPInfo.WasFlushedFromUnschedulable {
 		t.Errorf("Expected WasFlushedFromUnschedulable to be cleared (false) after returning to queue, but got true")
+	}
+}
+
+func TestFlushUnschedulablePodsLeftoverSetsFlag_GatedPod(t *testing.T) {
+	tests := []struct {
+		name                            string
+		gatedBeforeFlush                bool
+		gatedAfterFlush                 bool
+		backingOff                      bool
+		wantWasFlushedFromUnschedulable bool
+		wantQ                           string
+	}{
+		{
+			name:                            "flag is set when pod is not gated",
+			wantWasFlushedFromUnschedulable: true,
+			wantQ:                           activeQ,
+		},
+		{
+			name:                            "flag is set when pod is no longer gated",
+			gatedBeforeFlush:                true,
+			wantWasFlushedFromUnschedulable: true,
+			wantQ:                           activeQ,
+		},
+		{
+			name:                            "flag is unset when pod is newly gated",
+			gatedAfterFlush:                 true,
+			wantWasFlushedFromUnschedulable: false,
+			wantQ:                           unschedulableQ,
+		},
+		{
+			name:                            "flag is unset when pod is still gated",
+			gatedBeforeFlush:                true,
+			gatedAfterFlush:                 true,
+			wantWasFlushedFromUnschedulable: false,
+			wantQ:                           unschedulableQ,
+		},
+		{
+			name:                            "flag is set when pod is not gated and backoff is not complete",
+			backingOff:                      true,
+			wantWasFlushedFromUnschedulable: true,
+			wantQ:                           backoffQ,
+		},
+		{
+			name:                            "flag is set when pod is no longer gated and backoff is not complete",
+			gatedBeforeFlush:                true,
+			backingOff:                      true,
+			wantWasFlushedFromUnschedulable: true,
+			wantQ:                           backoffQ,
+		},
+		{
+			name:                            "flag is unset when pod is newly gated and backoff is not complete",
+			gatedAfterFlush:                 true,
+			backingOff:                      true,
+			wantWasFlushedFromUnschedulable: false,
+			wantQ:                           unschedulableQ,
+		},
+		{
+			name:                            "flag is unset when pod is still gated and backoff is not complete",
+			gatedBeforeFlush:                true,
+			gatedAfterFlush:                 true,
+			backingOff:                      true,
+			wantWasFlushedFromUnschedulable: false,
+			wantQ:                           unschedulableQ,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			const allowedLabel = "allow"
+			const preEnqueuePluginName = "preEnqueuePlugin"
+
+			var backoffDuration time.Duration
+			if tt.backingOff {
+				backoffDuration = DefaultPodMaxInUnschedulablePodsDuration + time.Minute
+			}
+
+			c := testingclock.NewFakeClock(time.Now())
+			m := makeEmptyQueueingHintMapPerProfile()
+			preEnqM := map[string]map[string]fwk.PreEnqueuePlugin{
+				"": {
+					preEnqueuePluginName: &preEnqueuePlugin{allowlists: []string{allowedLabel}},
+				},
+			}
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithQueueingHintMapPerProfile(m), WithPreEnqueuePluginMap(preEnqM),
+				WithPodInitialBackoffDuration(backoffDuration), WithPodMaxBackoffDuration(backoffDuration))
+
+			pod := st.MakePod().Name("pod1").Namespace("ns1").UID("1").Label(allowedLabel, "").Obj()
+			podInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(pod), UnschedulablePlugins: sets.New("foo")}
+			if tt.gatedBeforeFlush {
+				podInfo = setQueuedPodInfoGated(podInfo, preEnqueuePluginName, []fwk.ClusterEvent{})
+			}
+
+			q.Add(ctx, podInfo.Pod)
+			_, err := q.Pop(logger)
+			if err != nil {
+				t.Fatalf("Failed to pop from active queue: %v", err)
+			}
+
+			if tt.gatedAfterFlush {
+				delete(pod.Labels, allowedLabel)
+			}
+
+			err = q.AddUnschedulableIfNotPresent(logger, podInfo, q.SchedulingCycle())
+			if err != nil {
+				t.Fatalf("Failed to add pod to unschedulable: %v", err)
+			}
+
+			// Advance time past the flush duration and flush
+			c.Step(DefaultPodMaxInUnschedulablePodsDuration + time.Second)
+			q.flushUnschedulablePodsLeftover(logger)
+
+			queueSizes := map[string]int{
+				unschedulableQ: len(q.UnschedulablePods()),
+				backoffQ:       len(q.PodsInBackoffQ()),
+				activeQ:        len(q.PodsInActiveQ()),
+			}
+
+			if queueSizes[tt.wantQ] == 0 {
+				t.Errorf("Pod not found in %s", tt.wantQ)
+			}
+			actualPod, ok := q.GetPod(podInfo.Pod.Name, podInfo.Pod.Namespace)
+			if !ok {
+				t.Fatalf("Pod not found in scheduling queue")
+			}
+			if actualPod.WasFlushedFromUnschedulable != tt.wantWasFlushedFromUnschedulable {
+				t.Errorf("Unexpected WasFlushedFromUnschedulable value: %v", actualPod.WasFlushedFromUnschedulable)
+			}
+		})
+	}
+}
+
+// TestGatedPodFlushFrequency verifies that a gated pod is only flushed once every
+// podMaxInUnschedulablePodsDuration, and not on every periodic flush execution.
+func TestGatedPodFlushFrequency(t *testing.T) {
+	gatedPod := mustNewPodInfo(st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj())
+
+	podInfo := &framework.QueuedPodInfo{
+		PodInfo:              gatedPod,
+		UnschedulablePlugins: sets.New("foo"),
+	}
+
+	c := testingclock.NewFakeClock(time.Now())
+	m := makeEmptyQueueingHintMapPerProfile()
+	preEnqueuePluginName := "preEnqueuePlugin"
+	preEnqM := map[string]map[string]fwk.PreEnqueuePlugin{
+		"": {
+			preEnqueuePluginName: &preEnqueuePlugin{}, // Empty allowlist, gates all pods
+		},
+	}
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Use a user-defined 5-minute duration for clarity
+	flushDuration := 5 * time.Minute
+	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithQueueingHintMapPerProfile(m), WithPreEnqueuePluginMap(preEnqM),
+		WithPodMaxInUnschedulablePodsDuration(flushDuration))
+
+	getPodFromAnyQueue := func() *framework.QueuedPodInfo {
+		pInfo, ok := q.GetPod(podInfo.Pod.Name, podInfo.Pod.Namespace)
+		if !ok {
+			t.Fatalf("Failed to find pod in any queue")
+		}
+		return pInfo
+	}
+
+	// Add gated pod directly to unschedulablePods
+	q.unschedulablePods.addOrUpdate(podInfo, false, "test-setup")
+
+	// Step clock past the flush duration and trigger flush
+	// (T=5:01)
+	c.Step(flushDuration + time.Second)
+
+	q.flushUnschedulablePodsLeftover(logger)
+
+	actualPod := getPodFromAnyQueue()
+	// Verify that flush happened
+	firstFlushTime := actualPod.GetFlushTimestamp()
+	if firstFlushTime.IsZero() {
+		t.Errorf("Expected FlushTimestamp to be set after the first leftover flush")
+	}
+
+	// Step clock by less than the flush duration and trigger flush
+	// T=9:01
+	c.Step(4 * time.Minute)
+	q.flushUnschedulablePodsLeftover(logger)
+
+	actualPod = getPodFromAnyQueue()
+	if actualPod.GetFlushTimestamp() != firstFlushTime {
+		t.Errorf("Expected FlushTimestamp to remain %v, but was updated to %v (pod was flushed prematurely)", firstFlushTime, actualPod.GetFlushTimestamp())
+	}
+
+	// Step clock past the duration since the last flush
+	// T=10:02
+	c.Step(time.Minute + time.Second)
+	q.flushUnschedulablePodsLeftover(logger)
+
+	actualPod = getPodFromAnyQueue()
+	// Verify that flush happened
+	if !actualPod.GetFlushTimestamp().After(firstFlushTime) {
+		t.Errorf("Expected FlushTimestamp to be updated to a newer time after 5 minutes elapsed, but remained %v", actualPod.GetFlushTimestamp())
 	}
 }
 
