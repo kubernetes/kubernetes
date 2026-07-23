@@ -10321,6 +10321,62 @@ func TestPreQueueingHint_WildcardSkipsNarrowing(t *testing.T) {
 	}
 }
 
+// TestPreQueueingHint_SinglePluginSubset verifies that a single plugin can narrow
+// to a subset of pods (2 out of 3), and only those pods are moved.
+func TestPreQueueingHint_SinglePluginSubset(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.SchedulerPreQueueingHints: true,
+	})
+	logger, ctx := ktesting.NewTestContext(t)
+
+	m := makeEmptyQueueingHintMapPerProfile()
+	m[""][nodeAdd] = []*QueueingHintFunction{
+		{
+			PluginName:     "pluginA",
+			QueueingHintFn: queueHintReturnQueue,
+			PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
+				// Return 2 of 3 pods.
+				return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{
+					{Name: "pod1", Namespace: "ns1"},
+					{Name: "pod3", Namespace: "ns1"},
+				}}, nil
+			},
+		},
+	}
+
+	q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m))
+
+	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()
+	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj()
+	pod3 := st.MakePod().Name("pod3").Namespace("ns1").UID("3").Obj()
+
+	for _, pod := range []*v1.Pod{pod1, pod2, pod3} {
+		q.Add(ctx, pod)
+		entity, err := q.Pop(logger)
+		if err != nil {
+			t.Fatalf("Pop failed: %v", err)
+		}
+		pInfo := entity.(*framework.QueuedPodInfo)
+		pInfo.UnschedulablePlugins = sets.New[string]("pluginA")
+		if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
+			t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
+		}
+	}
+
+	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, st.MakeNode().Name("node1").Obj(), nil)
+
+	// pod1 and pod3 should be moved; pod2 stays.
+	unschedPods := q.UnschedulablePods()
+	if len(unschedPods) != 1 {
+		t.Errorf("expected 1 pod in unschedulable (pod2), got %d", len(unschedPods))
+	}
+	for _, pod := range unschedPods {
+		if pod.Name != "pod2" {
+			t.Errorf("expected pod2 to stay unschedulable, got %s", pod.Name)
+		}
+	}
+}
+
 // TestPreQueueingHint_PerPluginNarrowing verifies that when two plugins register PreQueueingHintFn,
 // each plugin's QueueingHintFn is only called for the pods its PreQueueingHintFn identified.
 func TestPreQueueingHint_PerPluginNarrowing(t *testing.T) {
