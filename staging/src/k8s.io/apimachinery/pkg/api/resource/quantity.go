@@ -320,27 +320,40 @@ func ParseQuantity(str string) (Quantity, error) {
 		if scale >= int32(Nano) {
 			shifted := num + denom
 
-			var value int64
-			value, err := strconv.ParseInt(shifted, 10, 64)
-			if err != nil {
-				return Quantity{}, ErrNumeric
-			}
-			if result, ok := int64Multiply(value, int64(mantissa)); ok {
-				if !positive {
-					result = -result
+			uvalue, err := strconv.ParseUint(shifted, 10, 64)
+			if err == nil {
+				var value int64
+				signApplied := false
+				inRange := false
+				if uvalue <= math.MaxInt64 {
+					// fits in positive int64 range
+					value = int64(uvalue)
+					inRange = true
+				} else if !positive && uvalue == uint64(math.MaxInt64)+1 {
+					// special case: absolute value of math.MinInt64
+					value = math.MinInt64 // already negative, skip negation later
+					signApplied = true
+					inRange = true
 				}
-				// if the number is in canonical form, reuse the string
-				switch format {
-				case BinarySI:
-					if exponent%10 == 0 && (value&0x07 != 0) {
-						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
-					}
-				default:
-					if scale%3 == 0 && !strings.HasSuffix(shifted, "000") && shifted[0] != '0' {
-						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+				if inRange {
+					if result, ok := int64Multiply(value, int64(mantissa)); ok {
+						if !positive && !signApplied {
+							result = -result
+						}
+						// if the number is in canonical form, reuse the string
+						switch format {
+						case BinarySI:
+							if exponent%10 == 0 && (value&0x07 != 0) {
+								return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+							}
+						default:
+							if scale%3 == 0 && !strings.HasSuffix(shifted, "000") && shifted[0] != '0' {
+								return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+							}
+						}
+						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}, nil
 					}
 				}
-				return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}, nil
 			}
 		}
 	}
