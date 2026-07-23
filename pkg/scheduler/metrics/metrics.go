@@ -454,7 +454,7 @@ func InitMetrics() {
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "unschedulable_pods",
-			Help:           "The number of unschedulable pods broken down by plugin name and scheduler profile. A pod will increment the gauge for all plugins that caused it to not schedule and so this metric have meaning only when broken down by plugin.",
+			Help:           "The number of unschedulable pods broken down by plugin name and scheduler profile. A pod will increment the gauge for all plugins that caused it to not schedule and so this metric has meaning only when broken down by plugin.",
 			StabilityLevel: metrics.BETA,
 		}, []string{"plugin", "profile"})
 
@@ -551,7 +551,7 @@ func InitMetrics() {
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "store_schedule_results_duration_seconds",
-			Help:      "Latency for getting a no, by scheduler profile.",
+			Help:      "Latency for storing scheduling results for opportunistic batching, by scheduler profile.",
 			// Start with 0.01ms with the last bucket being [~200ms, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.00001, 2, 12),
 			StabilityLevel: metrics.ALPHA,

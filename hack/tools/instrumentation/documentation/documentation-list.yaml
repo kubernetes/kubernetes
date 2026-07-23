@@ -6756,7 +6756,8 @@
     endpoint: /metrics
 - name: store_schedule_results_duration_seconds
   subsystem: scheduler
-  help: Latency for getting a no, by scheduler profile.
+  help: Latency for storing scheduling results for opportunistic batching, by scheduler
+    profile.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
@@ -8044,7 +8045,7 @@
   subsystem: scheduler
   help: The number of unschedulable pods broken down by plugin name and scheduler
     profile. A pod will increment the gauge for all plugins that caused it to not
-    schedule and so this metric have meaning only when broken down by plugin.
+    schedule and so this metric has meaning only when broken down by plugin.
   type: Gauge
   stabilityLevel: BETA
   labels:
