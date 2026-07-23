@@ -115,6 +115,13 @@ var _ = SIGDescribe("OOMKiller [LinuxOnly]", framework.WithNodeConformance(), fr
 	for _, tc := range testCases {
 		runOomKillerTest(f, tc, 0)
 	}
+
+	// The "cumulative oom_kill counter" scenario below is a cgroup v2 concept: cgroup v2's memory.events
+	// exposes a persistent, cumulative oom_kill count for the cgroup, which is what allows an earlier,
+	// unrelated OOM kill to leave a stale signal behind for a container that is later terminated gracefully.
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		runOomKillerStaleCounterSigtermTest(f)
+	}
 })
 
 func runOomKillerTest(f *framework.Framework, testCase testCase, kubeReservedMemory float64) {
@@ -182,6 +189,52 @@ func runOomKillerTest(f *framework.Framework, testCase testCase, kubeReservedMem
 	})
 }
 
+// runOomKillerStaleCounterSigtermTest verifies that a container is not misreported as OOMKilled when it is later
+// terminated by SIGTERM (exit code 143), even though an earlier, unrelated process in the same container was
+// OOM-killed and left the cgroup's cumulative oom_kill counter non-zero.
+// See https://github.com/kubernetes/kubernetes/issues/140716.
+func runOomKillerStaleCounterSigtermTest(f *framework.Framework) {
+	const (
+		podName       = "oomkill-stale-counter-pod"
+		containerName = "oomkill-stale-counter-container"
+	)
+
+	ginkgo.Context("container with a stale cgroup oom_kill counter that later exits via SIGTERM", func() {
+		// SingleProcessOOMKill must be enabled so the kernel only kills the offending process instead of the
+		// whole container cgroup, letting the container survive the earlier OOM kill.
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.SingleProcessOOMKill = ptr.To(true)
+		})
+
+		podSpec := getOOMTargetPod(podName, containerName, getOOMTargetContainerMultiProcessThenSigterm)
+
+		ginkgo.BeforeEach(func() {
+			waitForKubeletToStart(context.TODO(), f)
+
+			ginkgo.By("setting up the pod to be used in the test")
+			e2epod.NewPodClient(f).Create(context.TODO(), podSpec)
+		})
+
+		ginkgo.It("should not report OOMKilled for the later SIGTERM exit", func() {
+			ginkgo.By("waiting for the pod to terminate on its own via the later SIGTERM")
+			err := e2epod.WaitForPodTerminatedInNamespace(context.TODO(), f.ClientSet, podName, "", f.Namespace.Name)
+			framework.ExpectNoError(err, "Failed waiting for pod to terminate, %s/%s", f.Namespace.Name, podName)
+
+			ginkgo.By("fetching the latest pod status")
+			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), podName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Failed to get the recent pod object for name: %q", podName)
+
+			ginkgo.By("verifying the container was not misreported as OOMKilled")
+			verifyReasonForSigtermAfterStaleOOMCounter(pod, containerName)
+		})
+
+		ginkgo.AfterEach(func() {
+			ginkgo.By(fmt.Sprintf("deleting pod: %s", podName))
+			e2epod.NewPodClient(f).DeleteSync(context.TODO(), podName, metav1.DeleteOptions{}, framework.PodDeleteTimeout)
+		})
+	})
+}
+
 func verifyReasonForOOMKilledContainer(pod *v1.Pod, oomTargetContainerName string) {
 	container := e2epod.FindContainerStatusInPod(pod, oomTargetContainerName)
 	if container == nil {
@@ -201,6 +254,23 @@ func verifyReasonForOOMKilledContainer(pod *v1.Pod, oomTargetContainerName strin
 			"pod: %q, container: %q has unexpected reason: %q", pod.Name, container.Name, container.State.Terminated.Reason)
 	}
 
+}
+
+// verifyReasonForSigtermAfterStaleOOMCounter checks that a container terminated by SIGTERM (exit code 143) after
+// an earlier, unrelated OOM kill bumped its cgroup's cumulative oom_kill counter is not misreported as OOMKilled.
+// See https://github.com/kubernetes/kubernetes/issues/140716.
+func verifyReasonForSigtermAfterStaleOOMCounter(pod *v1.Pod, targetContainerName string) {
+	container := e2epod.FindContainerStatusInPod(pod, targetContainerName)
+	if container == nil {
+		framework.Failf("target pod %q, container %q does not have the expected state terminated", pod.Name, targetContainerName)
+	}
+	if container.State.Terminated == nil {
+		framework.Failf("target pod %q, container %q is not in the terminated state", pod.Name, container.Name)
+	}
+	gomega.Expect(container.State.Terminated.ExitCode).To(gomega.Equal(int32(143)),
+		"pod: %q, container: %q has unexpected exitCode: %q", pod.Name, container.Name, container.State.Terminated.ExitCode)
+	gomega.Expect(container.State.Terminated.Reason).ToNot(gomega.Equal("OOMKilled"),
+		"pod: %q, container: %q was misreported as OOMKilled despite exiting via SIGTERM", pod.Name, container.Name)
 }
 
 func getOOMTargetPod(podName string, ctnName string, createContainer func(name string) v1.Container) *v1.Pod {
@@ -282,6 +352,45 @@ func getOOMTargetContainerMultiProcess(name string) v1.Container {
 			"-c",
 			// use the dd tool to attempt to allocate 20M in a block which exceeds the limit
 			"sleep 5 && dd if=/dev/zero of=/dev/null bs=20M & sleep 86400",
+		},
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("15Mi"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("15Mi"),
+			},
+		},
+		SecurityContext: &v1.SecurityContext{
+			SeccompProfile: &v1.SeccompProfile{
+				Type: v1.SeccompProfileTypeRuntimeDefault,
+			},
+			AllowPrivilegeEscalation: ptr.To(false),
+			RunAsUser:                ptr.To[int64](999),
+			RunAsGroup:               ptr.To[int64](999),
+			RunAsNonRoot:             ptr.To(true),
+			Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
+		},
+	}
+}
+
+// getOOMTargetContainerMultiProcessThenSigterm returns a container with two processes: one which attempts to
+// allocate more memory than is allowed by the container memory limit and gets OOM-killed by the kernel, and a
+// second process which keeps the container alive and later terminates itself with SIGTERM, independent of the
+// earlier OOM kill. This simulates a runtime reporting a stale, cumulative cgroup oom_kill counter for a container
+// that is later terminated gracefully, e.g. during a node drain or eviction.
+func getOOMTargetContainerMultiProcessThenSigterm(name string) v1.Container {
+	return v1.Container{
+		Name:  name,
+		Image: busyboxImage,
+		Command: []string{
+			"sh",
+			"-c",
+			// The backgrounded dd process gets OOM-killed shortly after it starts, which bumps the container
+			// cgroup's cumulative oom_kill counter. The foreground sleep then keeps the container running well
+			// past that point, before the shell sends itself a SIGTERM to simulate a later, unrelated graceful
+			// termination.
+			"(sleep 5 && dd if=/dev/zero of=/dev/null bs=20M) & sleep 30; kill -TERM $$",
 		},
 		Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
