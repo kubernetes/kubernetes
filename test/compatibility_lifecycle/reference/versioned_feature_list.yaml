@@ -977,6 +977,12 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.29"
+- name: KubeletAllocatedPodsEndpoint
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: KubeletCgroupDriverFromCRI
   versionedSpecs:
   - default: false

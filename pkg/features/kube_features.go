@@ -564,6 +564,11 @@ const (
 	// serves localhost NodePort services on IPv4 and IPv6.
 	KubeProxyNFTablesLocalhostNodePorts featuregate.Feature = "KubeProxyNFTablesLocalhostNodePorts"
 
+	// owner: @tallclair
+	//
+	// Enables the kubelet allocated pods endpoint.
+	KubeletAllocatedPodsEndpoint featuregate.Feature = "KubeletAllocatedPodsEndpoint"
+
 	// owner: @marquiz
 	// kep: http://kep.k8s.io/4033
 	//
@@ -1674,6 +1679,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	KubeletAllocatedPodsEndpoint: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	KubeletCgroupDriverFromCRI: {
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
@@ -2606,6 +2615,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	KubeProxyIPVS: {},
 
 	KubeProxyNFTablesLocalhostNodePorts: {},
+
+	KubeletAllocatedPodsEndpoint: {InPlacePodVerticalScaling},
 
 	KubeletCgroupDriverFromCRI: {},
 
