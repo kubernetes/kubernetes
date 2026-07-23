@@ -72,15 +72,14 @@ func (e SMTAlignmentError) Error() string {
 	return fmt.Sprintf("SMT Alignment Error: requested %d cpus not multiple cpus per core = %d", e.RequestedCPUs, e.CpusPerCore)
 }
 
-// Type returns human-readable type of this error. Used in the admission control to populate Admission Failure reason.
+// Type returns human-readable type of this error. Used in the admission and in-place resize control to populate Admission and in-place resize Failure reason.
 func (e SMTAlignmentError) Type() string {
 	return ErrorSMTAlignment
 }
 
 // prohibitedCPUAllocationError represents an error due to an
-// attempt to reduce container exclusively allocated
-// pool below container exclusively original pool
-// allocated when container was created.
+// attempt to set container CPU assignments
+// below CPU assignments recorded at admission time.
 type prohibitedCPUAllocationError struct {
 	RequestedCPUs  string
 	AllocatedCPUs  string
@@ -92,8 +91,7 @@ func (e prohibitedCPUAllocationError) Error() string {
 	return fmt.Sprintf("prohibitedCPUAllocation Error: Skip resize, Not allowed to reduce container exclusively allocated pool below baseline, (requested CPUs = %s, allocated CPUs = %s, baseline CPUs = %s, guaranteed CPUs = %s)", e.RequestedCPUs, e.AllocatedCPUs, e.BaselineCPUs, e.GuaranteedCPUs)
 }
 
-// Type returns human-readable type of this error.
-// Used in the HandlePodResourcesResize to populate Failure reason
+// Type returns human-readable type of this error. Used in the in-place resize control to populate in-place resize Failure reason.
 func (e prohibitedCPUAllocationError) Type() string {
 	return ErrorProhibitedCPUAllocation
 }
@@ -119,14 +117,14 @@ func (e inconsistentCPUAllocationError) Error() string {
 	}
 }
 
-// Type returns human-readable type of this error.
-// Used in the HandlePodResourcesResize to populate Failure reason
+// Type returns human-readable type of this error. Used in the in-place resize control to populate in-place resize Failure reason.
 func (e inconsistentCPUAllocationError) Type() string {
 	return ErrorInconsistentCPUAllocation
 }
 
 // getBaselineCPUSetError represents an error due to a
-// failed attempt to GetBaselineCPUSet from state
+// failed attempt to get CPU assignments recorded at
+// admission time.
 type getBaselineCPUSetError struct {
 	PodUID        string
 	ContainerName string
@@ -136,8 +134,7 @@ func (e getBaselineCPUSetError) Error() string {
 	return fmt.Sprintf("getBaselineCPUSet Error: Skip resize, unable to get PromisedCPUSet, nothing to be done, (podUID = %s, containerName %s)", e.PodUID, e.ContainerName)
 }
 
-// Type returns human-readable type of this error.
-// Used in the HandlePodResourcesResize to populate Failure reason
+// Type returns human-readable type of this error. Used in the in-place resize control to populate in-place resize Failure reason.
 func (e getBaselineCPUSetError) Type() string {
 	return ErrorGetBaselineCPUSet
 }
@@ -155,8 +152,7 @@ func (e ResizeAllocateCPUsError) Error() string {
 	return fmt.Sprintf("ResizeAllocateCPUs Error: Skip resize, unable to resize container exclusively allocated pool, (podUID = %s, containerName = %s, topologyError = %s)", e.PodUID, e.ContainerName, e.TopologyError)
 }
 
-// Type returns human-readable type of this error.
-// Used in the HandlePodResourcesResize to populate Failure reason
+// Type returns human-readable type of this error. Used in the in-place resize control to populate in-place resize Failure reason.
 func (e ResizeAllocateCPUsError) Type() string {
 	return ErrorResizeAllocateCPUs
 }
