@@ -175,24 +175,23 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 			utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) &&
 			resourcehelper.IsPodLevelResourcesSet(pod) &&
 			!pod.Spec.Resources.Limits.Memory().IsZero()
-		if !skipContainerMemoryHigh && (memoryRequest != memoryLimitValue || memoryRequest == 0) {
+		if m.memoryThrottlingFactor != nil && !skipContainerMemoryHigh && (memoryRequest != memoryLimitValue || memoryRequest == 0) {
 			// The formula for memory.high for container cgroup is modified in Alpha stage of the feature in K8s v1.27.
 			// It will be set based on formula:
 			// `memory.high=floor[(requests.memory + memory throttling factor * (limits.memory or node allocatable memory - requests.memory))/pageSize] * pageSize`
-			// where default value of memory throttling factor is set to 0.9
 			// More info: https://git.k8s.io/enhancements/keps/sig-node/2570-memory-qos
 			memoryHigh := int64(0)
 			if memoryLimitValue != 0 {
 				memoryHigh = int64(math.Floor(
 					float64(memoryRequest)+
-						(float64(memoryLimitValue)-float64(memoryRequest))*float64(m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
+						(float64(memoryLimitValue)-float64(memoryRequest))*(*m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
 			} else {
 				allocatable := m.getNodeAllocatable()
 				allocatableMemory, ok := allocatable[v1.ResourceMemory]
 				if ok && allocatableMemory.Value() > 0 {
 					memoryHigh = int64(math.Floor(
 						float64(memoryRequest)+
-							(float64(allocatableMemory.Value())-float64(memoryRequest))*float64(m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
+							(float64(allocatableMemory.Value())-float64(memoryRequest))*(*m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
 				}
 			}
 			if memoryHigh != 0 && memoryHigh > memoryRequest {
@@ -446,8 +445,8 @@ func (m *kubeGenericRuntimeManager) isMemoryQoSEnforced() bool {
 
 // applyPodLevelMemoryHigh sets pod-level memory.high; kernel enforces hierarchically.
 func (m *kubeGenericRuntimeManager) applyPodLevelMemoryHigh(pod *v1.Pod, rc *cm.ResourceConfig) {
-	if m.memoryThrottlingFactor != 0 {
-		cm.ApplyPodLevelMemoryHigh(pod, rc, m.memoryThrottlingFactor)
+	if m.memoryThrottlingFactor != nil {
+		cm.ApplyPodLevelMemoryHigh(pod, rc, *m.memoryThrottlingFactor)
 	}
 }
 

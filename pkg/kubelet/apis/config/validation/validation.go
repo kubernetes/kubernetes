@@ -43,6 +43,10 @@ var (
 	defaultCFSQuota = metav1.Duration{Duration: 100 * time.Millisecond}
 )
 
+// Allows existing kubelet config files with the former default (0.9)
+// to pass validation when MemoryQoS is disabled
+const previousDefaultMemoryThrottlingFactor = 0.9
+
 // ValidateKubeletConfiguration validates `kc` and returns an error if it is invalid
 func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featureGate featuregate.FeatureGate) error {
 	allErrors := []error{}
@@ -344,9 +348,10 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, errs.ToAggregate().Errors()...)
 	}
 
-	if localFeatureGate.Enabled(features.MemoryQoS) && kc.MemoryThrottlingFactor == nil {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryThrottlingFactor is required when MemoryQoS feature flag is enabled"))
+	if !localFeatureGate.Enabled(features.MemoryQoS) && kc.MemoryThrottlingFactor != nil && *kc.MemoryThrottlingFactor != previousDefaultMemoryThrottlingFactor {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryThrottlingFactor must not be set when MemoryQoS feature gate is disabled"))
 	}
+
 	if kc.MemoryThrottlingFactor != nil && (*kc.MemoryThrottlingFactor <= 0 || *kc.MemoryThrottlingFactor > 1.0) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryThrottlingFactor %v must be greater than 0 and less than or equal to 1.0", *kc.MemoryThrottlingFactor))
 	}

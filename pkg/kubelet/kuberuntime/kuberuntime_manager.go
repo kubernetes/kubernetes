@@ -188,7 +188,8 @@ type kubeGenericRuntimeManager struct {
 	getNodeAllocatable func() v1.ResourceList
 
 	// Memory throttling factor for MemoryQoS
-	memoryThrottlingFactor float64
+	// If nil, memory.high is not set (throttling is disabled).
+	memoryThrottlingFactor *float64
 	// Memory reservation policy for MemoryQoS memory.min behavior
 	memoryReservationPolicy kubeletconfiginternal.MemoryReservationPolicy
 
@@ -245,7 +246,7 @@ func NewKubeGenericRuntimeManager(
 	seccompDefault bool,
 	memorySwapBehavior string,
 	getNodeAllocatable func() v1.ResourceList,
-	memoryThrottlingFactor float64,
+	memoryThrottlingFactor *float64,
 	memoryReservationPolicy kubeletconfiginternal.MemoryReservationPolicy,
 	podPullingTimeRecorder images.ImagePodPullingTimeRecorder,
 	tracerProvider trace.TracerProvider,

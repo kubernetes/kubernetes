@@ -109,11 +109,17 @@ func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable 
 			resourceParameters.CPUShares = &minShares
 		}
 
-		// Stale memory.low from a previously enabled MemoryQoS state can persist
-		// across kubelet restarts. Reset to 0 so rollback takes effect.
-		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) && libcontainercgroups.IsCgroup2UnifiedMode() {
-			if qosClass == v1.PodQOSBurstable {
-				resourceParameters.Unified = map[string]string{Cgroup2MemoryLow: "0"}
+		// Reset stale memory protection on startup when MemoryQoS is off or
+		// policy is None. The periodic loop only runs for TieredReservation
+		// (where values change with pod churn); all other transitions are
+		// config changes that require a kubelet restart, so startup is
+		// sufficient.
+		if libcontainercgroups.IsCgroup2UnifiedMode() {
+			if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) ||
+				m.memoryReservationPolicy != kubeletconfig.TieredReservationMemoryReservationPolicy {
+				if qosClass == v1.PodQOSBurstable {
+					resourceParameters.Unified = map[string]string{Cgroup2MemoryLow: "0"}
+				}
 			}
 		}
 
@@ -138,6 +144,27 @@ func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable 
 			}
 		}
 	}
+	// Reset stale memory protection on the root cgroup (kubepods.slice) at
+	// startup, which the loop above
+	// does not cover.
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) ||
+			m.memoryReservationPolicy != kubeletconfig.TieredReservationMemoryReservationPolicy {
+			rootConfig := &CgroupConfig{
+				Name: rootContainer,
+				ResourceParameters: &ResourceConfig{
+					Unified: map[string]string{
+						Cgroup2MemoryMin: "0",
+						Cgroup2MemoryLow: "0",
+					},
+				},
+			}
+			if err := cm.Update(logger, rootConfig); err != nil {
+				logger.Error(err, "Failed to reset memory protection on root cgroup")
+			}
+		}
+	}
+
 	// Store the top level qos container names
 	m.qosContainersInfo = QOSContainersInfo{
 		Guaranteed: rootContainer,
@@ -307,6 +334,9 @@ func (m *qosContainerManagerImpl) setMemoryQoS(logger klog.Logger, configs map[v
 		logger.V(4).Info("MemoryQoS config for qos", "qos", qos, "key", key, "value", value)
 	}
 
+	// In production the only caller already gates on
+	// memoryReservationPolicy == TieredReservation, so this branch is
+	// unreachable. Keep this for unit-test coverage.
 	if m.memoryReservationPolicy != kubeletconfig.TieredReservationMemoryReservationPolicy {
 		setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryMin, 0)
 		setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryLow, 0)
@@ -361,9 +391,13 @@ func (m *qosContainerManagerImpl) UpdateCgroups(logger klog.Logger) error {
 		return err
 	}
 
-	// Update cgroup v2 memory.min settings. Called only when MemoryQoS is
-	// enabled and cgroups v2 is the unified mode.
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) && libcontainercgroups.IsCgroup2UnifiedMode() {
+	// Update cgroup v2 memory.min/memory.low periodically only when
+	// TieredReservation policy is active, since the values change as pods
+	// come and go. The None policy and feature-gate-disabled rollback cases
+	// are handled at startup to avoid unnecessary systemd SetUnitProperties
+	// calls that reset unrelated cgroup properties as a side effect.
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) && libcontainercgroups.IsCgroup2UnifiedMode() &&
+		m.memoryReservationPolicy == kubeletconfig.TieredReservationMemoryReservationPolicy {
 		m.setMemoryQoS(logger, qosConfigs)
 	}
 
