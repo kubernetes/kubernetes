@@ -607,7 +607,6 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		pred.AllowWatchBookmarks,
 		c.groupResource,
 		c.watcherMetrics,
-		c.clock,
 		identifier,
 	)
 
@@ -994,9 +993,10 @@ func setCachingObjects(event *watchCacheEvent, versioner storage.Versioner) {
 }
 
 func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
-	// dispatchStart marks when this event began dispatching; the per-watcher
-	// StageFanout observations below measure from here to each watcher's accept.
-	dispatchStart := time.Now()
+	// Mark the start of fan-out. This is the last shared, pre-fanout timestamp;
+	// the shallow copy made below for non-bookmark events preserves it, so all
+	// watchers see the same dispatched time.
+	event.timeline.dispatched = c.clock.Now()
 	c.startDispatching(event)
 	defer c.finishDispatching()
 	// Watchers stopped after startDispatching will be delayed to finishDispatching,
@@ -1030,12 +1030,6 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		for _, watcher := range c.watchersBuffer {
 			if !watcher.nonblockingAdd(event) {
 				c.blockedWatchers = append(c.blockedWatchers, watcher)
-			} else {
-				// StageFanout = dispatch start -> accepted into this watcher's
-				// c.input. Fast lane: captures the serial-traversal wait (this
-				// watcher's position in the loop), ~0 at low fan-out but growing
-				// to ms at high fan-out. Blocked ones observed after add() below.
-				watcher.watcherMetrics.ObserveStage(metrics.StageFanout, time.Since(dispatchStart))
 			}
 		}
 
@@ -1054,9 +1048,6 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 			timer := c.timer
 			for _, watcher := range c.blockedWatchers {
 				accepted := watcher.add(event, timer)
-				// StageFanout for the slow lane: dispatch start -> accepted (or
-				// timed out). Captures traversal + the mailbox-full block wait.
-				watcher.watcherMetrics.ObserveStage(metrics.StageFanout, time.Since(dispatchStart))
 				if !accepted {
 					// fired, clean the timer by set it to nil.
 					timer = nil

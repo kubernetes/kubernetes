@@ -37,39 +37,42 @@ const (
 // through the watch cache dispatch pipeline. It is used as the "stage" label
 // value on the dispatchStageDuration metric.
 //
-// StageTotal is the end-to-end latency of a successfully delivered event.
-// The remaining stages measure individual segments of that path.
+// The pipeline stages (propagation..handoff) are additive per delivery.
+// StageTotal is a cumulative, whole-lifecycle observation
+// folded into the same metric: StageTotal is the end-to-end latency of a
+// successfully delivered event.
 type DispatchStage int
 
 const (
-	// StageTotal: end-to-end, etcd decode -> written to the result channel.
-	StageTotal DispatchStage = iota
-
-	// StageStorageToCache: event decoded from etcd -> event received by cacher.
-	// Captures the delay between when an event is decoded from the storage backend
-	// and when it is first processed by the cacher's reflector loop.
-	StageStorageToCache
-
-	// StageCacheToWatcher: watch.Event built -> written to watcher's result channel.
-	// Captures time spent blocked handing the event off to the client,
-	// i.e. downstream (result channel) backpressure.
-	StageCacheToWatcher
-
-	// StageFanout: dispatched -> event enqueued on this watcher's input channel.
-	// This is the single dispatcher's serial fan-out cost for one watcher: the
-	// wait for the dispatcher to reach this watcher in the loop (grows with
-	// fan-out size) plus any mailbox-full block. It is the stage where the
-	// single-dispatcher scaling problem shows up.
+	// StagePropagation: etcd decode -> reflector handed event to the watch cache.
+	StagePropagation DispatchStage = iota
+	// StageCacheIngest: watch cache received -> event appended to ring buffer.
+	StageCacheIngest
+	// StageIncomingQueue: enqueued to the cacher incoming channel -> dispatched.
+	StageIncomingQueue
+	// StageFanout: dispatched -> enqueued on this watcher's input channel.
 	StageFanout
+	// StageWatcherQueue: enqueued on input channel -> dequeued by the watcher.
+	StageWatcherQueue
+	// StageEncode: dequeued -> outgoing watch.Event built (filter + convert).
+	StageEncode
+	// StageHandoff: watch.Event built -> written to the result channel.
+	StageHandoff
+	// StageTotal: end-to-end, etcd decode -> written to the result channel.
+	StageTotal
 
 	numDispatchStages
 )
 
 var dispatchStageName = [numDispatchStages]string{
-	StageTotal:          "total",
-	StageStorageToCache: "storage_to_cache",
-	StageCacheToWatcher: "cache_to_watcher",
-	StageFanout:         "fanout",
+	StagePropagation:   "propagation",
+	StageCacheIngest:   "cache_ingest",
+	StageIncomingQueue: "incoming_queue",
+	StageFanout:        "fanout",
+	StageWatcherQueue:  "watcher_queue",
+	StageEncode:        "encode",
+	StageHandoff:       "handoff",
+	StageTotal:         "total",
 }
 
 /*
@@ -275,12 +278,12 @@ var (
 		[]string{"group", "resource"},
 	)
 
-	DispatchStageDuration = compbasemetrics.NewHistogramVec(
+	dispatchStageDuration = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Namespace:      namespace,
 			Subsystem:      "watch_events",
-			Name:           "dispatch_duration_seconds",
-			Help:           "Histogram of watch event dispatch latency broken by resource type and pipeline stage. The 'total' stage is the end-to-end latency of a delivered event.",
+			Name:           "delivery_duration_seconds",
+			Help:           "Histogram of watch event dispatch latency broken by resource type and pipeline stage. The additive stages (propagation, cache_ingest, incoming_queue, fanout, watcher_queue, encode, handoff) partition the delivery path; the 'total' stage is the end-to-end latency of a delivered event.",
 			StabilityLevel: compbasemetrics.ALPHA,
 			Buckets:        []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
 		}, []string{"group", "resource", "stage"})
@@ -313,7 +316,7 @@ func Register() {
 			legacyregistry.MustRegister(WatchShardsTotal)
 			legacyregistry.MustRegister(WatchFilteredEventsTotal)
 		}
-		legacyregistry.MustRegister(DispatchStageDuration)
+		legacyregistry.MustRegister(dispatchStageDuration)
 	})
 }
 
@@ -366,8 +369,8 @@ type WatcherMetricsObservers struct {
 // NewWatcherMetricsObservers creates a pre-resolved metrics observer for watch connections.
 func NewWatcherMetricsObservers(groupResource schema.GroupResource) *WatcherMetricsObservers {
 	o := &WatcherMetricsObservers{}
-	for s := range numDispatchStages {
-		o.stageDurations[s] = DispatchStageDuration.WithLabelValues(groupResource.Group, groupResource.Resource, dispatchStageName[s])
+	for s := DispatchStage(0); s < numDispatchStages; s++ {
+		o.stageDurations[s] = dispatchStageDuration.WithLabelValues(groupResource.Group, groupResource.Resource, dispatchStageName[s])
 	}
 	return o
 }

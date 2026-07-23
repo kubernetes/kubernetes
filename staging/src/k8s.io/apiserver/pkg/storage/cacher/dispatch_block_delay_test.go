@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 )
 
@@ -40,6 +41,10 @@ import (
 // This is the "blast radius" that #140851's per-watcher c.result handoff stage
 // cannot see, and that #140336's `total` stage folds in but cannot isolate.
 func TestBlockDelayBlastRadius(t *testing.T) {
+	// Watches created below drive watch-cache freshness waits, which record into
+	// the global WatchCacheReadWait metric. Reset it on cleanup so we don't leak
+	// observations into TestHistogramCacheReadWait, which asserts on that metric.
+	t.Cleanup(metrics.WatchCacheReadWait.Reset)
 	measure := func(t *testing.T, numSlow int) (p50, p99, max time.Duration) {
 		backing := &cachertesting.MockStorage{}
 		cacher, _, err := newTestCacher(backing)

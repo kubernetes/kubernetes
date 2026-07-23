@@ -37,16 +37,25 @@ import (
 	testingclock "k8s.io/utils/clock/testing"
 )
 
-const dispatchDurationMetric = "apiserver_watch_events_dispatch_duration_seconds"
+const dispatchDurationMetric = "apiserver_watch_events_delivery_duration_seconds"
 
 // TestDispatchStageSweep reproduces the fan-out at 100..10k watchers and reads
 // the delay straight from Richa's staged metric
-// (apiserver_watch_events_dispatch_duration_seconds), comparing the new
+// (apiserver_watch_events_delivery_duration_seconds), comparing the new
 // stage="fanout" (the single dispatcher's serial fan-out cost) against
 // stage="total" (end-to-end). No standalone metrics -- everything rides on
 // #140336's WatcherMetricsObservers framework.
 func TestDispatchStageSweep(t *testing.T) {
 	metrics.Register()
+	// Watches created below drive watch-cache freshness waits, which record into
+	// the global WatchCacheReadWait metric. Reset it on cleanup so we don't leak
+	// observations into TestHistogramCacheReadWait, which asserts on that metric.
+	t.Cleanup(metrics.WatchCacheReadWait.Reset)
+	// This sweep creates cachers with resource "pods" and drives watch-cache
+	// freshness waits, which record into the global WatchCacheReadWait metric.
+	// Reset it on cleanup so we don't leak observations into TestHistogramCacheReadWait,
+	// which asserts on that same global metric.
+	t.Cleanup(metrics.WatchCacheReadWait.Reset)
 
 	fmt.Printf("\nGOMAXPROCS=%d\n", runtime.GOMAXPROCS(0))
 	fmt.Printf("\n%-9s | %11s %11s | %12s %12s\n",
@@ -68,7 +77,7 @@ func TestDispatchStageSweep(t *testing.T) {
 			dur(schedQuantile(sched, 0.50)), dur(schedQuantile(sched, 0.99)))
 	}
 	fmt.Println("\nfanout = stage=\"fanout\" (dispatch -> c.input accept, the single dispatcher's serial cost)")
-	fmt.Println("on apiserver_watch_events_dispatch_duration_seconds. p99 grows with watcher count:")
+	fmt.Println("on apiserver_watch_events_delivery_duration_seconds. p99 grows with watcher count:")
 	fmt.Println("the serial single-dispatcher fan-out is the stage that scales with fan-out size.")
 	fmt.Println("")
 	fmt.Println("sched  = /sched/latencies:seconds delta over the same window (runtime-global time")
@@ -149,7 +158,7 @@ type leCount struct {
 	c  uint64
 }
 
-// snapshotStage reads one stage of the staged dispatch_duration_seconds metric.
+// snapshotStage reads one stage of the staged delivery_duration_seconds metric.
 func snapshotStage(t *testing.T, stage string) histSnap {
 	t.Helper()
 	fams, err := legacyregistry.DefaultGatherer.Gather()
