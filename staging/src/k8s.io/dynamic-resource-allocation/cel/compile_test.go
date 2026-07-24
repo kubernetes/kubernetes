@@ -415,6 +415,64 @@ var testcases = map[string]struct {
 		expectMatch: false,
 		expectCost:  4 + 64, /* cost of "includes" on dynamic type */
 	},
+	"includes-function-on-list-literal-rejected": {
+		features:           &Features{EnableListTypeAttributes: true},
+		expression:         `[1, 2, 3].includes(1)`,
+		driver:             "dra.example.com",
+		expectCompileError: "includes function can only be applied to device attributes",
+	},
+	"includes-function-on-scalar-rejected": {
+		features:           &Features{EnableListTypeAttributes: true},
+		expression:         `1.includes(1)`,
+		driver:             "dra.example.com",
+		expectCompileError: "includes function can only be applied to device attributes",
+	},
+	"includes-function-on-other-variable-rejected": {
+		features:           &Features{EnableListTypeAttributes: true},
+		expression:         `device.driver.includes("foo")`,
+		driver:             "dra.example.com",
+		expectCompileError: "includes function can only be applied to device attributes",
+	},
+	"includes-function-on-capacity-rejected": {
+		features:           &Features{EnableListTypeAttributes: true},
+		expression:         `device.capacity["dra.example.com"].name.includes("foo")`,
+		capacity:           map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"name": {Value: resource.MustParse("1Mi")}},
+		driver:             "dra.example.com",
+		expectCompileError: "includes function can only be applied to device attributes",
+	},
+	"includes-function-on-bound-variable-success": {
+		features:    &Features{EnableListTypeAttributes: true},
+		expression:  `cel.bind(dra, device.attributes["dra.example.com"], dra.name.includes("fish"))`,
+		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValues: []string{"fish", "bird"}}},
+		driver:      "dra.example.com",
+		expectMatch: true,
+		expectCost:  79,
+	},
+	"includes-function-on-bound-variable-rejected": {
+		features:           &Features{EnableListTypeAttributes: true},
+		expression:         `cel.bind(lst, [1, 2, 3], lst.includes(1))`,
+		driver:             "dra.example.com",
+		expectCompileError: "includes function can only be applied to device attributes",
+	},
+	// Nested cel.bind: inner variable bound to a field of the outer bound variable.
+	// The checker must trace through both binding levels to confirm the attribute path.
+	"includes-function-on-nested-bound-variable-success": {
+		features:    &Features{EnableListTypeAttributes: true},
+		expression:  `cel.bind(dra, device.attributes["dra.example.com"], cel.bind(attr, dra.name, attr.includes("fish")))`,
+		attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValues: []string{"fish", "bird"}}},
+		driver:      "dra.example.com",
+		expectMatch: true,
+		expectCost:  90,
+	},
+
+	// Inner cel.bind shadows an outer attribute-bound variable with a list literal;
+	// the check must respect inner scope and correctly reject.
+	"includes-function-on-shadowed-bound-variable-rejected": {
+		features:           &Features{EnableListTypeAttributes: true},
+		expression:         `cel.bind(dra, device.attributes["dra.example.com"], cel.bind(dra, [1, 2, 3], dra.includes(1)))`,
+		driver:             "dra.example.com",
+		expectCompileError: "includes function can only be applied to device attributes",
+	},
 	"in-operator-on-list": {
 		// This case is for documenting purpose to present the difference of call cost estimation
 		// between "in" operator and "includes" function.

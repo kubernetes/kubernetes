@@ -29,6 +29,8 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker"
+	celast "github.com/google/cel-go/common/ast"
+	"github.com/google/cel-go/common/operators"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
@@ -179,10 +181,20 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 		return resultError(fmt.Sprintf("must evaluate to %v or the unknown type, not %v", expectedReturnType.String(), ast.OutputType().String()), apiservercel.ErrorTypeInvalid)
 	}
 
-	_, err = cel.AstToCheckedExpr(ast)
+	checkedExpr, err := cel.AstToCheckedExpr(ast)
 	if err != nil {
 		// should be impossible since env.Compile returned no issues
 		return resultError("unexpected compilation error: "+err.Error(), apiservercel.ErrorTypeInternal)
+	}
+
+	celAST, err := celast.ToAST(checkedExpr)
+	if err != nil {
+		// should be impossible since env.Compile returned no issues
+		return resultError("unexpected compilation error: "+err.Error(), apiservercel.ErrorTypeInternal)
+	}
+
+	if err := checkIncludes(celAST.Expr(), nil); err != nil {
+		return resultError(err.Error(), apiservercel.ErrorTypeInvalid)
 	}
 	prog, err := env.Program(ast,
 		// The Kubernetes CEL base environment sets the VAP limit as runtime cost limit.
@@ -648,5 +660,122 @@ func (s *sizeEstimator) EstimateSize(element checker.AstNode) (res *checker.Size
 }
 
 func (s *sizeEstimator) EstimateCallCost(function, overloadID string, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	return nil
+}
+
+func isDeviceAttributesPath(e celast.Expr, bound map[string]celast.Expr) bool {
+	switch e.Kind() {
+	case celast.IdentKind:
+		name := e.AsIdent()
+		if initExpr, found := bound[name]; found {
+			return isDeviceAttributesPath(initExpr, bound)
+		}
+	case celast.SelectKind:
+		sel := e.AsSelect()
+		if isDeviceAttributesRoot(sel.Operand()) {
+			return true
+		}
+		return isDeviceAttributesPath(sel.Operand(), bound)
+	case celast.CallKind:
+		call := e.AsCall()
+		if call.FunctionName() == operators.Index && len(call.Args()) > 0 {
+			if isDeviceAttributesRoot(call.Args()[0]) {
+				return true
+			}
+			return isDeviceAttributesPath(call.Args()[0], bound)
+		}
+	}
+	return false
+}
+
+func isDeviceAttributesRoot(e celast.Expr) bool {
+	if e.Kind() != celast.SelectKind {
+		return false
+	}
+	sel := e.AsSelect()
+	if sel.FieldName() != attributesVar {
+		return false
+	}
+	operand := sel.Operand()
+	return operand.Kind() == celast.IdentKind && operand.AsIdent() == deviceVar
+}
+
+func checkIncludes(e celast.Expr, bound map[string]celast.Expr) error {
+	switch e.Kind() {
+	case celast.CallKind:
+		call := e.AsCall()
+		if call.FunctionName() == "includes" {
+			var target celast.Expr
+			if call.Target() != nil {
+				target = call.Target()
+			} else if len(call.Args()) > 0 {
+				target = call.Args()[0]
+			}
+			if target == nil || !isDeviceAttributesPath(target, bound) {
+				return fmt.Errorf("includes function can only be applied to device attributes")
+			}
+		}
+		if call.Target() != nil {
+			if err := checkIncludes(call.Target(), bound); err != nil {
+				return err
+			}
+		}
+		for _, arg := range call.Args() {
+			if err := checkIncludes(arg, bound); err != nil {
+				return err
+			}
+		}
+
+	case celast.SelectKind:
+		sel := e.AsSelect()
+		return checkIncludes(sel.Operand(), bound)
+
+	case celast.ComprehensionKind:
+		comp := e.AsComprehension()
+		if err := checkIncludes(comp.IterRange(), bound); err != nil {
+			return err
+		}
+		if err := checkIncludes(comp.AccuInit(), bound); err != nil {
+			return err
+		}
+		nestedBound := make(map[string]celast.Expr, len(bound)+2)
+		for k, v := range bound {
+			nestedBound[k] = v
+		}
+		nestedBound[comp.IterVar()] = comp.IterRange()
+		nestedBound[comp.AccuVar()] = comp.AccuInit()
+		if err := checkIncludes(comp.LoopStep(), nestedBound); err != nil {
+			return err
+		}
+		if err := checkIncludes(comp.Result(), nestedBound); err != nil {
+			return err
+		}
+
+	case celast.ListKind:
+		for _, el := range e.AsList().Elements() {
+			if err := checkIncludes(el, bound); err != nil {
+				return err
+			}
+		}
+
+	case celast.MapKind:
+		for _, entry := range e.AsMap().Entries() {
+			mapEntry := entry.AsMapEntry()
+			if err := checkIncludes(mapEntry.Key(), bound); err != nil {
+				return err
+			}
+			if err := checkIncludes(mapEntry.Value(), bound); err != nil {
+				return err
+			}
+		}
+
+	case celast.StructKind:
+		for _, entry := range e.AsStruct().Fields() {
+			structField := entry.AsStructField()
+			if err := checkIncludes(structField.Value(), bound); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
