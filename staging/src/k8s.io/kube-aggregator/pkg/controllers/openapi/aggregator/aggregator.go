@@ -26,6 +26,7 @@ import (
 
 	restful "github.com/emicklei/go-restful/v3"
 
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/klog/v2"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -100,8 +101,16 @@ func buildAndRegisterSpecAggregatorForLocalServices(downloader *Downloader, aggr
 	}
 
 	s.openAPIVersionedService = handler.NewOpenAPIServiceLazy(s.buildMergeSpecLocked())
-	s.openAPIVersionedService.RegisterOpenAPIVersionedService("/openapi/v2", pathHandler)
+	s.openAPIVersionedService.RegisterOpenAPIVersionedService("/openapi/v2", instrumentedPathHandler{delegate: pathHandler})
 	return s
+}
+
+type instrumentedPathHandler struct {
+	delegate common.PathHandler
+}
+
+func (i instrumentedPathHandler) Handle(path string, h http.Handler) {
+	i.delegate.Handle(path, metrics.InstrumentHandlerFunc("GET", "", "", "", "openapi/v2", "", "", false, "", h.ServeHTTP))
 }
 
 // BuildAndRegisterAggregator registered OpenAPI aggregator handler. This function is not thread safe as it only being called on startup.
