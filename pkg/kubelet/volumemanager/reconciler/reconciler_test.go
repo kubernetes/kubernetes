@@ -1370,14 +1370,15 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{volumeName})
 
 			// Start the reconciler to fill ASW.
-			stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
+			runCtx, cancel := context.WithCancel(ctx)
+			stoppedChan := make(chan struct{})
 			go func() {
 				defer close(stoppedChan)
-				reconciler.Run(ctx, stopChan)
+				reconciler.Run(runCtx)
 			}()
 			waitForMount(t, fakePlugin, volumeName, asw)
 			// Stop the reconciler.
-			close(stopChan)
+			cancel()
 			<-stoppedChan
 
 			// Simulate what DSOWP does
@@ -1401,7 +1402,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				if !cache.IsFSResizeRequiredError(podExistErr) {
 					t.Fatalf("Volume should be marked as fsResizeRequired, but receive unexpected error: %v", podExistErr)
 				}
-				go reconciler.Run(ctx, wait.NeverStop)
+				runReconciler(ctx, reconciler)
 
 				waitErr := retryWithExponentialBackOff(testOperationBackOffDuration, func() (done bool, err error) {
 					mounted, _, err := asw.PodExistsInVolume(logger, podName, volumeName, newSize, "" /* SELinuxContext */)
@@ -1480,7 +1481,6 @@ func getTestPod(claimName string) *v1.Pod {
 }
 
 func Test_UncertainDeviceGlobalMounts(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
 	var tests = []struct {
 		name                   string
 		deviceState            operationexecutor.DeviceMountState
@@ -1534,6 +1534,7 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 			uniquePodDir := fmt.Sprintf("%s-%x", kubeletPodsDir, hasher.Sum([]byte(uniqueTestString)))
 			t.Run(testName+"[", func(t *testing.T) {
 				t.Parallel()
+				logger, ctx := ktesting.NewTestContext(t)
 				pv := &v1.PersistentVolume{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: tc.volumeName,
@@ -1630,11 +1631,7 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 				dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{volumeName})
 
 				// Start the reconciler to fill ASW.
-				stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
-				go func() {
-					reconciler.Run(ctx, stopChan)
-					close(stoppedChan)
-				}()
+				runReconciler(ctx, reconciler)
 				waitForVolumeToExistInASW(t, volumeName, asw)
 				if tc.volumeName == volumetesting.TimeoutAndFailOnMountDeviceVolumeName {
 					// Wait upto 10s for reconciler to catch up
@@ -1677,7 +1674,6 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 }
 
 func Test_UncertainVolumeMountState(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
 	var tests = []struct {
 		name                   string
 		volumeState            operationexecutor.VolumeMountState
@@ -1748,6 +1744,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 			uniquePodDir := fmt.Sprintf("%s-%x", kubeletPodsDir, hasher.Sum([]byte(uniqueTestString)))
 			t.Run(testName, func(t *testing.T) {
 				t.Parallel()
+				logger, ctx := ktesting.NewTestContext(t)
 				pv := &v1.PersistentVolume{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: tc.volumeName,
@@ -1855,11 +1852,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 				dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{volumeName})
 
 				// Start the reconciler to fill ASW.
-				stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
-				go func() {
-					reconciler.Run(ctx, stopChan)
-					close(stoppedChan)
-				}()
+				runReconciler(ctx, reconciler)
 				waitForVolumeToExistInASW(t, volumeName, asw)
 				// all of these tests rely on device to be globally mounted and hence waiting for global
 				// mount ensures that unmountDevice is called as expected.
@@ -2105,7 +2098,7 @@ func createTestClient(attachedVolumes ...v1.AttachedVolume) *fake.Clientset {
 }
 
 func runReconciler(ctx context.Context, reconciler Reconciler) {
-	go reconciler.Run(ctx, wait.NeverStop)
+	go reconciler.Run(ctx)
 }
 
 func createtestClientWithPVPVC(pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, attachedVolumes ...v1.AttachedVolume) *fake.Clientset {
@@ -2220,14 +2213,15 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 	// Start the reconciler to fill ASW.
-	stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
+	runCtx, cancel := context.WithCancel(ctx)
+	stoppedChan := make(chan struct{})
 	go func() {
-		reconciler.Run(ctx, stopChan)
+		reconciler.Run(runCtx)
 		close(stoppedChan)
 	}()
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 	// Stop the reconciler.
-	close(stopChan)
+	cancel()
 	<-stoppedChan
 
 	finished := make(chan interface{})
@@ -2260,7 +2254,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 	fakePlugin.Unlock()
 
 	// Start the reconciler again.
-	go reconciler.Run(ctx, wait.NeverStop)
+	runReconciler(ctx, reconciler)
 
 	// 2. Delete the volume from DSW (and wait for callbacks)
 	dsw.DeletePodFromVolume(podName, generatedVolumeName)
