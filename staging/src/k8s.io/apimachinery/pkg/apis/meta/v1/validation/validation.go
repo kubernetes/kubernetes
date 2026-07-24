@@ -375,7 +375,9 @@ func ValidateCondition(condition metav1.Condition, fldPath *field.Path) field.Er
 		}
 	}
 
-	if len(condition.Message) > maxMessageLen {
+	if len(condition.Message) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("message"), ""))
+	} else if len(condition.Message) > maxMessageLen {
 		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "" /*unused*/, maxMessageLen))
 	}
 
