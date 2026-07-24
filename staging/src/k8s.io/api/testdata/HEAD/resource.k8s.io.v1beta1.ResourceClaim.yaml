@@ -111,6 +111,10 @@ status:
         - bindingFailureConditionsValue
         consumedCapacity:
           consumedCapacityKey: "0"
+        consumedCounters:
+        - counterSet: counterSetValue
+          counters:
+            countersKey: "0"
         device: deviceValue
         driver: driverValue
         pool: poolValue

@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -600,7 +601,7 @@ func tweakConstraintRequests(count int) func(*resource.ResourceClaim) {
 			rc.Spec.Devices.Constraints = append(rc.Spec.Devices.Constraints, mkDeviceConstraint())
 		}
 		rc.Spec.Devices.Constraints[0].Requests = []string{}
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rc.Spec.Devices.Constraints[0].Requests = append(rc.Spec.Devices.Constraints[0].Requests, fmt.Sprintf("req-%d", i))
 		}
 	}
@@ -613,7 +614,7 @@ func tweakConfigRequests(count int) func(*resource.ResourceClaim) {
 			rc.Spec.Devices.Config = append(rc.Spec.Devices.Config, mkDeviceClaimConfiguration())
 		}
 		rc.Spec.Devices.Config[0].Requests = []string{}
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rc.Spec.Devices.Config[0].Requests = append(rc.Spec.Devices.Config[0].Requests, fmt.Sprintf("req-%d", i))
 		}
 	}
@@ -1119,6 +1120,15 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 			),
 			expectedErrs: field.ErrorList{
 				field.TooMany(field.NewPath("status", "allocation", "devices", "results"), 33, 32).WithOrigin("maxItems").MarkBeta(),
+			},
+		},
+		"invalid status.allocation.devices.results[*].consumedCounters, too many": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(
+				tweakStatusAllocationResultConsumedCounters(3),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("consumedCounters"), 3, 2).WithOrigin("maxItems").MarkBeta(),
 			},
 		},
 		"valid status.allocation.devices.config, max items": {
@@ -1698,7 +1708,7 @@ func resourceClaimReference(uid string) resource.ResourceClaimConsumerReference 
 
 func generateResourceClaimReferences(count int) []resource.ResourceClaimConsumerReference {
 	refs := make([]resource.ResourceClaimConsumerReference, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		refs[i] = resource.ResourceClaimConsumerReference{
 			Resource: "pods",
 			Name:     fmt.Sprintf("pod-%d", i),
@@ -1717,7 +1727,7 @@ func tweakStatusReservedFor(refs ...resource.ResourceClaimConsumerReference) fun
 func tweakStatusAllocationDevicesResults(count int) func(rc *resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		rc.Status.Allocation.Devices.Results = []resource.DeviceRequestAllocationResult{}
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rc.Status.Allocation.Devices.Results = append(rc.Status.Allocation.Devices.Results, resource.DeviceRequestAllocationResult{
 				Request: "req-0",
 				Driver:  "dra.example.com",
@@ -1728,13 +1738,33 @@ func tweakStatusAllocationDevicesResults(count int) func(rc *resource.ResourceCl
 	}
 }
 
+func tweakStatusAllocationResultConsumedCounters(count int) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if rc.Status.Allocation == nil || len(rc.Status.Allocation.Devices.Results) == 0 {
+			return
+		}
+		rc.Status.Allocation.Devices.Results[0].ConsumedCounters = nil
+		for i := range count {
+			rc.Status.Allocation.Devices.Results[0].ConsumedCounters = append(
+				rc.Status.Allocation.Devices.Results[0].ConsumedCounters,
+				resource.CounterSetConsumption{
+					CounterSet: fmt.Sprintf("counterset-%d", i),
+					Counters: map[string]apiresource.Quantity{
+						"memory": apiresource.MustParse("1"),
+					},
+				},
+			)
+		}
+	}
+}
+
 func tweakStatusAllocationDevicesConfig(count int) func(rc *resource.ResourceClaim) {
 	return func(rc *resource.ResourceClaim) {
 		if rc.Status.Allocation == nil {
 			return
 		}
 		rc.Status.Allocation.Devices.Config = []resource.DeviceAllocationConfiguration{}
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rc.Status.Allocation.Devices.Config = append(rc.Status.Allocation.Devices.Config, resource.DeviceAllocationConfiguration{
 				Source:   resource.AllocationConfigSourceClaim,
 				Requests: []string{"req-0"},
@@ -1946,7 +1976,7 @@ func tweakStatusAllocationConfigRequests(count int) func(rc *resource.ResourceCl
 				},
 			})
 		}
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rc.Status.Allocation.Devices.Config[0].Requests = append(rc.Status.Allocation.Devices.Config[0].Requests, fmt.Sprintf("req-%d", i))
 		}
 	}
@@ -1961,7 +1991,7 @@ func tweakStatusDevicesTooManyIPs(count int) func(rc *resource.ResourceClaim) {
 			rc.Status.Devices[0].NetworkData = &resource.NetworkDeviceData{}
 		}
 		rc.Status.Devices[0].NetworkData.IPs = []string{}
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rc.Status.Devices[0].NetworkData.IPs = append(rc.Status.Devices[0].NetworkData.IPs, fmt.Sprintf("1.2.3.%d/32", i))
 		}
 	}

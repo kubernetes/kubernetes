@@ -967,6 +967,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		deviceStatusFeatureGate       bool
 		prioritizedListFeatureGate    bool
 		consumableCapacityFeatureGate bool
+		sharedConsumableCapacityGate  bool
 		oldClaim                      *resource.ResourceClaim
 		update                        func(claim *resource.ResourceClaim) *resource.ResourceClaim
 		wantFailures                  field.ErrorList
@@ -2227,6 +2228,38 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			consumableCapacityFeatureGate: true,
 			deviceStatusFeatureGate:       true,
 		},
+		"invalid-add-allocated-status-too-many-consumed-counters": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("consumedCounters"), resource.DeviceRequestAllocationResultMaxConsumedCounterSets+1, resource.DeviceRequestAllocationResultMaxConsumedCounterSets).MarkCoveredByDeclarative(),
+			},
+			adminAccess:                   true,
+			deviceStatusFeatureGate:       true,
+			consumableCapacityFeatureGate: true,
+			prioritizedListFeatureGate:    true,
+			oldClaim:                      testClaim(goodName, goodNS, validClaimSpec),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{
+							{
+								Request:     goodName,
+								Driver:      goodName,
+								Pool:        goodName,
+								Device:      goodName,
+								AdminAccess: ptr.To(false),
+								ConsumedCounters: []resource.CounterSetConsumption{
+									{CounterSet: "set-0", Counters: map[string]apiresource.Quantity{"counter-0": apiresource.MustParse("1")}},
+									{CounterSet: "set-1", Counters: map[string]apiresource.Quantity{"counter-1": apiresource.MustParse("1")}},
+									{CounterSet: "set-2", Counters: map[string]apiresource.Quantity{"counter-2": apiresource.MustParse("1")}},
+								},
+							},
+						},
+					},
+				}
+				return claim
+			},
+			sharedConsumableCapacityGate: true,
+		},
 		"invalid-add-allocated-status-no-share-id": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("status", "devices").Index(0), structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), nil), "must be an allocated device in the claim"),
@@ -2376,15 +2409,19 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			if !scenario.adminAccess {
+			if !scenario.adminAccess && !scenario.sharedConsumableCapacityGate {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+			overrides := featuregatetesting.FeatureOverrides{
 				features.DRAAdminAccess:               scenario.adminAccess,
 				features.DRAResourceClaimDeviceStatus: scenario.deviceStatusFeatureGate,
 				features.DRAPrioritizedList:           scenario.prioritizedListFeatureGate,
 				features.DRAConsumableCapacity:        scenario.consumableCapacityFeatureGate,
-			})
+			}
+			if scenario.sharedConsumableCapacityGate {
+				overrides[features.DRASharedConsumableCapacity] = true
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, overrides)
 
 			scenario.oldClaim.ResourceVersion = "1"
 			errs := ValidateResourceClaimStatusUpdate(scenario.update(scenario.oldClaim.DeepCopy()), scenario.oldClaim)

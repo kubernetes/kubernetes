@@ -30,7 +30,7 @@ type DeviceCounterConsumptionApplyConfiguration struct {
 	// Counters defines the counters that will be consumed by the device.
 	//
 	// The maximum number of counters is 32.
-	Counters map[string]CounterApplyConfiguration `json:"counters,omitempty"`
+	Counters map[string]ConsumeCounterApplyConfiguration `json:"counters,omitempty"`
 }
 
 // DeviceCounterConsumptionApplyConfiguration constructs a declarative configuration of the DeviceCounterConsumption type for use with
@@ -51,9 +51,9 @@ func (b *DeviceCounterConsumptionApplyConfiguration) WithCounterSet(value string
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Counters field,
 // overwriting an existing map entries in Counters field with the same key.
-func (b *DeviceCounterConsumptionApplyConfiguration) WithCounters(entries map[string]CounterApplyConfiguration) *DeviceCounterConsumptionApplyConfiguration {
+func (b *DeviceCounterConsumptionApplyConfiguration) WithCounters(entries map[string]ConsumeCounterApplyConfiguration) *DeviceCounterConsumptionApplyConfiguration {
 	if b.Counters == nil && len(entries) > 0 {
-		b.Counters = make(map[string]CounterApplyConfiguration, len(entries))
+		b.Counters = make(map[string]ConsumeCounterApplyConfiguration, len(entries))
 	}
 	for k, v := range entries {
 		b.Counters[k] = v

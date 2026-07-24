@@ -285,6 +285,89 @@ func Validate_AllocationResult(
 	return errs
 }
 
+var zeroOrOneOfMembershipFor_k8s_io_api_resource_v1beta2_ConsumeCounter_ = validate.NewUnionMembership(validate.NewUnionMember("value"), validate.NewUnionMember("valueFrom"))
+
+// Validate_ConsumeCounter validates an instance of ConsumeCounter according
+// to declarative validation rules in the API schema.
+func Validate_ConsumeCounter(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *resourcev1beta2.ConsumeCounter) (errs field.ErrorList) {
+
+	if e := validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_api_resource_v1beta2_ConsumeCounter_,
+		func(obj *resourcev1beta2.ConsumeCounter) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.Value != nil
+		},
+		func(obj *resourcev1beta2.ConsumeCounter) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.ValueFrom != nil
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	{ // field resourcev1beta2.ConsumeCounter.Value
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resource.Quantity,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1beta2.ConsumeCounter) *resource.Quantity {
+				return oldObj.Value
+			})
+		errs = append(errs, fn(fldPath.Child("value"), obj.Value, oldVal, oldObj != nil)...)
+	}
+
+	{ // field resourcev1beta2.ConsumeCounter.ValueFrom
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resourcev1beta2.CounterValueFrom,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1beta2.ConsumeCounter) *resourcev1beta2.CounterValueFrom {
+				return oldObj.ValueFrom
+			})
+		errs = append(errs, fn(fldPath.Child("valueFrom"), obj.ValueFrom, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
 // Validate_CounterSet validates an instance of CounterSet according
 // to declarative validation rules in the API schema.
 func Validate_CounterSet(
@@ -326,7 +409,7 @@ func Validate_CounterSet(
 	{ // field resourcev1beta2.CounterSet.Counters
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj map[string]resourcev1beta2.Counter,
+			obj, oldObj map[string]resourcev1beta2.SharedCounter,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -349,7 +432,7 @@ func Validate_CounterSet(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta2.CounterSet) map[string]resourcev1beta2.Counter {
+			func(oldObj *resourcev1beta2.CounterSet) map[string]resourcev1beta2.SharedCounter {
 				return oldObj.Counters
 			})
 		errs = append(errs, fn(fldPath.Child("counters"), obj.Counters, oldVal, oldObj != nil)...)
@@ -1628,7 +1711,7 @@ func Validate_DeviceCounterConsumption(
 	{ // field resourcev1beta2.DeviceCounterConsumption.Counters
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj map[string]resourcev1beta2.Counter,
+			obj, oldObj map[string]resourcev1beta2.ConsumeCounter,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -1648,10 +1731,14 @@ func Validate_DeviceCounterConsumption(
 			if e := validate.EachMapKey(ctx, op, fldPath, obj, oldObj, validate.ShortName).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			// iterate the map and call the value type's validation function
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_ConsumeCounter); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta2.DeviceCounterConsumption) map[string]resourcev1beta2.Counter {
+			func(oldObj *resourcev1beta2.DeviceCounterConsumption) map[string]resourcev1beta2.ConsumeCounter {
 				return oldObj.Counters
 			})
 		errs = append(errs, fn(fldPath.Child("counters"), obj.Counters, oldVal, oldObj != nil)...)
@@ -1953,6 +2040,39 @@ func Validate_DeviceRequestAllocationResult(
 	}
 
 	// field resourcev1beta2.DeviceRequestAllocationResult.ConsumedCapacity has no validation
+
+	{ // field resourcev1beta2.DeviceRequestAllocationResult.ConsumedCounters
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []resourcev1beta2.CounterSetConsumption,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 2).MarkBeta().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1beta2.DeviceRequestAllocationResult) []resourcev1beta2.CounterSetConsumption {
+				return oldObj.ConsumedCounters
+			})
+		errs = append(errs, fn(fldPath.Child("consumedCounters"), obj.ConsumedCounters, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 

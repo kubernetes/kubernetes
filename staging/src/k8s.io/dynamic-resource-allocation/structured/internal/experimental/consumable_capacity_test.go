@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 )
 
 const (
@@ -123,6 +124,22 @@ func TestConsumableCapacity(t *testing.T) {
 			g.Expect(string(name)).Should(BeElementOf([]string{capacity0, capacity1, "dummy"}))
 			g.Expect(val.Cmp(one)).To(BeZero())
 		}
+	})
+
+	t.Run("resolve-qualified-name-uses-driver-domain", func(t *testing.T) {
+		g := NewWithT(t)
+		g.Expect(draapi.ResolveQualifiedName("memory", driverA)).To(Equal(resourceapi.FullyQualifiedName(driverA + "/memory")))
+		g.Expect(draapi.ResolveQualifiedName(resourceapi.QualifiedName(driverA+"/memory"), driverA)).To(Equal(resourceapi.FullyQualifiedName(driverA + "/memory")))
+	})
+
+	t.Run("find-matching-qualified-name-uses-driver-domain", func(t *testing.T) {
+		g := NewWithT(t)
+		candidates := map[resourceapi.QualifiedName]resource.Quantity{
+			"memory": one,
+		}
+		match, found := findMatchingQualifiedName(resourceapi.QualifiedName(driverA+"/memory"), candidates, driverA)
+		g.Expect(found).To(BeTrueBecause("expected %q to match driver-domain qualified capacity name", driverA+"/memory"))
+		g.Expect(match).To(Equal(resourceapi.QualifiedName("memory")))
 	})
 
 	t.Run("violate-capacity-sharing", testViolateCapacityRequestPolicy)

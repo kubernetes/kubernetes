@@ -794,7 +794,7 @@ func PartitionableResources(withPartitionType bool) driverResourcesGenFunc {
 		counterSlice := resourceslice.Slice{
 			SharedCounters: []resourceapi.CounterSet{{
 				Name:     "gpu-0",
-				Counters: map[string]resourceapi.Counter{"memory": {Value: resource.MustParse("8")}},
+				Counters: map[string]resourceapi.SharedCounter{"memory": {Value: resource.NewQuantity(8, resource.BinarySI)}},
 			}},
 		}
 		deviceSlice := resourceslice.Slice{Devices: devices}
@@ -824,7 +824,7 @@ func partitionDevice(name, profile, memory string) resourceapi.Device {
 		Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{resourceapi.QualifiedName(PartitionProfileAttribute): {StringValue: &profile}},
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
 			CounterSet: "gpu-0",
-			Counters:   map[string]resourceapi.Counter{"memory": {Value: resource.MustParse(memory)}},
+			Counters:   map[string]resourceapi.ConsumeCounter{"memory": {Value: new(resource.MustParse(memory))}},
 		}},
 	}
 }

@@ -22,3 +22,7 @@
 ^- \./informers/[a-z]+\.Interface\.V[a-z0-9]+(, method set of .*)?: (added|removed)$
 ^- \./(listers|applyconfigurations)/[a-z]+/v1.*(, method set of .*)?: (added|removed|old is comparable, new is not)$
 ^- package k8s\.io/client-go/(applyconfigurations|informers|kubernetes/typed|listers)/[a-z]+/v[a-z0-9]+(/fake)?: (added|removed)$
+^- \./applyconfigurations/resource/v[a-z0-9]+\.\(\*DeviceCounterConsumptionApplyConfiguration\)\.WithCounters: changed from func\(map\[string\]CounterApplyConfiguration\) \*DeviceCounterConsumptionApplyConfiguration to func\(map\[string\]ConsumeCounterApplyConfiguration\) \*DeviceCounterConsumptionApplyConfiguration$
+^- \./applyconfigurations/resource/v[a-z0-9]+\.DeviceCounterConsumptionApplyConfiguration\.Counters: changed from map\[string\]CounterApplyConfiguration to map\[string\]ConsumeCounterApplyConfiguration$
+^- \./applyconfigurations/resource/v[a-z0-9]+\.\(\*CounterSetApplyConfiguration\)\.WithCounters: changed from func\(map\[string\]CounterApplyConfiguration\) \*CounterSetApplyConfiguration to func\(map\[string\]SharedCounterApplyConfiguration\) \*CounterSetApplyConfiguration$
+^- \./applyconfigurations/resource/v[a-z0-9]+\.CounterSetApplyConfiguration\.Counters: changed from map\[string\]CounterApplyConfiguration to map\[string\]SharedCounterApplyConfiguration$

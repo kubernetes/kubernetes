@@ -30,6 +30,12 @@ import (
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
+// mustParseQuantityPtr parses a quantity string and returns a pointer to it.
+func mustParseQuantityPtr(value string) *resource.Quantity {
+	quantity := resource.MustParse(value)
+	return &quantity
+}
+
 // partitionableDeviceResources tests the DRAPartitionableDevices feature across upgrade/downgrade.
 // It creates ResourceSlices with SharedCounters and devices that consume those counters,
 // then verifies that these API fields are preserved across cluster version transitions.
@@ -62,9 +68,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.ConsumeCounter{
 					"memory": {
-						Value: resource.MustParse("2Gi"),
+						Value: mustParseQuantityPtr("2Gi"),
 					},
 				},
 			},
@@ -78,9 +84,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.ConsumeCounter{
 					"memory": {
-						Value: resource.MustParse("2Gi"),
+						Value: mustParseQuantityPtr("2Gi"),
 					},
 				},
 			},
@@ -94,9 +100,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.ConsumeCounter{
 					"memory": {
-						Value: resource.MustParse("2Gi"),
+						Value: mustParseQuantityPtr("2Gi"),
 					},
 				},
 			},
@@ -110,9 +116,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.ConsumeCounter{
 					"memory": {
-						Value: resource.MustParse("2Gi"),
+						Value: mustParseQuantityPtr("2Gi"),
 					},
 				},
 			},
@@ -126,9 +132,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.ConsumeCounter{
 					"memory": {
-						Value: resource.MustParse("4Gi"),
+						Value: mustParseQuantityPtr("4Gi"),
 					},
 				},
 			},
@@ -142,9 +148,9 @@ var partitionableDeviceList = []resourceapi.Device{
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{
 			{
 				CounterSet: "memory-pool",
-				Counters: map[string]resourceapi.Counter{
+				Counters: map[string]resourceapi.ConsumeCounter{
 					"memory": {
-						Value: resource.MustParse("4Gi"),
+						Value: mustParseQuantityPtr("4Gi"),
 					},
 				},
 			},
@@ -155,9 +161,9 @@ var partitionableDeviceList = []resourceapi.Device{
 var partitionableSharedCounters = []resourceapi.CounterSet{
 	{
 		Name: "memory-pool",
-		Counters: map[string]resourceapi.Counter{
+		Counters: map[string]resourceapi.SharedCounter{
 			"memory": {
-				Value: resource.MustParse("8Gi"),
+				Value: mustParseQuantityPtr("8Gi"),
 			},
 		},
 	},

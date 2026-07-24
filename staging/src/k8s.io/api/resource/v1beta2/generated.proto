@@ -313,12 +313,26 @@ message CapacityRequirements {
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> requests = 1;
 }
 
-// Counter describes a quantity associated with a device.
-message Counter {
-  // Value defines how much of a certain device counter is available.
+// ConsumeCounter describes how much of a counter a device consumes.
+message ConsumeCounter {
+  // Value defines the statically consumed amount.
   //
-  // +required
+  // Exactly one of Value or ValueFrom must be specified.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:zeroOrOneOfMember
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity value = 1;
+
+  // ValueFrom looks up the requested capacity value in a ResourceClaim via
+  // the capacity name. That value is then consumed from the counter instead
+  // of using a static value defined by the driver.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:zeroOrOneOfMember
+  // +featureGate=DRASharedConsumableCapacity
+  optional CounterValueFrom valueFrom = 3;
 }
 
 // CounterSet defines a named set of counters
@@ -346,7 +360,36 @@ message CounterSet {
   // +required
   // +k8s:beta(since: "1.37")=+k8s:required
   // +k8s:beta(since: "1.37")=+k8s:eachKey=+k8s:format=k8s-short-name
-  map<string, Counter> counters = 2;
+  map<string, SharedCounter> counters = 2;
+}
+
+// CounterSetConsumption records the resolved consumption for one counter set
+// at allocation time.
+message CounterSetConsumption {
+  // CounterSet is the name of the counter set from which counters
+  // were consumed.
+  //
+  // +required
+  optional string counterSet = 1;
+
+  // Counters records the quantity consumed for each counter in the set.
+  //
+  // +required
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> counters = 2;
+}
+
+// CounterValueFrom looks up the requested capacity value in a ResourceClaim
+// via the capacity name.
+message CounterValueFrom {
+  // CapacityName is the name of a device capacity.
+  // This is the same name that users set in capacity requests.
+  //
+  // If this name has no domain prefix, the driver
+  // name from the ResourceSlice is used as the domain when matching against
+  // capacity requests.
+  //
+  // +required
+  optional string capacityName = 1;
 }
 
 // Device represents one individual hardware instance that can be selected based
@@ -906,7 +949,7 @@ message DeviceCounterConsumption {
   // +required
   // +k8s:beta(since: "1.37")=+k8s:required
   // +k8s:beta(since: "1.37")=+k8s:eachKey=+k8s:format=k8s-short-name
-  map<string, Counter> counters = 2;
+  map<string, ConsumeCounter> counters = 2;
 }
 
 // DeviceRequest is a request for devices required for a claim.
@@ -1082,6 +1125,21 @@ message DeviceRequestAllocationResult {
   // +optional
   // +featureGate=DRAConsumableCapacity
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> consumedCapacity = 10;
+
+  // ConsumedCounters records the resolved shared-counter consumption
+  // for this allocation at the time it was made. Each entry captures
+  // the amount consumed from one counter set. The scheduler uses this
+  // snapshot instead of recomputing consumption from live ResourceSlice
+  // definitions.
+  //
+  // The maximum number of counter sets is 2.
+  //
+  // +optional
+  // +listType=atomic
+  // +featureGate=DRASharedConsumableCapacity
+  // +k8s:beta(since: "1.37")=+k8s:optional
+  // +k8s:beta(since: "1.37")=+k8s:maxItems=2
+  repeated CounterSetConsumption consumedCounters = 11;
 }
 
 // DeviceSelector must have exactly one field set.
@@ -2058,5 +2116,23 @@ message ResourceSliceSpec {
   // +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:optional
   // +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:format=k8s-resource-fully-qualified-name
   optional string partitionTypeAttribute = 9;
+}
+
+// SharedCounter describes a quantity that is available in a counter set.
+message SharedCounter {
+  // Value defines how much of a certain device counter is available
+  // for consumption by devices.
+  //
+  // +required
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity value = 1;
+
+  // RequestPolicy defines how this counter must be consumed when
+  // a device references this counter through ValueFrom.
+  //
+  // If nil, the counter cannot be referenced through ValueFrom.
+  //
+  // +optional
+  // +featureGate=DRASharedConsumableCapacity
+  optional CapacityRequestPolicy requestPolicy = 2;
 }
 

@@ -113,13 +113,14 @@ func (CapacityRequirements) SwaggerDoc() map[string]string {
 	return map_CapacityRequirements
 }
 
-var map_Counter = map[string]string{
-	"":      "Counter describes a quantity associated with a device.",
-	"value": "Value defines how much of a certain device counter is available.",
+var map_ConsumeCounter = map[string]string{
+	"":          "ConsumeCounter describes how much of a counter a device consumes.",
+	"value":     "Value defines the statically consumed amount.\n\nExactly one of Value or ValueFrom must be specified.",
+	"valueFrom": "ValueFrom looks up the requested capacity value in a ResourceClaim via the capacity name. That value is then consumed from the counter instead of using a static value defined by the driver.",
 }
 
-func (Counter) SwaggerDoc() map[string]string {
-	return map_Counter
+func (ConsumeCounter) SwaggerDoc() map[string]string {
+	return map_ConsumeCounter
 }
 
 var map_CounterSet = map[string]string{
@@ -130,6 +131,25 @@ var map_CounterSet = map[string]string{
 
 func (CounterSet) SwaggerDoc() map[string]string {
 	return map_CounterSet
+}
+
+var map_CounterSetConsumption = map[string]string{
+	"":           "CounterSetConsumption records the resolved consumption for one counter set at allocation time.",
+	"counterSet": "CounterSet is the name of the counter set from which counters were consumed.",
+	"counters":   "Counters records the quantity consumed for each counter in the set.",
+}
+
+func (CounterSetConsumption) SwaggerDoc() map[string]string {
+	return map_CounterSetConsumption
+}
+
+var map_CounterValueFrom = map[string]string{
+	"":             "CounterValueFrom looks up the requested capacity value in a ResourceClaim via the capacity name.",
+	"capacityName": "CapacityName is the name of a device capacity. This is the same name that users set in capacity requests.\n\nIf this name has no domain prefix, the driver name from the ResourceSlice is used as the domain when matching against capacity requests.",
+}
+
+func (CounterValueFrom) SwaggerDoc() map[string]string {
+	return map_CounterValueFrom
 }
 
 var map_Device = map[string]string{
@@ -306,6 +326,7 @@ var map_DeviceRequestAllocationResult = map[string]string{
 	"bindingFailureConditions": "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 	"shareID":                  "ShareID uniquely identifies an individual allocation share of the device, used when the device supports multiple simultaneous allocations. It serves as an additional map key to differentiate concurrent shares of the same device.",
 	"consumedCapacity":         "ConsumedCapacity tracks the amount of capacity consumed per device as part of the claim request. The consumed amount may differ from the requested amount: it is rounded up to the nearest valid value based on the device’s requestPolicy if applicable (i.e., may not be less than the requested amount).\n\nThe total consumed capacity for each device must not exceed the DeviceCapacity's Value.\n\nThis field is populated only for devices that allow multiple allocations. All capacity entries are included, even if the consumed amount is zero.",
+	"consumedCounters":         "ConsumedCounters records the resolved shared-counter consumption for this allocation at the time it was made. Each entry captures the amount consumed from one counter set. The scheduler uses this snapshot instead of recomputing consumption from live ResourceSlice definitions.\n\nThe maximum number of counter sets is 2.",
 }
 
 func (DeviceRequestAllocationResult) SwaggerDoc() map[string]string {
@@ -542,6 +563,16 @@ var map_ResourceSliceSpec = map[string]string{
 
 func (ResourceSliceSpec) SwaggerDoc() map[string]string {
 	return map_ResourceSliceSpec
+}
+
+var map_SharedCounter = map[string]string{
+	"":              "SharedCounter describes a quantity that is available in a counter set.",
+	"value":         "Value defines how much of a certain device counter is available for consumption by devices.",
+	"requestPolicy": "RequestPolicy defines how this counter must be consumed when a device references this counter through ValueFrom.\n\nIf nil, the counter cannot be referenced through ValueFrom.",
+}
+
+func (SharedCounter) SwaggerDoc() map[string]string {
+	return map_SharedCounter
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE
