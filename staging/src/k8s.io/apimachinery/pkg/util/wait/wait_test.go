@@ -463,6 +463,23 @@ func TestPollImmediateError(t *testing.T) {
 	}
 }
 
+func TestPollImmediateTimeoutDoesNotInvokeConditionAfterExpiredDeadline(t *testing.T) {
+	var invocations atomic.Int32
+
+	err := PollImmediate(10*time.Millisecond, time.Millisecond, func() (bool, error) {
+		invocations.Add(1)
+		time.Sleep(50 * time.Millisecond)
+		return false, nil
+	})
+	if err != ErrWaitTimeout {
+		t.Fatalf("expected ErrWaitTimeout, got %v", err)
+	}
+
+	if got := invocations.Load(); got != 1 {
+		t.Fatalf("expected condition to run once after timeout expiry, got %d invocations", got)
+	}
+}
+
 func TestPollForever(t *testing.T) {
 	ch := make(chan struct{})
 	errc := make(chan error, 1)
