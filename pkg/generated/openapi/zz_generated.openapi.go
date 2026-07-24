@@ -73845,6 +73845,13 @@ func schema_k8sio_kube_scheduler_config_v1_KubeSchedulerConfiguration(ref common
 							Format:      "int32",
 						},
 					},
+					"percentageOfPlacementsToScore": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PercentageOfPlacementsToScore is the percentage of generated placements that once found feasible for running a PodGroup, the scheduler stops its search for more feasible placements. This field is used only when the TopologyAwareWorkloadScheduling feature is enabled. Scheduler always tries to find at least \"minFeasiblePlacementsToFind\" feasible placements. Example: if 500 placements are generated and the value is 30, the scheduler stops after finding 150 feasible placements. When the value is 0, the default percentage decreases from 100% to 10% as the summed node count across generated placements grows from 0 to 5000, with a 5% floor. It is overridden by profile level PercentageOfPlacementsToScore.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 					"podInitialBackoffSeconds": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PodInitialBackoffSeconds is the initial backoff for unschedulable pods. If specified, it must be greater than 0. If this value is null, the default value (1s) will be used.",
@@ -73931,6 +73938,13 @@ func schema_k8sio_kube_scheduler_config_v1_KubeSchedulerProfile(ref common.Refer
 					"percentageOfNodesToScore": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PercentageOfNodesToScore is the percentage of all nodes that once found feasible for running a pod, the scheduler stops its search for more feasible nodes in the cluster. This helps improve scheduler's performance. Scheduler always tries to find at least \"minFeasibleNodesToFind\" feasible nodes no matter what the value of this flag is. Example: if the cluster size is 500 nodes and the value of this flag is 30, then scheduler stops finding further feasible nodes once it finds 150 feasible ones. When the value is 0, default percentage (5%--50% based on the size of the cluster) of the nodes will be scored. It will override global PercentageOfNodesToScore. If it is empty, global PercentageOfNodesToScore will be used.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"percentageOfPlacementsToScore": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PercentageOfPlacementsToScore is the percentage of generated placements that once found feasible for running a PodGroup, the scheduler stops its search for more feasible placements. This field is used only when the TopologyAwareWorkloadScheduling feature is enabled. Scheduler always tries to find at least \"minFeasiblePlacementsToFind\" feasible placements. Example: if 500 placements are generated and the value is 30, the scheduler stops after finding 150 feasible placements. When the value is 0, the default percentage decreases from 100% to 10% as the summed node count across generated placements grows from 0 to 5000, with a 5% floor. It overrides global PercentageOfPlacementsToScore. If empty, the global PercentageOfPlacementsToScore is used.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
