@@ -1303,6 +1303,10 @@ func TestQuantityAsApproximateFloat64(t *testing.T) {
 		{decQuantity(0, 0, DecimalSI), 0.0},
 		{decQuantity(0, 0, DecimalExponent), 0.0},
 		{decQuantity(0, 0, BinarySI), 0.0},
+		{decQuantity(0, 500, DecimalSI), 0.0},
+		{intQuantity(0, 500, DecimalSI), 0.0},
+		{decQuantity(0, -500, DecimalSI), 0.0},
+		{intQuantity(0, -500, DecimalSI), 0.0},
 
 		{decQuantity(1, 0, DecimalSI), 1},
 		{decQuantity(1, 0, DecimalExponent), 1},
@@ -1374,6 +1378,10 @@ func TestQuantityAsFloat64Slow(t *testing.T) {
 		{decQuantity(0, 0, DecimalSI), 0.0},
 		{decQuantity(0, 0, DecimalExponent), 0.0},
 		{decQuantity(0, 0, BinarySI), 0.0},
+		{decQuantity(0, 500, DecimalSI), 0.0},
+		{intQuantity(0, 500, DecimalSI), 0.0},
+		{decQuantity(0, -500, DecimalSI), 0.0},
+		{intQuantity(0, -500, DecimalSI), 0.0},
 
 		{decQuantity(1, 0, DecimalSI), 1},
 		{decQuantity(1, 0, DecimalExponent), 1},

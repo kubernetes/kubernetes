@@ -475,7 +475,8 @@ func (q *Quantity) AsApproximateFloat64() float64 {
 		base = float64(q.i.value)
 		exponent = int(q.i.scale)
 	}
-	if exponent == 0 {
+	// Avoid 0 * Inf, which returns NaN.
+	if base == 0 || exponent == 0 {
 		return base
 	}
 
