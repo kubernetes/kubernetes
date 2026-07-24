@@ -43,11 +43,29 @@ var (
 	// Largest (in magnitude) number allowed.
 	maxAllowed = infDecAmount{inf.NewDec((1<<63)-1, 0)} // == max int64
 
-	// The maximum value we can represent milli-units for.
-	// Compare with the return value of Quantity.Value() to
-	// see if it's safe to use Quantity.MilliValue().
+	// MaxMilliValue is the largest whole number whose value in milli-units fits an
+	// int64. It bounds a value, not a quantity: a quantity may be fractional, so
+	// a quantity greater than MaxMilliValue can still have a MilliValue that fits.
+	// For a
+	// non-negative quantity, compare it against MaxMilliQuantity with Quantity.Cmp
+	// instead. Comparing Quantity.Value against MaxMilliValue is unreliable,
+	// because Value itself overflows for a quantity larger than MaxInt64.
 	MaxMilliValue = int64(((1 << 63) - 1) / 1000)
 )
+
+// MaxMilliQuantity returns the largest Quantity whose value in milli-units fits
+// an int64, so that MilliValue and ScaledValue(Milli) do not overflow. For a
+// non-negative q, q.Cmp(MaxMilliQuantity()) <= 0 reports whether q.MilliValue()
+// and q.ScaledValue(Milli) fit an int64. Prefer it over comparing q.Value()
+// against MaxMilliValue, which is unreliable because Value itself overflows for a
+// quantity larger than MaxInt64.
+//
+// The bound is one-sided: a large negative q also overflows those methods (its
+// value in milli-units is below MinInt64), so a q that may be negative must be
+// checked with q.Sign() first.
+func MaxMilliQuantity() Quantity {
+	return *NewMilliQuantity(mostPositive, DecimalSI)
+}
 
 const mostNegative = -(mostPositive + 1)
 const mostPositive = 1<<63 - 1
