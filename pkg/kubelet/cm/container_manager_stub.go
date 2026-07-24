@@ -216,6 +216,10 @@ func (cm *containerManagerStub) ContainerHasExclusiveCPUs(logger klog.Logger, po
 	return false
 }
 
+func (cm *containerManagerStub) AllocationMode(res v1.ResourceName) (ResourceAllocationMode, bool) {
+	return ResourceAllocationModeShared, false
+}
+
 func NewStubContainerManager() ContainerManager {
 	return &containerManagerStub{shouldResetExtendedResourceCapacity: false}
 }
