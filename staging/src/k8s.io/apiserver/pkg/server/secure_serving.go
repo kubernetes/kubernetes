@@ -186,6 +186,11 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 			// shrink the per-stream buffer and max framesize from the 1MB default while still accommodating most API POST requests in a single frame
 			MaxUploadBufferPerStream: resourceBody99Percentile,
 			MaxReadFrameSize:         resourceBody99Percentile,
+			WriteByteTimeout:         s.HTTP2WriteByteTimeout,
+			ReadIdleTimeout:          s.HTTP2ReadIdleTimeout,
+			CountError: func(errType string) {
+				metrics.HTTP2ServerErrors.WithLabelValues(errType).Inc()
+			},
 		}
 
 		// use the overridden concurrent streams setting or make the default of 250 explicit so we can size MaxUploadBufferPerConnection appropriately
