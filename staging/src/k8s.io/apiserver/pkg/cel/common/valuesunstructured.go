@@ -17,31 +17,29 @@ limitations under the License.
 package common
 
 import (
-	"fmt"
-	"reflect"
-	"sync"
 	"time"
 
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
 
-	"k8s.io/kube-openapi/pkg/validation/strfmt"
-
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apiserver/pkg/cel"
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
 )
 
 // UnstructuredToVal converts a Kubernetes unstructured data element to a CEL Val.
-// The root schema of custom resource schemas is expected to contain type meta and object meta schemas.
-// If Embedded resources do not contain type meta and object meta schemas, they will be added automatically.
 func UnstructuredToVal(unstructured interface{}, schema Schema) ref.Val {
 	if unstructured == nil {
-		if schema.Nullable() {
+		if schema != nil && schema.Nullable() {
 			return types.NullValue
 		}
 		return types.NewErr("invalid data, got null for schema with nullable=false")
 	}
+
+	if schema == nil {
+		return types.DefaultTypeAdapter.NativeToValue(unstructured)
+	}
+
 	if schema.IsXIntOrString() {
 		switch v := unstructured.(type) {
 		case string:
@@ -55,80 +53,80 @@ func UnstructuredToVal(unstructured interface{}, schema Schema) ref.Val {
 		}
 		return types.NewErr("invalid data, expected XIntOrString value to be either a string or integer")
 	}
-	if schema.Type() == "object" {
+
+	switch schema.Type() {
+	case "object":
 		m, ok := unstructured.(map[string]interface{})
 		if !ok {
 			return types.NewErr("invalid data, expected a map for the provided schema with type=object")
 		}
-		if schema.IsXEmbeddedResource() || schema.Properties() != nil {
-			if schema.IsXEmbeddedResource() {
-				schema = schema.WithTypeAndObjectMeta()
-			}
-			return &unstructuredMap{
-				value:  m,
-				schema: schema,
-				propSchema: func(key string) (Schema, bool) {
-					if schema, ok := schema.Properties()[key]; ok {
-						return schema, true
-					}
-					return nil, false
-				},
-			}
-		}
-		if schema.AdditionalProperties() != nil && schema.AdditionalProperties().Schema() != nil {
-			return &unstructuredMap{
-				value:  m,
-				schema: schema,
-				propSchema: func(key string) (Schema, bool) {
-					return schema.AdditionalProperties().Schema(), true
-				},
-			}
+
+		if schema.IsXEmbeddedResource() {
+			schema = schema.WithTypeAndObjectMeta()
 		}
 
-		// properties and additionalProperties are mutual exclusive, but nothing prevents the situation
-		// where both are missing.
-		// An object that (1) has no properties (2) has no additionalProperties or additionalProperties == false
-		// is treated as an empty object.
-		// An object that has additionalProperties == true is treated as an unstructured map.
-		// An object that has x-kubernetes-preserve-unknown-field extension set is treated as an unstructured map.
-		// Empty object vs unstructured map is differentiated by unstructuredMap implementation with the set schema.
-		// The resulting result remains the same.
-		return &unstructuredMap{
-			value:  m,
-			schema: schema,
-			propSchema: func(key string) (Schema, bool) {
-				return nil, false
-			},
-		}
-	}
+		props := schema.Properties()
+		addl := schema.AdditionalProperties()
+		celMap := make(map[string]ref.Val, len(m))
 
-	if schema.Type() == "array" {
+		for k, v := range m {
+			if v == nil && props != nil {
+				continue // skip null fields if they are explicitly part of properties
+			}
+
+			var propSchema Schema
+			if props != nil {
+				if ps, ok := props[k]; ok {
+					propSchema = ps
+				}
+			} else if addl != nil && addl.Schema() != nil {
+				propSchema = addl.Schema()
+			}
+
+			escapedK := k
+			if props != nil {
+				if esc, ok := cel.Escape(k); ok {
+					escapedK = esc
+				}
+			}
+
+			celMap[escapedK] = UnstructuredToVal(v, propSchema)
+		}
+		return types.DefaultTypeAdapter.NativeToValue(celMap)
+
+	case "array":
 		l, ok := unstructured.([]interface{})
 		if !ok {
 			return types.NewErr("invalid data, expected an array for the provided schema with type=array")
 		}
-		if schema.Items() == nil {
+
+		itemSchema := schema.Items()
+		if itemSchema == nil {
 			return types.NewErr("invalid array type, expected Items with a non-empty Schema")
 		}
-		typedList := unstructuredList{elements: l, itemsSchema: schema.Items()}
+
+		celItems := make([]ref.Val, len(l))
+		for i, item := range l {
+			celItems[i] = UnstructuredToVal(item, itemSchema)
+		}
+
+		nativeList := types.DefaultTypeAdapter.NativeToValue(celItems)
+
 		listType := schema.XListType()
-		if listType != "" {
-			switch listType {
-			case "map":
-				mapKeys := schema.XListMapKeys()
-				return &unstructuredMapList{unstructuredList: typedList, escapedKeyProps: escapeKeyProps(mapKeys)}
-			case "set":
-				return &unstructuredSetList{unstructuredList: typedList}
-			case "atomic":
-				return &typedList
-			default:
-				return types.NewErr("invalid x-kubernetes-list-type, expected 'map', 'set' or 'atomic' but got %s", listType)
+		if listType == "set" || listType == "map" {
+			lister, ok := nativeList.(traits.Lister)
+			if !ok {
+				return types.NewErr("unexpected native list type")
+			}
+			return &celListWrapper{
+				Lister:   lister,
+				listType: listType,
+				mapKeys:  schema.XListMapKeys(),
 			}
 		}
-		return &typedList
-	}
+		return nativeList
 
-	if schema.Type() == "string" {
+	case "string":
 		str, ok := unstructured.(string)
 		if !ok {
 			return types.NewErr("invalid data, expected string, got %T", unstructured)
@@ -141,7 +139,7 @@ func UnstructuredToVal(unstructured interface{}, schema Schema) ref.Val {
 			}
 			return types.Duration{Duration: d}
 		case "date":
-			d, err := time.Parse(strfmt.RFC3339FullDate, str) // strfmt uses this format for OpenAPIv3 value validation
+			d, err := time.Parse(strfmt.RFC3339FullDate, str)
 			if err != nil {
 				return types.NewErr("Invalid date formatted string %s: %v", str, err)
 			}
@@ -160,20 +158,16 @@ func UnstructuredToVal(unstructured interface{}, schema Schema) ref.Val {
 			}
 			return types.Bytes(base64)
 		}
-
 		return types.String(str)
-	}
-	if schema.Type() == "number" {
+
+	case "number":
 		switch v := unstructured.(type) {
-		// float representations of whole numbers (e.g. 1.0, 0.0) can convert to int representations (e.g. 1, 0) in yaml
-		// to json translation, and then get parsed as int64s
 		case int:
 			return types.Double(v)
 		case int32:
 			return types.Double(v)
 		case int64:
 			return types.Double(v)
-
 		case float32:
 			return types.Double(v)
 		case float64:
@@ -181,8 +175,8 @@ func UnstructuredToVal(unstructured interface{}, schema Schema) ref.Val {
 		default:
 			return types.NewErr("invalid data, expected float, got %T", unstructured)
 		}
-	}
-	if schema.Type() == "integer" {
+
+	case "integer":
 		switch v := unstructured.(type) {
 		case int:
 			return types.Int(v)
@@ -193,8 +187,7 @@ func UnstructuredToVal(unstructured interface{}, schema Schema) ref.Val {
 		default:
 			return types.NewErr("invalid data, expected int, got %T", unstructured)
 		}
-	}
-	if schema.Type() == "boolean" {
+	case "boolean":
 		b, ok := unstructured.(bool)
 		if !ok {
 			return types.NewErr("invalid data, expected bool, got %T", unstructured)
@@ -203,134 +196,72 @@ func UnstructuredToVal(unstructured interface{}, schema Schema) ref.Val {
 	}
 
 	if schema.IsXPreserveUnknownFields() {
-		return &unknownPreserved{u: unstructured}
+		return types.DefaultTypeAdapter.NativeToValue(unstructured)
 	}
 
 	return types.NewErr("invalid type, expected object, array, number, integer, boolean or string, or no type with x-kubernetes-int-or-string or x-kubernetes-preserve-unknown-fields is true, got %s", schema.Type())
 }
 
-// unknownPreserved represents unknown data preserved in custom resources via x-kubernetes-preserve-unknown-fields.
-// It preserves the data at runtime without assuming it is of any particular type and supports only equality checking.
-// unknownPreserved should be used only for values are not directly accessible in CEL expressions, i.e. for data
-// where there is no corresponding CEL type declaration.
-type unknownPreserved struct {
-	u interface{}
+// celListWrapper overrides the Equal operator for set and map arrays.
+type celListWrapper struct {
+	traits.Lister
+	listType string
+	mapKeys  []string
 }
 
-func (t *unknownPreserved) ConvertToNative(refType reflect.Type) (interface{}, error) {
-	return nil, fmt.Errorf("type conversion to '%s' not supported for values preserved by x-kubernetes-preserve-unknown-fields", refType)
-}
-
-func (t *unknownPreserved) ConvertToType(typeValue ref.Type) ref.Val {
-	return types.NewErr("type conversion to '%s' not supported for values preserved by x-kubernetes-preserve-unknown-fields", typeValue.TypeName())
-}
-
-func (t *unknownPreserved) Equal(other ref.Val) ref.Val {
-	return types.Bool(equality.Semantic.DeepEqual(t.u, other.Value()))
-}
-
-func (t *unknownPreserved) Type() ref.Type {
-	return types.UnknownType
-}
-
-func (t *unknownPreserved) Value() interface{} {
-	return t.u // used by Equal checks
-}
-
-// unstructuredMapList represents an unstructured data instance of an OpenAPI array with x-kubernetes-list-type=map.
-type unstructuredMapList struct {
-	unstructuredList
-	escapedKeyProps []string
-
-	sync.Once // for for lazy load of mapOfList since it is only needed if Equals is called
-	mapOfList map[interface{}]interface{}
-}
-
-func (t *unstructuredMapList) getMap() map[interface{}]interface{} {
-	t.Do(func() {
-		t.mapOfList = make(map[interface{}]interface{}, len(t.elements))
-		for _, e := range t.elements {
-			t.mapOfList[t.toMapKey(e)] = e
-		}
-	})
-	return t.mapOfList
-}
-
-// toMapKey returns a valid golang map key for the given element of the map list.
-// element must be a valid map list entry where all map key props are scalar types (which are comparable in go
-// and valid for use in a golang map key).
-func (t *unstructuredMapList) toMapKey(element interface{}) interface{} {
-	eObj, ok := element.(map[string]interface{})
-	if !ok {
-		return types.NewErr("unexpected data format for element of array with x-kubernetes-list-type=map: %T", element)
-	}
-	// Arrays are comparable in go and may be used as map keys, but maps and slices are not.
-	// So we can special case small numbers of key props as arrays and fall back to serialization
-	// for larger numbers of key props
-	if len(t.escapedKeyProps) == 1 {
-		return eObj[t.escapedKeyProps[0]]
-	}
-	if len(t.escapedKeyProps) == 2 {
-		return [2]interface{}{eObj[t.escapedKeyProps[0]], eObj[t.escapedKeyProps[1]]}
-	}
-	if len(t.escapedKeyProps) == 3 {
-		return [3]interface{}{eObj[t.escapedKeyProps[0]], eObj[t.escapedKeyProps[1]], eObj[t.escapedKeyProps[2]]}
-	}
-
-	key := make([]interface{}, len(t.escapedKeyProps))
-	for i, kf := range t.escapedKeyProps {
-		key[i] = eObj[kf]
-	}
-	// Serialize to a string for more than 3 keys. %#v quotes strings.
-	return fmt.Sprintf("%#v", key)
-}
-
-// Equal on a map list ignores list element order.
-func (t *unstructuredMapList) Equal(other ref.Val) ref.Val {
-	oMapList, ok := other.(traits.Lister)
+func (w *celListWrapper) Add(other ref.Val) ref.Val {
+	oList, ok := other.(traits.Lister)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(other)
 	}
-	sz := types.Int(len(t.elements))
-	if sz != oMapList.Size() {
+
+	szVal := w.Size()
+	sz, ok := szVal.(types.Int)
+	if !ok {
+		return types.NewErr("list size is not an int")
+	}
+
+	elements := make([]ref.Val, int(sz))
+	for i := 0; i < int(sz); i++ {
+		elements[i] = w.Get(types.Int(i))
+	}
+
+	switch w.listType {
+	case "set":
+		return addToSetList(elements, oList)
+	case "map":
+		escapedMapKeys := escapeKeyProps(w.mapKeys)
+		return addToMapList(elements, oList, escapedMapKeys)
+	default:
+		return w.Lister.Add(other)
+	}
+}
+
+func (w *celListWrapper) Equal(other ref.Val) ref.Val {
+	oList, ok := other.(traits.Lister)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(other)
+	}
+
+	sz1Val := w.Size()
+	sz2Val := oList.Size()
+	sz1, ok1 := sz1Val.(types.Int)
+	sz2, ok2 := sz2Val.(types.Int)
+	if !ok1 || !ok2 || sz1 != sz2 {
 		return types.False
 	}
-	tMap := t.getMap()
-	seen := make(map[interface{}]struct{}, len(tMap))
-	for it := oMapList.Iterator(); it.HasNext() == types.True; {
-		v := it.Next()
-		k := t.toMapKey(v.Value())
-		tVal, ok := tMap[k]
-		if !ok {
-			return types.False
-		}
-		eq := UnstructuredToVal(tVal, t.itemsSchema).Equal(v)
-		if eq != types.True {
-			return eq // either false or error
-		}
-		seen[k] = struct{}{}
-	}
-	return types.Bool(len(seen) == len(tMap))
-}
 
-// Add for a map list `X + Y` performs a merge where the array positions of all keys in `X` are preserved but the values
-// are overwritten by values in `Y` when the key sets of `X` and `Y` intersect. Elements in `Y` with
-// non-intersecting keys are appended, retaining their partial order.
-func (t *unstructuredMapList) Add(other ref.Val) ref.Val {
-	oMapList, ok := other.(traits.Lister)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(other)
+	switch w.listType {
+	case "set":
+		return setListEqual(w, oList, sz1, sz2)
+	case "map":
+		return mapListEqual(w, oList, w.mapKeys, sz1, sz2)
+	default:
+		return w.Lister.Equal(other)
 	}
-	elements := make([]ref.Val, len(t.elements))
-	for i := range t.elements {
-		elements[i] = t.Get(types.Int(i))
-	}
-	return addToMapList(elements, oMapList, t.escapedKeyProps)
 }
 
 // escapeKeyProps returns identifiers with Escape applied to each.
-// Identifiers that cannot be escaped are left as-is. They are inaccessible to CEL programs but are
-// are still needed internally to perform equality checks.
 func escapeKeyProps(idents []string) []string {
 	result := make([]string, len(idents))
 	for i, prop := range idents {
@@ -343,51 +274,25 @@ func escapeKeyProps(idents []string) []string {
 	return result
 }
 
-// unstructuredSetList represents an unstructured data instance of an OpenAPI array with x-kubernetes-list-type=set.
-type unstructuredSetList struct {
-	unstructuredList
-
-	sync.Once // for lazy load of setOfList since it is only needed if Equals is called
-	set       map[interface{}]struct{}
-	setErr    ref.Val
-}
-
-func (t *unstructuredSetList) getSet() (map[interface{}]struct{}, ref.Val) {
-	t.Do(func() {
-		t.set = make(map[interface{}]struct{}, len(t.elements))
-		for i := range t.elements {
-			k, err := setElementKey(t.Get(types.Int(i)))
-			if err != nil {
-				t.set, t.setErr = nil, err
-				return
-			}
-			t.set[k] = struct{}{}
-		}
-	})
-	return t.set, t.setErr
-}
-
-// Equal on a set list ignores list element order.
-func (t *unstructuredSetList) Equal(other ref.Val) ref.Val {
-	oSetList, ok := other.(traits.Lister)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(other)
-	}
-	sz := types.Int(len(t.elements))
-	if sz != oSetList.Size() {
-		return types.False
-	}
-	tSet, err := t.getSet()
-	if err != nil {
-		return err
-	}
-	seen := make(map[interface{}]struct{}, len(tSet))
-	for it := oSetList.Iterator(); it.HasNext() == types.True; {
-		k, err := setElementKey(it.Next())
+func setListEqual(lister, other traits.Lister, sz1, sz2 types.Int) ref.Val {
+	tSet := make(map[interface{}]struct{}, int(sz1))
+	for i := types.Int(0); i < sz1; i++ {
+		v := lister.Get(i)
+		k, err := setElementKey(v)
 		if err != nil {
 			return err
 		}
-		if _, ok := tSet[k]; !ok {
+		tSet[k] = struct{}{}
+	}
+
+	seen := make(map[interface{}]struct{}, len(tSet))
+	for j := types.Int(0); j < sz2; j++ {
+		v := other.Get(j)
+		k, err := setElementKey(v)
+		if err != nil {
+			return err
+		}
+		if _, exists := tSet[k]; !exists {
 			return types.False
 		}
 		seen[k] = struct{}{}
@@ -395,323 +300,31 @@ func (t *unstructuredSetList) Equal(other ref.Val) ref.Val {
 	return types.Bool(len(seen) == len(tSet))
 }
 
-// Add for a set list `X + Y` performs a union where the array positions of all elements in `X` are preserved and
-// non-intersecting elements in `Y` are appended, retaining their partial order.
-func (t *unstructuredSetList) Add(other ref.Val) ref.Val {
-	oSetList, ok := other.(traits.Lister)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(other)
+func mapListEqual(lister, other traits.Lister, mapKeys []string, sz1, sz2 types.Int) ref.Val {
+	escapedMapKeys := escapeKeyProps(mapKeys)
+	tMap := make(map[interface{}]interface{}, int(sz1))
+	for i := types.Int(0); i < sz1; i++ {
+		v := lister.Get(i)
+		k := refValMapKey(v, escapedMapKeys)
+		tMap[k] = v
 	}
-	elements := make([]ref.Val, len(t.elements))
-	for i := range t.elements {
-		elements[i] = t.Get(types.Int(i))
-	}
-	return addToSetList(elements, oSetList)
-}
 
-// unstructuredList represents an unstructured data instance of an OpenAPI array with x-kubernetes-list-type=atomic (the default).
-type unstructuredList struct {
-	elements    []interface{}
-	itemsSchema Schema
-}
-
-var _ = traits.Lister(&unstructuredList{})
-
-func (t *unstructuredList) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
-	switch typeDesc.Kind() {
-	case reflect.Slice:
-		switch t.itemsSchema.Type() {
-		// Workaround for https://github.com/kubernetes/kubernetes/issues/117590 until we
-		// resolve the desired behavior in cel-go via https://github.com/google/cel-go/issues/688
-		case "string":
-			var result []string
-			for _, e := range t.elements {
-				s, ok := e.(string)
-				if !ok {
-					return nil, fmt.Errorf("expected all elements to be of type string, but got %T", e)
-				}
-				result = append(result, s)
-			}
-			return result, nil
-		default:
-			return t.elements, nil
+	seen := make(map[interface{}]struct{}, len(tMap))
+	for j := types.Int(0); j < sz2; j++ {
+		v := other.Get(j)
+		k := refValMapKey(v, escapedMapKeys)
+		tVal, exists := tMap[k]
+		if !exists {
+			return types.False
 		}
-	}
-	return nil, fmt.Errorf("type conversion error from '%s' to '%s'", t.Type(), typeDesc)
-}
-
-func (t *unstructuredList) ConvertToType(typeValue ref.Type) ref.Val {
-	switch typeValue {
-	case types.ListType:
-		return t
-	case types.TypeType:
-		return types.ListType
-	}
-	return types.NewErr("type conversion error from '%s' to '%s'", t.Type(), typeValue.TypeName())
-}
-
-func (t *unstructuredList) Equal(other ref.Val) ref.Val {
-	oList, ok := other.(traits.Lister)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(other)
-	}
-	sz := types.Int(len(t.elements))
-	if sz != oList.Size() {
-		return types.False
-	}
-	for i := types.Int(0); i < sz; i++ {
-		eq := t.Get(i).Equal(oList.Get(i))
-		if eq != types.True {
-			return eq // either false or error
-		}
-	}
-	return types.True
-}
-
-func (t *unstructuredList) Type() ref.Type {
-	return types.ListType
-}
-
-func (t *unstructuredList) Value() interface{} {
-	return t.elements
-}
-
-func (t *unstructuredList) Add(other ref.Val) ref.Val {
-	oList, ok := other.(traits.Lister)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(other)
-	}
-	otherSz, _ := oList.Size().(types.Int)
-	elements := make([]ref.Val, 0, len(t.elements)+int(otherSz))
-	for i := range t.elements {
-		elements = append(elements, t.Get(types.Int(i)))
-	}
-	for it := oList.Iterator(); it.HasNext() == types.True; {
-		elements = append(elements, it.Next())
-	}
-	return types.NewRefValList(types.DefaultTypeAdapter, elements)
-}
-
-func (t *unstructuredList) Contains(val ref.Val) ref.Val {
-	if types.IsUnknownOrError(val) {
-		return val
-	}
-	var err ref.Val
-	sz := len(t.elements)
-	for i := 0; i < sz; i++ {
-		elem := UnstructuredToVal(t.elements[i], t.itemsSchema)
-		cmp := elem.Equal(val)
-		b, ok := cmp.(types.Bool)
-		if !ok && err == nil {
-			err = types.MaybeNoSuchOverloadErr(cmp)
-		}
-		if b == types.True {
-			return types.True
-		}
-	}
-	if err != nil {
-		return err
-	}
-	return types.False
-}
-
-func (t *unstructuredList) Get(idx ref.Val) ref.Val {
-	iv, isInt := idx.(types.Int)
-	if !isInt {
-		return types.ValOrErr(idx, "unsupported index: %v", idx)
-	}
-	i := int(iv)
-	if i < 0 || i >= len(t.elements) {
-		return types.NewErr("index out of bounds: %v", idx)
-	}
-	return UnstructuredToVal(t.elements[i], t.itemsSchema)
-}
-
-func (t *unstructuredList) Iterator() traits.Iterator {
-	items := make([]ref.Val, len(t.elements))
-	for i, item := range t.elements {
-		itemCopy := item
-		items[i] = UnstructuredToVal(itemCopy, t.itemsSchema)
-	}
-	return &listIterator{unstructuredList: t, items: items}
-}
-
-type listIterator struct {
-	*unstructuredList
-	items []ref.Val
-	idx   int
-}
-
-func (it *listIterator) HasNext() ref.Val {
-	return types.Bool(it.idx < len(it.items))
-}
-
-func (it *listIterator) Next() ref.Val {
-	item := it.items[it.idx]
-	it.idx++
-	return item
-}
-
-func (t *unstructuredList) Size() ref.Val {
-	return types.Int(len(t.elements))
-}
-
-// unstructuredMap represented an unstructured data instance of an OpenAPI object.
-type unstructuredMap struct {
-	value  map[string]interface{}
-	schema Schema
-	// propSchema finds the schema to use for a particular map key.
-	propSchema func(key string) (Schema, bool)
-}
-
-var _ = traits.Mapper(&unstructuredMap{})
-
-func (t *unstructuredMap) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
-	switch typeDesc.Kind() {
-	case reflect.Map:
-		return t.value, nil
-	}
-	return nil, fmt.Errorf("type conversion error from '%s' to '%s'", t.Type(), typeDesc)
-}
-
-func (t *unstructuredMap) ConvertToType(typeValue ref.Type) ref.Val {
-	switch typeValue {
-	case types.MapType:
-		return t
-	case types.TypeType:
-		return types.MapType
-	}
-	return types.NewErr("type conversion error from '%s' to '%s'", t.Type(), typeValue.TypeName())
-}
-
-func (t *unstructuredMap) Equal(other ref.Val) ref.Val {
-	oMap, isMap := other.(traits.Mapper)
-	if !isMap {
-		return types.MaybeNoSuchOverloadErr(other)
-	}
-	if t.Size() != oMap.Size() {
-		return types.False
-	}
-
-	for key, value := range t.value {
-		if _, ok := t.propSchema(key); ok {
-			v, found := t.Find(types.String(key))
-			ov, oFound := oMap.Find(types.String(key))
-			if found != oFound {
-				return types.False
-			}
-			if !found {
-				continue
-			}
-			vEq := v.Equal(ov)
-			if vEq != types.True {
-				return vEq // either false or error
-			}
-		} else {
-			// Must be an object with properties.
-			// Since we've encountered an unknown field, fallback to unstructured equality checking.
-			ouMap, ok := other.(*unstructuredMap)
-			if !ok {
-				// The compiler ensures equality is against the same type of object, so this should be unreachable
-				return types.MaybeNoSuchOverloadErr(other)
-			}
-			if oValue, ok := ouMap.value[key]; ok {
-				if !equality.Semantic.DeepEqual(value, oValue) {
-					return types.False
-				}
-			}
-		}
-	}
-	return types.True
-}
-
-func (t *unstructuredMap) Type() ref.Type {
-	return types.MapType
-}
-
-func (t *unstructuredMap) Value() interface{} {
-	return t.value
-}
-
-func (t *unstructuredMap) Contains(key ref.Val) ref.Val {
-	v, found := t.Find(key)
-	if v != nil && types.IsUnknownOrError(v) {
-		return v
-	}
-
-	return types.Bool(found)
-}
-
-func (t *unstructuredMap) Get(key ref.Val) ref.Val {
-	v, found := t.Find(key)
-	if found {
-		return v
-	}
-	return types.ValOrErr(key, "no such key: %v", key)
-}
-
-func (t *unstructuredMap) Iterator() traits.Iterator {
-	isObject := t.schema.Properties() != nil
-	keys := make([]ref.Val, len(t.value))
-	i := 0
-	for k := range t.value {
-		if _, ok := t.propSchema(k); ok {
-			mapKey := k
-			if isObject {
-				if escaped, ok := cel.Escape(k); ok {
-					mapKey = escaped
-				}
-			}
-			keys[i] = types.String(mapKey)
-			i++
-		}
-	}
-	return &mapIterator{unstructuredMap: t, keys: keys}
-}
-
-type mapIterator struct {
-	*unstructuredMap
-	keys []ref.Val
-	idx  int
-}
-
-func (it *mapIterator) HasNext() ref.Val {
-	return types.Bool(it.idx < len(it.keys))
-}
-
-func (it *mapIterator) Next() ref.Val {
-	key := it.keys[it.idx]
-	it.idx++
-	return key
-}
-
-func (t *unstructuredMap) Size() ref.Val {
-	return types.Int(len(t.value))
-}
-
-func (t *unstructuredMap) Find(key ref.Val) (ref.Val, bool) {
-	isObject := t.schema.Properties() != nil
-	keyStr, ok := key.(types.String)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(key), true
-	}
-	k := keyStr.Value().(string)
-	if isObject {
-		k, ok = cel.Unescape(k)
+		tRefVal, ok := tVal.(ref.Val)
 		if !ok {
-			return nil, false
+			return types.False
 		}
+		if tRefVal.Equal(v) != types.True {
+			return types.False
+		}
+		seen[k] = struct{}{}
 	}
-	if v, ok := t.value[k]; ok {
-		// If this is an object with properties, not an object with additionalProperties,
-		// then null valued nullable fields are treated the same as absent optional fields.
-		if isObject && v == nil {
-			return nil, false
-		}
-		if propSchema, ok := t.propSchema(k); ok {
-			return UnstructuredToVal(v, propSchema), true
-		}
-	}
-
-	return nil, false
+	return types.Bool(len(seen) == len(tMap))
 }
