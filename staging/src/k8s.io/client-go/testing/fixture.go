@@ -28,6 +28,8 @@ import (
 
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 
+	policyv1 "k8s.io/api/policy/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
@@ -158,6 +160,11 @@ func (o objectTrackerReact) Create(action CreateActionImpl) (runtime.Object, err
 		if err != nil {
 			return nil, err
 		}
+	} else if deleteOptions, ok := deleteOptionsForEviction(action); ok {
+		if err := o.tracker.Delete(gvr, ns, objMeta.GetName(), deleteOptions); err != nil {
+			return nil, err
+		}
+		return action.GetObject(), nil
 	} else {
 		oldObj, getOldObjErr := o.tracker.Get(gvr, ns, objMeta.GetName(), metav1.GetOptions{})
 		if getOldObjErr != nil {
@@ -183,6 +190,30 @@ func (o objectTrackerReact) Create(action CreateActionImpl) (runtime.Object, err
 	}
 	obj, err := o.tracker.Get(gvr, ns, objMeta.GetName(), metav1.GetOptions{})
 	return obj, err
+}
+
+func deleteOptionsForEviction(action CreateActionImpl) (metav1.DeleteOptions, bool) {
+	if action.GetSubresource() != "eviction" {
+		return metav1.DeleteOptions{}, false
+	}
+	if action.GetResource() != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
+		return metav1.DeleteOptions{}, false
+	}
+
+	switch eviction := action.GetObject().(type) {
+	case *policyv1.Eviction:
+		if eviction.DeleteOptions == nil {
+			return metav1.DeleteOptions{}, true
+		}
+		return *eviction.DeleteOptions, true
+	case *policyv1beta1.Eviction:
+		if eviction.DeleteOptions == nil {
+			return metav1.DeleteOptions{}, true
+		}
+		return *eviction.DeleteOptions, true
+	default:
+		return metav1.DeleteOptions{}, false
+	}
 }
 
 func (o objectTrackerReact) Update(action UpdateActionImpl) (runtime.Object, error) {
