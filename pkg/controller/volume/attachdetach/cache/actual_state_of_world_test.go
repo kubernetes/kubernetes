@@ -17,6 +17,8 @@ limitations under the License.
 package cache
 
 import (
+	"maps"
+	"slices"
 	"testing"
 	"time"
 
@@ -59,7 +61,7 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNode(t *testing.T) {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, false /* expectNonZeroDetachRequestedTime */)
 }
 
 // Calls AddVolumeNode() once with attached set to false.
@@ -94,11 +96,10 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached(t *testing.T)
 	if len(allVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(allVolumes))
 	}
-	verifyAttachedVolume(t, allVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, allVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, false /* expectNonZeroDetachRequestedTime */)
 
-	reportAsAttachedVolumesMap := asw.GetVolumesToReportAttached(logger)
-	_, exists := reportAsAttachedVolumesMap[nodeName]
-	if exists {
+	reportAsAttachedVolumes := asw.GetVolumesToReportAttachedForNode(logger, nodeName)
+	if len(reportAsAttachedVolumes) > 0 {
 		t.Fatalf("AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached failed. Actual: <node %q exist> Expect: <node does not exist in the reportedAsAttached map", nodeName)
 	}
 
@@ -106,10 +107,10 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached(t *testing.T)
 	if len(volumesForNode) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(volumesForNode))
 	}
-	verifyAttachedVolume(t, volumesForNode, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, volumesForNode, generatedVolumeName, string(volumeName), nodeName, devicePath, false /* expectNonZeroDetachRequestedTime */)
 
 	attachedVolumesMap := asw.GetAttachedVolumesPerNode()
-	_, exists = attachedVolumesMap[nodeName]
+	_, exists := attachedVolumesMap[nodeName]
 	if exists {
 		t.Fatalf("AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached failed. Actual: <node %q exist> Expect: <node does not exist in the reportedAsAttached map", nodeName)
 	}
@@ -144,7 +145,7 @@ func Test_AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached(t *testing.T)
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, false /* expectNonZeroDetachRequestedTime */)
 
 	nodes = asw.GetNodesForAttachedVolume(volumeName)
 	if len(nodes) != 1 {
@@ -214,14 +215,14 @@ func Test_AddVolumeNode_Positive_NewVolumeTwoNodesWithFalseAttached(t *testing.T
 	if len(attachedVolumes) != 2 {
 		t.Fatalf("len(attachedVolumes) Expected: <2> Actual: <%v>", len(attachedVolumes))
 	}
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), node1Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), node2Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), node1Name, devicePath, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), node2Name, devicePath, false /* expectNonZeroDetachRequestedTime */)
 
 	volumesForNode := asw.GetAttachedVolumesForNode(node2Name)
 	if len(volumesForNode) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <2> Actual: <%v>", len(volumesForNode))
 	}
-	verifyAttachedVolume(t, volumesForNode, generatedVolumeName, string(volumeName), node2Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, volumesForNode, generatedVolumeName, string(volumeName), node2Name, devicePath, false /* expectNonZeroDetachRequestedTime */)
 
 	attachedVolumesMap := asw.GetAttachedVolumesPerNode()
 	attachedVolumesPerNode, exists := attachedVolumesMap[node2Name]
@@ -234,8 +235,7 @@ func Test_AddVolumeNode_Positive_NewVolumeTwoNodesWithFalseAttached(t *testing.T
 		t.Fatalf("AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached failed. Expect one node returned.")
 	}
 
-	reportAsAttachedVolumesMap := asw.GetVolumesToReportAttached(logger)
-	reportedVolumes, exists := reportAsAttachedVolumesMap[node2Name]
+	reportedVolumes := asw.GetVolumesToReportAttachedForNode(logger, node2Name)
 	if !exists || len(reportedVolumes) != 1 {
 		t.Fatalf("AddVolumeNode_Positive_NewVolumeNewNodeWithFalseAttached failed. Actual: <node %q exist> Expect: <node does not exist in the reportedAsAttached map", node2Name)
 	}
@@ -288,8 +288,8 @@ func Test_AddVolumeNode_Positive_ExistingVolumeNewNode(t *testing.T) {
 		t.Fatalf("len(attachedVolumes) Expected: <2> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), node1Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), node2Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), node1Name, devicePath, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), node2Name, devicePath, false /* expectNonZeroDetachRequestedTime */)
 }
 
 // Calls AddVolumeNode() twice. Uses the same volume and node both times.
@@ -333,7 +333,7 @@ func Test_AddVolumeNode_Positive_ExistingVolumeExistingNode(t *testing.T) {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), nodeName, devicePath, false /* expectNonZeroDetachRequestedTime */)
 }
 
 // Populates data struct with one volume/node entry.
@@ -440,7 +440,7 @@ func Test_DeleteVolumeNode_Positive_TwoNodesOneDeleted(t *testing.T) {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), node2Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), node2Name, devicePath, false /* expectNonZeroDetachRequestedTime */)
 }
 
 // Populates data struct with one volume/node entry.
@@ -473,7 +473,7 @@ func Test_VolumeNodeExists_Positive_VolumeExistsNodeExists(t *testing.T) {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, false /* expectNonZeroDetachRequestedTime */)
 }
 
 // Populates data struct with one volume1/node1 entry.
@@ -507,7 +507,7 @@ func Test_VolumeNodeExists_Positive_VolumeExistsNodeDoesntExist(t *testing.T) {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), node1Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), node1Name, devicePath, false /* expectNonZeroDetachRequestedTime */)
 }
 
 // Calls GetAttachState() on empty data struct.
@@ -574,7 +574,7 @@ func Test_GetAttachedVolumes_Positive_OneVolumeOneNode(t *testing.T) {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, false /* expectNonZeroDetachRequestedTime */)
 }
 
 // Populates data struct with two volume/node entries (different node and volume).
@@ -609,8 +609,8 @@ func Test_GetAttachedVolumes_Positive_TwoVolumeTwoNodes(t *testing.T) {
 		t.Fatalf("len(attachedVolumes) Expected: <2> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volume1Name), node1Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName2, string(volume2Name), node2Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volume1Name), node1Name, devicePath, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName2, string(volume2Name), node2Name, devicePath, false /* expectNonZeroDetachRequestedTime */)
 }
 
 // Populates data struct with two volume/node entries (same volume different node).
@@ -658,179 +658,8 @@ func Test_GetAttachedVolumes_Positive_OneVolumeTwoNodes(t *testing.T) {
 		t.Fatalf("len(attachedVolumes) Expected: <2> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), node1Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), node2Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
-}
-
-// Populates data struct with one volume/node entry.
-// Verifies mountedByNode is true and DetachRequestedTime is zero.
-func Test_SetVolumesMountedByNode_Positive_Set(t *testing.T) {
-	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	asw := NewActualStateOfWorld(volumePluginMgr)
-	volumeName := v1.UniqueVolumeName("volume-name")
-	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := types.NodeName("node-name")
-	devicePath := "fake/device/path"
-	logger, _ := ktesting.NewTestContext(t)
-	generatedVolumeName, addErr := asw.AddVolumeNode(logger, volumeName, volumeSpec, nodeName, devicePath, true)
-	if addErr != nil {
-		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
-	}
-
-	// Act: do not mark -- test default value
-
-	// Assert
-	attachedVolumes := asw.GetAttachedVolumes()
-	if len(attachedVolumes) != 1 {
-		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
-	}
-
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
-}
-
-// Populates data struct with one volume/node entry.
-// Calls SetVolumesMountedByNode twice, first setting mounted to true then false.
-// Verifies mountedByNode is false.
-func Test_SetVolumesMountedByNode_Positive_UnsetWithInitialSet(t *testing.T) {
-	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	asw := NewActualStateOfWorld(volumePluginMgr)
-	volumeName := v1.UniqueVolumeName("volume-name")
-	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := types.NodeName("node-name")
-	devicePath := "fake/device/path"
-	logger, _ := ktesting.NewTestContext(t)
-	generatedVolumeName, addErr := asw.AddVolumeNode(logger, volumeName, volumeSpec, nodeName, devicePath, true)
-	if addErr != nil {
-		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
-	}
-
-	// Act
-	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName)
-	asw.SetVolumesMountedByNode(logger, nil, nodeName)
-
-	attachedVolumes := asw.GetAttachedVolumes()
-	if len(attachedVolumes) != 1 {
-		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
-	}
-
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, false /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
-}
-
-// Populates data struct with one volume/node entry.
-// Calls SetVolumesMountedByNode once, setting mounted to false.
-// Verifies mountedByNode is false because value is overwritten
-func Test_SetVolumesMountedByNode_Positive_UnsetWithoutInitialSet(t *testing.T) {
-	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	asw := NewActualStateOfWorld(volumePluginMgr)
-	volumeName := v1.UniqueVolumeName("volume-name")
-	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := types.NodeName("node-name")
-	devicePath := "fake/device/path"
-	logger, _ := ktesting.NewTestContext(t)
-	generatedVolumeName, addErr := asw.AddVolumeNode(logger, volumeName, volumeSpec, nodeName, devicePath, true)
-	if addErr != nil {
-		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
-	}
-
-	attachedVolumes := asw.GetAttachedVolumes()
-	if len(attachedVolumes) != 1 {
-		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
-	}
-
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
-
-	// Act
-	asw.SetVolumesMountedByNode(logger, nil, nodeName)
-
-	// Assert
-	attachedVolumes = asw.GetAttachedVolumes()
-	if len(attachedVolumes) != 1 {
-		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
-	}
-
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, false /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
-}
-
-// Populates data struct with one volume/node entry.
-// Calls SetVolumesMountedByNode twice, first setting mounted to true then false.
-// Calls AddVolumeNode to readd the same volume/node.
-// Verifies mountedByNode is false and detachRequestedTime is zero.
-func Test_SetVolumesMountedByNode_Positive_UnsetWithInitialSetAddVolumeNodeNotReset(t *testing.T) {
-	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	asw := NewActualStateOfWorld(volumePluginMgr)
-	volumeName := v1.UniqueVolumeName("volume-name")
-	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := types.NodeName("node-name")
-	devicePath := "fake/device/path"
-	logger, _ := ktesting.NewTestContext(t)
-	generatedVolumeName, addErr := asw.AddVolumeNode(logger, volumeName, volumeSpec, nodeName, devicePath, true)
-	if addErr != nil {
-		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
-	}
-
-	// Act
-	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName)
-	asw.SetVolumesMountedByNode(logger, nil, nodeName)
-	generatedVolumeName, addErr = asw.AddVolumeNode(logger, volumeName, volumeSpec, nodeName, devicePath, true)
-
-	// Assert
-	if addErr != nil {
-		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
-	}
-
-	attachedVolumes := asw.GetAttachedVolumes()
-	if len(attachedVolumes) != 1 {
-		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
-	}
-
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, false /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
-}
-
-// Populates data struct with one volume/node entry.
-// Calls RemoveVolumeFromReportAsAttached() once on volume/node entry.
-// Calls SetVolumesMountedByNode() twice, first setting mounted to true then false.
-// Verifies mountedByNode is false and detachRequestedTime is NOT zero.
-func Test_SetVolumesMountedByNode_Positive_UnsetWithInitialSetVerifyDetachRequestedTimePerserved(t *testing.T) {
-	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	asw := NewActualStateOfWorld(volumePluginMgr)
-	volumeName := v1.UniqueVolumeName("volume-name")
-	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := types.NodeName("node-name")
-	devicePath := "fake/device/path"
-	logger, _ := ktesting.NewTestContext(t)
-	generatedVolumeName, addErr := asw.AddVolumeNode(logger, volumeName, volumeSpec, nodeName, devicePath, true)
-	if addErr != nil {
-		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
-	}
-	_, err := asw.SetDetachRequestTime(logger, generatedVolumeName, nodeName)
-	if err != nil {
-		t.Fatalf("SetDetachRequestTime failed. Expected: <no error> Actual: <%v>", err)
-	}
-	err = asw.RemoveVolumeFromReportAsAttached(generatedVolumeName, nodeName)
-	if err != nil {
-		t.Fatalf("RemoveVolumeFromReportAsAttached failed. Expected: <no error> Actual: <%v>", err)
-	}
-	expectedDetachRequestedTime := asw.GetAttachedVolumes()[0].DetachRequestedTime
-
-	// Act
-	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName)
-	asw.SetVolumesMountedByNode(logger, nil, nodeName)
-
-	// Assert
-	attachedVolumes := asw.GetAttachedVolumes()
-	if len(attachedVolumes) != 1 {
-		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
-	}
-
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, false /* expectedMountedByNode */, true /* expectNonZeroDetachRequestedTime */)
-	if !expectedDetachRequestedTime.Equal(attachedVolumes[0].DetachRequestedTime) {
-		t.Fatalf("DetachRequestedTime changed. Expected: <%v> Actual: <%v>", expectedDetachRequestedTime, attachedVolumes[0].DetachRequestedTime)
-	}
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), node1Name, devicePath, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), node2Name, devicePath, false /* expectNonZeroDetachRequestedTime */)
 }
 
 // Populates data struct with one volume/node entry.
@@ -857,7 +686,7 @@ func Test_RemoveVolumeFromReportAsAttached_Positive_Set(t *testing.T) {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, false /* expectNonZeroDetachRequestedTime */)
 }
 
 // Populates data struct with one volume/node entry.
@@ -882,10 +711,7 @@ func Test_RemoveVolumeFromReportAsAttached_Positive_Marked(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetDetachRequestTime failed. Expected: <no error> Actual: <%v>", err)
 	}
-	markDesireToDetachErr := asw.RemoveVolumeFromReportAsAttached(generatedVolumeName, nodeName)
-	if markDesireToDetachErr != nil {
-		t.Fatalf("MarkDesireToDetach failed. Expected: <no error> Actual: <%v>", markDesireToDetachErr)
-	}
+	asw.RemoveVolumeFromReportAsAttached(logger, generatedVolumeName, nodeName, false)
 
 	// Assert
 	attachedVolumes := asw.GetAttachedVolumes()
@@ -893,7 +719,7 @@ func Test_RemoveVolumeFromReportAsAttached_Positive_Marked(t *testing.T) {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, true /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectNonZeroDetachRequestedTime */)
 }
 
 // Populates data struct with one volume/node entry.
@@ -919,60 +745,17 @@ func Test_MarkDesireToDetach_Positive_MarkedAddVolumeNodeReset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetDetachRequestTime failed. Expected: <no error> Actual: <%v>", err)
 	}
-	markDesireToDetachErr := asw.RemoveVolumeFromReportAsAttached(generatedVolumeName, nodeName)
+	asw.RemoveVolumeFromReportAsAttached(logger, generatedVolumeName, nodeName, false)
 	// Reset detach request time to 0
 	asw.ResetDetachRequestTime(logger, generatedVolumeName, nodeName)
 
 	// Assert
-	if markDesireToDetachErr != nil {
-		t.Fatalf("RemoveVolumeFromReportAsAttached failed. Expected: <no error> Actual: <%v>", markDesireToDetachErr)
-	}
-
-	// Assert
 	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
-}
-
-// Populates data struct with one volume/node entry.
-// Calls SetVolumesMountedByNode() twice, first setting mounted to true then false.
-// Calls RemoveVolumeFromReportAsAttached() once on volume/node entry.
-// Verifies mountedByNode is false and detachRequestedTime is NOT zero.
-func Test_RemoveVolumeFromReportAsAttached_Positive_UnsetWithInitialSetVolumesMountedByNodePreserved(t *testing.T) {
-	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	asw := NewActualStateOfWorld(volumePluginMgr)
-	volumeName := v1.UniqueVolumeName("volume-name")
-	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
-	nodeName := types.NodeName("node-name")
-	devicePath := "fake/device/path"
-	logger, _ := ktesting.NewTestContext(t)
-	generatedVolumeName, addErr := asw.AddVolumeNode(logger, volumeName, volumeSpec, nodeName, devicePath, true)
-	if addErr != nil {
-		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
-	}
-	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{generatedVolumeName}, nodeName)
-	asw.SetVolumesMountedByNode(logger, nil, nodeName)
-	// Act
-	_, err := asw.SetDetachRequestTime(logger, generatedVolumeName, nodeName)
-	if err != nil {
-		t.Fatalf("SetDetachRequestTime failed. Expected: <no error> Actual: <%v>", err)
-	}
-	removeVolumeDetachErr := asw.RemoveVolumeFromReportAsAttached(generatedVolumeName, nodeName)
-	if removeVolumeDetachErr != nil {
-		t.Fatalf("RemoveVolumeFromReportAsAttached failed. Expected: <no error> Actual: <%v>", removeVolumeDetachErr)
-	}
-
-	// Assert
-	attachedVolumes := asw.GetAttachedVolumes()
-	if len(attachedVolumes) != 1 {
-		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
-	}
-
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, false /* expectedMountedByNode */, true /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, false /* expectNonZeroDetachRequestedTime */)
 }
 
 // Populates data struct with one volume/node entry.
@@ -982,30 +765,71 @@ func Test_RemoveVolumeFromReportAsAttached(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
-	volumeName := v1.UniqueVolumeName("volume-name")
-	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+	updated := false
+	asw.SetNodeUpdateHook(func(types.NodeName) { updated = true })
 	nodeName := types.NodeName("node-name")
-	devicePath := "fake/device/path"
 	logger, _ := ktesting.NewTestContext(t)
-	generatedVolumeName, addErr := asw.AddVolumeNode(logger, volumeName, volumeSpec, nodeName, devicePath, true)
-	if addErr != nil {
-		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
+	addVol := func(volumeName v1.UniqueVolumeName) v1.UniqueVolumeName {
+		volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+		generatedVolumeName, addErr := asw.AddVolumeNode(logger, volumeName, volumeSpec, nodeName, "", true)
+		if addErr != nil {
+			t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
+		}
+		return generatedVolumeName
+	}
+	vol1 := addVol("vol1")
+	vol2 := addVol("vol2")
+
+	removed := asw.RemoveVolumeFromReportAsAttached(logger, vol1, nodeName, false)
+	if removed {
+		t.Fatalf("RemoveVolumeFromReportAsAttached succeeded. Should wait for ConfirmNodeStatusRemoved")
+	}
+	if !updated {
+		t.Fatalf("update hook is not called")
 	}
 
-	removeVolumeDetachErr := asw.RemoveVolumeFromReportAsAttached(generatedVolumeName, nodeName)
-	if removeVolumeDetachErr != nil {
-		t.Fatalf("RemoveVolumeFromReportAsAttached failed. Expected: <no error> Actual: <%v>", removeVolumeDetachErr)
+	volumes := asw.GetVolumesToReportAttachedForNode(logger, nodeName)
+	if !slices.Equal(volumes, []VolumeToReport{
+		{v1.AttachedVolume{Name: vol1}, NodeStatusReportForceRemoving},
+		{v1.AttachedVolume{Name: vol2}, NodeStatusReportAdding},
+	}) {
+		t.Fatalf("reportAsAttachedVolumes Actual: %v", volumes)
 	}
 
-	reportAsAttachedVolumesMap := asw.GetVolumesToReportAttached(logger)
-	volumes, exists := reportAsAttachedVolumesMap[nodeName]
-	if !exists {
-		t.Fatalf("MarkDesireToDetach_UnmarkDesireToDetach failed. Expected: <node %q exist> Actual: <node does not exist in the reportedAsAttached map", nodeName)
+	// remove vol2 after get `volumes`
+	removed = asw.RemoveVolumeFromReportAsAttached(logger, vol2, nodeName, true)
+	if removed {
+		t.Fatalf("RemoveVolumeFromReportAsAttached succeeded. Should wait for ConfirmNodeStatusRemoved")
 	}
-	if len(volumes) > 0 {
-		t.Fatalf("len(reportAsAttachedVolumes) Expected: <0> Actual: <%v>", len(volumes))
+	volumes = asw.GetVolumesToReportAttachedForNode(logger, nodeName)
+	if !slices.Equal(volumes, []VolumeToReport{
+		{v1.AttachedVolume{Name: vol1}, NodeStatusReportForceRemoving},
+		{v1.AttachedVolume{Name: vol2}, NodeStatusReportRemoving},
+	}) {
+		t.Fatalf("reportAsAttachedVolumes Actual: %v", volumes)
 	}
 
+	asw.ConfirmNodeStatusRemoved(logger, nodeName, []v1.UniqueVolumeName{vol1})
+	// Should success after async node update
+	removed = asw.RemoveVolumeFromReportAsAttached(logger, vol1, nodeName, false)
+	if !removed {
+		t.Fatalf("RemoveVolumeFromReportAsAttached failed. ConfirmNodeStatusRemoved not effective")
+	}
+	// vol2 should still fail, because we only confirmed vol1
+	removed = asw.RemoveVolumeFromReportAsAttached(logger, vol2, nodeName, false)
+	if removed {
+		t.Fatalf("RemoveVolumeFromReportAsAttached succeeded. Should wait for ConfirmNodeStatusRemoved")
+	}
+}
+
+func addingVolumes(volumes []VolumeToReport) []v1.UniqueVolumeName {
+	var result []v1.UniqueVolumeName
+	for _, v := range volumes {
+		if v.Report == NodeStatusReportAdding {
+			result = append(result, v.Volume.Name)
+		}
+	}
+	return result
 }
 
 // Populates data struct with one volume/node entry.
@@ -1026,28 +850,19 @@ func Test_RemoveVolumeFromReportAsAttached_AddVolumeToReportAsAttached_Positive(
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
 	}
 
-	removeVolumeDetachErr := asw.RemoveVolumeFromReportAsAttached(generatedVolumeName, nodeName)
-	if removeVolumeDetachErr != nil {
-		t.Fatalf("RemoveVolumeFromReportAsAttached failed. Expected: <no error> Actual: <%v>", removeVolumeDetachErr)
-	}
+	asw.RemoveVolumeFromReportAsAttached(logger, generatedVolumeName, nodeName, false)
 
-	reportAsAttachedVolumesMap := asw.GetVolumesToReportAttached(logger)
-	volumes, exists := reportAsAttachedVolumesMap[nodeName]
-	if !exists {
-		t.Fatalf("Test_RemoveVolumeFromReportAsAttached_AddVolumeToReportAsAttached_Positive failed. Expected: <node %q exist> Actual: <node does not exist in the reportedAsAttached map", nodeName)
-	}
-	if len(volumes) > 0 {
-		t.Fatalf("len(reportAsAttachedVolumes) Expected: <0> Actual: <%v>", len(volumes))
+	volumes := asw.GetVolumesToReportAttachedForNode(logger, nodeName)
+	reportAsAttachedVolumes := addingVolumes(volumes)
+	if len(reportAsAttachedVolumes) > 0 {
+		t.Fatalf("len(reportAsAttachedVolumes) Expected: <0> Actual: <%v>", len(reportAsAttachedVolumes))
 	}
 
 	asw.AddVolumeToReportAsAttached(logger, generatedVolumeName, nodeName)
-	reportAsAttachedVolumesMap = asw.GetVolumesToReportAttached(logger)
-	volumes, exists = reportAsAttachedVolumesMap[nodeName]
-	if !exists {
-		t.Fatalf("Test_RemoveVolumeFromReportAsAttached_AddVolumeToReportAsAttached_Positive failed. Expected: <node %q exist> Actual: <node does not exist in the reportedAsAttached map", nodeName)
-	}
-	if len(volumes) != 1 {
-		t.Fatalf("len(reportAsAttachedVolumes) Expected: <1> Actual: <%v>", len(volumes))
+	volumes = asw.GetVolumesToReportAttachedForNode(logger, nodeName)
+	reportAsAttachedVolumes = addingVolumes(volumes)
+	if len(reportAsAttachedVolumes) != 1 {
+		t.Fatalf("len(reportAsAttachedVolumes) Expected: <1> Actual: <%v>", len(reportAsAttachedVolumes))
 	}
 }
 
@@ -1070,31 +885,22 @@ func Test_RemoveVolumeFromReportAsAttached_Delete_AddVolumeNode(t *testing.T) {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
 	}
 
-	removeVolumeDetachErr := asw.RemoveVolumeFromReportAsAttached(generatedVolumeName, nodeName)
-	if removeVolumeDetachErr != nil {
-		t.Fatalf("RemoveVolumeFromReportAsAttached failed. Expected: <no error> Actual: <%v>", removeVolumeDetachErr)
-	}
+	asw.RemoveVolumeFromReportAsAttached(logger, generatedVolumeName, nodeName, false)
 
-	reportAsAttachedVolumesMap := asw.GetVolumesToReportAttached(logger)
-	volumes, exists := reportAsAttachedVolumesMap[nodeName]
-	if !exists {
-		t.Fatalf("Test_RemoveVolumeFromReportAsAttached_Delete_AddVolumeNode failed. Expected: <node %q exists> Actual: <node does not exist in the reportedAsAttached map", nodeName)
-	}
-	if len(volumes) > 0 {
-		t.Fatalf("len(reportAsAttachedVolumes) Expected: <0> Actual: <%v>", len(volumes))
+	volumes := asw.GetVolumesToReportAttachedForNode(logger, nodeName)
+	reportAsAttachedVolumes := addingVolumes(volumes)
+	if len(reportAsAttachedVolumes) > 0 {
+		t.Fatalf("len(reportAsAttachedVolumes) Expected: <0> Actual: <%v>", len(reportAsAttachedVolumes))
 	}
 
 	asw.DeleteVolumeNode(generatedVolumeName, nodeName)
 
 	asw.AddVolumeNode(logger, volumeName, volumeSpec, nodeName, "" /*device path*/, true)
 
-	reportAsAttachedVolumesMap = asw.GetVolumesToReportAttached(logger)
-	volumes, exists = reportAsAttachedVolumesMap[nodeName]
-	if !exists {
-		t.Fatalf("Test_RemoveVolumeFromReportAsAttached_Delete_AddVolumeNode failed. Expected: <node %q exists> Actual: <node does not exist in the reportedAsAttached map", nodeName)
-	}
-	if len(volumes) != 1 {
-		t.Fatalf("len(reportAsAttachedVolumes) Expected: <1> Actual: <%v>", len(volumes))
+	volumes = asw.GetVolumesToReportAttachedForNode(logger, nodeName)
+	reportAsAttachedVolumes = addingVolumes(volumes)
+	if len(reportAsAttachedVolumes) != 1 {
+		t.Fatalf("len(reportAsAttachedVolumes) Expected: <1> Actual: <%v>", len(reportAsAttachedVolumes))
 	}
 }
 
@@ -1172,7 +978,7 @@ func Test_GetAttachedVolumesForNode_Positive_OneVolumeOneNode(t *testing.T) {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, false /* expectNonZeroDetachRequestedTime */)
 }
 
 func Test_GetAttachedVolumesForNode_Positive_TwoVolumeTwoNodes(t *testing.T) {
@@ -1204,7 +1010,7 @@ func Test_GetAttachedVolumesForNode_Positive_TwoVolumeTwoNodes(t *testing.T) {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName2, string(volume2Name), node2Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName2, string(volume2Name), node2Name, devicePath, false /* expectNonZeroDetachRequestedTime */)
 }
 
 func Test_GetAttachedVolumesForNode_Positive_OneVolumeTwoNodes(t *testing.T) {
@@ -1249,7 +1055,7 @@ func Test_GetAttachedVolumesForNode_Positive_OneVolumeTwoNodes(t *testing.T) {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), node1Name, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), node1Name, devicePath, false /* expectNonZeroDetachRequestedTime */)
 }
 
 func Test_OneVolumeTwoNodes_TwoDevicePaths(t *testing.T) {
@@ -1295,13 +1101,13 @@ func Test_OneVolumeTwoNodes_TwoDevicePaths(t *testing.T) {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
-	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName2, string(volumeName), node2Name, devicePath2, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName2, string(volumeName), node2Name, devicePath2, false /* expectNonZeroDetachRequestedTime */)
 }
 
-// Test_SetNodeStatusUpdateNeededError expects the map nodesToUpdateStatusFor
-// to be empty if the SetNodeStatusUpdateNeeded is called on a node that
+// Test_ConfirmNodeStatusRemovedError expects the map nodesToUpdateStatusFor
+// to be empty if the ConfirmNodeStatusRemoved is called on a node that
 // does not exist in the actual state of the world
-func Test_SetNodeStatusUpdateNeededError(t *testing.T) {
+func Test_ConfirmNodeStatusRemovedError(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -1309,7 +1115,7 @@ func Test_SetNodeStatusUpdateNeededError(t *testing.T) {
 
 	// Act
 	logger, _ := ktesting.NewTestContext(t)
-	asw.SetNodeStatusUpdateNeeded(logger, nodeName)
+	asw.ConfirmNodeStatusRemoved(logger, nodeName, []v1.UniqueVolumeName{"any-volume"})
 
 	// Assert
 	nodesToUpdateStatusFor := asw.GetNodesToUpdateStatusFor()
@@ -1318,9 +1124,9 @@ func Test_SetNodeStatusUpdateNeededError(t *testing.T) {
 	}
 }
 
-// Test_updateNodeStatusUpdateNeeded expects statusUpdateNeeded to be properly updated if
-// updateNodeStatusUpdateNeeded is called on a node that exists in the actual state of the world
-func Test_updateNodeStatusUpdateNeeded(t *testing.T) {
+// Test_ConfirmNodeStatusRemoved expects volumesToReportAsAttached to be properly updated if
+// ConfirmNodeStatusRemoved is called on a node that exists in the actual state of the world
+func Test_ConfirmNodeStatusRemoved(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := &actualStateOfWorld{
@@ -1330,43 +1136,37 @@ func Test_updateNodeStatusUpdateNeeded(t *testing.T) {
 	}
 	nodeName := types.NodeName("node-1")
 	nodeToUpdate := nodeToUpdateStatusFor{
-		nodeName:                  nodeName,
-		statusUpdateNeeded:        true,
-		volumesToReportAsAttached: make(map[v1.UniqueVolumeName]v1.UniqueVolumeName),
+		volumesToReportAsAttached: map[v1.UniqueVolumeName]NodeStatusReport{
+			"volume-1": NodeStatusReportForceRemoving,
+			"volume-2": NodeStatusReportRemoving,
+			"volume-3": NodeStatusReportAdding,
+		},
 	}
 	asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
 
-	// Act
-	err := asw.updateNodeStatusUpdateNeeded(nodeName, false)
+	logger, _ := ktesting.NewTestContext(t)
+	asw.ConfirmNodeStatusRemoved(logger, nodeName, []v1.UniqueVolumeName{"volume-1"})
 
-	// Assert
-	if err != nil {
-		t.Fatalf("updateNodeStatusUpdateNeeded should not return error, but got: %v", err)
+	volumes := asw.GetNodesToUpdateStatusFor()[nodeName].volumesToReportAsAttached
+	if !maps.Equal(volumes, map[v1.UniqueVolumeName]NodeStatusReport{"volume-2": NodeStatusReportRemoving, "volume-3": NodeStatusReportAdding}) {
+		t.Fatalf("expect volumes-2 and volumes-3 to be reported as attached, got %v", volumes)
 	}
-	nodesToUpdateStatusFor := asw.GetNodesToUpdateStatusFor()
-	if nodesToUpdateStatusFor[nodeName].statusUpdateNeeded {
-		t.Fatalf("nodesToUpdateStatusFor should be updated to: false, but got: true")
+
+	asw.ConfirmNodeStatusRemoved(logger, nodeName, []v1.UniqueVolumeName{"volume-1", "volume-2"})
+
+	volumes = asw.GetNodesToUpdateStatusFor()[nodeName].volumesToReportAsAttached
+	if !maps.Equal(volumes, map[v1.UniqueVolumeName]NodeStatusReport{"volume-3": NodeStatusReportAdding}) {
+		t.Fatalf("expect volumes-3 to be reported as attached, got %v", volumes)
 	}
-}
 
-// Test_updateNodeStatusUpdateNeededError expects statusUpdateNeeded to report error if
-// updateNodeStatusUpdateNeeded is called on a node that does not exist in the actual state of the world
-func Test_updateNodeStatusUpdateNeededError(t *testing.T) {
-	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	asw := &actualStateOfWorld{
-		attachedVolumes:        make(map[v1.UniqueVolumeName]attachedVolume),
-		nodesToUpdateStatusFor: make(map[types.NodeName]nodeToUpdateStatusFor),
-		volumePluginMgr:        volumePluginMgr,
-	}
-	nodeName := types.NodeName("node-1")
+	// A volume that has been re-added (NodeStatusReportAdding) since the node
+	// status update was issued must not be dropped, even if it is named in
+	// removedVolumes. Otherwise the re-attach is lost.
+	asw.ConfirmNodeStatusRemoved(logger, nodeName, []v1.UniqueVolumeName{"volume-3"})
 
-	// Act
-	err := asw.updateNodeStatusUpdateNeeded(nodeName, false)
-
-	// Assert
-	if err == nil {
-		t.Fatalf("updateNodeStatusUpdateNeeded should return error, but got nothing")
+	volumes = asw.GetNodesToUpdateStatusFor()[nodeName].volumesToReportAsAttached
+	if !maps.Equal(volumes, map[v1.UniqueVolumeName]NodeStatusReport{"volume-3": NodeStatusReportAdding}) {
+		t.Fatalf("expect re-added volume-3 to be preserved, got %v", volumes)
 	}
 }
 
@@ -1406,7 +1206,7 @@ func Test_MarkVolumeAsAttached(t *testing.T) {
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
-	verifyAttachedVolume(t, attachedVolumes, volumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, volumeName, string(volumeName), nodeName, devicePath, false /* expectNonZeroDetachRequestedTime */)
 }
 
 // Mark a volume as attachment as uncertain.
@@ -1442,7 +1242,7 @@ func Test_MarkVolumeAsUncertain(t *testing.T) {
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
-	verifyAttachedVolume(t, attachedVolumes, volumeName, string(volumeName), nodeName, "", true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+	verifyAttachedVolume(t, attachedVolumes, volumeName, string(volumeName), nodeName, "", false /* expectNonZeroDetachRequestedTime */)
 }
 
 // Calls AddVolumeNode() once with attached set to true.
@@ -1470,30 +1270,20 @@ func Test_GetVolumesToReportAttachedForNode_Positive(t *testing.T) {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	needsUpdate, attachedVolumes := asw.GetVolumesToReportAttachedForNode(logger, nodeName)
-	if !needsUpdate {
-		t.Fatalf("GetVolumesToReportAttachedForNode_Positive_NewVolumeNewNodeWithTrueAttached failed. Actual: <node %q does not need an update> Expect: <node exists in the reportedAsAttached map and needs an update", nodeName)
-	}
-	if len(attachedVolumes) != 1 {
-		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
-	}
-
-	needsUpdate, _ = asw.GetVolumesToReportAttachedForNode(logger, nodeName)
-	if needsUpdate {
-		t.Fatalf("GetVolumesToReportAttachedForNode_Positive_NewVolumeNewNodeWithTrueAttached failed. Actual: <node %q needs an update> Expect: <node exists in the reportedAsAttached map and does not need an update", nodeName)
+	volumes := asw.GetVolumesToReportAttachedForNode(logger, nodeName)
+	if !slices.Equal(volumes, []VolumeToReport{
+		{v1.AttachedVolume{Name: volumeName, DevicePath: devicePath}, NodeStatusReportAdding},
+	}) {
+		t.Fatalf("volumes Actual: <%v>", volumes)
 	}
 
-	removeVolumeDetachErr := asw.RemoveVolumeFromReportAsAttached(generatedVolumeName, nodeName)
-	if removeVolumeDetachErr != nil {
-		t.Fatalf("RemoveVolumeFromReportAsAttached failed. Expected: <no error> Actual: <%v>", removeVolumeDetachErr)
-	}
+	asw.RemoveVolumeFromReportAsAttached(logger, generatedVolumeName, nodeName, false)
 
-	needsUpdate, attachedVolumes = asw.GetVolumesToReportAttachedForNode(logger, nodeName)
-	if !needsUpdate {
-		t.Fatalf("GetVolumesToReportAttachedForNode_Positive_NewVolumeNewNodeWithTrueAttached failed. Actual: <node %q does not need an update> Expect: <node exists in the reportedAsAttached map and needs an update", nodeName)
-	}
-	if len(attachedVolumes) != 0 {
-		t.Fatalf("len(attachedVolumes) Expected: <0> Actual: <%v>", len(attachedVolumes))
+	volumes = asw.GetVolumesToReportAttachedForNode(logger, nodeName)
+	if !slices.Equal(volumes, []VolumeToReport{
+		{v1.AttachedVolume{Name: volumeName, DevicePath: devicePath}, NodeStatusReportForceRemoving},
+	}) {
+		t.Fatalf("volumes Actual: <%v>", volumes)
 	}
 }
 
@@ -1504,9 +1294,9 @@ func Test_GetVolumesToReportAttachedForNode_UnknownNode(t *testing.T) {
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	nodeName := types.NodeName("node-name")
 	logger, _ := ktesting.NewTestContext(t)
-	needsUpdate, _ := asw.GetVolumesToReportAttachedForNode(logger, nodeName)
-	if needsUpdate {
-		t.Fatalf("GetVolumesToReportAttachedForNode_UnknownNode failed. Actual: <node %q needs an update> Expect: <node does not exist in the reportedAsAttached map and does not need an update", nodeName)
+	volumes := asw.GetVolumesToReportAttachedForNode(logger, nodeName)
+	if volumes != nil {
+		t.Fatalf("GetVolumesToReportAttachedForNode_UnknownNode failed. Actual: <%d volumes> Expect: <nil>", len(volumes))
 	}
 }
 
@@ -1517,25 +1307,22 @@ func verifyAttachedVolume(
 	expectedVolumeSpecName string,
 	expectedNodeName types.NodeName,
 	expectedDevicePath string,
-	expectedMountedByNode,
 	expectNonZeroDetachRequestedTime bool) {
 	for _, attachedVolume := range attachedVolumes {
 		if attachedVolume.VolumeName == expectedVolumeName &&
 			attachedVolume.VolumeSpec.Name() == expectedVolumeSpecName &&
 			attachedVolume.NodeName == expectedNodeName &&
 			attachedVolume.DevicePath == expectedDevicePath &&
-			attachedVolume.MountedByNode == expectedMountedByNode &&
 			attachedVolume.DetachRequestedTime.IsZero() == !expectNonZeroDetachRequestedTime {
 			return
 		}
 	}
 
 	t.Fatalf(
-		"attachedVolumes (%v) should contain the volume/node combo %q/%q with DevicePath=%q MountedByNode=%v and NonZeroDetachRequestedTime=%v. It does not.",
+		"attachedVolumes (%v) should contain the volume/node combo %q/%q with DevicePath=%q and NonZeroDetachRequestedTime=%v. It does not.",
 		attachedVolumes,
 		expectedVolumeName,
 		expectedNodeName,
 		expectedDevicePath,
-		expectedMountedByNode,
 		expectNonZeroDetachRequestedTime)
 }
