@@ -412,6 +412,12 @@ func (pgs *podGroupState) AssumedPods() sets.Set[types.UID] {
 	return sets.KeySet(pgs.podGroupStateData.assumedPods)
 }
 
+// AssumedInThisCycleCount returns 0 because the live cache does not track transient
+// scheduling cycle state; cycle-scoped assumptions only exist in snapshots.
+func (pgs *podGroupState) AssumedInThisCycleCount() int {
+	return 0
+}
+
 // AssignedPods returns the UIDs of all pods already assigned (bound) for this group.
 func (pgs *podGroupState) AssignedPods() sets.Set[types.UID] {
 	pgs.lock.RLock()
@@ -509,16 +515,36 @@ func (cpgs *compositePodGroupState) GetChildren() []fwk.EntityKey {
 // during the cycle without modifying the live state of pods.
 type podGroupStateSnapshot struct {
 	podGroupStateData
+	assumedThisCycle sets.Set[types.UID]
 }
 
 // assumePod marks a pod within the pod group state snapshot as assumed.
 func (s *podGroupStateSnapshot) assumePod(pod *v1.Pod) {
+	// Avoid re-counting pods assumed in previous scheduling cycles.
+	_, wasAlreadyAssumed := s.assumedPods[pod.UID]
+
 	s.podGroupStateData.assumePod(pod)
+	// If the pod was not successfully assumed (e.g., it was already assigned or not found in the group),
+	// we should not count it.
+	_, ok := s.assumedPods[pod.UID]
+	if !ok || wasAlreadyAssumed {
+		return
+	}
+
+	if s.assumedThisCycle == nil {
+		s.assumedThisCycle = sets.New[types.UID](pod.UID)
+	} else {
+		s.assumedThisCycle.Insert(pod.UID)
+	}
 }
 
 // forgetPod removes a pod from the assumed state within the snapshot.
 func (s *podGroupStateSnapshot) forgetPod(podUID types.UID) {
 	s.podGroupStateData.forgetPod(podUID)
+
+	if s.assumedThisCycle != nil {
+		s.assumedThisCycle.Delete(podUID)
+	}
 }
 
 // AllPods returns the UIDs of all pods known to the scheduler for this group.
@@ -534,6 +560,12 @@ func (s *podGroupStateSnapshot) UnscheduledPods() map[string]*v1.Pod {
 // AssumedPods returns the UIDs of all assumed pods for this group.
 func (s *podGroupStateSnapshot) AssumedPods() sets.Set[types.UID] {
 	return sets.KeySet(s.podGroupStateData.assumedPods)
+}
+
+// AssumedInThisCycleCount returns the number of pods assumed during the current
+// scheduling cycle to allow isolating pods scheduled in prior cycles.
+func (s *podGroupStateSnapshot) AssumedInThisCycleCount() int {
+	return len(s.assumedThisCycle)
 }
 
 // AssignedPods returns the UIDs of all assigned (bound) pods for this group.
