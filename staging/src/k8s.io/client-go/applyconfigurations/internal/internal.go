@@ -13183,6 +13183,12 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1.DeviceCounterConsumption
   map:
     fields:
+    - name: compatibilityGroups
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: counterSet
       type:
         scalar: string
@@ -14233,6 +14239,12 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta1.DeviceCounterConsumption
   map:
     fields:
+    - name: compatibilityGroups
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: counterSet
       type:
         scalar: string
@@ -15001,6 +15013,12 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta2.DeviceCounterConsumption
   map:
     fields:
+    - name: compatibilityGroups
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: counterSet
       type:
         scalar: string

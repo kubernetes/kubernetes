@@ -706,6 +706,11 @@ func (in *DeviceCounterConsumption) DeepCopyInto(out *DeviceCounterConsumption) 
 			(*out)[key] = *val.DeepCopy()
 		}
 	}
+	if in.CompatibilityGroups != nil {
+		in, out := &in.CompatibilityGroups, &out.CompatibilityGroups
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
