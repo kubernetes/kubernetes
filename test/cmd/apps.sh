@@ -780,7 +780,7 @@ run_rs_tests() {
   kube::test::get_object_assert rs "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Command
   kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]:?}"
-  kubectl create -f hack/testdata/redis-slave-replicaset.yaml "${kube_flags[@]:?}"
+  kubectl create -f hack/testdata/test-slave-replicaset.yaml "${kube_flags[@]:?}"
   # Post-condition: frontend and redis-slave
   kube::test::get_object_assert rs "{{range.items}}{{${id_field:?}}}:{{end}}" 'frontend:redis-slave:'
 
