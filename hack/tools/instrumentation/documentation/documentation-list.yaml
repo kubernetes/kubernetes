@@ -3921,6 +3921,14 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: imagemanager_inmemory_preloadedrecords_usage_percent
+  subsystem: kubelet
+  help: The ImagePreloadedRecords in-memory cache usage in percent.
+  type: Gauge
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: imagemanager_inmemory_pulledrecords_usage_percent
   subsystem: kubelet
   help: The ImagePulledRecords in-memory cache usage in percent.
@@ -3932,6 +3940,14 @@
 - name: imagemanager_inmemory_pullintents_usage_percent
   subsystem: kubelet
   help: The ImagePullIntents in-memory cache usage in percent.
+  type: Gauge
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: imagemanager_ondisk_preloadedrecords
+  subsystem: kubelet
+  help: Number of ImagePreloadedRecords stored on disk.
   type: Gauge
   stabilityLevel: ALPHA
   componentEndpoints:
