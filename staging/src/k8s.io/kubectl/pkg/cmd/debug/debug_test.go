@@ -2120,6 +2120,65 @@ func TestGenerateNodeDebugPodCustomProfile(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "sysadmin profile with custom RunAsUserName on windows node",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-XXX",
+					Labels: map[string]string{
+						corev1.LabelOSStable: string(corev1.Windows),
+					},
+				},
+			},
+			opts: &DebugOptions{
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Profile:    ProfileSysadmin,
+				CustomProfile: &corev1.Container{
+					SecurityContext: &corev1.SecurityContext{
+						WindowsOptions: &corev1.WindowsSecurityContextOptions{
+							RunAsUserName: ptr.To("NT AUTHORITY\\NetworkService"),
+						},
+					},
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
+				},
+				Spec: corev1.PodSpec{
+					OS:          &corev1.PodOS{Name: corev1.Windows},
+					HostNetwork: true,
+					SecurityContext: &corev1.PodSecurityContext{
+						WindowsOptions: &corev1.WindowsSecurityContextOptions{
+							HostProcess: ptr.To(true),
+						},
+					},
+					Containers: []corev1.Container{
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							SecurityContext: &corev1.SecurityContext{
+								WindowsOptions: &corev1.WindowsSecurityContextOptions{
+									RunAsUserName: ptr.To("NT AUTHORITY\\NetworkService"),
+								},
+							},
+						},
+					},
+					NodeName:      "node-XXX",
+					RestartPolicy: corev1.RestartPolicyNever,
+					Tolerations: []corev1.Toleration{
+						{
+							Operator: corev1.TolerationOpExists,
+						},
+					},
+				},
+			},
+		},
 	} {
 
 		t.Run(tc.name, func(t *testing.T) {
