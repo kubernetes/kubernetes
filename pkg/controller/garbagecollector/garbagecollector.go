@@ -494,6 +494,57 @@ func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
 	return ret
 }
 
+func (gc *GarbageCollector) shouldSyncItem(item *node) bool {
+	// should sync item as follows:
+	// 1. item no owners
+	// 2. item not found in informer
+	// 3. item record absentOwnerCache
+	// 4. item is beingDeleted or deletingDependents
+	if len(item.getOwners()) == 0 {
+		return true
+	}
+	if !item.isObserved() {
+		return true
+	}
+	if gc.absentOwnerCache.Has(item.identity) {
+		return true
+	}
+	if item.isBeingDeleted() || item.isDeletingDependents() {
+		return true
+	}
+
+	// should sync item when owners as follows:
+	// 1. owners not exist
+	// 2. owners not found in informer
+	// 3. owners record absentOwnerCache
+	// 4. two owner references coordinate fields not match
+	// 5. item and owners namespaces not match
+	// 6. owners is beingDeleted or deletingDependents
+	for _, owner := range item.getOwners() {
+		ownerNode, exist := gc.dependencyGraphBuilder.uidToNode.Read(owner.UID)
+		if !exist {
+			return true
+		}
+		if !ownerNode.isObserved() {
+			return true
+		}
+		if gc.absentOwnerCache.Has(ownerNode.identity) {
+			return true
+		}
+		if !ownerReferenceMatchesCoordinates(owner, ownerNode.identity.OwnerReference) {
+			return true
+		}
+		ownerIsNamespaced := len(ownerNode.identity.Namespace) > 0
+		if ownerIsNamespaced && ownerNode.identity.Namespace != item.identity.Namespace {
+			return true
+		}
+		if ownerNode.isBeingDeleted() || ownerNode.isDeletingDependents() {
+			return true
+		}
+	}
+	return false
+}
+
 // attemptToDeleteItem looks up the live API object associated with the node,
 // and issues a delete IFF the uid matches, the item is not blocked on deleting dependents,
 // and all owner references are dangling.
@@ -515,6 +566,12 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 		)
 		return nil
 	}
+
+	// skipping sync: item and owners exist in cache and not terminating
+	if !gc.shouldSyncItem(item) {
+		return nil
+	}
+
 	// TODO: It's only necessary to talk to the API server if this is a
 	// "virtual" node. The local graph could lag behind the real status, but in
 	// practice, the difference is small.

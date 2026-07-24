@@ -257,6 +257,199 @@ func serilizeOrDie(t *testing.T, object interface{}) []byte {
 	return data
 }
 
+func TestShouldSyncItem(t *testing.T) {
+	ownerRef := metav1.OwnerReference{
+		UID:        "owner-uid-1",
+		Name:       "owner1",
+		Kind:       "ReplicationController",
+		APIVersion: "v1",
+	}
+	clusterScopedOwnerRef := metav1.OwnerReference{
+		UID:        "node-uid-1",
+		Name:       "node1",
+		Kind:       "Node",
+		APIVersion: "v1",
+	}
+
+	itemIdentity := objectReference{
+		OwnerReference: metav1.OwnerReference{
+			UID:        "item-uid-1",
+			Name:       "pod1",
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		Namespace: "ns1",
+	}
+	namespacedOwnerIdentity := objectReference{
+		OwnerReference: ownerRef,
+		Namespace:      "ns1",
+	}
+	clusterScopedOwnerIdentity := objectReference{
+		OwnerReference: clusterScopedOwnerRef,
+		Namespace:      "",
+	}
+
+	makeItem := func(modifiers ...func(*node)) *node {
+		n := &node{
+			identity:   itemIdentity,
+			dependents: make(map[*node]struct{}),
+		}
+		n.setOwners([]metav1.OwnerReference{ownerRef})
+		n.markObserved()
+		for _, m := range modifiers {
+			m(n)
+		}
+		return n
+	}
+
+	makeGC := func(modifiers ...func(*GarbageCollector)) *GarbageCollector {
+		gc := &GarbageCollector{
+			absentOwnerCache:       NewReferenceCache(500),
+			dependencyGraphBuilder: &GraphBuilder{uidToNode: &concurrentUIDToNode{uidToNode: make(map[types.UID]*node)}},
+		}
+		for _, m := range modifiers {
+			m(gc)
+		}
+		return gc
+	}
+
+	addOwnerNode := func(gc *GarbageCollector, ownerIdentity objectReference) *node {
+		ownerNode := &node{
+			identity:   ownerIdentity,
+			dependents: make(map[*node]struct{}),
+		}
+		ownerNode.markObserved()
+		gc.dependencyGraphBuilder.uidToNode.Write(ownerNode)
+		return ownerNode
+	}
+
+	tests := []struct {
+		name     string
+		item     *node
+		gc       *GarbageCollector
+		wantSync bool
+	}{
+		{
+			name:     "stable item with observed namespaced owner should not sync",
+			item:     makeItem(),
+			gc:       makeGC(func(gc *GarbageCollector) { addOwnerNode(gc, namespacedOwnerIdentity) }),
+			wantSync: false,
+		},
+		{
+			name:     "item with no owners should sync",
+			item:     makeItem(func(n *node) { n.setOwners(nil) }),
+			gc:       makeGC(),
+			wantSync: true,
+		},
+		{
+			name:     "unobserved item should sync",
+			item:     makeItem(func(n *node) { n.virtual = true }),
+			gc:       makeGC(func(gc *GarbageCollector) { addOwnerNode(gc, namespacedOwnerIdentity) }),
+			wantSync: true,
+		},
+		{
+			name:     "item in absentOwnerCache should sync",
+			item:     makeItem(),
+			gc:       makeGC(func(gc *GarbageCollector) { gc.absentOwnerCache.Add(itemIdentity) }),
+			wantSync: true,
+		},
+		{
+			name:     "item being deleted should sync",
+			item:     makeItem(func(n *node) { n.markBeingDeleted() }),
+			gc:       makeGC(func(gc *GarbageCollector) { addOwnerNode(gc, namespacedOwnerIdentity) }),
+			wantSync: true,
+		},
+		{
+			name:     "item deleting dependents should sync",
+			item:     makeItem(func(n *node) { n.markDeletingDependents() }),
+			gc:       makeGC(func(gc *GarbageCollector) { addOwnerNode(gc, namespacedOwnerIdentity) }),
+			wantSync: true,
+		},
+		{
+			name:     "owner not in graph should sync",
+			item:     makeItem(),
+			gc:       makeGC(),
+			wantSync: true,
+		},
+		{
+			name: "unobserved owner should sync",
+			item: makeItem(),
+			gc: makeGC(func(gc *GarbageCollector) {
+				ownerNode := addOwnerNode(gc, namespacedOwnerIdentity)
+				ownerNode.virtual = true
+			}),
+			wantSync: true,
+		},
+		{
+			name: "owner in absentOwnerCache should sync",
+			item: makeItem(),
+			gc: makeGC(func(gc *GarbageCollector) {
+				addOwnerNode(gc, namespacedOwnerIdentity)
+				gc.absentOwnerCache.Add(namespacedOwnerIdentity)
+			}),
+			wantSync: true,
+		},
+		{
+			name: "owner coordinate mismatch should sync",
+			item: makeItem(func(n *node) {
+				n.setOwners([]metav1.OwnerReference{{
+					UID:        "owner-uid-1",
+					Name:       "owner1",
+					Kind:       "Deployment",
+					APIVersion: "apps/v1",
+				}})
+			}),
+			gc:       makeGC(func(gc *GarbageCollector) { addOwnerNode(gc, namespacedOwnerIdentity) }),
+			wantSync: true,
+		},
+		{
+			name: "namespaced owner with mismatched namespace should sync",
+			item: makeItem(),
+			gc: makeGC(func(gc *GarbageCollector) {
+				differentNSIdentity := objectReference{
+					OwnerReference: ownerRef,
+					Namespace:      "ns2",
+				}
+				addOwnerNode(gc, differentNSIdentity)
+			}),
+			wantSync: true,
+		},
+		{
+			name:     "cluster-scoped owner with namespaced item should not sync",
+			item:     makeItem(func(n *node) { n.setOwners([]metav1.OwnerReference{clusterScopedOwnerRef}) }),
+			gc:       makeGC(func(gc *GarbageCollector) { addOwnerNode(gc, clusterScopedOwnerIdentity) }),
+			wantSync: false,
+		},
+		{
+			name: "owner being deleted should sync",
+			item: makeItem(),
+			gc: makeGC(func(gc *GarbageCollector) {
+				ownerNode := addOwnerNode(gc, namespacedOwnerIdentity)
+				ownerNode.markBeingDeleted()
+			}),
+			wantSync: true,
+		},
+		{
+			name: "owner deleting dependents should sync",
+			item: makeItem(),
+			gc: makeGC(func(gc *GarbageCollector) {
+				ownerNode := addOwnerNode(gc, namespacedOwnerIdentity)
+				ownerNode.markDeletingDependents()
+			}),
+			wantSync: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.gc.shouldSyncItem(tt.item)
+			if got != tt.wantSync {
+				t.Errorf("shouldSyncItem() = %v, want %v", got, tt.wantSync)
+			}
+		})
+	}
+}
+
 func TestAttemptToDeleteItemDeleteObjectNotFound(t *testing.T) {
 	pod := getPod("ExternallyDeletedPod", []metav1.OwnerReference{
 		{
