@@ -140,7 +140,7 @@ func (r *reconciler) reconcile(ctx context.Context, endpoints *corev1.Endpoints,
 	for portKey, desiredEndpoints := range d.endpointsByKey {
 		numEndpoints := len(desiredEndpoints)
 		pmSlices, pmTotals := r.reconcileByPortMapping(
-			endpoints, existingSlicesByKey[portKey], desiredEndpoints, d.portsByKey[portKey], portKey.addressType())
+			endpoints, existingSlicesByKey[portKey], desiredEndpoints, d.portsByKey[portKey], portKey.AddressType())
 
 		slices.append(pmSlices)
 		totals.add(pmTotals)
@@ -303,10 +303,10 @@ func (r *reconciler) deleteEndpoints(ctx context.Context, namespace, name string
 
 // endpointSlicesByKey returns a map that groups EndpointSlices by unique
 // addrTypePortMapKey values.
-func endpointSlicesByKey(existingSlices []*discovery.EndpointSlice) map[addrTypePortMapKey][]*discovery.EndpointSlice {
-	slicesByKey := map[addrTypePortMapKey][]*discovery.EndpointSlice{}
+func endpointSlicesByKey(existingSlices []*discovery.EndpointSlice) map[endpointsliceutil.PortMapKey][]*discovery.EndpointSlice {
+	slicesByKey := map[endpointsliceutil.PortMapKey][]*discovery.EndpointSlice{}
 	for _, existingSlice := range existingSlices {
-		epKey := newAddrTypePortMapKey(existingSlice.Ports, existingSlice.AddressType)
+		epKey := endpointsliceutil.NewPortMapKey(existingSlice.Ports, existingSlice.AddressType)
 		slicesByKey[epKey] = append(slicesByKey[epKey], existingSlice)
 	}
 	return slicesByKey
