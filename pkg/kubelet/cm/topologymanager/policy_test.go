@@ -32,7 +32,7 @@ type policyMergeTestCase struct {
 	expected TopologyHint
 }
 
-func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
+func commonPolicyMergeTestCases(_ []int) []policyMergeTestCase {
 	return []policyMergeTestCase{
 		{
 			name: "Two providers, 1 hint each, same mask, both preferred 1/2",
@@ -753,7 +753,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 	}
 }
 
-func (p *bestEffortPolicy) mergeTestCasesNoPolicies(numaNodes []int) []policyMergeTestCase {
+func (p *bestEffortPolicy) mergeTestCasesNoPolicies(_ []int) []policyMergeTestCase {
 	return []policyMergeTestCase{
 		{
 			name: "bestNonPreferredAffinityCount (5)",
@@ -840,7 +840,7 @@ func (p *bestEffortPolicy) mergeTestCasesNoPolicies(numaNodes []int) []policyMer
 	}
 }
 
-func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMergeTestCase {
+func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(_ []int) []policyMergeTestCase {
 	return []policyMergeTestCase{
 		{
 			name: "Two providers, 2 hints each, same mask (some with different bits), same preferred",
@@ -1001,7 +1001,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 	}
 }
 
-func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase {
+func (p *singleNumaNodePolicy) mergeTestCases(_ []int) []policyMergeTestCase {
 	return []policyMergeTestCase{
 		{
 			name: "TopologyHint not set",

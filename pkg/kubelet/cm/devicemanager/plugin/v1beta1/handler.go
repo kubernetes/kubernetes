@@ -40,7 +40,7 @@ func (s *server) GetPluginHandler(ctx context.Context) cache.PluginHandler {
 	return s
 }
 
-func (s *server) RegisterPlugin(ctx context.Context, pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
+func (s *server) RegisterPlugin(ctx context.Context, pluginName string, endpoint string, _ []string, _ *time.Duration) error {
 	logger := klog.FromContext(ctx)
 	logger.V(2).Info("Registering plugin at endpoint", "plugin", pluginName, "endpoint", endpoint)
 	return s.connectClient(ctx, pluginName, endpoint)

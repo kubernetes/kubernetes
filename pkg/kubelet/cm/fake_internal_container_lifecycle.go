@@ -28,14 +28,14 @@ func NewFakeInternalContainerLifecycle() *fakeInternalContainerLifecycle {
 
 type fakeInternalContainerLifecycle struct{}
 
-func (f *fakeInternalContainerLifecycle) PreCreateContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerConfig *runtimeapi.ContainerConfig) error {
+func (f *fakeInternalContainerLifecycle) PreCreateContainer(_ klog.Logger, _ *v1.Pod, _ *v1.Container, _ *runtimeapi.ContainerConfig) error {
 	return nil
 }
 
-func (f *fakeInternalContainerLifecycle) PreStartContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerID string) error {
+func (f *fakeInternalContainerLifecycle) PreStartContainer(_ klog.Logger, _ *v1.Pod, _ *v1.Container, _ string) error {
 	return nil
 }
 
-func (f *fakeInternalContainerLifecycle) PostStopContainer(logger klog.Logger, containerID string) error {
+func (f *fakeInternalContainerLifecycle) PostStopContainer(_ klog.Logger, _ string) error {
 	return nil
 }

@@ -107,7 +107,7 @@ func (p *DRAPlugin) NodePrepareResources(
 		response, err = drapbv1beta1.V1Beta1ClientWrapper{DRAPluginClient: client}.NodePrepareResources(ctx, req)
 	case drapbv1.DRAPluginService:
 		client := drapbv1.NewDRAPluginClient(p.conn)
-		response, err = client.NodePrepareResources(ctx, req)
+		response, err = client.NodePrepareResources(ctx, req, opts...)
 	default:
 		// Shouldn't happen, validateSupportedServices should only
 		// return services we support here.
@@ -139,7 +139,7 @@ func (p *DRAPlugin) NodeUnprepareResources(
 		response, err = drapbv1beta1.V1Beta1ClientWrapper{DRAPluginClient: client}.NodeUnprepareResources(ctx, req)
 	case drapbv1.DRAPluginService:
 		client := drapbv1.NewDRAPluginClient(p.conn)
-		response, err = client.NodeUnprepareResources(ctx, req)
+		response, err = client.NodeUnprepareResources(ctx, req, opts...)
 	default:
 		// Shouldn't happen, validateSupportedServices should only
 		// return services we support here.
