@@ -98,6 +98,8 @@ func NewDesiredStateOfWorldPopulator(
 	loopSleepDuration time.Duration,
 	podManager PodManager,
 	podStateProvider PodStateProvider,
+	secretManager PodObjectRegistrar,
+	configMapManager PodObjectRegistrar,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	csiMigratedPluginManager csimigration.PluginManager,
@@ -108,6 +110,8 @@ func NewDesiredStateOfWorldPopulator(
 		loopSleepDuration:   loopSleepDuration,
 		podManager:          podManager,
 		podStateProvider:    podStateProvider,
+		secretManager:       secretManager,
+		configMapManager:    configMapManager,
 		desiredStateOfWorld: desiredStateOfWorld,
 		actualStateOfWorld:  actualStateOfWorld,
 		pods: processedPods{
@@ -120,11 +124,27 @@ func NewDesiredStateOfWorldPopulator(
 	}
 }
 
+// PodObjectRegistrar registers the secrets and config maps referenced by a pod
+// in the kubelet's object caches. The kubelet's secret manager and configmap
+// manager both implement RegisterPod and therefore satisfy this interface.
+//
+// The populator registers a pod's objects before adding the pod's volumes to
+// the desired state of world. This guarantees that by the time the volume
+// reconciler mounts a secret or configmap volume - which fetches the object
+// from the cache - the object has already been registered, avoiding the
+// transient "object not registered" mount failure observed on kubelet
+// start/restart (see https://github.com/kubernetes/kubernetes/issues/140037).
+type PodObjectRegistrar interface {
+	RegisterPod(pod *v1.Pod)
+}
+
 type desiredStateOfWorldPopulator struct {
 	kubeClient               clientset.Interface
 	loopSleepDuration        time.Duration
 	podManager               PodManager
 	podStateProvider         PodStateProvider
+	secretManager            PodObjectRegistrar
+	configMapManager         PodObjectRegistrar
 	desiredStateOfWorld      cache.DesiredStateOfWorld
 	actualStateOfWorld       cache.ActualStateOfWorld
 	pods                     processedPods
@@ -282,6 +302,24 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(ctx context.Context,
 	uniquePodName := util.GetUniquePodName(pod)
 	if dswp.podPreviouslyProcessed(uniquePodName) {
 		return
+	}
+
+	// Register the pod's secrets and config maps with the kubelet's object
+	// caches before adding any of its volumes to the desired state of world.
+	// The volume reconciler mounts volumes from the desired state of world and,
+	// while mounting a secret/configmap volume, fetches the referenced object
+	// from these caches (which only return objects that have been registered).
+	// Registering here - on the same path that queues the volume for mounting -
+	// guarantees the object is in the cache before the reconciler can attempt
+	// the fetch, avoiding a transient "object not registered" FailedMount on
+	// kubelet start/restart (https://github.com/kubernetes/kubernetes/issues/140037).
+	// RegisterPod is idempotent, so this cooperates safely with the kubelet's
+	// existing registration in SyncPod.
+	if dswp.secretManager != nil {
+		dswp.secretManager.RegisterPod(pod)
+	}
+	if dswp.configMapManager != nil {
+		dswp.configMapManager.RegisterPod(pod)
 	}
 
 	allVolumesAdded := true
