@@ -739,7 +739,6 @@ func TestSchedulerDefaults(t *testing.T) {
 				PodMaxBackoffSeconds:          ptr.To[int64](10),
 				Profiles: []configv1.KubeSchedulerProfile{
 					{
-						Plugins:       getDefaultPlugins(),
 						PluginConfig:  pluginConfigs,
 						SchedulerName: new("default-scheduler"),
 					},
@@ -752,6 +751,7 @@ func TestSchedulerDefaults(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, tc.features)
 			if len(tc.features) > 0 && len(tc.expected.Profiles) > 0 {
+				// Recompute plugin defaults after enabling feature gates for this test.
 				tc.expected.Profiles[0].Plugins = getDefaultPlugins()
 			}
 			SetDefaults_KubeSchedulerConfiguration(tc.config)
