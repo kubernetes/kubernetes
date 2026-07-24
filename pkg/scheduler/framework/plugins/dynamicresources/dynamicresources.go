@@ -1497,31 +1497,9 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 	if state.claims.empty() {
 		return
 	}
-	pgStateData, err := getPodGroupStateData(cs)
+	podGroupState, err := getPodGroupStateData(cs)
 	if err != nil {
 		return
-	}
-	// PodGroup snapshots are more likely out of date during asynchronous binding, so the
-	// shared PodGroupManager is used to look up the PodGroup instead.
-	var podGroup *schedulingapi.PodGroup
-	var podGroupState fwk.PodGroupState
-	if pl.fts.EnableDRAWorkloadResourceClaims &&
-		pod.Spec.SchedulingGroup != nil &&
-		pod.Spec.SchedulingGroup.PodGroupName != nil {
-		podGroup, err = pl.fh.PodGroupManager().PodGroups().Get(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
-		if err != nil {
-			return
-		}
-
-		// The podGroupState lister is based on the live cache and does not consider
-		// pods assumed within the PodGroup scheduling cycle, but the ones that
-		// happened before or outside the scheduling cycle. We use it to check
-		// whether there were no assumed or assigned pods that would use the
-		// ResourceClaim.
-		podGroupState, err = pl.fh.PodGroupManager().PodGroupStates().Get(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
-		if err != nil {
-			return
-		}
 	}
 
 	logger := klog.FromContext(ctx)
@@ -1543,50 +1521,30 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 			// share pending allocations started in *this* cycle until Unreserve
 			// completes for all the Pods sharing that pending allocation and
 			// they can be Reserved again in another cycle.
-			if pgStateData != nil {
-				delete(pgStateData.pendingAllocations, claim.UID)
+			if podGroupState != nil {
+				delete(podGroupState.pendingAllocations, claim.UID)
 			}
 		}
 
-		if claim.Status.Allocation == nil {
-			continue
-		}
-
-		var reservedUID types.UID
-		unreservedLogValues := []any{"resourceclaim", klog.KObj(claim)}
-		if resourceclaim.IsReservedForPod(pod, claim, false /* acceptPodGroupReservation */) {
-			reservedUID = pod.UID
-			unreservedLogValues = append(unreservedLogValues, "pod", klog.KObj(pod))
-		} else if pl.fts.EnableDRAWorkloadResourceClaims && resourceclaim.IsReservedForPod(pod, claim, true /* acceptPodGroupReservation */) {
-			// During the asynchronous binding cycle, this Pod is the only one allowed
-			// to have been scheduled before unreserving the claim for the PodGroup.
-			// This is unreachable during the synchronous scheduling cycle since
-			// the claim has not yet been reserved.
-			maxPodGroupPodsToUnreserve := 1
-			// If ScheduledPodsCount has not caught up to reality and there
-			// actually are not any other scheduled Pods, then PostFilter will
-			// check later if the PodGroup can be removed from status.reservedFor.
-			if podGroupState.ScheduledPodsCount() > maxPodGroupPodsToUnreserve {
-				logger.V(6).Info("Not unreserving claim for PodGroup with other scheduled Pods", "resourceclaim", klog.KObj(claim), "podgroup", klog.KObj(podGroup))
-				continue
+		// Ignore claims reserved for the PodGroup because other Pods in the
+		// group may still need this claim. The PodGroup may be unreserved and
+		// deallocated (in api-server) in the next scheduling cycle if the
+		// PodGroup is not schedulable (in PostFilter) and not used yet.
+		if claim.Status.Allocation != nil &&
+			resourceclaim.IsReservedForPod(pod, claim, false /* acceptPodGroupReservation */) {
+			// Remove pod from ReservedFor. A strategic-merge-patch is used
+			// because that allows removing an individual entry without having
+			// the latest ResourceClaim.
+			patch := fmt.Sprintf(`{"metadata": {"uid": %q}, "status": { "reservedFor": [ {"$patch": "delete", "uid": %q} ] }}`,
+				claim.UID,
+				pod.UID,
+			)
+			logger.V(5).Info("unreserve", "resourceclaim", klog.KObj(claim), "pod", klog.KObj(pod))
+			claim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Patch(ctx, claim.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "status")
+			if err != nil {
+				// We will get here again when pod scheduling is retried.
+				logger.Error(err, "unreserve", "resourceclaim", klog.KObj(claim))
 			}
-			reservedUID = podGroup.UID
-			unreservedLogValues = append(unreservedLogValues, "podgroup", klog.KObj(podGroup))
-		} else {
-			continue
-		}
-		// Remove Pod or PodGroup from ReservedFor. A strategic-merge-patch is used
-		// because that allows removing an individual entry without having
-		// the latest ResourceClaim.
-		patch := fmt.Sprintf(`{"metadata": {"uid": %q}, "status": { "reservedFor": [ {"$patch": "delete", "uid": %q} ] }}`,
-			claim.UID,
-			reservedUID,
-		)
-		logger.V(5).Info("unreserve", unreservedLogValues...)
-		claim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Patch(ctx, claim.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "status")
-		if err != nil {
-			// We will get here again when pod scheduling is retried.
-			logger.Error(err, "unreserve", "resourceclaim", klog.KObj(claim))
 		}
 	}
 	pl.unreserveExtendedResourceClaim(ctx, pod, state)

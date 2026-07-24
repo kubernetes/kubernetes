@@ -2108,52 +2108,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			enableDRAWorkloadResourceClaims: true,
 			pod:                             groupedPodWithClaimName,
 			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
-			objs: []apiruntime.Object{
-				// Pods in the PodGroup
-
-				// This Pod has been scheduled, but it's the only one left in
-				// the PodGroup, so the claim can be unreserved.
-				groupedPodWithClaimNameScheduled,
-			},
-			claims: []*resourceapi.ResourceClaim{allocatedPodGroupClaim},
-			want: want{
-				prebind: result{
-					assumedClaim: addAllocationTimestamp(reserveFor(allocatedPodGroupClaim, podGroupReservation)),
-					changes: change{
-						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
-							claim := st.FromResourceClaim(in).
-								ReservedFor(podGroupReservation).
-								Obj()
-							claim = addAllocationTimestamp(claim)
-							return claim
-						},
-					},
-				},
-				unreserveAfterBindFailure: &result{
-					assumedClaim: addAllocationTimestamp(reserveFor(allocatedPodGroupClaim, podGroupReservation)),
-					changes: change{
-						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
-							out := in.DeepCopy()
-							out.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{}
-							return out
-						},
-					},
-				},
-			},
-		},
-		"bind-podgroup-failure-with-active-pods": {
-			enableDRAWorkloadResourceClaims: true,
-			pod:                             groupedPodWithClaimName,
-			podGroups:                       []*schedulingapi.PodGroup{podGroupWithClaimName},
-			objs: []apiruntime.Object{
-				// Pods in the PodGroup
-				groupedPodWithClaimNameScheduled,
-				st.MakePod().Name(podName + "-2").Namespace(namespace).
-					Node(nodeName). // Scheduled, this Pod still needs the PodGroup's claim
-					PodGroupName(podGroupName).
-					Obj(),
-			},
-			claims: []*resourceapi.ResourceClaim{allocatedPodGroupClaim},
+			claims:                          []*resourceapi.ResourceClaim{allocatedPodGroupClaim},
 			want: want{
 				prebind: result{
 					assumedClaim: addAllocationTimestamp(reserveFor(allocatedPodGroupClaim, podGroupReservation)),
