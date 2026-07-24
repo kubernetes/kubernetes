@@ -749,6 +749,24 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 			"",
 			mustParseCPUSet(t, "4-7,12-15,1,9"),
 		},
+		{
+			"take even cpus from partial UncoreCache of single socket - SMT enabled",
+			topoUncoreSingleSocketSMT,
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			mustParseCPUSet(t, "3,5,7,11-15"),
+			4,
+			"",
+			mustParseCPUSet(t, "5,7,13,15"),
+		},
+		{
+			"take odd cpus from partial UncoreCache of single socket - SMT enabled",
+			topoUncoreSingleSocketSMT,
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			mustParseCPUSet(t, "3,5,7,11-15"),
+			5,
+			"",
+			mustParseCPUSet(t, "5,7,12,13,15"),
+		},
 	}...)
 
 	for _, tc := range testCases {
