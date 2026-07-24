@@ -692,17 +692,22 @@ func TestCacheWatcherDispatchStageMetric(t *testing.T) {
 	// dispatcher, so only the post-fanout (per-watcher) stages plus the total
 	// are observed. The pre-fanout stages (propagation/cache_ingest/
 	// incoming_queue/fanout) have no timestamps and are skipped.
+	// The event was enqueued before the process goroutine started, so it is
+	// picked up by the non-blocking receive and classified as backlog.
 	want := `
-# HELP apiserver_watch_events_delivery_duration_seconds [ALPHA] Histogram of watch event dispatch latency broken by resource type and pipeline stage. The additive stages (propagation, cache_ingest, incoming_queue, fanout, watcher_queue, encode, handoff) partition the delivery path; the 'total' stage is the end-to-end latency of a delivered event.
+# HELP apiserver_watch_events_delivery_duration_seconds [ALPHA] Histogram of watch event dispatch latency broken by resource type and pipeline stage. The additive stages (propagation, cache_ingest, incoming_queue, fanout, watcher_queue, encode, handoff) partition the delivery path; the 'total' stage is the end-to-end latency of a delivered event. The diagnostic stages are not part of the additive partition: 'watcher_queue_parked' and 'watcher_queue_backlog' split 'watcher_queue' into goroutine wake latency vs input-channel drain backlog and sum to it, and 'handoff_aborted' is the time an aborted delivery spent blocked on the result channel before the watcher was done.
 # TYPE apiserver_watch_events_delivery_duration_seconds histogram
 apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="cache_ingest"} 0
 apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="encode"} 1
 apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="fanout"} 0
 apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="handoff"} 1
+apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="handoff_aborted"} 0
 apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="incoming_queue"} 0
 apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="propagation"} 0
 apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="total"} 1
 apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="watcher_queue"} 1
+apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="watcher_queue_backlog"} 1
+apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="watcher_queue_parked"} 0
 `
 	if err := testutil.GatherAndCompare(gatherWithoutDurations(), strings.NewReader(want), "apiserver_watch_events_delivery_duration_seconds"); err != nil {
 		t.Fatal(err)
@@ -722,5 +727,167 @@ func gatherWithoutDurations() testutil.GathererFunc {
 			}
 		}
 		return got, err
+	}
+}
+
+// stageSampleCount returns the observation count recorded for the given stage
+// of the delivery duration histogram.
+func stageSampleCount(t *testing.T, stage string) uint64 {
+	t.Helper()
+	families, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mf := range families {
+		if mf.GetName() != "apiserver_watch_events_delivery_duration_seconds" {
+			continue
+		}
+		for _, m := range mf.Metric {
+			for _, l := range m.Label {
+				if l.GetName() == "stage" && l.GetValue() == stage {
+					return m.Histogram.GetSampleCount()
+				}
+			}
+		}
+	}
+	return 0
+}
+
+func TestCacheWatcherTerminationStallMetric(t *testing.T) {
+	metrics.Register()
+	legacyregistry.Reset()
+	t.Cleanup(legacyregistry.Reset)
+
+	filter := func(string, labels.Set, fields.Set, runtime.Object) bool { return true }
+	obs := metrics.NewWatcherMetricsObservers(schema.GroupResource{Resource: "pods"})
+
+	// budget_expired: the blocking add's timer fires while the input channel
+	// is full; the result channel still has free capacity.
+	var wBudget *cacheWatcher
+	wBudget = newCacheWatcher(1, filter, func(bool) { wBudget.stopLocked() }, storage.APIObjectVersioner{}, time.Now().Add(time.Minute), false, schema.GroupResource{Resource: "pods"}, obs, "")
+	if !wBudget.nonblockingAdd(makeWatchCacheEvent(1)) {
+		t.Fatal("failed to fill the input channel")
+	}
+	if wBudget.add(makeWatchCacheEvent(2), time.NewTimer(10*time.Millisecond)) {
+		t.Fatal("expected the add to fail")
+	}
+
+	// cascade: a nil timer kills the watcher immediately; the result channel
+	// is full at termination time.
+	var wCascade *cacheWatcher
+	wCascade = newCacheWatcher(1, filter, func(bool) { wCascade.stopLocked() }, storage.APIObjectVersioner{}, time.Now().Add(time.Minute), false, schema.GroupResource{Resource: "pods"}, obs, "")
+	wCascade.result <- watch.Event{}
+	if !wCascade.nonblockingAdd(makeWatchCacheEvent(1)) {
+		t.Fatal("failed to fill the input channel")
+	}
+	if wCascade.add(makeWatchCacheEvent(2), nil) {
+		t.Fatal("expected the add to fail")
+	}
+
+	want := `
+# HELP apiserver_terminated_watchers_duration_seconds [ALPHA] Histogram of how long a watcher terminated for unresponsiveness had been stalled (time since it last dequeued from its input channel), broken by resource type, termination reason ('budget_expired': the shared dispatch timeout budget expired while blocked on this watcher; 'cascade': killed immediately after the budget was exhausted by another watcher), and result-channel state sampled at termination ('result_full': the delivery goroutine is alive but blocked on client handoff; 'result_free': the goroutine never woke to drain).
+# TYPE apiserver_terminated_watchers_duration_seconds histogram
+apiserver_terminated_watchers_duration_seconds_count{group="",reason="budget_expired",resource="pods",state="result_free"} 1
+apiserver_terminated_watchers_duration_seconds_count{group="",reason="budget_expired",resource="pods",state="result_full"} 0
+apiserver_terminated_watchers_duration_seconds_count{group="",reason="cascade",resource="pods",state="result_free"} 0
+apiserver_terminated_watchers_duration_seconds_count{group="",reason="cascade",resource="pods",state="result_full"} 1
+`
+	if err := testutil.GatherAndCompare(gatherWithoutDurations(), strings.NewReader(want), "apiserver_terminated_watchers_duration_seconds"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCacheWatcherQueueParkedBacklogSplit(t *testing.T) {
+	metrics.Register()
+	legacyregistry.Reset()
+	t.Cleanup(legacyregistry.Reset)
+
+	w := newCacheWatcher(10, func(string, labels.Set, fields.Set, runtime.Object) bool { return true }, func(bool) {}, storage.APIObjectVersioner{}, time.Now().Add(time.Minute), false, schema.GroupResource{Resource: "pods"}, metrics.NewWatcherMetricsObservers(schema.GroupResource{Resource: "pods"}), "")
+
+	// Enqueued before the process goroutine starts, so it is picked up by the
+	// non-blocking receive: backlog.
+	if !w.add(makeWatchCacheEvent(1), time.NewTimer(time.Second)) {
+		t.Fatal("failed adding an event to the watcher")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go w.processInterval(ctx, intervalFromEvents(nil), 0)
+	<-w.ResultChan()
+
+	if got := stageSampleCount(t, "watcher_queue_backlog"); got != 1 {
+		t.Fatalf("watcher_queue_backlog count = %d, want 1", got)
+	}
+
+	// Once the input channel runs empty the goroutine parks in the blocking
+	// select and the next event is classified as parked. Parking is not
+	// synchronously observable, so retry until an event lands as parked.
+	var parked uint64
+	for i := uint64(2); i < 52 && parked == 0; i++ {
+		time.Sleep(10 * time.Millisecond)
+		if !w.add(makeWatchCacheEvent(i), time.NewTimer(time.Second)) {
+			t.Fatal("failed adding an event to the watcher")
+		}
+		<-w.ResultChan()
+		parked = stageSampleCount(t, "watcher_queue_parked")
+	}
+	w.Stop()
+	if parked == 0 {
+		t.Fatal("no event was classified as watcher_queue_parked")
+	}
+	backlog := stageSampleCount(t, "watcher_queue_backlog")
+	if total := stageSampleCount(t, "watcher_queue"); parked+backlog != total {
+		t.Fatalf("parked (%d) + backlog (%d) = %d, want watcher_queue count %d", parked, backlog, parked+backlog, total)
+	}
+}
+
+func TestCacheWatcherHandoffAbortedMetric(t *testing.T) {
+	metrics.Register()
+	legacyregistry.Reset()
+	t.Cleanup(legacyregistry.Reset)
+
+	w := newCacheWatcher(1, func(string, labels.Set, fields.Set, runtime.Object) bool { return true }, func(bool) {}, storage.APIObjectVersioner{}, time.Now().Add(time.Minute), false, schema.GroupResource{Resource: "pods"}, metrics.NewWatcherMetricsObservers(schema.GroupResource{Resource: "pods"}), "")
+
+	// Occupy the only result slot so the handoff blocks until done is closed.
+	w.result <- watch.Event{}
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		close(w.done)
+	}()
+	if _, sentAt := w.sendWatchCacheEvent(makeWatchCacheEvent(1)); !sentAt.IsZero() {
+		t.Fatal("expected the delivery to abort")
+	}
+
+	if got := stageSampleCount(t, "handoff_aborted"); got != 1 {
+		t.Fatalf("handoff_aborted count = %d, want 1", got)
+	}
+	if got := stageSampleCount(t, "handoff"); got != 0 {
+		t.Fatalf("handoff count = %d, want 0", got)
+	}
+}
+
+func TestCacheWatcherInputDepthMetrics(t *testing.T) {
+	metrics.Register()
+	legacyregistry.Reset()
+	t.Cleanup(legacyregistry.Reset)
+
+	w := newCacheWatcher(1, func(string, labels.Set, fields.Set, runtime.Object) bool { return true }, func(bool) {}, storage.APIObjectVersioner{}, time.Now().Add(time.Minute), false, schema.GroupResource{Resource: "pods"}, metrics.NewWatcherMetricsObservers(schema.GroupResource{Resource: "pods"}), "")
+
+	if !w.nonblockingAdd(makeWatchCacheEvent(1)) {
+		t.Fatal("failed adding an event to the watcher")
+	}
+	if w.nonblockingAdd(makeWatchCacheEvent(2)) {
+		t.Fatal("expected the input channel to be full")
+	}
+
+	want := `
+# HELP apiserver_watch_watcher_input_depth [ALPHA] Histogram of the per-watcher input channel depth observed at each successful event enqueue, broken by resource type.
+# TYPE apiserver_watch_watcher_input_depth histogram
+apiserver_watch_watcher_input_depth_count{group="",resource="pods"} 1
+# HELP apiserver_watch_watcher_input_full_total [ALPHA] Counter of failed non-blocking enqueues onto a watcher's full input channel, broken by resource type.
+# TYPE apiserver_watch_watcher_input_full_total counter
+apiserver_watch_watcher_input_full_total{group="",resource="pods"} 1
+`
+	if err := testutil.GatherAndCompare(gatherWithoutDurations(), strings.NewReader(want), "apiserver_watch_watcher_input_depth", "apiserver_watch_watcher_input_full_total"); err != nil {
+		t.Fatal(err)
 	}
 }
