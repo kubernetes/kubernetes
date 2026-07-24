@@ -118,7 +118,7 @@ func (resizefs *ResizeFs) NeedResize(devicePath string, deviceMountPath string) 
 
 	format, err := getDiskFormat(resizefs.exec, devicePath)
 	if err != nil {
-		formatErr := fmt.Errorf("ResizeFS.Resize - error checking format for device %s: %v", devicePath, err)
+		formatErr := fmt.Errorf("ResizeFS.NeedResize - error checking format for device %s: %v", devicePath, err)
 		return false, formatErr
 	}
 
