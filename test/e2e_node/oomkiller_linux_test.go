@@ -203,7 +203,7 @@ func runOomKillerStaleCounterSigtermTest(f *framework.Framework) {
 		// SingleProcessOOMKill must be enabled so the kernel only kills the offending process instead of the
 		// whole container cgroup, letting the container survive the earlier OOM kill.
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.SingleProcessOOMKill = ptr.To(true)
+			initialConfig.SingleProcessOOMKill = new(true)
 		})
 
 		podSpec := getOOMTargetPod(podName, containerName, getOOMTargetContainerMultiProcessThenSigterm)
@@ -390,7 +390,7 @@ func getOOMTargetContainerMultiProcessThenSigterm(name string) v1.Container {
 			// cgroup's cumulative oom_kill counter. The foreground sleep then keeps the container running well
 			// past that point, before the shell sends itself a SIGTERM to simulate a later, unrelated graceful
 			// termination.
-			"(sleep 5 && dd if=/dev/zero of=/dev/null bs=20M) & sleep 30; kill -TERM $$",
+			"trap 'exit 143' TERM; (sleep 5 && dd if=/dev/zero of=/dev/null bs=20M) & sleep 30; kill -TERM $$",
 		},
 		Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
@@ -404,10 +404,10 @@ func getOOMTargetContainerMultiProcessThenSigterm(name string) v1.Container {
 			SeccompProfile: &v1.SeccompProfile{
 				Type: v1.SeccompProfileTypeRuntimeDefault,
 			},
-			AllowPrivilegeEscalation: ptr.To(false),
+			AllowPrivilegeEscalation: new(false),
 			RunAsUser:                ptr.To[int64](999),
 			RunAsGroup:               ptr.To[int64](999),
-			RunAsNonRoot:             ptr.To(true),
+			RunAsNonRoot:             new(true),
 			Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
 		},
 	}
