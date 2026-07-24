@@ -532,6 +532,7 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 	if result.ShareID != nil {
 		allErrs = append(allErrs, validateUID(string(*result.ShareID), fldPath.Child("shareID")).MarkCoveredByDeclarative()...)
 	}
+	allErrs = append(allErrs, validateSkipNodeOperations(result.SkipNodeOperations, fldPath.Child("skipNodeOperations"))...)
 	return allErrs
 }
 
@@ -747,6 +748,8 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		allErrs = append(allErrs, validatePartitionTypeAttribute(spec, fldPath)...)
 	}
 
+	allErrs = append(allErrs, validateSkipNodeOperations(spec.SkipNodeOperations, fldPath.Child("skipNodeOperations"))...)
+
 	return allErrs
 }
 
@@ -788,6 +791,24 @@ func validatePartitionTypeAttribute(spec *resource.ResourceSliceSpec, fldPath *f
 			allErrs = append(allErrs, field.Invalid(attrPath, attribute,
 				"must be a string value because `partitionTypeAttribute` names this attribute"))
 		}
+	}
+
+	return allErrs
+}
+
+// validateSkipNodeOperations checks business logic constraints on SkipNodeOperations:
+// NodePrepareResources cannot be skipped unless NodeUnprepareResources is also skipped
+// (or "*" is specified). Other checks (e.g. valid enum values, set uniqueness) are handled
+// by declarative validation.
+func validateSkipNodeOperations(skipOps []resource.SkipNodeOperation, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	skipSet := sets.New(skipOps...)
+
+	if skipSet.Has(resource.SkipNodeOperationNodePrepareResources) &&
+		!skipSet.Has(resource.SkipNodeOperationNodeUnprepareResources) &&
+		!skipSet.Has(resource.SkipNodeOperationAll) {
+		allErrs = append(allErrs, field.Invalid(fldPath, skipOps,
+			"NodePrepareResources cannot be skipped unless NodeUnprepareResources is also skipped"))
 	}
 
 	return allErrs

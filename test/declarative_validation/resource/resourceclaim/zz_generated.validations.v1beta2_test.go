@@ -180,6 +180,10 @@ func init() {
 			"status.allocation.devices.results[*].shareID": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-uuid"},
 			},
+			"status.allocation.devices.results[*].skipNodeOperations[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+				{ErrorType: "FieldValueNotSupported"},
+			},
 			"status.allocation.devices.results[*].tolerations[*].effect": {
 				{ErrorType: "FieldValueNotSupported"},
 			},

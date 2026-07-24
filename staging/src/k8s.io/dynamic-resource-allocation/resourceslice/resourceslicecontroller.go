@@ -208,6 +208,7 @@ type Slice struct {
 	// device's partition type. Only effective when the DRAPartitionableDevicesType
 	// feature is enabled; dropped by the apiserver otherwise.
 	PartitionTypeAttribute *resourceapi.FullyQualifiedName
+	SkipNodeOperations     []resourceapi.SkipNodeOperation
 }
 
 // +k8s:deepcopy-gen=true
@@ -379,6 +380,10 @@ func (err *DroppedFieldsError) DisabledFeatures() []string {
 	// PartitionTypeAttribute is dropped when DRAPartitionableDevicesType is disabled.
 	if err.DesiredSlice.Spec.PartitionTypeAttribute != nil && err.ActualSlice.Spec.PartitionTypeAttribute == nil {
 		disabled = append(disabled, "DRAPartitionableDevicesType")
+	}
+
+	if len(err.DesiredSlice.Spec.SkipNodeOperations) > 0 && len(err.ActualSlice.Spec.SkipNodeOperations) == 0 {
+		disabled = append(disabled, "DRAOptionalNodeOperations")
 	}
 
 	return disabled
@@ -817,7 +822,8 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			!DevicesDeepEqual(currentSlice.Spec.Devices, pool.Slices[i].Devices) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.SharedCounters, pool.Slices[i].SharedCounters) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.PerDeviceNodeSelection, pool.Slices[i].PerDeviceNodeSelection) ||
-			!apiequality.Semantic.DeepEqual(currentSlice.Spec.PartitionTypeAttribute, pool.Slices[i].PartitionTypeAttribute) {
+			!apiequality.Semantic.DeepEqual(currentSlice.Spec.PartitionTypeAttribute, pool.Slices[i].PartitionTypeAttribute) ||
+			!apiequality.Semantic.DeepEqual(currentSlice.Spec.SkipNodeOperations, pool.Slices[i].SkipNodeOperations) {
 			changedDesiredSlices.Insert(i)
 			logger.V(5).Info("Need to update slice", "slice", klog.KObj(currentSlice), "matchIndex", i)
 		}
@@ -868,6 +874,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		slice.Spec.SharedCounters = pool.Slices[i].SharedCounters
 		slice.Spec.PerDeviceNodeSelection = pool.Slices[i].PerDeviceNodeSelection
 		slice.Spec.PartitionTypeAttribute = pool.Slices[i].PartitionTypeAttribute
+		slice.Spec.SkipNodeOperations = pool.Slices[i].SkipNodeOperations
 		// Preserve TimeAdded from existing device, if there is a matching device and taint.
 		slice.Spec.Devices = copyTaintTimeAdded(slice.Spec.Devices, pool.Slices[i].Devices)
 
@@ -922,6 +929,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 				SharedCounters:         pool.Slices[i].SharedCounters,
 				PerDeviceNodeSelection: pool.Slices[i].PerDeviceNodeSelection,
 				PartitionTypeAttribute: pool.Slices[i].PartitionTypeAttribute,
+				SkipNodeOperations:     pool.Slices[i].SkipNodeOperations,
 			},
 		}
 
@@ -1026,10 +1034,12 @@ func (c *Controller) sliceStored(ctx context.Context, msg string, poolName strin
 	if !apiequality.Semantic.DeepEqual(desiredSlice.Spec.PerDeviceNodeSelection, actualSlice.Spec.PerDeviceNodeSelection) ||
 		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.SharedCounters, actualSlice.Spec.SharedCounters) ||
 		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.PartitionTypeAttribute, actualSlice.Spec.PartitionTypeAttribute) ||
+		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.SkipNodeOperations, actualSlice.Spec.SkipNodeOperations) ||
 		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.Devices, actualSlice.Spec.Devices) {
 		pool.Slices[sliceIndex].PerDeviceNodeSelection = actualSlice.Spec.PerDeviceNodeSelection
 		pool.Slices[sliceIndex].SharedCounters = actualSlice.Spec.SharedCounters
 		pool.Slices[sliceIndex].PartitionTypeAttribute = actualSlice.Spec.PartitionTypeAttribute
+		pool.Slices[sliceIndex].SkipNodeOperations = actualSlice.Spec.SkipNodeOperations
 		pool.Slices[sliceIndex].Devices = actualSlice.Spec.Devices
 
 		err := &DroppedFieldsError{

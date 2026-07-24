@@ -207,6 +207,7 @@ func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRANodeAllocatableResourcesFields(newSlice, oldSlice)
 	dropDisableDRAListTypeAttributesFields(newSlice, oldSlice)
 	dropDisabledDRAPartitionableDevicesTypeFields(newSlice, oldSlice)
+	dropDisabledDRAOptionalNodeOperationsFields(newSlice, oldSlice)
 }
 
 func dropDisabledDRAPartitionableDevicesTypeFields(newSlice, oldSlice *resource.ResourceSlice) {
@@ -416,4 +417,19 @@ func draListTypeAttributesFeatureInUse(slice *resource.ResourceSlice) bool {
 	}
 
 	return false
+}
+
+func dropDisabledDRAOptionalNodeOperationsFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAOptionalNodeOperations) || draOptionalNodeOperationsFeatureInUse(oldSlice) {
+		return
+	}
+
+	newSlice.Spec.SkipNodeOperations = nil
+}
+
+func draOptionalNodeOperationsFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+	return len(slice.Spec.SkipNodeOperations) > 0
 }

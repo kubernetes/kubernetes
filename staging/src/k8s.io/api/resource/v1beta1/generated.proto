@@ -1203,6 +1203,19 @@ message DeviceRequestAllocationResult {
   // +optional
   // +featureGate=DRAConsumableCapacity
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> consumedCapacity = 10;
+
+  // SkipNodeOperations lists node-local resource operations (gRPC calls)
+  // that will be skipped for this allocated device when determining whether
+  // operations are necessary on the node. If all allocated devices for a driver in
+  // a claim skip an operation, that gRPC call will be skipped. It is a copy of
+  // the ResourceSlice.spec.skipNodeOperations value at the time when the device was allocated.
+  //
+  // +optional
+  // +listType=set
+  // +k8s:listType=set
+  // +featureGate=DRAOptionalNodeOperations
+  // +k8s:optional
+  repeated string skipNodeOperations = 11;
 }
 
 // DeviceSelector must have exactly one field set.
@@ -1955,5 +1968,26 @@ message ResourceSliceSpec {
   // +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:optional
   // +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:format=k8s-resource-fully-qualified-name
   optional string partitionTypeAttribute = 9;
+
+  // SkipNodeOperations lists node-local resource operations (gRPC calls)
+  // that will be skipped for the devices in this slice when determining whether
+  // operations are necessary on the node. If all allocated devices for a driver in
+  // a claim skip an operation, that gRPC call will be skipped. Valid values are:
+  //
+  // - "NodePrepareResources": NodePrepareResources gRPC calls are skipped. This
+  //   value cannot be specified unless "NodeUnprepareResources" is also listed
+  //   (or "*" is specified).
+  // - "NodeUnprepareResources": NodeUnprepareResources gRPC calls are skipped.
+  // - "*": All node-local resource operations are skipped.
+  //
+  // Other values may be added in the future. The kubelet must ignore unknown
+  // values.
+  //
+  // +optional
+  // +listType=set
+  // +k8s:listType=set
+  // +featureGate=DRAOptionalNodeOperations
+  // +k8s:optional
+  repeated string skipNodeOperations = 10;
 }
 

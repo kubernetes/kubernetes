@@ -525,6 +525,16 @@ func (ex *ExamplePlugin) UnprepareResourceClaims(ctx context.Context, claims []k
 	return result, nil
 }
 
+// UnprepareClaim manually unprepares a single resource claim on the plugin.
+// This is required in tests where kubelet intentionally bypasses unprepare (e.g. SkipNodeOperationNodeUnprepareResources)
+// so that test cleanup assertions on prepared resources can succeed.
+func (ex *ExamplePlugin) UnprepareClaim(ctx context.Context, claim *resourceapi.ResourceClaim) error {
+	return ex.nodeUnprepareResource(ctx, kubeletplugin.NamespacedObject{
+		NamespacedName: types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
+		UID:            claim.UID,
+	})
+}
+
 func (ex *ExamplePlugin) GetPreparedResources() []ClaimID {
 	ex.mutex.Lock()
 	defer ex.mutex.Unlock()

@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/klog/v2/ktesting"
@@ -145,6 +146,14 @@ func node(name, region string) *v1.Node {
 			},
 		},
 	}
+}
+
+// nodeWithDRAOptionalNodeOperations returns a node declaring DRAOptionalNodeOperations feature support
+// required by devices that define SkipNodeOperations.
+func nodeWithDRAOptionalNodeOperations(name, region string) *v1.Node {
+	n := node(name, region)
+	n.Status.DeclaredFeatures = append(n.Status.DeclaredFeatures, draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate)
+	return n
 }
 
 // generate a DeviceClass object with the given name and a driver CEL selector.
@@ -654,6 +663,12 @@ func (in wrapResourceSliceWithDevices) obj() *resourceapi.ResourceSlice {
 	return in.ResourceSlice
 }
 
+func (in wrapResourceSliceWithDevices) withSkipNodeOperations(skip ...resourceapi.SkipNodeOperation) wrapResourceSliceWithDevices {
+	out := in.DeepCopy()
+	out.Spec.SkipNodeOperations = skip
+	return wrapResourceSliceWithDevices{ResourceSlice: out}
+}
+
 func sliceWithCounterSets(name string, nodeSelection, pool any, driver string, counterSets ...resourceapi.CounterSet) wrapResourceSliceWithCounterSets {
 	slice := slice(name, nodeSelection, pool, driver)
 	slice.Spec.SharedCounters = counterSets
@@ -687,6 +702,12 @@ func deviceAllocationResult(request, driver, pool, device string, adminAccess bo
 	if adminAccess {
 		r.AdminAccess = &adminAccess
 	}
+	return r
+}
+
+func deviceAllocationResultWithSkipNodeOperations(request, driver, pool, device string, skip ...resourceapi.SkipNodeOperation) resourceapi.DeviceRequestAllocationResult {
+	r := deviceAllocationResult(request, driver, pool, device, false)
+	r.SkipNodeOperations = skip
 	return r
 }
 
@@ -1019,6 +1040,27 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
+		},
+		"optional-node-operations": {
+			features:         Features{OptionalNodeOperations: true},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices:           unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA).withSkipNodeOperations(resourceapi.SkipNodeOperationAll)),
+			node:             nodeWithDRAOptionalNodeOperations(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResultWithSkipNodeOperations(req0, driverA, pool1, device1, resourceapi.SkipNodeOperationAll),
+			)},
+		},
+		"optional-node-operations-missing-feature": {
+			features:         Features{OptionalNodeOperations: true},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices:           unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA).withSkipNodeOperations(resourceapi.SkipNodeOperationAll)),
+			node:             node(node1, region1),
+
+			expectResults: []any{},
 		},
 		"other-node": {
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),

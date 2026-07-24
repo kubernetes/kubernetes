@@ -728,6 +728,20 @@ func TaintAllDevices(taints ...resourceapi.DeviceTaint) driverResourcesMutatorFu
 	}
 }
 
+func SkipNodeOperations(skipNodeOperations ...resourceapi.SkipNodeOperation) driverResourcesMutatorFunc {
+	return func(resources map[string]resourceslice.DriverResources) {
+		for nodename, dr := range resources {
+			for poolName, pool := range dr.Pools {
+				for i := range pool.Slices {
+					pool.Slices[i].SkipNodeOperations = skipNodeOperations
+				}
+				dr.Pools[poolName] = pool
+			}
+			resources[nodename] = dr
+		}
+	}
+}
+
 func NetworkResources(maxAllocations int, tainted bool) driverResourcesGenFunc {
 	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
 		driverResources := make(map[string]resourceslice.DriverResources)
@@ -914,6 +928,12 @@ func DriverResourcesNow(nodes *Nodes, maxAllocations int, devicesPerNode ...map[
 		}
 	}
 	return driverResources
+}
+
+func DriverResourcesWithSkipNodeOperationsNow(nodes *Nodes, maxAllocations int, skipNodeOperations ...resourceapi.SkipNodeOperation) map[string]resourceslice.DriverResources {
+	res := DriverResourcesNow(nodes, maxAllocations)
+	SkipNodeOperations(skipNodeOperations...)(res)
+	return res
 }
 
 func ToDriverResources(counters []resourceapi.CounterSet, devices ...resourceapi.Device) driverResourcesGenFunc {

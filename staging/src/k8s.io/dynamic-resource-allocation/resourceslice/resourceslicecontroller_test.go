@@ -140,6 +140,31 @@ func TestControllerSyncPool(t *testing.T) {
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
 			},
 		},
+		"create-slice-with-skip-node-operations": {
+			nodeUID:        nodeUID,
+			initialObjects: []runtime.Object{},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Slices: []Slice{{
+							Devices:            []resourceapi.Device{},
+							SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll},
+						}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{}).
+					SkipNodeOperations(resourceapi.SkipNodeOperationAll).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+		},
 		"keep-slice-unchanged": {
 			nodeUID: nodeUID,
 			initialObjects: []runtime.Object{
@@ -366,6 +391,42 @@ func TestControllerSyncPool(t *testing.T) {
 					Obj(),
 			},
 			expectedErrors: []string{`update ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRAConsumableCapacity`},
+		},
+		"drop-optional-node-operations-field": {
+			features: features{disableOptionalNodeOperations: true},
+			nodeUID:  nodeUID,
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices([]resourceapi.Device{newDevice(deviceName)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{{
+							Devices:            []resourceapi.Device{newDevice(deviceName)},
+							SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll},
+						}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumUpdates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices([]resourceapi.Device{newDevice(deviceName)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			expectedErrors: []string{`update ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRAOptionalNodeOperations`},
 		},
 		"remove-pool": {
 			nodeUID:   nodeUID,
@@ -1801,10 +1862,11 @@ func sortResourceSlices(slices []resourceapi.ResourceSlice) {
 }
 
 type features struct {
-	disableBindingConditions    bool
-	disableDeviceTaints         bool
-	disablePartitionableDevices bool
-	disableConsumableCapacity   bool
+	disableBindingConditions      bool
+	disableDeviceTaints           bool
+	disablePartitionableDevices   bool
+	disableConsumableCapacity     bool
+	disableOptionalNodeOperations bool
 }
 
 func createTestClient(features features, timeAdded metav1.Time, objects ...runtime.Object) *fake.Clientset {
@@ -1885,6 +1947,9 @@ func dropDisabledFields(features features, resourceslice *resourceapi.ResourceSl
 		for i := range resourceslice.Spec.Devices {
 			resourceslice.Spec.Devices[i].AllowMultipleAllocations = nil
 		}
+	}
+	if features.disableOptionalNodeOperations {
+		resourceslice.Spec.SkipNodeOperations = nil
 	}
 }
 
@@ -2023,6 +2088,12 @@ func (r *ResourceSliceWrapper) PerDeviceNodeSelection(perDeviceNodeSelection boo
 // SharedCounters sets ResourceSlice.Spec.SharedCounters.
 func (r *ResourceSliceWrapper) SharedCounters(counters []resourceapi.CounterSet) *ResourceSliceWrapper {
 	r.Spec.SharedCounters = counters
+	return r
+}
+
+// SkipNodeOperations sets ResourceSlice.Spec.SkipNodeOperations.
+func (r *ResourceSliceWrapper) SkipNodeOperations(skip ...resourceapi.SkipNodeOperation) *ResourceSliceWrapper {
+	r.Spec.SkipNodeOperations = skip
 	return r
 }
 

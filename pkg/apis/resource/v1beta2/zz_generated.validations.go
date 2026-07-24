@@ -1953,6 +1953,43 @@ func Validate_DeviceRequestAllocationResult(
 	}
 
 	// field resourcev1beta2.DeviceRequestAllocationResult.ConsumedCapacity has no validation
+
+	{ // field resourcev1beta2.DeviceRequestAllocationResult.SkipNodeOperations
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []resourcev1beta2.SkipNodeOperation,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with set semantics require unique values
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, Validate_SkipNodeOperation); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1beta2.DeviceRequestAllocationResult) []resourcev1beta2.SkipNodeOperation {
+				return oldObj.SkipNodeOperations
+			})
+		errs = append(errs, fn(fldPath.Child("skipNodeOperations"), obj.SkipNodeOperations, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -3476,6 +3513,57 @@ func Validate_ResourceSliceSpec(
 				return oldObj.PartitionTypeAttribute
 			})
 		errs = append(errs, fn(fldPath.Child("partitionTypeAttribute"), obj.PartitionTypeAttribute, oldVal, oldObj != nil)...)
+	}
+
+	{ // field resourcev1beta2.ResourceSliceSpec.SkipNodeOperations
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []resourcev1beta2.SkipNodeOperation,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with set semantics require unique values
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, Validate_SkipNodeOperation); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1beta2.ResourceSliceSpec) []resourcev1beta2.SkipNodeOperation {
+				return oldObj.SkipNodeOperations
+			})
+		errs = append(errs, fn(fldPath.Child("skipNodeOperations"), obj.SkipNodeOperations, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+var symbolsForSkipNodeOperation = sets.New(resourcev1beta2.SkipNodeOperationAll, resourcev1beta2.SkipNodeOperationNodePrepareResources, resourcev1beta2.SkipNodeOperationNodeUnprepareResources)
+
+// Validate_SkipNodeOperation validates an instance of SkipNodeOperation according
+// to declarative validation rules in the API schema.
+func Validate_SkipNodeOperation(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *resourcev1beta2.SkipNodeOperation) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForSkipNodeOperation, nil); len(e) != 0 {
+		errs = append(errs, e...)
 	}
 
 	return errs

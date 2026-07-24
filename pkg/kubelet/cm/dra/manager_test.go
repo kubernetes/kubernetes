@@ -3089,3 +3089,122 @@ func TestBuildDeviceHealth(t *testing.T) {
 		})
 	}
 }
+
+func genTestClaimWithSkip(name, driver, device, podUID string, skip ...resourceapi.SkipNodeOperation) *resourceapi.ResourceClaim {
+	c := genTestClaim(name, driver, device, podUID)
+	c.Status.Allocation.Devices.Results[0].SkipNodeOperations = skip
+	return c
+}
+
+func TestPrepareUnprepareResourcesSkipNodeOperations(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	fakeKubeClient := fake.NewClientset()
+
+	manager, err := NewManager(logger, fakeKubeClient, t.TempDir())
+	require.NoError(t, err)
+	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second)
+
+	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, false, nil, nil, nil, nil)
+	require.NoError(t, err)
+	defer draServerInfo.teardownFn()
+
+	pluginHandler := manager.GetWatcherHandler()
+	require.NoError(t, pluginHandler.RegisterPlugin(tCtx, driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil))
+
+	t.Run("SkipNodeOperationAll", func(t *testing.T) {
+		t.Run("Prepare fails when feature gate is disabled", func(t *testing.T) {
+			const claimName = "claim-skip-all-fg-disabled"
+			pod := genTestPodWithClaims(claimName)
+			claim := genTestClaimWithSkip(claimName, driverName, deviceName, string(pod.ObjectMeta.UID), resourceapi.SkipNodeOperationAll)
+			claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{UID: pod.ObjectMeta.UID})
+			_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+			require.NoError(t, err)
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, false)
+			err = manager.PrepareResources(tCtx, pod)
+			require.ErrorContains(t, err, "DRAOptionalNodeOperations feature gate is disabled")
+			assert.Equal(t, uint32(0), draServerInfo.server.prepareResourceCalls.Load())
+		})
+
+		t.Run("Feature gate enabled for prepare and unprepare", func(t *testing.T) {
+			const claimName = "claim-skip-all-normal"
+			pod := genTestPodWithClaims(claimName)
+			claim := genTestClaimWithSkip(claimName, driverName, deviceName, string(pod.ObjectMeta.UID), resourceapi.SkipNodeOperationAll)
+			claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{UID: pod.ObjectMeta.UID})
+			_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+			require.NoError(t, err)
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+
+			err = manager.PrepareResources(tCtx, pod)
+			require.NoError(t, err)
+			assert.Equal(t, uint32(0), draServerInfo.server.prepareResourceCalls.Load(), "NodePrepareResources must be skipped for SkipNodeOperationAll")
+
+			err = manager.UnprepareResources(tCtx, pod)
+			require.NoError(t, err)
+			assert.Equal(t, uint32(0), draServerInfo.server.unprepareResourceCalls.Load(), "NodeUnprepareResources must be skipped for SkipNodeOperationAll")
+		})
+
+		t.Run("Feature gate disabled during unprepare", func(t *testing.T) {
+			const claimName = "claim-skip-all-rollback"
+			pod := genTestPodWithClaims(claimName)
+			claim := genTestClaimWithSkip(claimName, driverName, deviceName, string(pod.ObjectMeta.UID), resourceapi.SkipNodeOperationAll)
+			claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{UID: pod.ObjectMeta.UID})
+			_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+			require.NoError(t, err)
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+			err = manager.PrepareResources(tCtx, pod)
+			require.NoError(t, err)
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, false)
+			err = manager.UnprepareResources(tCtx, pod)
+			require.NoError(t, err, "UnprepareResources must succeed during rollback even if feature gate is disabled")
+			assert.Equal(t, uint32(0), draServerInfo.server.unprepareResourceCalls.Load(), "NodeUnprepareResources must be skipped for SkipNodeOperationAll")
+		})
+	})
+
+	t.Run("SkipNodeOperationNodeUnprepareResources", func(t *testing.T) {
+		t.Run("Feature gate enabled for prepare and unprepare", func(t *testing.T) {
+			const claimName = "claim-skip-unprepare-normal"
+			pod := genTestPodWithClaims(claimName)
+			claim := genTestClaimWithSkip(claimName, driverName, deviceName, string(pod.ObjectMeta.UID), resourceapi.SkipNodeOperationNodeUnprepareResources)
+			claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{UID: pod.ObjectMeta.UID})
+			_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+			require.NoError(t, err)
+
+			draServerInfo.server.prepareResourcesResponse = genPrepareResourcesResponse(claim.UID)
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+
+			prepareCallsBefore := draServerInfo.server.prepareResourceCalls.Load()
+			err = manager.PrepareResources(tCtx, pod)
+			require.NoError(t, err)
+			assert.Equal(t, prepareCallsBefore+1, draServerInfo.server.prepareResourceCalls.Load(), "NodePrepareResources must be called for SkipNodeOperationNodeUnprepareResources")
+
+			err = manager.UnprepareResources(tCtx, pod)
+			require.NoError(t, err)
+			assert.Equal(t, uint32(0), draServerInfo.server.unprepareResourceCalls.Load(), "NodeUnprepareResources must be skipped for SkipNodeOperationNodeUnprepareResources")
+		})
+
+		t.Run("Feature gate disabled during unprepare", func(t *testing.T) {
+			const claimName = "claim-skip-unprepare-rollback"
+			pod := genTestPodWithClaims(claimName)
+			claim := genTestClaimWithSkip(claimName, driverName, deviceName, string(pod.ObjectMeta.UID), resourceapi.SkipNodeOperationNodeUnprepareResources)
+			claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{UID: pod.ObjectMeta.UID})
+			_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+			require.NoError(t, err)
+
+			draServerInfo.server.prepareResourcesResponse = genPrepareResourcesResponse(claim.UID)
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+			err = manager.PrepareResources(tCtx, pod)
+			require.NoError(t, err)
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, false)
+			err = manager.UnprepareResources(tCtx, pod)
+			require.NoError(t, err, "UnprepareResources must succeed during rollback even if feature gate is disabled")
+			assert.Equal(t, uint32(0), draServerInfo.server.unprepareResourceCalls.Load(), "NodeUnprepareResources must be skipped for SkipNodeOperationNodeUnprepareResources")
+		})
+	})
+}

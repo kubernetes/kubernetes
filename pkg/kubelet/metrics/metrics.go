@@ -1181,6 +1181,26 @@ var (
 		[]string{"driver_name", "method_name", "grpc_status_code"},
 	)
 
+	DRANodePrepareSkipsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      DRASubsystem,
+			Name:           "node_prepare_skips_total",
+			Help:           "Cumulative number of times NodePrepareResources gRPC calls were skipped due to SkipNodeOperations.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"driver_name"},
+	)
+
+	DRANodeUnprepareSkipsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      DRASubsystem,
+			Name:           "node_unprepare_skips_total",
+			Help:           "Cumulative number of times NodeUnprepareResources gRPC calls were skipped due to SkipNodeOperations.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"driver_name"},
+	)
+
 	DRAResourceClaimsInUseDesc = metrics.NewDesc(
 		metrics.BuildFQName("", DRASubsystem, "resource_claims_in_use"),
 		"The number of ResourceClaims that are currently in use on the node, by driver name (driver_name label value) and across all drivers (special value <any> for driver_name). Note that the sum of all by-driver counts is not the total number of in-use ResourceClaims because the same ResourceClaim might use devices from different drivers. Instead, use the count for the <any> driver_name.",
@@ -1523,6 +1543,8 @@ func Register() {
 			legacyregistry.MustRegister(
 				DRAOperationsDuration,
 				DRAGRPCOperationsDuration,
+				DRANodePrepareSkipsTotal,
+				DRANodeUnprepareSkipsTotal,
 			)
 		}
 

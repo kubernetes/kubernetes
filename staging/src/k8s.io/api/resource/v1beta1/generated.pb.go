@@ -1588,6 +1588,15 @@ func (m *DeviceRequestAllocationResult) MarshalToSizedBuffer(dAtA []byte) (int, 
 	_ = i
 	var l int
 	_ = l
+	if len(m.SkipNodeOperations) > 0 {
+		for iNdEx := len(m.SkipNodeOperations) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.SkipNodeOperations[iNdEx])
+			copy(dAtA[i:], m.SkipNodeOperations[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(m.SkipNodeOperations[iNdEx])))
+			i--
+			dAtA[i] = 0x5a
+		}
+	}
 	if len(m.ConsumedCapacity) > 0 {
 		keysForConsumedCapacity := make([]string, 0, len(m.ConsumedCapacity))
 		for k := range m.ConsumedCapacity {
@@ -2647,6 +2656,15 @@ func (m *ResourceSliceSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.SkipNodeOperations) > 0 {
+		for iNdEx := len(m.SkipNodeOperations) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.SkipNodeOperations[iNdEx])
+			copy(dAtA[i:], m.SkipNodeOperations[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(m.SkipNodeOperations[iNdEx])))
+			i--
+			dAtA[i] = 0x52
+		}
+	}
 	if m.PartitionTypeAttribute != nil {
 		i -= len(*m.PartitionTypeAttribute)
 		copy(dAtA[i:], *m.PartitionTypeAttribute)
@@ -3347,6 +3365,12 @@ func (m *DeviceRequestAllocationResult) Size() (n int) {
 			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
 		}
 	}
+	if len(m.SkipNodeOperations) > 0 {
+		for _, s := range m.SkipNodeOperations {
+			l = len(s)
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
 	return n
 }
 
@@ -3727,6 +3751,12 @@ func (m *ResourceSliceSpec) Size() (n int) {
 	if m.PartitionTypeAttribute != nil {
 		l = len(*m.PartitionTypeAttribute)
 		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if len(m.SkipNodeOperations) > 0 {
+		for _, s := range m.SkipNodeOperations {
+			l = len(s)
+			n += 1 + l + sovGenerated(uint64(l))
+		}
 	}
 	return n
 }
@@ -4196,6 +4226,7 @@ func (this *DeviceRequestAllocationResult) String() string {
 		`BindingFailureConditions:` + fmt.Sprintf("%v", this.BindingFailureConditions) + `,`,
 		`ShareID:` + valueToStringGenerated(this.ShareID) + `,`,
 		`ConsumedCapacity:` + mapStringForConsumedCapacity + `,`,
+		`SkipNodeOperations:` + fmt.Sprintf("%v", this.SkipNodeOperations) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -4481,6 +4512,7 @@ func (this *ResourceSliceSpec) String() string {
 		`PerDeviceNodeSelection:` + valueToStringGenerated(this.PerDeviceNodeSelection) + `,`,
 		`SharedCounters:` + repeatedStringForSharedCounters + `,`,
 		`PartitionTypeAttribute:` + valueToStringGenerated(this.PartitionTypeAttribute) + `,`,
+		`SkipNodeOperations:` + fmt.Sprintf("%v", this.SkipNodeOperations) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -9313,6 +9345,38 @@ func (m *DeviceRequestAllocationResult) Unmarshal(dAtA []byte) error {
 			}
 			m.ConsumedCapacity[QualifiedName(mapkey)] = *mapvalue
 			iNdEx = postIndex
+		case 11:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SkipNodeOperations", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SkipNodeOperations = append(m.SkipNodeOperations, SkipNodeOperation(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -12415,6 +12479,38 @@ func (m *ResourceSliceSpec) Unmarshal(dAtA []byte) error {
 			}
 			s := FullyQualifiedName(dAtA[iNdEx:postIndex])
 			m.PartitionTypeAttribute = &s
+			iNdEx = postIndex
+		case 10:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SkipNodeOperations", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SkipNodeOperations = append(m.SkipNodeOperations, SkipNodeOperation(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

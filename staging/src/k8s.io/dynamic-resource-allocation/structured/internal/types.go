@@ -83,6 +83,7 @@ type Features struct {
 	DeviceTaints            bool
 	FractionalCapacityRange bool
 	ListTypeAttributes      bool
+	OptionalNodeOperations  bool
 	PartitionableDevices    bool
 	PrioritizedList         bool
 }
@@ -110,6 +111,9 @@ func (f Features) Set() sets.Set[string] {
 	if f.ListTypeAttributes {
 		enabled.Insert("DRAListTypeAttributes")
 	}
+	if f.OptionalNodeOperations {
+		enabled.Insert("DRAOptionalNodeOperations")
+	}
 	if f.PartitionableDevices {
 		enabled.Insert("DRAPartitionableDevices")
 	}
@@ -129,6 +133,7 @@ var FeaturesAll = Features{
 	DeviceTaints:            true,
 	FractionalCapacityRange: true,
 	ListTypeAttributes:      true,
+	OptionalNodeOperations:  true,
 	PartitionableDevices:    true,
 	PrioritizedList:         true,
 }

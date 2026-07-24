@@ -193,6 +193,9 @@
         }
       }
     ],
-    "partitionTypeAttribute": "partitionTypeAttributeValue"
+    "partitionTypeAttribute": "partitionTypeAttributeValue",
+    "skipNodeOperations": [
+      "skipNodeOperationsValue"
+    ]
   }
 }

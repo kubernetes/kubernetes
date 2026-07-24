@@ -47,6 +47,7 @@ type ResourceSliceSpec struct {
 	PerDeviceNodeSelection *bool                           `json:",omitempty"`
 	SharedCounters         []CounterSet                    `json:",omitempty"`
 	PartitionTypeAttribute *resourceapi.FullyQualifiedName `json:",omitempty"`
+	SkipNodeOperations     []resourceapi.SkipNodeOperation `json:",omitempty"`
 }
 
 type CounterSet struct {

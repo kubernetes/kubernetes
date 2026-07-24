@@ -763,6 +763,11 @@ func (in *DeviceRequestAllocationResult) DeepCopyInto(out *DeviceRequestAllocati
 			(*out)[key] = val.DeepCopy()
 		}
 	}
+	if in.SkipNodeOperations != nil {
+		in, out := &in.SkipNodeOperations, &out.SkipNodeOperations
+		*out = make([]SkipNodeOperation, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
@@ -1494,6 +1499,11 @@ func (in *ResourceSliceSpec) DeepCopyInto(out *ResourceSliceSpec) {
 		in, out := &in.PartitionTypeAttribute, &out.PartitionTypeAttribute
 		*out = new(FullyQualifiedName)
 		**out = **in
+	}
+	if in.SkipNodeOperations != nil {
+		in, out := &in.SkipNodeOperations, &out.SkipNodeOperations
+		*out = make([]SkipNodeOperation, len(*in))
+		copy(*out, *in)
 	}
 	return
 }

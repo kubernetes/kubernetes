@@ -228,7 +228,43 @@ type ResourceSliceSpec struct {
 	// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:optional
 	// +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:format=k8s-resource-fully-qualified-name
 	PartitionTypeAttribute *FullyQualifiedName `json:"partitionTypeAttribute,omitempty" protobuf:"bytes,9,opt,name=partitionTypeAttribute"`
+
+	// SkipNodeOperations lists node-local resource operations (gRPC calls)
+	// that will be skipped for the devices in this slice when determining whether
+	// operations are necessary on the node. If all allocated devices for a driver in
+	// a claim skip an operation, that gRPC call will be skipped. Valid values are:
+	//
+	// - "NodePrepareResources": NodePrepareResources gRPC calls are skipped. This
+	//   value cannot be specified unless "NodeUnprepareResources" is also listed
+	//   (or "*" is specified).
+	// - "NodeUnprepareResources": NodeUnprepareResources gRPC calls are skipped.
+	// - "*": All node-local resource operations are skipped.
+	//
+	// Other values may be added in the future. The kubelet must ignore unknown
+	// values.
+	//
+	// +optional
+	// +listType=set
+	// +k8s:listType=set
+	// +featureGate=DRAOptionalNodeOperations
+	// +k8s:optional
+	SkipNodeOperations []SkipNodeOperation `json:"skipNodeOperations,omitempty" protobuf:"bytes,10,rep,name=skipNodeOperations,casttype=SkipNodeOperation"`
 }
+
+// +enum
+// +k8s:enum
+type SkipNodeOperation string
+
+const (
+	// SkipNodeOperationNodePrepareResources indicates that NodePrepareResources gRPC calls are skipped.
+	SkipNodeOperationNodePrepareResources SkipNodeOperation = "NodePrepareResources"
+
+	// SkipNodeOperationNodeUnprepareResources indicates that NodeUnprepareResources gRPC calls are skipped.
+	SkipNodeOperationNodeUnprepareResources SkipNodeOperation = "NodeUnprepareResources"
+
+	// SkipNodeOperationAll indicates that all node-local resource operations are skipped.
+	SkipNodeOperationAll SkipNodeOperation = "*"
+)
 
 // CounterSet defines a named set of counters
 // that are available to be used by devices defined in the
@@ -2118,6 +2154,19 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +featureGate=DRAConsumableCapacity
 	ConsumedCapacity map[QualifiedName]resource.Quantity `json:"consumedCapacity,omitempty" protobuf:"bytes,10,rep,name=consumedCapacity"`
+
+	// SkipNodeOperations lists node-local resource operations (gRPC calls)
+	// that will be skipped for this allocated device when determining whether
+	// operations are necessary on the node. If all allocated devices for a driver in
+	// a claim skip an operation, that gRPC call will be skipped. It is a copy of
+	// the ResourceSlice.spec.skipNodeOperations value at the time when the device was allocated.
+	//
+	// +optional
+	// +listType=set
+	// +k8s:listType=set
+	// +featureGate=DRAOptionalNodeOperations
+	// +k8s:optional
+	SkipNodeOperations []SkipNodeOperation `json:"skipNodeOperations,omitempty" protobuf:"bytes,11,rep,name=skipNodeOperations,casttype=SkipNodeOperation"`
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.

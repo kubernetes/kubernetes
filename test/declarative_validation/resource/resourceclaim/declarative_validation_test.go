@@ -866,6 +866,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 	driverPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("driver")
 	configOpaqueDriverPath := field.NewPath("status", "allocation", "devices", "config").Index(0).Child("opaque", "driver")
 	resultTolerationPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("tolerations").Index(0)
+	skipNodeOperationsPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("skipNodeOperations")
 
 	testCases := map[string]struct {
 		old          resource.ResourceClaim
@@ -1239,6 +1240,33 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 			})),
 			expectedErrs: field.ErrorList{
 				field.NotSupported(resultTolerationPath.Child("effect"), resource.DeviceTaintEffect("InvalidEffect"), []string{"NoExecute", "NoSchedule"}).MarkBeta(),
+			},
+		},
+		// .Status.Allocation.Devices.Results[%d].SkipNodeOperations
+		"valid status.allocation.devices.results skipNodeOperations All": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultSkipNodeOperations(resource.SkipNodeOperationAll)),
+		},
+		"valid status.allocation.devices.results skipNodeOperations NodeUnprepareResources": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultSkipNodeOperations(resource.SkipNodeOperationNodeUnprepareResources)),
+		},
+		"valid status.allocation.devices.results skipNodeOperations, old value is invalid and new value is the same": {
+			old:    mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultSkipNodeOperations("InvalidOption")),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultSkipNodeOperations("InvalidOption")),
+		},
+		"invalid status.allocation.devices.results skipNodeOperations": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultSkipNodeOperations("InvalidOption")),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(skipNodeOperationsPath.Index(0), resource.SkipNodeOperation("InvalidOption"), []string{"*", "NodePrepareResources", "NodeUnprepareResources"}),
+			},
+		},
+		"invalid status.allocation.devices.results skipNodeOperations duplicate": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusDeviceRequestAllocationResultSkipNodeOperations(resource.SkipNodeOperationAll, resource.SkipNodeOperationAll)),
+			expectedErrs: field.ErrorList{
+				field.Duplicate(skipNodeOperationsPath.Index(1), resource.SkipNodeOperationAll),
 			},
 		},
 		// .Status.Devices
@@ -1618,6 +1646,14 @@ func tweakStatusDeviceRequestAllocationResultShareID(shareID types.UID) func(rc 
 	return func(rc *resource.ResourceClaim) {
 		for i := range rc.Status.Allocation.Devices.Results {
 			rc.Status.Allocation.Devices.Results[i].ShareID = &shareID
+		}
+	}
+}
+
+func tweakStatusDeviceRequestAllocationResultSkipNodeOperations(skipNodeOperations ...resource.SkipNodeOperation) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		for i := range rc.Status.Allocation.Devices.Results {
+			rc.Status.Allocation.Devices.Results[i].SkipNodeOperations = skipNodeOperations
 		}
 	}
 }

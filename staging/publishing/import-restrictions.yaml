@@ -272,6 +272,7 @@
   - k8s.io/client-go
   - k8s.io/component-base/metrics
   - k8s.io/component-base/metrics/legacyregistry
+  - k8s.io/component-helpers/nodedeclaredfeatures
   - k8s.io/component-helpers/scheduling/corev1/nodeaffinity
   - k8s.io/dynamic-resource-allocation
   - k8s.io/klog

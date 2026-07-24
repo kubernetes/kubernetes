@@ -297,6 +297,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 								Name: "device-simple",
 							},
 						},
+						SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll},
 					},
 					{
 						SharedCounters: []resourceapi.CounterSet{
@@ -367,9 +368,10 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 				Name:               poolName,
 				ResourceSliceCount: int64(len(expectedResources.Pools[poolName].Slices)),
 			},
-			AllNodes:       ptr.To(true),
-			SharedCounters: sl.SharedCounters,
-			Devices:        sl.Devices,
+			AllNodes:           new(true),
+			SharedCounters:     sl.SharedCounters,
+			Devices:            sl.Devices,
+			SkipNodeOperations: sl.SkipNodeOperations,
 		})
 	}
 
@@ -406,6 +408,11 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 						expectedSliceSpecs[i].Devices[e].BindsToNode = nil
 						disabledFeaturesForSlice.Insert(disabled)
 					}
+				}
+			case features.DRAOptionalNodeOperations:
+				if expectedSliceSpecs[i].SkipNodeOperations != nil {
+					expectedSliceSpecs[i].SkipNodeOperations = nil
+					disabledFeaturesForSlice.Insert(disabled)
 				}
 			default:
 				tCtx.Fatalf("faulty test, case for %s missing", disabled)
@@ -469,6 +476,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 				"PerDeviceNodeSelection": matchPointer(spec.PerDeviceNodeSelection),
 				"SharedCounters":         gomega.Equal(spec.SharedCounters),
 				"PartitionTypeAttribute": matchPointer(spec.PartitionTypeAttribute),
+				"SkipNodeOperations":     gomega.Equal(spec.SkipNodeOperations),
 			})))
 		}
 		return expectedSlices
