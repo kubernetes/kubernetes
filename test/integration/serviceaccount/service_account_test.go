@@ -305,7 +305,7 @@ func TestLegacyServiceAccountTokenTracking(t *testing.T) {
 			if !ok {
 				t.Fatalf("Secret wasn't labeled with %q", serviceaccount.LastUsedLabelKey)
 			}
-			if date != dateBefore || date != dateAfter {
+			if date != dateBefore && date != dateAfter {
 				t.Fatalf("Secret was labeled with wrong date: %q", date)
 			}
 		})
@@ -323,7 +323,7 @@ func TestLegacyServiceAccountTokenTracking(t *testing.T) {
 		if !ok {
 			return false, fmt.Errorf("configMap doesn't contain key %q", legacytokentracking.ConfigMapDataKey)
 		}
-		if date != dateBefore || date != dateAfter {
+		if date != dateBefore && date != dateAfter {
 			return false, fmt.Errorf("configMap contains a wrong date %q", date)
 		}
 		return true, nil
