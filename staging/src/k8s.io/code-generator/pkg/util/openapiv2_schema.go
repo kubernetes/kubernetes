@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package util
 
 import (
 	"encoding/json"
@@ -23,23 +23,14 @@ import (
 
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	"k8s.io/sample-controller/pkg/generated/openapi"
 )
 
-// Outputs openAPI schema JSON containing the schema definitions in zz_generated.openapi.go.
-func main() {
-	err := output()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed: %v", err) // nolint:errcheck
-		os.Exit(1)
-	}
-}
-
-func output() error {
+// OutputSchemas writes OpenAPI v2 schema JSON to stdout for the provided definitions.
+func OutputSchemas(getDefinitions common.GetOpenAPIDefinitions) error {
 	refFunc := func(name string) spec.Ref {
 		return spec.MustCreateRef(fmt.Sprintf("#/definitions/%s", name))
 	}
-	defs := openapi.GetOpenAPIDefinitions(refFunc)
+	defs := getDefinitions(refFunc)
 	schemaDefs := make(map[string]spec.Schema, len(defs))
 	for k, v := range defs {
 		// Replace top-level schema with v2 if a v2 schema is embedded
@@ -53,7 +44,6 @@ func output() error {
 				continue
 			}
 		}
-
 		schemaDefs[k] = v.Schema
 	}
 	data, err := json.Marshal(&spec.Swagger{
@@ -71,6 +61,6 @@ func output() error {
 	if err != nil {
 		return fmt.Errorf("error serializing api definitions: %w", err)
 	}
-	os.Stdout.Write(data) // nolint:errcheck
-	return nil
+	_, err = os.Stdout.Write(data)
+	return err
 }
