@@ -46,16 +46,13 @@ func SetObjectDefaults_Defaulted(in *Defaulted) {
 		in.StringDefault = "bar"
 	}
 	if in.StringPointer == nil {
-		var ptrVar1 string = "default"
-		in.StringPointer = &ptrVar1
+		in.StringPointer = new(string("default"))
 	}
 	if in.Int64 == nil {
-		var ptrVar1 int64 = 64
-		in.Int64 = &ptrVar1
+		in.Int64 = new(int64(64))
 	}
 	if in.Int32 == nil {
-		var ptrVar1 int32 = 32
-		in.Int32 = &ptrVar1
+		in.Int32 = new(int32(32))
 	}
 	if in.IntDefault == 0 {
 		in.IntDefault = 1
@@ -70,8 +67,7 @@ func SetObjectDefaults_Defaulted(in *Defaulted) {
 	}
 	for i := range in.List {
 		if in.List[i] == nil {
-			var ptrVar1 string = "apple"
-			in.List[i] = &ptrVar1
+			in.List[i] = new(string("apple"))
 		}
 	}
 	if in.Sub == nil {
@@ -123,8 +119,7 @@ func SetObjectDefaults_Defaulted(in *Defaulted) {
 	}
 	for i_Map := range in.Map {
 		if in.Map[i_Map] == nil {
-			var ptrVar1 string = "apple"
-			in.Map[i_Map] = &ptrVar1
+			in.Map[i_Map] = new(string("apple"))
 		}
 	}
 	if in.StructMap == nil {
@@ -138,8 +133,7 @@ func SetObjectDefaults_Defaulted(in *Defaulted) {
 		}
 	}
 	if in.AliasPtr == nil {
-		var ptrVar1 string = "banana"
-		in.AliasPtr = &ptrVar1
+		in.AliasPtr = new(string("banana"))
 	}
 }
 
@@ -148,16 +142,13 @@ func SetObjectDefaults_DefaultedOmitempty(in *DefaultedOmitempty) {
 		in.StringDefault = "bar"
 	}
 	if in.StringPointer == nil {
-		var ptrVar1 string = "default"
-		in.StringPointer = &ptrVar1
+		in.StringPointer = new(string("default"))
 	}
 	if in.Int64 == nil {
-		var ptrVar1 int64 = 64
-		in.Int64 = &ptrVar1
+		in.Int64 = new(int64(64))
 	}
 	if in.Int32 == nil {
-		var ptrVar1 int32 = 32
-		in.Int32 = &ptrVar1
+		in.Int32 = new(int32(32))
 	}
 	if in.IntDefault == 0 {
 		in.IntDefault = 1
@@ -172,8 +163,7 @@ func SetObjectDefaults_DefaultedOmitempty(in *DefaultedOmitempty) {
 	}
 	for i := range in.List {
 		if in.List[i] == nil {
-			var ptrVar1 string = "apple"
-			in.List[i] = &ptrVar1
+			in.List[i] = new(string("apple"))
 		}
 	}
 	if in.Sub == nil {
@@ -225,8 +215,7 @@ func SetObjectDefaults_DefaultedOmitempty(in *DefaultedOmitempty) {
 	}
 	for i_Map := range in.Map {
 		if in.Map[i_Map] == nil {
-			var ptrVar1 string = "apple"
-			in.Map[i_Map] = &ptrVar1
+			in.Map[i_Map] = new(string("apple"))
 		}
 	}
 	if in.StructMap == nil {
@@ -240,8 +229,7 @@ func SetObjectDefaults_DefaultedOmitempty(in *DefaultedOmitempty) {
 		}
 	}
 	if in.AliasPtr == nil {
-		var ptrVar1 string = "banana"
-		in.AliasPtr = &ptrVar1
+		in.AliasPtr = new(string("banana"))
 	}
 }
 
@@ -257,31 +245,25 @@ func SetObjectDefaults_DefaultedWithFunction(in *DefaultedWithFunction) {
 
 func SetObjectDefaults_DefaultedWithReference(in *DefaultedWithReference) {
 	if in.AliasConvertDefaultPointer == nil {
-		ptrVar1 := DefaultedValueItem(SomeValue)
-		in.AliasConvertDefaultPointer = &ptrVar1
+		in.AliasConvertDefaultPointer = new(DefaultedValueItem(SomeValue))
 	}
 	if in.PointerAliasDefault == nil {
-		var ptrVar1 string = "apple"
-		in.PointerAliasDefault = &ptrVar1
+		in.PointerAliasDefault = new(string("apple"))
 	}
 	if in.AliasPointerInside == nil {
-		ptrVar1 := string(SomeDefault)
-		in.AliasPointerInside = &ptrVar1
+		in.AliasPointerInside = new(string(SomeDefault))
 	}
 	if in.AliasOverride == nil {
-		ptrVar1 := string(SomeDefault)
-		in.AliasOverride = &ptrVar1
+		in.AliasOverride = new(string(SomeDefault))
 	}
 	if in.AliasPointerDefault == nil {
-		ptrVar1 := DefaultedValueItem(SomeValue)
-		in.AliasPointerDefault = &ptrVar1
+		in.AliasPointerDefault = new(DefaultedValueItem(SomeValue))
 	}
 	if in.AliasNonPointer == "" {
 		in.AliasNonPointer = ValueItem(SomeValue)
 	}
 	if in.AliasPointer == nil {
-		ptrVar1 := ValueItem(SomeValue)
-		in.AliasPointer = &ptrVar1
+		in.AliasPointer = new(ValueItem(SomeValue))
 	}
 	if in.SymbolReference == "" {
 		in.SymbolReference = string(SomeDefault)
@@ -293,33 +275,15 @@ func SetObjectDefaults_DefaultedWithReference(in *DefaultedWithReference) {
 		in.SameNamePackageSymbolReference2 = string(externalexternal.AnotherConstant)
 	}
 	if in.PointerConversion == nil {
-		ptrVar9 := string(SomeValue)
-		ptrVar8 := &ptrVar9
-		ptrVar7 := (*B1)(&ptrVar8)
-		ptrVar6 := (*B2)(&ptrVar7)
-		ptrVar5 := &ptrVar6
-		ptrVar4 := &ptrVar5
-		ptrVar3 := &ptrVar4
-		ptrVar2 := (*B3)(&ptrVar3)
-		ptrVar1 := &ptrVar2
-		in.PointerConversion = (*B4)(&ptrVar1)
+		in.PointerConversion = new(B4(new(new(B3(new(new(new(new(B2(new(B1(new(string(SomeValue))))))))))))))
 	}
 	if in.PointerConversionValue == nil {
-		ptrVar8 := string(SomeValue)
-		ptrVar7 := &ptrVar8
-		ptrVar6 := (*B1)(&ptrVar7)
-		ptrVar5 := (*B2)(&ptrVar6)
-		ptrVar4 := &ptrVar5
-		ptrVar3 := &ptrVar4
-		ptrVar2 := &ptrVar3
-		ptrVar1 := (*B3)(&ptrVar2)
-		in.PointerConversionValue = &ptrVar1
+		in.PointerConversionValue = new(new(B3(new(new(new(new(B2(new(B1(new(string(SomeValue))))))))))))
 	}
 	if in.FullyQualifiedLocalSymbol == "" {
 		in.FullyQualifiedLocalSymbol = string(SomeValue)
 	}
 	if in.ImportFromAliasCast == nil {
-		ptrVar1 := external2.String(SomeValue)
-		in.ImportFromAliasCast = &ptrVar1
+		in.ImportFromAliasCast = new(external2.String(SomeValue))
 	}
 }
