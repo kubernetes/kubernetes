@@ -1580,6 +1580,157 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 	}
 }
 
+// TestTopologyAwareSchedulingRespectsNominatedNode verifies that the gang lands on
+// the rack matching the pods' NominatedNodeName. The core scheduler evaluates the
+// nominated placement first and, when the gang is feasible there, uses it without
+// trying the other placements, mirroring pod-by-pod scheduling.
+func TestTopologyAwareSchedulingRespectsNominatedNode(t *testing.T) {
+	tt := scenario{
+		name: "gang prefers the rack matching the pods' nominated node",
+		steps: []stepsframework.Step{
+			{
+				Name: "Create one node per rack. rack-1's node is smaller so MostAllocated scores it higher; rack-2 (nominated) fits the gang but scores lower, so without the NNN fix the gang deterministically lands on rack-1",
+				CreateNodes: []*v1.Node{
+					makeNode("node-rack1", "rack-1", "zone-1"),
+					st.MakeNode().Name("node-rack2").Label("rack", "rack-2").Label("zone", "zone-1").
+						Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+				},
+			},
+			{
+				Name: "Create the gang pods before the PodGroup, so they wait gated in the queue",
+				CreatePods: []*v1.Pod{
+					makePod("p1", "pg1"),
+					makePod("p2", "pg1"),
+				},
+			},
+			{
+				Name: "Nominate rack-2 for p1 via its status",
+				UpdatePodStatus: &stepsframework.UpdatePod{
+					PodName:  "p1",
+					ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-rack2" },
+				},
+			},
+			{
+				Name: "Nominate rack-2 for p2 via its status",
+				UpdatePodStatus: &stepsframework.UpdatePod{
+					PodName:  "p2",
+					ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-rack2" },
+				},
+			},
+			{
+				Name: "Wait until the queued pods carry the nominated node before opening the gate",
+				WaitForPodsNominated: map[string]string{
+					"p1": "node-rack2",
+					"p2": "node-rack2",
+				},
+			},
+			{
+				Name:           "Create the PodGroup (gang, minCount=2), opening the gate",
+				CreatePodGroup: makeGangPodGroup("pg1", "rack", 2),
+			},
+			{
+				Name:                 "Verify the gang is scheduled",
+				WaitForPodsScheduled: []string{"p1", "p2"},
+			},
+			{
+				Name: "Verify the gang landed on rack-2, the nominated rack",
+				VerifyAssignments: &stepsframework.VerifyAssignments{
+					Pods:  []string{"p1", "p2"},
+					Nodes: sets.New("node-rack2"),
+				},
+			},
+		},
+	}
+	runTestScenario(t, tt, false)
+}
+
+// TestTopologyAwareSchedulingFallsBackWhenNominatedInfeasible verifies that a pod does not
+// short-circuit on a nominated placement where minCount was met in an earlier cycle but no
+// new pod can be scheduled.
+func TestTopologyAwareSchedulingFallsBackWhenNominatedInfeasible(t *testing.T) {
+	tt := scenario{
+		name: "pod falls back when its nominated placement is full after minCount was met",
+		steps: []stepsframework.Step{
+			{
+				Name: "Create a one-CPU node in rack-1 and a four-CPU node in rack-2",
+				CreateNodes: []*v1.Node{
+					st.MakeNode().Name("node-rack1").Label("rack", "rack-1").Label("zone", "zone-1").
+						Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+					st.MakeNode().Name("node-rack2").Label("rack", "rack-2").Label("zone", "zone-1").
+						Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+				},
+			},
+			{
+				Name:       "Fill rack-1 with an unrelated assigned pod",
+				CreatePods: []*v1.Pod{makeAssignedPod("existing", "node-rack1", "1")},
+			},
+			{
+				Name:           "Create the gang with minCount=2",
+				CreatePodGroup: makeGangPodGroup("pg1", "rack", 2),
+			},
+			{
+				Name: "Create the first two pods",
+				CreatePods: []*v1.Pod{
+					makePod("p1", "pg1"),
+					makePod("p2", "pg1"),
+				},
+			},
+			{
+				Name:                 "Wait for minCount to be satisfied",
+				WaitForPodsScheduled: []string{"p1", "p2"},
+			},
+			{
+				Name: "Verify the first two pods satisfied minCount on rack-2",
+				VerifyAssignments: &stepsframework.VerifyAssignments{
+					Pods:  []string{"p1", "p2"},
+					Nodes: sets.New("node-rack2"),
+				},
+			},
+			{
+				Name:           "Delete the PodGroup so a new pod remains gated",
+				DeletePodGroup: "pg1",
+			},
+			{
+				Name:       "Create a third pod while the PodGroup is absent",
+				CreatePods: []*v1.Pod{makePod("p3", "pg1")},
+			},
+			{
+				Name:                                "Wait for the third pod to be gated on the missing PodGroup",
+				WaitForPodsInIncompletePodGroupPods: []string{"p3"},
+			},
+			{
+				Name: "Nominate the full node in rack-1 for the third pod",
+				UpdatePodStatus: &stepsframework.UpdatePod{
+					PodName:  "p3",
+					ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-rack1" },
+				},
+			},
+			{
+				Name: "Wait until the gated pod carries the nominated node",
+				WaitForPodsNominated: map[string]string{
+					"p3": "node-rack1",
+				},
+			},
+			{
+				Name:           "Re-create the PodGroup to move the third pod to the active queue",
+				CreatePodGroup: makeGangPodGroup("pg1", "rack", 2),
+			},
+			{
+				Name:                 "Verify the third pod falls back and schedules",
+				WaitForPodsScheduled: []string{"p3"},
+			},
+			{
+				Name: "Verify the third pod landed on rack-2 instead of the full nominated node",
+				VerifyAssignments: &stepsframework.VerifyAssignments{
+					Pods:  []string{"p3"},
+					Nodes: sets.New("node-rack2"),
+				},
+			},
+		},
+	}
+	runTestScenario(t, tt, false)
+}
+
 func runTestScenario(t *testing.T, tt scenario, cpgEnabled bool) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.CompositePodGroup:               cpgEnabled,
