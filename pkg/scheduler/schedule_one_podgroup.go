@@ -79,10 +79,9 @@ const (
 	// minFeasiblePlacementsToFind is the minimum number of placements that would be scored
 	// in each scheduling cycle.
 	minFeasiblePlacementsToFind = 1
-	// minFeasiblePlacementsPercentageToFind is the minimum percentage of placements that
-	// would be scored in each scheduling cycle. This is a semi-arbitrary value
-	// to ensure that a certain minimum of placements are checked for feasibility.
-	// This in turn helps ensure a minimum level of spreading.
+	// minFeasiblePlacementsPercentageToFind is the minimum adaptive percentage used when
+	// PercentageOfPlacementsToScore is 0. An explicitly configured lower value, such as 3,
+	// overrides this adaptive minimum.
 	minFeasiblePlacementsPercentageToFind = 5
 )
 
@@ -1124,18 +1123,6 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 	var anyResultSubtree map[fwk.EntityKey]*podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]map[fwk.EntityKey]*podGroupAlgorithmResult)
 
-	numPlacementsToFind := 1
-	if schedFwk.HasPlacementScorePlugins() {
-		numPlacementsToFind = sched.numFeasiblePlacementsToFind(schedFwk.PercentageOfPlacementsToScore(), placements)
-	}
-
-	// Only a subset of placements will be evaluated, so shuffle to avoid favoring the order
-	// returned by the PlacementGenerate plugin. Clone the slice to avoid mutating plugin data.
-	if sched.shufflePlacements != nil && numPlacementsToFind < len(placements) {
-		placements = slices.Clone(placements)
-		sched.shufflePlacements(placements)
-	}
-
 	parentPlacement := sched.nodeInfoSnapshot.GetPlacement()
 	defer func() {
 		sched.nodeInfoSnapshot.ForgetPlacement()
@@ -1171,10 +1158,6 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 
 		if result.status.IsSuccess() {
 			successfulResults[placement] = subtreeResult
-		}
-
-		if len(successfulResults) >= numPlacementsToFind {
-			break
 		}
 	}
 
@@ -1238,15 +1221,12 @@ func (sched *Scheduler) numFeasiblePlacementsToFind(percentageOfPlacementsToScor
 		percentage = int(sched.percentageOfPlacementsToScore)
 	}
 
-	// If neither is set or the set value is 0, linearly interpolate the value between (0, 100) and (5000, 10),
-	// that is for small clusters use 100% of the placements, and for large clusters use 10% of the placements,
-	// with a hard cap at 5% placements for even larger clusters.
+	// If percentage is 0, linearly interpolate from 100% to 10% as the summed node count
+	// across generated placements grows from 0 to 5000, with a 5% floor.
 	if percentage == 0 {
 		numAllNodes := 0
 		for _, placement := range placements {
-			// We are summing up placement nodes as those can overlap or skip over certain nodes.
-			// For the purpose of this computation we care about the upper bound of computed nodes throughout the scheduling cycle,
-			// which can be different than the number of nodes in the cluster.
+			// Placements may overlap or omit cluster nodes, so use their summed node count.
 			numAllNodes += len(placement.Nodes)
 		}
 		percentage = max(minFeasiblePlacementsPercentageToFind, 100-numAllNodes*9/500)

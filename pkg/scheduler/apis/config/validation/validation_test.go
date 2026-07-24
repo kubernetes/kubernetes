@@ -112,6 +112,36 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 	percentageOfNodesToScoreNegative := validConfig.DeepCopy()
 	percentageOfNodesToScoreNegative.PercentageOfNodesToScore = ptr.To[int32](-1)
 
+	percentageOfPlacementsToScore50 := validConfig.DeepCopy()
+	percentageOfPlacementsToScore50.PercentageOfPlacementsToScore = ptr.To[int32](50)
+
+	percentageOfPlacementsToScore0 := validConfig.DeepCopy()
+	percentageOfPlacementsToScore0.PercentageOfPlacementsToScore = ptr.To[int32](0)
+
+	percentageOfPlacementsToScore100 := validConfig.DeepCopy()
+	percentageOfPlacementsToScore100.PercentageOfPlacementsToScore = ptr.To[int32](100)
+
+	percentageOfPlacementsToScore101 := validConfig.DeepCopy()
+	percentageOfPlacementsToScore101.PercentageOfPlacementsToScore = ptr.To[int32](101)
+
+	percentageOfPlacementsToScoreNegative := validConfig.DeepCopy()
+	percentageOfPlacementsToScoreNegative.PercentageOfPlacementsToScore = ptr.To[int32](-1)
+
+	profilePercentageOfPlacementsToScore50 := validConfig.DeepCopy()
+	profilePercentageOfPlacementsToScore50.Profiles[0].PercentageOfPlacementsToScore = ptr.To[int32](50)
+
+	profilePercentageOfPlacementsToScore0 := validConfig.DeepCopy()
+	profilePercentageOfPlacementsToScore0.Profiles[0].PercentageOfPlacementsToScore = ptr.To[int32](0)
+
+	profilePercentageOfPlacementsToScore100 := validConfig.DeepCopy()
+	profilePercentageOfPlacementsToScore100.Profiles[0].PercentageOfPlacementsToScore = ptr.To[int32](100)
+
+	profilePercentageOfPlacementsToScore101 := validConfig.DeepCopy()
+	profilePercentageOfPlacementsToScore101.Profiles[0].PercentageOfPlacementsToScore = ptr.To[int32](101)
+
+	profilePercentageOfPlacementsToScoreNegative := validConfig.DeepCopy()
+	profilePercentageOfPlacementsToScoreNegative.Profiles[0].PercentageOfPlacementsToScore = ptr.To[int32](-1)
+
 	schedulerNameNotSet := validConfig.DeepCopy()
 	schedulerNameNotSet.Profiles[1].SchedulerName = ""
 
@@ -264,7 +294,7 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 			featureOverrides: featuregatetesting.FeatureOverrides{
 				features.TopologyAwareWorkloadScheduling: false,
 			},
-			config: setPercentageOfPlacementsToScore(validConfig, 50),
+			config: percentageOfPlacementsToScore50,
 			wantErrs: field.ErrorList{
 				&field.Error{
 					Type:  field.ErrorTypeForbidden,
@@ -277,21 +307,21 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: true,
 			},
-			config: setPercentageOfPlacementsToScore(validConfig, 0),
+			config: percentageOfPlacementsToScore0,
 		},
 		"percentage-of-placements-to-score-upper-bound": {
 			featureOverrides: featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: true,
 			},
-			config: setPercentageOfPlacementsToScore(validConfig, 100),
+			config: percentageOfPlacementsToScore100,
 		},
 		"percentage-of-placements-to-score-greater-than-100": {
 			featureOverrides: featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: true,
 			},
-			config: setPercentageOfPlacementsToScore(validConfig, 101),
+			config: percentageOfPlacementsToScore101,
 			wantErrs: field.ErrorList{
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
@@ -304,7 +334,7 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: true,
 			},
-			config: setPercentageOfPlacementsToScore(validConfig, -1),
+			config: percentageOfPlacementsToScoreNegative,
 			wantErrs: field.ErrorList{
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
@@ -316,7 +346,7 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 			featureOverrides: featuregatetesting.FeatureOverrides{
 				features.TopologyAwareWorkloadScheduling: false,
 			},
-			config: setProfilePercentageOfPlacementsToScore(validConfig, 50),
+			config: profilePercentageOfPlacementsToScore50,
 			wantErrs: field.ErrorList{
 				&field.Error{
 					Type:  field.ErrorTypeForbidden,
@@ -329,21 +359,21 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: true,
 			},
-			config: setProfilePercentageOfPlacementsToScore(validConfig, 0),
+			config: profilePercentageOfPlacementsToScore0,
 		},
 		"profile-percentage-of-placements-to-score-upper-bound": {
 			featureOverrides: featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: true,
 			},
-			config: setProfilePercentageOfPlacementsToScore(validConfig, 100),
+			config: profilePercentageOfPlacementsToScore100,
 		},
 		"profile-percentage-of-placements-to-score-greater-than-100": {
 			featureOverrides: featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: true,
 			},
-			config: setProfilePercentageOfPlacementsToScore(validConfig, 101),
+			config: profilePercentageOfPlacementsToScore101,
 			wantErrs: field.ErrorList{
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
@@ -356,7 +386,7 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: true,
 			},
-			config: setProfilePercentageOfPlacementsToScore(validConfig, -1),
+			config: profilePercentageOfPlacementsToScoreNegative,
 			wantErrs: field.ErrorList{
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
@@ -517,16 +547,4 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 			}
 		})
 	}
-}
-
-func setPercentageOfPlacementsToScore(config *config.KubeSchedulerConfiguration, value int32) *config.KubeSchedulerConfiguration {
-	newConfig := config.DeepCopy()
-	newConfig.PercentageOfPlacementsToScore = &value
-	return newConfig
-}
-
-func setProfilePercentageOfPlacementsToScore(config *config.KubeSchedulerConfiguration, value int32) *config.KubeSchedulerConfiguration {
-	newConfig := config.DeepCopy()
-	newConfig.Profiles[0].PercentageOfPlacementsToScore = &value
-	return newConfig
 }
