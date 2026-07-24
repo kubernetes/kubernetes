@@ -176,6 +176,12 @@ var sliceWithCapacity = func() *resource.ResourceSlice {
 	return obj
 }()
 
+var sliceWithCompatibilityGroups = func() *resource.ResourceSlice {
+	obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+	obj.Spec.Devices[0].ConsumesCounters[0].CompatibilityGroups = []string{"mig"}
+	return obj
+}()
+
 var sliceWithConsumableCapacity = func() *resource.ResourceSlice {
 	obj := sliceWithCapacity.DeepCopy()
 	obj.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
@@ -454,6 +460,24 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: true},
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithSkipNodeOperations.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-fields-compatibility-groups": {
+			obj:              sliceWithCompatibilityGroups,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRADeviceCompatibilityGroups: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithCompatibilityGroups.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-compatibility-groups-disabled-feature": {
+			obj:              sliceWithCompatibilityGroups,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRADeviceCompatibilityGroups: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
 				obj.Generation = 1
 				return obj
 			}(),
@@ -1000,6 +1024,67 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: false},
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithSkipNodeOperations.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"drop-fields-compatibility-groups": {
+			oldObj: sliceWithPartitionableDevicesConsumesCounters,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithCompatibilityGroups.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRADeviceCompatibilityGroups: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+				obj.ResourceVersion = "4"
+				// The generation is bumped for the incoming spec change even
+				// though dropping the disabled field makes the stored spec
+				// identical again, like in the partitionable drop case above.
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-fields-compatibility-groups": {
+			oldObj: sliceWithPartitionableDevicesConsumesCounters,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithCompatibilityGroups.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRADeviceCompatibilityGroups: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithCompatibilityGroups.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-existing-fields-compatibility-groups": {
+			oldObj: sliceWithCompatibilityGroups,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithCompatibilityGroups.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRADeviceCompatibilityGroups: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithCompatibilityGroups.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"keep-existing-fields-compatibility-groups-disabled-feature": {
+			oldObj: sliceWithCompatibilityGroups,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithCompatibilityGroups.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRADeviceCompatibilityGroups: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithCompatibilityGroups.DeepCopy()
 				obj.ResourceVersion = "4"
 				return obj
 			}(),
