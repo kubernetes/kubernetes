@@ -38,6 +38,7 @@ func (FakeManager) RemovePod(_ *v1.Pod) {}
 // Simulated stopping liveness and startup probes.
 func (FakeManager) StopLivenessAndStartup(_ *v1.Pod) {}
 
+
 // CleanupPods simulates cleaning up Pods.
 func (FakeManager) CleanupPods(_ map[types.UID]sets.Empty) {}
 

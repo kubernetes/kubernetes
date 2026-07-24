@@ -84,6 +84,12 @@ type Manager interface {
 	// deleting cached results.
 	RemovePod(pod *v1.Pod)
 
+	// StartContainerProbes starts (or resumes) readiness/liveness probing for one container.
+	StartContainerProbes(ctx context.Context, podUID types.UID, containerName string)
+
+	// StopContainerProbes stops all probes for one container.
+	StopContainerProbes(podUID types.UID, containerName string)
+
 	// CleanupPods handles cleaning up pods which should no longer be running.
 	// It takes a map of "desired pods" which should not be cleaned up.
 	CleanupPods(desiredPods map[types.UID]sets.Empty)
@@ -200,7 +206,7 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 			}
 			w := newWorker(m, startup, pod, c)
 			m.workers[key] = w
-			go w.run(ctx)
+			w.Start(ctx)
 		}
 
 		if c.ReadinessProbe != nil {
@@ -225,6 +231,28 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 			w := newWorker(m, liveness, pod, c)
 			m.workers[key] = w
 			go w.run(ctx)
+		}
+	}
+}
+
+func (m *manager) StartContainerProbes(ctx context.Context, podUID types.UID, containerName string) {
+	m.workerLock.RLock()
+	defer m.workerLock.RUnlock()
+	for _, probeType := range [...]probeType{readiness, liveness} {
+		key := probeKey{podUID: podUID, containerName: containerName, probeType: probeType}
+		if w, ok := m.workers[key]; ok {
+			w.Start(ctx)
+		}
+	}
+}
+
+func (m *manager) StopContainerProbes(podUID types.UID, containerName string) {
+	m.workerLock.RLock()
+	defer m.workerLock.RUnlock()
+	for _, probeType := range [...]probeType{readiness, liveness, startup} {
+		key := probeKey{podUID: podUID, containerName: containerName, probeType: probeType}
+		if w, ok := m.workers[key]; ok {
+			w.stop()
 		}
 	}
 }
