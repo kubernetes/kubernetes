@@ -145,7 +145,7 @@ func (cm *containerManagerStub) GetAllocatableDevices(logger klog.Logger) []*pod
 	return nil
 }
 
-func (cm *containerManagerStub) ShouldResetExtendedResourceCapacity() bool {
+func (cm *containerManagerStub) ShouldResetExtendedResourceCapacity(_ v1.ResourceName) bool {
 	return cm.shouldResetExtendedResourceCapacity
 }
 
