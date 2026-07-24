@@ -27,6 +27,14 @@ import (
 )
 
 const (
+	minItemsTagName   = "k8s:minItems"
+	maxItemsTagName   = "k8s:maxItems"
+	minimumTagName    = "k8s:minimum"
+	maximumTagName    = "k8s:maximum"
+	minLengthTagName  = "k8s:minLength"
+	maxLengthTagName  = "k8s:maxLength"
+	maxBytesTagName   = "k8s:maxBytes"
+	multipleOfTagName = "k8s:multipleOf"
 	minItemsTagName      = "k8s:minItems"
 	maxItemsTagName      = "k8s:maxItems"
 	minimumTagName       = "k8s:minimum"
@@ -48,6 +56,7 @@ func init() {
 	RegisterTagValidator(minLengthTagValidator{})
 	RegisterTagValidator(maxLengthTagValidator{})
 	RegisterTagValidator(maxBytesTagValidator{})
+	RegisterTagValidator(multipleOfTagValidator{})
 }
 
 type maxLengthTagValidator struct{}
@@ -576,6 +585,58 @@ func (mltv minLengthTagValidator) Docs() TagDoc {
 		Payloads: []TagPayloadDoc{{
 			Description: "<integer>",
 			Docs:        "This field must be at least X characters long.",
+		}},
+		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsRequired: true,
+	}
+}
+
+type multipleOfTagValidator struct{}
+
+func (multipleOfTagValidator) Init(_ Config) {}
+
+func (multipleOfTagValidator) TagName() string {
+	return multipleOfTagName
+}
+
+var multipleOfTagValidScopes = sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
+
+func (multipleOfTagValidator) ValidScopes() sets.Set[Scope] {
+	return multipleOfTagValidScopes
+}
+
+var multipleOfValidator = types.Name{Package: libValidationPkg, Name: "MultipleOf"}
+
+func (multipleOfTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+	var result Validations
+
+	// This tag can apply to value and pointer fields, as well as typedefs
+	// (which should never be pointers). We need to check the concrete type.
+	t := util.NonPointer(util.NativeType(context.Type))
+	if !types.IsInteger(t) {
+		return result, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
+	}
+
+	intVal, err := util.ParseInt(tag.Value)
+	if err != nil {
+		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+	}
+	if intVal <= 0 {
+		return result, fmt.Errorf("must be strictly positive (greater than zero)")
+	}
+	result.AddFunction(Function(multipleOfTagName, DefaultFlags, multipleOfValidator, intVal))
+	return result, nil
+}
+
+func (mtv multipleOfTagValidator) Docs() TagDoc {
+	return TagDoc{
+		Tag:            mtv.TagName(),
+		StabilityLevel: TagStabilityLevelBeta,
+		Scopes:         sets.List(mtv.ValidScopes()),
+		Description:    "Indicates that a numeric field's value must be an exact multiple of the specified divisor.",
+		Payloads: []TagPayloadDoc{{
+			Description: "<positive integer>",
+			Docs:        "This field's value must be divisible by X with no remainder.",
 		}},
 		PayloadsType:     codetags.ValueTypeInt,
 		PayloadsRequired: true,
