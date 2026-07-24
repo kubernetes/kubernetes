@@ -87,14 +87,15 @@ func New(ctx context.Context, jobInformer batchinformers.JobInformer, client cli
 	}
 
 	logger := klog.FromContext(ctx)
-	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := jobInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			tc.addJob(logger, obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			tc.updateJob(logger, oldObj, newObj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 
 	tc.jLister = jobInformer.Lister()
 	tc.jListerSynced = jobInformer.Informer().HasSynced
