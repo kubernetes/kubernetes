@@ -123,7 +123,10 @@
                 "countersKey": {
                   "value": "0"
                 }
-              }
+              },
+              "compatibilityGroups": [
+                "compatibilityGroupsValue"
+              ]
             }
           ],
           "nodeName": "nodeNameValue",
