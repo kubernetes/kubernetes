@@ -423,6 +423,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowNamespacedSysctlsForHostNetAndHostIPC:          false,
 		AllowNonLocalProjectedTokenPath:                     false,
 		PodLevelResourcesEnabled:                            utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		AllowPodPIDLimit:                                    utilfeature.DefaultFeatureGate.Enabled(features.PerPodPIDLimit),
 		AllowInvalidLabelValueInRequiredNodeAffinity:        false,
 		AllowSidecarResizePolicy:                            utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 		AllowMatchLabelKeysInPodTopologySpread:              utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
@@ -479,6 +480,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 				}
 			}
 		}
+
+		// If old pod already has a PID limit, allow it even if the gate is now off
+		opts.AllowPodPIDLimit = opts.AllowPodPIDLimit || podPIDLimitInUse(oldPodSpec)
 
 		// If oldPod has resize policy set on the restartable init container, we must allow it
 		opts.AllowSidecarResizePolicy = opts.AllowSidecarResizePolicy || hasRestartableInitContainerResizePolicy(oldPodSpec)
@@ -2280,11 +2284,32 @@ func DefaultPodLevelResources(pod *api.Pod) {
 
 // defaultHugePagePodLevelLimits applies default values for pod-level hugepage limits,
 // setting pod-level hugepage limit equal to aggregated container limits if not specified.
+// hasAccountablePodLevelResource returns true if the pod-level requirements
+// contain at least one supported resource that participates in requests
+// accounting (i.e. is not limit-only, like pids).
+func hasAccountablePodLevelResource(resources *api.ResourceRequirements) bool {
+	for _, resourceList := range []api.ResourceList{resources.Requests, resources.Limits} {
+		for key := range resourceList {
+			if resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(key)) && !resourcehelper.IsLimitOnlyPodLevelResource(apiv1.ResourceName(key)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func defaultHugePagePodLevelLimits(pod *api.Pod, v1Pod *apiv1.Pod) {
 	if pod.Spec.Resources == nil {
 		return
 	}
 	if len(pod.Spec.Resources.Limits) == 0 && len(pod.Spec.Resources.Requests) == 0 {
+		return
+	}
+	// A pod whose only pod-level entry is a limit-only resource (e.g. pids) has
+	// not opted into pod-level cpu/memory/hugepages semantics; materializing
+	// hugepage limits for it would make an otherwise-valid pod fail the
+	// "HugePages require cpu or memory" validation.
+	if !hasAccountablePodLevelResource(pod.Spec.Resources) {
 		return
 	}
 
@@ -2325,6 +2350,14 @@ func defaultPodLevelRequests(pod *api.Pod, v1Pod *apiv1.Pod) {
 		return
 	}
 
+	// Only default pod-level requests when the pod specifies at least one
+	// pod-level resource that participates in requests accounting. Limit-only
+	// resources (e.g. pids) must not trigger materialization of pod-level
+	// cpu/memory requests from container aggregates.
+	if !hasAccountablePodLevelResource(pod.Spec.Resources) {
+		return
+	}
+
 	podReqs := pod.Spec.Resources.Requests
 	if podReqs == nil {
 		podReqs = make(api.ResourceList)
@@ -2340,7 +2373,7 @@ func defaultPodLevelRequests(pod *api.Pod, v1Pod *apiv1.Pod) {
 
 	if pod.Spec.Resources.Limits != nil {
 		for key, podLim := range pod.Spec.Resources.Limits {
-			if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(key)) {
+			if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(key)) && !resourcehelper.IsLimitOnlyPodLevelResource(apiv1.ResourceName(key)) {
 				podReqs[key] = podLim.DeepCopy()
 			}
 		}
@@ -2465,4 +2498,13 @@ func evictionRespondersInUse(podSpec *api.PodSpec) bool {
 	}
 
 	return len(podSpec.EvictionResponders) > 0
+}
+
+// podPIDLimitInUse returns true if the pod spec has a pid limit set at the pod level.
+func podPIDLimitInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil || podSpec.Resources == nil {
+		return false
+	}
+	_, ok := podSpec.Resources.Limits[api.ResourcePID]
+	return ok
 }

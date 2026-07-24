@@ -18,7 +18,7 @@ package kubelet
 
 import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate" // Import for the type conversion
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/nodedeclaredfeatures"
 )
 
