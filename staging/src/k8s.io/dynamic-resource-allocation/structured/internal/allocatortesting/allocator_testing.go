@@ -6260,6 +6260,49 @@ func TestAllocator(t *testing.T,
 				deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil),
 			)},
 		},
+		"dedicated-request-blocked-by-persisted-share": {
+			// device1 carries a persisted shared allocation (share ID), but the slice
+			// now advertises it as an ordinary, non-allow-multiple device: an
+			// AllowMultipleAllocations true->false flip while the share is still live.
+			// The dedicated-allocation gate must recognize the share (via deviceCapacityInUse,
+			// not deviceInUse) and refuse to hand device1 out exclusively on top of the share.
+			features: Features{ConsumableCapacity: true},
+			allocatedSharedDeviceIDs: sets.New(
+				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+			),
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA,
+					device(device1, nil, nil),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{},
+		},
+		"dedicated-request-falls-back-past-persisted-share": {
+			// Like dedicated-request-blocked-by-persisted-share, device1 carries a
+			// live persisted share and is now non-allow-multiple, so the dedicated
+			// gate must skip it. device2 is free, so the request still succeeds on
+			// device2: the guard drops the one candidate without aborting the search.
+			features: Features{ConsumableCapacity: true},
+			allocatedSharedDeviceIDs: sets.New(
+				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+			),
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA,
+					device(device1, nil, nil),
+					device(device2, nil, nil),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
 		"consumable-capacity-with-partitionable-device-multiple-capacity-pools": {
 			// This test case combines integration of PrioritizedList, PartitionableDevices, and ConsumableCapacity features.
 			features: Features{
