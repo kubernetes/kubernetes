@@ -95,6 +95,8 @@ type store struct {
 
 	collectorMux          sync.RWMutex
 	resourceSizeEstimator *resourceSizeEstimator
+
+	metricsTracker *metrics.EtcdMetricsTracker
 }
 
 var _ storage.Interface = (*store)(nil)
@@ -196,6 +198,8 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 		resourcePrefix: resourcePrefix,
 		newListFunc:    newListFunc,
 		compactor:      compactor,
+
+		metricsTracker: metrics.NewEtcdMetricsTracker(groupResource),
 	}
 
 	w.getResourceSizeEstimator = s.getResourceSizeEstimator
@@ -246,7 +250,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	defer span.End(500 * time.Millisecond)
 	startTime := time.Now()
 	getResp, err := s.client.Kubernetes.Get(ctx, preparedKey, kubernetes.GetOptions{})
-	metrics.RecordEtcdRequest("get", s.groupResource, err, startTime)
+	s.metricsTracker.Get.Record(err, startTime)
 	if err != nil {
 		span.AddEvent("Get call failed", attribute.String("err", err.Error()))
 		return err
