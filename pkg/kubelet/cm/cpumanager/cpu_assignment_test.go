@@ -1042,6 +1042,15 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 			mustParseCPUSet(t, "0-7,10-16,20-27,30-37,40-47,50-56,60-67,70-77"),
 		},
 		{
+			"ensure allocation with cpuGroupSize 2 terminates when per-NUMA availability is not a multiple of the group size",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-4,10-14,20-24,30-34"),
+			14,
+			2,
+			"",
+			mustParseCPUSet(t, "0-3,10-13,20-23,30-31"),
+		},
+		{
 			"ensure bestRemainder chosen with NUMA nodes that have enough CPUs to satisfy the request",
 			topoDualSocketMultiNumaPerSocketHT,
 			mustParseCPUSet(t, "0-3,10-13,20-23,30-36,40-43,50-53,60-63,70-76"),
