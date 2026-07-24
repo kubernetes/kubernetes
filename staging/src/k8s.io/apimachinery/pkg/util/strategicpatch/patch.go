@@ -57,6 +57,37 @@ const (
 // json marshaling and/or unmarshaling operations.
 type JSONMap map[string]interface{}
 
+type PatchOptions struct {
+	preconditions []mergepatch.PreconditionFunc
+	// AllowDuplicates indicates if we allow duplicate values for merge key in a list.
+	AllowDuplicates bool
+}
+
+type PatchOption func(*PatchOptions)
+
+func WithPreconditions(fns ...mergepatch.PreconditionFunc) PatchOption {
+	return func(o *PatchOptions) {
+		o.preconditions = append(o.preconditions, fns...)
+	}
+}
+
+// WithDuplicateMergeKeySupport sets whether we allow duplicate values for merge key in a list (default: false).
+func WithDuplicateMergeKeySupport(allow bool) PatchOption {
+	return func(o *PatchOptions) {
+		o.AllowDuplicates = allow
+	}
+}
+
+func applyPatchOptions(opts ...PatchOption) PatchOptions {
+	options := PatchOptions{
+		AllowDuplicates: false,
+	}
+	for _, o := range opts {
+		o(&options)
+	}
+	return options
+}
+
 type DiffOptions struct {
 	// SetElementOrder determines whether we generate the $setElementOrder parallel list.
 	SetElementOrder bool
@@ -70,6 +101,8 @@ type DiffOptions struct {
 	// And the fields that are present will be merged with live object.
 	// All the missing fields will be cleared when patching.
 	BuildRetainKeysDirective bool
+	// AllowDuplicates indicates if we allow duplicate values for merge key in a list.
+	AllowDuplicates bool
 }
 
 type MergeOptions struct {
@@ -91,17 +124,17 @@ type MergeOptions struct {
 // document and a modified document, which are passed to the method as json encoded content. It will
 // return a patch that yields the modified document when applied to the original document, or an error
 // if either of the two documents is invalid.
-func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, fns ...mergepatch.PreconditionFunc) ([]byte, error) {
+func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, opts ...PatchOption) ([]byte, error) {
 	schema, err := NewPatchMetaFromStruct(dataStruct)
 	if err != nil {
 		return nil, err
 	}
 
-	return CreateTwoWayMergePatchUsingLookupPatchMeta(original, modified, schema, fns...)
+	return CreateTwoWayMergePatchUsingLookupPatchMeta(original, modified, schema, opts...)
 }
 
 func CreateTwoWayMergePatchUsingLookupPatchMeta(
-	original, modified []byte, schema LookupPatchMeta, fns ...mergepatch.PreconditionFunc) ([]byte, error) {
+	original, modified []byte, schema LookupPatchMeta, opts ...PatchOption) ([]byte, error) {
 	originalMap := map[string]interface{}{}
 	if len(original) > 0 {
 		if err := json.Unmarshal(original, &originalMap); err != nil {
@@ -116,7 +149,7 @@ func CreateTwoWayMergePatchUsingLookupPatchMeta(
 		}
 	}
 
-	patchMap, err := CreateTwoWayMergeMapPatchUsingLookupPatchMeta(originalMap, modifiedMap, schema, fns...)
+	patchMap, err := CreateTwoWayMergeMapPatchUsingLookupPatchMeta(originalMap, modifiedMap, schema, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -127,18 +160,21 @@ func CreateTwoWayMergePatchUsingLookupPatchMeta(
 // CreateTwoWayMergeMapPatch creates a patch from an original and modified JSON objects,
 // encoded JSONMap.
 // The serialized version of the map can then be passed to StrategicMergeMapPatch.
-func CreateTwoWayMergeMapPatch(original, modified JSONMap, dataStruct interface{}, fns ...mergepatch.PreconditionFunc) (JSONMap, error) {
+func CreateTwoWayMergeMapPatch(original, modified JSONMap, dataStruct interface{}, opts ...PatchOption) (JSONMap, error) {
 	schema, err := NewPatchMetaFromStruct(dataStruct)
 	if err != nil {
 		return nil, err
 	}
 
-	return CreateTwoWayMergeMapPatchUsingLookupPatchMeta(original, modified, schema, fns...)
+	return CreateTwoWayMergeMapPatchUsingLookupPatchMeta(original, modified, schema, opts...)
 }
 
-func CreateTwoWayMergeMapPatchUsingLookupPatchMeta(original, modified JSONMap, schema LookupPatchMeta, fns ...mergepatch.PreconditionFunc) (JSONMap, error) {
+func CreateTwoWayMergeMapPatchUsingLookupPatchMeta(original, modified JSONMap, schema LookupPatchMeta, opts ...PatchOption) (JSONMap, error) {
+	patchOpts := applyPatchOptions(opts...)
+
 	diffOptions := DiffOptions{
 		SetElementOrder: true,
+		AllowDuplicates: patchOpts.AllowDuplicates,
 	}
 	patchMap, err := diffMaps(original, modified, schema, diffOptions)
 	if err != nil {
@@ -146,7 +182,7 @@ func CreateTwoWayMergeMapPatchUsingLookupPatchMeta(original, modified JSONMap, s
 	}
 
 	// Apply the preconditions to the patch, and return an error if any of them fail.
-	for _, fn := range fns {
+	for _, fn := range patchOpts.preconditions {
 		if !fn(patchMap) {
 			return nil, mergepatch.NewErrPreconditionFailed(patchMap)
 		}
@@ -222,7 +258,7 @@ func diffMaps(original, modified map[string]interface{}, schema LookupPatchMeta,
 	}
 
 	updatePatchIfMissing(original, modified, patch, diffOptions)
-	// Insert the retainKeysList iff there are values present in the retainKeysList and
+	// Insert the retainKeysList if there are values present in the retainKeysList and
 	// either of the following is true:
 	// - the patch is not empty
 	// - there are additional field in original that need to be cleared
@@ -727,6 +763,9 @@ func diffListsOfMaps(original, modified []interface{}, schema LookupPatchMeta, m
 		return nil, nil, err
 	}
 
+	var previousOriginalElementMergeKeyValueString, previousModifiedElementMergeKeyValueString string
+	bothPreviousInBounds := false
+
 	originalIndex, modifiedIndex := 0, 0
 	for {
 		originalInBounds := originalIndex < len(originalSorted)
@@ -776,6 +815,33 @@ func diffListsOfMaps(original, modified []interface{}, schema LookupPatchMeta, m
 				patch = append(patch, modifiedElement)
 			}
 			modifiedIndex++
+		// modified missing one of duplicated by MergeKey value elements
+		case diffOptions.AllowDuplicates && bothPreviousInBounds &&
+			originalElementMergeKeyValueString == previousOriginalElementMergeKeyValueString &&
+			previousOriginalElementMergeKeyValueString == previousModifiedElementMergeKeyValueString:
+			// if deleted one of duplicates by mergeKey, will send "delete" and "insert" commands
+			if !diffOptions.IgnoreDeletions {
+				var modifiedToAdd []interface{}
+				for i := modifiedIndex - 1; i >= 0; i-- {
+					element, mergeKeyValue, err := getMapAndMergeKeyValueByIndex(i, mergeKey, modifiedSorted)
+					if err != nil {
+						return nil, nil, err
+					}
+					if fmt.Sprintf("%v", mergeKeyValue) != originalElementMergeKeyValueString {
+						break
+					}
+					// reverse to keep ordering
+					modifiedToAdd = append([]interface{}{element}, modifiedToAdd...)
+				}
+				deletionList = append(deletionList, CreateDeleteDirective(mergeKey, originalElementMergeKeyValue))
+				// remove existing occurencies added if previous elements pair has diffs
+				patch, err = removePatchElementsByMergeKeyValue(patch, mergeKey, originalElementMergeKeyValueString)
+				if err != nil {
+					return nil, nil, err
+				}
+				patch = append(patch, modifiedToAdd...)
+			}
+			originalIndex++
 		// only original is in bound
 		case !modifiedInBounds:
 			fallthrough
@@ -787,9 +853,28 @@ func diffListsOfMaps(original, modified []interface{}, schema LookupPatchMeta, m
 			}
 			originalIndex++
 		}
+
+		previousOriginalElementMergeKeyValueString = originalElementMergeKeyValueString
+		previousModifiedElementMergeKeyValueString = modifiedElementMergeKeyValueString
+		bothPreviousInBounds = bothInBounds
 	}
 
 	return patch, deletionList, nil
+}
+
+// removePatchElementsByMergeKeyValue removes all elements from patch list with matching MergeKey value
+func removePatchElementsByMergeKeyValue(patch []interface{}, mergeKey, mergeKeyValue string) ([]interface{}, error) {
+	result := make([]interface{}, 0, len(patch))
+	for i, val := range patch {
+		_, key, err := getMapAndMergeKeyValueByIndex(i, mergeKey, patch)
+		if err != nil {
+			return nil, err
+		}
+		if fmt.Sprintf("%v", key) != mergeKeyValue {
+			result = append(result, val)
+		}
+	}
+	return result, nil
 }
 
 // getMapAndMergeKeyValueByIndex return a map in the list and its merge key value given the index of the map.
@@ -1561,6 +1646,13 @@ func mergeSliceWithSpecialElements(original, patch []interface{}, mergeKey strin
 				mergeValue, ok := typedV[mergeKey]
 				if ok {
 					var err error
+					// WARNING: side effect here. using 'original' in deleteMatchingEntries() if we have deletions
+					// breaks content of underlying array like '1, 2, 3, 4' -> delete 3 -> '1, 2, 4, 4',
+					// which causes incorrect ordering in 'mergeSlice(...)', because it uses its copy of
+					// 'original' slice (on the same array, but with original length 4)
+					// as source of truth about elements order.
+					// This is the reason of broken ordering in test case
+					// "behavior of set element order for a merging int list with duplicate"
 					original, err = deleteMatchingEntries(original, mergeKey, mergeValue)
 					if err != nil {
 						return nil, nil, err
@@ -2098,7 +2190,9 @@ func mapsOfMapsHaveConflicts(typedLeft, typedRight map[string]interface{}, schem
 // in a way that is different from how it is changed in current (e.g., deleting it, changing its
 // value). We also propagate values fields that do not exist in original but are explicitly
 // defined in modified.
-func CreateThreeWayMergePatch(original, modified, current []byte, schema LookupPatchMeta, overwrite bool, fns ...mergepatch.PreconditionFunc) ([]byte, error) {
+func CreateThreeWayMergePatch(original, modified, current []byte, schema LookupPatchMeta, overwrite bool, opts ...PatchOption) ([]byte, error) {
+	patchOpts := applyPatchOptions(opts...)
+
 	originalMap := map[string]interface{}{}
 	if len(original) > 0 {
 		if err := json.Unmarshal(original, &originalMap); err != nil {
@@ -2127,6 +2221,7 @@ func CreateThreeWayMergePatch(original, modified, current []byte, schema LookupP
 	deltaMapDiffOptions := DiffOptions{
 		IgnoreDeletions: true,
 		SetElementOrder: true,
+		AllowDuplicates: patchOpts.AllowDuplicates,
 	}
 	deltaMap, err := diffMaps(currentMap, modifiedMap, schema, deltaMapDiffOptions)
 	if err != nil {
@@ -2135,6 +2230,7 @@ func CreateThreeWayMergePatch(original, modified, current []byte, schema LookupP
 	deletionsMapDiffOptions := DiffOptions{
 		SetElementOrder:           true,
 		IgnoreChangesAndAdditions: true,
+		AllowDuplicates:           patchOpts.AllowDuplicates,
 	}
 	deletionsMap, err := diffMaps(originalMap, modifiedMap, schema, deletionsMapDiffOptions)
 	if err != nil {
@@ -2148,7 +2244,7 @@ func CreateThreeWayMergePatch(original, modified, current []byte, schema LookupP
 	}
 
 	// Apply the preconditions to the patch, and return an error if any of them fail.
-	for _, fn := range fns {
+	for _, fn := range patchOpts.preconditions {
 		if !fn(patchMap) {
 			return nil, mergepatch.NewErrPreconditionFailed(patchMap)
 		}
@@ -2157,7 +2253,9 @@ func CreateThreeWayMergePatch(original, modified, current []byte, schema LookupP
 	// If overwrite is false, and the patch contains any keys that were changed differently,
 	// then return a conflict error.
 	if !overwrite {
-		changeMapDiffOptions := DiffOptions{}
+		changeMapDiffOptions := DiffOptions{
+			AllowDuplicates: patchOpts.AllowDuplicates,
+		}
 		changedMap, err := diffMaps(originalMap, currentMap, schema, changeMapDiffOptions)
 		if err != nil {
 			return nil, err
