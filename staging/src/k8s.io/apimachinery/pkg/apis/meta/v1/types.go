@@ -268,6 +268,14 @@ type ObjectMeta struct {
 	// +listType=map
 	// +listMapKey=uid
 	// +k8s:alpha(since:"1.37")=+k8s:optional
+	//
+	// Note: although +listType=map / +listMapKey=uid are declared here (and
+	// respected by server-side apply for merge semantics), uid-uniqueness is
+	// NOT currently enforced as a hard validation error.  The OwnerReference
+	// struct carries +structType=atomic, which conflicts with its role as an
+	// SSA map-key element; resolving this without breaking existing objects
+	// requires a careful migration.  See
+	// https://github.com/kubernetes/kubernetes/issues/140503 for tracking.
 	OwnerReferences []OwnerReference `json:"ownerReferences,omitempty" patchStrategy:"merge" patchMergeKey:"uid" protobuf:"bytes,13,rep,name=ownerReferences"`
 
 	// Must be empty before the object is deleted from the registry. Each entry
