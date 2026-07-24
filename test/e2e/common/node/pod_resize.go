@@ -611,7 +611,7 @@ func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
 		podresize.VerifyPodResources(testPod, viableLoweredLimit, nil)
 
 		ginkgo.By("waiting for viable lowered limit to be actuated")
-		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod, viableLoweredLimit)
+		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod)
 		podresize.ExpectPodResized(ctx, f, resizedPod, viableLoweredLimit)
 
 		// There is some latency after container startup before memory usage is scraped. On CRI-O
@@ -684,7 +684,7 @@ func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
 		podresize.VerifyPodResources(testPod, original, nil)
 
 		ginkgo.By("waiting for the original values to be actuated")
-		resizedPod = podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod, original)
+		resizedPod = podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod)
 		podresize.ExpectPodResized(ctx, f, resizedPod, original)
 
 		ginkgo.By("deleting pod")
@@ -817,7 +817,7 @@ func doPodResizeReadAndReplaceTests(f *framework.Framework) {
 
 		ginkgo.By("verifying pod resources after patch")
 		expected := podresize.UpdateExpectedContainerRestarts(ctx, updatedPod, desiredContainers)
-		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, updatedPod, expected)
+		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, updatedPod)
 		podresize.ExpectPodResized(ctx, f, resizedPod, expected)
 
 		ginkgo.By("verifying pod fetched from resize subresource")
@@ -947,7 +947,7 @@ func doPodResizeMemoryVolumeTests(f *framework.Framework) {
 
 			ginkgo.By("waiting for resize actuation to complete")
 			expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, desiredContainers)
-			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, patchedPod, expected)
+			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, patchedPod)
 			podresize.ExpectPodResized(ctx, f, resizedPod, expected)
 
 			desiredQty := resource.MustParse(desiredSizeLimit)
@@ -989,7 +989,7 @@ func doPodResizeMemoryVolumeTests(f *framework.Framework) {
 			framework.ExpectNoError(pErr, "failed to patch pod for rollback")
 
 			expectedRollback := podresize.UpdateExpectedContainerRestarts(ctx, rolledBackPod, originalContainers)
-			finalPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, rolledBackPod, expectedRollback)
+			finalPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, rolledBackPod)
 			podresize.ExpectPodResized(ctx, f, finalPod, expectedRollback)
 
 			stdout, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, finalPod.Name, "c1", "df", "-m", "/cache")
@@ -1226,7 +1226,7 @@ func patchAndVerify(ctx context.Context, f *framework.Framework, podClient *e2ep
 	expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, expectedContainers)
 
 	podresize.VerifyPodResources(patchedPod, expected, expectedPodResources)
-	resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPod, expected)
+	resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPod)
 
 	podresize.ExpectPodResized(ctx, f, resizedPod, expected)
 	if expectedPodResources != nil {
