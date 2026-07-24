@@ -24,13 +24,16 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+// CacheKeyFunc returns the resource-relative key used by the watch cache.
+type CacheKeyFunc func(obj runtime.Object) (string, error)
+
 // StorageDecorator is a function signature for producing a storage.Interface
-// and an associated DestroyFunc from given parameters. cacheKeyFunc is used by
-// cache layers to compute resource keys from objects.
+// and an associated DestroyFunc from given parameters.
 type StorageDecorator func(
 	config *storagebackend.ConfigForResource,
 	resourcePrefix string,
-	cacheKeyFunc func(obj runtime.Object) (string, error),
+	cacheKeyFunc CacheKeyFunc,
+	reverseKeyFunc storage.ReverseKeyFunc,
 	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
 	getAttrsFunc storage.AttrFunc,
@@ -42,18 +45,19 @@ type StorageDecorator func(
 func UndecoratedStorage(
 	config *storagebackend.ConfigForResource,
 	resourcePrefix string,
-	cacheKeyFunc func(obj runtime.Object) (string, error),
+	cacheKeyFunc CacheKeyFunc,
+	reverseKeyFunc storage.ReverseKeyFunc,
 	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
 	getAttrsFunc storage.AttrFunc,
 	trigger storage.IndexerFuncs,
 	indexers *cache.Indexers) (storage.Interface, factory.DestroyFunc, error) {
-	return NewRawStorage(config, newFunc, newListFunc, resourcePrefix)
+	return NewRawStorage(config, newFunc, newListFunc, reverseKeyFunc, resourcePrefix)
 }
 
 // NewRawStorage creates the low level kv storage. This is a work-around for current
 // two layer of same storage interface.
 // TODO: Once cacher is enabled on all registries (event registry is special), we will remove this method.
-func NewRawStorage(config *storagebackend.ConfigForResource, newFunc, newListFunc func() runtime.Object, resourcePrefix string) (storage.Interface, factory.DestroyFunc, error) {
-	return factory.Create(*config, newFunc, newListFunc, resourcePrefix)
+func NewRawStorage(config *storagebackend.ConfigForResource, newFunc, newListFunc func() runtime.Object, reverseKeyFunc storage.ReverseKeyFunc, resourcePrefix string) (storage.Interface, factory.DestroyFunc, error) {
+	return factory.Create(*config, newFunc, newListFunc, reverseKeyFunc, resourcePrefix)
 }
