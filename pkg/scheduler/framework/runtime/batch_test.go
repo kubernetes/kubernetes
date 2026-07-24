@@ -464,6 +464,7 @@ func TestBatchRescore(t *testing.T) {
 		score                  int64
 		scoreErr               bool
 		normErr                bool
+		chosenNodeMissing      bool
 		expectedHint           string
 		expectedRemainingNodes []string
 	}{
@@ -482,6 +483,11 @@ func TestBatchRescore(t *testing.T) {
 			name:         "normalize error flushes state and gives no hint",
 			normErr:      true,
 			expectedHint: "",
+		},
+		{
+			name:              "chosen node missing from lister gives no hint",
+			chosenNodeMissing: true,
+			expectedHint:      "",
 		},
 	}
 
@@ -508,9 +514,11 @@ func TestBatchRescore(t *testing.T) {
 
 			// Put n3 in the lister so refreshHintCandidates can find it.
 			// Non-blocking pods always pass the filter, so rescoreHintedNode is triggered.
-			n3Info := framework.NewNodeInfo(pod1)
-			n3Info.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n3", UID: "n3"}})
-			lister.nodes = nodeInfoLister{n3Info}
+			if !tt.chosenNodeMissing {
+				n3Info := framework.NewNodeInfo(pod1)
+				n3Info.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n3", UID: "n3"}})
+				lister.nodes = nodeInfoLister{n3Info}
+			}
 
 			pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID(nonBlockingPodID("2"))}}
 			hint := batch.GetNodeHint(ctx, pod2, sig, state, 2)
