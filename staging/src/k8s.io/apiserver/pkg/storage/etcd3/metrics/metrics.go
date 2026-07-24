@@ -330,3 +330,40 @@ func (c *monitorCollector) CollectWithStability(ch chan<- compbasemetrics.Metric
 		ch <- metric
 	}
 }
+
+// OperationLatencyTracker is a pre-materialized tracker for etcd request latency and request/error counters.
+type OperationLatencyTracker struct {
+	latency  compbasemetrics.ObserverMetric
+	requests compbasemetrics.CounterMetric
+	errors   compbasemetrics.CounterMetric
+}
+
+// NewOperationLatencyTracker pre-materializes etcd request metrics for a specific verb and groupResource.
+func NewOperationLatencyTracker(verb string, groupResource schema.GroupResource) *OperationLatencyTracker {
+	return &OperationLatencyTracker{
+		latency:  etcdRequestLatency.WithLabelValues(verb, groupResource.Group, groupResource.Resource),
+		requests: etcdRequestCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource),
+		errors:   etcdRequestErrorCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource),
+	}
+}
+
+// Record records latency, request count, and error count if applicable.
+func (t *OperationLatencyTracker) Record(err error, startTime time.Time) {
+	t.latency.Observe(sinceInSeconds(startTime))
+	t.requests.Inc()
+	if err != nil {
+		t.errors.Inc()
+	}
+}
+
+// EtcdMetricsTracker holds pre-materialized metric trackers for etcd3 storage operations.
+type EtcdMetricsTracker struct {
+	Get *OperationLatencyTracker
+}
+
+// NewEtcdMetricsTracker initializes pre-materialized metric trackers for a given GroupResource.
+func NewEtcdMetricsTracker(groupResource schema.GroupResource) *EtcdMetricsTracker {
+	return &EtcdMetricsTracker{
+		Get: NewOperationLatencyTracker("get", groupResource),
+	}
+}
