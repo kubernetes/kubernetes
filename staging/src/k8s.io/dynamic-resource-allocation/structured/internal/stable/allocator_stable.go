@@ -63,11 +63,12 @@ type Allocator struct {
 	classLister      DeviceClassLister
 	slices           []*resourceapi.ResourceSlice
 	celCache         *cel.Cache
-	// groupedCounterSets lists, per pool, the counter sets on which an
+	// groupedCounterSets caches, per pool, the counter sets on which an
 	// already-allocated device declares groups (read from the ResourceSlices).
-	// The stable allocator does not enforce DRADeviceCompatibilityGroups, but
-	// during a version skew it uses this to skip devices it cannot validate
-	// against a grouped peer.
+	// Like availableCounters it is computed lazily by groupedCounterSetsForPool,
+	// never changes once set, and is guarded by mutex. The stable allocator
+	// does not enforce DRADeviceCompatibilityGroups, but during a version skew
+	// it uses this to skip devices it cannot validate against a grouped peer.
 	groupedCounterSets map[PoolID]sets.Set[string]
 	// availableCounters contains the available counters for each
 	// resource pool. It acts as a cache that is updated the first time
@@ -103,7 +104,7 @@ func NewAllocator(ctx context.Context,
 	return &Allocator{
 		features:           features,
 		allocatedDevices:   allocatedDevices,
-		groupedCounterSets: groupedCounterSetsFromSlices(slices, AllocatedState{AllocatedDevices: allocatedDevices}),
+		groupedCounterSets: make(map[PoolID]sets.Set[string]),
 		classLister:        classLister,
 		slices:             slices,
 		celCache:           celCache,
@@ -1482,7 +1483,7 @@ func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
 // from a counter set on which an already-allocated device declared groups. This
 // lets the feature be enabled later without deleting pods which got scheduled incorrectly.
 func (alloc *allocator) skipForDisabledCompatibilityGroups(device deviceWithID) bool {
-	grouped := alloc.groupedCounterSets[PoolID{Driver: device.id.Driver, Pool: device.id.Pool}]
+	grouped := alloc.groupedCounterSetsForPool(device.pool)
 	for _, deviceCounterConsumption := range device.ConsumesCounters {
 		if len(deviceCounterConsumption.CompatibilityGroups) > 0 {
 			alloc.logger.V(7).Info("Skipping device: it declares compatibility groups, which this allocator does not enforce",
