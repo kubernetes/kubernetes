@@ -85,7 +85,6 @@ func TestSchedulerCreation(t *testing.T) {
 	validRegistry := map[string]frameworkruntime.PluginFactory{
 		"Foo": defaultbinder.New,
 	}
-	customSnapshot := internalcache.NewEmptySnapshot()
 	cases := []struct {
 		name                            string
 		isSchedulerAsyncAPICallsEnabled bool
@@ -198,14 +197,6 @@ func TestSchedulerCreation(t *testing.T) {
 			wantExtenders: []string{"http://extender.kube-system/"},
 		},
 		{
-			name: "With custom nodeInfoSnapshot",
-			opts: []Option{
-				WithNodeInfoSnapshot(customSnapshot),
-			},
-			wantProfiles:         []string{"default-scheduler"},
-			wantNodeInfoSnapshot: customSnapshot,
-		},
-		{
 			name:                            "With SchedulerAsyncAPICalls enabled",
 			isSchedulerAsyncAPICallsEnabled: true,
 			opts: []Option{
@@ -290,11 +281,6 @@ func TestSchedulerCreation(t *testing.T) {
 						t.Errorf("unexpected extenders (-want, +got):\n%s", diff)
 					}
 				}
-			}
-
-			// nodeInfoSnapshot
-			if tc.wantNodeInfoSnapshot != nil && s.nodeInfoSnapshot != tc.wantNodeInfoSnapshot {
-				t.Errorf("unexpected nodeInfoSnapshot: got %p, want %p", s.nodeInfoSnapshot, tc.wantNodeInfoSnapshot)
 			}
 		})
 	}

@@ -538,11 +538,7 @@ func (sched *Scheduler) handleBindingCycleError(
 }
 
 func (sched *Scheduler) frameworkForPod(pod *v1.Pod) (framework.Framework, error) {
-	fwk, ok := sched.Profiles[pod.Spec.SchedulerName]
-	if !ok {
-		return nil, fmt.Errorf("profile not found for scheduler name %q", pod.Spec.SchedulerName)
-	}
-	return fwk, nil
+	return sched.Profiles.FrameworkForPod(pod)
 }
 
 // skipPodSchedule returns true if we could skip scheduling the pod for specified cases.
