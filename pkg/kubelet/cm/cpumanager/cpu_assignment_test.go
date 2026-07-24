@@ -676,6 +676,15 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 			"",
 			mustParseCPUSet(t, "0-29,40-69,30,31,70,71"),
 		},
+		{
+			"allocate 2 cpus from hybrid topology with 1 cpu reserved",
+			topoSingleSocketSingleNumaPerSocketPCoreHTECoreST,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "1-27"), // 0 is reserved
+			2,
+			"",
+			mustParseCPUSet(t, "16-17"),
+		},
 		// Test cases for PreferAlignByUncoreCache
 		{
 			"take cpus from two full UncoreCaches and partial from a single UncoreCache",

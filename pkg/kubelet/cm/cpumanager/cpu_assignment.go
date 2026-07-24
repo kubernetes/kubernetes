@@ -330,7 +330,7 @@ func (a *cpuAccumulator) isNUMANodeFree(numaID int) bool {
 // Returns true if the supplied socket is fully available in `a.details`.
 // "fully available" means that all the CPUs in it are free.
 func (a *cpuAccumulator) isSocketFree(socketID int) bool {
-	return a.details.CPUsInSockets(socketID).Size() == a.topo.CPUsPerSocket()
+	return a.details.CPUsInSockets(socketID).Size() == a.topo.CPUDetails.CPUsInSockets(socketID).Size()
 }
 
 // Returns true if the supplied UnCoreCache is fully available,
@@ -342,7 +342,7 @@ func (a *cpuAccumulator) isUncoreCacheFree(uncoreID int) bool {
 // Returns true if the supplied core is fully available in `a.details`.
 // "fully available" means that all the CPUs in it are free.
 func (a *cpuAccumulator) isCoreFree(coreID int) bool {
-	return a.details.CPUsInCores(coreID).Size() == a.topo.CPUsPerCore()
+	return a.details.CPUsInCores(coreID).Size() == a.topo.CPUDetails.CPUsInCores(coreID).Size()
 }
 
 // Returns free NUMA Node IDs as a slice sorted by sortAvailableNUMANodes().
@@ -606,8 +606,9 @@ func (a *cpuAccumulator) takePartialUncore(uncoreID int) {
 // First try to take full UncoreCache, if available and need is at least the size of the UncoreCache group.
 // Second try to take the partial UncoreCache if available and the request size can fit w/in the UncoreCache.
 func (a *cpuAccumulator) takeUncoreCache() {
-	numCPUsInUncore := a.topo.CPUsPerUncore()
+	var numCPUsInUncore int
 	for _, uncore := range a.sortAvailableUncoreCaches() {
+		numCPUsInUncore = a.topo.CPUDetails.CPUsInUncoreCaches(uncore).Size()
 		// take full UncoreCache if the CPUs needed is greater than free UncoreCache size
 		if a.needsAtLeast(numCPUsInUncore) {
 			a.takeFullUncore()
