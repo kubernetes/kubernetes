@@ -144,6 +144,82 @@ func (fake *fakeDiskManager) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mntPath s
 	return nil
 }
 
+// pathTraversalDiskManager constructs global paths using the production
+// helpers so traversal behavior can be exercised in tests.
+type pathTraversalDiskManager struct {
+	host volume.VolumeHost
+}
+
+func (m *pathTraversalDiskManager) MakeGlobalPDName(disk iscsiDisk) string {
+	return makePDNameInternal(m.host, disk.Portals[0], disk.Iqn, disk.Lun, disk.Iface)
+}
+
+func (m *pathTraversalDiskManager) MakeGlobalVDPDName(disk iscsiDisk) string {
+	return makeVDPDNameInternal(m.host, disk.Portals[0], disk.Iqn, disk.Lun, disk.Iface)
+}
+
+func (*pathTraversalDiskManager) AttachDisk(b iscsiDiskMounter) (string, error) {
+	return "", nil
+}
+
+func (*pathTraversalDiskManager) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
+	return nil
+}
+
+func (*pathTraversalDiskManager) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mntPath string) error {
+	return nil
+}
+
+func TestPersistISCSIRejectsEscapedPluginPath(t *testing.T) {
+	root := t.TempDir()
+
+	host := volumetest.NewFakeVolumeHost(t, root, nil, nil)
+	plugin := &iscsiPlugin{host: host}
+
+	manager := &pathTraversalDiskManager{host: host}
+
+	mounter := iscsiDiskMounter{
+		iscsiDisk: &iscsiDisk{
+			Portals: []string{"10.0.0.1:3260"},
+			Iqn:     "iqn.2026-06.example.com:../../../../../escape",
+			Lun:     "0",
+			Iface:   "default",
+			plugin:  plugin,
+			manager: manager,
+		},
+		volumeMode: v1.PersistentVolumeFilesystem,
+		mounter: &mount.SafeFormatAndMount{
+			Interface: mount.NewFakeMounter(nil),
+		},
+	}
+
+	err := (&ISCSIUtil{}).persistISCSI(mounter)
+	if err == nil {
+		t.Fatal("expected escaped plugin path to be rejected")
+	}
+	if !strings.Contains(err.Error(), "escapes plugin directory") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	pluginDir := host.GetPluginDir(iscsiPluginName)
+
+	escapedPath := makePDNameInternal(
+		host,
+		"10.0.0.1:3260",
+		"iqn.2026-06.example.com:../../../../../escape",
+		"0",
+		"default",
+	)
+
+	if mount.PathWithinBase(escapedPath, pluginDir) {
+		t.Fatalf("expected test path %q to escape plugin dir %q", escapedPath, pluginDir)
+	}
+
+	if _, err := os.Stat(escapedPath); !os.IsNotExist(err) {
+		t.Fatalf("expected escaped path not to be created, got err=%v", err)
+	}
+}
+
 func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	tmpDir, err := utiltesting.MkTmpdir("iscsi_test")
 	if err != nil {

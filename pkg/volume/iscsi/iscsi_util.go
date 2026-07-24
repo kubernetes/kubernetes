@@ -492,6 +492,21 @@ func (util *ISCSIUtil) persistISCSI(b iscsiDiskMounter) error {
 		globalPDPath = b.manager.MakeGlobalPDName(*b.iscsiDisk)
 	}
 
+	var pluginDir string
+	if b.volumeMode == v1.PersistentVolumeBlock {
+		pluginDir = b.iscsiDisk.plugin.host.GetVolumeDevicePluginDir(iscsiPluginName)
+	} else {
+		pluginDir = b.iscsiDisk.plugin.host.GetPluginDir(iscsiPluginName)
+	}
+
+	if !mount.PathWithinBase(globalPDPath, pluginDir) {
+		return fmt.Errorf(
+			"iscsi: resolved path %q escapes plugin directory %q",
+			globalPDPath,
+			pluginDir,
+		)
+	}
+
 	if err := os.MkdirAll(globalPDPath, 0750); err != nil {
 		klog.Errorf("iscsi: failed to mkdir %s: %v", globalPDPath, err)
 		return err
