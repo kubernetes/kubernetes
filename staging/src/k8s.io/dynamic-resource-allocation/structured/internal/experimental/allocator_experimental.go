@@ -107,6 +107,12 @@ type Allocator struct {
 	// access to this map must be synchronized.
 	availableCounters map[PoolID]counterSets
 	mutex             sync.RWMutex
+	// allocatedDeviceIDsByPool groups every allocated device ID (from all the
+	// sources IsDeviceAllocated considers) by the pool that published it, letting
+	// checkAvailableCounters detect an allocated device a pool no longer publishes
+	// without rescanning the whole allocated state for every pool. Built once when
+	// the partitionable devices feature is enabled and read-only afterwards.
+	allocatedDeviceIDsByPool map[PoolID]sets.Set[DeviceID]
 	// numAllocateOneInvocations counts the number of times the allocateOne
 	// function is called for the allocator. This is a measurement of the
 	// amount of work the allocator had to do to allocate devices
@@ -137,7 +143,7 @@ func NewAllocator(ctx context.Context,
 			slicesOnNode[nodeName] = append(slicesOnNode[nodeName], slice)
 		}
 	}
-	return &Allocator{
+	a := &Allocator{
 		features:          features,
 		allocatedState:    allocatedState,
 		classLister:       classLister,
@@ -146,7 +152,43 @@ func NewAllocator(ctx context.Context,
 		allSlices:         slices,
 		celCache:          celCache,
 		availableCounters: make(map[PoolID]counterSets),
-	}, nil
+	}
+	// Index allocated devices by pool up front so checkAvailableCounters can detect
+	// an allocated device a republished pool no longer lists without rescanning the
+	// whole allocated state per pool. Only the partitionable devices feature consults
+	// counters, so skip the work otherwise.
+	if features.PartitionableDevices {
+		a.allocatedDeviceIDsByPool = allocatedDeviceIDsByPool(allocatedState)
+	}
+	return a, nil
+}
+
+// allocatedDeviceIDsByPool groups every allocated device ID by the pool that
+// published it, using the same sources as IsDeviceAllocated (dedicated devices,
+// shared allocations, and aggregated consumed capacity), so an allocated device
+// missing from a republished pool is detectable regardless of how the allocation
+// was recorded.
+func allocatedDeviceIDsByPool(state AllocatedState) map[PoolID]sets.Set[DeviceID] {
+	byPool := make(map[PoolID]sets.Set[DeviceID])
+	add := func(id DeviceID) {
+		poolID := PoolID{Driver: id.Driver, Pool: id.Pool}
+		ids := byPool[poolID]
+		if ids == nil {
+			ids = sets.New[DeviceID]()
+			byPool[poolID] = ids
+		}
+		ids.Insert(id)
+	}
+	for id := range state.AllocatedDevices {
+		add(id)
+	}
+	for sharedID := range state.AllocatedSharedDeviceIDs {
+		add(sharedID.GetDeviceID())
+	}
+	for id := range state.AggregatedCapacity {
+		add(id)
+	}
+	return byPool
 }
 
 func (a *Allocator) Channel() internal.AllocatorChannel {
@@ -1833,7 +1875,9 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 
 		// Update the data structure to reflect counters already consumed by allocated devices. This
 		// only includes devices where the allocation process has completed, so this will never
-		// change during the allocation process.
+		// change during the allocation process. While iterating, also record every DeviceID the
+		// pool currently publishes so allocated devices that are no longer present are detectable.
+		poolDeviceIDs := sets.New[DeviceID]()
 		for _, resourceSlices := range [][]*draapi.ResourceSlice{pool.DeviceSlicesTargetingNode, pool.DeviceSlicesNotTargetingNode} {
 			for _, slice := range resourceSlices {
 				for _, device := range slice.Spec.Devices {
@@ -1842,6 +1886,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 						Pool:   slice.Spec.Pool.Name,
 						Device: device.Name,
 					}
+					poolDeviceIDs.Insert(deviceID)
 					// Devices that aren't allocated doesn't consume any counters, so we don't
 					// need to consider them.
 					if !internal.IsDeviceAllocated(deviceID, &alloc.allocatedState) {
@@ -1868,11 +1913,31 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 			}
 		}
 
+		// An allocated device this pool no longer publishes in any slice cannot have its counter
+		// consumption reconstructed (the slice is the only source), so the pool's counter
+		// availability is unknowable. Mark it unusable (nil) rather than over-commit counters
+		// still in use; the allocated DeviceID names this pool, so the device is detectable even
+		// without a consumption record.
+		for allocatedID := range alloc.allocatedDeviceIDsByPool[poolID] {
+			if !poolDeviceIDs.Has(allocatedID) {
+				alloc.logger.V(5).Info("Marking counter pool unavailable: an allocated device is no longer published in any slice",
+					"pool", poolID, "device", allocatedID)
+				availableCountersForPool = nil
+				break
+			}
+		}
+
 		// Set the available counters on the allocator so we don't have to
 		// compute this again.
 		alloc.mutex.Lock()
 		alloc.availableCounters[poolID] = availableCountersForPool
 		alloc.mutex.Unlock()
+	}
+
+	// A pool with an allocated device it no longer publishes has unknowable counter
+	// availability; do not allocate from it.
+	if availableCountersForPool == nil {
+		return false, nil
 	}
 
 	// Update the consumedCounters data structure with the counters consumed
