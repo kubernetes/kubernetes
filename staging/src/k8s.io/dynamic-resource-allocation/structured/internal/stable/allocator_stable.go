@@ -69,7 +69,7 @@ type Allocator struct {
 	// never changes once set, and is guarded by mutex. The stable allocator
 	// does not enforce DRADeviceCompatibilityGroups, but during a version skew
 	// it uses this to skip devices it cannot validate against a grouped peer.
-	groupedCounterSets map[PoolID]sets.Set[string]
+	groupedCounterSets map[PoolID]sets.Set[draapi.UniqueString]
 	// availableCounters contains the available counters for each
 	// resource pool. It acts as a cache that is updated the first time
 	// the available counters are needed for each pool. The information
@@ -104,7 +104,7 @@ func NewAllocator(ctx context.Context,
 	return &Allocator{
 		features:           features,
 		allocatedDevices:   allocatedDevices,
-		groupedCounterSets: make(map[PoolID]sets.Set[string]),
+		groupedCounterSets: make(map[PoolID]sets.Set[draapi.UniqueString]),
 		classLister:        classLister,
 		slices:             slices,
 		celCache:           celCache,
@@ -1490,7 +1490,7 @@ func (alloc *allocator) skipForDisabledCompatibilityGroups(device deviceWithID) 
 				"device", device.id, "counterSet", deviceCounterConsumption.CounterSet.String())
 			return true
 		}
-		if grouped.Has(deviceCounterConsumption.CounterSet.String()) {
+		if grouped.Has(deviceCounterConsumption.CounterSet) {
 			alloc.logger.V(7).Info("Skipping device: its counter set already carries a grouped allocation this allocator cannot validate",
 				"device", device.id, "counterSet", deviceCounterConsumption.CounterSet.String())
 			return true
