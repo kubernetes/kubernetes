@@ -1,0 +1,10 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+spec:
+  matchConditions:
+    - name: only-pods
+      expression: "object.kind == 'Pod'"
+  mutations:
+    - patchType: ApplyConfiguration
+      applyConfiguration:
+        expression: "Object{metadata: Object.metadata{labels: {'mutated': 'true'}}}"
