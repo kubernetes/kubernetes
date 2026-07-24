@@ -74,7 +74,6 @@ type ObjectMetaApplyConfiguration struct {
 	//
 	// Populated by the system.
 	// Read-only.
-	// Value must be treated as opaque by clients and .
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
 	ResourceVersion *string `json:"resourceVersion,omitempty"`
 	// A sequence number representing a specific generation of the desired state.
