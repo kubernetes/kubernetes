@@ -107,10 +107,12 @@ type Allocator struct {
 	// The allocator might be accessed by different goroutines, so
 	// access to this map must be synchronized.
 	availableCounters map[PoolID]counterSets
-	// groupedCounterSets lists, per pool, the counter sets on which an
+	// groupedCounterSets caches, per pool, the counter sets on which an
 	// already-allocated device declares groups (read from the ResourceSlices).
-	// Used only by the version-skew skip, so it is only populated while the
-	// feature is disabled; enforcement (feature on) uses the richer
+	// Like availableCounters it is computed lazily by groupedCounterSetsForPool,
+	// never changes once set, and is guarded by mutex. Used only by the
+	// version-skew skip, so it is only ever populated while the feature is
+	// disabled; enforcement (feature on) uses the richer
 	// compatibilityGroupsBaseline below.
 	groupedCounterSets map[PoolID]sets.Set[string]
 	// compatibilityGroupsBaseline caches, per resource pool, the
@@ -152,19 +154,17 @@ func NewAllocator(ctx context.Context,
 		}
 	}
 	a := &Allocator{
-		features:          features,
-		allocatedState:    allocatedState,
-		classLister:       classLister,
-		slicesOnNode:      slicesOnNode,
-		slicesShared:      slicesShared,
-		allSlices:         slices,
-		celCache:          celCache,
-		availableCounters: make(map[PoolID]counterSets),
+		features:           features,
+		allocatedState:     allocatedState,
+		classLister:        classLister,
+		slicesOnNode:       slicesOnNode,
+		slicesShared:       slicesShared,
+		allSlices:          slices,
+		celCache:           celCache,
+		availableCounters:  make(map[PoolID]counterSets),
+		groupedCounterSets: make(map[PoolID]sets.Set[string]),
 
 		compatibilityGroupsBaseline: make(map[PoolID]map[string]compatibilityGroupIntersection),
-	}
-	if !features.CompatibilityGroups {
-		a.groupedCounterSets = groupedCounterSetsFromSlices(slices, allocatedState)
 	}
 	return a, nil
 }
@@ -2142,7 +2142,7 @@ func (alloc *allocator) checkAndConsumeCompatibilityGroups(device deviceWithID) 
 // allocators; enforcement (feature on) uses checkAndConsumeCompatibilityGroups
 // and the richer per-pool baseline instead.
 func (alloc *allocator) skipForDisabledCompatibilityGroups(device deviceWithID) bool {
-	grouped := alloc.groupedCounterSets[device.pool.PoolID]
+	grouped := alloc.groupedCounterSetsForPool(device.pool)
 	for _, deviceCounterConsumption := range device.ConsumesCounters {
 		if len(deviceCounterConsumption.CompatibilityGroups) > 0 {
 			alloc.logger.V(7).Info("Skipping device: it declares compatibility groups, which this allocator does not enforce",

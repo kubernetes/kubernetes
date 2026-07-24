@@ -17,8 +17,8 @@ limitations under the License.
 package experimental
 
 import (
-	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 )
 
@@ -100,33 +100,50 @@ func compatibilityGroupSet(groups []string) sets.Set[string] {
 	return sets.New[string](groups...)
 }
 
-// groupedCounterSetsFromSlices returns, per pool, the counter sets on which an
+// groupedCounterSetsForPool returns the counter sets of the pool on which an
 // already-allocated device declares at least one compatibility group, read
-// directly from the source ResourceSlices. A device that declares no groups
-// contributes nothing. Membership is read live, exactly like checkAvailableCounters
-// does for counters. Used only by the version-skew skip while the feature is
-// disabled; enforcement (feature on) uses the richer per-pool baseline instead.
-func groupedCounterSetsFromSlices(slices []*resourceapi.ResourceSlice, state AllocatedState) map[PoolID]sets.Set[string] {
-	grouped := make(map[PoolID]sets.Set[string])
-	for _, slice := range slices {
-		for _, device := range slice.Spec.Devices {
-			deviceID := internal.MakeDeviceID(slice.Spec.Driver, slice.Spec.Pool.Name, device.Name)
-			if !internal.IsDeviceAllocated(deviceID, &state) {
-				continue
-			}
-			for _, deviceCounterConsumption := range device.ConsumesCounters {
-				if len(deviceCounterConsumption.CompatibilityGroups) == 0 {
+// directly from the pool's ResourceSlices. A device that declares no groups
+// contributes nothing. Membership is read live, exactly like
+// checkAvailableCounters does for counters. Used only by the version-skew skip
+// while the feature is disabled; enforcement (feature on) uses the richer
+// compatibilityGroupsBaselineForPool instead.
+//
+// The result is computed lazily the first time a pool is touched and then
+// cached, mirroring availableCounters: pools whose devices never reach the
+// skip - including every pool in a cluster that does not use compatibility
+// groups - never pay for the walk.
+func (alloc *allocator) groupedCounterSetsForPool(pool *Pool) sets.Set[string] {
+	poolID := pool.PoolID
+
+	alloc.mutex.RLock()
+	grouped, found := alloc.groupedCounterSets[poolID]
+	alloc.mutex.RUnlock()
+	if found {
+		return grouped
+	}
+
+	// Computed without holding the lock; concurrent goroutines may duplicate
+	// the work, but the input is the same for all of them, so the result is,
+	// too.
+	grouped = sets.New[string]()
+	for _, resourceSlices := range [][]*draapi.ResourceSlice{pool.DeviceSlicesTargetingNode, pool.DeviceSlicesNotTargetingNode} {
+		for _, slice := range resourceSlices {
+			for _, device := range slice.Spec.Devices {
+				deviceID := DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: device.Name}
+				if !internal.IsDeviceAllocated(deviceID, &alloc.allocatedState) {
 					continue
 				}
-				poolID := PoolID{Driver: deviceID.Driver, Pool: deviceID.Pool}
-				cs := grouped[poolID]
-				if cs == nil {
-					cs = sets.New[string]()
-					grouped[poolID] = cs
+				for _, deviceCounterConsumption := range device.ConsumesCounters {
+					if len(deviceCounterConsumption.CompatibilityGroups) > 0 {
+						grouped.Insert(deviceCounterConsumption.CounterSet.String())
+					}
 				}
-				cs.Insert(deviceCounterConsumption.CounterSet)
 			}
 		}
 	}
+
+	alloc.mutex.Lock()
+	alloc.groupedCounterSets[poolID] = grouped
+	alloc.mutex.Unlock()
 	return grouped
 }
