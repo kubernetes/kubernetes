@@ -7547,6 +7547,7 @@ type NamespaceList struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
 
 // Binding ties one object to another; for example, a pod is bound to a node by a scheduler.
+// +k8s:supportsSubresource="/binding"
 type Binding struct {
 	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
@@ -7556,6 +7557,7 @@ type Binding struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// The target object that you want to bind to the standard object.
+	// +k8s:alpha(since: "1.37")=+k8s:subfield(name)=+k8s:required
 	Target ObjectReference `json:"target" protobuf:"bytes,2,opt,name=target"`
 }
 
