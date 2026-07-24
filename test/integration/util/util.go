@@ -29,7 +29,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapiv1alpha2 "k8s.io/api/scheduling/v1alpha3"
+	schedulingapiv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingapiv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -96,7 +97,7 @@ func StartScheduler(tCtx ktesting.TContext, cfg *kubeschedulerconfig.KubeSchedul
 // global metrics).
 func StartSchedulerWithDone(tCtx ktesting.TContext, cfg *kubeschedulerconfig.KubeSchedulerConfiguration, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}) {
 	clientSet := tCtx.Client()
-	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
+	informerFactory := scheduler.NewInformerFactory(clientSet, 0, nil)
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
 		Interface: clientSet.EventsV1()})
 	go func() {
@@ -143,7 +144,7 @@ func StartSchedulerWithDone(tCtx ktesting.TContext, cfg *kubeschedulerconfig.Kub
 // The caller is responsible for the management of the goroutine where that method is invoked.
 func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) func() {
 	podInformer := informerFactory.Core().V1().Pods()
-	podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
+	podGroupInformer := informerFactory.Scheduling().V1beta1().PodGroups()
 	claimInformer := informerFactory.Resource().V1().ResourceClaims()
 	claimTemplateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 	claimController, err := resourceclaim.NewController(klog.FromContext(ctx), clientSet, podInformer, podGroupInformer, claimInformer, claimTemplateInformer)
@@ -523,10 +524,11 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 	testCtx.ClientSet, testCtx.KubeConfig, testCtx.CloseFn = framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(options *options.ServerRunOptions) {
 			options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority", "StorageObjectInUseProtection"}
+			if options.APIEnablement.RuntimeConfig == nil {
+				options.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{}
+			}
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				options.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
-					resourceapi.SchemeGroupVersion.String(): "true",
-				}
+				options.APIEnablement.RuntimeConfig[resourceapi.SchemeGroupVersion.String()] = "true"
 				if utilfeature.DefaultMutableFeatureGate.EmulationVersion().LessThan(version.MustParse("v1.34.0")) {
 					// Cannot enable the resourceapi.SchemeGroupVersion when emulating < 1.34 unless
 					// we enable --runtime-config-emulation-forward-compatible.
@@ -534,9 +536,10 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 				}
 			}
 			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-				options.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
-					schedulingapiv1alpha2.SchemeGroupVersion.String(): "true",
-				}
+				options.APIEnablement.RuntimeConfig[schedulingapiv1beta1.SchemeGroupVersion.String()] = "true"
+			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+				options.APIEnablement.RuntimeConfig[schedulingapiv1alpha3.SchemeGroupVersion.String()] = "true"
 			}
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
@@ -575,6 +578,25 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 	return testCtx
 }
 
+// WithNewNamespace creates a child TestContext that shares the API server from
+// parent but gets a fresh namespace. Only the namespace is deleted on t.Cleanup;
+// the API server lifecycle is managed by the caller. This is useful when
+// multiple subtests share one API server to avoid the per-subtest startup cost.
+func WithNewNamespace(t *testing.T, parent *TestContext, nsPrefix string) *TestContext {
+	t.Helper()
+	child := &TestContext{
+		ClientSet:  parent.ClientSet,
+		KubeConfig: parent.KubeConfig,
+		Ctx:        parent.Ctx,
+		CloseFn:    func() {}, // API server is owned by parent; do not tear it down here.
+	}
+	child.NS = framework.CreateNamespaceOrDie(child.ClientSet, nsPrefix+string(uuid.NewUUID()), t)
+	t.Cleanup(func() {
+		framework.DeleteNamespaceOrDie(child.ClientSet, child.NS, t)
+	})
+	return child
+}
+
 // WaitForSchedulerCacheCleanup waits for cleanup of scheduler's cache to complete
 func WaitForSchedulerCacheCleanup(ctx context.Context, sched *scheduler.Scheduler, t *testing.T) {
 	schedulerCacheIsEmpty := func(context.Context) (bool, error) {
@@ -610,7 +632,7 @@ func InitTestSchedulerWithOptions(
 	testCtx.SchedulerCtx = ctx
 
 	// 1. Create scheduler
-	testCtx.InformerFactory = scheduler.NewInformerFactory(testCtx.ClientSet, resyncPeriod)
+	testCtx.InformerFactory = scheduler.NewInformerFactory(testCtx.ClientSet, resyncPeriod, nil)
 	if testCtx.KubeConfig != nil {
 		dynClient := dynamic.NewForConfigOrDie(testCtx.KubeConfig)
 		testCtx.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, v1.NamespaceAll, nil)
@@ -710,7 +732,7 @@ func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.Di
 
 	informers.Start(testCtx.Scheduler.StopEverything)
 	informers.WaitForCacheSync(testCtx.Scheduler.StopEverything)
-	go dc.Run(testCtx.Ctx)
+	go dc.Run(testCtx.Ctx, 1)
 	return dc
 }
 

@@ -24,6 +24,8 @@ import (
 	"os"
 	"path/filepath"
 
+	cdispec "tags.cncf.io/container-device-interface/specs-go"
+
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,35 +66,6 @@ func decodeFirstMetadata(data []byte) (*metadata.DeviceMetadata, error) {
 	return &dm, nil
 }
 
-// CDI JSON types for metadata bind-mount specs. These mirror the CDI spec
-// structure but only include the fields needed for file bind-mounts.
-// These definitions are sufficient to generate simple CDI files which set
-// the volume mount path for the metadata file.
-// Drivers should use pre-generated CDI files or the
-// github.com/container-orchestrated-devices/container-device-interface/pkg/cdi
-// helper package to generate files.
-// This is not done in Kubernetes to minimize dependencies.
-type cdiSpec struct {
-	Version string      `json:"cdiVersion"`
-	Kind    string      `json:"kind"`
-	Devices []cdiDevice `json:"devices"`
-}
-
-type cdiDevice struct {
-	Name           string            `json:"name"`
-	ContainerEdits cdiContainerEdits `json:"containerEdits"`
-}
-
-type cdiContainerEdits struct {
-	Mounts []cdiMount `json:"mounts,omitempty"`
-}
-
-type cdiMount struct {
-	HostPath      string   `json:"hostPath"`
-	ContainerPath string   `json:"containerPath"`
-	Options       []string `json:"options,omitempty"`
-}
-
 const (
 	// metadataSubDir is the subdirectory under the plugin data directory
 	// where metadata files are stored on the host.
@@ -101,7 +74,6 @@ const (
 	// DefaultCDIDir is the default directory for CDI spec files.
 	DefaultCDIDir = "/var/run/cdi"
 
-	cdiVersionStr     = "0.5.0"
 	metadataFilePerms = os.FileMode(0644)
 	metadataDirPerms  = os.FileMode(0755)
 )
@@ -373,14 +345,13 @@ func (w *metadataWriter) writeCDISpec(
 ) (string, error) {
 	deviceName := string(claim.UID) + "_" + requestName
 
-	spec := &cdiSpec{
-		Version: cdiVersionStr,
-		Kind:    w.driverName + "/metadata",
-		Devices: []cdiDevice{
+	spec := &cdispec.Spec{
+		Kind: w.driverName + "/metadata",
+		Devices: []cdispec.Device{
 			{
 				Name: deviceName,
-				ContainerEdits: cdiContainerEdits{
-					Mounts: []cdiMount{
+				ContainerEdits: cdispec.ContainerEdits{
+					Mounts: []*cdispec.Mount{
 						{
 							HostPath:      w.metadataFilePath(claim.Namespace, claim.Name, requestName),
 							ContainerPath: w.containerFilePath(ref, requestName),
@@ -391,6 +362,12 @@ func (w *metadataWriter) writeCDISpec(
 			},
 		},
 	}
+
+	minVersion, err := cdispec.MinimumRequiredVersion(spec)
+	if err != nil {
+		return "", fmt.Errorf("determine CDI spec version: %w", err)
+	}
+	spec.Version = minVersion
 
 	data, err := json.MarshalIndent(spec, "", "  ")
 	if err != nil {

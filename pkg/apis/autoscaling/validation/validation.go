@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	corevalidation "k8s.io/kubernetes/pkg/apis/core/v1/validation"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
@@ -435,7 +434,7 @@ func validateContainerResourceSource(src *autoscaling.ContainerResourceMetricSou
 	if len(src.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must specify a resource name"))
 	} else {
-		allErrs = append(allErrs, corevalidation.ValidateContainerResourceName(src.Name, fldPath.Child("name"))...)
+		allErrs = append(allErrs, apivalidation.ValidateContainerResourceName(src.Name, fldPath.Child("name"))...)
 	}
 
 	if len(src.Container) == 0 {

@@ -467,6 +467,13 @@ message ClusterTrustBundleProjection {
 
   // Relative path from the volume root to write the bundle.
   optional string path = 4;
+
+  // user is Optional: The owner UID of the created file.
+  // If specified, the item-level user field takes precedence over defaultUser.
+  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // +featureGate=AtomicWriteVolumeUserFields
+  // +optional
+  optional int64 user = 6;
 }
 
 // Information about the condition of a component.
@@ -680,6 +687,13 @@ message ConfigMapVolumeSource {
   // optional specify whether the ConfigMap or its keys must be defined
   // +optional
   optional bool optional = 4;
+
+  // defaultUser is Optional: The owner UID of the created files by default.
+  // The defaultUser field is only used as a fallback when the item-level user field is unset.
+  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // +featureGate=AtomicWriteVolumeUserFields
+  // +optional
+  optional int64 defaultUser = 5;
 }
 
 // A single application container that you want to run within a pod.
@@ -1222,6 +1236,13 @@ message DownwardAPIVolumeFile {
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
   optional int32 mode = 4;
+
+  // user is Optional: The owner UID of the created file.
+  // If specified, the item-level user field takes precedence over defaultUser.
+  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // +featureGate=AtomicWriteVolumeUserFields
+  // +optional
+  optional int64 user = 5;
 }
 
 // DownwardAPIVolumeSource represents a volume containing downward API info.
@@ -1242,6 +1263,13 @@ message DownwardAPIVolumeSource {
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
   optional int32 defaultMode = 2;
+
+  // defaultUser is Optional: The owner UID of the created files by default.
+  // The defaultUser field is only used as a fallback when the item-level user field is unset.
+  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // +featureGate=AtomicWriteVolumeUserFields
+  // +optional
+  optional int64 defaultUser = 3;
 }
 
 // Represents an empty directory for a pod.
@@ -1262,6 +1290,18 @@ message EmptyDirVolumeSource {
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
   // +optional
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity sizeLimit = 2;
+
+  // mode specifies the permission bits for the emptyDir directory, in numeric
+  // notation (e.g., 0755, 01777). Must be a value between 0000 and 01777.
+  // If not specified, defaults to 0777.
+  // This might be in conflict with other options that affect the file
+  // mode, like fsGroup. If fsGroup is specified, the fsGroup permissions
+  // will override the mode specified here.
+  // This field has no effect on Windows.
+  // This field is alpha and requires EmptyDirVolumeMode featuregate to be enabled.
+  // +featureGate=EmptyDirVolumeMode
+  // +optional
+  optional int32 mode = 3;
 }
 
 // EndpointAddress is a tuple that describes single IP address.
@@ -1813,6 +1853,43 @@ message EventSource {
   optional string host = 2;
 }
 
+// EvictionResponder allows you to specify the responder reacting to an Eviction.
+// Responders should observe and communicate through the Eviction Resource API to help with
+// the graceful eviction of a target (e.g. termination of a pod).
+// +structType=atomic
+message EvictionResponder {
+  // name allows you to identify the responder responding to the Eviction.
+  //
+  // It must be a valid domain-prefixed key (such as "acme.io/foo").
+  // Domain names *.k8s.io and *.kubernetes.io are reserved.
+  // This field must be unique for each responder.
+  // This field is required.
+  // +required
+  // +k8s:required
+  // +k8s:format=k8s-prefixed-label-key
+  // +k8s:customValidation
+  optional string name = 1;
+
+  // priority for this responder. Higher priorities are selected first by the evictionrequest-controller.
+  // If there are responders with the same priority, the responder whose domain name comes first in the
+  // alphabetical higher domain order, will be picked. This means that the top domain labels are compared
+  // alphabetically first, followed by the lower domain labels. The key is compared last.
+  //
+  // The responder that is the managing controller of the pod should set the value of
+  // this field to 10000 to allow both for preemption or fallback registration by other
+  // responders.
+  //
+  // The minimum value is 0 and the maximum value is 100000.
+  // The interval 0-999 is reserved for responders with *.k8s.io suffix.
+  // This field is required.
+  // +required
+  // +k8s:required
+  // +k8s:minimum=0
+  // +k8s:maximum=100000
+  // +k8s:customValidation
+  optional int32 priority = 2;
+}
+
 // ExecAction describes a "run in container" action.
 message ExecAction {
   // Command is the command line to execute inside the container, the working directory for the
@@ -2007,6 +2084,14 @@ message GRPCAction {
   // +optional
   // +default=""
   optional string service = 2;
+
+  // mode specifies the connection mode for the gRPC health probe.
+  // Set to "TLS" to use TLS without certificate verification.
+  // Set to "Plaintext" to use a plaintext (insecure) connection explicitly.
+  // If not specified, the probe uses a plaintext (insecure) connection.
+  // +featureGate=GRPCContainerProbeTLS
+  // +optional
+  optional string mode = 3;
 }
 
 // Represents a volume that is populated with the contents of a git repository.
@@ -2098,6 +2183,12 @@ message HTTPGetAction {
   // +optional
   // +listType=atomic
   repeated HTTPHeader httpHeaders = 5;
+
+  // Protocol selects the wire protocol for the probe connection.
+  // Nil defaults to HTTP/1.1.
+  // +optional
+  // +featureGate=H2CContainerProbe
+  optional string protocol = 6;
 }
 
 // HTTPHeader describes a custom header to be used in HTTP probes
@@ -2309,6 +2400,13 @@ message KeyToPath {
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
   optional int32 mode = 3;
+
+  // user is Optional: The owner UID of the created file.
+  // If specified, the item-level user field takes precedence over defaultUser.
+  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // +featureGate=AtomicWriteVolumeUserFields
+  // +optional
+  optional int64 user = 4;
 }
 
 // Lifecycle describes actions that the management system should take in response to container lifecycle
@@ -2696,20 +2794,86 @@ message NodeAffinity {
   repeated PreferredSchedulingTerm preferredDuringSchedulingIgnoredDuringExecution = 2;
 }
 
+// NodeAllocatableMappedResources describes mapped node allocatable resource allocations.
+message NodeAllocatableMappedResources {
+  // Name is the name of the resource (e.g., cpu, memory).
+  // +required
+  // +k8s:required
+  optional string name = 1;
+
+  // Quantity is the total node allocatable resource capacity allocated for the claim.
+  // This claim's allocated devices is shared by all the containers referencing the claim.
+  // Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.
+  // +required
+  // +k8s:required
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity quantity = 2;
+}
+
+// NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.
+message NodeAllocatableOverheadResources {
+  // Name is the name of the resource (e.g., cpu, memory).
+  // +required
+  // +k8s:required
+  optional string name = 1;
+
+  // PerPod is the flat overhead quantity allocated per pod.
+  // Adding to each container limit allows individual containers to utilize the overhead, while the parent pod-level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once.
+  // At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
+  // +optional
+  // +k8s:optional
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity perPod = 2;
+
+  // PerContainer is the variable overhead quantity applied for each container referencing the claim.
+  // The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`.
+  // The total overhead quantity allocated for the claim is computed as:
+  // Quantity = PerPod + (PerContainer * NumReferences)
+  // Kubelet accounts for this overhead in cgroups:
+  // - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences).
+  // - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container.
+  // This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.
+  // At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
+  // +optional
+  // +k8s:optional
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity perContainer = 3;
+}
+
 // NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.
 message NodeAllocatableResourceClaimStatus {
   // ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.
   // +required
+  // +k8s:required
   optional string resourceClaimName = 1;
 
   // Containers lists the names of all containers in this pod that reference the claim.
   // +optional
   // +listType=set
+  // +k8s:optional
+  // +k8s:listType=set
   repeated string containers = 2;
 
-  // Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.
-  // +required
-  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> resources = 3;
+  // Mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field.
+  // This is used by kubelet for pod level and container-level cgroup enforcement.
+  // +optional
+  // +patchStrategy=merge
+  // +patchMergeKey=name
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  repeated NodeAllocatableMappedResources mapping = 4;
+
+  // Overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field.
+  // This is used by kubelet for pod level and container-level cgroup enforcement.
+  // +optional
+  // +patchStrategy=merge
+  // +patchMergeKey=name
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  repeated NodeAllocatableOverheadResources overhead = 5;
 }
 
 // NodeCondition contains condition information for a node.
@@ -2819,6 +2983,21 @@ message NodeList {
 
   // List of nodes
   repeated Node items = 2;
+}
+
+// NodePodPreemptionPolicy defines the node-level policies governing preemption for pods on this node.
+message NodePodPreemptionPolicy {
+  // DisableResizePreemption lists the owners (e.g., autoscalers, operators, administrators)
+  // that have requested to disable scheduler and Kubelet preemption for in-place pod resize on this node.
+  // If this list is non-empty, resize-induced preemption is disabled on this node.
+  // This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.
+  // +listType=set
+  // +k8s:listType=set
+  // +optional
+  // +k8s:maxItems=20
+  // +k8s:optional
+  // +k8s:eachVal=+k8s:format=k8s-label-key
+  repeated string disableResizePreemption = 1;
 }
 
 // NodeProxyOptions is the query options to a Node's proxy call.
@@ -2936,6 +3115,14 @@ message NodeSpec {
   // see: https://issues.k8s.io/61966
   // +optional
   optional string externalID = 2;
+
+  // PodPreemptionPolicy controls the node-level preemption behaviors for pods on this node.
+  // This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.
+  // +featureGate=InPlacePodVerticalScalingSchedulerPreemption
+  // +optional
+  // +k8s:optional
+  // +k8s:ifDisabled(InPlacePodVerticalScalingSchedulerPreemption)=+k8s:forbidden
+  optional NodePodPreemptionPolicy podPreemptionPolicy = 8;
 }
 
 // NodeStatus is information about the current status of a node.
@@ -3413,6 +3600,13 @@ message PersistentVolumeClaimStatus {
   // +featureGate=VolumeAttributesClass
   // +optional
   optional ModifyVolumeStatus modifyVolumeStatus = 9;
+
+  // healthStatus contains the latest controller-reported health information
+  // for the volume bound to this claim.
+  // +featureGate=CSIVolumeHealth
+  // +optional
+  // +k8s:optional
+  optional VolumeHealthStatus healthStatus = 10;
 }
 
 // PersistentVolumeClaimTemplate is used to produce
@@ -3950,6 +4144,13 @@ message PodCertificateProjection {
   // Signers should document the keys and values they support. Signers should
   // deny requests that contain keys they do not recognize.
   map<string, string> userAnnotations = 7;
+
+  // user is Optional: The owner UID of the created file.
+  // If specified, the item-level user field takes precedence over defaultUser.
+  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // +featureGate=AtomicWriteVolumeUserFields
+  // +optional
+  optional int64 user = 8;
 }
 
 // PodCondition contains details for the current condition of this pod.
@@ -4800,7 +5001,6 @@ message PodSpec {
   // - `hostNetwork` must be set to false.
   //
   // This field must be a valid DNS subdomain as defined in RFC 1123 and contain at most 64 characters.
-  // Requires the HostnameOverride feature gate to be enabled.
   //
   // +featureGate=HostnameOverride
   // +optional
@@ -4822,6 +5022,34 @@ message PodSpec {
   // +featureGate=GenericWorkload
   // +optional
   optional PodSchedulingGroup schedulingGroup = 43;
+
+  // evictionResponders reference responders that react to Evictions based on EvictionRequests.
+  // Responders should observe and communicate through the Eviction Resource API to help with
+  // the graceful termination of a pod. The responders are selected sequentially, according to
+  // their specified priority.
+  //
+  // Responders should periodically report on an eviction progress by updating the
+  // .status.responders[].heartbeatTime field of the Eviction object. If this field is not updated
+  // within the heartbeat deadline defined by the Eviction API (currently 20 minutes), the eviction
+  // is passed over to the next responder with a lower priority. If there is no other responder,
+  // the last default imperative-eviction.k8s.io/evictor responder with a priority of 100 will
+  // evict the pod using the imperative Eviction API (pods/<name>/eviction subresource).
+  //
+  // The maximum length of the responders list is 10.
+  // Responders are not supported when the pod is part of a PodGroup (.spec.schedulingGroup is set).
+  // This field can only be set on creation and is immutable afterwards.
+  // +featureGate=EvictionRequestAPI
+  // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  // +k8s:maxItems=10
+  // +k8s:alpha(since: "1.37")=+k8s:dependentForbidden("schedulingGroup")
+  repeated EvictionResponder evictionResponders = 44;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -5006,8 +5234,25 @@ message PodStatus {
   // Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
   // +featureGate=DRANodeAllocatableResources
   // +optional
-  // +listType=atomic
+  // +patchStrategy=merge
+  // +patchMergeKey=resourceClaimName
+  // +listType=map
+  // +listMapKey=resourceClaimName
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=resourceClaimName
   repeated NodeAllocatableResourceClaimStatus nodeAllocatableResourceClaimStatuses = 21;
+
+  // volumeHealth contains node-reported health for each volume the pod is using.
+  // Populated by the kubelet on the pod's node.
+  // +featureGate=CSIVolumeHealth
+  // +optional
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  repeated PodVolumeHealth volumeHealth = 22;
 }
 
 // PodTemplate describes a template for creating copies of a predefined pod.
@@ -5046,6 +5291,35 @@ message PodTemplateSpec {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional PodSpec spec = 2;
+}
+
+// PodVolumeHealth contains health information for a volume used by a pod,
+// reported by the CSI node plugin via the kubelet.
+message PodVolumeHealth {
+  // name matches an entry in pod.spec.volumes.
+  // +required
+  // +k8s:required
+  optional string name = 1;
+
+  // conditions is the set of adverse conditions reported by
+  // the CSI node plugin for this volume on this node.
+  // At most 16 conditions may be reported.
+  // +optional
+  // +listType=map
+  // +listMapKey=status
+  // +patchMergeKey=status
+  // +patchStrategy=merge
+  // +listMapKey=reason
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=status
+  // +k8s:listMapKey=reason
+  // +k8s:maxItems=16
+  repeated VolumeHealthCondition healthConditions = 2;
+
+  // lastTransitionTime is when the current set of conditions first appeared.
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 }
 
 // PortStatus represents the error condition of a service port
@@ -5206,6 +5480,13 @@ message ProjectedVolumeSource {
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
   optional int32 defaultMode = 2;
+
+  // defaultUser is Optional: The owner UID of the created files by default.
+  // The defaultUser field is only used as a fallback when the item-level user field is unset.
+  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // +featureGate=AtomicWriteVolumeUserFields
+  // +optional
+  optional int64 defaultUser = 3;
 }
 
 // Represents a Quobyte mount that lasts the lifetime of a pod.
@@ -5643,8 +5924,13 @@ message ResourceRequirements {
 // ResourceStatus represents the status of a single resource allocated to a Pod.
 message ResourceStatus {
   // Name of the resource. Must be unique within the pod and in case of non-DRA resource, match one of the resources from the pod spec.
-  // For DRA resources, the value must be "claim:<claim_name>/<request>".
-  // When this status is reported about a container, the "claim_name" and "request" must match one of the claims of this container.
+  // For DRA resources, the value must be "claim:<claim_name>/<request>" when
+  // container.resources.claims[*].request is set or "claim:<claim_name>" when
+  // container.resources.claims[*].request is empty.
+  // For DRA-backed extended resources, "claim:<claim_name>/<request>" is used
+  // when the claim name and request name are recorded in pod.status.extendedResourceClaimStatus.
+  // When this status is reported about a container, the "claim_name" and "request"
+  // must match one of the claims of this container.
   // +required
   optional string name = 1;
 
@@ -5973,6 +6259,13 @@ message SecretVolumeSource {
   // optional field specify whether the Secret or its keys must be defined
   // +optional
   optional bool optional = 4;
+
+  // defaultUser is Optional: The owner UID of the created files by default.
+  // The defaultUser field is only used as a fallback when the item-level user field is unset.
+  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // +featureGate=AtomicWriteVolumeUserFields
+  // +optional
+  optional int64 defaultUser = 5;
 }
 
 // SecurityContext holds security configuration that will be applied to a container.
@@ -6174,6 +6467,13 @@ message ServiceAccountTokenProjection {
   // path is the path relative to the mount point of the file to project the
   // token into.
   optional string path = 3;
+
+  // user is Optional: The owner UID of the created file.
+  // If specified, the item-level user field takes precedence over defaultUser.
+  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // +featureGate=AtomicWriteVolumeUserFields
+  // +optional
+  optional int64 user = 4;
 }
 
 // ServiceList holds a list of services.
@@ -6898,6 +7198,57 @@ message VolumeDevice {
   optional string devicePath = 2;
 }
 
+// VolumeHealthCondition represents an adverse health condition reported for a volume.
+message VolumeHealthCondition {
+  // status is the machine-parseable health category.
+  // Possible values:
+  // - "Inaccessible": the volume cannot be accessed.
+  // - "DataLoss": data loss has been detected on the volume.
+  // - "Degraded": the volume is functioning with reduced capability.
+  // +required
+  // +k8s:required
+  optional string status = 1;
+
+  // reason is a brief CamelCase machine-parseable reason.
+  // Together with status it forms the unique identity of a condition entry.
+  // Maximum permitted length of a reason is 256 bytes.
+  // +required
+  // +k8s:required
+  // +k8s:maxBytes=256
+  optional string reason = 2;
+
+  // message is a human-readable description.
+  // Maximum permitted length of a message is 1024 bytes.
+  // +optional
+  // +k8s:optional
+  // +k8s:maxBytes=1024
+  optional string message = 3;
+}
+
+// VolumeHealthStatus contains health information for a volume reported
+// by the CSI controller plugin.
+message VolumeHealthStatus {
+  // conditions is the set of adverse conditions reported by
+  // the CSI controller plugin. An empty list means no adverse condition.
+  // At most 16 conditions may be reported.
+  // +optional
+  // +listType=map
+  // +listMapKey=status
+  // +patchMergeKey=status
+  // +patchStrategy=merge
+  // +listMapKey=reason
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=status
+  // +k8s:listMapKey=reason
+  // +k8s:maxItems=16
+  repeated VolumeHealthCondition healthConditions = 1;
+
+  // lastTransitionTime is when the current set of conditions first appeared.
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 2;
+}
+
 // VolumeMount describes a mounting of a Volume within a container.
 message VolumeMount {
   // This must match the Name of a Volume.
@@ -6950,6 +7301,17 @@ message VolumeMount {
   // SubPathExpr and SubPath are mutually exclusive.
   // +optional
   optional string subPathExpr = 6;
+
+  // bindMountOptions is the list of additional bind mount options to apply when
+  // mounting this volume into the container. Allowed values are noexec,
+  // nodev, and nosuid. These are Linux mount options and have no effect on
+  // Windows nodes.
+  // This field is not supported with image volumes.
+  // This is an alpha field and requires enabling the VolumeBindMountOptions feature gate.
+  // +featureGate=VolumeBindMountOptions
+  // +optional
+  // +listType=set
+  repeated string bindMountOptions = 8;
 }
 
 // VolumeMountStatus shows status of volume mounts.

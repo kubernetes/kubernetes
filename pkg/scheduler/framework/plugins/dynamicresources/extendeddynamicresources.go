@@ -548,10 +548,10 @@ func (pl *DynamicResources) createExtendedResourceClaimInAPI(
 
 	createdClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 	if err != nil {
-		metrics.ResourceClaimCreatesTotal.WithLabelValues("failure", "false").Inc()
+		metrics.ResourceClaimCreatesTotal.WithLabelValues("failure", "false", "", "Pod").Inc()
 		return nil, fmt.Errorf("create claim for extended resources %v: %w", klog.KObj(claim), err)
 	}
-	metrics.ResourceClaimCreatesTotal.WithLabelValues("success", "false").Inc()
+	metrics.ResourceClaimCreatesTotal.WithLabelValues("success", "false", "", "Pod").Inc()
 	logger.V(5).Info("created claim for extended resources", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(createdClaim))
 
 	return createdClaim, nil
@@ -579,7 +579,7 @@ func (pl *DynamicResources) patchPodExtendedResourceClaimStatus(
 		RequestMappings:   cer,
 		ResourceClaimName: claim.Name,
 	}
-	err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, "", &pod.Status, podStatusCopy)
+	err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
 	if err != nil {
 		return fmt.Errorf("update pod %s/%s ExtendedResourceClaimStatus: %w", pod.Namespace, pod.Name, err)
 	}

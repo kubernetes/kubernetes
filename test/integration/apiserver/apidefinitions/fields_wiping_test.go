@@ -86,6 +86,16 @@ func TestFieldsWipingConsistency(t *testing.T) {
 		}
 		createWipesStatus := !checkPatch(t, status, "status", created.Object)
 
+		// Infer main-endpoint GetResetFields behavior from the created object's
+		// managedFields, before the status apply below (Force: true) steals
+		// ownership of the status fields and destroys the evidence.
+		ssaMainResetsStatus := true
+		for _, mf := range created.GetManagedFields() {
+			if mf.Manager == "spec-manager" && mf.Subresource == "" {
+				ssaMainResetsStatus = !managedFieldsOwnTopLevelField(t, mf.FieldsV1, "status")
+			}
+		}
+
 		// Apply to /status endpoint with mutated spec, status and metadata field changes.
 		statusObj := TestObj(t, api.StorageData.Stub, status, api.Mapping.GroupVersionKind)
 		if api.StorageData.MutatedStub != "" {
@@ -114,13 +124,9 @@ func TestFieldsWipingConsistency(t *testing.T) {
 		baselineSpec := baseline.Object["spec"]
 
 		// Infer GetResetFields behavior from managedFields.
-		ssaMainResetsStatus := true
 		ssaStatusResetsSpec := true
 		ssaStatusResetsMetadata := true
 		for _, mf := range baseline.GetManagedFields() {
-			if mf.Manager == "spec-manager" && mf.Subresource == "" {
-				ssaMainResetsStatus = !managedFieldsOwnTopLevelField(t, mf.FieldsV1, "status")
-			}
 			if mf.Manager == "status-manager" && mf.Subresource == "status" {
 				ssaStatusResetsSpec = !managedFieldsOwnTopLevelField(t, mf.FieldsV1, "spec")
 				ssaStatusResetsMetadata = !managedFieldsOwnLabel(t, mf.FieldsV1, "test-status-ssa")

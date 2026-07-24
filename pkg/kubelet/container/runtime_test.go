@@ -145,6 +145,50 @@ func TestPodStatusFindContainerStatusByName(t *testing.T) {
 	}
 }
 
+func TestPodStatusFindActiveContainerStatusByName(t *testing.T) {
+	podStatus := &PodStatus{
+		ActiveContainerStatuses: []*Status{
+			{Name: "container1", State: ContainerStateRunning},
+			{Name: "container2", State: ContainerStateExited},
+			{Name: "container1", State: ContainerStateCreated}, // duplicate name
+		},
+	}
+
+	tests := []struct {
+		name           string
+		containerName  string
+		expectedStatus *Status
+	}{
+		{
+			name:           "find existing container",
+			containerName:  "container1",
+			expectedStatus: podStatus.ActiveContainerStatuses[0], // should return first match
+		},
+		{
+			name:           "find another existing container",
+			containerName:  "container2",
+			expectedStatus: podStatus.ActiveContainerStatuses[1],
+		},
+		{
+			name:           "find non-existing container",
+			containerName:  "nonexistent",
+			expectedStatus: nil,
+		},
+		{
+			name:           "empty container name",
+			containerName:  "",
+			expectedStatus: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := podStatus.FindActiveContainerStatusByName(tt.containerName)
+			assert.Equal(t, tt.expectedStatus, result, "FindActiveContainerStatusByName(%q)", tt.containerName)
+		})
+	}
+}
+
 func TestPodStatusGetRunningContainerStatuses(t *testing.T) {
 	podStatus := &PodStatus{
 		ContainerStatuses: []*Status{
@@ -609,7 +653,7 @@ func TestRuntimeStatusString(t *testing.T) {
 	}
 
 	result := status.String()
-	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true, Features: SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true"
+	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true, Features: SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true MountOptions: false"
 	assert.Equal(t, expected, result, "String()")
 }
 
@@ -695,7 +739,7 @@ func TestRuntimeFeaturesString(t *testing.T) {
 				SupplementalGroupsPolicy:  true,
 				UserNamespacesHostNetwork: true,
 			},
-			expected: "SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true",
+			expected: "SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true MountOptions: false",
 		},
 		{
 			name: "features with both flags false",
@@ -703,7 +747,7 @@ func TestRuntimeFeaturesString(t *testing.T) {
 				SupplementalGroupsPolicy:  false,
 				UserNamespacesHostNetwork: false,
 			},
-			expected: "SupplementalGroupsPolicy: false UserNamespacesHostNetwork: false",
+			expected: "SupplementalGroupsPolicy: false UserNamespacesHostNetwork: false MountOptions: false",
 		},
 		{
 			name:     "nil features",

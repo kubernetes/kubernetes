@@ -36,7 +36,7 @@ import (
 	resourcealpha "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -374,17 +374,23 @@ func (*metricsCollector) run(tCtx ktesting.TContext) {
 }
 
 func (mc *metricsCollector) collect() []DataItem {
+	gm, err := testutil.GatherMetrics(legacyregistry.DefaultGatherer)
+	if err != nil {
+		klog.ErrorS(err, "failed to gather metrics for collection")
+		return nil
+	}
+
 	var dataItems []DataItem
 	for metric, labelValsSlice := range mc.Metrics {
 		// no filter is specified, aggregate all the metrics within the same metricFamily.
 		if labelValsSlice == nil {
-			dataItem := collectHistogramVec(metric, mc.labels, nil)
+			dataItem := collectHistogramVec(gm, metric, mc.labels, nil)
 			if dataItem != nil {
 				dataItems = append(dataItems, *dataItem)
 			}
 		} else {
 			for _, lvMap := range uniqueLVCombos(labelValsSlice) {
-				dataItem := collectHistogramVec(metric, mc.labels, lvMap)
+				dataItem := collectHistogramVec(gm, metric, mc.labels, lvMap)
 				if dataItem != nil {
 					dataItems = append(dataItems, *dataItem)
 				}
@@ -420,8 +426,8 @@ func uniqueLVCombos(lvs []*labelValues) []map[string]string {
 	return results
 }
 
-func collectHistogramVec(metric string, labels map[string]string, lvMap map[string]string) *DataItem {
-	vec, err := testutil.GetHistogramVecFromGatherer(legacyregistry.DefaultGatherer, metric, lvMap)
+func collectHistogramVec(gm *testutil.GatheredMetrics, metric string, labels map[string]string, lvMap map[string]string) *DataItem {
+	vec, err := gm.GetHistogramVec(metric, lvMap)
 	if err != nil {
 		// "metric ... not found" is pretty normal. Don't spam the output with it!
 		if !strings.HasSuffix(err.Error(), "not found") {

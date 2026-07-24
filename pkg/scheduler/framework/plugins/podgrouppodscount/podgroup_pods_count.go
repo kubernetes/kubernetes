@@ -23,12 +23,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // PodGroupPodsCount is a placement score plugin that favors placements that can accommodate more pods from the considered PodGroup.
 type PodGroupPodsCount struct {
 	handle fwk.Handle
+	fts    feature.Features
 }
 
 var _ fwk.PlacementScorePlugin = &PodGroupPodsCount{}
@@ -36,8 +38,8 @@ var _ fwk.PlacementScorePlugin = &PodGroupPodsCount{}
 const Name = names.PodGroupPodsCount
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, h fwk.Handle, _ feature.Features) (fwk.Plugin, error) {
-	return &PodGroupPodsCount{handle: h}, nil
+func New(_ context.Context, _ runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
+	return &PodGroupPodsCount{handle: h, fts: fts}, nil
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -50,12 +52,12 @@ func (pl *PodGroupPodsCount) Name() string {
 // when computing the score. This ensures that the relative difference between choices is reduced,
 // and small changes to the total count result in small changes to the score.
 func (pl *PodGroupPodsCount) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
-	pgState, err := pl.handle.SnapshotSharedLister().PodGroupStates().Get(podGroup.GetNamespace(), podGroup.GetName())
+	scheduledPodsCount, err := pl.getScheduledPodsCount(podGroup)
 	if err != nil {
 		return 0, fwk.AsStatus(err)
 	}
 
-	return int64(pgState.ScheduledPodsCount() + len(placement.ProposedAssignments)), nil
+	return int64(scheduledPodsCount + len(placement.ProposedAssignments)), nil
 }
 
 // PlacementScoreExtensions returns a PlacementScoreExtensions interface if it implements one, or nil if does not.
@@ -76,6 +78,8 @@ func (pl *PodGroupPodsCount) NormalizePlacementScore(ctx context.Context, state 
 	}
 
 	if maxCount == 0 {
+		// TODO: this plugin assumes that the gang scheduling plugin will not let pod groups with 0 scheduled pods through.
+		// This can be solved by making it a core algorithm assumption or handling it gracefully in the plugin.
 		return fwk.AsStatus(errors.New("no pods from pod group are assigned to any of the candidate placements"))
 	}
 
@@ -84,4 +88,22 @@ func (pl *PodGroupPodsCount) NormalizePlacementScore(ctx context.Context, state 
 	}
 
 	return nil
+}
+
+func (pl *PodGroupPodsCount) getScheduledPodsCount(podGroup fwk.PodGroupInfo) (int, error) {
+	if pl.fts.EnableCompositePodGroup {
+		count := 0
+		for podGroupState, err := range helper.GetPodGroupStates(pl.handle.SnapshotSharedLister(), fwk.MustParseEntityKey(podGroup.GetKey())) {
+			if err != nil {
+				return 0, err
+			}
+			count += podGroupState.ScheduledPodsCount()
+		}
+		return count, nil
+	}
+	pgState, err := pl.handle.SnapshotSharedLister().PodGroupStates().Get(podGroup.GetNamespace(), podGroup.GetName())
+	if err != nil {
+		return 0, err
+	}
+	return pgState.ScheduledPodsCount(), nil
 }

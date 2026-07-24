@@ -22,9 +22,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/scheduling/v1alpha3"
+	"k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -40,27 +42,27 @@ func TestPodGroupMemberPods_Add(t *testing.T) {
 	tests := []struct {
 		name      string
 		podsToAdd []*framework.QueuedPodInfo
-		want      map[string]map[string]*framework.QueuedPodInfo
+		want      map[fwk.EntityKey]map[fwk.EntityKey]*framework.QueuedPodInfo
 	}{
 		{
 			name:      "pod group with multiple pods",
 			podsToAdd: []*framework.QueuedPodInfo{pInfo1, pInfo2},
-			want: map[string]map[string]*framework.QueuedPodInfo{
-				"pg/ns1/pg1": {
-					"ns1/pod1": pInfo1,
-					"ns1/pod2": pInfo2,
+			want: map[fwk.EntityKey]map[fwk.EntityKey]*framework.QueuedPodInfo{
+				fwk.PodGroupKey("ns1", "pg1"): {
+					fwk.PodKey("ns1", "pod1"): pInfo1,
+					fwk.PodKey("ns1", "pod2"): pInfo2,
 				},
 			},
 		},
 		{
 			name:      "two pod groups",
 			podsToAdd: []*framework.QueuedPodInfo{pInfo1, pInfo3},
-			want: map[string]map[string]*framework.QueuedPodInfo{
-				"pg/ns1/pg1": {
-					"ns1/pod1": pInfo1,
+			want: map[fwk.EntityKey]map[fwk.EntityKey]*framework.QueuedPodInfo{
+				fwk.PodGroupKey("ns1", "pg1"): {
+					fwk.PodKey("ns1", "pod1"): pInfo1,
 				},
-				"pg/ns1/pg2": {
-					"ns1/pod3": pInfo3,
+				fwk.PodGroupKey("ns1", "pg2"): {
+					fwk.PodKey("ns1", "pod3"): pInfo3,
 				},
 			},
 		},
@@ -68,7 +70,7 @@ func TestPodGroupMemberPods_Add(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ppm := newPodGroupMemberPods()
+			ppm := newPodGroupMemberPods(metrics.IncompletePodGroupPods())
 			for _, pInfo := range tt.podsToAdd {
 				ppm.add(pInfo)
 			}
@@ -123,7 +125,7 @@ func TestPodGroupMemberPods_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ppm := newPodGroupMemberPods()
+			ppm := newPodGroupMemberPods(metrics.IncompletePodGroupPods())
 			for _, pInfo := range tt.podsToAdd {
 				ppm.add(pInfo)
 			}
@@ -171,7 +173,7 @@ func TestPodGroupMemberPods_Has(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ppm := newPodGroupMemberPods()
+			ppm := newPodGroupMemberPods(metrics.IncompletePodGroupPods())
 			for _, pInfo := range tt.podsToAdd {
 				ppm.add(pInfo)
 			}
@@ -214,7 +216,7 @@ func TestPodGroupMemberPods_Update(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ppm := newPodGroupMemberPods()
+			ppm := newPodGroupMemberPods(metrics.IncompletePodGroupPods())
 			for _, pInfo := range tt.podsToAdd {
 				ppm.add(pInfo.DeepCopy())
 			}
@@ -240,15 +242,15 @@ func TestPodGroupMemberPods_Delete(t *testing.T) {
 		podsToAdd   []*framework.QueuedPodInfo
 		podToDelete *v1.Pod
 		wantDeleted *framework.QueuedPodInfo
-		want        map[string]*framework.QueuedPodInfo
+		want        map[fwk.EntityKey]*framework.QueuedPodInfo
 	}{
 		{
 			name:        "delete non-existent pod from existing pod group",
 			podsToAdd:   []*framework.QueuedPodInfo{pInfo1},
 			podToDelete: pod3,
 			wantDeleted: nil,
-			want: map[string]*framework.QueuedPodInfo{
-				"ns1/pod1": pInfo1,
+			want: map[fwk.EntityKey]*framework.QueuedPodInfo{
+				fwk.PodKey("ns1", "pod1"): pInfo1,
 			},
 		},
 		{
@@ -263,8 +265,8 @@ func TestPodGroupMemberPods_Delete(t *testing.T) {
 			podsToAdd:   []*framework.QueuedPodInfo{pInfo1, pInfo2},
 			podToDelete: pod1,
 			wantDeleted: pInfo1,
-			want: map[string]*framework.QueuedPodInfo{
-				"ns1/pod2": pInfo2,
+			want: map[fwk.EntityKey]*framework.QueuedPodInfo{
+				fwk.PodKey("ns1", "pod2"): pInfo2,
 			},
 		},
 		{
@@ -278,7 +280,7 @@ func TestPodGroupMemberPods_Delete(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ppm := newPodGroupMemberPods()
+			ppm := newPodGroupMemberPods(metrics.IncompletePodGroupPods())
 			for _, pInfo := range tt.podsToAdd {
 				ppm.add(pInfo.DeepCopy())
 			}
@@ -311,18 +313,18 @@ func TestPodGroupMemberPods_Clear(t *testing.T) {
 	tests := []struct {
 		name        string
 		podsToAdd   []*framework.QueuedPodInfo
-		clearGroup  *v1alpha3.PodGroup
+		clearGroup  *v1beta1.PodGroup
 		wantCleared sets.Set[*framework.QueuedPodInfo]
-		want        map[string]map[string]*framework.QueuedPodInfo
+		want        map[fwk.EntityKey]map[fwk.EntityKey]*framework.QueuedPodInfo
 	}{
 		{
 			name:        "clear existing pod group",
 			podsToAdd:   []*framework.QueuedPodInfo{pInfo1, pInfo2, pInfo3},
 			clearGroup:  podGroup1,
 			wantCleared: sets.New(pInfo1, pInfo2),
-			want: map[string]map[string]*framework.QueuedPodInfo{
-				"pg/ns1/pg2": {
-					"ns1/pod3": pInfo3,
+			want: map[fwk.EntityKey]map[fwk.EntityKey]*framework.QueuedPodInfo{
+				fwk.PodGroupKey("ns1", "pg2"): {
+					fwk.PodKey("ns1", "pod3"): pInfo3,
 				},
 			},
 		},
@@ -331,9 +333,9 @@ func TestPodGroupMemberPods_Clear(t *testing.T) {
 			podsToAdd:   []*framework.QueuedPodInfo{pInfo1},
 			clearGroup:  podGroup3,
 			wantCleared: nil,
-			want: map[string]map[string]*framework.QueuedPodInfo{
-				"pg/ns1/pg1": {
-					"ns1/pod1": pInfo1,
+			want: map[fwk.EntityKey]map[fwk.EntityKey]*framework.QueuedPodInfo{
+				fwk.PodGroupKey("ns1", "pg1"): {
+					fwk.PodKey("ns1", "pod1"): pInfo1,
 				},
 			},
 		},
@@ -341,7 +343,7 @@ func TestPodGroupMemberPods_Clear(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ppm := newPodGroupMemberPods()
+			ppm := newPodGroupMemberPods(metrics.IncompletePodGroupPods())
 			for _, pInfo := range tt.podsToAdd {
 				ppm.add(pInfo)
 			}
@@ -384,7 +386,7 @@ func TestPodGroupMemberPods_Len(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ppm := newPodGroupMemberPods()
+			ppm := newPodGroupMemberPods(metrics.IncompletePodGroupPods())
 			for _, pInfo := range tt.podsToAdd {
 				ppm.add(pInfo)
 			}

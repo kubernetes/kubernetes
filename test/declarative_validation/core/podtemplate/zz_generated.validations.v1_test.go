@@ -61,6 +61,24 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"template.spec.evictionResponders": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"template.spec.evictionResponders[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"template.spec.evictionResponders[*].name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"template.spec.evictionResponders[*].priority": {
+				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"template.spec.schedulingGroup": {
+				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
+			},
 			"template.spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
 			},

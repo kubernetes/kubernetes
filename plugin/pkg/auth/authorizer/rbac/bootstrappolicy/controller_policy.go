@@ -265,6 +265,8 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceslices").RuleOrDie(),
 					// Read ResourceClaims to calculate allocation counts
 					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
+					// Read DeviceTaintRules to count tainted devices as unavailable
+					rbacv1helpers.NewRule("get", "list", "watch").Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie(),
 					eventsRule(),
 				},
 			})
@@ -302,7 +304,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) {
 		jobControllerRules = append(jobControllerRules,
-			rbacv1helpers.NewRule("get", "list", "watch", "create").Groups(schedulingGroup).Resources("workloads", "podgroups").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "patch").Groups(schedulingGroup).Resources("workloads", "podgroups").RuleOrDie(),
 		)
 	}
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{

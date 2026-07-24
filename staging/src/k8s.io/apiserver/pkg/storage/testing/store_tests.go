@@ -32,7 +32,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.etcd.io/etcd/client/v3/kubernetes"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -733,8 +732,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/first/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion)},
+						Key:      "/registry/pods/first/",
+						Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion),
 					},
 				}
 			},
@@ -753,8 +752,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/second/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion)},
+						Key:      "/registry/pods/second/",
+						Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion),
 					},
 				}
 			},
@@ -773,8 +772,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/second/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[1].ResourceVersion)},
+						Key:      "/registry/pods/second/",
+						Revision: mustParseResourceVersion(t, createdPods[1].ResourceVersion),
 					},
 				}
 			},
@@ -792,8 +791,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/first/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, initialRV)},
+						Key:      "/registry/pods/first/",
+						Revision: mustParseResourceVersion(t, initialRV),
 					},
 				}
 			},
@@ -851,8 +850,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/first/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV)},
+						Key:      "/registry/pods/first/",
+						Revision: int64(continueRV),
 					},
 				}
 			},
@@ -934,8 +933,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/second/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1},
+						Key:      "/registry/pods/second/",
+						Revision: int64(continueRV),
+						Limit:    1,
 					},
 				}
 			},
@@ -961,8 +961,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/second/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1},
+						Key:      "/registry/pods/second/",
+						Revision: int64(continueRV),
+						Limit:    1,
 					},
 				}
 			},
@@ -1040,8 +1041,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/second/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion), Limit: 1},
+						Key:      "/registry/pods/second/",
+						Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion),
+						Limit:    1,
 					},
 				}
 			},
@@ -1065,8 +1067,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/second/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[1].ResourceVersion), Limit: 1},
+						Key:      "/registry/pods/second/",
+						Revision: mustParseResourceVersion(t, createdPods[1].ResourceVersion),
+						Limit:    1,
 					},
 				}
 			},
@@ -1087,8 +1090,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/second/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1, Continue: "/registry/pods/second/foo"},
+						Key:      "/registry/pods/second/foo",
+						Revision: int64(continueRV),
+						Limit:    1,
 					},
 				}
 			},
@@ -1110,8 +1114,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/second/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1, Continue: "/registry/pods/second/foo"},
+						Key:      "/registry/pods/second/foo",
+						Revision: int64(continueRV),
+						Limit:    1,
 					},
 				}
 			},
@@ -1269,8 +1274,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 2, Continue: "/registry/pods/third/barfoo"},
+						Key:      "/registry/pods/third/barfoo",
+						Revision: int64(continueRV),
+						Limit:    2,
 					},
 				}
 			},
@@ -1291,12 +1297,14 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1, Continue: "/registry/pods/third/barfoo"},
+						Key:      "/registry/pods/third/barfoo",
+						Revision: int64(continueRV),
+						Limit:    1,
 					},
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 2, Continue: "/registry/pods/third/barfoo\x00"},
+						Key:      "/registry/pods/third/barfoo\x00",
+						Revision: int64(continueRV),
+						Limit:    2,
 					},
 				}
 			},
@@ -1317,8 +1325,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 2, Continue: "/registry/pods/third/barfoo"},
+						Key:      "/registry/pods/third/barfoo",
+						Revision: int64(continueRV),
+						Limit:    2,
 					},
 				}
 			},
@@ -1456,8 +1465,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: 2},
+						Key:      "/registry/pods/",
+						Revision: 2,
 					},
 				}
 			},
@@ -1476,8 +1485,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: 3},
+						Key:      "/registry/pods/",
+						Revision: 3,
 					},
 				}
 			},
@@ -1496,8 +1505,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: 4},
+						Key:      "/registry/pods/",
+						Revision: 4,
 					},
 				}
 			},
@@ -1516,8 +1525,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: 5},
+						Key:      "/registry/pods/",
+						Revision: 5,
 					},
 				}
 			},
@@ -1536,8 +1545,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: 6},
+						Key:      "/registry/pods/",
+						Revision: 6,
 					},
 				}
 			},
@@ -1556,8 +1565,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: 7},
+						Key:      "/registry/pods/",
+						Revision: 7,
 					},
 				}
 			},
@@ -1576,8 +1585,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: 8},
+						Key:      "/registry/pods/",
+						Revision: 8,
 					},
 				}
 			},
@@ -1596,8 +1605,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV)},
+						Key:      "/registry/pods/",
+						Revision: int64(continueRV),
 					},
 				}
 			},
@@ -1616,8 +1625,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1},
+						Key:      "/registry/pods/",
+						Revision: int64(continueRV) + 1,
 					},
 				}
 			},
@@ -1635,8 +1644,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 2},
+						Key:      "/registry/pods/",
+						Revision: int64(continueRV) + 2,
 					},
 				}
 			},
@@ -1663,8 +1672,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[1].ResourceVersion), Limit: 1},
+						Key:      "/registry/pods/",
+						Revision: mustParseResourceVersion(t, createdPods[1].ResourceVersion),
+						Limit:    1,
 					},
 				}
 			},
@@ -1690,8 +1700,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[2].ResourceVersion), Limit: 2},
+						Key:      "/registry/pods/",
+						Revision: mustParseResourceVersion(t, createdPods[2].ResourceVersion),
+						Limit:    2,
 					},
 				}
 			},
@@ -1714,8 +1725,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[3].ResourceVersion), Limit: 4},
+						Key:      "/registry/pods/",
+						Revision: mustParseResourceVersion(t, createdPods[3].ResourceVersion),
+						Limit:    4,
 					},
 				}
 			},
@@ -1741,8 +1753,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[4].ResourceVersion), Limit: 1},
+						Key:      "/registry/pods/",
+						Revision: mustParseResourceVersion(t, createdPods[4].ResourceVersion),
+						Limit:    1,
 					},
 				}
 			},
@@ -1768,8 +1781,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[5].ResourceVersion), Limit: 2},
+						Key:      "/registry/pods/",
+						Revision: mustParseResourceVersion(t, createdPods[5].ResourceVersion),
+						Limit:    2,
 					},
 				}
 			},
@@ -1795,8 +1809,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, updatedPod.ResourceVersion), Limit: 4},
+						Key:      "/registry/pods/",
+						Revision: mustParseResourceVersion(t, updatedPod.ResourceVersion),
+						Limit:    4,
 					},
 				}
 			},
@@ -1819,8 +1834,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 8},
+						Key:      "/registry/pods/",
+						Revision: int64(continueRV),
+						Limit:    8,
 					},
 				}
 			},
@@ -1846,8 +1862,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 1},
+						Key:      "/registry/pods/",
+						Revision: int64(continueRV) + 1,
+						Limit:    1,
 					},
 				}
 			},
@@ -1869,8 +1886,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, initialRV), Limit: 4},
+						Key:      "/registry/pods/",
+						Revision: mustParseResourceVersion(t, initialRV),
+						Limit:    4,
 					},
 				}
 			},
@@ -1892,8 +1910,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion), Limit: 1, Continue: "/registry/pods/first/bar\x00"},
+						Key:      "/registry/pods/first/bar\x00",
+						Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion),
+						Limit:    1,
 					},
 				}
 			},
@@ -1915,8 +1934,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[1].ResourceVersion), Limit: 1, Continue: "/registry/pods/first/bar\x00"},
+						Key:      "/registry/pods/first/bar\x00",
+						Revision: mustParseResourceVersion(t, createdPods[1].ResourceVersion),
+						Limit:    1,
 					},
 				}
 			},
@@ -1938,8 +1958,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[2].ResourceVersion), Limit: 2, Continue: "/registry/pods/second/bar\x00"},
+						Key:      "/registry/pods/second/bar\x00",
+						Revision: mustParseResourceVersion(t, createdPods[2].ResourceVersion),
+						Limit:    2,
 					},
 				}
 			},
@@ -1964,8 +1985,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[4].ResourceVersion), Limit: 1, Continue: "/registry/pods/first/bar\x00"},
+						Key:      "/registry/pods/first/bar\x00",
+						Revision: mustParseResourceVersion(t, createdPods[4].ResourceVersion),
+						Limit:    1,
 					},
 				}
 			},
@@ -1990,8 +2012,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, createdPods[5].ResourceVersion), Limit: 2, Continue: "/registry/pods/second/bar\x00"},
+						Key:      "/registry/pods/second/bar\x00",
+						Revision: mustParseResourceVersion(t, createdPods[5].ResourceVersion),
+						Limit:    2,
 					},
 				}
 			},
@@ -2013,8 +2036,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: mustParseResourceVersion(t, updatedPod.ResourceVersion), Limit: 4, Continue: "/registry/pods/second/foo\x00"},
+						Key:      "/registry/pods/second/foo\x00",
+						Revision: mustParseResourceVersion(t, updatedPod.ResourceVersion),
+						Limit:    4,
 					},
 				}
 			},
@@ -2039,8 +2063,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 1, Continue: "/registry/pods/first/bar\x00"},
+						Key:      "/registry/pods/first/bar\x00",
+						Revision: int64(continueRV) + 1,
+						Limit:    1,
 					},
 				}
 			},
@@ -2061,8 +2086,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Continue: "/registry/pods/first/bar\x00"},
+						Key: "/registry/pods/first/bar\x00",
 					},
 				}
 			},
@@ -2087,8 +2111,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Continue: "/registry/pods/first/bar\x00", Limit: 2},
+						Key:   "/registry/pods/first/bar\x00",
+						Limit: 2,
 					},
 				}
 			},
@@ -2109,8 +2133,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				}
 				return []RecordedList{
 					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Continue: "/registry/pods/second/foo\x00"},
+						Key: "/registry/pods/second/foo\x00",
 					},
 				}
 			},
@@ -2802,6 +2825,436 @@ func RunTestGetListRecursivePrefix(ctx context.Context, t *testing.T, store stor
 	}
 }
 
+// errorInjector decides, per object storage key, whether transformation should
+// fail and with which error. Returning nil delegates to default behavior.
+type errorInjector func(key string) error
+
+// idOf extracts the numeric suffix from an object key like ".../foo-000002" -> 2.
+func idOf(t *testing.T, key string) int {
+	t.Helper()
+	name := key[strings.LastIndex(key, "/")+1:]
+	n, err := strconv.Atoi(strings.TrimPrefix(name, "foo-"))
+	if err != nil {
+		t.Fatalf("failed to parse the object id from key %q: %v", key, err)
+	}
+	return n
+}
+
+// errInjectingTransformer wraps an existing transformer and lets an errorInjector
+// fail transformation for selected keys on read. Writes (TransformToStorage)
+// delegate to the embedded transformer.
+type errInjectingTransformer struct {
+	value.Transformer
+	inject errorInjector
+}
+
+func (t *errInjectingTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error) {
+	if injErr := t.inject(string(dataCtx.AuthenticatedData())); injErr != nil {
+		return nil, false, injErr
+	}
+	return t.Transformer.TransformFromStorage(ctx, data, dataCtx)
+}
+
+func newErrInjectingModifier(inject errorInjector) TransformerModifier {
+	return func(orig value.Transformer) value.Transformer {
+		return &errInjectingTransformer{Transformer: orig, inject: inject}
+	}
+}
+
+// RunTestGetListWithErrorAggregation tests aggregation of errors while the list operation is in progress
+func RunTestGetListWithErrorAggregation(ctx context.Context, t *testing.T, store InterfaceWithTransformerOverride, corruptErr error) {
+	// the test creates n objects and assigns each object unique id i ie. 1 <= i <= n
+	objNameFn := func(id int) string {
+		// pad with leading zeros so that for i, j where i < j, object
+		// foo-{j} follows object foo-{i} in lexicographical order
+		return fmt.Sprintf("foo-%06d", id)
+	}
+	keyFn := func(prefix string, id int) string {
+		return fmt.Sprintf("%s%s", prefix, objNameFn(id))
+	}
+
+	// errUnexpected is a non-corrupt transform error. The aggregator treats it as
+	// fatal and aborts the list, unlike corruptErr which is collected.
+	errUnexpected := errors.New("bits flipped")
+
+	tests := []struct {
+		name string
+		// number of Pod objects to be created when the test starts, the
+		// objects are named as "foo-{i}" where 1 <= i <= n
+		n int
+		// inject decides, per object key, whether transformation fails and with
+		// which error. Returning nil means the object transforms normally.
+		inject func(t *testing.T, key string) error
+		// verifies the result from GetList
+		// list: result of GetList operation is saved into list
+		// err: error returned from GetList
+		verifier func(t *testing.T, prefix string, list *example.PodList, err error)
+	}{
+		{
+			name: "first error is an unexpected error, no aggregation expected",
+			// we initially create n=7 objects with ids {1, 2, 3 ... 7}, they are put in the following disjoint sets:
+			// - good: {1, 3, 5, 7}, these objects will never become corrupt
+			// - unexpected: {2}, this object is marked to yield an unexpected error (not corruptObjErr)
+			// - corrupt: {4, 6}, these objects are marked to become corrupt
+			n: 7,
+			inject: func(t *testing.T, key string) error {
+				switch id := idOf(t, key); {
+				case id == 2:
+					return errUnexpected
+				case id%2 == 0:
+					return corruptErr
+				default:
+					return nil
+				}
+			},
+			// the following sequence of events are expected to occur in order while retrieving the n objects:
+			//
+			// -- |- 1: no error, successfully decoded
+			//    |- 2: unexpected error, GetList aborts
+			//
+			//  a) GetList encounters an unexpected (not corruptObjErr)
+			//  error while retrieving {2} and immediately aborts
+			//  b) GetList successfully decodes {1}
+			verifier: func(t *testing.T, _ string, list *example.PodList, err error) {
+				// a) the error returned from GetList should be a bare
+				// storage.InternalError, not wrapped — proves no aggregation
+				// nolint:errorlint // the aggregator should return the error as is
+				if _, ok := err.(storage.InternalError); !ok {
+					t.Fatalf("expected the error to be %T, but got: %#v", storage.InternalError{}, err)
+				}
+
+				// b) GetList should successfully decode object 1 from the good set
+				if want, got := 1, len(list.Items); want != got {
+					t.Fatalf("expected the list to have %d item(s), but got: %d", want, got)
+				}
+				if want, got := objNameFn(1), list.Items[0].Name; want != got {
+					t.Errorf("expected an object name of %q, but got: %q", want, got)
+				}
+			},
+		},
+		{
+			name: "feature enabled, should aggregate corrupt object errors",
+
+			// we initially create n=7 objects with ids {1, 2, 3 ... 7}, they are put in the following disjoint sets:
+			// - good: {1, 3, 5, 7}, these objects will never become corrupt
+			// - corrupt: {2, 4, 6}, these objects are marked to become corrupt
+			n: 7,
+			inject: func(t *testing.T, key string) error {
+				if idOf(t, key)%2 == 0 {
+					return corruptErr
+				}
+				return nil
+			},
+			// while retrieving the n objects, we expect the following from GetList:
+			//  a) GetList encounters corruptObjErr while retrieving objects in the corrupt set
+			//  b) GetList successfully decodes object(s) in the good set
+			verifier: func(t *testing.T, prefix string, list *example.PodList, listErr error) {
+				// the error returned from GetList should be an API status object
+				var statusGot apierrors.APIStatus
+				if !errors.As(listErr, &statusGot) {
+					t.Fatalf("expected an API status error object, but got: %v", listErr)
+				}
+
+				details := statusGot.Status().Details
+				corrupt := []string{keyFn(prefix, 2), keyFn(prefix, 4), keyFn(prefix, 6)}
+				// a) all the corruptObjErr errors should be aggregated
+				if details == nil || len(details.Causes) != len(corrupt) {
+					t.Fatalf("expected the API status to include the corrupt object errors, but got: %v", details)
+				}
+				for i, key := range corrupt {
+					if want, got := key, details.Causes[i].Field; want != got {
+						t.Errorf("expected an object name of %q, but got: %q", want, got)
+					}
+				}
+
+				// b) GetList should successfully decode all objects in the good set
+				good := []int{1, 3, 5, 7}
+				if want, got := len(good), len(list.Items); want != got {
+					t.Fatalf("expected the list to have %d item(s), but got: %d", want, got)
+				}
+				for i, id := range good {
+					if want, got := objNameFn(id), list.Items[i].Name; want != got {
+						t.Errorf("expected an object name of %q, but got: %q", want, got)
+					}
+				}
+			},
+		},
+		{
+			name: "feature enabled, aggregation should abort as soon as it encounters an unexpected error",
+
+			// we initially create n=7 objects with ids {1, 2, 3 ... 7}, they are put in the following disjoint sets:
+			// - good: {1, 3, 5, 7}, these objects will never become corrupt
+			// - unexpected: {4}, this object is marked to yield an unexpected error (not corruptObjErr)
+			// - corrupt: {2, 6}, these objects are marked to become corrupt
+			n: 7,
+			inject: func(t *testing.T, key string) error {
+				switch id := idOf(t, key); {
+				case id == 4:
+					return errUnexpected
+				case id%2 == 0:
+					return corruptErr
+				default:
+					return nil
+				}
+			},
+			// the following sequence of events are expected to occur in order while retrieving the n objects:
+			//
+			// --|- 1: no error, successfully decoded
+			//   |- 2: yields an expected corruptObjErr, GetList aggregates this error
+			//   |- 3: no error, successfully decoded
+			//   |- 4: unexpected error, GetList aborts
+			//
+			//  a) GetList encounters a corruptObjErr error while retrieving {2} in the corrupt set
+			//  b) GetList encounters an unexpected (not corruptObjErr) error while
+			//  retrieving {4} in the unexpected set, and immediately aborts
+			//  c) GetList successfully decodes {1,3} in the good set before it aborts
+			verifier: func(t *testing.T, prefix string, list *example.PodList, err error) {
+				// the error returned from GetList should be an API status object
+				var statusGot apierrors.APIStatus
+				if !errors.As(err, &statusGot) {
+					t.Fatalf("expected an API status error object, but got: %v", err)
+				}
+
+				details := statusGot.Status().Details
+				// a) the corrupt error from {2} plus the unexpected abort error from {4}
+				// should both be surfaced as causes
+				if details == nil || len(details.Causes) != 2 {
+					t.Fatalf("expected 2 causes (1 corrupt + 1 abort), but got: %v", details)
+				}
+				if want, got := keyFn(prefix, 2), details.Causes[0].Field; want != got {
+					t.Errorf("expected corrupt object key %q, but got: %q", want, got)
+				}
+				if want, got := metav1.CauseTypeUnexpectedServerResponse, details.Causes[1].Type; want != got {
+					t.Errorf("expected abort cause type %q, but got: %q", want, got)
+				}
+
+				// b) verify that GetList successfully decodes objects before the abort
+				ids := []int{1, 3}
+				if want, got := len(ids), len(list.Items); want != got {
+					t.Errorf("expected GetList to successfully decode %d object(s), but got: %d", want, got)
+				}
+				for i, id := range ids {
+					if want, got := objNameFn(id), list.Items[i].Name; want != got {
+						t.Errorf("expected an object name of %q, but got: %q", want, got)
+					}
+				}
+			},
+		},
+		{
+			name: "feature enabled, error aggregation should not exceed the maximum limit",
+
+			// aggregation limit is currently hard coded to 100
+			// we initially create n=210 objects with ids {1, 2, 3 ... 210}, they are put in the following disjoint sets:
+			// - good: {1, 3, 5 ... 195, 197, 199, ... 207, 209}, these 105 objects will never become corrupt
+			// - corrupt: {2, 4, 6 ... 196, 198, 200, ... 208, 210}, these 105 objects are marked to become corrupt
+			n: 210,
+			inject: func(t *testing.T, key string) error {
+				if idOf(t, key)%2 == 0 {
+					return corruptErr
+				}
+				return nil
+			},
+			// while listing the n objects, we expect the following:
+			//  a) GetList continues to aggregate the corruptObjErr errors
+			//  until it reaches the maximum limit, and then it immediately aborts
+			//  b) GetList successfully decodes the first 100 objects in the good set into list
+			verifier: func(t *testing.T, _ string, list *example.PodList, err error) {
+				// must match the aggregation limit that etcd3 configures via
+				// corruptObjErrAggregatorFactory when the feature is enabled
+				limit := 100
+				var statusGot apierrors.APIStatus
+				if !errors.As(err, &statusGot) {
+					t.Fatalf("expected an API status error object, but got: %v", err)
+				}
+				details := statusGot.Status().Details
+				// a) the returned error should contain limit+1 causes:
+				// limit corrupt errors + the sentinel "too many" entry
+				if want := limit + 1; details == nil || len(details.Causes) != want {
+					t.Fatalf("expected %d causes (limit + sentinel), but got: %d", want, len(details.Causes))
+				}
+				want := metav1.StatusCause{
+					Type:    metav1.CauseTypeTooMany,
+					Message: "too many errors, the list is truncated",
+				}
+				if got := details.Causes[limit]; !cmp.Equal(want, got) {
+					t.Errorf("expected the sentinel error, diff: %s", cmp.Diff(want, got))
+				}
+
+				// b) before the limit is hit and GetList aborts, it successfully decodes 100 objects
+				if want, got := limit, len(list.Items); want != got {
+					t.Errorf("expected GetList to successfully decode %d object(s), but got: %d", want, got)
+				}
+			},
+		},
+		{
+			name: "feature enabled, there are exactly 100 (error aggregation limit) corrupt errors",
+
+			// aggregation limit is currently hard coded to 100
+			// we initially create n=100 objects with ids {1, 2, 3 ... 100}, they are put in the following disjoint sets:
+			// - good: {}, all the objects are marked to become corrupt
+			// - corrupt: {1, 2, 3 ... 99, 100}, these objects are marked to become corrupt
+			n:      100,
+			inject: func(t *testing.T, key string) error { return corruptErr },
+			//  while listing the n objects, we expect the following:
+			//  a) GetList continues to aggregate the corruptObjErr errors
+			//  until it reaches the maximum limit, and then it immediately aborts
+			//  b) GetList successfully decodes zero objects
+			verifier: func(t *testing.T, _ string, list *example.PodList, err error) {
+				// must match the aggregation limit that etcd3 configures via
+				// corruptObjErrAggregatorFactory when the feature is enabled
+				limit := 100
+				var statusGot apierrors.APIStatus
+				if !errors.As(err, &statusGot) {
+					t.Fatalf("expected an API status error object, but got: %v", err)
+				}
+				// a) the returned error should contain limit+1 causes:
+				// limit corrupt errors + the sentinel "too many" entry
+				details := statusGot.Status().Details
+				if want := limit + 1; details == nil || len(details.Causes) != want {
+					t.Fatalf("expected %d causes (limit + sentinel), but got: %d", want, len(details.Causes))
+				}
+				want := metav1.StatusCause{
+					Type:    metav1.CauseTypeTooMany,
+					Message: "too many errors, the list is truncated",
+				}
+				if got := details.Causes[limit]; !cmp.Equal(want, got) {
+					t.Errorf("expected the sentinel error, diff: %s", cmp.Diff(want, got))
+				}
+
+				// b) all objects are corrupt, so GetList should decode 0 objects
+				if want, got := 0, len(list.Items); want != got {
+					t.Errorf("expected GetList to successfully decode %d object(s), but got: %d", want, got)
+				}
+			},
+		},
+	}
+
+	for i, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ns := fmt.Sprintf("ns-%d", i)
+			prefix := fmt.Sprintf("/pods/%s/", ns)
+
+			// Step 1: add N objects to the store foo-{1 ... n}
+			// we construct the names of the objects in a way that ensures
+			// that the order of creation is also the lexicographical
+			// order by which etcd List operation returns the objects
+			for j := 1; j <= test.n; j++ {
+				obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{
+					Name:      objNameFn(j),
+					Namespace: ns,
+				}}
+				if err := store.Create(ctx, computePodKey(obj), obj, &example.Pod{}, 0); err != nil {
+					t.Fatalf("Create failed: %v", err)
+				}
+			}
+
+			// step 2: list the N objects, we expect no error
+			out := &example.PodList{}
+			storageOpts := storage.ListOptions{
+				Predicate: storage.Everything,
+				Recursive: true,
+			}
+			err := store.GetList(ctx, prefix, storageOpts, out)
+			if err != nil {
+				t.Fatalf("GetList failed with unexpected error: %v", err)
+			}
+			if want, got := test.n, len(out.Items); want != got {
+				t.Fatalf("Expected length: %d, but got: %d", want, got)
+			}
+
+			// step 3: change the transformer so the marked objects appear corrupt
+			revertTransformer := store.UpdateTransformer(newErrInjectingModifier(func(key string) error {
+				return test.inject(t, key)
+			}))
+			defer revertTransformer()
+
+			// step 4: invoke GetList again, this time it should encounter the corrupt object(s)
+			out = &example.PodList{}
+			err = store.GetList(ctx, prefix, storageOpts, out)
+			if err == nil {
+				t.Fatalf("Expected GetList to return error")
+			}
+
+			// step 5: verify what we expect from GetList
+			test.verifier(t, prefix, out, err)
+		})
+	}
+}
+
+// RunTestGetListWithoutErrorAggregation tests that when the AllowUnsafeMalformedObjectDeletion
+// feature is disabled, GetList maintains backward compatibility by aborting on the first error.
+func RunTestGetListWithoutErrorAggregation(ctx context.Context, t *testing.T, store InterfaceWithTransformerOverride, corruptErr error) {
+	prefix := "/pods/ns/"
+	objNameFn := func(id int) string {
+		return fmt.Sprintf("foo-%06d", id)
+	}
+	keyFn := func(id int) string {
+		return fmt.Sprintf("%s%s", prefix, objNameFn(id))
+	}
+
+	// Step 1: create 7 objects, where even-numbered ones are corrupt
+	// - good: {1, 3, 5, 7}
+	// - corrupt: {2, 4, 6}
+	n := 7
+	for i := 1; i <= n; i++ {
+		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{
+			Name:      objNameFn(i),
+			Namespace: "ns",
+		}}
+		if err := store.Create(ctx, computePodKey(obj), obj, &example.Pod{}, 0); err != nil {
+			t.Fatalf("Create failed: %v", err)
+		}
+	}
+
+	// Step 2: list all objects, expect no error before corruption
+	out := &example.PodList{}
+	storageOpts := storage.ListOptions{
+		Predicate: storage.Everything,
+		Recursive: true,
+	}
+	err := store.GetList(ctx, prefix, storageOpts, out)
+	if err != nil {
+		t.Fatalf("GetList failed with unexpected error: %v", err)
+	}
+	if want, got := n, len(out.Items); want != got {
+		t.Fatalf("Expected length: %d, but got: %d", want, got)
+	}
+
+	// Step 3: corrupt the transformer so even-numbered objects fail to decode
+	revertTransformer := store.UpdateTransformer(newErrInjectingModifier(func(key string) error {
+		if idOf(t, key)%2 == 0 {
+			return corruptErr
+		}
+		return nil
+	}))
+	defer revertTransformer()
+
+	// Step 4: list again, expect GetList to abort on the first corrupt object
+	out = &example.PodList{}
+	err = store.GetList(ctx, prefix, storageOpts, out)
+	if err == nil {
+		t.Fatalf("Expected GetList to return error")
+	}
+
+	// Verify: the error should be a bare storage.InternalError (no aggregation)
+	// nolint:errorlint // the aggregator should return the error as is
+	intErr, ok := err.(storage.InternalError)
+	if !ok {
+		t.Fatalf("expected the error to be %T, but got: %#v", storage.InternalError{}, err)
+	}
+	if want, got := fmt.Sprintf(`unable to transform key "%s"`, keyFn(2)), intErr.Error(); !strings.HasPrefix(got, want) {
+		t.Errorf("expected the error to start with %q, but got: %v", want, got)
+	}
+
+	// Verify: GetList successfully decodes {1} before aborting
+	if want, got := 1, len(out.Items); want != got {
+		t.Errorf("expected the list to have %d item(s), but got: %d", want, got)
+	}
+	if want, got := objNameFn(1), out.Items[0].Name; want != got {
+		t.Errorf("expected an object name of %q, but got: %q", want, got)
+	}
+}
+
 type CallsValidation func(t *testing.T, pageSize, estimatedProcessedObjects uint64)
 
 func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.Interface, validation CallsValidation) {
@@ -3259,9 +3712,11 @@ type InterfaceWithPrefixTransformer interface {
 	UpdatePrefixTransformer(PrefixTransformerModifier) func()
 }
 
-type InterfaceWithCorruptTransformer interface {
+type TransformerModifier func(value.Transformer) value.Transformer
+
+type InterfaceWithTransformerOverride interface {
 	storage.Interface
-	CorruptTransformer() func()
+	UpdateTransformer(TransformerModifier) func()
 }
 
 func RunTestListResourceVersionMatch(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer) {

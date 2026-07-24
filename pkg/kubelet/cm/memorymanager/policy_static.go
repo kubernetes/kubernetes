@@ -60,6 +60,15 @@ type staticPolicy struct {
 	// Note that the restartable init container memory is not included here,
 	// because it is not reusable.
 	initContainersReusableMemory reusableMemory
+	// skipExtend, when true, disables extending the Topology Manager hint to
+	// additional NUMA nodes even when the hint does not, by itself, satisfy the
+	// container's memory request. The Linux static policy always leaves it false.
+	// It is set per container by the Windows BestEffort policy (see
+	// policy_best_effort.go) when the container follows the CPU manager's NUMA
+	// decision: Windows has no cpuset.mems, so memory placement follows CPU
+	// affinity and the hint must not be widened beyond the CPU manager's
+	// exclusive-CPU nodes.
+	skipExtend bool
 }
 
 var _ Policy = &staticPolicy{}
@@ -447,6 +456,15 @@ func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod,
 		return nil
 	}
 
+	requestedResources, err := getContainerRequestedResources(logger, pod, container)
+	if err != nil {
+		return err
+	}
+	if len(requestedResources) == 0 {
+		logger.V(5).Info("Exclusive memory allocation skipped, container requests no memory resources", "podUID", podUID, "containerName", container.Name)
+		return nil
+	}
+
 	logger.Info("Allocate")
 	// Container belongs in an exclusively allocated pool
 	metrics.MemoryManagerPinningRequestTotal.Inc()
@@ -467,11 +485,6 @@ func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod,
 	hint := p.affinity.GetAffinity(logger, podUID, container.Name)
 	logger.Info("Got topology affinity", "hint", hint)
 
-	requestedResources, err := getContainerRequestedResources(logger, pod, container)
-	if err != nil {
-		return err
-	}
-
 	machineState := s.GetMachineState()
 	bestHint := &hint
 	// topology manager returned the hint with NUMA affinity nil
@@ -489,8 +502,11 @@ func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod,
 	}
 
 	// topology manager returns the hint that does not satisfy completely the container request
-	// we should extend this hint to the one who will satisfy the request and include the current hint
-	if !isAffinitySatisfyRequest(machineState, bestHint.NUMANodeAffinity, requestedResources) {
+	// we should extend this hint to the one who will satisfy the request and include the current hint,
+	// unless skipExtend is set. skipExtend is set per container by the Windows BestEffort policy when
+	// the container follows the CPU manager's NUMA decision (see policy_best_effort.go); the Linux
+	// static policy never sets it, so the hint is extended as usual.
+	if !isAffinitySatisfyRequest(machineState, bestHint.NUMANodeAffinity, requestedResources) && !p.skipExtend {
 		extendedHint, err := p.extendTopologyManagerHint(machineState, pod, requestedResources, bestHint.NUMANodeAffinity)
 		if err != nil {
 			return err
@@ -856,6 +872,9 @@ func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *
 	requestedResources, err := getContainerRequestedResources(logger, pod, container)
 	if err != nil {
 		logger.Error(err, "Failed to get container requested resources", "podUID", pod.UID, "containerName", container.Name)
+		return nil
+	}
+	if len(requestedResources) == 0 {
 		return nil
 	}
 

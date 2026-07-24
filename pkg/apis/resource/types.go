@@ -95,6 +95,9 @@ const (
 	// ResourceSliceSelectorDriver can be used in a [metav1.ListOptions]
 	// field selector to filter based on [ResourceSliceSpec.Driver].
 	ResourceSliceSelectorDriver = "spec.driver"
+	// ResourceSliceSelectorPoolName can be used in a [metav1.ListOptions]
+	// field selector to filter based on [ResourceSliceSpec.Pool.Name].
+	ResourceSliceSelectorPoolName = "spec.pool.name"
 )
 
 // ResourceSliceSpec contains the information published by the driver in one ResourceSlice.
@@ -186,6 +189,18 @@ type ResourceSliceSpec struct {
 	// +featureGate=DRAPartitionableDevices
 	// +zeroOrOneOf=ResourceSliceType
 	SharedCounters []CounterSet
+
+	// PartitionTypeAttribute names a string device attribute (by fully
+	// qualified name, e.g. "gpu.example.com/profile") whose value labels
+	// each device with its partition type, such as "Full" or "Half" for a
+	// MIG-style GPU.
+	//
+	// When set, every partitionable device in the slice must carry the attribute
+	// and devices sharing a value must share the same ConsumesCounters cost.
+	//
+	// +optional
+	// +featureGate=DRAPartitionableDevicesType
+	PartitionTypeAttribute *FullyQualifiedName
 }
 
 // CounterSet defines a named set of counters
@@ -220,6 +235,8 @@ const DriverNameMaxLength = 63
 type ResourcePool struct {
 	// Name is used to identify the pool. For node-local devices, this
 	// is often the node name, but this is not required.
+	// A field selector can be used to list only ResourceSlice objects
+	// belonging to a certain pool.
 	//
 	// It must not be longer than 253 characters and must consist of one or more DNS sub-domains
 	// separated by slashes. This field is immutable.
@@ -423,7 +440,7 @@ type Device struct {
 	// +featureGate=DRAConsumableCapacity
 	AllowMultipleAllocations *bool
 
-	// NodeAllocatableResourceMappings defines the mapping of node resources
+	// NodeAllocatableResources defines the mapping of node resources
 	// that are managed by the DRA driver exposing this device. This includes resources currently
 	// reported in v1.Node `status.allocatable` that are not extended resources
 	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
@@ -436,45 +453,91 @@ type Device struct {
 	// Extended resource names are not permitted as keys.
 	// +optional
 	// +featureGate=DRANodeAllocatableResources
-	NodeAllocatableResourceMappings map[v1.ResourceName]NodeAllocatableResourceMapping
+	NodeAllocatableResources map[v1.ResourceName]NodeAllocatableResource
 }
 
-// NodeAllocatableResourceMapping defines the translation of the requested DRA device/capacity
+// NodeAllocatableResource defines the translation of the requested DRA device/capacity
 // units to the corresponding quantity of the node-allocatable resource.
-type NodeAllocatableResourceMapping struct {
+// At least one of Mapping or Overhead must be specified.
+type NodeAllocatableResource struct {
+	// Mapping is used when the device directly models a node allocatable resource like standard CPU or memory
+	// (e.g., with a CPU DRA driver). The calculated quantity is accounted for exactly once per claim instance
+	// on the node. To prevent node cgroup isolation friction, the scheduler explicitly
+	// blocks sharing mapped device claims across multiple pods.
+	// +optional
+	Mapping *NodeAllocatableMapping
+
+	// Overhead contains fields for modeling auxiliary overhead incurred on node allocatable resources
+	// when allocating devices that are not themselves modeling a node allocatable resource (e.g., host memory overhead for GPUs).
+	// Sharing overhead-mapped claims across multiple pods is allowed. The node allocatable overhead is accounted
+	// for individually for each pod referencing the claim.
+	// Overhead is always subtracted from the node's allocatable capacity for the resource, even when mapping
+	// is specified for the same resource.
+	// Eg: If a device models memory capacity per socket as a consumable capacity pool via Mapping (with CapacityKey),
+	// any overhead specified for the same resource will be subtracted from the node's general allocatable capacity
+	// and not from the per-socket capacity pool in Mapping.
+	// +optional
+	Overhead *NodeAllocatableOverhead
+}
+
+// NodeAllocatableMapping defines how a DRA allocation directly translates into a node allocatable resource quantity.
+// The mapping can be derived from either the count of allocated devices (via deviceMultiplier) or the specific capacity consumed (via capacityKey and capacityMultiplier). These options are mutually exclusive.
+// Kubelet adds this mapped resource quantity from claim to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.
+type NodeAllocatableMapping struct {
 	// CapacityKey references a capacity name defined as a key in the
 	// `spec.devices[*].capacity` map. When this field is set, the value associated with
 	// this key in the `status.allocation.devices.results[*].consumedCapacity` map
 	// (for a specific claim allocation) determines the base quantity for
-	// the node allocatable resource. If `allocationMultiplier` is also set, it is
+	// the node allocatable resource. `capacityMultiplier` must also be set and is
 	// multiplied with the base quantity.
 	// For example, if `spec.devices[*].capacity` has an entry "dra.example.com/memory": "128Gi",
 	// and this field is set to "dra.example.com/memory", then for a claim allocation
 	// that consumes { "dra.example.com/memory": "4Gi" } the base quantity for the
-	// node allocatable resource mapping will be "4Gi", and `allocationMultiplier` should
-	// be omitted or set to "1".
+	// node allocatable resource mapping will be "4Gi".
+	// The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.
 	// +optional
 	CapacityKey *QualifiedName
 
-	// AllocationMultiplier is used as a multiplier for the allocated device count or the allocated capacity in the claim.
-	// It defaults to 1 if not specified. How the field is used also depends on whether `capacityKey` is set.
-	// 1.  If `capacityKey` is NOT set: `allocationMultiplier` multiplies the device count allocated to the claim.
-	// 	   a. A DRA driver representing each CPU core as a device would have
-	//        {ResourceName: "cpu", allocationMultiplier: "2"} in its
-	//        `nodeAllocatableResourceMappings`. If 4 devices are allocated to the claim,
-	// 		  4 * 2 CPUs would be considered as allocated and subtracted from the node's capacity.
-	//     b. A GPU device that needs additional node memory per GPU allocation would
-	//        have {ResourceName: "memory", allocationMultiplier: "2Gi"}.  Each allocated
-	// 		  GPU device instance of this type will account for 2Gi of memory.
-	//
-	// 2.  If `capacityKey` IS set: `allocationMultiplier` is multiplied by the amount of that capacity consumed.
-	// 	   The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `allocationMultiplier`.
-	//     For example, if a Device's capacity "dra.example.com/cores" is consumed,
-	//     and each "core" provides 2 "cpu"s, the mapping would be:
-	//     {ResourceName: "cpu", capacityKey: "dra.example.com/cores", allocationMultiplier: "2"}.
-	//     If a claim consumes 8 "dra.example.com/cores", the CPU footprint is 8 * 2 = 16.
+	// CapacityMultiplier is used as a multiplier for the allocated capacity consumed.
+	// It is only valid if `capacityKey` is set.
+	// The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.
+	// For example, if a Device's capacity "dra.example.com/cores" is consumed,
+	// and each "core" provides 2 "cpu"s, the mapping would be:
+	// {ResourceName: "cpu", capacityKey: "dra.example.com/cores", capacityMultiplier: "2"}.
+	// If a claim consumes 8 "dra.example.com/cores", the CPU footprint is 8 * 2 = 16.
 	// +optional
-	AllocationMultiplier *resource.Quantity
+	CapacityMultiplier *resource.Quantity
+
+	// DeviceMultiplier is used as a multiplier for the allocated device count in the claim.
+	// The final node allocatable resource amount is `deviceCount` * `deviceMultiplier`.
+	// For example, a DRA driver representing each cache complex (CCX) as a device would have
+	// {ResourceName: "cpu", deviceMultiplier: "8"} in its `nodeAllocatableResources`.
+	// If 2 devices (CCX) are allocated to the claim, 2 * 8 = 16 CPUs would be considered as allocated.
+	// It is only valid when `capacityKey` and `capacityMultiplier` are not set.
+	// +optional
+	DeviceMultiplier *resource.Quantity
+}
+
+// NodeAllocatableOverhead defines auxiliary resource overheads incurred when allocating a device.
+// Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both.
+// Kubelet accounts for this overhead by adding it to both the pod-level and container-level cgroups of referencing containers.
+type NodeAllocatableOverhead struct {
+	// PerPod is overhead applied once per pod referencing the claim on this node.
+	// This is a flat overhead incurred for every pod referencing the claim.
+	// +optional
+	PerPod *resource.Quantity
+
+	// PerContainer is applied per container reference to the claim.
+	// This models overhead scaling linearly with the number of containers actively using the device.
+	// When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing
+	// the claim is computed as:
+	// Quantity = PerPod + (PerContainer * NumReferences)
+	// Kubelet accounts for this overhead in cgroups:
+	// - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences).
+	// - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container.
+	// This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.
+	// +optional
+	PerContainer *resource.Quantity
 }
 
 // DeviceCounterConsumption defines a set of counters that
@@ -577,6 +640,13 @@ type CapacityRequestPolicy struct {
 }
 
 // CapacityRequestPolicyRange defines a valid range for consumable capacity values.
+//
+// If the DRAFractionalCapacityRange feature gate is
+// enabled and at least one of Min, Max, or Step is a fractional quantity (i.e.
+// its value is not an integer), milli-unit arithmetic is used instead,
+// supporting values with up to 3 decimal places (e.g. 100m = 0.1).
+// The largest supported value then is 1000 times smaller compared to using 64-bit integers.
+// Otherwise, all comparisons use 64-bit integer arithmetic via resource.Quantity.Value().
 //
 //   - If the requested amount is less than Min, it is rounded up to the Min value.
 //   - If Step is set and the requested amount is between Min and Max but not aligned with Step,
@@ -2171,6 +2241,15 @@ type ResourcePoolStatusRequestSpec struct {
 	//
 	// +optional
 	Limit *int32
+
+	// DefaultPartitionTypeAttribute optionally names a device attribute (by its
+	// fully qualified name) to use as the default grouping attribute for
+	// partitionable devices whose slice has not declared one themselves. A
+	// slice's own PartitionTypeAttribute always takes precedence. When neither
+	// the slice nor this default names an attribute, a partitionable pool
+	// reports no partitionSummary.
+	// +optional
+	DefaultPartitionTypeAttribute *string
 }
 
 // ResourcePoolStatusRequestLimitDefault is the default value for spec.limit.
@@ -2241,6 +2320,81 @@ type PoolStatus struct {
 	// When set, device count fields and ResourceSliceCount may be unset.
 	// +optional
 	ValidationError *string
+
+	// PartitionSummary reports allocatability per (attribute, partition type)
+	// for a partitionable pool. Each entry names the grouping attribute it was
+	// resolved from: the one declared by a device's own slice, or for devices
+	// whose slice declares none, the default named in the request.
+	// +optional
+	PartitionSummary []PartitionTypeStatus
+
+	// ShareableSummary reports aggregate capacity for a pool that contains
+	// devices with AllowMultipleAllocations.
+	// +optional
+	ShareableSummary *ShareableSummaryStatus
+}
+
+// PartitionTypeStatus reports allocatability for a single partition type,
+// identified by the value of a grouping attribute.
+type PartitionTypeStatus struct {
+	// Attribute is the fully qualified name of the device attribute whose value
+	// groups this entry. It is the PartitionTypeAttribute declared by the
+	// devices' own slice, or the default named in the request when their slice
+	// declares none.
+	// +required
+	Attribute string
+
+	// Type is the partition type value (e.g. "Full" or "Half").
+	// +required
+	Type string
+
+	// Total is the number of devices of this partition type in the pool.
+	// +required
+	Total *int32
+
+	// Allocatable is the number of additional devices of this partition type
+	// that could still be allocated given current shared-counter consumption.
+	// +required
+	Allocatable *int32
+}
+
+// ShareableSummaryStatus reports aggregate capacity for a pool that contains
+// devices with AllowMultipleAllocations.
+type ShareableSummaryStatus struct {
+	// FullyAvailableDevices is the number of shareable devices with no
+	// capacity consumed.
+	// +required
+	FullyAvailableDevices *int32
+
+	// PartiallyAvailableDevices is the number of shareable devices with some
+	// but not all capacity consumed.
+	// +required
+	PartiallyAvailableDevices *int32
+
+	// Capacity reports aggregate total, consumed, and available amounts per
+	// shareable capacity key across the pool.
+	// +optional
+	Capacity []ShareableCapacityStatus
+}
+
+// ShareableCapacityStatus reports aggregate amounts for a single shareable
+// capacity key.
+type ShareableCapacityStatus struct {
+	// Name is the capacity name.
+	// +required
+	Name string
+
+	// Total is the sum of this capacity across shareable devices in the pool.
+	// +required
+	Total *resource.Quantity
+
+	// Consumed is the amount drawn by current allocations.
+	// +required
+	Consumed *resource.Quantity
+
+	// Available is Total minus Consumed, never negative.
+	// +required
+	Available *resource.Quantity
 }
 
 // ResourcePoolStatusRequestConditionComplete is the condition type for completed requests.

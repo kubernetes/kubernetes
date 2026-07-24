@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -294,6 +295,118 @@ type SharedIndexInformer interface {
 	SharedInformer
 	AddIndexers(indexers Indexers) error
 	GetIndexer() Indexer
+}
+
+// TypedSharedIndexInformer adds type-safe variants for non-type-safe methods
+// in SharedIndexInformer. No type casts are needed when using those variants.
+type TypedSharedIndexInformer[T Object] interface {
+	SharedIndexInformer
+
+	// AddTypedEventHandler is a type-safe replacement for
+	// SharedIndexInformer.AddEventHandlerWithOptions
+	// and SharedIndexInformer.AddEventHandler.
+	//
+	// Without options, it uses the same defaults as AddEventHandler
+	// or AddEventHandlerWithOptions with empty HandlerOptions.
+	// Passing one instance corresponds to AddEventHandlerWithOptions.
+	// Passing more than one is invalid and returns an error.
+	AddTypedEventHandler(handler TypedResourceEventHandler[T], options ...HandlerOptions) (ResourceEventHandlerRegistration, error)
+	AddTypedIndexers(indexers TypedIndexers[T]) error
+	GetTypedIndexer() TypedIndexer[T]
+}
+
+func NewTypedSharedIndexInformer[T Object](informer SharedIndexInformer) TypedSharedIndexInformer[T] {
+	return &typedSharedIndexInformer[T]{SharedIndexInformer: informer}
+}
+
+type typedSharedIndexInformer[T Object] struct {
+	SharedIndexInformer
+}
+
+func (s typedSharedIndexInformer[T]) AddTypedEventHandler(handler TypedResourceEventHandler[T], options ...HandlerOptions) (ResourceEventHandlerRegistration, error) {
+	var o HandlerOptions
+	switch len(options) {
+	case 0:
+	case 1:
+		o = options[0]
+	default:
+		return nil, fmt.Errorf("at most one HandlerOptions may be passed, got %d", len(options))
+	}
+	return s.AddEventHandlerWithOptions(&typedResourceEventHandler[T]{handler}, o)
+}
+
+func (s typedSharedIndexInformer[T]) AddTypedIndexers(indexers TypedIndexers[T]) error {
+	return s.AddIndexers(TypedIndexersToIndexers(indexers))
+}
+
+func (s typedSharedIndexInformer[T]) GetTypedIndexer() TypedIndexer[T] {
+	return &typedIndexer[T]{s.GetIndexer()}
+}
+
+// typedResourceEventHandler implements the untyped ResourceEventHandler interface
+// by invoking the methods of a TypedResourceEventHandler instance.
+type typedResourceEventHandler[T Object] struct {
+	handler TypedResourceEventHandler[T]
+}
+
+var _ ResourceEventHandler = &typedResourceEventHandler[*metav1.ObjectMeta]{}
+
+func (h *typedResourceEventHandler[T]) OnAdd(obj any, isInitialList bool) {
+	h.handler.OnAdd(obj.(T), isInitialList)
+}
+
+func (h *typedResourceEventHandler[T]) OnUpdate(oldObj, newObj any) {
+	h.handler.OnUpdate(oldObj.(T), newObj.(T))
+}
+
+func (h *typedResourceEventHandler[T]) OnDelete(obj any) {
+	if tomb, ok := obj.(DeletedFinalStateUnknown); ok {
+		if tomb.Obj == nil {
+			h.handler.OnDelete(DeletedObject[T]{FinalStateUnknown: &tomb})
+			return
+		}
+		h.handler.OnDelete(DeletedObject[T]{OptionalObj: tomb.Obj.(T), FinalStateUnknown: &tomb})
+		return
+	}
+	h.handler.OnDelete(DeletedObject[T]{OptionalObj: obj.(T)})
+}
+
+type typedIndexer[T any] struct {
+	Indexer
+}
+
+func (i typedIndexer[T]) TypedIndex(indexName string, obj T) ([]T, error) {
+	untyped, err := i.Index(indexName, obj)
+	if err != nil {
+		return nil, err
+	}
+	typed := make([]T, len(untyped))
+	for i, obj := range untyped {
+		typed[i] = obj.(T)
+	}
+	return typed, nil
+}
+
+func (i typedIndexer[T]) ByTypedIndex(indexName, indexedValue string) ([]T, error) {
+	untyped, err := i.ByIndex(indexName, indexedValue)
+	if err != nil {
+		return nil, err
+	}
+	typed := make([]T, len(untyped))
+	for i, obj := range untyped {
+		typed[i] = obj.(T)
+	}
+	return typed, nil
+}
+
+func (i typedIndexer[T]) AddTypedIndexers(newIndexers TypedIndexers[T]) error {
+	untyped := make(Indexers, len(newIndexers))
+	for i, indexer := range newIndexers {
+		untyped[i] = func(obj any) ([]string, error) {
+			return indexer(obj.(T))
+		}
+	}
+	return i.AddIndexers(untyped)
 }
 
 // NewSharedInformer creates a new instance for the ListerWatcher. See NewSharedIndexInformerWithOptions for full details.

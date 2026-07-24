@@ -75,13 +75,14 @@ func NewConsumedCapacityCollection() ConsumedCapacityCollection {
 // making this the variant that is used when any of those
 // are enabled.
 var SupportedFeatures = internal.Features{
-	AdminAccess:            true,
-	PrioritizedList:        true,
-	PartitionableDevices:   true,
-	DeviceTaints:           true,
-	DeviceBindingAndStatus: true,
-	ConsumableCapacity:     true,
-	ListTypeAttributes:     true,
+	AdminAccess:             true,
+	PrioritizedList:         true,
+	PartitionableDevices:    true,
+	DeviceTaints:            true,
+	DeviceBindingAndStatus:  true,
+	ConsumableCapacity:      true,
+	FractionalCapacityRange: true,
+	ListTypeAttributes:      true,
 }
 
 type Allocator struct {
@@ -308,7 +309,6 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 					requestNames:  sets.New(constraint.Requests...),
 					attributeName: distinctAttribute,
 					features:      a.features,
-					attributes:    make(map[string]resourceapi.DeviceAttribute),
 				}
 				constraints[i] = m
 			default:
@@ -573,6 +573,7 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 		// better to wait. This does not matter yet as long the incomplete pool
 		// has some matching device.
 		requestData.allDevices = make([]deviceWithID, 0, resourceapi.AllocationResultsMaxSize)
+		emptyConsumedCapacity := NewConsumedCapacity() // reusable: CmpRequestOverCapacity clones/reads only
 		for _, pool := range pools {
 			if pool.IsIncomplete {
 				return requestData, fmt.Errorf("claim %s, request %s: asks for all devices, but resource pool %s is currently being updated", klog.KObj(claim), request.name(), pool.PoolID)
@@ -594,16 +595,16 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 							pool:   pool,
 						}
 						if alloc.features.ConsumableCapacity {
-							// Next validate whether resource request over capacity
-							device := slice.Spec.Devices[deviceIndex]
-							success, err := alloc.CmpRequestOverCapacity(requestData.request, slice, device)
+							// Static capacity only: remaining capacity is checked in allocateDevice
+							// so capacity-blocked matching devices stay in allDevices and All fails.
+							apiDevice := slice.Spec.Devices[deviceIndex]
+							success, err := CmpRequestOverCapacity(emptyConsumedCapacity, requestData.request.capacities(),
+								apiDevice.AllowMultipleAllocations, apiDevice.Capacity, emptyConsumedCapacity, alloc.features.FractionalCapacityRange)
 							if err != nil {
-								alloc.logger.V(7).Info("Skip comparing device capacity request",
-									"device", device, "request", requestData.request.name(), "err", err)
-								continue
+								return requestData, fmt.Errorf("claim %s, request %s: checking capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), apiDevice.Name, err)
 							}
 							if !success {
-								alloc.logger.V(7).Info("Device capacity not enough", "device", device)
+								alloc.logger.V(7).Info("Device static capacity insufficient", "device", apiDevice)
 								continue
 							}
 						}
@@ -1274,9 +1275,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool, st
 					device := slice.Spec.Devices[deviceIndex]
 					success, err := alloc.CmpRequestOverCapacity(requestData.request, slice, device)
 					if err != nil {
-						alloc.logger.V(7).Info("Skip comparing device capacity request",
-							"device", deviceID, "request", requestData.request.name(), "err", err)
-						continue
+						return false, fmt.Errorf("claim %s, request %s: checking capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), deviceID, err)
 					}
 					if !success {
 						alloc.logger.V(7).Info("Device capacity not enough", "device", deviceID)
@@ -1402,9 +1401,9 @@ func (alloc *allocator) CmpRequestOverCapacity(request requestAccessor, slice *d
 	allowMultipleAllocations := device.AllowMultipleAllocations
 	capacities := device.Capacity
 	if allocatedCapacity, found := alloc.allocatedState.AggregatedCapacity[deviceID]; found {
-		return CmpRequestOverCapacity(allocatedCapacity, request.capacities(), allowMultipleAllocations, capacities, allocatingCapacity)
+		return CmpRequestOverCapacity(allocatedCapacity, request.capacities(), allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
 	}
-	return CmpRequestOverCapacity(NewConsumedCapacity(), request.capacities(), allowMultipleAllocations, capacities, allocatingCapacity)
+	return CmpRequestOverCapacity(NewConsumedCapacity(), request.capacities(), allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
 }
 
 func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
@@ -1491,10 +1490,15 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		return false, nil, nil
 	}
 
-	// Skip counter availability check for devices that allow multiple allocation and some capacity has already in-use.
+	// Skip the counter check for an allow-multiple device in use: its counters are already
+	// accounted for, so a further share must not charge them again.
 	skipCounterCheck := allowMultipleAllocations && alloc.deviceCapacityInUse(device.id)
 
 	// The API validation logic has checked the ConsumesCounters referred should exist inside SharedCounters.
+	// countersReserved records whether checkAvailableCounters actually reserved
+	// this device's counters. It is not the same as len(device.ConsumesCounters) > 0,
+	// because skipCounterCheck can bypass the reservation.
+	countersReserved := false
 	if !skipCounterCheck && len(device.ConsumesCounters) > 0 {
 		// If a device consumes counters from a counter set, verify that
 		// there is sufficient counters available.
@@ -1506,6 +1510,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 			alloc.logger.V(7).Info("Insufficient counters", "device", device.id)
 			return false, nil, nil
 		}
+		countersReserved = true
 	}
 
 	var parentRequestName string
@@ -1519,39 +1524,48 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		subRequestName = requestData.request.name()
 	}
 
+	// state records the mutations this call makes so rollbackDevice can undo
+	// them. Every rejection path after a successful counter reservation calls
+	// rollbackDevice synchronously, and the success path returns a closure that
+	// calls the same helper during backtracking, so both undo routes stay
+	// identical. Passing the state by value to rollbackDevice keeps it (and the flags) on the
+	// stack for the rejection paths; only the success closure escapes.
+	state := deviceRollbackState{
+		countersReserved:   countersReserved,
+		previousNumResults: len(alloc.result[r.claimIndex].devices),
+	}
+
 	// Might be tainted, in which case the taint has to be tolerated.
 	// The check is skipped if the feature is disabled.
 	if alloc.features.DeviceTaints && taintPreventsAllocation(device.Device, request) {
+		alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
 		return false, nil, nil
 	}
 
 	// It's available. Now check constraints.
-	for i, constraint := range alloc.constraints[r.claimIndex] {
-		added := constraint.add(baseRequestName, subRequestName, device.Device, device.id)
-		if !added {
+	for _, constraint := range alloc.constraints[r.claimIndex] {
+		if !constraint.add(baseRequestName, subRequestName, device.Device, device.id) {
+			alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
 			if must {
 				// It does not make sense to declare a claim where a constraint prevents getting
 				// all devices. Treat this as an error.
 				return false, nil, fmt.Errorf("claim %s, request %s: cannot add device %s because a claim constraint would not be satisfied", klog.KObj(claim), request.name(), device.id)
 			}
-
-			// Roll back for all previous constraints before we return.
-			for e := 0; e < i; e++ {
-				alloc.constraints[r.claimIndex][e].remove(baseRequestName, subRequestName, device.Device, device.id)
-			}
 			return false, nil, nil
 		}
+		state.constraintsAdded++
 	}
 
 	// All constraints satisfied. Mark as in use (unless we do admin access or allow multiple allocations)
 	// and record the result.
 	alloc.logger.V(7).Info("Device allocated", "device", device.id)
 
-	if alloc.allocatingDevices[device.id] == nil {
-		alloc.allocatingDevices[device.id] = make(sets.Set[int])
-	}
 	if !allowMultipleAllocations {
+		if alloc.allocatingDevices[device.id] == nil {
+			alloc.allocatingDevices[device.id] = make(sets.Set[int])
+		}
 		alloc.allocatingDevices[device.id].Insert(r.claimIndex)
+		state.deviceMarked = true
 	}
 
 	consumedCapacity := make(map[resourceapi.QualifiedName]resource.Quantity, 0)
@@ -1559,23 +1573,35 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	if alloc.features.ConsumableCapacity {
 		// Validate whether resource request over capacity
 		success, err := alloc.CmpRequestOverCapacity(requestData.request, device.slice, *device.Device)
-		// The error should not occur at this point as it should be detected in the previous step.
 		if err != nil {
-			alloc.logger.V(7).Info("Failed to compare device capacity request on allocateDevice",
-				"device", device, "request", requestData.request.name(), "err", err)
-			return false, nil, nil
+			// The overflow guard already ran during validation, so an error here is
+			// unexpected. Roll back and surface it rather than swallowing it.
+			alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
+			return false, nil, fmt.Errorf("claim %s, request %s: rechecking capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), device.id, err)
 		}
 		if !success {
 			alloc.logger.V(7).Info("Device capacity not enough", "device", device)
+			alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
 			return false, nil, nil
 		}
 
 		if allowMultipleAllocations {
-			consumedCapacity = GetConsumedCapacityFromRequest(request.capacities(), device.Capacity)
+			consumedCapacity, err = GetConsumedCapacityFromRequest(request.capacities(), device.Capacity, alloc.features.FractionalCapacityRange)
+			if err != nil {
+				alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
+				return false, nil, fmt.Errorf("claim %s, request %s: computing consumed capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), device.id, err)
+			}
 			shareID = GenerateNewShareID()
 			alloc.logger.V(7).Info("Device capacity allocated", "device", device.id,
 				"consumed capacity", klog.Format(consumedCapacity))
+			// A prior share of this device may already hold the capacity entry.
+			// That entry doubles as the "already shared" marker that lets a later
+			// share skip the counter check, so record whether it predated this
+			// share; rollback must not delete it while another share still needs it.
+			_, state.capacityEntryExisted = alloc.allocatingCapacity[device.id]
 			alloc.allocatingCapacity.Insert(NewDeviceConsumedCapacity(device.id, consumedCapacity))
+			state.capacityInserted = true
+			state.consumedCapacity = consumedCapacity
 		}
 	}
 
@@ -1593,29 +1619,64 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	if len(consumedCapacity) > 0 {
 		result.consumedCapacity = consumedCapacity
 	}
-	previousNumResults := len(alloc.result[r.claimIndex].devices)
 	alloc.result[r.claimIndex].devices = append(alloc.result[r.claimIndex].devices, result)
+	state.resultAdded = true
 
+	// Only this success path builds an escaping closure, so backtracking can undo
+	// a committed candidate. undo is a copy: capturing state directly would move it
+	// and its flags to the heap on the rejection paths too, which never escape.
+	undo := state
 	return true, func() {
-		for _, constraint := range alloc.constraints[r.claimIndex] {
-			constraint.remove(baseRequestName, subRequestName, device.Device, device.id)
-		}
-		alloc.allocatingDevices[device.id].Delete(r.claimIndex)
-		if allowMultipleAllocations {
-			requestedResource := alloc.result[r.claimIndex].devices[previousNumResults].consumedCapacity
-			if requestedResource != nil {
-				alloc.allocatingCapacity.Remove(NewDeviceConsumedCapacity(device.id, requestedResource))
-			}
-		} else {
-			alloc.allocatingDevices[device.id].Delete(r.claimIndex)
-			if alloc.features.PartitionableDevices && len(device.ConsumesCounters) > 0 {
-				alloc.deallocateCountersForDevice(device)
-			}
-		}
-		// Truncate, but keep the underlying slice.
-		alloc.result[r.claimIndex].devices = alloc.result[r.claimIndex].devices[:previousNumResults]
-		alloc.logger.V(7).Info("Device deallocated", "device", device.id)
+		alloc.rollbackDevice(r, device, baseRequestName, subRequestName, undo)
 	}, nil
+}
+
+// deviceRollbackState records the mutations allocateDevice makes for a single
+// candidate so rollbackDevice can undo them, both when the candidate is rejected
+// and when the backtracking search abandons a previously successful candidate.
+type deviceRollbackState struct {
+	countersReserved     bool
+	constraintsAdded     int
+	deviceMarked         bool
+	capacityInserted     bool
+	capacityEntryExisted bool
+	resultAdded          bool
+	previousNumResults   int
+	consumedCapacity     map[resourceapi.QualifiedName]resource.Quantity
+}
+
+// rollbackDevice reverses the mutations recorded in state, in the opposite order
+// they were applied. It is called synchronously on the rejection paths and, via
+// the closure returned on success, during backtracking.
+func (alloc *allocator) rollbackDevice(r deviceIndices, device deviceWithID, baseRequestName, subRequestName string, state deviceRollbackState) {
+	if state.resultAdded {
+		alloc.result[r.claimIndex].devices = alloc.result[r.claimIndex].devices[:state.previousNumResults]
+	}
+	if state.capacityInserted {
+		alloc.allocatingCapacity.Remove(NewDeviceConsumedCapacity(device.id, state.consumedCapacity))
+		if state.capacityEntryExisted {
+			// Remove drops the entry once it becomes empty, which also erases the
+			// shared marker that the earlier share still relies on. Restore an empty
+			// entry in that case so the earlier share stays accounted as shared.
+			if _, found := alloc.allocatingCapacity[device.id]; !found {
+				alloc.allocatingCapacity[device.id] = NewConsumedCapacity()
+			}
+		}
+	}
+	if state.deviceMarked {
+		alloc.allocatingDevices[device.id].Delete(r.claimIndex)
+	}
+	for i := state.constraintsAdded - 1; i >= 0; i-- {
+		alloc.constraints[r.claimIndex][i].remove(baseRequestName, subRequestName, device.Device, device.id)
+	}
+	if state.countersReserved {
+		alloc.deallocateCountersForDevice(device)
+	}
+	if state.resultAdded {
+		// Only a fully allocated candidate recorded a result, so this is a real
+		// deallocation during backtracking, not a rejection rollback.
+		alloc.logger.V(7).Info("Device deallocated", "device", device.id)
+	}
 }
 
 func taintPreventsAllocation(device *draapi.Device, request requestAccessor) bool {
@@ -1664,6 +1725,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		for _, counterSet := range pool.CounterSets {
 			availableCountersForCounterSet := make(map[string]resourceapi.Counter, len(counterSet.Counters))
 			for name, c := range counterSet.Counters {
+				c.Value = c.Value.DeepCopy()
 				availableCountersForCounterSet[name] = c
 			}
 			availableCountersForPool[counterSet.Name] = availableCountersForCounterSet
@@ -1731,6 +1793,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		for name, c := range deviceCounterConsumption.Counters {
 			consumedCounters, found := consumedCountersForCounterSet[name]
 			if !found {
+				c.Value = c.Value.DeepCopy()
 				consumedCountersForCounterSet[name] = c
 				continue
 			}
@@ -1761,8 +1824,17 @@ func (alloc *allocator) deviceInUse(deviceID DeviceID) bool {
 }
 
 func (alloc *allocator) deviceCapacityInUse(deviceID DeviceID) bool {
-	_, found := alloc.allocatedState.AggregatedCapacity[deviceID]
-	return found || alloc.allocatingCapacityForAnyClaim(deviceID)
+	if _, found := alloc.allocatedState.AggregatedCapacity[deviceID]; found {
+		return true
+	}
+	// A persisted allow-multiple allocation with no per-share capacity is recorded
+	// only in AllocatedSharedDeviceIDs (with no AggregatedCapacity entry).
+	for sharedDeviceID := range alloc.allocatedState.AllocatedSharedDeviceIDs {
+		if sharedDeviceID.GetDeviceID() == deviceID {
+			return true
+		}
+	}
+	return alloc.allocatingCapacityForAnyClaim(deviceID)
 }
 
 func (alloc *allocator) allocatingDeviceForAnyClaim(deviceID DeviceID) bool {

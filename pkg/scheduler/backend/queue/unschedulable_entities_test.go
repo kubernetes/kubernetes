@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -35,16 +36,16 @@ type mockMetricRecorder struct {
 	val atomic.Int64
 }
 
-func (m *mockMetricRecorder) Add(val int) {
-	m.val.Add(int64(val))
+func (m *mockMetricRecorder) Add(entity metrics.Entity) {
+	m.val.Add(int64(entity.Size()))
 }
 
-func (m *mockMetricRecorder) Inc() {
-	m.val.Add(1)
+func (m *mockMetricRecorder) Remove(entity metrics.Entity) {
+	m.val.Add(-int64(entity.Size()))
 }
 
-func (m *mockMetricRecorder) Dec() {
-	m.val.Add(-1)
+func (m *mockMetricRecorder) Update(oldEntity, newEntity metrics.Entity) {
+	m.val.Add(int64(newEntity.Size() - oldEntity.Size()))
 }
 
 func (m *mockMetricRecorder) Clear() {
@@ -73,10 +74,10 @@ func TestUnschedulableEntities(t *testing.T) {
 
 	var actionToOperation = map[action]func(ue *unschedulableEntities, pInfo *framework.QueuedPodInfo, gatedBefore bool){
 		add: func(ue *unschedulableEntities, pInfo *framework.QueuedPodInfo, _ bool) {
-			ue.addOrUpdate(pInfo, false, framework.EventUnscheduledPodAdd.Label())
+			ue.addOrUpdate(pInfo, false, framework.EventUnscheduledPodAdd.Label(), nil)
 		},
 		update: func(ue *unschedulableEntities, pInfo *framework.QueuedPodInfo, gatedBefore bool) {
-			ue.addOrUpdate(pInfo, gatedBefore, framework.EventUnscheduledPodUpdate.Label())
+			ue.addOrUpdate(pInfo, gatedBefore, framework.EventUnscheduledPodUpdate.Label(), nil)
 		},
 		delete: func(ue *unschedulableEntities, pInfo *framework.QueuedPodInfo, gatedBefore bool) {
 			ue.delete(pInfo, gatedBefore)
@@ -248,14 +249,16 @@ func TestUnschedulablePodGroups_Unified(t *testing.T) {
 			Namespace: "ns1",
 			Name:      "pg1",
 		},
-		QueuedPodInfos: []*framework.QueuedPodInfo{
-			{
-				PodInfo: &framework.PodInfo{Pod: st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()},
+		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
+			fwk.PodGroupKey("ns1", "pg1"): {
+				{
+					PodInfo: &framework.PodInfo{Pod: st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()},
+				},
 			},
 		},
 	}
 
-	ue.addOrUpdate(pgInfo, false, "test")
+	ue.addOrUpdate(pgInfo, false, "test", nil)
 	if ue.get(pgInfo) == nil {
 		t.Errorf("Expected pod group to be present")
 	}

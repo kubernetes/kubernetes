@@ -39,15 +39,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -531,7 +534,10 @@ func TestStatusEquality(t *testing.T) {
 		{
 			ResourceClaimName: "my-claim",
 			Containers:        []string{"ctr0"},
-			Resources:         map[v1.ResourceName]resource.Quantity{v1.ResourceMemory: resource.MustParse("100Mi")},
+			Mapping: []v1.NodeAllocatableMappedResources{{
+				Name:     v1.ResourceMemory,
+				Quantity: new(resource.MustParse("100Mi")),
+			}},
 		},
 	}
 
@@ -566,6 +572,7 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 		"AllocatedResources",
 		"ObservedGeneration",
 		"Resources",
+		"VolumeHealth",
 	)
 
 	// kubeletIgnoredFields are fields in v1.PodStatus not owned by the kubelet.
@@ -1576,6 +1583,166 @@ func TestSetContainerReadiness(t *testing.T) {
 	verifyUpdates(t, m, 0)
 	status = expectPodStatus(t, m, pod)
 	verifyReadiness("ignore non-existent", &status, true, true, true)
+}
+
+func TestSetPodVolumeHealth(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
+
+	pod := getTestPod()
+	m := newTestManager(&fake.Clientset{})
+	m.podManager.(mutablePodManager).AddPod(pod)
+
+	unhealthy := []v1.VolumeHealthCondition{{
+		Status:  v1.VolumeHealthInaccessible,
+		Reason:  "TargetPathNotFound",
+		Message: "volume path missing",
+	}}
+	degraded := []v1.VolumeHealthCondition{{
+		Status:  v1.VolumeHealthDegraded,
+		Reason:  "SlowIO",
+		Message: "io latency high",
+	}}
+
+	t.Log("Setting volume health before status should fail.")
+	if m.SetPodVolumeHealth(logger, pod.UID, "vol1", unhealthy) {
+		t.Error("expected no update when pod status is not cached")
+	}
+	verifyUpdates(t, m, 0)
+	if _, ok := m.GetPodStatus(pod.UID); ok {
+		t.Error("unexpected PodStatus before SetPodStatus")
+	}
+
+	t.Log("Setting initial status.")
+	m.SetPodStatus(logger, pod, v1.PodStatus{})
+	verifyUpdates(t, m, 1)
+
+	t.Log("Setting volume health should update cached status.")
+	if !m.SetPodVolumeHealth(logger, pod.UID, "vol1", unhealthy) {
+		t.Fatal("expected update when setting volume health")
+	}
+	verifyUpdates(t, m, 1)
+	status := expectPodStatus(t, m, pod)
+	if len(status.VolumeHealth) != 1 {
+		t.Fatalf("expected 1 VolumeHealth entry, got %d", len(status.VolumeHealth))
+	}
+	if status.VolumeHealth[0].Name != "vol1" {
+		t.Errorf("unexpected volume name: %q", status.VolumeHealth[0].Name)
+	}
+	if !reflect.DeepEqual(status.VolumeHealth[0].HealthConditions, unhealthy) {
+		t.Errorf("unexpected conditions: %+v", status.VolumeHealth[0].HealthConditions)
+	}
+	if status.VolumeHealth[0].LastTransitionTime.IsZero() {
+		t.Error("expected LastTransitionTime to be set")
+	}
+	firstTransition := status.VolumeHealth[0].LastTransitionTime
+
+	t.Log("Same (status,reason) with different message should be a no-op.")
+	sameIdentity := []v1.VolumeHealthCondition{{
+		Status:  v1.VolumeHealthInaccessible,
+		Reason:  "TargetPathNotFound",
+		Message: "different message",
+	}}
+	if m.SetPodVolumeHealth(logger, pod.UID, "vol1", sameIdentity) {
+		t.Error("expected no update when (status,reason) set is unchanged")
+	}
+	verifyUpdates(t, m, 0)
+	status = expectPodStatus(t, m, pod)
+	if status.VolumeHealth[0].HealthConditions[0].Message != "volume path missing" {
+		t.Errorf("message should be unchanged, got %q", status.VolumeHealth[0].HealthConditions[0].Message)
+	}
+	if !status.VolumeHealth[0].LastTransitionTime.Equal(&firstTransition) {
+		t.Error("LastTransitionTime should be unchanged on no-op")
+	}
+
+	t.Log("Changing (status,reason) should update.")
+	if !m.SetPodVolumeHealth(logger, pod.UID, "vol1", degraded) {
+		t.Fatal("expected update when (status,reason) changes")
+	}
+	verifyUpdates(t, m, 1)
+	status = expectPodStatus(t, m, pod)
+	if !reflect.DeepEqual(status.VolumeHealth[0].HealthConditions, degraded) {
+		t.Errorf("unexpected conditions after update: %+v", status.VolumeHealth[0].HealthConditions)
+	}
+	if status.VolumeHealth[0].LastTransitionTime.IsZero() {
+		t.Error("expected LastTransitionTime to be set after condition change")
+	}
+
+	t.Log("Clearing conditions (healthy) should update.")
+	if !m.SetPodVolumeHealth(logger, pod.UID, "vol1", nil) {
+		t.Fatal("expected update when clearing conditions")
+	}
+	verifyUpdates(t, m, 1)
+	status = expectPodStatus(t, m, pod)
+	if len(status.VolumeHealth[0].HealthConditions) != 0 {
+		t.Errorf("expected empty conditions, got %+v", status.VolumeHealth[0].HealthConditions)
+	}
+
+	t.Log("Multiple volumes on one pod.")
+	if !m.SetPodVolumeHealth(logger, pod.UID, "vol1", unhealthy) {
+		t.Fatal("expected update for vol1")
+	}
+	verifyUpdates(t, m, 1)
+	if !m.SetPodVolumeHealth(logger, pod.UID, "vol2", degraded) {
+		t.Fatal("expected update for vol2")
+	}
+	verifyUpdates(t, m, 1)
+	status = expectPodStatus(t, m, pod)
+	if len(status.VolumeHealth) != 2 {
+		t.Fatalf("expected 2 VolumeHealth entries, got %d", len(status.VolumeHealth))
+	}
+	byName := map[string]v1.PodVolumeHealth{}
+	for _, vh := range status.VolumeHealth {
+		byName[vh.Name] = vh
+	}
+	if !reflect.DeepEqual(byName["vol1"].HealthConditions, unhealthy) {
+		t.Errorf("vol1 conditions: %+v", byName["vol1"].HealthConditions)
+	}
+	if !reflect.DeepEqual(byName["vol2"].HealthConditions, degraded) {
+		t.Errorf("vol2 conditions: %+v", byName["vol2"].HealthConditions)
+	}
+}
+
+func TestVolumeHealthSurvivesPodStatusUpdate(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
+
+	pod := getTestPod()
+	m := newTestManager(&fake.Clientset{})
+	m.podManager.(mutablePodManager).AddPod(pod)
+
+	m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning})
+	verifyUpdates(t, m, 1)
+
+	unhealthy := []v1.VolumeHealthCondition{{
+		Status:  v1.VolumeHealthInaccessible,
+		Reason:  "TargetPathNotFound",
+		Message: "volume path missing",
+	}}
+	if !m.SetPodVolumeHealth(logger, pod.UID, "vol1", unhealthy) {
+		t.Fatal("expected update when setting volume health")
+	}
+	verifyUpdates(t, m, 1)
+
+	status := expectPodStatus(t, m, pod)
+	if len(status.VolumeHealth) != 1 {
+		t.Fatalf("expected 1 VolumeHealth entry, got %d", len(status.VolumeHealth))
+	}
+
+	// Simulate what happens on the next pod sync: SetPodStatus is called
+	// with a freshly generated status that has no VolumeHealth.
+	m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning})
+
+	status = expectPodStatus(t, m, pod)
+	if len(status.VolumeHealth) != 1 {
+		t.Fatalf("VolumeHealth should survive SetPodStatus, got %d entries", len(status.VolumeHealth))
+	}
+	if status.VolumeHealth[0].Name != "vol1" {
+		t.Errorf("unexpected volume name: %q", status.VolumeHealth[0].Name)
+	}
+	if !reflect.DeepEqual(status.VolumeHealth[0].HealthConditions, unhealthy) {
+		t.Errorf("unexpected conditions after SetPodStatus: %+v", status.VolumeHealth[0].HealthConditions)
+	}
 }
 
 func TestSetContainerStartup(t *testing.T) {
@@ -2612,7 +2779,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "clear pod resize pending condition",
 			updateFunc: func(podUID types.UID) bool {
-				m.ClearPodResizePendingCondition(podUID)
+				m.ClearPodResizePendingCondition(podUID, metrics.DeferredResizeResolutionAccepted)
 				return false
 			},
 			expected: nil,
@@ -2773,9 +2940,11 @@ func TestRecordInProgressResizeCount(t *testing.T) {
 
 func TestRecordPendingResizesCount(t *testing.T) {
 	metrics.Register()
+	int32Ptr := func(val int32) *int32 { return &val }
 
 	for _, tc := range []struct {
 		name               string
+		existingPods       []*v1.Pod
 		existingConditions map[types.UID]podResizeConditions
 		expected           string
 	}{
@@ -2799,6 +2968,9 @@ func TestRecordPendingResizesCount(t *testing.T) {
 		},
 		{
 			name: "one pod deferred",
+			existingPods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", UID: "test-pod"}},
+			},
 			existingConditions: map[types.UID]podResizeConditions{
 				"test-pod": {
 					PodResizePending: &v1.PodCondition{
@@ -2810,13 +2982,17 @@ func TestRecordPendingResizesCount(t *testing.T) {
 				},
 			},
 			expected: `
-			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods.
+			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods. Label 'priority_bucket' classifies the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod). Label 'reason' describes the state (deferred, infeasible).
 				# TYPE kubelet_pod_pending_resizes gauge
-				kubelet_pod_pending_resizes{reason="deferred"} 1
+				kubelet_pod_pending_resizes{priority_bucket="normal",reason="deferred"} 1
 			`,
 		},
 		{
 			name: "2 pods infeasible, each with a different reason",
+			existingPods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "test-pod-1", UID: "test-pod-1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "test-pod-2", UID: "test-pod-2"}},
+			},
 			existingConditions: map[types.UID]podResizeConditions{
 				"test-pod-1": {
 					PodResizePending: &v1.PodCondition{
@@ -2836,13 +3012,17 @@ func TestRecordPendingResizesCount(t *testing.T) {
 				},
 			},
 			expected: `
-			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods.
+			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods. Label 'priority_bucket' classifies the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod). Label 'reason' describes the state (deferred, infeasible).
 				# TYPE kubelet_pod_pending_resizes gauge
-				kubelet_pod_pending_resizes{reason="infeasible"} 2
+				kubelet_pod_pending_resizes{priority_bucket="normal",reason="infeasible"} 2
 			`,
 		},
 		{
 			name: "one deferred, one infeasible",
+			existingPods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "test-pod-1", UID: "test-pod-1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "test-pod-2", UID: "test-pod-2"}},
+			},
 			existingConditions: map[types.UID]podResizeConditions{
 				"test-pod-1": {
 					PodResizePending: &v1.PodCondition{
@@ -2862,10 +3042,81 @@ func TestRecordPendingResizesCount(t *testing.T) {
 				},
 			},
 			expected: `
-			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods.
+			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods. Label 'priority_bucket' classifies the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod). Label 'reason' describes the state (deferred, infeasible).
 				# TYPE kubelet_pod_pending_resizes gauge
-				kubelet_pod_pending_resizes{reason="deferred"} 1
-				kubelet_pod_pending_resizes{reason="infeasible"} 1
+				kubelet_pod_pending_resizes{priority_bucket="normal",reason="deferred"} 1
+				kubelet_pod_pending_resizes{priority_bucket="normal",reason="infeasible"} 1
+			`,
+		},
+		{
+			name: "multiple pods with different priority classes",
+			existingPods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-sys", UID: "sys-uid"},
+					Spec:       v1.PodSpec{Priority: int32Ptr(2000000000)},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-high", UID: "high-uid"},
+					Spec:       v1.PodSpec{Priority: int32Ptr(100000)},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-med", UID: "med-uid"},
+					Spec:       v1.PodSpec{Priority: int32Ptr(5000)},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-low", UID: "low-uid"},
+					Spec:       v1.PodSpec{Priority: int32Ptr(-500)},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-vlow", UID: "vlow-uid"},
+					Spec:       v1.PodSpec{Priority: int32Ptr(-1500)},
+				},
+			},
+			existingConditions: map[types.UID]podResizeConditions{
+				"sys-uid": {
+					PodResizePending: &v1.PodCondition{
+						Type:   v1.PodResizePending,
+						Status: v1.ConditionTrue,
+						Reason: v1.PodReasonDeferred,
+					},
+				},
+				"high-uid": {
+					PodResizePending: &v1.PodCondition{
+						Type:   v1.PodResizePending,
+						Status: v1.ConditionTrue,
+						Reason: v1.PodReasonDeferred,
+					},
+				},
+				"med-uid": {
+					PodResizePending: &v1.PodCondition{
+						Type:   v1.PodResizePending,
+						Status: v1.ConditionTrue,
+						Reason: v1.PodReasonInfeasible,
+					},
+				},
+				"low-uid": {
+					PodResizePending: &v1.PodCondition{
+						Type:   v1.PodResizePending,
+						Status: v1.ConditionTrue,
+						Reason: v1.PodReasonDeferred,
+					},
+				},
+				"vlow-uid": {
+					PodResizePending: &v1.PodCondition{
+						Type:   v1.PodResizePending,
+						Status: v1.ConditionTrue,
+						Reason: v1.PodReasonInfeasible,
+					},
+				},
+			},
+			expected: `
+			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods. Label 'priority_bucket' classifies the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod). Label 'reason' describes the state (deferred, infeasible).
+				# TYPE kubelet_pod_pending_resizes gauge
+				kubelet_pod_pending_resizes{priority_bucket="high",reason="deferred"} 1
+				kubelet_pod_pending_resizes{priority_bucket="low",reason="deferred"} 1
+				kubelet_pod_pending_resizes{priority_bucket="medium",reason="infeasible"} 1
+				kubelet_pod_pending_resizes{priority_bucket="system-critical",reason="deferred"} 1
+				kubelet_pod_pending_resizes{priority_bucket="very-low",reason="infeasible"} 1
 			`,
 		},
 		{
@@ -2875,8 +3126,11 @@ func TestRecordPendingResizesCount(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			manager := newTestManager(&fake.Clientset{})
+			for _, p := range tc.existingPods {
+				manager.podManager.(mutablePodManager).AddPod(p)
+			}
 			manager.podResizeConditions = tc.existingConditions
-			manager.recordPendingResizeCount()
+			manager.observePendingResizeCount()
 
 			require.NoError(t, testutil.GatherAndCompare(
 				legacyregistry.DefaultGatherer, strings.NewReader(tc.expected), "kubelet_pod_pending_resizes",
@@ -2972,6 +3226,9 @@ func TestBackfillPodResizeConditions(t *testing.T) {
 	}
 
 	manager := newTestManager(&fake.Clientset{})
+	for _, p := range pods {
+		manager.podManager.(mutablePodManager).AddPod(p)
+	}
 	manager.BackfillPodResizeConditions(pods)
 	actualResizeConditions := manager.podResizeConditions
 	expectedResizeConditions := map[types.UID]podResizeConditions{
@@ -3031,10 +3288,10 @@ func TestBackfillPodResizeConditions(t *testing.T) {
 	require.Equal(t, expectedResizeConditions, actualResizeConditions)
 
 	expectedMetrics := `
-		# HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods.
+		# HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods. Label 'priority_bucket' classifies the pod priority (system-critical: >=2000000000, high: 100000..1999999999, medium: 1..99999, normal: 0/default, low: -999..-1, very-low: <=-1000, unknown: nil pod). Label 'reason' describes the state (deferred, infeasible).
 		# TYPE kubelet_pod_pending_resizes gauge
-		kubelet_pod_pending_resizes{reason="deferred"} 1
-		kubelet_pod_pending_resizes{reason="infeasible"} 1
+		kubelet_pod_pending_resizes{priority_bucket="normal",reason="deferred"} 1
+		kubelet_pod_pending_resizes{priority_bucket="normal",reason="infeasible"} 1
 	`
 	require.NoError(t, testutil.GatherAndCompare(
 		legacyregistry.DefaultGatherer, strings.NewReader(expectedMetrics), "kubelet_pod_pending_resizes",
@@ -3093,5 +3350,157 @@ func getPodStatus() v1.PodStatus {
 			},
 		},
 		Message: "Message",
+	}
+}
+
+func TestPodDeferredResizeDurationSeconds(t *testing.T) {
+	metrics.Register()
+	int32Ptr := func(val int32) *int32 { return &val }
+
+	testCases := []struct {
+		name               string
+		podUID             types.UID
+		priority           *int32
+		conditionReason    string
+		action             string // "clear", "delete", "orphan"
+		resolution         metrics.DeferredResizeResolution
+		expectedResolution metrics.DeferredResizeResolution
+		expectedPriority   metrics.PriorityBucket
+		expectedCount      int
+		podMissing         bool
+	}{
+		{
+			name:               "no condition present - no metric emitted",
+			podUID:             "pod-no-cond",
+			priority:           int32Ptr(0),
+			conditionReason:    "",
+			action:             "clear",
+			resolution:         metrics.DeferredResizeResolutionAccepted,
+			expectedResolution: metrics.DeferredResizeResolutionAccepted,
+			expectedPriority:   metrics.PriorityBucketNormal,
+			expectedCount:      0,
+		},
+		{
+			name:               "infeasible condition - no metric emitted",
+			podUID:             "pod-infeasible",
+			priority:           int32Ptr(0),
+			conditionReason:    v1.PodReasonInfeasible,
+			action:             "clear",
+			resolution:         metrics.DeferredResizeResolutionAccepted,
+			expectedResolution: metrics.DeferredResizeResolutionAccepted,
+			expectedPriority:   metrics.PriorityBucketNormal,
+			expectedCount:      0,
+		},
+		{
+			name:               "deferred condition cleared as accepted",
+			podUID:             "pod-accepted",
+			priority:           int32Ptr(100000),
+			conditionReason:    v1.PodReasonDeferred,
+			action:             "clear",
+			resolution:         metrics.DeferredResizeResolutionAccepted,
+			expectedResolution: metrics.DeferredResizeResolutionAccepted,
+			expectedPriority:   metrics.PriorityBucketHigh,
+			expectedCount:      1,
+		},
+		{
+			name:               "deferred condition cleared as reverted",
+			podUID:             "pod-reverted",
+			priority:           int32Ptr(-500),
+			conditionReason:    v1.PodReasonDeferred,
+			action:             "clear",
+			resolution:         metrics.DeferredResizeResolutionReverted,
+			expectedResolution: metrics.DeferredResizeResolutionReverted,
+			expectedPriority:   metrics.PriorityBucketLow,
+			expectedCount:      1,
+		},
+		{
+			name:               "deferred condition removed via DeletePodStatus as terminated",
+			podUID:             "pod-deleted",
+			priority:           int32Ptr(2000000000),
+			conditionReason:    v1.PodReasonDeferred,
+			action:             "delete",
+			expectedResolution: metrics.DeferredResizeResolutionTerminated,
+			expectedPriority:   metrics.PriorityBucketSystemCritical,
+			expectedCount:      1,
+		},
+		{
+			name:               "deferred condition removed via RemoveOrphanedStatuses as terminated",
+			podUID:             "pod-orphaned",
+			priority:           int32Ptr(-1500),
+			conditionReason:    v1.PodReasonDeferred,
+			action:             "orphan",
+			expectedResolution: metrics.DeferredResizeResolutionTerminated,
+			expectedPriority:   metrics.PriorityBucketVeryLow,
+			expectedCount:      1,
+		},
+		{
+			name:               "deferred condition removed via DeletePodStatus as terminated with missing pod (unknown priority)",
+			podUID:             "pod-deleted-missing",
+			priority:           int32Ptr(0), // Doesn't matter because pod is missing
+			conditionReason:    v1.PodReasonDeferred,
+			action:             "delete",
+			expectedResolution: metrics.DeferredResizeResolutionTerminated,
+			expectedPriority:   metrics.PriorityBucketUnknown,
+			expectedCount:      1,
+			podMissing:         true,
+		},
+		{
+			name:               "deferred condition removed via RemoveOrphanedStatuses as terminated with missing pod (unknown priority)",
+			podUID:             "pod-orphaned-missing",
+			priority:           int32Ptr(0), // Doesn't matter because pod is missing
+			conditionReason:    v1.PodReasonDeferred,
+			action:             "orphan",
+			expectedResolution: metrics.DeferredResizeResolutionTerminated,
+			expectedPriority:   metrics.PriorityBucketUnknown,
+			expectedCount:      1,
+			podMissing:         true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			metrics.PodDeferredResizeDurationSeconds.Reset()
+			manager := newTestManager(&fake.Clientset{})
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: string(tc.podUID), UID: tc.podUID},
+				Spec:       v1.PodSpec{Priority: tc.priority},
+			}
+			if !tc.podMissing {
+				manager.podManager.(mutablePodManager).AddPod(pod)
+			}
+
+			if tc.conditionReason != "" {
+				manager.podResizeConditions[tc.podUID] = podResizeConditions{
+					PodResizePending: &v1.PodCondition{
+						Type:               v1.PodResizePending,
+						Status:             v1.ConditionTrue,
+						Reason:             tc.conditionReason,
+						LastTransitionTime: metav1.Time{Time: time.Now().Add(-30 * time.Second)},
+					},
+				}
+			}
+			if tc.action == "delete" || tc.action == "orphan" {
+				manager.podStatuses[tc.podUID] = versionedPodStatus{
+					status: v1.PodStatus{Phase: v1.PodRunning},
+				}
+			}
+
+			switch tc.action {
+			case "clear":
+				manager.ClearPodResizePendingCondition(tc.podUID, tc.resolution)
+			case "delete":
+				manager.deletePodStatus(tc.podUID)
+			case "orphan":
+				manager.RemoveOrphanedStatuses(klog.Background(), map[types.UID]bool{})
+			}
+
+			count, err := testutil.GetHistogramMetricCount(
+				metrics.PodDeferredResizeDurationSeconds.WithLabelValues(string(tc.expectedResolution), string(tc.expectedPriority)),
+			)
+			if tc.expectedCount == 0 && err != nil {
+				count = 0
+			}
+			require.Equal(t, uint64(tc.expectedCount), count)
+		})
 	}
 }

@@ -41,6 +41,7 @@ import (
 	extensions "k8s.io/client-go/informers/extensions"
 	flowcontrol "k8s.io/client-go/informers/flowcontrol"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
+	lifecycle "k8s.io/client-go/informers/lifecycle"
 	networking "k8s.io/client-go/informers/networking"
 	node "k8s.io/client-go/informers/node"
 	policy "k8s.io/client-go/informers/policy"
@@ -356,6 +357,7 @@ type SharedInformerFactory interface {
 	Events() events.Interface
 	Extensions() extensions.Interface
 	Flowcontrol() flowcontrol.Interface
+	Lifecycle() lifecycle.Interface
 	Networking() networking.Interface
 	Node() node.Interface
 	Policy() policy.Interface
@@ -412,6 +414,10 @@ func (f *sharedInformerFactory) Extensions() extensions.Interface {
 
 func (f *sharedInformerFactory) Flowcontrol() flowcontrol.Interface {
 	return flowcontrol.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Lifecycle() lifecycle.Interface {
+	return lifecycle.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Networking() networking.Interface {

@@ -45,6 +45,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	fifometrics "k8s.io/component-base/metrics/prometheus/clientgo/fifo"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -325,7 +328,7 @@ func TestFailureHandler(t *testing.T) {
 
 				recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
 				queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithMetricsRecorder(recorder), internalqueue.WithAPIDispatcher(apiDispatcher))
-				schedulerCache := internalcache.New(ctx, apiDispatcher, false)
+				schedulerCache := internalcache.New(ctx, apiDispatcher, false, false)
 
 				queue.Add(ctx, testPod)
 
@@ -399,7 +402,7 @@ func TestFailureHandler_PodAlreadyBound(t *testing.T) {
 			}
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithAPIDispatcher(apiDispatcher))
-			schedulerCache := internalcache.New(ctx, apiDispatcher, false)
+			schedulerCache := internalcache.New(ctx, apiDispatcher, false, false)
 
 			// Add node to schedulerCache no matter it's deleted in API server or not.
 			schedulerCache.AddNode(logger, &nodeFoo)
@@ -595,7 +598,7 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fakeInformerFactory := NewInformerFactory(&fake.Clientset{}, 0*time.Second)
+			fakeInformerFactory := NewInformerFactory(&fake.Clientset{}, 0*time.Second, nil)
 
 			var registerPluginFuncs []tf.RegisterPluginFunc
 			for name, entrypoint := range tt.entrypoints {
@@ -1006,7 +1009,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.StorageClass:          fwk.All - fwk.Delete,
 				fwk.VolumeAttachment:      fwk.Delete,
 				fwk.DeviceClass:           fwk.All - fwk.Delete,
-				fwk.ResourceClaim:         fwk.All - fwk.Delete,
+				fwk.ResourceClaim:         fwk.All,
 				fwk.ResourceSlice:         fwk.All - fwk.Delete,
 			},
 			enableDynamicResourceAllocation: true,
@@ -1028,7 +1031,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.StorageClass:          fwk.All - fwk.Delete,
 				fwk.VolumeAttachment:      fwk.Delete,
 				fwk.DeviceClass:           fwk.All - fwk.Delete,
-				fwk.ResourceClaim:         fwk.All - fwk.Delete,
+				fwk.ResourceClaim:         fwk.All,
 				fwk.ResourceSlice:         fwk.All - fwk.Delete,
 			},
 			enableDynamicResourceAllocation: true,
@@ -1064,7 +1067,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.StorageClass:          fwk.All - fwk.Delete,
 				fwk.VolumeAttachment:      fwk.Delete,
 				fwk.DeviceClass:           fwk.All - fwk.Delete,
-				fwk.ResourceClaim:         fwk.All - fwk.Delete,
+				fwk.ResourceClaim:         fwk.All,
 				fwk.ResourceSlice:         fwk.All - fwk.Delete,
 				fwk.PodGroup:              fwk.Add | fwk.Update,
 			},
@@ -1159,7 +1162,7 @@ func newFramework(ctx context.Context, r frameworkruntime.Registry, profile sche
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
 		frameworkruntime.WithMutableSnapshotLister(snapshot),
 		frameworkruntime.WithInformerFactory(informers.NewSharedInformerFactory(fake.NewClientset(), 0)),
-		frameworkruntime.WithPodGroupManager(internalcache.New(ctx, nil, false)),
+		frameworkruntime.WithPodGroupManager(internalcache.New(ctx, nil, false, false /* CompositePodGroup */)),
 	)
 }
 
@@ -1500,7 +1503,7 @@ func TestNewInformerFactoryTrim(t *testing.T) {
 	}}
 	require.NoError(t, cs.Tracker().Add(pd))
 
-	informerFactory := NewInformerFactory(cs, 0)
+	informerFactory := NewInformerFactory(cs, 0, nil)
 	lister := informerFactory.Core().V1().Pods().Lister()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1511,4 +1514,35 @@ func TestNewInformerFactoryTrim(t *testing.T) {
 	p, err := lister.Pods("default").Get("test")
 	require.NoError(t, err)
 	require.Empty(t, p.GetManagedFields(), "expected managedFields to be trimmed by the transform")
+}
+
+func TestNewInformerFactoryMetrics(t *testing.T) {
+	cache.ResetInformerNamesForTesting()
+	fifometrics.Register()
+
+	informerName, err := cache.NewInformerName("kube-scheduler")
+	require.NoError(t, err)
+	defer informerName.Release()
+
+	cs := fake.NewClientset()
+	informerFactory := NewInformerFactory(cs, 0, informerName)
+	// The pod informer is built by the scheduler itself rather than by the factory,
+	// so make sure it carries the identity too.
+	informerFactory.Core().V1().Pods().Informer()
+	informerFactory.Core().V1().Nodes().Informer()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	want := `
+# HELP informer_queued_items [ALPHA] Number of items currently queued in the FIFO.
+# TYPE informer_queued_items gauge
+informer_queued_items{group="",name="kube-scheduler",resource="nodes",version="v1"} 0
+informer_queued_items{group="",name="kube-scheduler",resource="pods",version="v1"} 0
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "informer_queued_items"); err != nil {
+		t.Error(err)
+	}
 }

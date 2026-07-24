@@ -37,9 +37,11 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -91,6 +93,11 @@ type Interface interface {
 	// Concurrent calls to UninstallCSIDriver() is allowed, but they should not be intertwined with calls
 	// to other methods in this interface.
 	UninstallCSIDriver(driverName string) error
+
+	// UpdateCSINodeStorageHealth updates CSINode.Status.StorageHealth for the given
+	// driver with the provided conditions. Other drivers' entries are preserved.
+	// No-ops if the condition identity set for this driver is unchanged.
+	UpdateCSINodeStorageHealth(driverName string, conditions []storagev1.StorageHealthCondition) error
 }
 
 // NewNodeInfoManager initializes nodeInfoManager
@@ -709,4 +716,107 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
 
 	return err // do not wrap error
 
+}
+
+// UpdateCSINodeStorageHealth updates CSINode.Status.StorageHealth for the given
+// driver with the provided conditions. Other drivers' entries are preserved.
+// No-ops if the status, reason, and volume-capability identities for this driver
+// are unchanged.
+func (nim *nodeInfoManager) UpdateCSINodeStorageHealth(driverName string, conditions []storagev1.StorageHealthCondition) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
+		return nil
+	}
+
+	csiKubeClient := nim.volumeHost.GetKubeClient()
+	if csiKubeClient == nil {
+		return goerrors.New("error getting CSI client")
+	}
+
+	var updateErrs []error
+	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
+		if err := nim.tryUpdateCSINodeStorageHealth(csiKubeClient, driverName, conditions); err != nil {
+			updateErrs = append(updateErrs, err)
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("error updating CSINode status: %w; caused by: %w", err, utilerrors.NewAggregate(updateErrs))
+	}
+	return nil
+}
+
+func (nim *nodeInfoManager) tryUpdateCSINodeStorageHealth(
+	csiKubeClient clientset.Interface,
+	driverName string,
+	conditions []storagev1.StorageHealthCondition) error {
+
+	nim.lock.Lock()
+	defer nim.lock.Unlock()
+
+	nodeInfo, err := csiKubeClient.StorageV1().CSINodes().Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	if err = nim.ensureNodeOwnsCSINode(nodeInfo); err != nil {
+		return err
+	}
+
+	var existingDriverConds []storagev1.StorageHealthCondition
+	otherDriversHealth := make([]storagev1.StorageHealth, 0, len(nodeInfo.Status.StorageHealth))
+	for _, health := range nodeInfo.Status.StorageHealth {
+		if health.Name == driverName {
+			existingDriverConds = health.HealthConditions
+		} else {
+			otherDriversHealth = append(otherDriversHealth, health)
+		}
+	}
+
+	if storageHealthIdentityEqual(existingDriverConds, conditions) {
+		return nil
+	}
+
+	combined := make([]storagev1.StorageHealth, 0, len(otherDriversHealth)+1)
+	combined = append(combined, otherDriversHealth...)
+	if len(conditions) > 0 {
+		combined = append(combined, storagev1.StorageHealth{Name: driverName, HealthConditions: conditions})
+	}
+	nodeInfo.Status.StorageHealth = combined
+	_, err = csiKubeClient.StorageV1().CSINodes().UpdateStatus(context.TODO(), nodeInfo, metav1.UpdateOptions{})
+	return err
+}
+
+// storageHealthIdentityEqual reports whether two condition slices have the same
+// set of status, reason, and volume-capability identities. Message, transition
+// time, and duplicate entries are ignored so repeated or duplicate reports do
+// not cause status write churn.
+func storageHealthIdentityEqual(a, b []storagev1.StorageHealthCondition) bool {
+	return storageHealthIdentities(a).Equal(storageHealthIdentities(b))
+}
+
+func storageHealthIdentities(conditions []storagev1.StorageHealthCondition) sets.Set[storageHealthIdentity] {
+	identities := sets.New[storageHealthIdentity]()
+	for _, c := range conditions {
+		identities.Insert(storageHealthConditionIdentity(c))
+	}
+	return identities
+}
+
+type storageHealthIdentity struct {
+	status, reason, accessMode, volumeMode string
+}
+
+func storageHealthConditionIdentity(condition storagev1.StorageHealthCondition) storageHealthIdentity {
+	identity := storageHealthIdentity{
+		status: string(condition.Status),
+		reason: condition.Reason,
+	}
+	if condition.AccessMode != nil {
+		identity.accessMode = string(*condition.AccessMode)
+	}
+	if condition.VolumeMode != nil {
+		identity.volumeMode = string(*condition.VolumeMode)
+	}
+	return identity
 }

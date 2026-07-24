@@ -21,19 +21,27 @@ import (
 	"strings"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
+	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/resource/resourceslice"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.DRANodeAllocatableResources: true,
+	})
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
@@ -46,9 +54,12 @@ func TestDeclarativeValidate(t *testing.T) {
 
 			strategy := registry.Strategy
 
+			capacityKey1 := resource.QualifiedName("capacity_1")
+
 			testCases := map[string]struct {
-				input        resource.ResourceSlice
-				expectedErrs field.ErrorList
+				input                   resource.ResourceSlice
+				enablePartitionTypeAttr bool
+				expectedErrs            field.ErrorList
 			}{
 				"valid": {
 					input: mkResourceSliceWithDevices(),
@@ -266,11 +277,244 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Required(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "").MarkBeta(),
 					},
 				},
-				// TODO: Add more test cases
+				// spec.partitionTypeAttribute. The field is only permitted on a
+				// slice whose devices consume counters, and those devices must
+				// carry the named attribute as a string.
+				"valid: partitionTypeAttribute": {
+					input: mkResourceSliceWithDevices(
+						tweakDeviceCounter(counters("valid-key")),
+						tweakDeviceAttribute("gpu.example.com/profile", resource.DeviceAttribute{StringValue: new("Full")}),
+						tweakPartitionTypeAttribute("gpu.example.com/profile"),
+					),
+					enablePartitionTypeAttr: true,
+				},
+				"invalid: partitionTypeAttribute format": {
+					input: mkResourceSliceWithDevices(
+						tweakDeviceCounter(counters("valid-key")),
+						tweakPartitionTypeAttribute("invalid attr!"),
+					),
+					enablePartitionTypeAttr: true,
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name"),
+					},
+				},
+				// A bare name is a valid attribute key but not a valid reference:
+				// the domain is required so the attribute is unambiguous.
+				"invalid: partitionTypeAttribute without domain": {
+					input: mkResourceSliceWithDevices(
+						tweakDeviceCounter(counters("valid-key")),
+						tweakPartitionTypeAttribute("profile"),
+					),
+					enablePartitionTypeAttr: true,
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name"),
+					},
+				},
+				"invalid: partitionTypeAttribute with feature disabled": {
+					input: mkResourceSliceWithDevices(
+						tweakDeviceCounter(counters("valid-key")),
+						tweakDeviceAttribute("gpu.example.com/profile", resource.DeviceAttribute{StringValue: new("Full")}),
+						tweakPartitionTypeAttribute("gpu.example.com/profile"),
+					),
+					expectedErrs: field.ErrorList{
+						field.Forbidden(field.NewPath("spec", "partitionTypeAttribute"), ""),
+					},
+				},
+				// NodeAllocatableResources test cases
+				"invalid: node allocatable resource name not native": {
+					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+						"example.com/gpu": {
+							Mapping: &resource.NodeAllocatableMapping{
+								DeviceMultiplier: new(apiresource.MustParse("1")),
+							},
+						},
+					})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("example.com/gpu"), "example.com/gpu", "must be a node allocatable resource name").MarkFromImperative(),
+					},
+				},
+				"invalid: node allocatable resource name unprefixed non-standard": {
+					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+						"abc": {
+							Overhead: &resource.NodeAllocatableOverhead{
+								PerPod: new(apiresource.MustParse("1")),
+							},
+						},
+					})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("abc"), "abc", "must be a node allocatable resource name").MarkFromImperative(),
+					},
+				},
+				"invalid: node allocatable resource name in kubernetes.io namespace": {
+					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+						"kubernetes.io/foo": {
+							Overhead: &resource.NodeAllocatableOverhead{
+								PerPod: new(apiresource.MustParse("1")),
+							},
+						},
+					})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("kubernetes.io/foo"), "kubernetes.io/foo", "must be a node allocatable resource name").MarkFromImperative(),
+					},
+				},
+				"invalid: node allocatable resource name ephemeral-storage": {
+					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+						"ephemeral-storage": {
+							Overhead: &resource.NodeAllocatableOverhead{
+								PerPod: new(apiresource.MustParse("2Gi")),
+							},
+						},
+					})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("ephemeral-storage"), "ephemeral-storage", "must be a node allocatable resource name").MarkFromImperative(),
+					},
+				},
+				"valid: node allocatable resource name hugepages": {
+					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+						"hugepages-2Mi": {
+							Overhead: &resource.NodeAllocatableOverhead{
+								PerPod: new(apiresource.MustParse("2Mi")),
+							},
+						},
+					})),
+				},
+				"invalid: node allocatable resource both mapping and overhead nil": {
+					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+						"cpu": {},
+					})),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu"), "at least one of mapping or overhead must be set").MarkFromImperative(),
+					},
+				},
+				"valid: node allocatable resource both mapping and overhead set": {
+					input: mkResourceSliceWithDevices(
+						tweakDeviceCapacity("capacity_1", resource.DeviceCapacity{Value: apiresource.MustParse("100")}),
+						tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+							"cpu": {
+								Mapping: &resource.NodeAllocatableMapping{
+									CapacityKey:        &capacityKey1,
+									CapacityMultiplier: new(apiresource.MustParse("1")),
+								},
+								Overhead: &resource.NodeAllocatableOverhead{
+									PerPod: new(apiresource.MustParse("100m")),
+								},
+							},
+						}),
+					),
+				},
+				"invalid: node allocatable mapping deviceMultiplier set when capacityKey is set": {
+					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+						"cpu": {
+							Mapping: &resource.NodeAllocatableMapping{
+								CapacityKey:      &capacityKey1,
+								DeviceMultiplier: new(apiresource.MustParse("1")),
+							},
+						},
+					})),
+					expectedErrs: field.ErrorList{
+						field.NotFound(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping", "capacityKey"), "capacity_1").MarkFromImperative(),
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping"), "", "").WithOrigin("union"),
+						field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping", "capacityMultiplier"), "must be set when capacityKey is set").WithOrigin("dependentRequired").MarkAlpha(),
+					},
+				},
+				"invalid: node allocatable mapping capacityMultiplier set when capacityKey is not set": {
+					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+						"cpu": {
+							Mapping: &resource.NodeAllocatableMapping{
+								CapacityMultiplier: new(apiresource.MustParse("1")),
+							},
+						},
+					})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping"), "", "").WithOrigin("union"),
+						field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping", "capacityKey"), "must be set when capacityMultiplier is set").WithOrigin("dependentRequired").MarkAlpha(),
+					},
+				},
+				"invalid: node allocatable mapping both capacityMultiplier and deviceMultiplier set": {
+					input: mkResourceSliceWithDevices(
+						tweakDeviceCapacity("capacity_1", resource.DeviceCapacity{Value: apiresource.MustParse("10G")}),
+						tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+							"cpu": {
+								Mapping: &resource.NodeAllocatableMapping{
+									CapacityKey:        &capacityKey1,
+									CapacityMultiplier: new(apiresource.MustParse("1")),
+									DeviceMultiplier:   new(apiresource.MustParse("1")),
+								},
+							},
+						}),
+					),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping"), "", "").WithOrigin("union"),
+					},
+				},
+				"invalid: node allocatable mapping both capacityMultiplier and deviceMultiplier nil": {
+					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+						"cpu": {
+							Mapping: &resource.NodeAllocatableMapping{},
+						},
+					})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping"), "", "").WithOrigin("union"),
+					},
+				},
+				"invalid: node allocatable mapping capacityMultiplier negative": {
+					input: mkResourceSliceWithDevices(
+						tweakDeviceCapacity("capacity_1", resource.DeviceCapacity{Value: apiresource.MustParse("10G")}),
+						tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+							"cpu": {
+								Mapping: &resource.NodeAllocatableMapping{
+									CapacityKey:        &capacityKey1,
+									CapacityMultiplier: new(apiresource.MustParse("-1")),
+								},
+							},
+						}),
+					),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping", "capacityMultiplier"), "-1", "must be positive").MarkFromImperative(),
+					},
+				},
+				"invalid: node allocatable mapping deviceMultiplier negative": {
+					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+						"cpu": {
+							Mapping: &resource.NodeAllocatableMapping{
+								DeviceMultiplier: new(apiresource.MustParse("-1")),
+							},
+						},
+					})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping", "deviceMultiplier"), "-1", "must be positive").MarkFromImperative(),
+					},
+				},
+				"invalid: node allocatable overhead both perPod and perContainer nil": {
+					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+						"cpu": {
+							Overhead: &resource.NodeAllocatableOverhead{},
+						},
+					})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("overhead"), "", "at least one of perPod or perContainer must be set").MarkFromImperative(),
+					},
+				},
+				"invalid: node allocatable overhead perPod negative": {
+					input: mkResourceSliceWithDevices(tweakDeviceNodeAllocatableResources(map[v1.ResourceName]resource.NodeAllocatableResource{
+						"cpu": {
+							Overhead: &resource.NodeAllocatableOverhead{
+								PerPod: new(apiresource.MustParse("-100m")),
+							},
+						},
+					})),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("overhead", "perPod"), "-100m", "must be non-negative").MarkFromImperative(),
+					},
+				},
 			}
 
 			for k, tc := range testCases {
 				t.Run(k, func(t *testing.T) {
+					// DRAPartitionableDevicesType depends on DRAResourcePoolStatus,
+					// so it cannot be enabled on its own.
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourcePoolStatus, true)
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPartitionableDevicesType, tc.enablePartitionTypeAttr)
 					apitesting.VerifyValidationEquivalence(
 						t, ctx, &tc.input, strategy, tc.expectedErrs,
 						apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...),
@@ -286,6 +530,9 @@ func TestDeclarativeValidate(t *testing.T) {
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.DRANodeAllocatableResources: true,
+	})
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
@@ -615,6 +862,12 @@ func tweakDeviceTaintEffect(effect string) func(*resource.ResourceSlice) {
 	}
 }
 
+func tweakPartitionTypeAttribute(name resource.FullyQualifiedName) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		rs.Spec.PartitionTypeAttribute = &name
+	}
+}
+
 func tweakDeviceAttribute(name resource.QualifiedName, value resource.DeviceAttribute) func(*resource.ResourceSlice) {
 	return func(rs *resource.ResourceSlice) {
 		if rs.Spec.Devices[0].Attributes == nil {
@@ -709,5 +962,20 @@ func tweakDeviceCounter(counters map[string]resource.Counter) func(*resource.Res
 func counters(key string) map[string]resource.Counter {
 	return map[string]resource.Counter{
 		key: {},
+	}
+}
+
+func tweakDeviceNodeAllocatableResources(resources map[v1.ResourceName]resource.NodeAllocatableResource) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		rs.Spec.Devices[0].NodeAllocatableResources = resources
+	}
+}
+
+func tweakDeviceCapacity(name resource.QualifiedName, capacity resource.DeviceCapacity) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		if rs.Spec.Devices[0].Capacity == nil {
+			rs.Spec.Devices[0].Capacity = make(map[resource.QualifiedName]resource.DeviceCapacity)
+		}
+		rs.Spec.Devices[0].Capacity[name] = capacity
 	}
 }

@@ -21,6 +21,7 @@ syntax = "proto2";
 
 package k8s.io.api.resource.v1alpha3;
 
+import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -261,6 +262,40 @@ message DeviceTaintSelector {
   optional string device = 4;
 }
 
+// PartitionTypeStatus reports allocatability for a single partition type,
+// identified by the value of a grouping attribute.
+message PartitionTypeStatus {
+  // Attribute is the fully qualified name of the device attribute whose value
+  // groups this entry. It is the PartitionTypeAttribute declared by the
+  // devices' own slice, or the default named in the request when their slice
+  // declares none.
+  //
+  // +required
+  // +k8s:required
+  optional string attribute = 4;
+
+  // Type is the partition type value (e.g. "Full" or "Half").
+  //
+  // +required
+  // +k8s:required
+  optional string type = 1;
+
+  // Total is the number of devices of this partition type in the pool.
+  //
+  // +required
+  // +k8s:required
+  // +k8s:minimum=0
+  optional int32 total = 2;
+
+  // Allocatable is the number of additional devices of this partition type
+  // that could still be allocated given current shared-counter consumption.
+  //
+  // +required
+  // +k8s:required
+  // +k8s:minimum=0
+  optional int32 allocatable = 3;
+}
+
 // PoolStatus contains status information for a single resource pool.
 message PoolStatus {
   // Driver is the DRA driver name for this pool.
@@ -352,6 +387,33 @@ message PoolStatus {
   // +k8s:optional
   // +k8s:maxBytes=256
   optional string validationError = 10;
+
+  // PartitionSummary reports allocatability per (attribute, partition type)
+  // for a partitionable pool that publishes SharedCounters. Each entry names
+  // the grouping attribute it was resolved from: the PartitionTypeAttribute
+  // declared by a device's own slice, or for devices whose slice declares
+  // none, the default named in the request. A pool that mixes partitions
+  // declared under different attributes reports each independently. When no
+  // slice declares an attribute and the request names no default, the pool
+  // reports no partition summary.
+  //
+  // +optional
+  // +k8s:optional
+  // +listType=atomic
+  // +k8s:listType=atomic
+  // +k8s:unique=map
+  // +k8s:listMapKey=attribute
+  // +k8s:listMapKey=type
+  // +k8s:maxItems=32
+  repeated PartitionTypeStatus partitionSummary = 11;
+
+  // ShareableSummary reports aggregate capacity for a pool that contains
+  // devices with AllowMultipleAllocations. It is populated only when at
+  // least one device in the pool is shareable.
+  //
+  // +optional
+  // +k8s:optional
+  optional ShareableSummaryStatus shareableSummary = 13;
 }
 
 // ResourcePoolStatusRequest triggers a one-time calculation of resource pool status
@@ -423,6 +485,26 @@ message ResourcePoolStatusRequestSpec {
   // +k8s:minimum=1
   // +k8s:maximum=1000
   optional int32 limit = 3;
+
+  // DefaultPartitionTypeAttribute optionally names a device attribute (by its
+  // fully qualified name, e.g. "gpu.example.com/profile") to use as the default
+  // grouping attribute for partitionable devices whose slice has not declared
+  // one themselves.
+  //
+  // A slice's own PartitionTypeAttribute always takes precedence. This default
+  // applies only to devices whose slice does not declare one, so that a request
+  // can still get an accurate partitionSummary from a driver that has not
+  // been updated to declare it. When neither the slice nor this default names
+  // an attribute, a partitionable pool reports no partitionSummary.
+  //
+  // Must include the domain qualifier.
+  //
+  // +optional
+  // +featureGate=DRAPartitionableDevicesType
+  // +k8s:ifDisabled(DRAPartitionableDevicesType)=+k8s:forbidden
+  // +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:optional
+  // +k8s:ifEnabled(DRAPartitionableDevicesType)=+k8s:format=k8s-resource-fully-qualified-name
+  optional string defaultPartitionTypeAttribute = 4;
 }
 
 // ResourcePoolStatusRequestStatus contains the calculated pool status information.
@@ -466,5 +548,62 @@ message ResourcePoolStatusRequestStatus {
   // +k8s:alpha(since: "1.37")=+k8s:listType=map
   // +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 3;
+}
+
+// ShareableCapacityStatus reports aggregate amounts for a single shareable
+// capacity key.
+message ShareableCapacityStatus {
+  // Name is the capacity name.
+  //
+  // +required
+  // +k8s:required
+  optional string name = 1;
+
+  // Total is the sum of this capacity across shareable devices in the pool.
+  //
+  // +required
+  // +k8s:required
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity total = 2;
+
+  // Consumed is the amount drawn by current allocations.
+  //
+  // +required
+  // +k8s:required
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity consumed = 3;
+
+  // Available is Total minus Consumed, never negative.
+  //
+  // +required
+  // +k8s:required
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity available = 4;
+}
+
+// ShareableSummaryStatus reports aggregate capacity for a pool that contains
+// devices with AllowMultipleAllocations.
+message ShareableSummaryStatus {
+  // FullyAvailableDevices is the number of shareable devices with no
+  // capacity consumed.
+  //
+  // +required
+  // +k8s:required
+  // +k8s:minimum=0
+  optional int32 fullyAvailableDevices = 1;
+
+  // PartiallyAvailableDevices is the number of shareable devices with some
+  // but not all capacity consumed.
+  //
+  // +required
+  // +k8s:required
+  // +k8s:minimum=0
+  optional int32 partiallyAvailableDevices = 2;
+
+  // Capacity reports aggregate total, consumed, and available amounts per
+  // shareable capacity key across the pool.
+  //
+  // +optional
+  // +k8s:optional
+  // +listType=atomic
+  // +k8s:maxItems=32
+  repeated ShareableCapacityStatus capacity = 3;
 }
 

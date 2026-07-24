@@ -35,7 +35,6 @@ type Struct struct {
 	// +k8s:subfield(ownerReferences)=+k8s:listMapKey=uid
 	// +k8s:subfield(finalizers)=+k8s:listType=set
 	// +k8s:subfield(labels)=+k8s:eachKey=+k8s:validateFalse="labels key error"
-	// +k8s:subfield(ownerReferences)=+k8s:eachVal=+k8s:subfield(name)=+k8s:validateFalse="ownerReference name error"
 	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"objectMeta"`
 }

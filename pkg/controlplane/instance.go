@@ -44,6 +44,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	eventsv1 "k8s.io/api/events/v1"
+	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
@@ -55,6 +56,7 @@ import (
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	schedulingapiv1 "k8s.io/api/scheduling/v1"
 	schedulingapiv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingapiv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
@@ -98,6 +100,7 @@ import (
 	discoveryrest "k8s.io/kubernetes/pkg/registry/discovery/rest"
 	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
 	flowcontrolrest "k8s.io/kubernetes/pkg/registry/flowcontrol/rest"
+	lifecyclerest "k8s.io/kubernetes/pkg/registry/lifecycle/rest"
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
@@ -404,6 +407,7 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 			IPRepairInterval:        c.Extra.RepairServicesInterval,
 		},
 		EndpointSliceGetter: c.ControlPlane.Extra.EndpointSliceGetter,
+		Authorizer:          c.ControlPlane.Generic.Authorization.Authorizer,
 	}, c.ControlPlane.Generic.Authorization.Authorizer)
 	if err != nil {
 		return nil, err
@@ -426,6 +430,7 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 		certificatesrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer},
 		coordinationrest.RESTStorageProvider{},
 		discoveryrest.StorageProvider{},
+		lifecyclerest.RESTStorageProvider{},
 		networkingrest.RESTStorageProvider{},
 		noderest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
@@ -498,6 +503,7 @@ var (
 		networkingapiv1beta1.SchemeGroupVersion,
 		resourcev1beta1.SchemeGroupVersion,
 		resourcev1beta2.SchemeGroupVersion,
+		schedulingapiv1beta1.SchemeGroupVersion,
 	}
 
 	// genericAlphaAPIGroupVersionsDisabledByDefault holds the alpha APIs we have for API groups provided by GenericStorageProviders. They are always disabled by default.
@@ -511,6 +517,7 @@ var (
 	}
 	// alphaAPIGroupVersionsDisabledByDefault holds the alpha APIs we have for additional API groups only provided in kube-apiserver. They are always disabled by default.
 	alphaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
+		lifecyclev1alpha1.SchemeGroupVersion,
 		resourcev1alpha3.SchemeGroupVersion,
 		schedulingapiv1alpha3.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,

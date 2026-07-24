@@ -28,8 +28,16 @@ type FakeSchedulingV1beta1 struct {
 	*testing.Fake
 }
 
+func (c *FakeSchedulingV1beta1) PodGroups(namespace string) v1beta1.PodGroupInterface {
+	return newFakePodGroups(c, namespace)
+}
+
 func (c *FakeSchedulingV1beta1) PriorityClasses() v1beta1.PriorityClassInterface {
 	return newFakePriorityClasses(c)
+}
+
+func (c *FakeSchedulingV1beta1) Workloads(namespace string) v1beta1.WorkloadInterface {
+	return newFakeWorkloads(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

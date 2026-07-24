@@ -35,3 +35,12 @@ func SetDefaults_PodGroup(in *schedulingv1alpha3.PodGroup) {
 		}
 	}
 }
+
+func SetDefaults_CompositePodGroup(in *schedulingv1alpha3.CompositePodGroup) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) {
+		if in.Spec.PreemptionPolicy == nil {
+			preemptLowerPriority := schedulingv1alpha3.PreemptLowerPriority
+			in.Spec.PreemptionPolicy = &preemptLowerPriority
+		}
+	}
+}

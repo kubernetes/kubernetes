@@ -38,7 +38,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,13 +69,24 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodedeclaredfeatures"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -1030,7 +1041,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		var gotNominatingInfo *fwk.NominatingInfo
 
 		var clientObjs []runtime.Object
-		var podGroup *schedulingv1alpha3.PodGroup
+		var podGroup *schedulingv1beta1.PodGroup
 		if scheduleAsPodGroup {
 			group := &v1.PodSchedulingGroup{
 				PodGroupName: new("pg"),
@@ -1045,7 +1056,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				item.expectPodInUnschedulable = nil
 			}
 
-			podGroup = &schedulingv1alpha3.PodGroup{
+			podGroup = &schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: item.sendPod.Namespace},
 			}
 			clientObjs = []runtime.Object{item.sendPod, podGroup}
@@ -1069,7 +1080,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			defer apiDispatcher.Close()
 		}
 
-		internalCache := internalcache.New(ctx, apiDispatcher, scheduleAsPodGroup)
+		internalCache := internalcache.New(ctx, apiDispatcher, scheduleAsPodGroup, false)
 
 		if scheduleAsPodGroup {
 			internalCache.AddPodGroupMember(item.sendPod)
@@ -1386,6 +1397,99 @@ func TestHandleSchedulingFailureSkipsRecreatedPod(t *testing.T) {
 	}
 	if diff := cmp.Diff(recreatedPod.Status, updatedPod.Status); diff != "" {
 		t.Fatalf("expected recreated pod status to remain unchanged (-want,+got):\n%s", diff)
+	}
+}
+
+func TestHandleSchedulingFailureForDeferredResizePod(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	pod := st.MakePod().Name("foo").Namespace("ns").UID("pod-uid").Node("node1").SchedulerName(testSchedulerName).Obj()
+	pod.Status.Conditions = []v1.PodCondition{
+		{
+			Type:   v1.PodScheduled,
+			Status: v1.ConditionTrue,
+		},
+		{
+			Type:   v1.PodResizePending,
+			Reason: v1.PodReasonDeferred,
+		},
+	}
+
+	node := st.MakeNode().Name("node1").Obj()
+	client := clientsetfake.NewClientset(pod, node)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+
+	schedFramework, err := tf.NewFramework(ctx,
+		[]tf.RegisterPluginFunc{
+			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		},
+		testSchedulerName,
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
+		frameworkruntime.WithInformerFactory(informerFactory),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+	queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar))
+	schedCache := internalcache.New(ctx, nil, false, false /* CompositePodGroup */)
+	schedCache.AddNode(logger, node)
+
+	sched := &Scheduler{
+		client:          client,
+		Cache:           schedCache,
+		SchedulingQueue: queue,
+		inPlacePodVerticalScalingSchedulerPreemptionEnabled: true,
+	}
+
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	queue.Add(ctx, pod)
+	popped, err := queue.Pop(logger)
+	if err != nil {
+		t.Fatalf("Pop: %v", err)
+	}
+	poppedPod := popped.(*framework.QueuedPodInfo)
+
+	nominatingInfo := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
+	sched.handleSchedulingFailure(ctx, schedFramework, poppedPod, fwk.NewStatus(fwk.Unschedulable, "no fit"), nominatingInfo, time.Now())
+
+	// Assert queue status: pod should be added back to the queue
+	_, found := queue.GetPod(pod.Name, pod.Namespace, nil)
+	if !found {
+		t.Errorf("expected pod to be in queue")
+	}
+
+	// Retrieve the pod from client to verify status updates
+	updatedPod, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert PodScheduled status condition remains True
+	var gotScheduledStatus v1.ConditionStatus
+	for _, cond := range updatedPod.Status.Conditions {
+		if cond.Type == v1.PodScheduled {
+			gotScheduledStatus = cond.Status
+		}
+	}
+	if gotScheduledStatus != v1.ConditionTrue {
+		t.Errorf("expected PodScheduled condition status to remain True, got %v", gotScheduledStatus)
+	}
+
+	// Assert NominatedNodeName remains empty
+	if updatedPod.Status.NominatedNodeName != "" {
+		t.Errorf("expected NominatedNodeName to remain empty, got %q", updatedPod.Status.NominatedNodeName)
 	}
 }
 
@@ -1797,7 +1901,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 					defer apiDispatcher.Close()
 				}
 
-				internalCache := internalcache.New(ctx, apiDispatcher, false)
+				internalCache := internalcache.New(ctx, apiDispatcher, false, false)
 				cache := &fakecache.Cache{
 					Cache: internalCache,
 					ForgetFunc: func(pod *v1.Pod) {
@@ -1985,7 +2089,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 				defer apiDispatcher.Close()
 			}
 
-			scache := internalcache.New(ctx, apiDispatcher, false)
+			scache := internalcache.New(ctx, apiDispatcher, false, false)
 			firstPod := podWithPort("pod.Name", "", 8080)
 			node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
 			scache.AddNode(logger, &node)
@@ -2074,7 +2178,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 				defer apiDispatcher.Close()
 			}
 
-			scache := internalcache.New(ctx, apiDispatcher, false)
+			scache := internalcache.New(ctx, apiDispatcher, false, false)
 
 			// Design the baseline for the pods, and we will make nodes that don't fit it later.
 			var cpu = int64(4)
@@ -2382,7 +2486,7 @@ func TestSchedulerBinding(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				cache := internalcache.New(ctx, apiDispatcher, false)
+				cache := internalcache.New(ctx, apiDispatcher, false, false)
 				if asyncAPICallsEnabled {
 					informerFactory := informers.NewSharedInformerFactory(client, 0)
 					ar := metrics.NewMetricsAsyncRecorder(10, 1*time.Second, ctx.Done())
@@ -2679,7 +2783,6 @@ func Test_SelectHost(t *testing.T) {
 		name             string
 		list             []fwk.NodePluginScores
 		expectedNodeList []fwk.NodePluginScores
-		wantError        error
 	}{
 		{
 			name: "unique properly ordered scores",
@@ -2724,15 +2827,10 @@ func Test_SelectHost(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var err error
-			var scoreList = []fwk.NodePluginScores{}
-			h := newSortedNodeScores(test.list)
+			var scoreList []fwk.NodePluginScores
+			h := framework.NewSortedScoredNodes(test.list)
 			for range len(test.list) {
-				gotNode := h.PopScore()
-				scoreList = append(scoreList, gotNode)
-			}
-			if !errors.Is(err, test.wantError) {
-				t.Fatalf("unexpected error is returned from selectHost: got: %v want: %v", err, test.wantError)
+				scoreList = append(scoreList, h.Pop())
 			}
 			if !cmp.Equal(test.expectedNodeList, scoreList) {
 				t.Errorf("Unexpected scoreList: %v", scoreList)
@@ -3709,7 +3807,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(ctx, nil, false)
+			cache := internalcache.New(ctx, nil, false, false)
 			for _, pod := range test.pods {
 				cache.AddPod(logger, pod)
 			}
@@ -4041,6 +4139,16 @@ func Test_prioritizeNodes(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+						{
+							Name:  "Node2Prioritizer",
+							Score: 10,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "Node2Prioritizer",
@@ -4055,6 +4163,16 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+						{
+							Name:  "Node2Prioritizer",
+							Score: 100,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "Node2Prioritizer",
@@ -4103,8 +4221,13 @@ func Test_prioritizeNodes(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+					},
 					Scores: []fwk.PluginScore{
-
 						{
 							Name:  "FakeExtender1",
 							Score: 300,
@@ -4122,6 +4245,12 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "FakeExtender1",
@@ -4158,6 +4287,16 @@ func Test_prioritizeNodes(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+						{
+							Name:  "Node2Prioritizer",
+							Score: 10,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "Node2Prioritizer",
@@ -4172,6 +4311,16 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+						{
+							Name:  "Node2Prioritizer",
+							Score: 100,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "Node2Prioritizer",
@@ -4200,8 +4349,8 @@ func Test_prioritizeNodes(t *testing.T) {
 			},
 			extenders: nil,
 			want: []fwk.NodePluginScores{
-				{Name: "node1", Scores: []fwk.PluginScore{}},
-				{Name: "node2", Scores: []fwk.PluginScore{}},
+				{Name: "node1", RawScores: []fwk.PluginScore{}, Scores: []fwk.PluginScore{}},
+				{Name: "node2", RawScores: []fwk.PluginScore{}, Scores: []fwk.PluginScore{}},
 			},
 		},
 		{
@@ -4229,6 +4378,12 @@ func Test_prioritizeNodes(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 5,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
@@ -4239,6 +4394,12 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 5,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
@@ -4249,6 +4410,12 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node3",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 5,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
@@ -4283,6 +4450,12 @@ func Test_prioritizeNodes(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 18,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
@@ -4293,6 +4466,12 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 18,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
@@ -4303,6 +4482,12 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node3",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 0,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
@@ -4323,7 +4508,7 @@ func Test_prioritizeNodes(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			cache := internalcache.New(ctx, nil, false)
+			cache := internalcache.New(ctx, nil, false, false)
 			for _, node := range test.nodes {
 				cache.AddNode(klog.FromContext(ctx), node)
 			}
@@ -4525,7 +4710,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			nodes := makeNodeList([]string{"node1", "node2", "node3"})
 			client := clientsetfake.NewClientset(test.pod)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			cache := internalcache.New(ctx, nil, false)
+			cache := internalcache.New(ctx, nil, false, false)
 			for _, n := range nodes {
 				cache.AddNode(logger, n)
 			}
@@ -4608,7 +4793,7 @@ func makeNodeList(nodeNames []string) []*v1.Node {
 // makeScheduler makes a simple Scheduler for testing.
 func makeScheduler(ctx context.Context, nodes []*v1.Node) *Scheduler {
 	logger := klog.FromContext(ctx)
-	cache := internalcache.New(ctx, nil, false)
+	cache := internalcache.New(ctx, nil, false, false)
 	for _, n := range nodes {
 		cache.AddNode(logger, n)
 	}
@@ -4772,7 +4957,7 @@ func setupTestSchedulerWithVolumeBinding(ctx context.Context, t *testing.T, clie
 		t.Cleanup(apiDispatcher.Close)
 	}
 
-	scache := internalcache.New(ctx, apiDispatcher, false)
+	scache := internalcache.New(ctx, apiDispatcher, false, false)
 	scache.AddNode(logger, &testNode)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
@@ -4912,6 +5097,219 @@ func TestEvaluateNominatedNode(t *testing.T) {
 			}
 			if diff := cmp.Diff(tt.wantNodeList, gotNodeNames, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("Unexpected nodes (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestScheduler_DeferredResizePluginSkipping(t *testing.T) {
+	// Setup feature gate
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRASchedulerFilterTimeout, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceBindingConditions, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageCapacityScoring, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Create a node and a deferred resize pod assigned to that node
+	node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}}
+	pod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+
+	// Setup Cache, snapshot, and informer factory
+	cache := internalcache.New(ctx, nil, false, false /* CompositePodGroup */)
+	cache.AddNode(logger, node)
+	snapshot := internalcache.NewEmptySnapshot()
+	if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+		t.Fatalf("Failed to update snapshot: %v", err)
+	}
+
+	informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(), 0)
+
+	// Register a list of plugins to check if they skip/run
+	fts := feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate)
+	registerPlugins := []tf.RegisterPluginFunc{
+		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		tf.RegisterPluginAsExtensions(nodename.Name, frameworkruntime.FactoryAdapter(fts, nodename.New), "Filter"),
+		tf.RegisterPluginAsExtensions(noderesources.Name, frameworkruntime.FactoryAdapter(fts, noderesources.NewFit), "PreFilter", "Filter"),
+		tf.RegisterPluginAsExtensions(nodeaffinity.Name, frameworkruntime.FactoryAdapter(fts, nodeaffinity.New), "PreFilter", "Filter"),
+		tf.RegisterPluginAsExtensions(podtopologyspread.Name, frameworkruntime.FactoryAdapter(fts, podtopologyspread.New), "PreFilter", "Filter"),
+		tf.RegisterPluginAsExtensions(nodevolumelimits.CSIName, frameworkruntime.FactoryAdapter(fts, nodevolumelimits.NewCSI), "PreFilter", "Filter"),
+		tf.RegisterPluginAsExtensions(nodeports.Name, frameworkruntime.FactoryAdapter(fts, nodeports.New), "PreFilter", "Filter"),
+		tf.RegisterPluginAsExtensions(volumebinding.Name, frameworkruntime.FactoryAdapter(fts, volumebinding.New), "PreFilter", "Filter"),
+		tf.RegisterPluginAsExtensions(volumezone.Name, frameworkruntime.FactoryAdapter(fts, volumezone.New), "PreFilter", "Filter"),
+		tf.RegisterPluginAsExtensions(volumerestrictions.Name, frameworkruntime.FactoryAdapter(fts, volumerestrictions.New), "PreFilter", "Filter"),
+		tf.RegisterPluginAsExtensions(interpodaffinity.Name, frameworkruntime.FactoryAdapter(fts, interpodaffinity.New), "PreFilter", "Filter"),
+		tf.RegisterPluginAsExtensions(nodedeclaredfeatures.Name, frameworkruntime.FactoryAdapter(fts, nodedeclaredfeatures.New), "PreFilter", "Filter"),
+		tf.RegisterPluginAsExtensions(dynamicresources.Name, frameworkruntime.FactoryAdapter(fts, dynamicresources.New), "PreFilter", "Filter"),
+		tf.RegisterPluginAsExtensions(tainttoleration.Name, frameworkruntime.FactoryAdapter(fts, tainttoleration.New), "PreFilter", "Filter"),
+		tf.RegisterPluginAsExtensions(nodeunschedulable.Name, frameworkruntime.FactoryAdapter(fts, nodeunschedulable.New), "PreFilter", "Filter"),
+		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+	}
+
+	schedFramework, err := tf.NewFramework(
+		ctx,
+		registerPlugins, "",
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+	)
+	if err != nil {
+		t.Fatalf("NewFramework failed: %v", err)
+	}
+
+	sched := &Scheduler{
+		Cache:            cache,
+		nodeInfoSnapshot: snapshot,
+	}
+
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	state := framework.NewCycleState()
+	podInfo := queuedPodInfoForPod(pod)
+
+	// Run schedulePod
+	_, _ = sched.schedulePod(ctx, schedFramework, state, podInfo)
+
+	// Verify the skipped plugins
+	skipped := state.GetSkipFilterPlugins()
+
+	// Irrelevant plugins should be skipped
+	irrelevant := []string{
+		nodeaffinity.Name,
+		podtopologyspread.Name,
+		nodevolumelimits.CSIName,
+		nodeports.Name,
+		volumebinding.Name,
+		volumezone.Name,
+		volumerestrictions.Name,
+		interpodaffinity.Name,
+		nodedeclaredfeatures.Name,
+		dynamicresources.Name,
+		tainttoleration.Name,
+		nodeunschedulable.Name,
+	}
+
+	for _, name := range irrelevant {
+		if !skipped.Has(name) {
+			t.Errorf("Expected plugin %s to be skipped, but it was not", name)
+		}
+	}
+
+	// Relevant plugins must NOT be skipped
+	relevant := []string{
+		nodename.Name,
+		noderesources.Name,
+	}
+
+	for _, name := range relevant {
+		if skipped.Has(name) {
+			t.Errorf("Expected plugin %s to NOT be skipped, but it was", name)
+		}
+	}
+
+	// Assert lengths for future-proofing. If new plugins are registered in this test but not
+	// categorized as relevant/irrelevant or not implemented properly, these length assertions will fail.
+	if len(relevant) != 2 {
+		t.Errorf("Expected exactly 2 relevant plugins, got %d", len(relevant))
+	}
+	if len(skipped) != len(irrelevant) {
+		t.Errorf("Expected exactly %d skipped plugins, got %d (skipped list: %v)", len(irrelevant), len(skipped), skipped.UnsortedList())
+	}
+}
+
+func TestScheduler_DeferredResizePostFilterPluginSkipping(t *testing.T) {
+	tests := []struct {
+		name                                                string
+		inPlacePodVerticalScalingSchedulerPreemptionEnabled bool
+		expectedCode                                        fwk.Code
+		expectedReasonPrefix                                string
+	}{
+		{
+			name: "FG enabled: dynamicresources is skipped, preemption runs and fails (unschedulable)",
+			inPlacePodVerticalScalingSchedulerPreemptionEnabled: true,
+			expectedCode:         fwk.Unschedulable,
+			expectedReasonPrefix: "preemption: ",
+		},
+		{
+			name: "FG disabled: dynamicresources is not skipped, fails with Error (missing state)",
+			inPlacePodVerticalScalingSchedulerPreemptionEnabled: false,
+			expectedCode:         fwk.Error,
+			expectedReasonPrefix: "not found",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, tc.inPlacePodVerticalScalingSchedulerPreemptionEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRASchedulerFilterTimeout, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceBindingConditions, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageCapacityScoring, true)
+
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			// Create a node and a deferred resize pod assigned to that node
+			node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}}
+			pod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").
+				Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+
+			// Setup Cache, snapshot, and informer factory
+			cache := internalcache.New(ctx, nil, false, false /* CompositePodGroup */)
+			cache.AddNode(logger, node)
+			snapshot := internalcache.NewEmptySnapshot()
+			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+				t.Fatalf("Failed to update snapshot: %v", err)
+			}
+
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(pod), 0)
+
+			// Register both DynamicResources (irrelevant) and DefaultPreemption (relevant)
+			fts := feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate)
+			registerPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterPostFilterPlugin(dynamicresources.Name, frameworkruntime.FactoryAdapter(fts, dynamicresources.New)),
+				tf.RegisterPostFilterPlugin(defaultpreemption.Name, frameworkruntime.FactoryAdapter(fts, defaultpreemption.New)),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+
+			schedFramework, err := tf.NewFramework(
+				ctx,
+				registerPlugins, "",
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
+				frameworkruntime.WithInformerFactory(informerFactory),
+			)
+			if err != nil {
+				t.Fatalf("NewFramework failed: %v", err)
+			}
+
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			state := framework.NewCycleState()
+
+			// Run PostFilter plugins directly
+			_, status := schedFramework.RunPostFilterPlugins(ctx, state, pod, framework.NewDefaultNodeToStatus())
+
+			// Verify the result
+			if status.Code() != tc.expectedCode {
+				t.Errorf("Expected status code %v, got %v (status: %v)", tc.expectedCode, status.Code(), status)
+			}
+			reasons := status.Reasons()
+			if len(reasons) != 1 {
+				t.Fatalf("Expected exactly 1 PostFilter reason, got %d (reasons: %v)", len(reasons), reasons)
+			}
+			if !strings.HasPrefix(reasons[0], tc.expectedReasonPrefix) {
+				t.Errorf("Expected reason to start with %q, got %q", tc.expectedReasonPrefix, reasons[0])
 			}
 		})
 	}

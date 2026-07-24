@@ -32,6 +32,8 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/kubernetes"
 	"go.opentelemetry.io/otel/attribute"
+	grpccodes "google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 
 	etcdrpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -85,7 +87,7 @@ type store struct {
 	watcher            *watcher
 	leaseManager       *leaseManager
 	decoder            Decoder
-	listErrAggrFactory func() ListErrorAggregator
+	listErrAggrFactory func() listItemErrors
 
 	resourcePrefix string
 	newListFunc    func() runtime.Object
@@ -111,36 +113,35 @@ type objState struct {
 	stale bool
 }
 
-// ListErrorAggregator aggregates the error(s) that the LIST operation
-// encounters while retrieving object(s) from the storage
-type ListErrorAggregator interface {
-	// Aggregate aggregates the given error from list operation
-	// key: it identifies the given object in the storage.
-	// err: it represents the error the list operation encountered while
-	// retrieving the given object from the storage.
-	// done: true if the aggregation is done and the list operation should
-	// abort, otherwise the list operation will continue
-	Aggregate(key string, err error) bool
+// listItemErrors stores a slice of item storage errors during LIST operations.
+// They are iteratively added, and eventually returned as an aggregated error. On
+// each Append, it signals whether it considers itself full or the error to be fatal.
+// In either case, the caller is supposed to not keep collecting, but return the
+// collection.
+type listItemErrors interface {
+	// Append adds an item storage error for the given storage key during a LIST operation.
+	// The caller is expected to stop appending as soon as true is returned.
+	Append(key string, err error) bool
 
-	// Err returns the aggregated error
-	Err() error
+	// Aggregate returns the aggregated error
+	Aggregate() error
 }
 
 // defaultListErrorAggregatorFactory returns the default list error
 // aggregator that maintains backward compatibility, which is abort
 // the list operation as soon as it encounters the first error
-func defaultListErrorAggregatorFactory() ListErrorAggregator { return &abortOnFirstError{} }
+func defaultListErrorAggregatorFactory() listItemErrors { return &abortOnFirstError{} }
 
 // LIST aborts on the first error it encounters (backward compatible)
 type abortOnFirstError struct {
 	err error
 }
 
-func (a *abortOnFirstError) Aggregate(key string, err error) bool {
+func (a *abortOnFirstError) Append(key string, err error) bool {
 	a.err = err
 	return true
 }
-func (a *abortOnFirstError) Err() error { return a.err }
+func (a *abortOnFirstError) Aggregate() error { return a.err }
 
 // New returns an etcd3 implementation of storage.Interface.
 func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) (*store, error) {
@@ -164,7 +165,7 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 
 	listErrAggrFactory := defaultListErrorAggregatorFactory
 	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
-		listErrAggrFactory = corruptObjErrAggregatorFactory(100)
+		listErrAggrFactory = corruptObjErrAggregatorFactory(maxCorruptObjErrsToAggregate)
 	}
 
 	w := &watcher{
@@ -236,12 +237,21 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	if err != nil {
 		return err
 	}
+	ctx, span := tracing.Start(ctx, "Get etcd3",
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+		attribute.String("key", key),
+		attribute.String("group", s.groupResource.Group),
+		attribute.String("resource", s.groupResource.Resource),
+	)
+	defer span.End(500 * time.Millisecond)
 	startTime := time.Now()
 	getResp, err := s.client.Kubernetes.Get(ctx, preparedKey, kubernetes.GetOptions{})
 	metrics.RecordEtcdRequest("get", s.groupResource, err, startTime)
 	if err != nil {
+		span.AddEvent("Get call failed", attribute.String("err", err.Error()))
 		return err
 	}
+	span.AddEvent("Get call succeeded")
 	if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Revision)); err != nil {
 		return err
 	}
@@ -255,14 +265,18 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 
 	data, _, err := s.transformer.TransformFromStorage(ctx, getResp.KV.Value, authenticatedDataString(preparedKey))
 	if err != nil {
+		span.AddEvent("TransformFromStorage failed", attribute.String("err", err.Error()))
 		return storage.NewInternalError(err)
 	}
+	span.AddEvent("TransformFromStorage succeeded")
 
 	err = s.decoder.Decode(data, out, getResp.KV.ModRevision)
 	if err != nil {
+		span.AddEvent("Decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
 		recordDecodeError(s.groupResource, preparedKey)
 		return err
 	}
+	span.AddEvent("Decode succeeded", attribute.Int("len", len(data)))
 	return nil
 }
 
@@ -325,11 +339,11 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	if out != nil {
 		err = s.decoder.Decode(data, out, txnResp.Revision)
 		if err != nil {
-			span.AddEvent("decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
+			span.AddEvent("Decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
 			recordDecodeError(s.groupResource, preparedKey)
 			return err
 		}
-		span.AddEvent("decode succeeded", attribute.Int("len", len(data)))
+		span.AddEvent("Decode succeeded", attribute.Int("len", len(data)))
 	}
 	return nil
 }
@@ -613,11 +627,11 @@ func (s *store) GuaranteedUpdate(
 
 		err = s.decoder.Decode(data, destination, txnResp.Revision)
 		if err != nil {
-			span.AddEvent("decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
+			span.AddEvent("Decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
 			recordDecodeError(s.groupResource, preparedKey)
 			return err
 		}
-		span.AddEvent("decode succeeded", attribute.Int("len", len(data)))
+		span.AddEvent("Decode succeeded", attribute.Int("len", len(data)))
 		return nil
 	}
 }
@@ -730,6 +744,21 @@ func (s *store) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
 	return uint64(getResp.Revision), nil
 }
 
+// shouldStream determines whether a list request should use etcd RangeStream.
+func shouldStream(opts storage.ListOptions) bool {
+	// Only recursive lists stream, a non-recursive request reads a single object.
+	if !opts.Recursive {
+		return false
+	}
+	// etcd is unaware of selector matches, so a filtered page can't carry a proper limit.
+	// Stream only unfiltered pages.
+	if opts.Predicate.Limit > 0 && !opts.Predicate.Empty() {
+		return false
+	}
+	return utilfeature.DefaultFeatureGate.Enabled(features.EtcdRangeStream) &&
+		etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RangeStream)
+}
+
 // GetList implements storage.Interface.
 func (s *store) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 	keyPrefix, err := s.prepareKey(key, opts.Recursive)
@@ -769,29 +798,47 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	var count int64
 	var numFetched int
 	var numEvald int
+	var streamed bool
+	startTime := time.Now()
 	// Because these metrics are for understanding the costs of handling LIST requests,
 	// get them recorded even in error cases.
 	defer func() {
 		numReturn := v.Len()
 		metrics.RecordStorageListMetrics(s.groupResource, "", numFetched, numEvald, numReturn)
+		metrics.RecordListLatency(s.groupResource, streamed, startTime)
 	}()
 
 	aggregator := s.listErrAggrFactory()
 
-	for chunk, chunkErr := range s.pagedChunks(ctx, keyPrefix, opts, withRev, limit, continueKey) {
+	chunks := s.pagedChunks(ctx, keyPrefix, opts, withRev, limit, continueKey)
+	if shouldStream(opts) {
+		streamChunks, supported := s.streamChunks(ctx, keyPrefix, withRev, limit, continueKey)
+		if supported {
+			chunks = streamChunks
+			streamed = true
+		} else {
+			etcdfeature.DefaultFeatureSupportChecker.MarkUnsupported(storage.RangeStream)
+			klog.V(4).Infof("etcd server does not support RangeStream for %v; falling back to paginated list", s.groupResource)
+		}
+	}
+
+	for chunk, chunkErr := range chunks {
 		if chunkErr != nil {
 			return chunkErr
 		}
 		numFetched += len(chunk.kvs)
-		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(chunk.revision)); err != nil {
-			return err
+		if chunk.revision != nil {
+			if withRev == 0 {
+				if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(*chunk.revision)); err != nil {
+					return err
+				}
+				withRev = *chunk.revision
+			} else if *chunk.revision != withRev {
+				return fmt.Errorf("etcd returned revision %d for a list read at revision %d", *chunk.revision, withRev)
+			}
 		}
 		if len(chunk.kvs) == 0 && chunk.hasMore {
 			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
-		}
-		// indicate to the client which resource version was returned, and use the same resource version for subsequent requests.
-		if withRev == 0 {
-			withRev = chunk.revision
 		}
 		count = chunk.count
 
@@ -822,10 +869,11 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	return s.finalizeList(listObj, opts.Predicate, uint64(withRev), continueValue, remainingItemCount, aggregator, v)
 }
 
-// listChunk is one batch of kvs from a list read.
+// listChunk is one batch of kvs from a list read: a page of a paginated Range, or a
+// chunk of a RangeStream.
 type listChunk struct {
 	kvs      []*mvccpb.KeyValue
-	revision int64
+	revision *int64
 	count    int64 // etcd's count of keys remaining in the range, including this batch
 	hasMore  bool
 }
@@ -851,7 +899,8 @@ func (s *store) pagedChunks(ctx context.Context, keyPrefix string, opts storage.
 			if len(getResp.Kvs) > 0 {
 				continueKey = string(getResp.Kvs[len(getResp.Kvs)-1].Key) + "\x00"
 			}
-			if !yield(listChunk{kvs: getResp.Kvs, revision: getResp.Revision, count: getResp.Count, hasMore: hasMore}, nil) {
+			revision := withRev
+			if !yield(listChunk{kvs: getResp.Kvs, revision: &revision, count: getResp.Count, hasMore: hasMore}, nil) {
 				return
 			}
 			if !hasMore {
@@ -882,8 +931,79 @@ func (s *store) listReadError(ctx context.Context, err error, withRev int64, pag
 	return interpretListError(err, paging, continueKey, keyPrefix)
 }
 
-func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredicate, rev uint64, continueValue string, remainingItemCount *int64, aggregator ListErrorAggregator, v reflect.Value) error {
-	if err := aggregator.Err(); err != nil {
+// streamChunks reads the list as a single etcd RangeStream, pinned to withRev when
+// nonzero, capped at limit keys and resumed from continueKey when set.
+// supported is false when the etcd server does not implement RangeStream.
+func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev, limit int64, continueKey string) (chunks iter.Seq2[listChunk, error], supported bool) {
+	startTime := time.Now()
+	paging := continueKey != ""
+	startKey := keyPrefix
+	if paging {
+		startKey = continueKey
+	}
+	streamOpts := []clientv3.OpOption{clientv3.WithRange(clientv3.GetPrefixRangeEnd(keyPrefix))}
+	if withRev > 0 {
+		streamOpts = append(streamOpts, clientv3.WithRev(withRev))
+	}
+	if limit > 0 {
+		streamOpts = append(streamOpts, clientv3.WithLimit(limit))
+	}
+	stream, streamErr := s.client.KV.GetStream(ctx, startKey, streamOpts...)
+	var first clientv3.RangeStreamResponse
+	var firstOk bool
+	if streamErr == nil {
+		first, firstOk = <-stream
+		if firstOk && grpcstatus.Code(first.Err()) == grpccodes.Unimplemented {
+			return nil, false
+		}
+	} else if grpcstatus.Code(streamErr) == grpccodes.Unimplemented {
+		return nil, false
+	}
+	return func(yield func(listChunk, error) bool) {
+		var err error
+		defer func() {
+			metrics.RecordEtcdRequest("listStream", s.groupResource, err, startTime)
+		}()
+		if err = streamErr; err != nil {
+			yield(listChunk{}, s.listReadError(ctx, err, withRev, paging, continueKey, keyPrefix))
+			return
+		}
+		estimator := s.getResourceSizeEstimator()
+		var revision *int64
+		if withRev > 0 {
+			revision = &withRev
+		}
+		resp, ok := first, firstOk
+		for ok {
+			if err = resp.Err(); err != nil {
+				yield(listChunk{}, s.listReadError(ctx, err, withRev, paging, continueKey, keyPrefix))
+				return
+			}
+			rangeResp := resp.RangeResponse
+			if estimator != nil && len(rangeResp.Kvs) > 0 {
+				estimator.Update(rangeResp.Kvs)
+			}
+			// A pinned stream's final header holds the latest store revision, not withRev.
+			if revision == nil && rangeResp.Header != nil {
+				revision = &rangeResp.Header.Revision
+			}
+			next, nextOk := <-stream
+			// On the final chunk, More means the limit truncated the range, so there
+			// is a next page even though the stream ended.
+			if !yield(listChunk{kvs: rangeResp.Kvs, revision: revision, count: rangeResp.Count, hasMore: nextOk || rangeResp.More}, nil) {
+				return
+			}
+			resp, ok = next, nextOk
+		}
+		if revision == nil {
+			err = fmt.Errorf("rangeStream for %q completed without a revision", keyPrefix)
+			yield(listChunk{}, err)
+		}
+	}, true
+}
+
+func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredicate, rev uint64, continueValue string, remainingItemCount *int64, aggregator listItemErrors, v reflect.Value) error {
+	if err := aggregator.Aggregate(); err != nil {
 		return err
 	}
 	if v.IsNil() {
@@ -899,11 +1019,11 @@ func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredi
 	return nil
 }
 
-func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator ListErrorAggregator, v reflect.Value) (bool, error) {
+func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator listItemErrors, v reflect.Value) (bool, error) {
 	data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
 	if err != nil {
-		if done := aggregator.Aggregate(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
-			return false, aggregator.Err()
+		if done := aggregator.Append(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
+			return false, aggregator.Aggregate()
 		}
 		return false, nil
 	}
@@ -919,8 +1039,8 @@ func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred s
 	obj, err := s.decoder.DecodeListItem(ctx, data, uint64(kv.ModRevision), newItemFunc)
 	if err != nil {
 		recordDecodeError(s.groupResource, string(kv.Key))
-		if done := aggregator.Aggregate(string(kv.Key), err); done {
-			return false, aggregator.Err()
+		if done := aggregator.Append(string(kv.Key), err); done {
+			return false, aggregator.Aggregate()
 		}
 		return false, nil
 	}
@@ -934,7 +1054,7 @@ func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred s
 }
 
 // appendChunk appends the kvs matching pred to v.
-func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator ListErrorAggregator, v reflect.Value, paging bool) (lastKey []byte, evaluated int, limitReached bool, err error) {
+func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator listItemErrors, v reflect.Value, paging bool) (lastKey []byte, evaluated int, limitReached bool, err error) {
 	// avoid small allocations for the result slice, since this can be called in many
 	// different contexts and we don't know how significantly the result will be filtered
 	if pred.Empty() {

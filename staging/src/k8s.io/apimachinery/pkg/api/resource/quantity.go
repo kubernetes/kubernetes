@@ -878,3 +878,14 @@ func (q *QuantityValue) Set(s string) error {
 func (q QuantityValue) Type() string {
 	return "quantity"
 }
+
+// QuantityPtrEqual compares two Quantity pointers and returns true if they are both nil or point to equal quantities.
+func QuantityPtrEqual(a, b *Quantity) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Equal(*b)
+}

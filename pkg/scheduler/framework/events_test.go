@@ -459,7 +459,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			name:   "pod's resource request is scaled up",
 			newPod: podWithBigRequest,
 			oldPod: podWithSmallRequest,
-			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.Update}},
+			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodScaleUp}},
 		},
 		{
 			name:   "both pod's resource request and label are updated",

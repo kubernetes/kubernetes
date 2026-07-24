@@ -17,7 +17,6 @@ limitations under the License.
 package scheduler
 
 import (
-	"container/heap"
 	"context"
 	"errors"
 	"fmt"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	compresource "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -100,7 +100,7 @@ func (sched *Scheduler) scheduleOnePod(ctx context.Context, podInfo *framework.Q
 	ctx = klog.NewContext(ctx, logger)
 	logger.V(4).Info("About to try and schedule pod", "pod", klog.KObj(pod))
 
-	fwk, err := sched.frameworkForPod(pod)
+	schedFramework, err := sched.frameworkForPod(pod)
 	if err != nil {
 		// This shouldn't happen, because we only accept for scheduling the pods
 		// which specify a scheduler name that matches one of the profiles.
@@ -108,7 +108,7 @@ func (sched *Scheduler) scheduleOnePod(ctx context.Context, podInfo *framework.Q
 		sched.SchedulingQueue.Done(podInfo.Pod.UID)
 		return
 	}
-	if sched.skipPodSchedule(ctx, fwk, pod) {
+	if sched.skipPodSchedule(ctx, schedFramework, pod) {
 		// We don't put this Pod back to the queue, but we have to cleanup the in-flight pods/events.
 		sched.SchedulingQueue.Done(podInfo.Pod.UID)
 		return
@@ -131,14 +131,14 @@ func (sched *Scheduler) scheduleOnePod(ctx context.Context, podInfo *framework.Q
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	scheduleResult, assumedPodInfo, status := sched.schedulingCycle(schedulingCycleCtx, state, fwk, podInfo, start, podsToActivate)
+	scheduleResult, assumedPodInfo, status := sched.schedulingCycle(schedulingCycleCtx, state, schedFramework, podInfo, start, podsToActivate)
 	if !status.IsSuccess() {
-		sched.FailureHandler(schedulingCycleCtx, fwk, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
+		sched.FailureHandler(schedulingCycleCtx, schedFramework, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
 		return
 	}
 
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
-	go sched.runBindingCycle(ctx, state, fwk, scheduleResult, assumedPodInfo, start, podsToActivate)
+	go sched.runBindingCycle(ctx, state, schedFramework, scheduleResult, assumedPodInfo, start, podsToActivate)
 }
 
 // runBindingCycle runs a binding cycle algorithm.
@@ -272,6 +272,14 @@ func (sched *Scheduler) schedulingAlgorithm(
 		if !ok {
 			logger.Error(err, "Error selecting node for pod", "pod", klog.KObj(pod))
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, fwk.AsStatus(err)
+		}
+
+		// We do not want to run PostFilters for single pods in PodGroup cycle.
+		// Instead we will run PodGroupPostFilter at the end of PodGroup cycle.
+		if state.IsPodGroupSchedulingCycle() {
+			// Return nil as NominatingInfo. It can be overridden by the PodGroupPostFilter later
+			// and the final decision whether to clear NominatingInfo will be done in submitPodGroupAlgorithmResult.
+			return ScheduleResult{nominatingInfo: nil}, fwk.NewStatus(fwk.Unschedulable).WithError(err)
 		}
 
 		// SchedulePod() may have failed because the pod would not fit on any host, so we try to
@@ -602,8 +610,8 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 		return result, err
 	}
 
-	sortedPrioritizedNodes := newSortedNodeScores(priorityList)
-	node := sortedPrioritizedNodes.Pop()
+	sortedPrioritizedNodes := framework.NewSortedScoredNodes(priorityList)
+	node := sortedPrioritizedNodes.Pop().Name
 	trace.Step("Prioritizing done")
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
@@ -1047,56 +1055,6 @@ func prioritizeNodes(
 	return nodesScores, nil
 }
 
-type sortedNodeScores struct {
-	nodes nodeScoreHeap
-}
-
-func newSortedNodeScores(nodeScoreList []fwk.NodePluginScores) *sortedNodeScores {
-	var h nodeScoreHeap = nodeScoreList
-	heap.Init(&h)
-	return &sortedNodeScores{nodes: h}
-}
-
-func (s *sortedNodeScores) Pop() string {
-	ent := heap.Pop(&s.nodes).(fwk.NodePluginScores)
-	return ent.Name
-}
-
-// Used only for unit tests.
-func (s *sortedNodeScores) PopScore() fwk.NodePluginScores {
-	ent := heap.Pop(&s.nodes).(fwk.NodePluginScores)
-	return ent
-}
-
-func (s *sortedNodeScores) Len() int {
-	return s.nodes.Len()
-}
-
-// nodeScoreHeap is a heap of fwk.NodePluginScores.
-type nodeScoreHeap []fwk.NodePluginScores
-
-// nodeScoreHeap implements heap.Interface.
-var _ heap.Interface = &nodeScoreHeap{}
-
-func (h nodeScoreHeap) Len() int { return len(h) }
-func (h nodeScoreHeap) Less(i, j int) bool {
-	return (h[i].TotalScore > h[j].TotalScore ||
-		(h[i].TotalScore == h[j].TotalScore && h[i].Randomizer > h[j].Randomizer))
-}
-func (h nodeScoreHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
-
-func (h *nodeScoreHeap) Push(x interface{}) {
-	*h = append(*h, x.(fwk.NodePluginScores))
-}
-
-func (h *nodeScoreHeap) Pop() interface{} {
-	old := *h
-	n := len(old)
-	x := old[n-1]
-	*h = old[0 : n-1]
-	return x
-}
-
 // assume signals to the cache that a pod is already in the cache, so that binding can be asynchronous.
 // When called during pod group scheduling cycle, pod is assumed in the snapshot instead.
 func (sched *Scheduler) assume(logger klog.Logger, state fwk.CycleState, assumedPodInfo *framework.QueuedPodInfo, host string) error {
@@ -1192,6 +1150,7 @@ func getAttemptsLabel(p *framework.QueuedPodInfo) string {
 // handleSchedulingFailure records an event for the pod that indicates the
 // pod has failed to schedule. Also, update the pod condition and nominated node name if set.
 func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk framework.Framework, podInfo *framework.QueuedPodInfo, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time) {
+	podInfo = podInfo.DeepCopy()
 	calledDone := false
 	defer func() {
 		if !calledDone {
@@ -1217,6 +1176,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 
 	pod := podInfo.Pod
 	nominatedPodInfo := podInfo.PodInfo
+	isDeferredResize := sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(pod)
 	err := status.AsError()
 	errMsg := status.Message()
 
@@ -1247,7 +1207,8 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	} else {
 		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
 		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
-		if len(cachedPod.Spec.NodeName) != 0 {
+		// For deferred resize pods, being assigned to a node in the cache is expected and not an inconsistent extender binding timeout.
+		if len(cachedPod.Spec.NodeName) != 0 && !isDeferredResize {
 			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
 			// We need to call DonePod here because we don't call AddUnschedulablePodIfNotPresent in this case.
 		} else {
@@ -1266,6 +1227,13 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 			}
 			calledDone = true
 		}
+	}
+
+	// Deferred resize pods are already bound to and running on their assigned node. The scheduler only
+	// evaluates resize feasibility and executes preemption; Kubelet actuates the resize in-place.
+	// Return early to avoid binding operations or setting nominated node status.
+	if isDeferredResize {
+		return
 	}
 
 	// Update the scheduling queue with the nominated pod information. Without
@@ -1335,8 +1303,5 @@ func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.AP
 	if nnnNeedsUpdate {
 		podStatusCopy.NominatedNodeName = nominatingInfo.NominatedNodeName
 	}
-	// Resource version is included here to prevent an update during binding
-	// setting the PodScheduled=False condition from overwriting a
-	// PodScheduled=True update if a subsequent retry succeeds first.
-	return util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, pod.ResourceVersion, &pod.Status, podStatusCopy)
+	return util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
 }

@@ -27,6 +27,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,12 +39,13 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
+	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/ptr"
 )
 
-// newGangSchedulingJob creates a Job that meets gang scheduling eligibility criteria.
+// newGangSchedulingJob creates a Job that opts into gang scheduling via
+// spec.scheduling with minCount equal to parallelism.
 func newGangSchedulingJob(name string, parallelism int32) *batch.Job {
 	indexed := batch.IndexedCompletion
 	return &batch.Job{
@@ -53,9 +55,14 @@ func newGangSchedulingJob(name string, parallelism int32) *batch.Job {
 			UID:       types.UID(name + "-uid"),
 		},
 		Spec: batch.JobSpec{
-			Parallelism:    ptr.To(parallelism),
-			Completions:    ptr.To(parallelism),
+			Parallelism:    new(parallelism),
+			Completions:    new(parallelism),
 			CompletionMode: &indexed,
+			Scheduling: &batch.JobSchedulingConfiguration{
+				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+					Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(parallelism)},
+				},
+			},
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"job-name": name},
 			},
@@ -71,8 +78,8 @@ func newGangSchedulingJob(name string, parallelism int32) *batch.Job {
 	}
 }
 
-func newWorkloadJobControllerRef(jobName string) *schedulingv1alpha3.TypedLocalObjectReference {
-	return &schedulingv1alpha3.TypedLocalObjectReference{
+func newWorkloadJobControllerRef(jobName string) *schedulingv1beta1.TypedLocalObjectReference {
+	return &schedulingv1beta1.TypedLocalObjectReference{
 		APIGroup: batch.SchemeGroupVersion.Group,
 		Kind:     "Job",
 		Name:     jobName,
@@ -94,8 +101,8 @@ func newControllerWithSchedulingInformers(ctx context.Context, t *testing.T, kub
 		realClock,
 		sharedInformers.Core().V1().Pods(),
 		sharedInformers.Batch().V1().Jobs(),
-		sharedInformers.Scheduling().V1alpha3().Workloads(),
-		sharedInformers.Scheduling().V1alpha3().PodGroups(),
+		sharedInformers.Scheduling().V1beta1().Workloads(),
+		sharedInformers.Scheduling().V1beta1().PodGroups(),
 	)
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
@@ -109,116 +116,97 @@ func newControllerWithSchedulingInformers(ctx context.Context, t *testing.T, kub
 }
 
 func TestShouldManageWorkloadForJob(t *testing.T) {
-	indexed := batch.IndexedCompletion
-	nonIndexed := batch.NonIndexedCompletion
+	parentWorkloadOwner := []metav1.OwnerReference{{
+		APIVersion: "jobset.x-k8s.io/v1alpha2",
+		Kind:       "JobSet",
+		Name:       "js",
+		Controller: new(true),
+	}}
+	cronJobOwner := []metav1.OwnerReference{{
+		APIVersion: "batch/v1",
+		Kind:       "CronJob",
+		Name:       "cj",
+		Controller: new(true),
+	}}
 
 	tests := map[string]struct {
 		workloadWithJob bool
 		job             *batch.Job
-		want            bool
+		wantMode        managementMode
 	}{
-		"eligible: indexed, parallelism=completions>1, no schedulingGroup": {
+		"gate enabled, standalone Job -> managed (Universal Representation)": {
 			workloadWithJob: true,
-			job: &batch.Job{
-				Spec: batch.JobSpec{
-					Parallelism:    ptr.To[int32](4),
-					Completions:    ptr.To[int32](4),
-					CompletionMode: &indexed,
-				},
-			},
-			want: true,
+			job:             &batch.Job{Spec: batch.JobSpec{Parallelism: new(int32(4))}},
+			wantMode:        manageBoth,
 		},
-		"feature gate disabled": {
+		"gate enabled, basic single-pod Job -> still managed": {
+			workloadWithJob: true,
+			job:             &batch.Job{Spec: batch.JobSpec{Parallelism: new(int32(1))}},
+			wantMode:        manageBoth,
+		},
+		"feature gate disabled -> not managed": {
 			workloadWithJob: false,
-			job: &batch.Job{
-				Spec: batch.JobSpec{
-					Parallelism:    ptr.To[int32](4),
-					Completions:    ptr.To[int32](4),
-					CompletionMode: &indexed,
-				},
-			},
-			want: false,
+			job:             &batch.Job{Spec: batch.JobSpec{Parallelism: new(int32(4))}},
+			wantMode:        manageNone,
 		},
-		"parallelism is nil": {
+		"BYO PodGroup via pod template schedulingGroup -> not managed": {
 			workloadWithJob: true,
 			job: &batch.Job{
 				Spec: batch.JobSpec{
-					Completions:    ptr.To[int32](4),
-					CompletionMode: &indexed,
-				},
-			},
-			want: false,
-		},
-		"parallelism=1": {
-			workloadWithJob: true,
-			job: &batch.Job{
-				Spec: batch.JobSpec{
-					Parallelism:    ptr.To[int32](1),
-					Completions:    ptr.To[int32](1),
-					CompletionMode: &indexed,
-				},
-			},
-			want: false,
-		},
-		"non-indexed completion mode": {
-			workloadWithJob: true,
-			job: &batch.Job{
-				Spec: batch.JobSpec{
-					Parallelism:    ptr.To[int32](4),
-					Completions:    ptr.To[int32](4),
-					CompletionMode: &nonIndexed,
-				},
-			},
-			want: false,
-		},
-		"completions is nil": {
-			workloadWithJob: true,
-			job: &batch.Job{
-				Spec: batch.JobSpec{
-					Parallelism:    ptr.To[int32](4),
-					CompletionMode: &indexed,
-				},
-			},
-			want: false,
-		},
-		"completions != parallelism": {
-			workloadWithJob: true,
-			job: &batch.Job{
-				Spec: batch.JobSpec{
-					Parallelism:    ptr.To[int32](4),
-					Completions:    ptr.To[int32](8),
-					CompletionMode: &indexed,
-				},
-			},
-			want: false,
-		},
-		"schedulingGroup already set (opt-out)": {
-			workloadWithJob: true,
-			job: &batch.Job{
-				Spec: batch.JobSpec{
-					Parallelism:    ptr.To[int32](4),
-					Completions:    ptr.To[int32](4),
-					CompletionMode: &indexed,
+					Parallelism: new(int32(4)),
 					Template: v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
-							SchedulingGroup: &v1.PodSchedulingGroup{
-								PodGroupName: ptr.To("existing-pg"),
-							},
+							SchedulingGroup: &v1.PodSchedulingGroup{PodGroupName: new("existing-pg")},
 						},
 					},
 				},
 			},
-			want: false,
+			wantMode: manageNone,
 		},
-		"completionMode is nil": {
+		"BYO schedulingGroup takes precedence over delegation annotation -> not managed": {
 			workloadWithJob: true,
 			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					OwnerReferences: parentWorkloadOwner,
+					Annotations:     map[string]string{apischeduling.GroupTemplateNameAnnotation: "workers"},
+				},
 				Spec: batch.JobSpec{
-					Parallelism: ptr.To[int32](4),
-					Completions: ptr.To[int32](4),
+					Parallelism: new(int32(4)),
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							SchedulingGroup: &v1.PodSchedulingGroup{PodGroupName: new("existing-pg")},
+						},
+					},
 				},
 			},
-			want: false,
+			wantMode: manageNone,
+		},
+		"parent-owned Workload without delegation annotation -> not managed": {
+			workloadWithJob: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{OwnerReferences: parentWorkloadOwner},
+				Spec:       batch.JobSpec{Parallelism: new(int32(4))},
+			},
+			wantMode: manageNone,
+		},
+		"parent-owned Workload with delegation annotation -> managed (delegated PodGroup)": {
+			workloadWithJob: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					OwnerReferences: parentWorkloadOwner,
+					Annotations:     map[string]string{apischeduling.GroupTemplateNameAnnotation: "workers"},
+				},
+				Spec: batch.JobSpec{Parallelism: new(int32(4))},
+			},
+			wantMode: managePodGroupOnly,
+		},
+		"CronJob-owned Job is treated as parent-owned (not managed)": {
+			workloadWithJob: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{OwnerReferences: cronJobOwner},
+				Spec:       batch.JobSpec{Parallelism: new(int32(4))},
+			},
+			wantMode: manageNone,
 		},
 	}
 
@@ -229,61 +217,151 @@ func TestShouldManageWorkloadForJob(t *testing.T) {
 				features.GenericWorkload: tc.workloadWithJob,
 				features.WorkloadWithJob: tc.workloadWithJob,
 			})
-			got := shouldManageWorkloadForJob(tc.job)
-			if got != tc.want {
-				t.Errorf("shouldManageWorkloadForJob() = %v, want %v", got, tc.want)
+			if got := getManagementMode(tc.job); got != tc.wantMode {
+				t.Errorf("getManagementMode() = %v, want %v", got, tc.wantMode)
+			}
+			want := tc.wantMode != manageNone
+			if got := shouldManageWorkloadForJob(tc.job); got != want {
+				t.Errorf("shouldManageWorkloadForJob() = %v, want %v", got, want)
 			}
 		})
 	}
 }
 
-func TestBuildPodGroupTemplates(t *testing.T) {
-	tests := map[string]struct {
-		jobName      string
-		parallelism  int32
-		completions  int32
-		wantName     string
-		wantMinCount int32
+func TestGenerateWorkload(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	clientSet := fake.NewClientset()
+	jm, _ := newControllerWithSchedulingInformers(ctx, t, clientSet)
+
+	newJob := func(name string, parallelism int32, scheduling *batch.JobSchedulingConfiguration) *batch.Job {
+		return &batch.Job{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: metav1.NamespaceDefault, UID: types.UID(name + "-uid")},
+			Spec:       batch.JobSpec{Parallelism: new(parallelism), Scheduling: scheduling},
+		}
+	}
+
+	testCases := map[string]struct {
+		job                   *batch.Job
+		wantErr               bool
+		wantBasic             bool
+		wantGangMinCount      int32
+		wantTopologyKey       string
+		wantAllDisrupt        bool
+		wantClaimNames        []string
+		wantPriorityClassName string
 	}{
-		"basic job": {
-			jobName:      "my-training-job",
-			parallelism:  8,
-			completions:  8,
-			wantName:     "my-training-job-pgt-0",
-			wantMinCount: 8,
+		"nil scheduling defaults to Basic": {
+			job:       newJob("basic-default", 4, nil),
+			wantBasic: true,
 		},
-		"single template with small parallelism": {
-			jobName:      "small-job",
-			parallelism:  2,
-			completions:  2,
-			wantName:     "small-job-pgt-0",
-			wantMinCount: 2,
+		"scheduling set but policy nil defaults to Basic": {
+			job:       newJob("basic-nil-policy", 4, &batch.JobSchedulingConfiguration{}),
+			wantBasic: true,
+		},
+		"explicit basic policy": {
+			job: newJob("basic-explicit", 4, &batch.JobSchedulingConfiguration{
+				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}},
+			}),
+			wantBasic: true,
+		},
+		"gang with explicit minCount": {
+			job: newJob("gang", 4, &batch.JobSchedulingConfiguration{
+				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(3))}},
+			}),
+			wantGangMinCount: 3,
+		},
+		"gang without minCount defaults to parallelism": {
+			job: newJob("gang-zero", 4, &batch.JobSchedulingConfiguration{
+				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{}},
+			}),
+			wantGangMinCount: 4,
+		},
+		"gang without minCount and zero parallelism clamps to 1": {
+			job: newJob("gang-zero-parallelism", 0, &batch.JobSchedulingConfiguration{
+				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{}},
+			}),
+			wantGangMinCount: 1,
+		},
+		"gang, topology, disruption, and claims passthrough": {
+			job: newJob("full", 4, &batch.JobSchedulingConfiguration{
+				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(4))}},
+				SchedulingConstraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
+					Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
+				},
+				DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}},
+				ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{Name: "gpu", ResourceClaimName: new("my-claim")}},
+			}),
+			wantGangMinCount: 4,
+			wantTopologyKey:  "topology.kubernetes.io/zone",
+			wantAllDisrupt:   true,
+			wantClaimNames:   []string{"gpu"},
+		},
+		"priorityClassName copied from pod template": {
+			job: func() *batch.Job {
+				j := newJob("prio", 4, nil)
+				j.Spec.Template.Spec.PriorityClassName = "high-priority"
+				return j
+			}(),
+			wantBasic:             true,
+			wantPriorityClassName: "high-priority",
 		},
 	}
 
-	for name, tc := range tests {
+	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			job := &batch.Job{
-				ObjectMeta: metav1.ObjectMeta{Name: tc.jobName},
-				Spec: batch.JobSpec{
-					Parallelism: ptr.To(tc.parallelism),
-					Completions: ptr.To(tc.completions),
-				},
+			wl, err := jm.generateWorkload(tc.job)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got none")
+				}
+				return
 			}
-			templates := buildPodGroupTemplates(job)
-
-			if len(templates) != 1 {
-				t.Fatalf("expected 1 template, got %d", len(templates))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
-			tpl := templates[0]
-			if tpl.Name != tc.wantName {
-				t.Errorf("template name = %q, want %q", tpl.Name, tc.wantName)
+			if len(wl.Spec.PodGroupTemplates) != 1 {
+				t.Fatalf("expected 1 template, got %d", len(wl.Spec.PodGroupTemplates))
 			}
-			if tpl.SchedulingPolicy.Gang == nil {
-				t.Fatal("expected gang scheduling policy, got nil")
+			tpl := wl.Spec.PodGroupTemplates[0]
+			if tpl.Name != podGroupTemplateName(tc.job) {
+				t.Errorf("template name = %q, want %q", tpl.Name, podGroupTemplateName(tc.job))
 			}
-			if tpl.SchedulingPolicy.Gang.MinCount != tc.wantMinCount {
-				t.Errorf("minCount = %d, want %d", tpl.SchedulingPolicy.Gang.MinCount, tc.wantMinCount)
+			if tc.wantBasic {
+				if tpl.SchedulingPolicy.Basic == nil {
+					t.Errorf("expected Basic policy, got %+v", tpl.SchedulingPolicy)
+				}
+			} else {
+				if tpl.SchedulingPolicy.Gang == nil {
+					t.Fatalf("expected Gang policy, got %+v", tpl.SchedulingPolicy)
+				}
+				if tpl.SchedulingPolicy.Gang.MinCount != tc.wantGangMinCount {
+					t.Errorf("gang minCount = %d, want %d", tpl.SchedulingPolicy.Gang.MinCount, tc.wantGangMinCount)
+				}
+			}
+			if tc.wantTopologyKey != "" {
+				if tpl.SchedulingConstraints == nil || len(tpl.SchedulingConstraints.Topology) != 1 ||
+					tpl.SchedulingConstraints.Topology[0].Key != tc.wantTopologyKey {
+					t.Errorf("topology = %+v, want key %q", tpl.SchedulingConstraints, tc.wantTopologyKey)
+				}
+			}
+			if tc.wantAllDisrupt && (tpl.DisruptionMode == nil || tpl.DisruptionMode.All == nil) {
+				t.Errorf("expected All disruption mode, got %+v", tpl.DisruptionMode)
+			}
+			if len(tc.wantClaimNames) > 0 {
+				if len(tpl.ResourceClaims) != len(tc.wantClaimNames) {
+					t.Fatalf("resourceClaims = %d, want %d", len(tpl.ResourceClaims), len(tc.wantClaimNames))
+				}
+				for i, want := range tc.wantClaimNames {
+					if tpl.ResourceClaims[i].Name != want {
+						t.Errorf("claim[%d].Name = %q, want %q", i, tpl.ResourceClaims[i].Name, want)
+					}
+				}
+			}
+			if tpl.PriorityClassName != tc.wantPriorityClassName {
+				t.Errorf("priorityClassName = %q, want %q", tpl.PriorityClassName, tc.wantPriorityClassName)
+			}
+			if wl.Spec.ControllerRef == nil || wl.Spec.ControllerRef.Name != tc.job.Name {
+				t.Errorf("unexpected controllerRef: %+v", wl.Spec.ControllerRef)
 			}
 		})
 	}
@@ -423,21 +501,21 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 	templateName := fmt.Sprintf("%s-pgt-%d", baseJob.Name, 0)
 	podGroupName := computePodGroupName(workloadName, templateName)
 
-	makeWorkload := func(name, jobName string) *schedulingv1alpha3.Workload {
-		return &schedulingv1alpha3.Workload{
+	makeWorkload := func(name, jobName string) *schedulingv1beta1.Workload {
+		return &schedulingv1beta1.Workload{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            name,
 				Namespace:       metav1.NamespaceDefault,
 				UID:             types.UID(name + "-uid"),
 				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(baseJob, controllerKind)},
 			},
-			Spec: schedulingv1alpha3.WorkloadSpec{
+			Spec: schedulingv1beta1.WorkloadSpec{
 				ControllerRef: newWorkloadJobControllerRef(jobName),
-				PodGroupTemplates: []schedulingv1alpha3.PodGroupTemplate{
+				PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{
 					{
 						Name: templateName,
-						SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
-							Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: 4},
+						SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+							Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 4},
 						},
 					},
 				},
@@ -445,18 +523,71 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 		}
 	}
 
-	makePodGroup := func(name, wlName string) *schedulingv1alpha3.PodGroup {
-		return &schedulingv1alpha3.PodGroup{
+	makePodGroup := func(name, wlName string) *schedulingv1beta1.PodGroup {
+		return &schedulingv1beta1.PodGroup{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            name,
 				Namespace:       metav1.NamespaceDefault,
 				UID:             types.UID(name + "-uid"),
 				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(baseJob, controllerKind)},
 			},
-			Spec: schedulingv1alpha3.PodGroupSpec{
-				WorkloadRef: &schedulingv1alpha3.WorkloadReference{
+			Spec: schedulingv1beta1.PodGroupSpec{
+				WorkloadRef: &schedulingv1beta1.WorkloadReference{
 					WorkloadName: wlName,
 					TemplateName: templateName,
+				},
+			},
+		}
+	}
+
+	delegatedJob := baseJob.DeepCopy()
+	delegatedJob.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: "jobset.x-k8s.io/v1alpha2",
+		Kind:       "JobSet",
+		Name:       "parent-js",
+		UID:        types.UID("parent-js-uid"),
+		Controller: new(true),
+	}}
+	delegatedJob.Annotations = map[string]string{apischeduling.GroupTemplateNameAnnotation: "workers"}
+
+	makeParentWorkload := func(minCount int32) *schedulingv1beta1.Workload {
+		return &schedulingv1beta1.Workload{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "parent-workload",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("parent-wl-uid"),
+			},
+			Spec: schedulingv1beta1.WorkloadSpec{
+				ControllerRef: &schedulingv1beta1.TypedLocalObjectReference{
+					APIGroup: "jobset.x-k8s.io",
+					Kind:     "JobSet",
+					Name:     "parent-js",
+				},
+				PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{{
+					Name: "workers",
+					SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+						Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: minCount},
+					},
+				}},
+			},
+		}
+	}
+	delegatedPodGroupName := computePodGroupName("parent-workload", "workers")
+	makeDelegatedPodGroup := func(minCount int32) *schedulingv1beta1.PodGroup {
+		return &schedulingv1beta1.PodGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            delegatedPodGroupName,
+				Namespace:       metav1.NamespaceDefault,
+				UID:             types.UID("delegated-pg-uid"),
+				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(delegatedJob, controllerKind)},
+			},
+			Spec: schedulingv1beta1.PodGroupSpec{
+				WorkloadRef: &schedulingv1beta1.WorkloadReference{
+					WorkloadName: "parent-workload",
+					TemplateName: "workers",
+				},
+				SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+					Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: minCount},
 				},
 			},
 		}
@@ -465,17 +596,18 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 	testCases := map[string]struct {
 		job               *batch.Job
 		pods              []*v1.Pod
-		existingWorkloads []*schedulingv1alpha3.Workload
-		existingPodGroups []*schedulingv1alpha3.PodGroup
+		existingWorkloads []*schedulingv1beta1.Workload
+		existingPodGroups []*schedulingv1beta1.PodGroup
 
 		// When true, the Workload create reactor returns a generic error.
 		simulateCreateError bool
 		// When true, PodGroup create returns a generic error.
 		simulatePGCreateError bool
 
-		wantPodGroup     bool
-		wantPodGroupName string
-		wantErr          bool
+		wantPodGroup             bool
+		wantPodGroupName         string
+		wantPodGroupGangMinCount *int32
+		wantErr                  bool
 	}{
 		"creates both Workload and PodGroup when no pods exist": {
 			job:              baseJob,
@@ -522,84 +654,88 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 		},
 		"discovers existing Workload and PodGroup": {
 			job:               baseJob,
-			existingWorkloads: []*schedulingv1alpha3.Workload{makeWorkload(workloadName, baseJob.Name)},
-			existingPodGroups: []*schedulingv1alpha3.PodGroup{makePodGroup(podGroupName, workloadName)},
+			existingWorkloads: []*schedulingv1beta1.Workload{makeWorkload(workloadName, baseJob.Name)},
+			existingPodGroups: []*schedulingv1beta1.PodGroup{makePodGroup(podGroupName, workloadName)},
 			wantPodGroup:      true,
 			wantPodGroupName:  podGroupName,
 		},
 		"discovers existing objects even when pods exist": {
 			job:               baseJob,
 			pods:              []*v1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Namespace: metav1.NamespaceDefault}}},
-			existingWorkloads: []*schedulingv1alpha3.Workload{makeWorkload(workloadName, baseJob.Name)},
-			existingPodGroups: []*schedulingv1alpha3.PodGroup{makePodGroup(podGroupName, workloadName)},
+			existingWorkloads: []*schedulingv1beta1.Workload{makeWorkload(workloadName, baseJob.Name)},
+			existingPodGroups: []*schedulingv1beta1.PodGroup{makePodGroup(podGroupName, workloadName)},
 			wantPodGroup:      true,
 			wantPodGroupName:  podGroupName,
 		},
 		"workload found but no PodGroup creates one": {
 			job:               baseJob,
-			existingWorkloads: []*schedulingv1alpha3.Workload{makeWorkload("user-workload", baseJob.Name)},
+			existingWorkloads: []*schedulingv1beta1.Workload{makeWorkload("user-workload", baseJob.Name)},
 			wantPodGroup:      true,
 		},
 
-		"BYO Workload without controller ownerRef falls back": {
+		"BYO Workload (no controller ownerRef) is ignored; controller creates its own": {
 			job: baseJob,
-			existingWorkloads: []*schedulingv1alpha3.Workload{
+			existingWorkloads: []*schedulingv1beta1.Workload{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "user-created-workload",
 						Namespace: metav1.NamespaceDefault,
 						UID:       types.UID("user-wl-uid"),
 					},
-					Spec: schedulingv1alpha3.WorkloadSpec{
+					Spec: schedulingv1beta1.WorkloadSpec{
 						ControllerRef: newWorkloadJobControllerRef(baseJob.Name),
-						PodGroupTemplates: []schedulingv1alpha3.PodGroupTemplate{
+						PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{
 							{
 								Name: templateName,
-								SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
-									Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: 4},
+								SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+									Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 4},
 								},
 							},
 						},
 					},
 				},
 			},
+			wantPodGroup:     true,
+			wantPodGroupName: podGroupName,
 		},
 		"ambiguous Workloads fall back": {
 			job: baseJob,
-			existingWorkloads: []*schedulingv1alpha3.Workload{
+			existingWorkloads: []*schedulingv1beta1.Workload{
 				makeWorkload("workload-1", baseJob.Name),
 				makeWorkload("workload-2", baseJob.Name),
 			},
 		},
-		"BYO PodGroup without controller ownerRef falls back": {
+		"BYO PodGroup (no controller ownerRef) is ignored; controller creates its own": {
 			job:               baseJob,
-			existingWorkloads: []*schedulingv1alpha3.Workload{makeWorkload(workloadName, baseJob.Name)},
-			existingPodGroups: []*schedulingv1alpha3.PodGroup{
+			existingWorkloads: []*schedulingv1beta1.Workload{makeWorkload(workloadName, baseJob.Name)},
+			existingPodGroups: []*schedulingv1beta1.PodGroup{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "external-pg",
 						Namespace: metav1.NamespaceDefault,
 						UID:       types.UID("ext-pg-uid"),
 					},
-					Spec: schedulingv1alpha3.PodGroupSpec{
-						WorkloadRef: &schedulingv1alpha3.WorkloadReference{
+					Spec: schedulingv1beta1.PodGroupSpec{
+						WorkloadRef: &schedulingv1beta1.WorkloadReference{
 							WorkloadName: workloadName,
 						},
 					},
 				},
 			},
+			wantPodGroup:     true,
+			wantPodGroupName: podGroupName,
 		},
 		"ambiguous PodGroups fall back": {
 			job:               baseJob,
-			existingWorkloads: []*schedulingv1alpha3.Workload{makeWorkload(workloadName, baseJob.Name)},
-			existingPodGroups: []*schedulingv1alpha3.PodGroup{
+			existingWorkloads: []*schedulingv1beta1.Workload{makeWorkload(workloadName, baseJob.Name)},
+			existingPodGroups: []*schedulingv1beta1.PodGroup{
 				makePodGroup("pg-1", workloadName),
 				makePodGroup("pg-2", workloadName),
 			},
 		},
-		"unsupported PodGroupTemplate count falls back": {
+		"unsupported PodGroupTemplate count returns an error": {
 			job: baseJob,
-			existingWorkloads: []*schedulingv1alpha3.Workload{
+			existingWorkloads: []*schedulingv1beta1.Workload{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:            workloadName,
@@ -607,15 +743,16 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 						UID:             types.UID(workloadName + "-uid"),
 						OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(baseJob, controllerKind)},
 					},
-					Spec: schedulingv1alpha3.WorkloadSpec{
+					Spec: schedulingv1beta1.WorkloadSpec{
 						ControllerRef: newWorkloadJobControllerRef(baseJob.Name),
-						PodGroupTemplates: []schedulingv1alpha3.PodGroupTemplate{
+						PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{
 							{Name: "group-a"},
 							{Name: "group-b"},
 						},
 					},
 				},
 			},
+			wantErr: true,
 		},
 
 		"Workload create error propagates": {
@@ -626,9 +763,32 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 
 		"PodGroup create error propagates": {
 			job:                   baseJob,
-			existingWorkloads:     []*schedulingv1alpha3.Workload{makeWorkload(workloadName, baseJob.Name)},
+			existingWorkloads:     []*schedulingv1beta1.Workload{makeWorkload(workloadName, baseJob.Name)},
 			simulatePGCreateError: true,
 			wantErr:               true,
+		},
+		"delegated Job creates the PodGroup from the parent's template": {
+			job:                      delegatedJob,
+			existingWorkloads:        []*schedulingv1beta1.Workload{makeParentWorkload(4)},
+			wantPodGroup:             true,
+			wantPodGroupName:         delegatedPodGroupName,
+			wantPodGroupGangMinCount: new(int32(4)),
+		},
+		"delegated PodGroup follows a parent Workload minCount change": {
+			job:                      delegatedJob,
+			existingWorkloads:        []*schedulingv1beta1.Workload{makeParentWorkload(7)},
+			existingPodGroups:        []*schedulingv1beta1.PodGroup{makeDelegatedPodGroup(4)},
+			wantPodGroup:             true,
+			wantPodGroupName:         delegatedPodGroupName,
+			wantPodGroupGangMinCount: new(int32(7)),
+		},
+		"delegated PodGroup already matching the parent template is left unchanged": {
+			job:                      delegatedJob,
+			existingWorkloads:        []*schedulingv1beta1.Workload{makeParentWorkload(4)},
+			existingPodGroups:        []*schedulingv1beta1.PodGroup{makeDelegatedPodGroup(4)},
+			wantPodGroup:             true,
+			wantPodGroupName:         delegatedPodGroupName,
+			wantPodGroupGangMinCount: new(int32(4)),
 		},
 	}
 
@@ -679,6 +839,18 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			} else if pg != nil {
 				t.Errorf("expected nil PodGroup, got %v", pg)
 			}
+			if tc.wantPodGroupGangMinCount != nil {
+				gotPG, err := clientSet.SchedulingV1beta1().PodGroups(metav1.NamespaceDefault).Get(ctx, tc.wantPodGroupName, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("get podGroup %q: %v", tc.wantPodGroupName, err)
+				}
+				if gotPG.Spec.SchedulingPolicy.Gang == nil {
+					t.Fatalf("podGroup %q has no gang policy", tc.wantPodGroupName)
+				}
+				if got := gotPG.Spec.SchedulingPolicy.Gang.MinCount; got != *tc.wantPodGroupGangMinCount {
+					t.Errorf("podGroup gang minCount = %d, want %d", got, *tc.wantPodGroupGangMinCount)
+				}
+			}
 		})
 	}
 }
@@ -722,58 +894,161 @@ func TestCreateWorkloadForJob(t *testing.T) {
 	}
 }
 
-func TestCreatePodGroupForWorkload(t *testing.T) {
+func TestCreatePodGroup(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	clientSet := fake.NewClientset()
 	jm, _ := newControllerWithSchedulingInformers(ctx, t, clientSet)
 	job := newGangSchedulingJob("my-job", 4)
 	templateName := fmt.Sprintf("%s-pgt-%d", job.Name, 0)
 
-	t.Run("creates PodGroup with correct name and ownerReferences", func(t *testing.T) {
-		workload := &schedulingv1alpha3.Workload{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "my-workload",
-				Namespace: job.Namespace,
-				UID:       "wl-uid",
-			},
-			Spec: schedulingv1alpha3.WorkloadSpec{
-				PodGroupTemplates: []schedulingv1alpha3.PodGroupTemplate{
-					{
-						Name: templateName,
-						SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
-							Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: 4},
+	testCases := map[string]struct {
+		workloadName      string
+		linkWorkloadOwner bool
+		wantOwnerRefs     int
+	}{
+		"root Job links the Workload as a non-controller owner": {
+			workloadName:      "root-workload",
+			linkWorkloadOwner: true,
+			wantOwnerRefs:     2,
+		},
+		"delegated Job does not link the parent-owned Workload": {
+			workloadName:      "delegated-workload",
+			linkWorkloadOwner: false,
+			wantOwnerRefs:     1,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			workload := &schedulingv1beta1.Workload{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      tc.workloadName,
+					Namespace: job.Namespace,
+					UID:       "wl-uid",
+				},
+				Spec: schedulingv1beta1.WorkloadSpec{
+					PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{
+						{
+							Name: templateName,
+							SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+								Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 4},
+							},
+							PriorityClassName: "high-priority",
+							Priority:          new(int32(1000)),
 						},
 					},
 				},
-			},
-		}
+			}
 
-		pg, err := jm.createPodGroupForWorkload(ctx, job, workload)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+			builder := newBuilderFromExistingWorkload(job, workload)
+			pg, err := jm.createPodGroup(ctx, job, workload, "", tc.linkWorkloadOwner, builder)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-		expectedName := computePodGroupName(workload.Name, templateName)
-		if pg.Name != expectedName {
-			t.Errorf("PodGroup name = %q, want %q", pg.Name, expectedName)
-		}
-		if len(pg.OwnerReferences) != 2 {
-			t.Fatalf("expected 2 ownerReferences, got %d", len(pg.OwnerReferences))
-		}
-	})
+			expectedName := computePodGroupName(workload.Name, templateName)
+			if pg.Name != expectedName {
+				t.Errorf("PodGroup name = %q, want %q", pg.Name, expectedName)
+			}
+			if len(pg.OwnerReferences) != tc.wantOwnerRefs {
+				t.Fatalf("expected %d ownerReferences, got %d", tc.wantOwnerRefs, len(pg.OwnerReferences))
+			}
 
-	t.Run("errors when Workload has no templates", func(t *testing.T) {
-		workload := &schedulingv1alpha3.Workload{
+			wantSpec := schedulingv1beta1.PodGroupSpec{
+				WorkloadRef: &schedulingv1beta1.WorkloadReference{
+					WorkloadName: tc.workloadName,
+					TemplateName: templateName,
+				},
+				SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+					Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 4},
+				},
+				PriorityClassName: "high-priority",
+				Priority:          new(int32(1000)),
+			}
+			if diff := cmp.Diff(wantSpec, pg.Spec); diff != "" {
+				t.Errorf("unexpected PodGroup spec (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestSyncGangMinCount(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	// The Job opts into gang with minCount=5, so the desired runtime size is 5.
+	job := newGangSchedulingJob("scale-job", 5)
+	wlName := computeWorkloadName(job)
+	tmplName := podGroupTemplateName(job)
+	pgName := computePodGroupName(wlName, tmplName)
+
+	makeWL := func(minCount int32) *schedulingv1beta1.Workload {
+		return &schedulingv1beta1.Workload{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "empty-workload",
-				Namespace: job.Namespace,
+				Name:            wlName,
+				Namespace:       job.Namespace,
+				UID:             "wl-uid",
+				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(job, controllerKind)},
 			},
-			Spec: schedulingv1alpha3.WorkloadSpec{},
+			Spec: schedulingv1beta1.WorkloadSpec{
+				ControllerRef: newWorkloadJobControllerRef(job.Name),
+				PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{{
+					Name:             tmplName,
+					SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: minCount}},
+				}},
+			},
 		}
+	}
+	makePG := func(minCount int32) *schedulingv1beta1.PodGroup {
+		return &schedulingv1beta1.PodGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            pgName,
+				Namespace:       job.Namespace,
+				UID:             "pg-uid",
+				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(job, controllerKind)},
+			},
+			Spec: schedulingv1beta1.PodGroupSpec{
+				WorkloadRef:      &schedulingv1beta1.WorkloadReference{WorkloadName: wlName, TemplateName: tmplName},
+				SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: minCount}},
+			},
+		}
+	}
 
-		_, err := jm.createPodGroupForWorkload(ctx, job, workload)
-		if err == nil {
-			t.Fatal("expected error for Workload with no templates")
-		}
-	})
+	testCases := map[string]struct {
+		workload     *schedulingv1beta1.Workload
+		podGroup     *schedulingv1beta1.PodGroup
+		wantMinCount int32
+	}{
+		"controller-owned objects are resized to the Job's minCount": {
+			workload: makeWL(2), podGroup: makePG(2), wantMinCount: 5,
+		},
+		"already at desired minCount is left unchanged": {
+			workload: makeWL(5), podGroup: makePG(5), wantMinCount: 5,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			clientSet := fake.NewClientset(tc.workload, tc.podGroup)
+			jm, _ := newControllerWithSchedulingInformers(ctx, t, clientSet)
+
+			if err := jm.syncGangMinCount(ctx, job, tc.workload, tc.podGroup); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			gotWL, err := clientSet.SchedulingV1beta1().Workloads(job.Namespace).Get(ctx, wlName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("get workload: %v", err)
+			}
+			if got := gotWL.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount; got != tc.wantMinCount {
+				t.Errorf("workload minCount = %d, want %d", got, tc.wantMinCount)
+			}
+			gotPG, err := clientSet.SchedulingV1beta1().PodGroups(job.Namespace).Get(ctx, pgName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("get podGroup: %v", err)
+			}
+			if got := gotPG.Spec.SchedulingPolicy.Gang.MinCount; got != tc.wantMinCount {
+				t.Errorf("podGroup minCount = %d, want %d", got, tc.wantMinCount)
+			}
+		})
+	}
 }

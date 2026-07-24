@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -284,6 +285,9 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 
 // PreFilter invoked at the prefilter extension point.
 func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, allNodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil, fwk.NewStatus(fwk.Skip)
+	}
 	var nodesWithRequiredAntiAffinityPods []fwk.NodeInfo
 	var err error
 	if nodesWithRequiredAntiAffinityPods, err = pl.sharedLister.NodeInfos().HavePodsWithRequiredAntiAffinityList(); err != nil {
@@ -422,6 +426,9 @@ func satisfyPodAffinity(state *preFilterState, nodeInfo fwk.NodeInfo) bool {
 // Filter invoked at the filter extension point.
 // It checks if a pod can be scheduled on the specified node with pod affinity/anti-affinity configuration.
 func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil
+	}
 
 	state, err := getPreFilterState(cycleState)
 	if err != nil {

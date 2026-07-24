@@ -59,7 +59,7 @@ var map_CSIDriverSpec = map[string]string{
 	"seLinuxMount":                       "seLinuxMount specifies if the CSI driver supports \"-o context\" mount option.\n\nWhen \"true\", the CSI driver must ensure that all volumes provided by this CSI driver can be mounted separately with different `-o context` options. This is typical for storage backends that provide volumes as filesystems on block devices or as independent shared volumes. Kubernetes will call NodeStage / NodePublish with \"-o context=xyz\" mount option when mounting a ReadWriteOncePod volume used in Pod that has explicitly set SELinux context. In the future, it may be expanded to other volume AccessModes. In any case, Kubernetes will ensure that the volume is mounted only with a single SELinux context.\n\nWhen \"false\", Kubernetes won't pass any special SELinux mount options to the driver. This is typical for volumes that represent subdirectories of a bigger shared filesystem.\n\nDefault is \"false\".",
 	"nodeAllocatableUpdatePeriodSeconds": "nodeAllocatableUpdatePeriodSeconds specifies the interval between periodic updates of the CSINode allocatable capacity for this driver. When set, both periodic updates and updates triggered by capacity-related failures are enabled. If not set, no updates occur (neither periodic nor upon detecting capacity-related failures), and the allocatable.count remains static. The minimum allowed value for this field is 10 seconds.\n\nThis is a beta feature and requires the MutableCSINodeAllocatableCount feature gate to be enabled.\n\nThis field is mutable.",
 	"serviceAccountTokenInSecrets":       "serviceAccountTokenInSecrets is an opt-in for CSI drivers to indicate that service account tokens should be passed via the Secrets field in NodePublishVolumeRequest instead of the VolumeContext field. The CSI specification provides a dedicated Secrets field for sensitive information like tokens, which is the appropriate mechanism for handling credentials. This addresses security concerns where sensitive tokens were being logged as part of volume context.\n\nWhen \"true\", kubelet will pass the tokens only in the Secrets field with the key \"csi.storage.k8s.io/serviceAccount.tokens\". The CSI driver must be updated to read tokens from the Secrets field instead of VolumeContext.\n\nWhen \"false\" or not set, kubelet will pass the tokens in VolumeContext with the key \"csi.storage.k8s.io/serviceAccount.tokens\" (existing behavior). This maintains backward compatibility with existing CSI drivers.\n\nThis field can only be set when TokenRequests is configured. The API server will reject CSIDriver specs that set this field without TokenRequests.\n\nDefault behavior if unset is to pass tokens in the VolumeContext field.",
-	"preventPodSchedulingIfMissing":      "preventPodSchedulingIfMissing indicates that the CSI driver wants to prevent pod scheduling if the CSI driver on the node is missing.\n\nEnabling this option will prevent the scheduler (or any other component which embeds default scheduler such as cluster-autoscaler) from scheduling pods to nodes where CSI driver is not installed.\n\nFor components(such as cluster-autoscaler) that embed the scheduler and run pod placement simulations using scheduler plugins, they MUST be aware of CSI driver registration information via CSINode object. They must create simulated CSINode objects in addition to Node objects during scheduling simulation, otherwise if PreventPodSchedulingIfMissing is enabled globally for CSIDriver object, any newly created node may be rejected by the scheduler because of missing CSI driver information from the node.\n\nThis is an alpha feature and requires the VolumeLimitScaling feature gate to be enabled. Default is \"false\".",
+	"preventPodSchedulingIfMissing":      "preventPodSchedulingIfMissing indicates that the CSI driver wants to prevent pod scheduling if the CSI driver on the node is missing.\n\nEnabling this option will prevent the scheduler (or any other component which embeds default scheduler such as cluster-autoscaler) from scheduling pods to nodes where CSI driver is not installed.\n\nFor components(such as cluster-autoscaler) that embed the scheduler and run pod placement simulations using scheduler plugins, they MUST be aware of CSI driver registration information via CSINode object. They must create simulated CSINode objects in addition to Node objects during scheduling simulation, otherwise if PreventPodSchedulingIfMissing is enabled globally for CSIDriver object, any newly created node may be rejected by the scheduler because of missing CSI driver information from the node.\n\nThis is a beta feature and requires the VolumeLimitScaling feature gate to be enabled. Default is \"false\".",
 }
 
 func (CSIDriverSpec) SwaggerDoc() map[string]string {
@@ -70,6 +70,7 @@ var map_CSINode = map[string]string{
 	"":         "DEPRECATED - This group version of CSINode is deprecated by storage/v1/CSINode. See the release notes for more information. CSINode holds information about all CSI drivers installed on a node. CSI drivers do not need to create the CSINode object directly. As long as they use the node-driver-registrar sidecar container, the kubelet will automatically populate the CSINode object for the CSI driver as part of kubelet plugin registration. CSINode has the same name as a node. If the object is missing, it means either there are no CSI Drivers available on the node, or the Kubelet version is low enough that it doesn't create this object. CSINode has an OwnerReference that points to the corresponding node object.",
 	"metadata": "metadata is the standard object metadata. metadata.name must be the Kubernetes node name.",
 	"spec":     "spec is the specification of CSINode",
+	"status":   "status contains health and status information for the node's storage.",
 }
 
 func (CSINode) SwaggerDoc() map[string]string {
@@ -105,6 +106,15 @@ var map_CSINodeSpec = map[string]string{
 
 func (CSINodeSpec) SwaggerDoc() map[string]string {
 	return map_CSINodeSpec
+}
+
+var map_CSINodeStatus = map[string]string{
+	"":              "CSINodeStatus contains health and status information for storage on a node.",
+	"storageHealth": "storageHealth contains backend health reports for CSI drivers registered on the node.",
+}
+
+func (CSINodeStatus) SwaggerDoc() map[string]string {
+	return map_CSINodeStatus
 }
 
 var map_CSIStorageCapacity = map[string]string{
@@ -154,6 +164,30 @@ var map_StorageClassList = map[string]string{
 
 func (StorageClassList) SwaggerDoc() map[string]string {
 	return map_StorageClassList
+}
+
+var map_StorageHealth = map[string]string{
+	"":                 "StorageHealth contains storage backend health reported by a CSI driver on a node.",
+	"name":             "name is the CSI driver name, matching CSINodeDriver.name.",
+	"healthConditions": "healthConditions are the adverse storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
+}
+
+func (StorageHealth) SwaggerDoc() map[string]string {
+	return map_StorageHealth
+}
+
+var map_StorageHealthCondition = map[string]string{
+	"":                   "StorageHealthCondition represents an adverse health condition reported by a CSI driver for its storage backend on a node.",
+	"status":             "status is the health status category. One of \"StorageUnreachable\", \"StorageDegraded\".",
+	"reason":             "reason is a brief CamelCase machine-parseable reason. Maximum permitted length of a reason is 256 characters.",
+	"message":            "message is a human-readable description. Maximum permitted length of a message is 1024 characters.",
+	"accessMode":         "accessMode is the access mode affected. Nil means all access modes are affected.",
+	"volumeMode":         "volumeMode is the volume mode affected. Nil means both are affected.",
+	"lastTransitionTime": "lastTransitionTime is when this condition first appeared at its current state.",
+}
+
+func (StorageHealthCondition) SwaggerDoc() map[string]string {
+	return map_StorageHealthCondition
 }
 
 var map_TokenRequest = map[string]string{

@@ -38,11 +38,13 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"google.golang.org/grpc/internal"
+	"google.golang.org/grpc/internal/envconfig"
 	"google.golang.org/grpc/internal/grpclog"
 	"google.golang.org/grpc/internal/grpcutil"
 	"google.golang.org/grpc/internal/pretty"
 	istatus "google.golang.org/grpc/internal/status"
 	"google.golang.org/grpc/internal/syscall"
+	transportinternal "google.golang.org/grpc/internal/transport/internal"
 	"google.golang.org/grpc/mem"
 
 	"google.golang.org/grpc/codes"
@@ -165,7 +167,13 @@ func NewServerTransport(conn net.Conn, config *ServerConfig) (_ ServerTransport,
 	}
 	writeBufSize := config.WriteBufferSize
 	readBufSize := config.ReadBufferSize
+	// The default header list size is moving from 16MB to 8KB. The 8KB limit
+	// is only used if Enable8KBDefaultHeaderListSize is true; otherwise, the
+	// old 16MB default is used. User-specified options always take precedence.
 	maxHeaderListSize := defaultServerMaxHeaderListSize
+	if envconfig.Enable8KBDefaultHeaderListSize {
+		maxHeaderListSize = upcomingDefaultHeaderListSize
+	}
 	if config.MaxHeaderListSize != nil {
 		maxHeaderListSize = *config.MaxHeaderListSize
 	}
@@ -802,7 +810,10 @@ func (t *http2Server) handleData(f *parsedDataFrame) {
 		dataLen := f.data.Len()
 		if f.Header().Flags.Has(http2.FlagDataPadded) {
 			if w := s.fc.onRead(size - uint32(dataLen)); w > 0 {
-				t.controlBuf.put(&outgoingWindowUpdate{s.id, w})
+				t.controlBuf.put(&outgoingWindowUpdate{
+					streamID:  s.id,
+					increment: w,
+				})
 			}
 		}
 		if dataLen > 0 {
@@ -948,8 +959,8 @@ func (t *http2Server) checkForHeaderListSize(hf []hpack.HeaderField) bool {
 			return false
 		}
 	}
-	if sz > int64(upcomingDefaultHeaderListSize) {
-		t.logger.Warningf("Header list size to send (%d bytes) is larger than the upcoming default limit (%d bytes). In a future release, this will be restricted to %d bytes.", sz, upcomingDefaultHeaderListSize, upcomingDefaultHeaderListSize)
+	if !envconfig.Enable8KBDefaultHeaderListSize && sz > int64(upcomingDefaultHeaderListSize) {
+		t.logger.Warningf("Header list size to send (%d bytes) is larger than the upcoming default limit (%d bytes). In release v1.82.0, GRPC_GO_EXPERIMENTAL_ENABLE_8KB_DEFAULT_HEADER_LIST_SIZE will be enabled by default, enforcing this limit.", sz, upcomingDefaultHeaderListSize)
 	}
 	return true
 }
@@ -1039,7 +1050,7 @@ func (t *http2Server) writeHeaderLocked(s *ServerStream) error {
 		headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-encoding", Value: s.sendCompress})
 	}
 	headerFields = appendHeaderFieldsFromMD(headerFields, s.header)
-	hf := &headerFrame{
+	hf := &serverHeaders{
 		streamID:  s.id,
 		hf:        headerFields,
 		endStream: false,
@@ -1107,7 +1118,7 @@ func (t *http2Server) writeStatus(s *ServerStream, st *status.Status) error {
 
 	// Attach the trailer metadata.
 	headerFields = appendHeaderFieldsFromMD(headerFields, s.trailer)
-	trailingHeader := &headerFrame{
+	trailingHeader := &serverHeaders{
 		streamID:  s.id,
 		hf:        headerFields,
 		endStream: true,
@@ -1317,7 +1328,7 @@ func (t *http2Server) deleteStream(s *ServerStream, eosReceived bool) {
 }
 
 // finishStream closes the stream and puts the trailing headerFrame into controlbuf.
-func (t *http2Server) finishStream(s *ServerStream, rst bool, rstCode http2.ErrCode, hdr *headerFrame, eosReceived bool) {
+func (t *http2Server) finishStream(s *ServerStream, rst bool, rstCode http2.ErrCode, hdr *serverHeaders, eosReceived bool) {
 	// In case stream sending and receiving are invoked in separate
 	// goroutines (e.g., bi-directional streaming), cancel needs to be
 	// called to interrupt the potential blocking on other goroutines.
@@ -1441,14 +1452,14 @@ func (t *http2Server) socketMetrics() *channelz.EphemeralSocketMetrics {
 func (t *http2Server) incrMsgSent() {
 	if channelz.IsOn() {
 		t.channelz.SocketMetrics.MessagesSent.Add(1)
-		t.channelz.SocketMetrics.LastMessageSentTimestamp.Add(1)
+		t.channelz.SocketMetrics.LastMessageSentTimestamp.Store(transportinternal.TimeNowFunc())
 	}
 }
 
 func (t *http2Server) incrMsgRecv() {
 	if channelz.IsOn() {
 		t.channelz.SocketMetrics.MessagesReceived.Add(1)
-		t.channelz.SocketMetrics.LastMessageReceivedTimestamp.Add(1)
+		t.channelz.SocketMetrics.LastMessageReceivedTimestamp.Store(transportinternal.TimeNowFunc())
 	}
 }
 
@@ -1456,7 +1467,7 @@ func (t *http2Server) getOutFlowWindow() int64 {
 	resp := make(chan uint32, 1)
 	timer := time.NewTimer(time.Second)
 	defer timer.Stop()
-	t.controlBuf.put(&outFlowControlSizeRequest{resp})
+	t.controlBuf.put(&outFlowControlSizeRequest{resp: resp})
 	select {
 	case sz := <-resp:
 		return int64(sz)

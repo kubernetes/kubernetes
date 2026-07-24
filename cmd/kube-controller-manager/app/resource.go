@@ -85,7 +85,7 @@ func newResourceClaimController(ctx context.Context, controllerContext Controlle
 		klog.FromContext(ctx),
 		client,
 		controllerContext.InformerFactory.Core().V1().Pods(),
-		controllerContext.InformerFactory.Scheduling().V1alpha3().PodGroups(),
+		controllerContext.InformerFactory.Scheduling().V1beta1().PodGroups(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaimTemplates())
 	if err != nil {
@@ -119,6 +119,7 @@ func newResourcePoolStatusRequestController(ctx context.Context, controllerConte
 		controllerContext.InformerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
 		controllerContext.InformerFactory.Resource().V1().ResourceSlices(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
+		controllerContext.InformerFactory.Resource().V1().DeviceTaintRules(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init resourcepoolstatusrequest controller: %w", err)

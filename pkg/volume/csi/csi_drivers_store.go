@@ -77,3 +77,15 @@ func (s *DriversStore) Clear() {
 
 	s.store = store{}
 }
+
+// List returns the names of all registered CSI drivers.
+func (s *DriversStore) List() []string {
+	s.RLock()
+	defer s.RUnlock()
+
+	names := make([]string, 0, len(s.store))
+	for name := range s.store {
+		names = append(names, name)
+	}
+	return names
+}

@@ -58,17 +58,18 @@ var systemDefaultConstraints = []v1.TopologySpreadConstraint{
 
 // PodTopologySpread is a plugin that ensures pod's topologySpreadConstraints is satisfied.
 type PodTopologySpread struct {
-	systemDefaulted                              bool
-	parallelizer                                 fwk.Parallelizer
-	defaultConstraints                           []v1.TopologySpreadConstraint
-	sharedLister                                 fwk.SharedLister
-	services                                     corelisters.ServiceLister
-	replicationCtrls                             corelisters.ReplicationControllerLister
-	replicaSets                                  appslisters.ReplicaSetLister
-	statefulSets                                 appslisters.StatefulSetLister
-	enableNodeInclusionPolicyInPodTopologySpread bool
-	enableMatchLabelKeysInPodTopologySpread      bool
-	enableTaintTolerationComparisonOperators     bool
+	systemDefaulted                                    bool
+	parallelizer                                       fwk.Parallelizer
+	defaultConstraints                                 []v1.TopologySpreadConstraint
+	sharedLister                                       fwk.SharedLister
+	services                                           corelisters.ServiceLister
+	replicationCtrls                                   corelisters.ReplicationControllerLister
+	replicaSets                                        appslisters.ReplicaSetLister
+	statefulSets                                       appslisters.StatefulSetLister
+	enableNodeInclusionPolicyInPodTopologySpread       bool
+	enableMatchLabelKeysInPodTopologySpread            bool
+	enableTaintTolerationComparisonOperators           bool
+	enableInPlacePodVerticalScalingSchedulerPreemption bool
 }
 
 var _ fwk.PreFilterPlugin = &PodTopologySpread{}
@@ -117,9 +118,10 @@ func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Fea
 		parallelizer:       h.Parallelizer(),
 		sharedLister:       h.SnapshotSharedLister(),
 		defaultConstraints: args.DefaultConstraints,
-		enableNodeInclusionPolicyInPodTopologySpread: fts.EnableNodeInclusionPolicyInPodTopologySpread,
-		enableMatchLabelKeysInPodTopologySpread:      fts.EnableMatchLabelKeysInPodTopologySpread,
-		enableTaintTolerationComparisonOperators:     fts.EnableTaintTolerationComparisonOperators,
+		enableNodeInclusionPolicyInPodTopologySpread:       fts.EnableNodeInclusionPolicyInPodTopologySpread,
+		enableMatchLabelKeysInPodTopologySpread:            fts.EnableMatchLabelKeysInPodTopologySpread,
+		enableTaintTolerationComparisonOperators:           fts.EnableTaintTolerationComparisonOperators,
+		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
 	}
 	if args.DefaultingType == config.SystemDefaulting {
 		pl.defaultConstraints = systemDefaultConstraints

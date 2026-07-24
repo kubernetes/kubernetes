@@ -78,6 +78,7 @@ import (
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	discoveryrest "k8s.io/kubernetes/pkg/registry/discovery/rest"
+	lifecyclerest "k8s.io/kubernetes/pkg/registry/lifecycle/rest"
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
@@ -560,7 +561,8 @@ func TestGenericStorageProviders(t *testing.T) {
 			schedulingrest.RESTStorageProvider,
 			storagerest.RESTStorageProvider,
 			appsrest.StorageProvider,
-			resourcerest.RESTStorageProvider:
+			resourcerest.RESTStorageProvider,
+			lifecyclerest.RESTStorageProvider:
 			// all these are non-generic, but kube specific
 			continue
 		default:
@@ -751,6 +753,8 @@ var gvrToStorageVersionHash = map[string]string{
 	"batch/v1/jobs":     "mudhfqk/qZY=",
 	"batch/v1/cronjobs": "sd5LIXh4Fjs=",
 	"certificates.k8s.io/v1/certificatesigningrequests":                 "95fRKMXA+00=",
+	"certificates.k8s.io/v1/clustertrustbundles":                        "v5yhuVertL4=",
+	"certificates.k8s.io/v1/podcertificaterequests":                     "wYA9yXQH8fg=",
 	"coordination.k8s.io/v1/leases":                                     "gqkMMb/YqFM=",
 	"discovery.k8s.io/v1/endpointslices":                                "qgS0xkrxYAI=",
 	"networking.k8s.io/v1/networkpolicies":                              "YpfwF18m1G8=",
@@ -784,8 +788,8 @@ var gvrToStorageVersionHash = map[string]string{
 	"apps/v1/statefulsets":                                              "H+vl74LkKdo=",
 	"admissionregistration.k8s.io/v1/mutatingwebhookconfigurations":     "Sqi0GUgDaX0=",
 	"admissionregistration.k8s.io/v1/validatingwebhookconfigurations":   "B0wHjQmsGNk=",
-	"admissionregistration.k8s.io/v1/mutatingadmissionpolicies":         "LYmCf+UMVdg=",
-	"admissionregistration.k8s.io/v1/mutatingadmissionpolicybindings":   "90V5FRZZ3Zg=",
+	"admissionregistration.k8s.io/v1/mutatingadmissionpolicies":         "mHCkTKpUTrE=",
+	"admissionregistration.k8s.io/v1/mutatingadmissionpolicybindings":   "ZKgZT1uTmZ0=",
 	"admissionregistration.k8s.io/v1/validatingadmissionpolicies":       "6OxvlMmQ6is=",
 	"admissionregistration.k8s.io/v1/validatingadmissionpolicybindings": "v9715VZqakg=",
 	"events.k8s.io/v1/events":                                           "r2yiGXH7wu8=",

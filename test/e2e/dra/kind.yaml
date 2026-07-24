@@ -4,7 +4,7 @@ runtimeConfig:
   "resource.k8s.io/v1alpha3": "true"
   "resource.k8s.io/v1beta1": "true"
   "resource.k8s.io/v1beta2": "true"
-  "scheduling.k8s.io/v1alpha3": "true"
+  "scheduling.k8s.io/v1beta1": "true"
 containerdConfigPatches:
 # Enable CDI as described in
 # https://github.com/container-orchestrated-devices/container-device-interface#containerd-configuration

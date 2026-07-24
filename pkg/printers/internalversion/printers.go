@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -30,18 +31,22 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
 	apiv1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
+	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	resourceapi "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -49,6 +54,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/certificate/csr"
+	"k8s.io/kubernetes/pkg/apis/lifecycle"
 	"k8s.io/utils/ptr"
 
 	podutil "k8s.io/kubernetes/pkg/api/pod"
@@ -418,19 +424,19 @@ func AddHandlers(h printers.PrintHandler) {
 
 	clusterTrustBundleColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "SignerName", Type: "string", Description: certificatesv1beta1.ClusterTrustBundleSpec{}.SwaggerDoc()["signerName"]},
+		{Name: "SignerName", Type: "string", Description: certificatesv1.ClusterTrustBundleSpec{}.SwaggerDoc()["signerName"]},
 	}
 	h.TableHandler(clusterTrustBundleColumnDefinitions, printClusterTrustBundle)
 	h.TableHandler(clusterTrustBundleColumnDefinitions, printClusterTrustBundleList)
 
 	podCertificateRequestColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "PodName", Type: "string", Description: certificatesv1beta1.PodCertificateRequestSpec{}.SwaggerDoc()["podName"]},
-		{Name: "ServiceAccountName", Type: "string", Description: certificatesv1beta1.PodCertificateRequestSpec{}.SwaggerDoc()["serviceAccountName"]},
-		{Name: "NodeName", Type: "string", Description: certificatesv1beta1.PodCertificateRequestSpec{}.SwaggerDoc()["nodeName"]},
-		{Name: "SignerName", Type: "string", Description: certificatesv1beta1.PodCertificateRequestSpec{}.SwaggerDoc()["signerName"]},
+		{Name: "PodName", Type: "string", Description: certificatesv1.PodCertificateRequestSpec{}.SwaggerDoc()["podName"]},
+		{Name: "ServiceAccountName", Type: "string", Description: certificatesv1.PodCertificateRequestSpec{}.SwaggerDoc()["serviceAccountName"]},
+		{Name: "NodeName", Type: "string", Description: certificatesv1.PodCertificateRequestSpec{}.SwaggerDoc()["nodeName"]},
+		{Name: "SignerName", Type: "string", Description: certificatesv1.PodCertificateRequestSpec{}.SwaggerDoc()["signerName"]},
 		{Name: "State", Type: "string", Description: "Is the request Pending, Issued, Denied, or Failed?"},
-		{Name: "UnverifiedUserAnnotations", Type: "string", Description: certificatesv1beta1.PodCertificateRequestSpec{}.SwaggerDoc()["unverifiedUserAnnotations"]},
+		{Name: "UnverifiedUserAnnotations", Type: "string", Description: certificatesv1.PodCertificateRequestSpec{}.SwaggerDoc()["unverifiedUserAnnotations"]},
 	}
 	h.TableHandler(podCertificateRequestColumnDefinitions, printPodCertificateRequest)
 	h.TableHandler(podCertificateRequestColumnDefinitions, printPodCertificateRequestList)
@@ -762,13 +768,50 @@ func AddHandlers(h printers.PrintHandler) {
 
 	podGroupColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Policy", Type: "string", Description: schedulingv1alpha3.PodGroupSpec{}.SwaggerDoc()["schedulingPolicy"]},
+		{Name: "Policy", Type: "string", Description: schedulingv1beta1.PodGroupSpec{}.SwaggerDoc()["schedulingPolicy"]},
 		{Name: "Workload", Type: "string", Description: "Name of the referenced Workload object"},
 		{Name: "Status", Type: "string", Description: "Status of the PodGroup"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(podGroupColumnDefinitions, printPodGroup)
 	_ = h.TableHandler(podGroupColumnDefinitions, printPodGroupList)
+
+	compositePodGroupColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Policy", Type: "string", Description: schedulingv1alpha3.CompositePodGroupSpec{}.SwaggerDoc()["schedulingPolicy"]},
+		{Name: "Workload", Type: "string", Description: "Name of the referenced Workload object"},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	_ = h.TableHandler(compositePodGroupColumnDefinitions, printCompositePodGroup)
+	_ = h.TableHandler(compositePodGroupColumnDefinitions, printCompositePodGroupList)
+
+	evictionRequestColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Target", Type: "string", Description: lifecyclev1alpha1.EvictionRequestSpec{}.SwaggerDoc()["target"]},
+		{Name: "Target Type", Type: "string", Description: lifecyclev1alpha1.EvictionRequestSpec{}.SwaggerDoc()["target"]},
+		{Name: "Status", Type: "string", Description: lifecyclev1alpha1.EvictionRequestStatus{}.SwaggerDoc()["conditions"]},
+		{Name: "Requester", Type: "string", Description: lifecyclev1alpha1.EvictionRequestSpec{}.SwaggerDoc()["requester"]},
+		{Name: "Intent", Type: "string", Description: lifecyclev1alpha1.EvictionRequestSpec{}.SwaggerDoc()["intent"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	_ = h.TableHandler(evictionRequestColumnDefinitions, printEvictionRequest)
+	_ = h.TableHandler(evictionRequestColumnDefinitions, printEvictionRequestList)
+
+	evictionColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Target", Type: "string", Description: lifecyclev1alpha1.EvictionSpec{}.SwaggerDoc()["target"]},
+		{Name: "Target Type", Type: "string", Description: lifecyclev1alpha1.EvictionSpec{}.SwaggerDoc()["target"]},
+		{Name: "Status", Type: "string", Description: lifecyclev1alpha1.EvictionStatus{}.SwaggerDoc()["conditions"]},
+		{Name: "Active Responder", Type: "string", Description: lifecyclev1alpha1.TargetResponder{}.SwaggerDoc()["state"]},
+		{Name: "Responder Status", Type: "string", Description: lifecyclev1alpha1.ResponderStatus{}.SwaggerDoc()[""]},
+		{Name: "Responder Expected Finish", Type: "string", Description: lifecyclev1alpha1.ResponderStatus{}.SwaggerDoc()["expectedCompletionTime"]},
+		{Name: "Requesters", Type: "string", Description: lifecyclev1alpha1.EvictionStatus{}.SwaggerDoc()["requesters"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "Responder Heartbeat", Type: "string", Priority: 1, Description: lifecyclev1alpha1.ResponderStatus{}.SwaggerDoc()["heartbeatTime"]},
+		{Name: "Responder Status Message", Type: "string", Priority: 1, Description: lifecyclev1alpha1.ResponderStatus{}.SwaggerDoc()["message"]},
+	}
+	_ = h.TableHandler(evictionColumnDefinitions, printEviction)
+	_ = h.TableHandler(evictionColumnDefinitions, printEvictionList)
 }
 
 // Pass ports=nil for all ports.
@@ -3530,6 +3573,222 @@ func printPodGroupList(list *scheduling.PodGroupList, options printers.GenerateO
 		rows = append(rows, r...)
 	}
 	return rows, nil
+}
+
+func printCompositePodGroup(obj *scheduling.CompositePodGroup, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	policy := "Basic"
+	if obj.Spec.SchedulingPolicy.Gang != nil {
+		policy = "Gang"
+	}
+
+	workload := "<none>"
+	if ref := obj.Spec.WorkloadRef; ref != nil {
+		workload = ref.WorkloadName
+	}
+
+	row.Cells = append(row.Cells, obj.Name, policy, workload, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1.TableRow{row}, nil
+}
+
+func printCompositePodGroupList(list *scheduling.CompositePodGroupList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printCompositePodGroup(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printEvictionRequest(obj *lifecycle.EvictionRequest, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	var wideCells []interface{}
+	row.Cells = append(row.Cells, obj.Name)
+
+	// resolve target
+	target := "<unset>"
+	targetType := "<unset>"
+	if obj.Spec.Target.Pod != nil {
+		target = obj.Spec.Target.Pod.Name
+		targetType = "Pod"
+	}
+	row.Cells = append(row.Cells, target, targetType)
+
+	// resolve status
+	evictionStatus := resolveEvictionStatusConditions(obj.Status.ObservedGeneration, obj.Status.Conditions)
+	row.Cells = append(row.Cells, evictionStatus)
+
+	// resolve requester, intent, age
+	row.Cells = append(row.Cells, obj.Spec.Requester, string(obj.Spec.Intent), translateTimestampSince(obj.CreationTimestamp))
+
+	row.Cells = append(row.Cells, wideCells...)
+	return []metav1.TableRow{row}, nil
+}
+func printEvictionRequestList(list *lifecycle.EvictionRequestList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printEvictionRequest(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printEviction(obj *lifecycle.Eviction, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	var wideCells []interface{}
+	row.Cells = append(row.Cells, obj.Name)
+
+	// resolve target
+	target := "<unset>"
+	targetType := "<unset>"
+	if obj.Spec.Target.Pod != nil {
+		target = obj.Spec.Target.Pod.Name
+		targetType = "Pod"
+	}
+	row.Cells = append(row.Cells, target, targetType)
+
+	// resolve status
+	evictionStatus := resolveEvictionStatusConditions(obj.Status.ObservedGeneration, obj.Status.Conditions)
+	row.Cells = append(row.Cells, evictionStatus)
+
+	// resolve responder progress and find an active responder
+	totalResponders := len(obj.Status.TargetResponders)
+	processedOrActiveResponders := 0
+	var lastActiveResponder, lastProcessedResponder *lifecycle.TargetResponder
+	for _, targetResponder := range obj.Status.TargetResponders {
+		switch targetResponder.State {
+		case lifecycle.ResponderStateCanceled, lifecycle.ResponderStateInterrupted, lifecycle.ResponderStateCompleted:
+			processedOrActiveResponders++
+			lastProcessedResponder = &targetResponder
+
+		case lifecycle.ResponderStateActive:
+			processedOrActiveResponders++
+			lastActiveResponder = &targetResponder
+		}
+	}
+	if lastActiveResponder == nil {
+		// present last completed one if all have been processed
+		lastActiveResponder = lastProcessedResponder
+	}
+	activeResponder := "<unset>"
+	if lastActiveResponder != nil {
+		activeResponder = lastActiveResponder.Name
+	}
+	activeResponderWithCount := fmt.Sprintf("%s (%d/%d)", activeResponder, processedOrActiveResponders, totalResponders)
+	row.Cells = append(row.Cells, activeResponderWithCount)
+
+	// resolve responder status and finish time
+	activeResponderExpectedCompletionTime := "<unknown>"
+	responderStatus := "<unset>"
+	heartbeat := "<unset>"
+	message := "<unset>"
+	if lastActiveResponder != nil {
+		for _, responder := range obj.Status.Responders {
+			if responder.Name != lastActiveResponder.Name {
+				continue
+			}
+
+			responderStatus = string(lastActiveResponder.State)
+			switch lastActiveResponder.State {
+			case lifecycle.ResponderStateActive:
+				if responder.StartTime != nil {
+					responderStatus = fmt.Sprintf("Started (%s ago)", translateTimestampSince(*responder.StartTime))
+					if responder.ExpectedCompletionTime != nil {
+						if responder.ExpectedCompletionTime.After(time.Now()) {
+							activeResponderExpectedCompletionTime = fmt.Sprintf("in %s", translateTimestampUntil(*responder.ExpectedCompletionTime))
+						} else {
+							// in case the estimate is wrong, or a kubelet is slow
+							activeResponderExpectedCompletionTime = fmt.Sprintf("%s ago", translateTimestampSince(*responder.ExpectedCompletionTime))
+						}
+					}
+				}
+			case lifecycle.ResponderStateCanceled, lifecycle.ResponderStateInterrupted:
+				activeResponderExpectedCompletionTime = "-"
+			case lifecycle.ResponderStateCompleted:
+				if responder.CompletionTime != nil {
+					responderStatus = fmt.Sprintf("%s (%s ago)", lastActiveResponder.State, translateTimestampSince(*responder.CompletionTime))
+				}
+				activeResponderExpectedCompletionTime = "-"
+			}
+			if options.Wide {
+				if responder.HeartbeatTime != nil {
+					heartbeat = fmt.Sprintf("%s ago", translateTimestampSince(*responder.HeartbeatTime))
+				}
+				if msg := strings.TrimSpace(ptr.Deref(responder.Message, "")); len(msg) > 0 {
+					message = msg
+				}
+			}
+			break
+		}
+	}
+
+	if options.Wide {
+		wideCells = append(wideCells, heartbeat, message)
+	}
+	row.Cells = append(row.Cells, responderStatus, activeResponderExpectedCompletionTime)
+
+	// resolve requesters
+	var requesters []string
+	for _, requester := range obj.Status.Requesters {
+		if requester.Intent != lifecycle.RequesterIntentWithdrawn {
+			requesters = append(requesters, requester.Name)
+		}
+	}
+	slices.Sort(requesters)
+	requestersStr := "<none>"
+	if len(obj.Status.Requesters) > 0 {
+		requestersStr = "<withdrawn>"
+	}
+	if len(requesters) > 0 {
+		requestersStr = listWithMoreString(requesters[:1], len(requesters) > 1, len(requesters), 1)
+	}
+	row.Cells = append(row.Cells, requestersStr, translateTimestampSince(obj.CreationTimestamp))
+
+	row.Cells = append(row.Cells, wideCells...)
+	return []metav1.TableRow{row}, nil
+}
+
+func printEvictionList(list *lifecycle.EvictionList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printEviction(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func resolveEvictionStatusConditions(observedGeneration *int64, conditions []metav1.Condition) string {
+	evictionStatus := "Pending"
+	if ptr.Deref(observedGeneration, 0) > 0 {
+		evictionStatus = "Progressing"
+	}
+	evicted := meta.FindStatusCondition(conditions, string(lifecycle.EvictionConditionTargetEvicted))
+	failed := meta.FindStatusCondition(conditions, string(lifecycle.EvictionConditionFailed))
+	isFailed := failed != nil && failed.Status == metav1.ConditionTrue
+	if isFailed {
+		evictionStatus = fmt.Sprintf("%s (%s)", failed.Type, failed.Reason)
+	}
+	if evicted != nil && evicted.Status == metav1.ConditionTrue {
+		evictionStatus = fmt.Sprintf("%s (%s)", evicted.Type, evicted.Reason)
+	}
+	return evictionStatus
 }
 
 func printBoolPtr(value *bool) string {

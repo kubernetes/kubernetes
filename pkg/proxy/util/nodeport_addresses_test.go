@@ -21,7 +21,7 @@ import (
 	"net"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fake "k8s.io/kubernetes/pkg/proxy/util/testing"
 	netutils "k8s.io/utils/net"
@@ -398,6 +398,78 @@ func TestGetNodeIPs(t *testing.T) {
 				if err != nil {
 					t.Errorf("unexpected mismatch for %s: %v", family, err)
 				}
+			}
+		})
+	}
+}
+
+func TestContainsExplicitLoopback(t *testing.T) {
+	tests := []struct {
+		name        string
+		family      v1.IPFamily
+		cidrStrings []string
+		want        bool
+	}{
+		{
+			name:        "IPv4 explicit loopback /8",
+			family:      v1.IPv4Protocol,
+			cidrStrings: []string{"127.0.0.0/8"},
+			want:        true,
+		},
+		{
+			name:        "IPv6 explicit loopback /128",
+			family:      v1.IPv6Protocol,
+			cidrStrings: []string{"::1/128"},
+			want:        true,
+		},
+		{
+			name:        "IPv4 zero CIDR is not explicit loopback",
+			family:      v1.IPv4Protocol,
+			cidrStrings: []string{"0.0.0.0/0"},
+			want:        false,
+		},
+		{
+			name:        "IPv6 zero CIDR is not explicit loopback",
+			family:      v1.IPv6Protocol,
+			cidrStrings: []string{"::/0"},
+			want:        false,
+		},
+		{
+			name:        "IPv4 empty defaults to zero CIDR, not explicit loopback",
+			family:      v1.IPv4Protocol,
+			cidrStrings: []string{},
+			want:        false,
+		},
+		{
+			name:        "explicit loopback combined with zero CIDR",
+			family:      v1.IPv4Protocol,
+			cidrStrings: []string{"127.0.0.0/8", "0.0.0.0/0"},
+			want:        true,
+		},
+		{
+			name:        "zero CIDR before explicit loopback (not cut off by parse break)",
+			family:      v1.IPv4Protocol,
+			cidrStrings: []string{"0.0.0.0/0", "127.0.0.0/8"},
+			want:        true,
+		},
+		{
+			name:        "non-loopback CIDR is not explicit loopback",
+			family:      v1.IPv4Protocol,
+			cidrStrings: []string{"192.168.1.1/32"},
+			want:        false,
+		},
+		{
+			name:        "IPv4 family drops IPv6 loopback, falls back to zero CIDR",
+			family:      v1.IPv4Protocol,
+			cidrStrings: []string{"::1/128"},
+			want:        false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			npa := NewNodePortAddresses(tt.family, tt.cidrStrings)
+			if got := npa.ContainsExplicitLoopback(); got != tt.want {
+				t.Errorf("ContainsExplicitLoopback() = %v, want %v", got, tt.want)
 			}
 		})
 	}

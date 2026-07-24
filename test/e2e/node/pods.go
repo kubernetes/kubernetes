@@ -629,8 +629,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 			})
 
 			expectedPodConditions := []v1.PodConditionType{
-				// add back once PodReadyToStartContainers feature GAs
-				// v1.PodReadyToStartContainers
+				v1.PodReadyToStartContainers,
 				v1.PodInitialized,
 				v1.PodReady,
 				v1.ContainersReady,

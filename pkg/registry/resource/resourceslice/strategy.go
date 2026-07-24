@@ -65,7 +65,12 @@ func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) f
 // DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
 // validation options to the generic BeforeCreate/BeforeUpdate code path.
 func (resourceSliceStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
-	return rest.DeclarativeValidationConfig{NormalizationRules: validation.ResourceNormalizationRules}
+	return rest.DeclarativeValidationConfig{
+		NormalizationRules: validation.ResourceNormalizationRules,
+		Options: map[string]bool{
+			string(features.DRAPartitionableDevicesType): utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevicesType),
+		},
+	}
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -180,13 +185,14 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 	// amount of allocations needed to create the fields.Set. If you add any
 	// field here or the number of object-meta related fields changes, this should
 	// be adjusted.
-	fields := make(fields.Set, 3)
+	fields := make(fields.Set, 4)
 	if slice.Spec.NodeName == nil {
 		fields[resource.ResourceSliceSelectorNodeName] = ""
 	} else {
 		fields[resource.ResourceSliceSelectorNodeName] = *slice.Spec.NodeName
 	}
 	fields[resource.ResourceSliceSelectorDriver] = slice.Spec.Driver
+	fields[resource.ResourceSliceSelectorPoolName] = slice.Spec.Pool.Name
 
 	// Adds one field.
 	return generic.AddObjectMetaFieldsSet(fields, &slice.ObjectMeta, false)
@@ -200,6 +206,22 @@ func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice)
 	dropDisabledDRANodeAllocatableResourcesFields(newSlice, oldSlice)
 	dropDisableDRAListTypeAttributesFields(newSlice, oldSlice)
+	dropDisabledDRAPartitionableDevicesTypeFields(newSlice, oldSlice)
+}
+
+func dropDisabledDRAPartitionableDevicesTypeFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevicesType) || draPartitionableDevicesTypeFeatureInUse(oldSlice) {
+		return
+	}
+
+	newSlice.Spec.PartitionTypeAttribute = nil
+}
+
+func draPartitionableDevicesTypeFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+	return slice.Spec.PartitionTypeAttribute != nil
 }
 
 func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
@@ -335,7 +357,7 @@ func dropDisabledDRANodeAllocatableResourcesFields(newSlice, oldSlice *resource.
 	}
 
 	for i := range newSlice.Spec.Devices {
-		newSlice.Spec.Devices[i].NodeAllocatableResourceMappings = nil
+		newSlice.Spec.Devices[i].NodeAllocatableResources = nil
 	}
 }
 
@@ -345,7 +367,7 @@ func draNodeAllocatableResourcesFeatureInUse(slice *resource.ResourceSlice) bool
 	}
 
 	for _, device := range slice.Spec.Devices {
-		if len(device.NodeAllocatableResourceMappings) > 0 {
+		if len(device.NodeAllocatableResources) > 0 {
 			return true
 		}
 	}

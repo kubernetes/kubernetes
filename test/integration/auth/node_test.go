@@ -217,8 +217,10 @@ func TestNodeAuthorizer(t *testing.T) {
 	}
 	removeResourceClaimReference := func(client clientset.Interface) func() error {
 		return func() error {
+			// An explicit empty slice clears the field; null would be
+			// treated as an omitted field and preserved by the apiserver.
 			_, err := client.CoreV1().Pods("ns").Patch(context.TODO(), "node2normalpod", types.MergePatchType,
-				[]byte(`{"status":{"resourceClaimStatuses":null}}`),
+				[]byte(`{"status":{"resourceClaimStatuses":[]}}`),
 				metav1.PatchOptions{}, "status")
 			return err
 		}

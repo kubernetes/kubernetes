@@ -18,9 +18,11 @@ package dra
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
@@ -120,7 +122,7 @@ func testPodGroup(tCtx ktesting.TContext) {
 
 			claim := createClaim(tCtx, namespace, "", class, claim)
 
-			podGroup, err := tCtx.Client().SchedulingV1alpha3().PodGroups(namespace).Create(tCtx, test.podGroup, metav1.CreateOptions{})
+			podGroup, err := tCtx.Client().SchedulingV1beta1().PodGroups(namespace).Create(tCtx, test.podGroup, metav1.CreateOptions{})
 			tCtx.ExpectNoError(err, "create PodGroup")
 			schedGroup := &v1.PodSchedulingGroup{
 				PodGroupName: &podGroup.Name,
@@ -134,9 +136,33 @@ func testPodGroup(tCtx ktesting.TContext) {
 			}
 
 			waitForClaimAllocatedToDevice(tCtx, namespace, claim.Name, schedulingTimeout)
-			for _, pod := range pods {
-				waitForPodScheduled(tCtx, namespace, pod.Name)
-			}
+			// The PodScheduled condition checked by [waitForPodScheduled] could
+			// converge to either a True or False status due to a race
+			// condition, but Pods should still ultimately be scheduled:
+			// https://github.com/kubernetes/kubernetes/issues/139417#issuecomment-4651436886
+			tCtx.Eventually(func(tCtx ktesting.TContext) ([]v1.Pod, error) {
+				var groupPods []v1.Pod
+				pods, err := tCtx.Client().CoreV1().Pods(namespace).List(tCtx, metav1.ListOptions{})
+				if err != nil {
+					return nil, err
+				}
+				for _, pod := range pods.Items {
+					if pod.Spec.SchedulingGroup == nil ||
+						pod.Spec.SchedulingGroup.PodGroupName == nil ||
+						*pod.Spec.SchedulingGroup.PodGroupName != podGroupName {
+						continue
+					}
+					groupPods = append(groupPods, pod)
+				}
+				return groupPods, err
+			}).WithTimeout(60*time.Second).Should(
+				gomega.HaveEach(
+					gomega.HaveField("Spec.NodeName",
+						gomega.Not(gomega.BeEmpty()),
+					),
+				),
+				"Pods should have been scheduled.",
+			)
 		})
 	}
 
@@ -165,7 +191,7 @@ func testPodGroup(tCtx ktesting.TContext) {
 				},
 			},
 		}
-		podGroup, err := tCtx.Client().SchedulingV1alpha3().PodGroups(namespace).Create(tCtx, podGroup, metav1.CreateOptions{})
+		podGroup, err := tCtx.Client().SchedulingV1beta1().PodGroups(namespace).Create(tCtx, podGroup, metav1.CreateOptions{})
 		tCtx.ExpectNoError(err, "create PodGroup")
 
 		schedGroup := &v1.PodSchedulingGroup{

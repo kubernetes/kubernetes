@@ -23,7 +23,8 @@ package contract
 import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
@@ -37,6 +38,9 @@ var _ fwk.ResourceSliceLister = &resourceSliceListerContract{}
 var _ fwk.PodGroupStateLister = &podGroupStateListerContract{}
 var _ fwk.PodGroupLister = &podGroupListerContract{}
 var _ fwk.PodGroupState = &podGroupStateContract{}
+var _ fwk.CompositePodGroupStateLister = &compositePodGroupStateListerContract{}
+var _ fwk.CompositePodGroupLister = &compositePodGroupListerContract{}
+var _ fwk.CompositePodGroupState = &compositePodGroupStateContract{}
 var _ fwk.DeviceClassLister = &deviceClassListerContract{}
 var _ fwk.ResourceClaimTracker = &resourceClaimTrackerContract{}
 var _ fwk.DeviceClassResolver = &deviceClassResolverContract{}
@@ -84,6 +88,14 @@ func (c *shareListerContract) PodGroups() fwk.PodGroupLister {
 	return nil
 }
 
+func (c *shareListerContract) CompositePodGroupStates() fwk.CompositePodGroupStateLister {
+	return nil
+}
+
+func (c *shareListerContract) CompositePodGroups() fwk.CompositePodGroupLister {
+	return nil
+}
+
 type podGroupListerContract struct{}
 
 func (c *podGroupListerContract) Get(_ string, _ string) (*schedulingapi.PodGroup, error) {
@@ -123,6 +135,24 @@ func (c *podGroupStateContract) ScheduledPodsCount() int {
 }
 
 func (c *podGroupStateContract) ScheduledPods() []*v1.Pod {
+	return nil
+}
+
+type compositePodGroupListerContract struct{}
+
+func (c *compositePodGroupListerContract) Get(_ string, _ string) (*schedulingv1alpha3.CompositePodGroup, error) {
+	return nil, nil
+}
+
+type compositePodGroupStateListerContract struct{}
+
+func (c *compositePodGroupStateListerContract) Get(_ string, _ string) (fwk.CompositePodGroupState, error) {
+	return nil, nil
+}
+
+type compositePodGroupStateContract struct{}
+
+func (c *compositePodGroupStateContract) GetChildren() []fwk.EntityKey {
 	return nil
 }
 

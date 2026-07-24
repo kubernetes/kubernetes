@@ -389,6 +389,11 @@ aliases:
   sig-cloud-provider-api-approvers:
     - liggitt
     - thockin
+  sig-cloud-provider-leads:
+    - bridgetkromhout
+    - cheftako
+    - elmiko
+    - joelspeed
   sig-cluster-lifecycle-api-approvers:
     - deads2k
     - liggitt

@@ -28,6 +28,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -94,6 +95,7 @@ type Plugin struct {
 	allowInsecureKubeletCertificateSigningRequests bool
 	serviceAccountNodeAudienceRestriction          bool
 	podCertificateRequestsEnabled                  bool
+	csiVolumeHealthEnabled                         bool
 }
 
 var (
@@ -110,6 +112,7 @@ func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	p.allowInsecureKubeletCertificateSigningRequests = featureGates.Enabled(features.AllowInsecureKubeletCertificateSigningRequests)
 	p.serviceAccountNodeAudienceRestriction = featureGates.Enabled(features.ServiceAccountNodeAudienceRestriction)
 	p.podCertificateRequestsEnabled = featureGates.Enabled(features.PodCertificateRequest)
+	p.csiVolumeHealthEnabled = featureGates.Enabled(features.CSIVolumeHealth)
 	p.inspectedFeatureGates = true
 }
 
@@ -430,20 +433,28 @@ func nodeAllocatableResourceClaimStatusesEqual(statusA, statusB []api.NodeAlloca
 		if !slices.Equal(statusA[i].Containers, statusB[i].Containers) {
 			return false
 		}
-		if len(statusA[i].Resources) != len(statusB[i].Resources) {
+		if !nodeAllocatableMappedResourcesEqual(statusA[i].Mapping, statusB[i].Mapping) {
 			return false
 		}
-		for name, qtyA := range statusA[i].Resources {
-			qtyB, ok := statusB[i].Resources[name]
-			if !ok {
-				return false
-			}
-			if qtyA.Cmp(qtyB) != 0 {
-				return false
-			}
+		if !nodeAllocatableOverheadResourcesEqual(statusA[i].Overhead, statusB[i].Overhead) {
+			return false
 		}
 	}
 	return true
+}
+
+func nodeAllocatableMappedResourcesEqual(a, b []api.NodeAllocatableMappedResources) bool {
+	itemEqual := func(x, y api.NodeAllocatableMappedResources) bool {
+		return x.Name == y.Name && apiresource.QuantityPtrEqual(x.Quantity, y.Quantity)
+	}
+	return slices.EqualFunc(a, b, itemEqual)
+}
+
+func nodeAllocatableOverheadResourcesEqual(a, b []api.NodeAllocatableOverheadResources) bool {
+	itemEqual := func(x, y api.NodeAllocatableOverheadResources) bool {
+		return x.Name == y.Name && apiresource.QuantityPtrEqual(x.PerPod, y.PerPod) && apiresource.QuantityPtrEqual(x.PerContainer, y.PerContainer)
+	}
+	return slices.EqualFunc(a, b, itemEqual)
 }
 
 // admitPodEviction allows to evict a pod if it is assigned to the current node.
@@ -1034,7 +1045,35 @@ func (p *Plugin) admitCSINode(nodeName string, a admission.Attributes) error {
 		}
 	}
 
+	if a.GetSubresource() == "status" {
+		if !p.csiVolumeHealthEnabled {
+			return admission.NewForbidden(a, fmt.Errorf("CSIVolumeHealth feature gate is disabled"))
+		}
+		return p.admitCSINodeStatus(nodeName, a)
+	}
+
 	return nil
+}
+
+// admitCSINodeStatus ensures a node cannot modify CSINode Spec via the status subresource.
+func (p *Plugin) admitCSINodeStatus(nodeName string, a admission.Attributes) error {
+	switch a.GetOperation() {
+	case admission.Update:
+		oldCSINode, ok := a.GetOldObject().(*storage.CSINode)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetOldObject()))
+		}
+		newCSINode, ok := a.GetObject().(*storage.CSINode)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+		}
+		if !apiequality.Semantic.DeepEqual(oldCSINode.Spec, newCSINode.Spec) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to modify CSINode spec via status", nodeName))
+		}
+		return nil
+	default:
+		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %q", a.GetOperation()))
+	}
 }
 
 func (p *Plugin) admitResourceSlice(nodeName string, a admission.Attributes) error {

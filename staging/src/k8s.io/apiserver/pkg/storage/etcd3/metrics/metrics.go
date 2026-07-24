@@ -142,6 +142,17 @@ var (
 		},
 		[]string{"group", "resource"},
 	)
+	listLatency = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace: "apiserver",
+			Name:      "storage_list_duration_seconds",
+			Help:      "Latency of the storage layer GetList call in seconds, including object decode, split by whether etcd RangeStream was used.",
+			Buckets: []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
+				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"streamed", "group", "resource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -162,6 +173,7 @@ func Register() {
 		legacyregistry.MustRegister(etcdBookmarkTotal)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
 		legacyregistry.MustRegister(decodeErrorCounts)
+		legacyregistry.MustRegister(listLatency)
 	})
 }
 
@@ -203,6 +215,15 @@ func RecordEtcdRequest(verb string, groupResource schema.GroupResource, err erro
 	if err != nil {
 		etcdRequestErrorCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource).Inc()
 	}
+}
+
+// RecordListLatency sets the storage_list_duration_seconds metric.
+func RecordListLatency(groupResource schema.GroupResource, streamed bool, startTime time.Time) {
+	streamedLabel := "false"
+	if streamed {
+		streamedLabel = "true"
+	}
+	listLatency.WithLabelValues(streamedLabel, groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
 }
 
 // RecordEtcdEvent updated the etcd_events_received_total metric.

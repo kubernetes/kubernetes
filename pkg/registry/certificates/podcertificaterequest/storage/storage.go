@@ -56,9 +56,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Uncondi
 		DefaultQualifiedResource:  api.Resource("podcertificaterequests"),
 		SingularQualifiedResource: api.Resource("podcertificaterequest"),
 
-		CreateStrategy: strategy,
-		UpdateStrategy: strategy,
-		DeleteStrategy: strategy,
+		CreateStrategy:      strategy,
+		UpdateStrategy:      strategy,
+		DeleteStrategy:      strategy,
+		ResetFieldsStrategy: strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}

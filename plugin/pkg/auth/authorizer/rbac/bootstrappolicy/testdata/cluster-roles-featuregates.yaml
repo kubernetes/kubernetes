@@ -271,6 +271,26 @@ items:
     - deletecollection
     - patch
     - update
+  - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - compositepodgroups
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - patch
+    - update
+  - apiGroups:
+    - lifecycle.k8s.io
+    resources:
+    - evictionrequests
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - patch
+    - update
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -431,6 +451,24 @@ items:
     - podgroups
     - podgroups/status
     - workloads
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - compositepodgroups
+    - compositepodgroups/status
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - lifecycle.k8s.io
+    resources:
+    - evictionrequests
+    - evictions
     verbs:
     - get
     - list
@@ -1019,6 +1057,21 @@ items:
     verbs:
     - patch
     - update
+  - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - compositepodgroups
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - scheduling.k8s.io
+    resources:
+    - compositepodgroups/status
+    verbs:
+    - patch
+    - update
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -1253,6 +1306,14 @@ items:
     verbs:
     - create
     - delete
+    - get
+    - patch
+    - update
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csinodes/status
+    verbs:
     - get
     - patch
     - update

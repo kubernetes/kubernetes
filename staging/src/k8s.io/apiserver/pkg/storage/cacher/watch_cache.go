@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -67,6 +68,8 @@ type watchCacheEvent struct {
 	Key             string
 	ResourceVersion uint64
 	RecordTime      time.Time
+	// CacheReceived is the time the event was received by the cacher.
+	CacheReceived time.Time
 }
 
 // watchCache implements a Store interface.
@@ -206,6 +209,13 @@ func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Ob
 // processEvent is safe as long as there is at most one call to it in flight
 // at any point in time.
 func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) error {
+	cacheReceived := w.config.clock.Now()
+	recordTime := cacheReceived
+	if withRecordTime, ok := event.Object.(storage.WatchEventWithRecordTime); ok {
+		recordTime = withRecordTime.RecordTime()
+		event.Object = withRecordTime.Unwrap()
+	}
+
 	metrics.EventsReceivedCounter.WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Inc()
 
 	key, err := w.config.keyFunc(event.Object)
@@ -225,7 +235,8 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		ObjFields:       elem.Fields,
 		Key:             key,
 		ResourceVersion: resourceVersion,
-		RecordTime:      w.config.clock.Now(),
+		RecordTime:      recordTime,
+		CacheReceived:   cacheReceived,
 	}
 
 	// We can call w.storage.Get() outside of a critical section,
@@ -340,8 +351,6 @@ func (w *watchCache) waitUntilFreshLocked(ctx context.Context, consistentReadSup
 		}()
 	}
 
-	span := tracing.SpanFromContext(ctx)
-	span.AddEvent("watchCache locked acquired")
 	for w.resourceVersion < resourceVersion {
 		if w.config.clock.Since(startTime) >= blockTimeout {
 			// Request that the client retry after 'resourceVersionTooHighRetrySeconds' seconds.
@@ -349,7 +358,6 @@ func (w *watchCache) waitUntilFreshLocked(ctx context.Context, consistentReadSup
 		}
 		w.cond.Wait()
 	}
-	span.AddEvent("watchCache fresh enough")
 	return nil
 }
 
@@ -387,15 +395,20 @@ func (c *watchCache) waitUntilFreshAndGetList(ctx context.Context, key string, o
 
 // WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
 // with their ResourceVersion and the name of the index, if any, that was used.
-func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersion uint64) (keys []string, err error) {
+func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersion uint64) ([]string, error) {
+	span := tracing.SpanFromContext(ctx)
 	consistentReadSupported := delegator.ConsistentReadSupported()
 	w.RLock()
+	span.AddEvent("watchCache locked acquired")
 	defer w.RUnlock()
-	err = w.waitUntilFreshLocked(ctx, consistentReadSupported, resourceVersion)
+	err := w.waitUntilFreshLocked(ctx, consistentReadSupported, resourceVersion)
 	if err != nil {
 		return nil, err
 	}
-	return w.storage.ListKeys(), nil
+	span.AddEvent("watchCache fresh enough")
+	keys := w.storage.ListKeys()
+	span.AddEvent("ListKeys success")
+	return keys, nil
 }
 
 // NOTICE: Structure follows the shouldDelegateList function in
@@ -446,23 +459,34 @@ func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey st
 	}, "", err
 }
 
-func (w *watchCache) waitAndGetExactSnapshot(ctx context.Context, resourceVersion uint64) (store store.Snapshot, err error) {
+func (w *watchCache) waitAndGetExactSnapshot(ctx context.Context, resourceVersion uint64) (store.Snapshot, error) {
+	span := tracing.SpanFromContext(ctx)
 	consistentReadSupported := delegator.ConsistentReadSupported()
 	w.RLock()
+	span.AddEvent("watchCache locked acquired")
 	defer w.RUnlock()
-	err = w.waitUntilFreshLocked(ctx, consistentReadSupported, resourceVersion)
+	err := w.waitUntilFreshLocked(ctx, consistentReadSupported, resourceVersion)
 	if err != nil {
 		return nil, err
 	}
+	span.AddEvent("watchCache fresh enough")
 
-	return w.storage.GetExactSnapshotLocked(resourceVersion)
+	store, err := w.storage.GetExactSnapshotLocked(resourceVersion)
+	if err != nil {
+		span.AddEvent("GetExactSnapshotLocked failed", attribute.String("error", err.Error()))
+		return nil, err
+	}
+	span.AddEvent("GetExactSnapshotLocked success")
+	return store, nil
 }
 
 func (w *watchCache) waitAndListConsistent(ctx context.Context, key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
+	span := tracing.SpanFromContext(ctx)
 	resourceVersion, err := w.config.getCurrentRV(ctx)
 	if err != nil {
 		return listResp{}, "", err
 	}
+	span.AddEvent("getCurrentRV success")
 	return w.waitAndListLatestRV(ctx, resourceVersion, key, continueKey, matchValues)
 }
 
@@ -483,23 +507,34 @@ func (w *watchCache) waitAndListLatestRV(ctx context.Context, minResourceVersion
 
 func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVersion uint64, key, continueKey string, matchValues []storage.MatchValue) (snap store.Snapshot, resourceVersion uint64, index string, err error) {
 	consistentReadSupported := delegator.ConsistentReadSupported()
+	span := tracing.SpanFromContext(ctx)
 	w.RLock()
+	span.AddEvent("watchCache locked acquired")
 	defer w.RUnlock()
 	err = w.waitUntilFreshLocked(ctx, consistentReadSupported, minResourceVersion)
 	if err != nil {
 		return nil, 0, "", err
 	}
+	span.AddEvent("watchCache fresh enough")
 	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
 	// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
 	// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
 	// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
 	for _, matchValue := range matchValues {
-		if snap, err := w.storage.GetByIndexSnapshot(matchValue.IndexName, matchValue.Value); err == nil {
+		snap, err := w.storage.GetByIndexSnapshot(matchValue.IndexName, matchValue.Value)
+		if err == nil {
+			span.AddEvent("GetByIndexSnapshot success", attribute.String("index", matchValue.IndexName))
 			return snap, w.resourceVersion, matchValue.IndexName, nil
 		}
+		span.AddEvent("GetByIndexSnapshot fail", attribute.String("index", matchValue.IndexName), attribute.String("error", err.Error()))
 	}
 	snap, err = w.storage.GetLatestSnapshotOrBuildLocked(key, continueKey)
-	return snap, w.resourceVersion, "", err
+	if err != nil {
+		span.AddEvent("GetLatestSnapshotOrBuildLocked failed", attribute.String("error", err.Error()))
+		return nil, 0, "", err
+	}
+	span.AddEvent("GetLatestSnapshotOrBuildLocked success")
+	return snap, w.resourceVersion, "", nil
 }
 
 func (w *watchCache) notFresh(resourceVersion uint64) bool {
@@ -510,14 +545,22 @@ func (w *watchCache) notFresh(resourceVersion uint64) bool {
 
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.
 func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion uint64, key string) (interface{}, bool, uint64, error) {
+	span := tracing.SpanFromContext(ctx)
 	consistentReadSupported := delegator.ConsistentReadSupported()
 	w.RLock()
+	span.AddEvent("watchCache locked acquired")
 	defer w.RUnlock()
 	err := w.waitUntilFreshLocked(ctx, consistentReadSupported, resourceVersion)
 	if err != nil {
 		return nil, false, 0, err
 	}
+	span.AddEvent("watchCache fresh enough")
 	value, exists, err := w.storage.GetByKey(key)
+	if err != nil {
+		span.AddEvent("GetByKey failed", attribute.String("error", err.Error()))
+		return nil, false, 0, err
+	}
+	span.AddEvent("GetByKey success")
 	return value, exists, w.resourceVersion, err
 }
 

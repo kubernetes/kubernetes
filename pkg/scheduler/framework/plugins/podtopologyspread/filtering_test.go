@@ -37,7 +37,6 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-
 	"k8s.io/utils/ptr"
 )
 
@@ -3530,5 +3529,22 @@ func TestPodTopoSignatures(t *testing.T) {
 				t.Fatalf("Diff %s", diff)
 			}
 		})
+	}
+}
+
+func TestPodTopologySpread_DeferredResizeSkipped(t *testing.T) {
+	ctx := context.Background()
+	pod := st.MakePod().Name("p").UID("p").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(st.MakeNode().Name("node1").Obj())
+
+	pl := &PodTopologySpread{enableInPlacePodVerticalScalingSchedulerPreemption: true}
+
+	if preRes, preStatus := pl.PreFilter(ctx, nil, pod, nil); preStatus.Code() != fwk.Skip || preRes != nil {
+		t.Errorf("PreFilter: got (res: %v, status: %v), want (nil, Skip)", preRes, preStatus.Code())
+	}
+
+	if filterStatus := pl.Filter(ctx, nil, pod, nodeInfo); filterStatus.Code() != fwk.Success {
+		t.Errorf("Filter: got status %v, want Success (nil)", filterStatus.Code())
 	}
 }

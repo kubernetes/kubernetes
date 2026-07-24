@@ -224,7 +224,7 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return err
 	}
 	if !exists {
-		logger.V(4).Info("resource does not exist in our rest mapper", "gvr", gvr.String())
+		logger.V(4).Info("resource does not exist in our rest mapper", "resource", toBeProcessedSVM.Spec.Resource.String())
 		if toBeProcessedSVM.CreationTimestamp.Add(time.Minute).After(time.Now()) {
 			return fmt.Errorf("resource does not exist in rest mapper, requeuing to attempt again: %w", err)
 		}

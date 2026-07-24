@@ -87,9 +87,9 @@ func (podStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pod := obj.(*api.Pod)
 	pod.Generation = 1
+
 	pod.Status = api.PodStatus{
-		Phase:    api.PodPending,
-		QOSClass: qos.GetPodQOS(pod),
+		Phase: api.PodPending,
 	}
 
 	podutil.DropDisabledPodFields(pod, nil)
@@ -98,6 +98,9 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	mutatePodAffinity(pod)
 	mutateTopologySpreadConstraints(pod)
 	applyAppArmorVersionSkew(ctx, pod)
+	podutil.DefaultPodLevelResources(pod)
+
+	pod.Status.QOSClass = qos.GetPodQOS(pod)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -105,6 +108,14 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
+		if newPod.Spec.Resources == nil && oldPod.Spec.Resources != nil {
+			// preserve existing PLR for requests from potentially PLR-unaware clients that completely dropped the field
+			newPod.Spec.Resources = oldPod.Spec.Resources.DeepCopy()
+		}
+	}
+
 	podutil.DropDisabledPodFields(newPod, oldPod)
 	updatePodGeneration(newPod, oldPod)
 }
@@ -226,6 +237,19 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	// we need to backfill it for backward compatibility because the old kubelet dropped this field when the pod was rejected.
 	if newPod.Status.QOSClass == "" {
 		newPod.Status.QOSClass = oldPod.Status.QOSClass
+	}
+
+	// Preserve DRA-related status fields when an old or misbehaving client
+	// strips fields that it does not know about during a pods/status update.
+	// For the slice fields, a non-nil empty slice can still clear the field.
+	if newPod.Status.ResourceClaimStatuses == nil && oldPod.Status.ResourceClaimStatuses != nil {
+		newPod.Status.ResourceClaimStatuses = oldPod.Status.ResourceClaimStatuses
+	}
+	if newPod.Status.ExtendedResourceClaimStatus == nil && oldPod.Status.ExtendedResourceClaimStatus != nil {
+		newPod.Status.ExtendedResourceClaimStatus = oldPod.Status.ExtendedResourceClaimStatus
+	}
+	if newPod.Status.NodeAllocatableResourceClaimStatuses == nil && oldPod.Status.NodeAllocatableResourceClaimStatuses != nil {
+		newPod.Status.NodeAllocatableResourceClaimStatuses = oldPod.Status.NodeAllocatableResourceClaimStatuses
 	}
 
 	preserveOldObservedGeneration(newPod, oldPod)
@@ -370,6 +394,8 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	// Preserve the incoming pod-level resource from the new pod object.
 	newPodResources := newPod.Spec.Resources
 
+	newVolumes := dropNonResizeUpdatesForVolumes(newPod.Spec.Volumes, oldPod.Spec.Volumes)
+
 	containers := dropNonResizeUpdatesForContainers(newPod.Spec.Containers, oldPod.Spec.Containers)
 	initContainers := dropNonResizeUpdatesForContainers(newPod.Spec.InitContainers, oldPod.Spec.InitContainers)
 
@@ -385,6 +411,7 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 
 	newPod.Spec.Containers = containers
 	newPod.Spec.InitContainers = initContainers
+	newPod.Spec.Volumes = newVolumes
 
 	return newPod
 }
@@ -410,11 +437,32 @@ func dropNonResizeUpdatesForContainers(new, old []api.Container) []api.Container
 	return oldCopyWithMergedResources
 }
 
+func dropNonResizeUpdatesForVolumes(new, old []api.Volume) []api.Volume {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		return old
+	}
+	return new
+}
+
 func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 
 	*newPod = *dropNonResizeUpdates(newPod, oldPod)
+
+	// When pod-level resources are set or updated via resize, apply defaulting
+	// so any unmanaged resources (e.g. memory when only CPU existed) are complete and consistent.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
+		if newPod.Spec.Resources == nil && oldPod.Spec.Resources != nil {
+			// preserve existing PLR for requests from potentially PLR-unaware clients that completely dropped the field
+			newPod.Spec.Resources = oldPod.Spec.Resources.DeepCopy()
+		}
+
+		if newPod.Spec.Resources != nil {
+			podutil.DefaultPodLevelResources(newPod)
+		}
+	}
+
 	podutil.DropDisabledPodFields(newPod, oldPod)
 	updatePodGeneration(newPod, oldPod)
 }

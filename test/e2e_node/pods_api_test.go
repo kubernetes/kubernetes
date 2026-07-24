@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -37,13 +38,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/component-base/metrics/testutil"
 	podsv1alpha1 "k8s.io/kubelet/pkg/apis/pods/v1alpha1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/pods"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"sigs.k8s.io/yaml"
 )
@@ -107,7 +111,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 					Containers: []v1.Container{
 						{
 							Name:    "test-container",
-							Image:   "busybox:1.36",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"sleep", "3600"},
 						},
 					},
@@ -242,7 +246,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 					Containers: []v1.Container{
 						{
 							Name:    "test-container",
-							Image:   "busybox:1.36",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"sleep", "3600"},
 						},
 					},
@@ -357,7 +361,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 					Containers: []v1.Container{
 						{
 							Name:    "test-container",
-							Image:   "busybox:1.36",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"sleep", "3600"},
 						},
 					},
@@ -492,7 +496,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 					Containers: []v1.Container{
 						{
 							Name:    "test-container",
-							Image:   "busybox:1.36",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"sleep", "3600"},
 						},
 					},
@@ -630,5 +634,192 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 			gomega.Expect(currentStateIdx).To(gomega.Equal(len(expectedStates)-1), "did not observe all expected state transitions (last state seen: %s)", expectedStates[currentStateIdx])
 		})
 
+		ginkgo.It("should return correct state post-restart without transient oscillations", func(ctx context.Context) {
+			// 1. Create a test pod and wait for it to be Ready
+			podName := "restart-test-pod-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      podName,
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:    "test-container",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"sleep", "3600"},
+						},
+					},
+				},
+			}
+			ginkgo.By("creating a test pod")
+			testPod := e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+			// Verify it is Ready in the Pods API
+			ginkgo.By("verifying the pod is Ready in Pods API")
+			verifyPodReadyInAPI(ctx, client, testPod.UID)
+
+			// 2. Restart Kubelet
+			ginkgo.By("restarting Kubelet")
+			oldCfg, err := getCurrentKubeletConfig(ctx)
+			framework.ExpectNoError(err)
+			newCfg := oldCfg.DeepCopy()
+			newCfg.FileCheckFrequency = metav1.Duration{Duration: 22 * time.Second}
+			updateKubeletConfig(ctx, f, newCfg, true)
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				updateKubeletConfig(ctx, f, oldCfg, true)
+			})
+
+			// Reconnect to the API
+			endpoint, err := util.LocalEndpoint("/var/lib/kubelet/pods-api", pods.Socket)
+			framework.ExpectNoError(err)
+			conn, err = grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
+			framework.ExpectNoError(err)
+			defer func() { _ = conn.Close() }()
+			client = podsv1alpha1.NewPodsClient(conn)
+
+			// 3. Query the API immediately post-restart
+			ginkgo.By("querying the API immediately post-restart")
+			var phases []string
+
+			gomega.Eventually(ctx, func(ctx context.Context) (bool, error) {
+				resp, err := client.GetPod(ctx, &podsv1alpha1.GetPodRequest{PodUID: string(testPod.UID)})
+				if err != nil {
+					st, ok := status.FromError(err)
+					if ok && st.Code() == codes.FailedPrecondition {
+						phases = append(phases, "Initializing")
+						return false, nil
+					}
+					return false, err
+				}
+
+				var p v1.Pod
+				if err := p.Unmarshal(resp.Pod); err != nil {
+					return false, err
+				}
+
+				for _, c := range p.Status.Conditions {
+					if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
+						phases = append(phases, "Ready")
+						return true, nil
+					}
+				}
+				phases = append(phases, "NotReady")
+				return false, nil
+			}).WithTimeout(30 * time.Second).WithPolling(100 * time.Millisecond).Should(gomega.BeTrueBecause("pod should become Ready in Pods API post-restart"))
+
+			framework.Logf("Observed phase transitions: %v", phases)
+
+			for _, phase := range phases {
+				if phase == "NotReady" {
+					framework.Failf("Observed transient NotReady state during Kubelet restart! Phase sequence: %v", phases)
+				}
+			}
+			gomega.Expect(phases).To(gomega.ContainElement("Ready"), "Pod should eventually become Ready again")
+		})
+
+		ginkgo.It("should increment metrics on API calls", func(ctx context.Context) {
+			ginkgo.By("grabbing initial metrics")
+			initialMetrics, err := e2emetrics.GetKubeletMetrics(ctx, f.ClientSet, framework.TestContext.NodeName)
+			framework.ExpectNoError(err)
+
+			initialTotal := getMetricValue(initialMetrics, "pod_requests_total", map[string]string{"server_api_version": "v1alpha1", "status_code": "OK"})
+			initialList := getMetricValue(initialMetrics, "pod_requests_list_total", map[string]string{"server_api_version": "v1alpha1", "status_code": "OK"})
+
+			ginkgo.By("performing API calls")
+			_, err = client.ListPods(ctx, &podsv1alpha1.ListPodsRequest{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("verifying metrics incremented")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				currentMetrics, err := e2emetrics.GetKubeletMetrics(ctx, f.ClientSet, framework.TestContext.NodeName)
+				if err != nil {
+					return err
+				}
+				currentTotal := getMetricValue(currentMetrics, "pod_requests_total", map[string]string{"server_api_version": "v1alpha1", "status_code": "OK"})
+				currentList := getMetricValue(currentMetrics, "pod_requests_list_total", map[string]string{"server_api_version": "v1alpha1", "status_code": "OK"})
+
+				if currentTotal != initialTotal+1 {
+					return fmt.Errorf("expected total metrics to be %v, got %v", initialTotal+1, currentTotal)
+				}
+				if currentList != initialList+1 {
+					return fmt.Errorf("expected list metrics to be %v, got %v", initialList+1, currentList)
+				}
+				return nil
+			}, "30s", "2s").Should(gomega.Succeed())
+		})
+
+	})
+
+	ginkgo.Context("when the PodsAPI feature gate is disabled", func() {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = make(map[string]bool)
+			}
+			initialConfig.FeatureGates[string(kubefeatures.PodsAPI)] = false
+		})
+
+		ginkgo.It("should not serve requests when feature gate is disabled", func(ctx context.Context) {
+			endpoint, err := util.LocalEndpoint("/var/lib/kubelet/pods-api", pods.Socket)
+			framework.ExpectNoError(err)
+
+			conn, err := grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
+			framework.ExpectNoError(err)
+			defer func() { _ = conn.Close() }()
+			client := podsv1alpha1.NewPodsClient(conn)
+
+			_, err = client.ListPods(ctx, &podsv1alpha1.ListPodsRequest{})
+			assertGrpcErrorWithCode(err, codes.Unavailable, "")
+
+			_, err = client.GetPod(ctx, &podsv1alpha1.GetPodRequest{PodUID: "some-uid"})
+			assertGrpcErrorWithCode(err, codes.Unavailable, "")
+		})
 	})
 })
+
+func verifyPodReadyInAPI(ctx context.Context, client podsv1alpha1.PodsClient, uid types.UID) {
+	gomega.Eventually(ctx, func(ctx context.Context) bool {
+		resp, err := client.GetPod(ctx, &podsv1alpha1.GetPodRequest{PodUID: string(uid)})
+		if err != nil {
+			return false
+		}
+		var p v1.Pod
+		if err := p.Unmarshal(resp.Pod); err != nil {
+			return false
+		}
+		for _, c := range p.Status.Conditions {
+			if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
+				return true
+			}
+		}
+		return false
+	}, "2m", "2s").Should(gomega.BeTrueBecause("pod should be Ready in Pods API"))
+}
+
+func getMetricValue(metrics e2emetrics.KubeletMetrics, metricName string, labels map[string]string) float64 {
+	samples, ok := metrics[metricName]
+	if !ok {
+		return 0
+	}
+	for _, sample := range samples {
+		match := true
+		for k, v := range labels {
+			if string(sample.Metric[testutil.LabelName(k)]) != v {
+				match = false
+				break
+			}
+		}
+		if match {
+			return float64(sample.Value)
+		}
+	}
+	return 0
+}
+
+func assertGrpcErrorWithCode(err error, expectedCode codes.Code, expectedMsg string) {
+	gomega.Expect(err).To(gomega.HaveOccurred())
+	st, ok := status.FromError(err)
+	gomega.Expect(ok).To(gomega.BeTrueBecause("error should be a gRPC status error"))
+	gomega.Expect(st.Code()).To(gomega.Equal(expectedCode))
+	gomega.Expect(st.Message()).To(gomega.ContainSubstring(expectedMsg))
+}

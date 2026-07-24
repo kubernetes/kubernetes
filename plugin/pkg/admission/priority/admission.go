@@ -91,12 +91,14 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 }
 
 var (
-	podResource           = core.Resource("pods")
-	podGroupResource      = scheduling.Resource("podgroups")
-	priorityClassResource = scheduling.Resource("priorityclasses")
+	podResource               = core.Resource("pods")
+	podGroupResource          = scheduling.Resource("podgroups")
+	compositePodGroupResource = scheduling.Resource("compositepodgroups")
+	priorityClassResource     = scheduling.Resource("priorityclasses")
 )
 
-// Admit checks Pods and PodGroups and admits or rejects them. It also resolves the priority of pods and pod groups based on their PriorityClass.
+// Admit checks Pods, PodGroups and CompositePodGroups and admits or rejects them.
+// It also resolves the priority of Pods, PodGroups and CompositePodGroups based on their PriorityClass.
 func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	operation := a.GetOperation()
 	// Ignore all calls to subresources
@@ -112,6 +114,11 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	case podGroupResource:
 		if operation == admission.Create {
 			return p.admitPodGroup(a)
+		}
+		return nil
+	case compositePodGroupResource:
+		if operation == admission.Create {
+			return p.admitCompositePodGroup(a)
 		}
 		return nil
 	default:
@@ -228,6 +235,48 @@ func (p *Plugin) admitPodGroup(attributes admission.Attributes) error {
 			return admission.NewForbidden(attributes, fmt.Errorf("the string value of PreemptionPolicy (%s) must not be provided in pod group spec; priority admission controller computed %s from the given PriorityClass name", *pg.Spec.PreemptionPolicy, schedulingPreemptionPolicy))
 		}
 		pg.Spec.PreemptionPolicy = &schedulingPreemptionPolicy
+	}
+	return nil
+}
+
+// admitCompositePodGroup makes sure a new composite pod group does not set spec.Priority field.
+// It also makes sure that the PriorityClassName exists if it is provided and resolves
+// the composite pod group priority from the PriorityClassName.
+func (p *Plugin) admitCompositePodGroup(attributes admission.Attributes) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		return nil
+	}
+
+	cpg, ok := attributes.GetObject().(*scheduling.CompositePodGroup)
+	if !ok {
+		return errors.NewBadRequest("resource was marked with kind CompositePodGroup but was unable to be converted")
+	}
+
+	priorityClassName, priority, preemptionPolicy, err := p.establishPriority(attributes, &cpg.Spec.PriorityClassName)
+	if err != nil {
+		return err
+	}
+	// Reject if the composite pod group already contained a priority that differs from the one computed from the priority class.
+	if cpg.Spec.Priority != nil && *cpg.Spec.Priority != priority {
+		return admission.NewForbidden(attributes, fmt.Errorf("priority set in the composite pod group (%d) must match the priority computed (%d) based on the priority class set in the spec", *cpg.Spec.Priority, priority))
+	}
+	cpg.Spec.Priority = &priority
+	cpg.Spec.PriorityClassName = priorityClassName
+
+	var schedulingPreemptionPolicy scheduling.PreemptionPolicy
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) && preemptionPolicy != nil {
+		switch *preemptionPolicy {
+		case apiv1.PreemptLowerPriority:
+			schedulingPreemptionPolicy = scheduling.PreemptLowerPriority
+		case apiv1.PreemptNever:
+			schedulingPreemptionPolicy = scheduling.PreemptNever
+		default:
+			return admission.NewForbidden(attributes, fmt.Errorf("preemptionPolicy set in the PriorityClass object (%v) must match one of the allowed values of PreemptionPolicy type in composite pod group", *preemptionPolicy))
+		}
+		if cpg.Spec.PreemptionPolicy != nil && *cpg.Spec.PreemptionPolicy != schedulingPreemptionPolicy {
+			return admission.NewForbidden(attributes, fmt.Errorf("the string value of PreemptionPolicy (%s) must not be provided in composite pod group spec; priority admission controller computed %s from the given PriorityClass name", *cpg.Spec.PreemptionPolicy, schedulingPreemptionPolicy))
+		}
+		cpg.Spec.PreemptionPolicy = &schedulingPreemptionPolicy
 	}
 	return nil
 }

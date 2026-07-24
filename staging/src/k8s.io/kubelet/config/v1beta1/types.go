@@ -772,6 +772,12 @@ type KubeletConfiguration struct {
 	// Default: []
 	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
+	// DefaultPodSysctls is a set of default sysctls that will be applied to all pods.
+	// It can be overridden by sysctls set in pod spec.securityContext.sysctls.
+	// Support namespaced groups: `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`, `net.*`, `kernel.domainname`, and `user.*`.
+	// For example: {"net.ipv4.ip_forward": "1", "kernel.shmall": "1048576"}
+	// +optional
+	DefaultPodSysctls map[string]string `json:"defaultPodSysctls,omitempty"`
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins.
 	// Default: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
@@ -893,9 +899,9 @@ type KubeletConfiguration struct {
 	// MemoryThrottlingFactor specifies the factor multiplied by the memory limit or node allocatable memory
 	// when setting the cgroupv2 memory.high value to enforce MemoryQoS.
 	// Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure
-	// while increasing will put less reclaim pressure.
+	// while increasing will put less reclaim pressure. If nil, memory.high is not set.
 	// See https://kep.k8s.io/2570 for more details.
-	// Default: 0.9
+	// Default: nil
 	// +featureGate=MemoryQoS
 	// +optional
 	MemoryThrottlingFactor *float64 `json:"memoryThrottlingFactor,omitempty"`

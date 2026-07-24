@@ -152,6 +152,11 @@ func withProtectionFinalizer(pvc *v1.PersistentVolumeClaim) *v1.PersistentVolume
 	return pvc
 }
 
+func bound(pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
+	pvc.Status.Phase = v1.ClaimBound
+	return pvc
+}
+
 func withUnusedCondition(status v1.ConditionStatus, ts metav1.Time, pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
 	pvc.Status.Conditions = append(pvc.Status.Conditions, v1.PersistentVolumeClaimCondition{
 		Type:               v1.PersistentVolumeClaimUnused,
@@ -425,42 +430,50 @@ func TestPVCProtectionController(t *testing.T) {
 		// PVC UnusedSince condition — when feature gate is enabled
 		//
 		{
-			name:                     "feature enabled: unused PVC with no pods -> Unused=True condition set",
+			name:                     "feature enabled: unused bound PVC with no pods -> Unused=True condition set",
 			enablePVCUnusedSinceTime: true,
-			updatedPVCs:              []*v1.PersistentVolumeClaim{withProtectionFinalizer(pvc())},
+			updatedPVCs:              []*v1.PersistentVolumeClaim{bound(withProtectionFinalizer(pvc()))},
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
-				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
+				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), bound(withProtectionFinalizer(pvc())))),
 			},
 		},
 		{
-			name:                     "feature enabled: PVC already has Unused=True and is still unused -> no update",
+			name:                     "feature enabled: pending PVC -> no Unused condition",
 			enablePVCUnusedSinceTime: true,
-			updatedPVCs:              []*v1.PersistentVolumeClaim{withUnusedCondition(v1.ConditionTrue, metav1.Unix(100, 0), withProtectionFinalizer(pvc()))},
+			updatedPVCs:              []*v1.PersistentVolumeClaim{withProtectionFinalizer(pvc())},
+			// PVC is not Bound, so the Unused condition is not evaluated.
+			// No pod list, no status update.
+			expectedActions: []clienttesting.Action{},
+		},
+		{
+			name:                     "feature enabled: bound PVC already has Unused=True and is still unused -> no update",
+			enablePVCUnusedSinceTime: true,
+			updatedPVCs:              []*v1.PersistentVolumeClaim{bound(withUnusedCondition(v1.ConditionTrue, metav1.Unix(100, 0), withProtectionFinalizer(pvc())))},
 			// PVC already has condition (index != -1), so pvcAddedUpdated does not enqueue it.
 			// No pod event to trigger re-evaluation. No actions expected.
 			expectedActions: []clienttesting.Action{},
 		},
 		{
-			name:                     "feature enabled: running pod references PVC with Unused=True -> condition set to False",
+			name:                     "feature enabled: running pod references bound PVC with Unused=True -> condition set to False",
 			enablePVCUnusedSinceTime: true,
 			initialObjects: []runtime.Object{
-				withUnusedCondition(v1.ConditionTrue, metav1.Unix(100, 0), withProtectionFinalizer(pvc())),
+				bound(withUnusedCondition(v1.ConditionTrue, metav1.Unix(100, 0), withProtectionFinalizer(pvc()))),
 			},
 			updatedPod: withStatus(v1.PodRunning, withPVC(defaultPVCName, pod())),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
+				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), bound(withProtectionFinalizer(pvc())))),
 			},
 		},
 		{
-			name:                     "feature enabled: PVC in use by running pod without condition -> Unused=False set proactively",
+			name:                     "feature enabled: bound PVC in use by running pod without condition -> Unused=False set proactively",
 			enablePVCUnusedSinceTime: true,
 			initialObjects: []runtime.Object{
 				withStatus(v1.PodRunning, withPVC(defaultPVCName, pod())),
 			},
-			updatedPVCs: []*v1.PersistentVolumeClaim{withProtectionFinalizer(pvc())},
+			updatedPVCs: []*v1.PersistentVolumeClaim{bound(withProtectionFinalizer(pvc()))},
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
+				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), bound(withProtectionFinalizer(pvc())))),
 			},
 		},
 		{
@@ -478,44 +491,44 @@ func TestPVCProtectionController(t *testing.T) {
 			expectedActions: []clienttesting.Action{},
 		},
 		{
-			name:                     "feature enabled: unscheduled pending pod references PVC -> Unused=False set proactively",
+			name:                     "feature enabled: unscheduled pending pod references bound PVC -> Unused=False set proactively",
 			enablePVCUnusedSinceTime: true,
 			initialObjects: []runtime.Object{
 				unscheduled(withPVC(defaultPVCName, pod())),
 			},
-			updatedPVCs: []*v1.PersistentVolumeClaim{withProtectionFinalizer(pvc())},
+			updatedPVCs: []*v1.PersistentVolumeClaim{bound(withProtectionFinalizer(pvc()))},
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
+				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), bound(withProtectionFinalizer(pvc())))),
 			},
 		},
 		{
-			name:                     "feature enabled: terminated (Succeeded) pod does not count as using PVC -> Unused=True set",
+			name:                     "feature enabled: terminated (Succeeded) pod does not count as using bound PVC -> Unused=True set",
 			enablePVCUnusedSinceTime: true,
 			initialObjects: []runtime.Object{
 				withStatus(v1.PodSucceeded, withPVC(defaultPVCName, pod())),
 			},
-			updatedPVCs: []*v1.PersistentVolumeClaim{withProtectionFinalizer(pvc())},
+			updatedPVCs: []*v1.PersistentVolumeClaim{bound(withProtectionFinalizer(pvc()))},
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
-				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
+				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), bound(withProtectionFinalizer(pvc())))),
 			},
 		},
 		{
-			name:                     "feature enabled: terminated (Failed) pod does not count as using PVC -> Unused=True set",
+			name:                     "feature enabled: terminated (Failed) pod does not count as using bound PVC -> Unused=True set",
 			enablePVCUnusedSinceTime: true,
 			initialObjects: []runtime.Object{
 				withStatus(v1.PodFailed, withPVC(defaultPVCName, pod())),
 			},
-			updatedPVCs: []*v1.PersistentVolumeClaim{withProtectionFinalizer(pvc())},
+			updatedPVCs: []*v1.PersistentVolumeClaim{bound(withProtectionFinalizer(pvc()))},
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
-				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
+				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), bound(withProtectionFinalizer(pvc())))),
 			},
 		},
 		{
 			name:                     "feature enabled: status update fails -> controller retries",
 			enablePVCUnusedSinceTime: true,
-			updatedPVCs:              []*v1.PersistentVolumeClaim{withProtectionFinalizer(pvc())},
+			updatedPVCs:              []*v1.PersistentVolumeClaim{bound(withProtectionFinalizer(pvc()))},
 			reactors: []reaction{
 				{
 					verb:      "update",
@@ -525,11 +538,11 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
-				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
+				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), bound(withProtectionFinalizer(pvc())))),
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
-				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
+				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), bound(withProtectionFinalizer(pvc())))),
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
-				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
+				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), bound(withProtectionFinalizer(pvc())))),
 			},
 		},
 		{
@@ -539,22 +552,22 @@ func TestPVCProtectionController(t *testing.T) {
 				withPVC(defaultPVCName, pod()),
 			},
 			informersAreLate: true,
-			updatedPVCs:      []*v1.PersistentVolumeClaim{withProtectionFinalizer(pvc())},
+			updatedPVCs:      []*v1.PersistentVolumeClaim{bound(withProtectionFinalizer(pvc()))},
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
-				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
+				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), bound(withProtectionFinalizer(pvc())))),
 			},
 		},
 		{
-			name:                     "feature enabled: one of two pods deleted, remaining pod keeps PVC in use -> Unused=False set proactively",
+			name:                     "feature enabled: one of two pods deleted, remaining pod keeps bound PVC in use -> Unused=False set proactively",
 			enablePVCUnusedSinceTime: true,
 			initialObjects: []runtime.Object{
 				withPVC(defaultPVCName, pod()),
-				withProtectionFinalizer(pvc()),
+				bound(withProtectionFinalizer(pvc())),
 			},
 			deletedPod: withPVC(defaultPVCName, withUID("uid2", podWithConfig("pod2", defaultNS))),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
+				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), bound(withProtectionFinalizer(pvc())))),
 			},
 		},
 		{
@@ -569,29 +582,29 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 		},
 		{
-			name:                     "feature enabled: pod deleted, PVC becomes unused -> Unused=True condition set",
+			name:                     "feature enabled: pod deleted, bound PVC becomes unused -> Unused=True condition set",
 			enablePVCUnusedSinceTime: true,
 			initialObjects: []runtime.Object{
-				withProtectionFinalizer(pvc()),
+				bound(withProtectionFinalizer(pvc())),
 			},
 			deletedPod: withPVC(defaultPVCName, pod()),
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
-				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), withProtectionFinalizer(pvc()))),
+				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionTrue, metav1.Unix(123, 0), bound(withProtectionFinalizer(pvc())))),
 			},
 		},
 		{
-			name:                     "feature enabled: used PVC without finalizer -> Unused=False set then finalizer added",
+			name:                     "feature enabled: used bound PVC without finalizer -> Unused=False set then finalizer added",
 			enablePVCUnusedSinceTime: true,
 			initialObjects: []runtime.Object{
 				withPVC(defaultPVCName, pod()),
 			},
-			updatedPVCs: []*v1.PersistentVolumeClaim{pvc()},
+			updatedPVCs: []*v1.PersistentVolumeClaim{bound(pvc())},
 			expectedActions: []clienttesting.Action{
 				// First: condition set proactively (UpdateStatus on PVC without finalizer)
-				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), pvc())),
+				clienttesting.NewUpdateSubresourceAction(pvcGVR, "status", defaultNS, withUnusedCondition(v1.ConditionFalse, metav1.Unix(123, 0), bound(pvc()))),
 				// Then: finalizer added (Update on original PVC without condition)
-				clienttesting.NewUpdateAction(pvcGVR, defaultNS, withProtectionFinalizer(pvc())),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, bound(withProtectionFinalizer(pvc()))),
 			},
 		},
 		{

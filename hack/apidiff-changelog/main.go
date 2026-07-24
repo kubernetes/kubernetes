@@ -191,8 +191,10 @@ with three dots (...).`
 		updated  string
 	}
 	var dirsWithChanges []string
+	dirLabel := make(map[string]string) // per-dir annotation: "documented", "added placeholder documentation", or "undocumented"
 	var changelogEntries []changelogEntry
-	documentedDirs := 0
+	foundDirs := 0
+	addedDirs := 0
 
 	fmt.Println()
 
@@ -227,7 +229,8 @@ with three dots (...).`
 		verifyErr := verifyChangelog(changelog, incompatible)
 		if verifyErr == nil {
 			// Already documented; not a failure.
-			documentedDirs++
+			dirLabel[dir] = "documented"
+			foundDirs++
 			continue
 		}
 		if !errors.Is(verifyErr, errVerificationFail) {
@@ -246,7 +249,8 @@ with three dots (...).`
 				return fmt.Errorf("inserting changelog entry for %s: %w", dir, err)
 			}
 			// Now it's documented, so don't treat as failure.
-			documentedDirs++
+			dirLabel[dir] = "added placeholder documentation"
+			addedDirs++
 		} else {
 			// Write the entry into a temp copy for patch generation later.
 			tempChangelog := filepath.Join(tempDir, dir, changelogFilename)
@@ -275,7 +279,11 @@ with three dots (...).`
 Detected incompatible changes on modules:
 `)
 	for _, f := range dirsWithChanges {
-		fmt.Println(f)
+		label := dirLabel[f]
+		if label == "" {
+			label = "undocumented"
+		}
+		fmt.Printf("%s (%s)\n", f, label)
 	}
 	fmt.Print(`
 For more information about incompatible changes, see
@@ -320,9 +328,17 @@ vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
 	// 3 indicates to apidiff.sh that it should consider the check a success, despite having
 	// some incompatible changes.
-	if len(dirsWithChanges) == documentedDirs {
-		//nolint:staticcheck // ST1005: error strings should not be capitalized - ignored here because exit errors get dumped to stderr as-is and this is more readable.
-		return fmt.Errorf("Found or added documentation of changes in %d module(s)%w", documentedDirs, exitError{3})
+	if len(dirsWithChanges) == foundDirs+addedDirs {
+		var parts []string
+		if foundDirs > 0 {
+			//nolint:staticcheck // ST1005: error strings should not be capitalized - ignored here because exit errors get dumped to stderr as-is and this is more readable.
+			parts = append(parts, fmt.Sprintf("Found documentation of changes in %d module(s)", foundDirs))
+		}
+		if addedDirs > 0 {
+			//nolint:staticcheck // ST1005: error strings should not be capitalized - ignored here because exit errors get dumped to stderr as-is and this is more readable.
+			parts = append(parts, fmt.Sprintf("Added documentation of changes in %d module(s)", addedDirs))
+		}
+		return fmt.Errorf("%s%w", strings.Join(parts, "\n"), exitError{3})
 	}
 
 	// 2 indicates that there's missing documentation or some action must be taken

@@ -54,6 +54,7 @@ const (
 	coordinationGroup            = "coordination.k8s.io"
 	discoveryGroup               = "discovery.k8s.io"
 	extensionsGroup              = "extensions"
+	lifecycleGroup               = "lifecycle.k8s.io"
 	policyGroup                  = "policy"
 	rbacGroup                    = "rbac.authorization.k8s.io"
 	resourceGroup                = "resource.k8s.io"
@@ -149,6 +150,12 @@ func viewRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("workloads", "podgroups", "podgroups/status").RuleOrDie())
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("compositepodgroups", "compositepodgroups/status").RuleOrDie())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
+		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(lifecycleGroup).Resources("evictionrequests", "evictions").RuleOrDie())
+	}
 	return rules
 }
 
@@ -192,6 +199,13 @@ func editRules() []rbacv1.PolicyRule {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources("workloads", "podgroups").RuleOrDie())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources("compositepodgroups").RuleOrDie())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
+		// "evictions" are in the domain of the system and should be only updated by the evictionrequest-controller. "evictionrequests" are user-scoped.
+		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(lifecycleGroup).Resources("evictionrequests").RuleOrDie())
 	}
 	return rules
 }
@@ -264,6 +278,12 @@ func NodeRules() []rbacv1.PolicyRule {
 	nodePolicyRules = append(nodePolicyRules, csiDriverRule)
 	csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie()
 	nodePolicyRules = append(nodePolicyRules, csiNodeInfoRule)
+	// Use the Node authorization mode to limit a node to update status of its own CSINode.
+	// Use the NodeRestriction admission plugin to limit a node to just update the status stanza.
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
+		csiNodeStatusRule := rbacv1helpers.NewRule("get", "update", "patch").Groups("storage.k8s.io").Resources("csinodes/status").RuleOrDie()
+		nodePolicyRules = append(nodePolicyRules, csiNodeStatusRule)
+	}
 
 	// RuntimeClass
 	nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch").Groups("node.k8s.io").Resources("runtimeclasses").RuleOrDie())
@@ -666,6 +686,10 @@ func ClusterRoles() []rbacv1.ClusterRole {
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("podgroups").RuleOrDie())
 		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule("patch", "update").Groups(schedulingGroup).Resources("podgroups/status").RuleOrDie())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("compositepodgroups").RuleOrDie())
+		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule("patch", "update").Groups(schedulingGroup).Resources("compositepodgroups/status").RuleOrDie())
 	}
 	roles = append(roles, rbacv1.ClusterRole{
 		// a role to use for the kube-scheduler

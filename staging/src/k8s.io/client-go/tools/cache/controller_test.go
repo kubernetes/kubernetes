@@ -741,6 +741,110 @@ func TestDeletionHandlingObjectToName(t *testing.T) {
 	}
 }
 
+func TestDeletedObjectGetObjectName(t *testing.T) {
+	cm := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testname",
+			Namespace: "testnamespace",
+		},
+	}
+	expected, err := ObjectToName(cm)
+	if err != nil {
+		t.Error(err)
+	}
+
+	deleted := DeletedObject[*v1.ConfigMap]{OptionalObj: cm}
+	actual := deleted.GetObjectName()
+	if expected != actual {
+		t.Errorf("Expected %#v, got %#v", expected, actual)
+	}
+
+	stringKey, err := MetaNamespaceKeyFunc(cm)
+	if err != nil {
+		t.Error(err)
+	}
+	deletedUnknown := DeletedObject[*v1.ConfigMap]{
+		FinalStateUnknown: &DeletedFinalStateUnknown{
+			Key: stringKey,
+			Obj: cm,
+		},
+	}
+	actual = deletedUnknown.GetObjectName()
+	if expected != actual {
+		t.Errorf("Expected %#v, got %#v", expected, actual)
+	}
+
+	// FinalStateUnknown may have a nil Obj if the informer never saw the
+	// object; the key is still authoritative.
+	deletedUnknownNoObj := DeletedObject[*v1.ConfigMap]{
+		FinalStateUnknown: &DeletedFinalStateUnknown{
+			Key: stringKey,
+			Obj: nil,
+		},
+	}
+	actual = deletedUnknownNoObj.GetObjectName()
+	if expected != actual {
+		t.Errorf("Expected %#v, got %#v", expected, actual)
+	}
+
+	// A completely empty DeletedObject (no FinalStateUnknown, nil
+	// OptionalObj) must not panic and returns the zero ObjectName.
+	var empty DeletedObject[*v1.ConfigMap]
+	if actual := empty.GetObjectName(); actual != (ObjectName{}) {
+		t.Errorf("Expected empty ObjectName, got %#v", actual)
+	}
+}
+
+func TestDeletedObjectGetKey(t *testing.T) {
+	cm := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testname",
+			Namespace: "testnamespace",
+		},
+	}
+	expected, err := MetaNamespaceKeyFunc(cm)
+	if err != nil {
+		t.Error(err)
+	}
+
+	deleted := DeletedObject[*v1.ConfigMap]{OptionalObj: cm}
+	actual := deleted.GetKey()
+	if expected != actual {
+		t.Errorf("Expected %#v, got %#v", expected, actual)
+	}
+
+	deletedUnknown := DeletedObject[*v1.ConfigMap]{
+		FinalStateUnknown: &DeletedFinalStateUnknown{
+			Key: expected,
+			Obj: cm,
+		},
+	}
+	actual = deletedUnknown.GetKey()
+	if expected != actual {
+		t.Errorf("Expected %#v, got %#v", expected, actual)
+	}
+
+	// FinalStateUnknown may have a nil Obj if the informer never saw the
+	// object; the key is still authoritative.
+	deletedUnknownNoObj := DeletedObject[*v1.ConfigMap]{
+		FinalStateUnknown: &DeletedFinalStateUnknown{
+			Key: expected,
+			Obj: nil,
+		},
+	}
+	actual = deletedUnknownNoObj.GetKey()
+	if expected != actual {
+		t.Errorf("Expected %#v, got %#v", expected, actual)
+	}
+
+	// A completely empty DeletedObject (no FinalStateUnknown, nil
+	// OptionalObj) must not panic and returns the empty string.
+	var empty DeletedObject[*v1.ConfigMap]
+	if actual := empty.GetKey(); actual != "" {
+		t.Errorf("Expected empty key, got %#v", actual)
+	}
+}
+
 type listWatchWithUnSupportedWatchListSemanticsWrapper struct {
 	*ListWatch
 }

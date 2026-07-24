@@ -26,6 +26,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	k8sresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -193,9 +195,11 @@ var sliceWithConsumableCapacity = func() *resource.ResourceSlice {
 var sliceWithNodeAllocatableResources = func() *resource.ResourceSlice {
 	obj := slice.DeepCopy()
 	instanceQuantity := k8sresource.MustParse("1")
-	obj.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resource.NodeAllocatableResourceMapping{
+	obj.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resource.NodeAllocatableResource{
 		v1.ResourceCPU: {
-			AllocationMultiplier: &instanceQuantity,
+			Mapping: &resource.NodeAllocatableMapping{
+				DeviceMultiplier: &instanceQuantity,
+			},
 		},
 	}
 	return obj
@@ -208,6 +212,15 @@ var sliceWithListTypeAttributes = func() *resource.ResourceSlice {
 			StringValues: []string{"value1", "value2"},
 		},
 	}
+	return obj
+}()
+
+// The attribute is only permitted on a slice whose devices consume counters,
+// and each of them must carry it as a string. The bare "version" key qualifies
+// with the driver's own domain.
+var sliceWithPartitionTypeAttribute = func() *resource.ResourceSlice {
+	obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+	obj.Spec.PartitionTypeAttribute = ptr.To(resource.FullyQualifiedName("testdriver.example.com/version"))
 	return obj
 }()
 
@@ -327,6 +340,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		},
 		"drop-fields-binding-conditions": {
 			obj:              sliceWithBindingConditions,
+			emulatedVersion:  "1.35",
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceBindingConditions: false, features.DRAResourceClaimDeviceStatus: false},
 			expectObj: func() *resource.ResourceSlice {
 				obj := slice.DeepCopy()
@@ -401,6 +415,24 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 			obj:                     sliceWithListTypeAttributes,
 			featureOverrides:        featuregatetesting.FeatureOverrides{features.DRAListTypeAttributes: false},
 			expectedValidationError: true,
+		},
+		"keep-fields-partition-type-attribute": {
+			obj:              sliceWithPartitionTypeAttribute,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAResourcePoolStatus: true, features.DRAPartitionableDevicesType: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionTypeAttribute.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"drop-fields-partition-type-attribute": {
+			obj:              sliceWithPartitionTypeAttribute,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAResourcePoolStatus: true, features.DRAPartitionableDevicesType: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionableDevicesConsumesCounters.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
 		},
 	}
 
@@ -518,6 +550,20 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			emulatedVersion:  "1.35",
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithDeviceTaints.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"keep-existing-fields-partition-type-attribute-disabled-feature": {
+			oldObj: sliceWithPartitionTypeAttribute,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionTypeAttribute.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPartitionableDevices: true, features.DRAResourcePoolStatus: true, features.DRAPartitionableDevicesType: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithPartitionTypeAttribute.DeepCopy()
 				obj.ResourceVersion = "4"
 				return obj
 			}(),
@@ -701,6 +747,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				obj.Generation = 1
 				return obj
 			}(),
+			emulatedVersion:  "1.35",
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceBindingConditions: false, features.DRAResourceClaimDeviceStatus: false},
 		},
 		"drop-fields-binding-conditions-with-binding-conditions": {
@@ -846,6 +893,49 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				return obj
 			}(),
 		},
+		"keep-existing-fields-node-allocatable-dra-claims": {
+			oldObj: sliceWithNodeAllocatableResources,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithNodeAllocatableResources.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithNodeAllocatableResources.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"drop-fields-node-allocatable-dra-claims-disabled-feature": {
+			oldObj: slice,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithNodeAllocatableResources.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := slice.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-existing-fields-node-allocatable-dra-claims-disabled-feature": {
+			oldObj: sliceWithNodeAllocatableResources,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithNodeAllocatableResources.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: false},
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithNodeAllocatableResources.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
 	}
 
 	for name, tc := range testcases {
@@ -946,6 +1036,107 @@ func TestWarningsOnUpdate(t *testing.T) {
 				warnings = []string{}
 			}
 			require.Equal(t, tc.wantWarningMessages, warnings)
+		})
+	}
+}
+
+func TestMatch(t *testing.T) {
+	testCases := map[string]struct {
+		in            *resource.ResourceSlice
+		fieldSelector fields.Selector
+		expectMatch   bool
+	}{
+		"match-metadata-name": {
+			in: &resource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("metadata.name=foo"),
+			expectMatch:   true,
+		},
+		"not-match-metadata-name": {
+			in: &resource.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("metadata.name=bar"),
+			expectMatch:   false,
+		},
+		"match-spec-driver": {
+			in: &resource.ResourceSlice{
+				Spec: resource.ResourceSliceSpec{
+					Driver: "foo",
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.driver=foo"),
+			expectMatch:   true,
+		},
+		"not-match-spec-driver": {
+			in: &resource.ResourceSlice{
+				Spec: resource.ResourceSliceSpec{
+					Driver: "foo",
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.driver=bar"),
+			expectMatch:   false,
+		},
+		"match-spec-node-name": {
+			in: &resource.ResourceSlice{
+				Spec: resource.ResourceSliceSpec{
+					NodeName: new("foo"),
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName=foo"),
+			expectMatch:   true,
+		},
+		"not-match-spec-node-name": {
+			in: &resource.ResourceSlice{
+				Spec: resource.ResourceSliceSpec{
+					NodeName: new("foo"),
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName=bar"),
+			expectMatch:   false,
+		},
+		"match-spec-pool-name": {
+			in: &resource.ResourceSlice{
+				Spec: resource.ResourceSliceSpec{
+					Pool: resource.ResourcePool{
+						Name: "foo",
+					},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.pool.name=foo"),
+			expectMatch:   true,
+		},
+		"not-match-spec-pool-name": {
+			in: &resource.ResourceSlice{
+				Spec: resource.ResourceSliceSpec{
+					Pool: resource.ResourcePool{
+						Name: "foo",
+					},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.pool.name=bar"),
+			expectMatch:   false,
+		},
+		"not-match-spec-pool-generation": {
+			in: &resource.ResourceSlice{
+				Spec: resource.ResourceSliceSpec{
+					Pool: resource.ResourcePool{
+						Generation: 1,
+					},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.pool.generation=1"),
+			expectMatch:   false,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			m := Match(labels.Everything(), testCase.fieldSelector)
+			result, err := m.Matches(testCase.in)
+			require.NoError(t, err)
+			assert.Equal(t, testCase.expectMatch, result, "selector: %s, resourceSlice: %+v", testCase.fieldSelector.String(), testCase.in)
 		})
 	}
 }

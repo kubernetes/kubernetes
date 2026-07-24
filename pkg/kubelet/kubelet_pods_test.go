@@ -47,6 +47,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/cri-streaming/pkg/streaming/portforward"
@@ -4446,6 +4447,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 		expectedPodDisruptionCondition                 *v1.PodCondition
 		expectedPodReadyToStartContainersCondition     v1.PodCondition
 		inPlacePodLevelResourcesVerticalScalingEnabled bool
+		enableDRANodeAllocatableResources              bool
 	}{
 		{
 			name: "pod disruption condition is copied over and the phase is set to failed when deleted",
@@ -5721,34 +5723,114 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			},
 			inPlacePodLevelResourcesVerticalScalingEnabled: true,
 		},
+		{
+			name: "pod status AllocatedResources includes DRA claim allocations",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "uid-dra-alloc",
+					Name:      "pod-dra-alloc",
+					Namespace: "foo",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "dra-claim",
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{
+									Name:     v1.ResourceCPU,
+									Quantity: new(resource.MustParse("50m")),
+								},
+								{
+									Name:     v1.ResourceMemory,
+									Quantity: new(resource.MustParse("50Mi")),
+								},
+							},
+						},
+					},
+				},
+			},
+			currentStatus: sandboxReadyStatus,
+			expected: v1.PodStatus{
+				Phase:   v1.PodPending,
+				HostIP:  "127.0.0.1",
+				HostIPs: []v1.HostIP{{IP: "127.0.0.1"}, {IP: "::1"}},
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionTrue},
+					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				QOSClass: v1.PodQOSBurstable,
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name: "c1",
+						State: v1.ContainerState{
+							Waiting: &v1.ContainerStateWaiting{Reason: "ContainerCreating"},
+						},
+						Ready: true,
+					},
+				},
+				// Resources field should reflect total allocated pod level requests (standard + DRA).
+				// Limits stay empty: DRA is not added to limits the containers do not declare.
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("150m"),
+						v1.ResourceMemory: resource.MustParse("150Mi"),
+					},
+					Limits: v1.ResourceList{},
+				},
+				// AllocatedResources should sum standard requests (100m, 100Mi) + DRA allocations (50m, 50Mi)
+				AllocatedResources: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("150m"),
+					v1.ResourceMemory: resource.MustParse("150Mi"),
+				},
+				InitContainerStatuses:      []v1.ContainerStatus{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+			},
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   v1.PodReadyToStartContainers,
+				Status: v1.ConditionTrue,
+			},
+			inPlacePodLevelResourcesVerticalScalingEnabled: true,
+			enableDRANodeAllocatableResources:              true,
+		},
 	}
 	for _, test := range tests {
-		for _, enablePodReadyToStartContainersCondition := range []bool{false, true} {
-			t.Run(test.name, func(t *testing.T) {
-				logger, tCtx := ktesting.NewTestContext(t)
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadyToStartContainersCondition, enablePodReadyToStartContainersCondition)
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inPlacePodLevelResourcesVerticalScalingEnabled)
+		t.Run(test.name, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inPlacePodLevelResourcesVerticalScalingEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.enableDRANodeAllocatableResources)
 
-				testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-				defer testKubelet.Cleanup()
-				kl := testKubelet.kubelet
-				kl.statusManager.SetPodStatus(logger, test.pod, test.previousStatus)
-				for _, name := range test.unreadyContainer {
-					kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
-				}
-				expected := test.expected.DeepCopy()
-				actual := kl.generateAPIPodStatus(tCtx, test.pod, test.currentStatus, test.isPodTerminal)
-				if enablePodReadyToStartContainersCondition {
-					expected.Conditions = append([]v1.PodCondition{test.expectedPodReadyToStartContainersCondition}, expected.Conditions...)
-				}
-				if test.expectedPodDisruptionCondition != nil {
-					expected.Conditions = append([]v1.PodCondition{*test.expectedPodDisruptionCondition}, expected.Conditions...)
-				}
-				if !apiequality.Semantic.DeepEqual(*expected, actual) {
-					t.Fatalf("Unexpected status: %s", cmp.Diff(*expected, actual))
-				}
-			})
-		}
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			kl.statusManager.SetPodStatus(logger, test.pod, test.previousStatus)
+			for _, name := range test.unreadyContainer {
+				kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
+			}
+			expected := test.expected.DeepCopy()
+			actual := kl.generateAPIPodStatus(tCtx, test.pod, test.currentStatus, test.isPodTerminal)
+			expected.Conditions = append([]v1.PodCondition{test.expectedPodReadyToStartContainersCondition}, expected.Conditions...)
+			if test.expectedPodDisruptionCondition != nil {
+				expected.Conditions = append([]v1.PodCondition{*test.expectedPodDisruptionCondition}, expected.Conditions...)
+			}
+			if !apiequality.Semantic.DeepEqual(*expected, actual) {
+				t.Fatalf("Unexpected status: %s", cmp.Diff(*expected, actual))
+			}
+		})
 	}
 }
 
@@ -9029,7 +9111,6 @@ func TestGeneratePodHostNameAndDomain(t *testing.T) {
 		podHostname         string
 		podSubdomain        string
 		podHostnameOverride *string
-		featureGateEnabled  bool
 		expectedHostname    string
 		expectedDomain      string
 		expectError         bool
@@ -9068,42 +9149,29 @@ func TestGeneratePodHostNameAndDomain(t *testing.T) {
 			expectedDomain:   "my-subdomain.default.svc.cluster.local",
 		},
 		{
-			name:                "HostnameOverride - enabled - overrides all",
+			name:                "HostnameOverride - overrides all",
 			podName:             "test-pod",
 			podHostname:         "custom-hostname",
 			podSubdomain:        "my-subdomain",
 			podHostnameOverride: ptr.To("override-hostname"),
-			featureGateEnabled:  true,
 			expectedHostname:    "override-hostname",
 			expectedDomain:      "",
 		},
 		{
-			name:                "HostnameOverride - enabled - overrides all - invalid hostname",
+			name:                "HostnameOverride - overrides all - invalid hostname",
 			podName:             "test-pod",
 			podHostname:         "custom-hostname",
 			podSubdomain:        "my-subdomain",
 			podHostnameOverride: ptr.To("Invalid-Hostname-!"),
-			featureGateEnabled:  true,
 			expectError:         true,
 			errorContains:       "pod HostnameOverride \"Invalid-Hostname-!\" is not a valid DNS subdomain",
 		},
 		{
-			name:                "HostnameOverride - enabled - overrides all - valid DNS hostname",
+			name:                "HostnameOverride - overrides all - valid DNS hostname",
 			podName:             "test-pod",
 			podHostnameOverride: ptr.To("valid.hostname"),
 			expectedHostname:    "valid.hostname",
-			featureGateEnabled:  true,
 			errorContains:       "",
-		},
-		{
-			name:                "HostnameOverride - disabled - is ignored",
-			podName:             "test-pod",
-			podHostname:         "custom-hostname",
-			podSubdomain:        "my-subdomain",
-			podHostnameOverride: ptr.To("override-hostname"),
-			featureGateEnabled:  false,
-			expectedHostname:    "custom-hostname",
-			expectedDomain:      "my-subdomain.default.svc.cluster.local",
 		},
 		{
 			name:             "Hostname Truncation - pod name is too long",
@@ -9138,7 +9206,6 @@ func TestGeneratePodHostNameAndDomain(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HostnameOverride, tc.featureGateEnabled)
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      tc.podName,
@@ -9316,4 +9383,130 @@ func TestMakemountsSubpathCleanupAccumulation(t *testing.T) {
 				"expected cleaned subpaths %v but got %v", tc.expectedCleanedSubPaths, tracker.cleanedSubPaths)
 		})
 	}
+}
+
+func TestRecordPodLevelResourcesAdmission(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	_ = legacyregistry.Register(metrics.PodLevelResourcesAdmissionTotal)
+
+	metricHeader := `
+# HELP kubelet_pod_level_resources_admission_total [ALPHA] Total number of pods admitted during Kubelet admission, categorized by resource configuration mode (pod_and_container_level, pod_level, container_level, or empty for unconfigured/BestEffort) and QoS class.
+# TYPE kubelet_pod_level_resources_admission_total counter
+`
+
+	testCases := []struct {
+		name           string
+		pod            *v1.Pod
+		expectedMetric string
+	}{
+		{
+			name: "pod and container level resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedMetric: `kubelet_pod_level_resources_admission_total{config_mode="pod_and_container_level",qos_class="burstable"} 1`,
+		},
+		{
+			name: "pod level only resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+						},
+					},
+				},
+			},
+			expectedMetric: `kubelet_pod_level_resources_admission_total{config_mode="pod_level",qos_class="burstable"} 1`,
+		},
+		{
+			name: "container level only resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedMetric: `kubelet_pod_level_resources_admission_total{config_mode="container_level",qos_class="burstable"} 1`,
+		},
+		{
+			name: "no resources best effort",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+						},
+					},
+				},
+			},
+			expectedMetric: `kubelet_pod_level_resources_admission_total{config_mode="",qos_class="besteffort"} 1`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			metrics.PodLevelResourcesAdmissionTotal.Reset()
+			recordPodLevelResourcesAdmission(tc.pod)
+
+			expected := metricHeader + tc.expectedMetric + "\n"
+			testMetric(t, metrics.PodLevelResourcesAdmissionTotal.FQName(), expected)
+		})
+	}
+}
+
+func TestMakeMountsBindMountOptions(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	podDir := t.TempDir()
+	volPath := filepath.Join(podDir, "volumes", "disk")
+	require.NoError(t, os.MkdirAll(volPath, 0755))
+
+	container := v1.Container{
+		VolumeMounts: []v1.VolumeMount{
+			{MountPath: "/mnt/a", Name: "disk", BindMountOptions: []string{"noexec", "nosuid"}},
+			{MountPath: "/mnt/b", Name: "disk"},
+		},
+	}
+
+	fhu := hostutil.NewFakeHostUtil(nil)
+	podVolumes := kubecontainer.VolumeMap{
+		"disk": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: volPath}},
+	}
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "test-pod-uid"},
+	}
+
+	mounts, _, err := makeMounts(logger, &pod, podDir, &container, "fakepod", "", []string{""}, podVolumes, fhu, &trackingSubpath{}, nil, false, nil)
+	require.NoError(t, err)
+	require.Len(t, mounts, 3) // 2 volume mounts + /etc/hosts
+	assert.Equal(t, []string{"noexec", "nosuid"}, mounts[0].BindMountOptions)
+	assert.Empty(t, mounts[1].BindMountOptions)
 }

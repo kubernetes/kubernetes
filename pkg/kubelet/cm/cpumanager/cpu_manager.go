@@ -89,6 +89,10 @@ type Manager interface {
 	// exclusively allocated cpus for the container
 	GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet
 
+	// GetPodCPUs implements the podresources.CPUsProvider interface to provide
+	// the total cpuset allocated to the pod
+	GetPodCPUs(podUID string) cpuset.CPUSet
+
 	// GetPodTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment per Pod
 	// among this and other resource controllers.
@@ -503,14 +507,29 @@ func (m *manager) reconcileState(ctx context.Context) (success []reconciledConta
 			// Idempotently add it to the containerMap incase it is missing.
 			// This can happen after a kubelet restart, for example.
 			m.containerMap.Add(string(pod.UID), container.Name, containerID)
-			m.Unlock()
 
 			cset := m.state.GetCPUSetOrDefault(string(pod.UID), container.Name)
+			baselineCPUs, hasBaselineCPUs := m.state.GetBaselineCPUSet(string(pod.UID), container.Name)
+			m.Unlock()
+
 			if cset.IsEmpty() {
 				// NOTE: This should not happen outside of tests.
 				logger.V(2).Info("ReconcileState: skipping container; empty cpuset assigned")
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
 				continue
+			}
+
+			if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScalingExclusiveCPUs) {
+				// this is less clear than it should be because of the constraints of the GetCPUSetOrDefault API which should
+				// be revisited separately. A container can only have baseline CPUs set if it got an exclusive CPU assignment
+				// the first time it was admitted. Baseline CPUs reflects the CPUs promised at that time, which no following
+				// scaleup/down can ever mutate. In that case, we are also guaranteed that the `GetCPUSetOrDefault` will return
+				// _an_ exclusive CPUSet and never the default set. A clear improvement would be get rid of GetCPUSetOrDefault
+				// and make a new API which returns TWO cpusets: the exclusively allocated and the shared set.
+				if hasBaselineCPUs && !baselineCPUs.Equals(cset) {
+					logger.V(4).Info("Current container CPU assignments differ from CPU assignments recorded at admission time",
+						"currentCPUSet", cset, "baselineCPUSet", baselineCPUs)
+				}
 			}
 
 			lcset := m.lastUpdateState.GetCPUSetOrDefault(string(pod.UID), container.Name)
@@ -557,6 +576,13 @@ func findContainerStatusByName(status *v1.PodStatus, name string) (*v1.Container
 
 func (m *manager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
 	if result, ok := m.state.GetCPUSet(podUID, containerName); ok {
+		return result
+	}
+	return cpuset.New()
+}
+
+func (m *manager) GetPodCPUs(podUID string) cpuset.CPUSet {
+	if result, ok := m.state.GetPodCPUSet(podUID); ok {
 		return result
 	}
 	return cpuset.New()

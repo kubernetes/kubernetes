@@ -19,8 +19,11 @@ package preemption
 import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -46,47 +49,143 @@ func PodTerminatingByPreemption(p *v1.Pod) bool {
 //  1. Priority:
 //     Higher priority units are more important.
 //
-//  2. Workload Type (if enabled):
-//     If GenericWorkload is enabled, PodGroups are considered more important
-//     than individual Pods to preserve group integrity.
+//  2. Workload Type:
+//     CompositePodGroups are considered more important than PodGroups, and
+//     PodGroups are more important than individual Pods to preserve group integrity.
 //
 //  3. Runtime / Start Time (for individual Pods):
 //     For two individual Pods, the one that started earlier (longer runtime)
 //     is more important. This honors "first-come, first-served".
 //
-//  4. Group Size (for PodGroups):
-//     If both units are PodGroups, the one with more members (larger size) is considered
+//  4. Group Size (for PodGroups and CompositePodGroups):
+//     If both units are of the same type, the one with more members (larger size) is considered
 //     more important. This avoids the high cost of rescheduling massive jobs.
 //
-//  5. Start Time (Tie-breaker for PodGroups):
-//     If sizes are equal, the group that started earlier (has the oldest pod)
+//  5. Start Time (Tie-breaker for group types):
+//     If group types and sizes are equal, the group that started earlier (has the oldest pod)
 //     is more important.
-func MoreImportantVictim(vi1, vi2 Victim, genericWorkloadEnabled bool) bool {
+func MoreImportantVictim(vi1, vi2 Victim) bool {
 	if vi1.Priority() != vi2.Priority() {
 		return vi1.Priority() > vi2.Priority()
 	}
 
-	if !genericWorkloadEnabled {
-		return vi1.EarliestStartTime().Before(vi2.EarliestStartTime())
+	rank1 := victimRank(vi1)
+	rank2 := victimRank(vi2)
+
+	if rank1 != rank2 {
+		return rank1 > rank2
 	}
 
-	if vi1.IsPodGroup() != vi2.IsPodGroup() {
-		return vi1.IsPodGroup()
-	}
-
-	if vi1.IsPodGroup() && len(vi1.Pods()) != len(vi2.Pods()) {
+	if len(vi1.Pods()) != len(vi2.Pods()) {
 		return len(vi1.Pods()) > len(vi2.Pods())
 	}
 
 	return vi1.EarliestStartTime().Before(vi2.EarliestStartTime())
 }
 
+func victimRank(vi Victim) int {
+	switch vi.Type() {
+	case fwk.CompositePodGroupKeyType:
+		return 3
+	case fwk.PodGroupKeyType:
+		return 2
+	default:
+		return 1
+	}
+}
+
+// TraverseHierarchyUp traverses the hierarchy of PodGroups/CompositePodGroups upward from startKey.
+// At each node (either a PodGroup or a CompositePodGroup), visitFn is called.
+// If visitFn returns (stop = true), the traversal stops immediately.
+// If the next parent is missing, or cannot be listed, the traversal also stops.
+// This method assumes that both GenericWorkload as well as CompositePodGroup feature gates are enabled.
+// TODO: log/return an error if there is a gap in the hierarchy.
+func TraverseHierarchyUp(
+	namespace string,
+	startKey fwk.EntityKey,
+	pgLister fwk.PodGroupLister,
+	cpgLister fwk.CompositePodGroupLister,
+	visitFn func(key fwk.EntityKey, pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) (stop bool),
+) {
+	if pgLister == nil || cpgLister == nil {
+		return
+	}
+	currentKey := startKey
+	visited := sets.New[fwk.EntityKey]()
+	for range schedulingv1beta1.WorkloadMaxTreeDepth {
+		if visited.Has(currentKey) {
+			break
+		}
+		visited.Insert(currentKey)
+
+		switch currentKey.Type {
+		case fwk.PodGroupKeyType:
+			pg, err := pgLister.Get(namespace, currentKey.Name)
+			if err != nil || pg == nil {
+				return
+			}
+			if visitFn(currentKey, pg, nil) {
+				return
+			}
+			if pg.Spec.ParentCompositePodGroupName == nil {
+				return
+			}
+			currentKey = fwk.CompositePodGroupKey(namespace, *pg.Spec.ParentCompositePodGroupName)
+
+		case fwk.CompositePodGroupKeyType:
+			cpg, err := cpgLister.Get(namespace, currentKey.Name)
+			if err != nil || cpg == nil {
+				return
+			}
+			if visitFn(currentKey, nil, cpg) {
+				return
+			}
+			if cpg.Spec.ParentCompositePodGroupName == nil {
+				return
+			}
+			currentKey = fwk.CompositePodGroupKey(namespace, *cpg.Spec.ParentCompositePodGroupName)
+		}
+	}
+}
+
 // GetPodPriority returns the effective preemption priority of a pod. If the pod belongs to
-// a pod group, it returns the priority of the pod group.
+// a pod group or composite pod group hierarchy, it returns the priority of the root group of the hierarchy.
 // If podGroupLister is nil or the pod does not belong to a pod group, it returns the pod's own priority.
-func GetPodPriority(p *v1.Pod, podGroupLister fwk.PodGroupLister) int32 {
-	if pg := getPodGroup(p, podGroupLister); pg != nil {
+// If compositePodGroupLister is nil or a parent composite pod group in the hierarchy is not found,
+// it falls back to the priority of the last successfully resolved group (or the pod's own priority).
+// TODO: log/return an error if there is a gap in the hierarchy.
+func GetPodPriority(p *v1.Pod, podGroupLister fwk.PodGroupLister, compositePodGroupLister fwk.CompositePodGroupLister) int32 {
+	if p.Spec.SchedulingGroup == nil || podGroupLister == nil {
+		return corev1helpers.PodPriority(p)
+	}
+	if compositePodGroupLister == nil {
+		pg, err := podGroupLister.Get(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
+		if err != nil || pg == nil {
+			return corev1helpers.PodPriority(p)
+		}
 		return util.PodGroupPriority(pg)
+	}
+
+	startKey := fwk.PodGroupKey(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
+	var lastPG *schedulingv1beta1.PodGroup
+	var lastCPG *schedulingv1alpha3.CompositePodGroup
+
+	TraverseHierarchyUp(p.Namespace, startKey, podGroupLister, compositePodGroupLister, func(key fwk.EntityKey, pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) bool {
+		if pg != nil {
+			lastPG = pg
+			lastCPG = nil
+		} else if cpg != nil {
+			lastCPG = cpg
+			lastPG = nil
+		}
+		return false
+	})
+
+	if lastCPG != nil {
+		return util.CompositePodGroupPriority(lastCPG)
+	}
+	if lastPG != nil {
+		return util.PodGroupPriority(lastPG)
 	}
 	return corev1helpers.PodPriority(p)
 }

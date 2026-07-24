@@ -2102,17 +2102,21 @@ func TestStaticPolicyAllocate(t *testing.T) {
 					v1.ResourceMemory: 512 * mb,
 				},
 			},
-			pod:                      getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsGuaranteed),
-			expectedTopologyHints:    nil,
-			topologyHint:             &topologymanager.TopologyHint{},
-			expectedError:            nil,
-			podLevelResourcesEnabled: true,
+			pod:                             getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsGuaranteed),
+			expectedTopologyHints:           nil,
+			topologyHint:                    &topologymanager.TopologyHint{},
+			expectedError:                   nil,
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: false,
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			if testCase.podLevelResourcesEnabled && !testCase.podLevelResourceManagersEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, false)
+			}
 
 			t.Logf("TestStaticPolicyAllocate %s", testCase.description)
 			p, s, err := initTests(t, &testCase, testCase.topologyHint, nil)
@@ -3970,12 +3974,8 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			if testCase.podLevelResourcesEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
-			}
-			if testCase.podLevelResourceManagersEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
 
 			p, s, err := initTests(t, &testCase, nil, nil)
 			if err != nil {
@@ -4289,12 +4289,8 @@ func TestStaticPolicyGetPodTopologyHints(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			if testCase.podLevelResourcesEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
-			}
-			if testCase.podLevelResourceManagersEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
 
 			p, s, err := initTests(t, &testCase, nil, nil)
 			if err != nil {

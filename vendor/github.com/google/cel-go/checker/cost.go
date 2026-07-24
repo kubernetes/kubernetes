@@ -159,6 +159,11 @@ func (se SizeEstimate) Union(size SizeEstimate) SizeEstimate {
 	return result
 }
 
+// AsCost converts a size estimates to an equivalent cost estimate.
+func (se SizeEstimate) AsCost() CostEstimate {
+	return se.MultiplyByCostFactor(1)
+}
+
 // CostEstimate represents an estimated cost range and provides add and multiply operations
 // that do not overflow.
 type CostEstimate struct {
@@ -786,18 +791,26 @@ func (c *coster) functionCost(e ast.Expr, function, overloadID string, target *A
 			return CallEstimate{CostEstimate: c.sizeOrUnknown(args[1]).MultiplyByCostFactor(1).Add(argCostSum())}
 		}
 	// O(nm) functions
-	case overloads.MatchesString:
+	case overloads.Matches, overloads.MatchesString:
 		// https://swtch.com/~rsc/regexp/regexp1.html applies to RE2 implementation supported by CEL
-		if target != nil && len(args) == 1 {
+		var strNode, regexNode AstNode
+		if overloadID == overloads.MatchesString && target != nil && len(args) == 1 {
+			strNode = *target
+			regexNode = args[0]
+		} else if overloadID == overloads.Matches && target == nil && len(args) == 2 {
+			strNode = args[0]
+			regexNode = args[1]
+		}
+		if strNode != nil && regexNode != nil {
 			// Add one to string length for purposes of cost calculation to prevent product of string and regex to be 0
 			// in case where string is empty but regex is still expensive.
-			strCost := c.sizeOrUnknown(*target).Add(SizeEstimate{Min: 1, Max: 1}).MultiplyByCostFactor(common.StringTraversalCostFactor)
+			strCost := c.sizeOrUnknown(strNode).Add(SizeEstimate{Min: 1, Max: 1}).MultiplyByCostFactor(common.StringTraversalCostFactor)
 			// We don't know how many expressions are in the regex, just the string length (a huge
 			// improvement here would be to somehow get a count the number of expressions in the regex or
 			// how many states are in the regex state machine and use that to measure regex cost).
 			// For now, we're making a guess that each expression in a regex is typically at least 4 chars
 			// in length.
-			regexCost := c.sizeOrUnknown(args[0]).MultiplyByCostFactor(common.RegexStringLengthCostFactor)
+			regexCost := c.sizeOrUnknown(regexNode).MultiplyByCostFactor(common.RegexStringLengthCostFactor)
 			return CallEstimate{CostEstimate: strCost.Multiply(regexCost).Add(argCostSum())}
 		}
 	case overloads.ContainsString:

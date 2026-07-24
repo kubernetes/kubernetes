@@ -1495,9 +1495,10 @@ func runNonGuPodTest(ctx context.Context, f *framework.Framework, cpuCap int64, 
 	framework.ExpectNoError(err)
 	expAllowedCPUs = expAllowedCPUs.Difference(strictReservedCPUs)
 	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", expAllowedCPUs.String())
-	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-		pod.Spec.Containers[0].Name, pod.Name)
+	gomega.Eventually(ctx, func() error {
+		return e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	}).WithTimeout(30*time.Second).WithPolling(2*time.Second).Should(gomega.Succeed(),
+		"expected log not found in container [%s] of pod [%s]", pod.Spec.Containers[0].Name, pod.Name)
 
 	ginkgo.By("by deleting the pods and waiting for container removal")
 	deletePods(ctx, f, []string{pod.Name})

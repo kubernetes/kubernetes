@@ -90,8 +90,8 @@ func (s *subPathTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *subPathTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
-	skipVolTypePatterns(pattern, driver, storageframework.NewVolTypeMap(
+func (s *subPathTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
+	return checkVolTypePatterns(pattern, driver, storageframework.NewVolTypeMap(
 		storageframework.PreprovisionedPV,
 		storageframework.InlineVolume))
 }

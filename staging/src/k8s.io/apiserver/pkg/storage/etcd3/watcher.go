@@ -32,6 +32,8 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -104,6 +106,7 @@ type watchChan struct {
 	initialRev               int64
 	recursive                bool
 	progressNotify           bool
+	recordTimestamps         bool
 	internalPred             storage.SelectionPredicate
 	ctx                      context.Context
 	cancel                   context.CancelFunc
@@ -133,7 +136,7 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	if err != nil {
 		return nil, err
 	}
-	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, opts.Predicate)
+	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, opts.RecordTimestamps, opts.Predicate)
 	go wc.run(isInitialEventsEndBookmarkRequired(opts), areInitialEventsRequired(rev, opts))
 
 	// For etcd watch we don't have an easy way to answer whether the watch
@@ -146,13 +149,14 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify bool, pred storage.SelectionPredicate) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify, recordTimestamps bool, pred storage.SelectionPredicate) *watchChan {
 	wc := &watchChan{
 		watcher:                  w,
 		key:                      key,
 		initialRev:               rev,
 		recursive:                recursive,
 		progressNotify:           progressNotify,
+		recordTimestamps:         recordTimestamps,
 		internalPred:             pred,
 		incomingEventChan:        make(chan *event, incomingBufSize),
 		resultChan:               make(chan watch.Event, outgoingBufSize),
@@ -699,7 +703,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event, err error) {
 				Type:   watch.Modified,
 				Object: curObj,
 			}
-			return res, nil
+			break
 		}
 		curObjPasses := wc.filter(curObj)
 		oldObjPasses := wc.filter(oldObj)
@@ -721,7 +725,39 @@ func (wc *watchChan) transform(e *event) (res *watch.Event, err error) {
 			}
 		}
 	}
+	if res != nil && wc.recordTimestamps && !e.isInitialEvent {
+		res.Object = &timedWatchEvent{Object: res.Object, recordTime: e.recordTime}
+	}
 	return res, nil
+}
+
+// timedWatchEvent wraps a decoded watch object with the timestamp at which the
+// storage layer decoded it, so the watch cache can measure end-to-end dispatch
+// latency. It exists only on the watch cache's ingest path (opened with
+// ListOptions.RecordTimestamps) and MUST be unwrapped by the watch cache before
+// the object is stored or serialized.
+type timedWatchEvent struct {
+	runtime.Object
+	recordTime time.Time
+}
+
+var _ storage.WatchEventWithRecordTime = &timedWatchEvent{}
+
+func (t *timedWatchEvent) GetObjectMeta() metav1.Object {
+	m, _ := meta.Accessor(t.Object)
+	return m
+}
+
+func (t *timedWatchEvent) DeepCopyObject() runtime.Object {
+	return &timedWatchEvent{Object: t.Object.DeepCopyObject(), recordTime: t.recordTime}
+}
+
+func (t *timedWatchEvent) RecordTime() time.Time {
+	return t.recordTime
+}
+
+func (t *timedWatchEvent) Unwrap() runtime.Object {
+	return t.Object
 }
 
 func transformErrorToEvent(err error) *watch.Event {

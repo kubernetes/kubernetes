@@ -20,70 +20,116 @@ import (
 	"time"
 
 	"k8s.io/component-base/metrics"
+	fwk "k8s.io/kube-scheduler/framework"
 )
 
-// MetricRecorder represents a metric recorder which takes action when the
-// metric Inc(), Dec() and Clear()
+// Entity is either a pod or a podgroup that gets recorded in the metrics.
+type Entity interface {
+	// Size returns the number of pods within the entity (1 for a single pod, or the pod count for a pod group).
+	Size() int
+	// Type returns the entity type (e.g. "pod" or "podgroup").
+	Type() fwk.EntityKeyType
+}
+
+// MetricRecorder represents a metric recorder which maintains a metric through Add(), Remove(), Update(), and Clear().
 type MetricRecorder interface {
-	Add(int)
-	Inc()
-	Dec()
+	// Add records the addition of an entity.
+	Add(entity Entity)
+	// Remove records the removal of an entity.
+	Remove(entity Entity)
+	// Update records the update of an entity.
+	Update(oldEntity, newEntity Entity)
+	// Clear resets recorded metrics to zero.
 	Clear()
 }
 
-var _ MetricRecorder = &PendingPodsRecorder{}
+var _ MetricRecorder = &QueuedEntitiesRecorder{}
 
-// PendingPodsRecorder is an implementation of MetricRecorder
-type PendingPodsRecorder struct {
-	recorder metrics.GaugeMetric
+// QueuedEntitiesRecorder is an implementation of MetricRecorder.
+type QueuedEntitiesRecorder struct {
+	pods     metrics.GaugeMetric
+	entities func(entityType string) metrics.GaugeMetric
 }
 
-// NewActivePodsRecorder returns ActivePods in a Prometheus metric fashion
-func NewActivePodsRecorder() *PendingPodsRecorder {
-	return &PendingPodsRecorder{
-		recorder: ActivePods(),
+// NewActiveEntitiesRecorder returns ActivePods and ActiveEntities in a Prometheus metric fashion.
+func NewActiveEntitiesRecorder() *QueuedEntitiesRecorder {
+	return &QueuedEntitiesRecorder{
+		pods:     ActivePods(),
+		entities: ActiveEntities,
 	}
 }
 
-// NewUnschedulablePodsRecorder returns UnschedulablePods in a Prometheus metric fashion
-func NewUnschedulablePodsRecorder() *PendingPodsRecorder {
-	return &PendingPodsRecorder{
-		recorder: UnschedulablePods(),
+// NewUnschedulableEntitiesRecorder returns UnschedulablePods and UnschedulableEntities in a Prometheus metric fashion.
+func NewUnschedulableEntitiesRecorder() *QueuedEntitiesRecorder {
+	return &QueuedEntitiesRecorder{
+		pods:     UnschedulablePods(),
+		entities: UnschedulableEntities,
 	}
 }
 
-// NewBackoffPodsRecorder returns BackoffPods in a Prometheus metric fashion
-func NewBackoffPodsRecorder() *PendingPodsRecorder {
-	return &PendingPodsRecorder{
-		recorder: BackoffPods(),
+// NewBackoffEntitiesRecorder returns BackoffPods and BackoffEntities in a Prometheus metric fashion.
+func NewBackoffEntitiesRecorder() *QueuedEntitiesRecorder {
+	return &QueuedEntitiesRecorder{
+		pods:     BackoffPods(),
+		entities: BackoffEntities,
 	}
 }
 
-// NewGatedPodsRecorder returns GatedPods in a Prometheus metric fashion
-func NewGatedPodsRecorder() *PendingPodsRecorder {
-	return &PendingPodsRecorder{
-		recorder: GatedPods(),
+// NewGatedEntitiesRecorder returns GatedPods and GatedEntities in a Prometheus metric fashion.
+func NewGatedEntitiesRecorder() *QueuedEntitiesRecorder {
+	return &QueuedEntitiesRecorder{
+		pods:     GatedPods(),
+		entities: GatedEntities,
 	}
 }
 
-// Add adds a value to the metric, in an atomic way
-func (r *PendingPodsRecorder) Add(val int) {
-	r.recorder.Add(float64(val))
+// EntityToLabel converts an Entity to an entity metric label string.
+func EntityToLabel(entity Entity) (string, bool) {
+	if entity == nil {
+		return "", false
+	}
+
+	switch entity.Type() {
+	case fwk.PodKeyType:
+		return Pod, true
+	case fwk.PodGroupKeyType:
+		return PodGroup, true
+	}
+
+	return "", false
 }
 
-// Inc increases a metric counter by 1, in an atomic way
-func (r *PendingPodsRecorder) Inc() {
-	r.recorder.Inc()
+// Add records the addition of an entity.
+// It increments pending pods and queued entities metric counters.
+func (r *QueuedEntitiesRecorder) Add(entity Entity) {
+	r.pods.Add(float64(entity.Size()))
+	if label, ok := EntityToLabel(entity); ok {
+		r.entities(label).Inc()
+	}
 }
 
-// Dec decreases a metric counter by 1, in an atomic way
-func (r *PendingPodsRecorder) Dec() {
-	r.recorder.Dec()
+// Remove records the removal of an entity.
+// It decrements pending pods and queued entities metric counters.
+func (r *QueuedEntitiesRecorder) Remove(entity Entity) {
+	r.pods.Add(-float64(entity.Size()))
+	if label, ok := EntityToLabel(entity); ok {
+		r.entities(label).Dec()
+	}
 }
 
-// Clear set a metric counter to 0, in an atomic way
-func (r *PendingPodsRecorder) Clear() {
-	r.recorder.Set(float64(0))
+// Update records the update of an entity.
+// It updates pending pods metric counter only.
+// It shouldn't update queued entities metric, because the entity type cannot be changed, and an entity will always be a single object.
+func (r *QueuedEntitiesRecorder) Update(oldEntity, newEntity Entity) {
+	diff := newEntity.Size() - oldEntity.Size()
+	r.pods.Add(float64(diff))
+}
+
+// Clear resets pending pods and queued entities metric counters to 0.
+func (r *QueuedEntitiesRecorder) Clear() {
+	r.pods.Set(float64(0))
+	r.entities(Pod).Set(float64(0))
+	r.entities(PodGroup).Set(float64(0))
 }
 
 // histogramVecMetric is the data structure passed in the buffer channel between the main framework thread
@@ -205,14 +251,13 @@ func (r *MetricAsyncRecorder) observeMetricAsync(m *metrics.HistogramVec, value 
 // run flushes buffered metrics into Prometheus every second.
 func (r *MetricAsyncRecorder) run() {
 	for {
+		r.FlushMetrics()
 		select {
 		case <-r.stopCh:
 			close(r.IsStoppedCh)
 			return
-		default:
+		case <-time.After(r.interval):
 		}
-		r.FlushMetrics()
-		time.Sleep(r.interval)
 	}
 }
 

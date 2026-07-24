@@ -34,8 +34,9 @@ import (
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
@@ -340,7 +341,7 @@ func (b *Builder) PodExternalMultiple(externalClaimName string) *v1.Pod {
 }
 
 // GroupedPodWithClaims returns a pod that is a member of the given PodGroup.
-func (b *Builder) GroupedPodWithClaims(podGroup *schedulingv1alpha3.PodGroup) *v1.Pod {
+func (b *Builder) GroupedPodWithClaims(podGroup *schedulingv1beta1.PodGroup) *v1.Pod {
 	pod := b.Pod()
 	pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
 		PodGroupName: &podGroup.Name,
@@ -357,18 +358,18 @@ func (b *Builder) GroupedPodWithClaims(podGroup *schedulingv1alpha3.PodGroup) *v
 }
 
 // Workload creates a Workload with one PodGroupTemplate and no ResourceClaims.
-func (b *Builder) Workload() *schedulingv1alpha3.Workload {
-	workload := &schedulingv1alpha3.Workload{
+func (b *Builder) Workload() *schedulingv1beta1.Workload {
+	workload := &schedulingv1beta1.Workload{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: b.namespace,
 			Name:      fmt.Sprintf("tester%s-%d", b.Driver.NameSuffix, b.workloadCounter),
 		},
-		Spec: schedulingv1alpha3.WorkloadSpec{
-			PodGroupTemplates: []schedulingv1alpha3.PodGroupTemplate{
+		Spec: schedulingv1beta1.WorkloadSpec{
+			PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{
 				{
 					Name: "group",
-					SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
-						Basic: &schedulingv1alpha3.BasicSchedulingPolicy{},
+					SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+						Basic: &schedulingv1beta1.BasicSchedulingPolicy{},
 					},
 				},
 			},
@@ -380,9 +381,9 @@ func (b *Builder) Workload() *schedulingv1alpha3.Workload {
 
 // WorkloadExternal creates a Workload with one PodGroupTemplate that refers to
 // one ResourceClaim with the given name.
-func (b *Builder) WorkloadExternal(externalClaimName string) *schedulingv1alpha3.Workload {
+func (b *Builder) WorkloadExternal(externalClaimName string) *schedulingv1beta1.Workload {
 	workload := b.Workload()
-	workload.Spec.PodGroupTemplates[0].ResourceClaims = []schedulingv1alpha3.PodGroupResourceClaim{
+	workload.Spec.PodGroupTemplates[0].ResourceClaims = []schedulingv1beta1.PodGroupResourceClaim{
 		{
 			Name:              "resource-claim",
 			ResourceClaimName: &externalClaimName,
@@ -393,10 +394,10 @@ func (b *Builder) WorkloadExternal(externalClaimName string) *schedulingv1alpha3
 
 // WorkloadInline creates a ResourceClaimTemplate and a Workload with one
 // PodGroupTemplate that refers to that ResourceClaimTemplate.
-func (b *Builder) WorkloadInline() (*schedulingv1alpha3.Workload, *resourceapi.ResourceClaimTemplate) {
+func (b *Builder) WorkloadInline() (*schedulingv1beta1.Workload, *resourceapi.ResourceClaimTemplate) {
 	workload := b.Workload()
 	podGroupClaimName := "my-inline-claim"
-	workload.Spec.PodGroupTemplates[0].ResourceClaims = []schedulingv1alpha3.PodGroupResourceClaim{
+	workload.Spec.PodGroupTemplates[0].ResourceClaims = []schedulingv1beta1.PodGroupResourceClaim{
 		{
 			Name:                      podGroupClaimName,
 			ResourceClaimTemplateName: new(workload.Name),
@@ -416,14 +417,14 @@ func (b *Builder) WorkloadInline() (*schedulingv1alpha3.Workload, *resourceapi.R
 
 // PodGroup returns a simple PodGroup owned by the given Workload with no
 // resource claims.
-func (b *Builder) PodGroup(workload *schedulingv1alpha3.Workload, template schedulingv1alpha3.PodGroupTemplate) *schedulingv1alpha3.PodGroup {
-	podGroup := &schedulingv1alpha3.PodGroup{
+func (b *Builder) PodGroup(workload *schedulingv1beta1.Workload, template schedulingv1beta1.PodGroupTemplate) *schedulingv1beta1.PodGroup {
+	podGroup := &schedulingv1beta1.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: b.namespace,
 			Name:      fmt.Sprintf("%s-%s-%d", workload.Name, template.Name, b.podGroupCounter),
 		},
-		Spec: schedulingv1alpha3.PodGroupSpec{
-			WorkloadRef: &schedulingv1alpha3.WorkloadReference{
+		Spec: schedulingv1beta1.PodGroupSpec{
+			WorkloadRef: &schedulingv1beta1.WorkloadReference{
 				WorkloadName: workload.Name,
 				TemplateName: template.Name,
 			},
@@ -504,10 +505,10 @@ func (b *Builder) Create(tCtx ktesting.TContext, objs ...klog.KMetadata) []klog.
 				err := tCtx.Client().AppsV1().DaemonSets(b.namespace).Delete(tCtx, obj.Name, metav1.DeleteOptions{})
 				tCtx.ExpectNoError(err, "delete daemonset")
 			})
-		case *schedulingv1alpha3.Workload:
-			createdObj, err = tCtx.Client().SchedulingV1alpha3().Workloads(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
-		case *schedulingv1alpha3.PodGroup:
-			createdObj, err = tCtx.Client().SchedulingV1alpha3().PodGroups(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
+		case *schedulingv1beta1.Workload:
+			createdObj, err = tCtx.Client().SchedulingV1beta1().Workloads(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
+		case *schedulingv1beta1.PodGroup:
+			createdObj, err = tCtx.Client().SchedulingV1beta1().PodGroups(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 		default:
 			tCtx.Fatalf("internal error, unsupported type %T", obj)
 		}
@@ -652,12 +653,12 @@ func (b *Builder) tearDown(tCtx ktesting.TContext) {
 			continue
 		}
 		tCtx.Logf("Deleting %T %s", &podGroup, klog.KObj(&podGroup))
-		err := tCtx.Client().SchedulingV1alpha3().PodGroups(b.namespace).Delete(tCtx, podGroup.Name, metav1.DeleteOptions{})
+		err := tCtx.Client().SchedulingV1beta1().PodGroups(b.namespace).Delete(tCtx, podGroup.Name, metav1.DeleteOptions{})
 		if !apierrors.IsNotFound(err) {
 			tCtx.ExpectNoError(err, "delete podgroup")
 		}
 	}
-	tCtx.Eventually(func(tCtx ktesting.TContext) ([]schedulingv1alpha3.PodGroup, error) {
+	tCtx.Eventually(func(tCtx ktesting.TContext) ([]schedulingv1beta1.PodGroup, error) {
 		return b.listTestPodGroups(tCtx)
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "remaining podgroups despite deletion")
 
@@ -701,8 +702,8 @@ func (b *Builder) listTestPods(tCtx ktesting.TContext) ([]v1.Pod, error) {
 	return testPods, nil
 }
 
-func (b *Builder) listTestPodGroups(tCtx ktesting.TContext) ([]schedulingv1alpha3.PodGroup, error) {
-	podGroups, err := tCtx.Client().SchedulingV1alpha3().PodGroups(b.namespace).List(tCtx, metav1.ListOptions{})
+func (b *Builder) listTestPodGroups(tCtx ktesting.TContext) ([]schedulingv1beta1.PodGroup, error) {
+	podGroups, err := tCtx.Client().SchedulingV1beta1().PodGroups(b.namespace).List(tCtx, metav1.ListOptions{})
 	if apierrors.IsNotFound(err) {
 		// API is disabled
 		return nil, nil
@@ -766,6 +767,105 @@ func NetworkResources(maxAllocations int, tainted bool) driverResourcesGenFunc {
 			},
 		}
 		return driverResources
+	}
+}
+
+// PartitionProfileAttribute is the fully qualified device attribute whose value
+// labels each device's partition type in PartitionableResources.
+const PartitionProfileAttribute = resourceapi.FullyQualifiedName("dra.e2e.example.com/profile")
+
+// PartitionableResources publishes one pool "partitioned" split into a
+// shared-counter slice and a device slice whose devices consume those counters.
+// Each device carries the PartitionProfileAttribute ("Full"/"Half"). When
+// withPartitionType is true the device slice declares PartitionTypeAttribute,
+// which opts the pool into the typed partitionSummary view; otherwise the pool
+// falls back to the counterSets view. The attribute goes only on the device
+// slice: it may not be set on a slice without counter-consuming devices.
+// Node-selected for control-plane use.
+func PartitionableResources(withPartitionType bool) driverResourcesGenFunc {
+	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
+		full := "Full"
+		half := "Half"
+		devices := []resourceapi.Device{
+			partitionDevice("full", full, "8"),
+			partitionDevice("half-a", half, "4"),
+			partitionDevice("half-b", half, "4"),
+		}
+		counterSlice := resourceslice.Slice{
+			SharedCounters: []resourceapi.CounterSet{{
+				Name:     "gpu-0",
+				Counters: map[string]resourceapi.Counter{"memory": {Value: resource.MustParse("8")}},
+			}},
+		}
+		deviceSlice := resourceslice.Slice{Devices: devices}
+		if withPartitionType {
+			attr := PartitionProfileAttribute
+			deviceSlice.PartitionTypeAttribute = &attr
+		}
+		return map[string]resourceslice.DriverResources{
+			multiHostDriverResources: {
+				Pools: map[string]resourceslice.Pool{
+					"partitioned": {
+						Slices:       []resourceslice.Slice{counterSlice, deviceSlice},
+						NodeSelector: hostnameSelector(nodes),
+						Generation:   1,
+					},
+				},
+			},
+		}
+	}
+}
+
+// partitionDevice builds a device that consumes "memory" counters from gpu-0 and
+// carries the partition-type attribute.
+func partitionDevice(name, profile, memory string) resourceapi.Device {
+	return resourceapi.Device{
+		Name:       name,
+		Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{resourceapi.QualifiedName(PartitionProfileAttribute): {StringValue: &profile}},
+		ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
+			CounterSet: "gpu-0",
+			Counters:   map[string]resourceapi.Counter{"memory": {Value: resource.MustParse(memory)}},
+		}},
+	}
+}
+
+// ShareableResources publishes one pool "shareable" with count shareable devices
+// (AllowMultipleAllocations), each carrying "memory" capacity, exercising the
+// shareableSummary view. Node-selected for control-plane use.
+func ShareableResources(count int) driverResourcesGenFunc {
+	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
+		devices := make([]resourceapi.Device, count)
+		for i := range count {
+			devices[i] = resourceapi.Device{
+				Name:                     fmt.Sprintf("shared-%d", i),
+				AllowMultipleAllocations: new(true),
+				Capacity:                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"memory": {Value: resource.MustParse("16")}},
+			}
+		}
+		return map[string]resourceslice.DriverResources{
+			multiHostDriverResources: {
+				Pools: map[string]resourceslice.Pool{
+					"shareable": {
+						Slices:       []resourceslice.Slice{{Devices: devices}},
+						NodeSelector: hostnameSelector(nodes),
+						Generation:   1,
+					},
+				},
+			},
+		}
+	}
+}
+
+// hostnameSelector selects all of the test's nodes by hostname.
+func hostnameSelector(nodes *Nodes) *v1.NodeSelector {
+	return &v1.NodeSelector{
+		NodeSelectorTerms: []v1.NodeSelectorTerm{{
+			MatchExpressions: []v1.NodeSelectorRequirement{{
+				Key:      "kubernetes.io/hostname",
+				Operator: v1.NodeSelectorOpIn,
+				Values:   nodes.NodeNames,
+			}},
+		}},
 	}
 }
 

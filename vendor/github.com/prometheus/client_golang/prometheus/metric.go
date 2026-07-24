@@ -81,6 +81,9 @@ type Opts struct {
 	// string.
 	Help string
 
+	// Unit provides the unit of this metric as per https://prometheus.io/docs/specs/om
+	Unit string
+
 	// ConstLabels are used to attach fixed labels to this metric. Metrics
 	// with the same fully-qualified name must have the same label names in
 	// their ConstLabels.

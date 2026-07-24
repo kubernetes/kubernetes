@@ -30,15 +30,15 @@ import (
 	"strings"
 	"time"
 
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	certsv1 "k8s.io/api/certificates/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
-	certinformersv1beta1 "k8s.io/client-go/informers/certificates/v1beta1"
+	certinformersv1 "k8s.io/client-go/informers/certificates/v1"
 	"k8s.io/client-go/kubernetes"
-	certlistersv1beta1 "k8s.io/client-go/listers/certificates/v1beta1"
+	certlistersv1 "k8s.io/client-go/listers/certificates/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -56,14 +56,14 @@ type Controller struct {
 	kc          kubernetes.Interface
 	pcrInformer cache.SharedIndexInformer
 	pcrQueue    workqueue.TypedRateLimitingInterface[string]
-	pcrLister   certlistersv1beta1.PodCertificateRequestLister
+	pcrLister   certlistersv1.PodCertificateRequestLister
 	caKeys      []crypto.PrivateKey
 	caCerts     [][]byte
 }
 
 // New creates a new Controller.
 func New(clock clock.PassiveClock, signerName string, caKeys []crypto.PrivateKey, caCerts [][]byte, kc kubernetes.Interface) *Controller {
-	pcrInformer := certinformersv1beta1.NewFilteredPodCertificateRequestInformer(kc, metav1.NamespaceAll, 24*time.Hour, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+	pcrInformer := certinformersv1.NewFilteredPodCertificateRequestInformer(kc, metav1.NamespaceAll, 24*time.Hour, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		func(opts *metav1.ListOptions) {
 			opts.FieldSelector = fields.OneTermEqualSelector("spec.signerName", signerName).String()
 		},
@@ -75,7 +75,7 @@ func New(clock clock.PassiveClock, signerName string, caKeys []crypto.PrivateKey
 		kc:          kc,
 		pcrInformer: pcrInformer,
 		pcrQueue:    workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
-		pcrLister:   certlistersv1beta1.NewPodCertificateRequestLister(pcrInformer.GetIndexer()),
+		pcrLister:   certlistersv1.NewPodCertificateRequestLister(pcrInformer.GetIndexer()),
 		caKeys:      caKeys,
 		caCerts:     caCerts,
 	}
@@ -113,7 +113,7 @@ func (c *Controller) Run(ctx context.Context) {
 	ctbName := prefix + ":primary-bundle"
 	defer func() {
 		klog.Infof("Deleting ClusterTrustBundle %s", ctbName)
-		err := c.kc.CertificatesV1beta1().ClusterTrustBundles().Delete(context.Background(), ctbName, metav1.DeleteOptions{})
+		err := c.kc.CertificatesV1().ClusterTrustBundles().Delete(context.Background(), ctbName, metav1.DeleteOptions{})
 		if err != nil && !k8serrors.IsNotFound(err) {
 			klog.Errorf("Failed to delete ClusterTrustBundle %s: %v", ctbName, err)
 		}
@@ -134,18 +134,18 @@ func (c *Controller) ensureTrustBundle(ctx context.Context) {
 	prefix := strings.Replace(c.signerName, "/", ":", 1)
 	ctbName := prefix + ":primary-bundle"
 	caCertPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: c.caCerts[0]})
-	wantCTB := &certsv1beta1.ClusterTrustBundle{
+	wantCTB := &certsv1.ClusterTrustBundle{
 		ObjectMeta: metav1.ObjectMeta{Name: ctbName},
-		Spec: certsv1beta1.ClusterTrustBundleSpec{
+		Spec: certsv1.ClusterTrustBundleSpec{
 			SignerName:  c.signerName,
 			TrustBundle: string(caCertPEM),
 		},
 	}
 
 	klog.Infof("Getting ClusterTrustBundle %s", ctbName)
-	ctb, err := c.kc.CertificatesV1beta1().ClusterTrustBundles().Get(ctx, wantCTB.ObjectMeta.Name, metav1.GetOptions{})
+	ctb, err := c.kc.CertificatesV1().ClusterTrustBundles().Get(ctx, wantCTB.ObjectMeta.Name, metav1.GetOptions{})
 	if k8serrors.IsNotFound(err) {
-		_, err := c.kc.CertificatesV1beta1().ClusterTrustBundles().Create(ctx, wantCTB, metav1.CreateOptions{})
+		_, err := c.kc.CertificatesV1().ClusterTrustBundles().Create(ctx, wantCTB, metav1.CreateOptions{})
 		if err != nil {
 			klog.Errorf("Failed to create ClusterTrustBundle %s: %v", ctbName, err)
 			return
@@ -164,7 +164,7 @@ func (c *Controller) ensureTrustBundle(ctx context.Context) {
 	ctb = ctb.DeepCopy()
 	ctb.Spec = wantCTB.Spec
 
-	_, err = c.kc.CertificatesV1beta1().ClusterTrustBundles().Update(ctx, ctb, metav1.UpdateOptions{})
+	_, err = c.kc.CertificatesV1().ClusterTrustBundles().Update(ctx, ctb, metav1.UpdateOptions{})
 	if err != nil {
 		klog.Errorf("Failed to update ClusterTrustBundle %s: %v", ctbName, err)
 	}
@@ -210,7 +210,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	return true
 }
 
-func (c *Controller) handlePCR(ctx context.Context, pcr *certsv1beta1.PodCertificateRequest) error {
+func (c *Controller) handlePCR(ctx context.Context, pcr *certsv1.PodCertificateRequest) error {
 	if pcr.Spec.SignerName != c.signerName {
 		return nil
 	}
@@ -304,7 +304,7 @@ func (c *Controller) handlePCR(ctx context.Context, pcr *certsv1beta1.PodCertifi
 	pcr = pcr.DeepCopy()
 	pcr.Status.Conditions = []metav1.Condition{
 		{
-			Type:               certsv1beta1.PodCertificateRequestConditionTypeIssued,
+			Type:               certsv1.PodCertificateRequestConditionTypeIssued,
 			Status:             metav1.ConditionTrue,
 			Reason:             "Reason",
 			Message:            "Issued",
@@ -316,7 +316,7 @@ func (c *Controller) handlePCR(ctx context.Context, pcr *certsv1beta1.PodCertifi
 	pcr.Status.BeginRefreshAt = ptr.To(metav1.NewTime(beginRefreshAt))
 	pcr.Status.NotAfter = ptr.To(metav1.NewTime(notAfter))
 
-	_, err = c.kc.CertificatesV1beta1().PodCertificateRequests(pcr.ObjectMeta.Namespace).UpdateStatus(ctx, pcr, metav1.UpdateOptions{})
+	_, err = c.kc.CertificatesV1().PodCertificateRequests(pcr.ObjectMeta.Namespace).UpdateStatus(ctx, pcr, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("while updating PodCertificateRequest: %w", err)
 	}

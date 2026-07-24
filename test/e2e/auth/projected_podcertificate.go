@@ -29,15 +29,18 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	"k8s.io/kubernetes/test/utils/hermeticpodcertificatesigner"
 	imageutils "k8s.io/kubernetes/test/utils/image" // Import imageutils
 	admissionapi "k8s.io/pod-security-admission/api"
 	admissiontest "k8s.io/pod-security-admission/test"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 )
 
 var _ = SIGDescribe("Projected PodCertificate",
@@ -70,7 +73,14 @@ var _ = SIGDescribe("Projected PodCertificate",
 			go signer.Run(signerCtx)
 		})
 
-		ginkgo.It("should allow server and client pods to establish an mTLS connection", func(ctx context.Context) {
+		/*
+			Release: v1.37
+			Testname: Projected PodCertificate mTLS Connection
+			Description:
+			A pod configured with a projected podCertificate volume and an associated ClusterTrustBundle MUST project a valid leaf certificate chain and key.
+			Two pods configured with such certificates and keys under the same CA MUST be able to establish a mutually authenticated TLS (mTLS) connection.
+		*/
+		framework.ConformanceIt("should allow server and client pods to establish an mTLS connection [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 			namespace := f.Namespace.Name
 			ginkgo.By("Using namespace: " + namespace)
 
@@ -109,7 +119,14 @@ var _ = SIGDescribe("Projected PodCertificate",
 				"client logs did not contain expected success message pattern")
 		})
 
-		ginkgo.It("should honor UserAnnotations for SPIFFE URI path", func(ctx context.Context) {
+		/*
+			Release: v1.37
+			Testname: Projected PodCertificate UserAnnotations
+			Description:
+			The podCertificate volume projection MUST support passing unverified user annotations from the pod spec to the signer.
+			The signer MUST be able to receive and process these annotations (e.g. to override the SPIFFE URI path in the generated certificate SANs).
+		*/
+		framework.ConformanceIt("should honor UserAnnotations for SPIFFE URI path [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 			namespace := f.Namespace.Name
 			ginkgo.By("Using namespace: " + namespace)
 
@@ -118,7 +135,7 @@ var _ = SIGDescribe("Projected PodCertificate",
 			userAnnotations := map[string]string{
 				"spiffe/path-overriding": customPath, // Match the key supported the signer
 			}
-			inspectorPod := createInspectorPod(namespace, "path-override-pod", userAnnotations, nil, spiffeSignerName)
+			inspectorPod := createInspectorPod(namespace, "path-override-pod", createPodCertificateVolumes(userAnnotations, nil, spiffeSignerName))
 
 			ginkgo.By("Creating inspector pod with UserAnnotations...")
 			_, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, inspectorPod, metav1.CreateOptions{})
@@ -158,12 +175,18 @@ var _ = SIGDescribe("Projected PodCertificate",
 
 		ginkgo.Describe("MaxExpirationSeconds validations", func() {
 
-			ginkgo.It("should issue certificate with default life time (24h) when MaxExpirationSeconds is not set", func(ctx context.Context) {
+			/*
+				Release: v1.37
+				Testname: Projected PodCertificate Default Expiration
+				Description:
+				If MaxExpirationSeconds is omitted from the projected volume spec, the issued certificate MUST have a default lifetime of 24 hours.
+			*/
+			framework.ConformanceIt("should issue certificate with default life time (24h) when MaxExpirationSeconds is not set [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 				namespace := f.Namespace.Name
 				ginkgo.By("Using namespace: " + namespace)
 
 				// Create pod without MaxExpirationSeconds
-				testPod := createInspectorPod(namespace, "default-duration-pod", nil, nil, spiffeSignerName)
+				testPod := createInspectorPod(namespace, "default-duration-pod", createPodCertificateVolumes(nil, nil, spiffeSignerName))
 				ginkgo.By("Creating pod without MaxExpirationSeconds...")
 				createdPod, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, testPod, metav1.CreateOptions{})
 				if err != nil {
@@ -193,13 +216,19 @@ var _ = SIGDescribe("Projected PodCertificate",
 				gomega.Expect(lifeTime).To(gomega.BeNumerically("==", expectedDuration), "Certificate duration should be 24 hours")
 			})
 
-			ginkgo.It("should issue certificate with specified duration (1h) when MaxExpirationSeconds is set", func(ctx context.Context) {
+			/*
+				Release: v1.37
+				Testname: Projected PodCertificate Custom Expiration
+				Description:
+				If MaxExpirationSeconds is specified in the projected volume spec (e.g. 1 hour), the issued certificate MUST have a lifetime matching that duration.
+			*/
+			framework.ConformanceIt("should issue certificate with specified duration (1h) when MaxExpirationSeconds is set [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 				namespace := f.Namespace.Name
 				ginkgo.By("Using namespace: " + namespace)
 
 				// Create pod requesting 1 hour
 				requestedSeconds := int32(3600)
-				testPod := createInspectorPod(namespace, "one-hour-duration-pod", nil, &requestedSeconds, spiffeSignerName)
+				testPod := createInspectorPod(namespace, "one-hour-duration-pod", createPodCertificateVolumes(nil, &requestedSeconds, spiffeSignerName))
 				ginkgo.By("Creating pod requesting 1 hour MaxExpirationSeconds...")
 				createdPod, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, testPod, metav1.CreateOptions{})
 				if err != nil {
@@ -229,40 +258,97 @@ var _ = SIGDescribe("Projected PodCertificate",
 				gomega.Expect(lifeTime).To(gomega.BeNumerically("==", expectedDuration), "Certificate duration should be 1 hour")
 			})
 
-			ginkgo.It("should fail pod startup when MaxExpirationSeconds exceeds maximum (91d)", func(ctx context.Context) {
+			/*
+				Release: v1.37
+				Testname: Projected PodCertificate Expiration Maximum Validation
+				Description:
+				Creating a pod with a projected podCertificate volume requesting a MaxExpirationSeconds exceeding the maximum of 91 days MUST be rejected by the API server during admission.
+			*/
+			framework.ConformanceIt("should reject pod creation when MaxExpirationSeconds exceeds maximum (91d) [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 				namespace := f.Namespace.Name
 				ginkgo.By("Using namespace: " + namespace)
 
 				// Exceeds 91 days
 				tooLongSeconds := int32((91 * 24 * 60 * 60) + 1)
-				testPod := createInspectorPod(namespace, "too-long-duration-pod", nil, &tooLongSeconds, spiffeSignerName)
+				testPod := createInspectorPod(namespace, "too-long-duration-pod", createPodCertificateVolumes(nil, &tooLongSeconds, spiffeSignerName))
 				ginkgo.By("Creating pod requesting >91d MaxExpirationSeconds...")
 				_, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, testPod, metav1.CreateOptions{})
 				if err == nil {
-					framework.Fail("Error message does not match the expected.")
+					framework.Fail("Expected pod creation to fail due to too long MaxExpirationSeconds, but it succeeded")
 				}
-				if err != nil {
-					if !strings.Contains(err.Error(), "if provided, maxExpirationSeconds must be <= 7862400") {
-						framework.Failf("failed to create pod: %v", err)
-					}
+				if !strings.Contains(err.Error(), "if provided, maxExpirationSeconds must be <= 7862400") {
+					framework.Fail("Error message does not match the expected")
 				}
 			})
 
-			ginkgo.It("should fail pod startup when MaxExpirationSeconds is less than minimum (1h)", func(ctx context.Context) {
+			/*
+				Release: v1.37
+				Testname: Projected PodCertificate Expiration Minimum Validation
+				Description:
+				Creating a pod with a projected podCertificate volume requesting a MaxExpirationSeconds less than the minimum of 1 hour MUST be rejected by the API server during admission.
+			*/
+			framework.ConformanceIt("should reject pod creation when MaxExpirationSeconds is less than minimum (1h) [MinimumKubeletVersion:1.37]", func(ctx context.Context) {
 				namespace := f.Namespace.Name
 				ginkgo.By("Using namespace: " + namespace)
 
 				// Less than 1 hour
 				tooShortSeconds := int32(3599)
-				testPod := createInspectorPod(namespace, "too-short-duration-pod", nil, &tooShortSeconds, spiffeSignerName)
+				testPod := createInspectorPod(namespace, "too-short-duration-pod", createPodCertificateVolumes(nil, &tooShortSeconds, spiffeSignerName))
 				ginkgo.By("Creating pod requesting <1h MaxExpirationSeconds...")
 				_, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, testPod, metav1.CreateOptions{})
-				if err != nil {
-					if !strings.Contains(err.Error(), "if provided, maxExpirationSeconds must be >= 3600") {
-						framework.Fail("Error message does not match the expected")
-					}
+				if err == nil {
+					framework.Fail("Expected pod creation to fail due to too short MaxExpirationSeconds, but it succeeded")
+				}
+				if !strings.Contains(err.Error(), "if provided, maxExpirationSeconds must be >= 3600") {
+					framework.Fail("Error message does not match the expected")
 				}
 			})
+		})
+
+		ginkgo.It("should issue certificate with user fields [LinuxOnly]", f.WithFeatureGate(features.AtomicWriteVolumeUserFields), func(ctx context.Context) {
+			for _, tt := range []struct {
+				name           string
+				itemUser       *int64
+				defaultUser    *int64
+				expectedOutput []string
+			}{
+				{
+					name:           "set ownership when DefaultUser is present",
+					defaultUser:    ptr.To[int64](1000),
+					expectedOutput: []string{"owner UID of \"/run/tls-config/..data/spiffe-cred-bundle.pem\": 1000"},
+				},
+				{
+					name:           "set ownership when User is present",
+					itemUser:       ptr.To[int64](1000),
+					expectedOutput: []string{"owner UID of \"/run/tls-config/..data/spiffe-cred-bundle.pem\": 1000"},
+				},
+				{
+					name:           "set ownership when DefaultUser and User is present",
+					defaultUser:    ptr.To[int64](1001),
+					itemUser:       ptr.To[int64](1000),
+					expectedOutput: []string{"owner UID of \"/run/tls-config/..data/spiffe-cred-bundle.pem\": 1000"},
+				},
+			} {
+				podName := "pod-" + string(uuid.NewUUID())
+				volumes := createPodCertificateVolumes(nil, nil, spiffeSignerName)
+				volumeMounts := []v1.VolumeMount{
+					{Name: "tls-config", MountPath: "/run/tls-config"},
+				}
+				mounttestArgs := []string{
+					"mounttest",
+					"--file_owner=/run/tls-config/..data/spiffe-cred-bundle.pem",
+				}
+				pod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, volumes, volumeMounts, nil, mounttestArgs...)
+				pod.Spec.RestartPolicy = v1.RestartPolicyNever
+
+				if tt.itemUser != nil {
+					pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].PodCertificate.User = tt.itemUser
+				}
+				if tt.defaultUser != nil {
+					pod.Spec.Volumes[0].VolumeSource.Projected.DefaultUser = tt.defaultUser
+				}
+				e2epodoutput.TestContainerOutputRegexp(ctx, f, "project pod certificate", pod, 0, tt.expectedOutput)
+			}
 		})
 	})
 
@@ -413,7 +499,7 @@ func createClientObjects(namespace string, spiffeSignerName string, securityCont
 }
 
 // createInspectorPod creates a pod designed to print its certificate and wait, for inspection purposes.
-func createInspectorPod(namespace, podName string, userAnnotations map[string]string, maxExpirationSeconds *int32, spiffeSignerName string) *v1.Pod {
+func createInspectorPod(namespace, podName string, volumes []v1.Volume) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -431,27 +517,31 @@ func createInspectorPod(namespace, podName string, userAnnotations map[string]st
 					},
 				},
 			},
-			Volumes: []v1.Volume{
-				{
-					Name: "tls-config",
-					VolumeSource: v1.VolumeSource{
-						Projected: &v1.ProjectedVolumeSource{
-							Sources: []v1.VolumeProjection{
-								{
-									PodCertificate: &v1.PodCertificateProjection{
-										SignerName:           spiffeSignerName,
-										CredentialBundlePath: "spiffe-cred-bundle.pem",
-										KeyType:              "ECDSAP256",
-										UserAnnotations:      userAnnotations,
-										MaxExpirationSeconds: maxExpirationSeconds,
-									},
-								},
+			Volumes:       volumes,
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+}
+
+func createPodCertificateVolumes(userAnnotations map[string]string, maxExpirationSeconds *int32, spiffeSignerName string) []v1.Volume {
+	return []v1.Volume{
+		{
+			Name: "tls-config",
+			VolumeSource: v1.VolumeSource{
+				Projected: &v1.ProjectedVolumeSource{
+					Sources: []v1.VolumeProjection{
+						{
+							PodCertificate: &v1.PodCertificateProjection{
+								SignerName:           spiffeSignerName,
+								CredentialBundlePath: "spiffe-cred-bundle.pem",
+								KeyType:              "ECDSAP256",
+								UserAnnotations:      userAnnotations,
+								MaxExpirationSeconds: maxExpirationSeconds,
 							},
 						},
 					},
 				},
 			},
-			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 }

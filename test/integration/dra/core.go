@@ -33,9 +33,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	resourcev1beta1 "k8s.io/api/resource/v1beta1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
@@ -90,6 +93,124 @@ func testConvert(tCtx ktesting.TContext) {
 	tCtx.ExpectNoError(err, "get claim")
 	// We could check more fields, but there are unit tests which cover this better.
 	assert.Equal(tCtx, claim.Name, claimBeta2.Name, "claim name")
+}
+
+// testResourceSliceFieldSelectors verifies that all supported ResourceSlice
+// field selectors return the same objects through all served API versions.
+func testResourceSliceFieldSelectors(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+
+	type resourceSliceTestCase struct {
+		driverField   string
+		nodeNameField string
+		poolNameField string
+		list          func(ktesting.TContext, metav1.ListOptions) (runtime.Object, error)
+	}
+	testCases := map[string]resourceSliceTestCase{
+		"v1": {
+			driverField:   resourceapi.ResourceSliceSelectorDriver,
+			nodeNameField: resourceapi.ResourceSliceSelectorNodeName,
+			poolNameField: resourceapi.ResourceSliceSelectorPoolName,
+			list: func(tCtx ktesting.TContext, options metav1.ListOptions) (runtime.Object, error) {
+				return tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, options)
+			},
+		},
+		"v1beta1": {
+			driverField:   resourcev1beta1.ResourceSliceSelectorDriver,
+			nodeNameField: resourcev1beta1.ResourceSliceSelectorNodeName,
+			poolNameField: resourcev1beta1.ResourceSliceSelectorPoolName,
+			list: func(tCtx ktesting.TContext, options metav1.ListOptions) (runtime.Object, error) {
+				return tCtx.Client().ResourceV1beta1().ResourceSlices().List(tCtx, options)
+			},
+		},
+		"v1beta2": {
+			driverField:   resourcev1beta2.ResourceSliceSelectorDriver,
+			nodeNameField: resourcev1beta2.ResourceSliceSelectorNodeName,
+			poolNameField: resourcev1beta2.ResourceSliceSelectorPoolName,
+			list: func(tCtx ktesting.TContext, options metav1.ListOptions) (runtime.Object, error) {
+				return tCtx.Client().ResourceV1beta2().ResourceSlices().List(tCtx, options)
+			},
+		},
+	}
+
+	for testName, testCase := range testCases {
+		tCtx.Run(testName, func(tCtx ktesting.TContext) {
+			namespace := createTestNamespace(tCtx, nil)
+			driverName := namespace + ".example.com"
+			nodeName := namespace + "-node"
+			poolName := namespace + "-pool"
+			metadataSliceName := namespace + "-metadata"
+			driverSliceName := namespace + "-driver"
+			otherDriverName := namespace + "-other.example.com"
+			otherNodeName := namespace + "-other-node"
+			otherPoolName := namespace + "-other-pool"
+
+			selectorTestCases := []struct {
+				name          string
+				driver        string
+				nodeName      string
+				poolName      string
+				fieldSelector string
+				value         string
+			}{
+				{
+					name:          metadataSliceName,
+					driver:        otherDriverName,
+					nodeName:      otherNodeName,
+					poolName:      otherPoolName,
+					fieldSelector: "metadata.name",
+					value:         metadataSliceName,
+				},
+				{
+					name:          driverSliceName,
+					driver:        driverName,
+					nodeName:      otherNodeName,
+					poolName:      otherPoolName,
+					fieldSelector: testCase.driverField,
+					value:         driverName,
+				},
+				{
+					name:          nodeName,
+					driver:        otherDriverName,
+					nodeName:      nodeName,
+					poolName:      otherPoolName,
+					fieldSelector: testCase.nodeNameField,
+					value:         nodeName,
+				},
+				{
+					name:          poolName,
+					driver:        otherDriverName,
+					nodeName:      otherNodeName,
+					poolName:      poolName,
+					fieldSelector: testCase.poolNameField,
+					value:         poolName,
+				},
+			}
+			for _, selectorTestCase := range selectorTestCases {
+				createSlice(tCtx, &resourceapi.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{Name: selectorTestCase.name},
+					Spec: resourceapi.ResourceSliceSpec{
+						Driver:   selectorTestCase.driver,
+						NodeName: new(selectorTestCase.nodeName),
+						Pool: resourceapi.ResourcePool{
+							Name:               selectorTestCase.poolName,
+							ResourceSliceCount: 1,
+						},
+					},
+				})
+			}
+
+			for _, selectorTestCase := range selectorTestCases {
+				selector := selectorTestCase.fieldSelector + "=" + selectorTestCase.value
+				list, err := testCase.list(tCtx, metav1.ListOptions{FieldSelector: selector})
+				tCtx.ExpectNoError(err, "list ResourceSlices with field selector %q", selector)
+				names, err := listObjectNames(list)
+				tCtx.ExpectNoError(err, "extract ResourceSlices from list with field selector %q", selector)
+				require.Len(tCtx, names, 1, "field selector %q", selector)
+				assert.Equal(tCtx, selectorTestCase.name, names[0], "field selector %q", selector)
+			}
+		})
+	}
 }
 
 // testFilterTimeout covers the scheduler plugin's filter timeout configuration and behavior.
@@ -337,16 +458,17 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 								}
 								return expected
 							}()...),
-							"BindingConditions":               gomega.Equal(device.BindingConditions),
-							"BindingFailureConditions":        gomega.Equal(device.BindingFailureConditions),
-							"BindsToNode":                     gomega.Equal(device.BindsToNode),
-							"NodeAllocatableResourceMappings": gomega.Equal(device.NodeAllocatableResourceMappings),
+							"BindingConditions":        gomega.Equal(device.BindingConditions),
+							"BindingFailureConditions": gomega.Equal(device.BindingFailureConditions),
+							"BindsToNode":              gomega.Equal(device.BindsToNode),
+							"NodeAllocatableResources": gomega.Equal(device.NodeAllocatableResources),
 						}))
 					}
 					return expected
 				}()...),
 				"PerDeviceNodeSelection": matchPointer(spec.PerDeviceNodeSelection),
 				"SharedCounters":         gomega.Equal(spec.SharedCounters),
+				"PartitionTypeAttribute": matchPointer(spec.PartitionTypeAttribute),
 			})))
 		}
 		return expectedSlices
@@ -625,7 +747,7 @@ func testControllerManagerMetrics(tCtx ktesting.TContext) {
 
 	// Helper function to get metrics from the metric counter directly
 	getMetricValue := func(status, adminAccess string) float64 {
-		value, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues(status, adminAccess))
+		value, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues(status, adminAccess, "", "Pod"))
 		if err != nil {
 			// If the metric doesn't exist yet, default to 0
 			return 0

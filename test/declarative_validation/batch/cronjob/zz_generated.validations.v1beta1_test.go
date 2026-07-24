@@ -64,6 +64,67 @@ func init() {
 			"spec.jobTemplate.spec.backoffLimitPerIndex": {
 				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},
 			},
+			"spec.jobTemplate.spec.scheduling": {
+				{ErrorType: "FieldValueForbidden"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
+			"spec.jobTemplate.spec.scheduling.disruptionMode": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"spec.jobTemplate.spec.scheduling.resourceClaims": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.jobTemplate.spec.scheduling.resourceClaims[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"spec.jobTemplate.spec.scheduling.resourceClaims[*].name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.jobTemplate.spec.scheduling.resourceClaims[*].resourceClaimName": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+			},
+			"spec.jobTemplate.spec.scheduling.resourceClaims[*].resourceClaimTemplateName": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+			},
+			"spec.jobTemplate.spec.scheduling.schedulingConstraints": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.jobTemplate.spec.scheduling.schedulingConstraints.topology": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.jobTemplate.spec.scheduling.schedulingConstraints.topology[*].key": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.jobTemplate.spec.scheduling.schedulingPolicy": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
+			"spec.jobTemplate.spec.scheduling.schedulingPolicy.gang.minCount": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.jobTemplate.spec.template.spec.evictionResponders": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.jobTemplate.spec.template.spec.evictionResponders[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"spec.jobTemplate.spec.template.spec.evictionResponders[*].name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-prefixed-label-key"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.jobTemplate.spec.template.spec.evictionResponders[*].priority": {
+				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.jobTemplate.spec.template.spec.schedulingGroup": {
+				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
+			},
 			"spec.jobTemplate.spec.template.spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
 			},

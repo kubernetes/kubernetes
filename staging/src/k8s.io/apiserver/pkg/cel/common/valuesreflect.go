@@ -478,6 +478,7 @@ func (t *typedMapList) Equal(other ref.Val) ref.Val {
 		return types.False
 	}
 	tMap := t.getMap()
+	seen := make(map[interface{}]struct{}, len(tMap))
 	for it := oMapList.Iterator(); it.HasNext() == types.True; {
 		v := it.Next()
 		k := t.toMapKey(reflect.ValueOf(v.Value()))
@@ -489,8 +490,9 @@ func (t *typedMapList) Equal(other ref.Val) ref.Val {
 		if eq != types.True {
 			return eq // either false or error
 		}
+		seen[k] = struct{}{}
 	}
-	return types.True
+	return types.Bool(len(seen) == len(tMap))
 }
 
 // Add for a map list `X + Y` performs a merge where the array positions of all keys in `X` are preserved but the values
@@ -617,9 +619,11 @@ func (l *refValMapList) Equal(other ref.Val) ref.Val {
 		e := l.Get(i)
 		keyToElement[refValMapKey(e, l.escapedKeyProps)] = e
 	}
+	seen := make(map[interface{}]struct{}, int(sz))
 	for it := oMapList.Iterator(); it.HasNext() == types.True; {
 		v := it.Next()
-		e, ok := keyToElement[refValMapKey(v, l.escapedKeyProps)]
+		k := refValMapKey(v, l.escapedKeyProps)
+		e, ok := keyToElement[k]
 		if !ok {
 			return types.False
 		}
@@ -627,8 +631,9 @@ func (l *refValMapList) Equal(other ref.Val) ref.Val {
 		if eq != types.True {
 			return eq
 		}
+		seen[k] = struct{}{}
 	}
-	return types.True
+	return types.Bool(len(seen) == len(keyToElement))
 }
 
 type typedSetList struct {
@@ -636,23 +641,26 @@ type typedSetList struct {
 
 	sync.Once // for lazy load of setOfList since it is only needed if Equals is called
 	set       map[interface{}]struct{}
+	setErr    ref.Val
 }
 
-func (t *typedSetList) getSet() map[interface{}]struct{} {
-	// sets are only allowed to contain scalar elements, which are comparable in go, and can safely be used as
-	// golang map keys
+func (t *typedSetList) getSet() (map[interface{}]struct{}, ref.Val) {
 	t.Do(func() {
 		sz := t.value.Len()
 		t.set = make(map[interface{}]struct{}, sz)
 		for i := range types.Int(sz) {
-			e := t.Get(i).Value()
-			t.set[e] = struct{}{}
+			k, err := setElementKey(t.Get(i))
+			if err != nil {
+				t.set, t.setErr = nil, err
+				return
+			}
+			t.set[k] = struct{}{}
 		}
 	})
-	return t.set
+	return t.set, t.setErr
 }
 
-// Equal on a map list ignores list element order.
+// Equal on a set list ignores list element order.
 func (t *typedSetList) Equal(other ref.Val) ref.Val {
 	oSetList, ok := other.(traits.Lister)
 	if !ok {
@@ -662,45 +670,130 @@ func (t *typedSetList) Equal(other ref.Val) ref.Val {
 	if sz != oSetList.Size() {
 		return types.False
 	}
-	tSet := t.getSet()
+	tSet, err := t.getSet()
+	if err != nil {
+		return err
+	}
+	seen := make(map[interface{}]struct{}, len(tSet))
 	for it := oSetList.Iterator(); it.HasNext() == types.True; {
-		next := it.Next().Value()
-		_, ok := tSet[next]
-		if !ok {
+		k, err := setElementKey(it.Next())
+		if err != nil {
+			return err
+		}
+		if _, ok := tSet[k]; !ok {
 			return types.False
 		}
+		seen[k] = struct{}{}
 	}
-	return types.True
+	return types.Bool(len(seen) == len(tSet))
 }
 
 // Add for a set list `X + Y` performs a union where the array positions of all elements in `X` are preserved and
 // non-intersecting elements in `Y` are appended, retaining their partial order.
 func (t *typedSetList) Add(other ref.Val) ref.Val {
-	setType := t.value.Type()
-	elementType := setType.Elem()
 	oSetList, ok := other.(traits.Lister)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(other)
 	}
 	sz := t.value.Len()
-	elements := reflect.MakeSlice(setType, sz, sz)
-	for i := 0; i < sz; i++ {
-		e := t.Get(types.Int(i)).Value()
-		re := reflect.ValueOf(e)
-		elements.Index(i).Set(re.Convert(elementType))
+	elements := make([]ref.Val, sz)
+	for i := range sz {
+		elements[i] = t.Get(types.Int(i))
 	}
-	set := t.getSet()
-	for it := oSetList.Iterator(); it.HasNext() == types.True; {
-		e := it.Next().Value()
-		re := reflect.ValueOf(e)
-		if _, ok := set[e]; !ok {
-			set[e] = struct{}{}
-			elements = reflect.Append(elements, re.Convert(elementType))
+	return addToSetList(elements, oSetList)
+}
+
+// addToSetList unions the elements of other into the given set list elements
+// according to x-kubernetes-list-type=set semantics: the array positions of
+// elements are preserved, and elements of other that are not already present
+// are appended to maintain partial order. elements may be appended to,
+// so callers must not retain or reuse elements after the call.
+func addToSetList(elements []ref.Val, other traits.Lister) ref.Val {
+	set := make(map[interface{}]struct{}, len(elements))
+	for _, e := range elements {
+		k, err := setElementKey(e)
+		if err != nil {
+			return err
+		}
+		set[k] = struct{}{}
+	}
+	for it := other.Iterator(); it.HasNext() == types.True; {
+		v := it.Next()
+		k, err := setElementKey(v)
+		if err != nil {
+			return err
+		}
+		if _, exists := set[k]; !exists {
+			set[k] = struct{}{}
+			elements = append(elements, v)
 		}
 	}
-	return &typedSetList{
-		typedList: typedList{value: elements, itemsSchema: t.itemsSchema},
+	return &refValSetList{Lister: types.NewRefValList(types.DefaultTypeAdapter, elements)}
+}
+
+// setElementKey returns a valid golang map key for the given element of a set list.
+// Set elements are expected to be scalars; if the element is a non-scalar an error is returned.
+func setElementKey(element ref.Val) (value interface{}, err ref.Val) {
+	switch element.(type) {
+	case traits.Lister, traits.Mapper:
+		return nil, types.NewErr("listSet operations are only supported on lists of scalar values")
 	}
+	raw := element.Value()
+	if raw != nil && !reflect.TypeOf(raw).Comparable() {
+		// %#v includes type information and quotes strings, so the
+		// serialized form cannot collide with a comparable raw value.
+		return fmt.Sprintf("%#v", raw), nil
+	}
+	return raw, nil
+}
+
+type refValSetList struct {
+	traits.Lister
+}
+
+func (l *refValSetList) Add(other ref.Val) ref.Val {
+	oSetList, ok := other.(traits.Lister)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(other)
+	}
+	sz, _ := l.Size().(types.Int)
+	elements := make([]ref.Val, int(sz))
+	for i := range sz {
+		elements[i] = l.Get(i)
+	}
+	return addToSetList(elements, oSetList)
+}
+
+// Equal on a set list ignores list element order.
+func (l *refValSetList) Equal(other ref.Val) ref.Val {
+	oSetList, ok := other.(traits.Lister)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(other)
+	}
+	sz, _ := l.Size().(types.Int)
+	if sz != oSetList.Size() {
+		return types.False
+	}
+	set := make(map[interface{}]struct{}, int(sz))
+	for i := range sz {
+		k, err := setElementKey(l.Get(i))
+		if err != nil {
+			return err
+		}
+		set[k] = struct{}{}
+	}
+	seen := make(map[interface{}]struct{}, len(set))
+	for it := oSetList.Iterator(); it.HasNext() == types.True; {
+		k, err := setElementKey(it.Next())
+		if err != nil {
+			return err
+		}
+		if _, exists := set[k]; !exists {
+			return types.False
+		}
+		seen[k] = struct{}{}
+	}
+	return types.Bool(len(seen) == len(set))
 }
 
 type typedMap struct {

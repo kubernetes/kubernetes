@@ -32,7 +32,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -79,9 +78,7 @@ var _ = common.SIGDescribe("DNS", func() {
 	})
 
 	// Added due to #8512. This is critical for GCE and GKE deployments.
-	ginkgo.It("should provide DNS for the cluster [Provider:GCE]", func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("gce")
-
+	f.It("should provide DNS for the cluster", f.WithProvider("gce"), func(ctx context.Context) {
 		namesToResolve := []string{"google.com"}
 		// Windows containers do not have a route to the GCE metadata server by default.
 		if !framework.NodeOSDistroIs("windows") {

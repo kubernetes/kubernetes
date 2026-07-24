@@ -849,9 +849,11 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 	nodeToDaemonPods map[string][]*v1.Pod,
 	ds *apps.DaemonSet,
 	hash string,
+	tolerations []v1.Toleration,
+	requiredNodeAffinity nodeaffinity.RequiredNodeAffinity,
 ) (nodesNeedingDaemonPods, podsToDelete []string) {
 
-	shouldRun, shouldContinueRunning := NodeShouldRunDaemonPod(logger, node, ds)
+	shouldRun, shouldContinueRunning := nodeShouldRunDaemonPod(logger, node, ds, tolerations, requiredNodeAffinity)
 	daemonPods, exists := nodeToDaemonPods[node.Name]
 
 	switch {
@@ -1006,9 +1008,13 @@ func (dsc *DaemonSetsController) manage(ctx context.Context, ds *apps.DaemonSet,
 	// pod. If the node is supposed to run the daemon pod, but isn't, create the daemon pod on the node.
 	logger := klog.FromContext(ctx)
 	var nodesNeedingDaemonPods, podsToDelete []string
+	// The daemon pod tolerations and the parsed required node affinity are
+	// the same for every node; build them once instead of once per node.
+	tolerations := daemonPodTolerations(ds)
+	requiredNodeAffinity := nodeaffinity.NewRequiredNodeAffinity(ds.Spec.Template.Spec.NodeSelector, ds.Spec.Template.Spec.Affinity)
 	for _, node := range nodeList {
 		nodesNeedingDaemonPodsOnNode, podsToDeleteOnNode := dsc.podsShouldBeOnNode(
-			logger, node, nodeToDaemonPods, ds, hash)
+			logger, node, nodeToDaemonPods, ds, hash, tolerations, requiredNodeAffinity)
 
 		nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, nodesNeedingDaemonPodsOnNode...)
 		podsToDelete = append(podsToDelete, podsToDeleteOnNode...)
@@ -1209,8 +1215,10 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ctx context.Context, ds *
 
 	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable int
 	now := dsc.failedPodsBackoff.Clock.Now()
+	tolerations := daemonPodTolerations(ds)
+	requiredNodeAffinity := nodeaffinity.NewRequiredNodeAffinity(ds.Spec.Template.Spec.NodeSelector, ds.Spec.Template.Spec.Affinity)
 	for _, node := range nodeList {
-		shouldRun, _ := NodeShouldRunDaemonPod(logger, node, ds)
+		shouldRun, _ := nodeShouldRunDaemonPod(logger, node, ds, tolerations, requiredNodeAffinity)
 		scheduled := len(nodeToDaemonPods[node.Name]) > 0
 
 		if shouldRun {
@@ -1379,22 +1387,41 @@ func (dsc *DaemonSetsController) syncDaemonSet(ctx context.Context, key string) 
 //     Returns true when a daemonset should continue running on a node if a daemonset pod is already
 //     running on that node.
 func NodeShouldRunDaemonPod(logger klog.Logger, node *v1.Node, ds *apps.DaemonSet) (bool, bool) {
-	pod := NewPod(ds, node.Name)
+	return nodeShouldRunDaemonPod(logger, node, ds, daemonPodTolerations(ds),
+		nodeaffinity.NewRequiredNodeAffinity(ds.Spec.Template.Spec.NodeSelector, ds.Spec.Template.Spec.Affinity))
+}
 
+// daemonPodTolerations returns the tolerations of the pods this DaemonSet
+// creates: the template's tolerations plus the defaults every daemon pod
+// gets. The template is not modified.
+func daemonPodTolerations(ds *apps.DaemonSet) []v1.Toleration {
+	spec := ds.Spec.Template.Spec
+	util.AddOrUpdateDaemonPodTolerations(&spec)
+	return spec.Tolerations
+}
+
+// nodeShouldRunDaemonPod is NodeShouldRunDaemonPod for callers that evaluate
+// many nodes against the same DaemonSet: tolerations and requiredNodeAffinity
+// depend only on ds — daemonPodTolerations(ds) and the parsing result of the
+// pod template's nodeSelector and affinity — so per-node loops build them
+// once instead of once per node. Parsing the required node affinity
+// dominates the cost of this check, and the sync paths run it for every node
+// in the cluster.
+func nodeShouldRunDaemonPod(logger klog.Logger, node *v1.Node, ds *apps.DaemonSet, tolerations []v1.Toleration, requiredNodeAffinity nodeaffinity.RequiredNodeAffinity) (bool, bool) {
 	// If the daemon set specifies a node name, check that it matches with node.Name.
 	if !(ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name) {
 		return false, false
 	}
 
 	taints := node.Spec.Taints
-	fitsNodeName, fitsNodeAffinity, fitsTaints := predicates(logger, pod, node, taints)
-	if !fitsNodeName || !fitsNodeAffinity {
+	fitsNodeAffinity, fitsTaints := predicates(logger, node, taints, tolerations, requiredNodeAffinity)
+	if !fitsNodeAffinity {
 		return false, false
 	}
 
 	if !fitsTaints {
 		// Scheduled daemon pods should continue running if they tolerate NoExecute taint.
-		_, hasUntoleratedTaint := v1helper.FindMatchingUntoleratedTaint(logger, taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
+		_, hasUntoleratedTaint := v1helper.FindMatchingUntoleratedTaint(logger, taints, tolerations, func(t *v1.Taint) bool {
 			return t.Effect == v1.TaintEffectNoExecute
 		}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
 		return false, !hasUntoleratedTaint
@@ -1403,12 +1430,13 @@ func NodeShouldRunDaemonPod(logger klog.Logger, node *v1.Node, ds *apps.DaemonSe
 	return true, true
 }
 
-// predicates checks if a DaemonSet's pod can run on a node.
-func predicates(logger klog.Logger, pod *v1.Pod, node *v1.Node, taints []v1.Taint) (fitsNodeName, fitsNodeAffinity, fitsTaints bool) {
-	fitsNodeName = len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName == node.Name
+// predicates checks if a DaemonSet's pod can run on a node. tolerations and
+// requiredNodeAffinity must be derived from the DaemonSet's pod template
+// (see NodeShouldRunDaemonPod).
+func predicates(logger klog.Logger, node *v1.Node, taints []v1.Taint, tolerations []v1.Toleration, requiredNodeAffinity nodeaffinity.RequiredNodeAffinity) (fitsNodeAffinity, fitsTaints bool) {
 	// Ignore parsing errors for backwards compatibility.
-	fitsNodeAffinity, _ = nodeaffinity.GetRequiredNodeAffinity(pod).Match(node)
-	_, hasUntoleratedTaint := v1helper.FindMatchingUntoleratedTaint(logger, taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
+	fitsNodeAffinity, _ = requiredNodeAffinity.Match(node)
+	_, hasUntoleratedTaint := v1helper.FindMatchingUntoleratedTaint(logger, taints, tolerations, func(t *v1.Taint) bool {
 		return t.Effect == v1.TaintEffectNoExecute || t.Effect == v1.TaintEffectNoSchedule
 	}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
 	fitsTaints = !hasUntoleratedTaint

@@ -19,6 +19,7 @@ package e2enode
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -42,6 +43,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/component-base/metrics/testutil"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	remote "k8s.io/cri-client/pkg"
@@ -646,4 +648,34 @@ func deletePodSyncAndWait(ctx context.Context, f *framework.Framework, podNS, po
 	deletePodSyncByName(ctx, f, podName)
 	waitForAllContainerRemoval(ctx, podName, podNS)
 	framework.Logf("deleted pod: %s/%s", podNS, podName)
+}
+
+func getKubeletMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
+	ginkgo.By("Getting Kubelet metrics from the metrics API")
+	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, nodeNameOrIP()+":10255", "/metrics")
+}
+
+// ErrMetricNotFound indicates that a metric family or matching sample was not found in scraped metrics.
+var ErrMetricNotFound = errors.New("metric or sample not found in kubelet metrics")
+
+// getCounterMetricValue extracts the counter metric value matching metricName and labels.
+// It returns ErrMetricNotFound if metricName or the matching label sample is not found in metrics.
+func getCounterMetricValue(metrics e2emetrics.KubeletMetrics, metricName string, labels map[string]string) (float64, error) {
+	samples, ok := metrics[metricName]
+	if !ok {
+		return 0, fmt.Errorf("%w: metric %q not found in kubelet metrics", ErrMetricNotFound, metricName)
+	}
+	for _, sample := range samples {
+		match := true
+		for k, v := range labels {
+			if val, ok := sample.Metric[testutil.LabelName(k)]; !ok || string(val) != v {
+				match = false
+				break
+			}
+		}
+		if match {
+			return float64(sample.Value), nil
+		}
+	}
+	return 0, fmt.Errorf("%w: metric %q with labels %v not found in kubelet metrics", ErrMetricNotFound, metricName, labels)
 }

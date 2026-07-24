@@ -32,7 +32,7 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -139,8 +139,8 @@ func newControllerFromClientWithClock(ctx context.Context, t *testing.T, kubeCli
 	jm, err := newControllerWithClock(ctx, kubeClient, clock,
 		sharedInformers.Core().V1().Pods(),
 		sharedInformers.Batch().V1().Jobs(),
-		sharedInformers.Scheduling().V1alpha3().Workloads(),
-		sharedInformers.Scheduling().V1alpha3().PodGroups(),
+		sharedInformers.Scheduling().V1beta1().Workloads(),
+		sharedInformers.Scheduling().V1beta1().PodGroups(),
 	)
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
@@ -6574,7 +6574,7 @@ func TestWatchOrphanPods(t *testing.T) {
 	t.Cleanup(cancel)
 	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1alpha3().Workloads(), sharedInformers.Scheduling().V1alpha3().PodGroups())
+	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1beta1().Workloads(), sharedInformers.Scheduling().V1beta1().PodGroups())
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
 	}
@@ -6645,7 +6645,7 @@ func TestSyncOrphanPod(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1alpha3().Workloads(), sharedInformers.Scheduling().V1alpha3().PodGroups())
+	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1beta1().Workloads(), sharedInformers.Scheduling().V1beta1().PodGroups())
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
 	}
@@ -7520,7 +7520,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1alpha3().Workloads(), sharedInformers.Scheduling().V1alpha3().PodGroups())
+	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1beta1().Workloads(), sharedInformers.Scheduling().V1beta1().PodGroups())
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
 	}
@@ -7624,7 +7624,7 @@ func TestFinalizerCleanup(t *testing.T) {
 
 	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1alpha3().Workloads(), sharedInformers.Scheduling().V1alpha3().PodGroups())
+	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1beta1().Workloads(), sharedInformers.Scheduling().V1beta1().PodGroups())
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
 	}
@@ -7881,31 +7881,31 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 	gangJob.Spec.BackoffLimit = ptr.To[int32](6)
 	templateName := fmt.Sprintf("%s-pgt-%d", gangJob.Name, 0)
 
-	makeWorkload := func(job *batch.Job) *schedulingv1alpha3.Workload {
-		return &schedulingv1alpha3.Workload{
+	makeWorkload := func(job *batch.Job) *schedulingv1beta1.Workload {
+		return &schedulingv1beta1.Workload{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            computeWorkloadName(job),
 				Namespace:       metav1.NamespaceDefault,
 				UID:             types.UID("wl-uid"),
 				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(job, controllerKind)},
 			},
-			Spec: schedulingv1alpha3.WorkloadSpec{
-				ControllerRef: &schedulingv1alpha3.TypedLocalObjectReference{
+			Spec: schedulingv1beta1.WorkloadSpec{
+				ControllerRef: &schedulingv1beta1.TypedLocalObjectReference{
 					APIGroup: "batch",
 					Kind:     "Job",
 					Name:     job.Name,
 				},
-				PodGroupTemplates: []schedulingv1alpha3.PodGroupTemplate{
+				PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{
 					{Name: templateName},
 				},
 			},
 		}
 	}
 
-	makePodGroup := func(job *batch.Job, wl *schedulingv1alpha3.Workload) *schedulingv1alpha3.PodGroup {
-		return &schedulingv1alpha3.PodGroup{
+	makePodGroup := func(job *batch.Job, wl *schedulingv1beta1.Workload) *schedulingv1beta1.PodGroup {
+		return &schedulingv1beta1.PodGroup{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: "scheduling.k8s.io/v1alpha3",
+				APIVersion: "scheduling.k8s.io/v1beta1",
 				Kind:       "PodGroup",
 			},
 			ObjectMeta: metav1.ObjectMeta{
@@ -7914,8 +7914,8 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				UID:             types.UID("pg-uid"),
 				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(job, controllerKind)},
 			},
-			Spec: schedulingv1alpha3.PodGroupSpec{
-				WorkloadRef: &schedulingv1alpha3.WorkloadReference{
+			Spec: schedulingv1beta1.PodGroupSpec{
+				WorkloadRef: &schedulingv1beta1.WorkloadReference{
 					WorkloadName: wl.Name,
 					TemplateName: templateName,
 				},
@@ -7926,10 +7926,15 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 	gangWorkload := makeWorkload(gangJob)
 	gangPodGroup := makePodGroup(gangJob, gangWorkload)
 
+	// A Basic Job (no spec.scheduling) still materializes a Workload/PodGroup
+	// under Universal Representation, so its pods get a schedulingGroup too.
+	basicJob := newJob(2, 5, 6, batch.NonIndexedCompletion)
+	basicPodGroupName := computePodGroupName(computeWorkloadName(basicJob), podGroupTemplateName(basicJob))
+
 	testCases := map[string]struct {
 		job              *batch.Job
-		existingWorkload *schedulingv1alpha3.Workload
-		existingPodGroup *schedulingv1alpha3.PodGroup
+		existingWorkload *schedulingv1beta1.Workload
+		existingPodGroup *schedulingv1beta1.PodGroup
 
 		workloadWithJob bool
 
@@ -7947,10 +7952,12 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 			wantPodGroupOwnerRef:    true,
 			wantCreations:           4,
 		},
-		"non-eligible job: no schedulingGroup on pods": {
-			job:             newJob(2, 5, 6, batch.NonIndexedCompletion),
-			workloadWithJob: true,
-			wantCreations:   2,
+		"basic job: Workload/PodGroup materialized and pods get schedulingGroup": {
+			job:                     basicJob,
+			workloadWithJob:         true,
+			wantSchedulingGroupName: basicPodGroupName,
+			wantPodGroupOwnerRef:    true,
+			wantCreations:           2,
 		},
 		"job with pre-existing schedulingGroup: preserved without PodGroup ownerRef": {
 			job: func() *batch.Job {
@@ -7973,11 +7980,11 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				return j
 			}(),
 			workloadWithJob: true,
-			existingWorkload: func() *schedulingv1alpha3.Workload {
+			existingWorkload: func() *schedulingv1beta1.Workload {
 				j := newGangSchedulingJob("suspended-job", 4)
 				return makeWorkload(j)
 			}(),
-			existingPodGroup: func() *schedulingv1alpha3.PodGroup {
+			existingPodGroup: func() *schedulingv1beta1.PodGroup {
 				j := newGangSchedulingJob("suspended-job", 4)
 				wl := makeWorkload(j)
 				return makePodGroup(j, wl)

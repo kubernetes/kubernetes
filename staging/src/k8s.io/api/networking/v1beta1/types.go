@@ -36,7 +36,7 @@ import (
 type Ingress struct {
 	metav1.TypeMeta `json:""`
 
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -233,6 +233,7 @@ type IngressRuleValue struct {
 	// 2. Consider adding fields for ingress-type specific global options
 	// usable by a loadbalancer, like http keep-alive.
 
+	// http is a HTTP IngressRuleValue, which contains a list of http selectors
 	// +optional
 	HTTP *HTTPIngressRuleValue `json:"http,omitempty" protobuf:"bytes,1,opt,name=http"`
 }
@@ -344,7 +345,7 @@ type IngressBackend struct {
 type IngressClass struct {
 	metav1.TypeMeta `json:""`
 
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -442,7 +443,7 @@ type IngressClassList struct {
 // Invalid: 10.01.2.3 or 2001:db8:0:0:0::1
 type IPAddress struct {
 	metav1.TypeMeta `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -454,7 +455,7 @@ type IPAddress struct {
 
 // IPAddressSpec describe the attributes in an IP Address.
 type IPAddressSpec struct {
-	// ParentRef references the resource that an IPAddress is attached to.
+	// parentRef references the resource that an IPAddress is attached to.
 	// An IPAddress must reference a parent object.
 	// +required
 	// +k8s:beta(since: "1.37")=+k8s:required
@@ -464,17 +465,17 @@ type IPAddressSpec struct {
 
 // ParentReference describes a reference to a parent object.
 type ParentReference struct {
-	// Group is the group of the object being referenced.
+	// group is the group of the object being referenced.
 	// +optional
 	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
-	// Resource is the resource of the object being referenced.
+	// resource is the resource of the object being referenced.
 	// +required
 	// +k8s:beta(since: "1.37")=+k8s:required
 	Resource string `json:"resource,omitempty" protobuf:"bytes,2,opt,name=resource"`
-	// Namespace is the namespace of the object being referenced.
+	// namespace is the namespace of the object being referenced.
 	// +optional
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
-	// Name is the name of the object being referenced.
+	// name is the name of the object being referenced.
 	// +required
 	// +k8s:beta(since: "1.37")=+k8s:required
 	Name string `json:"name,omitempty" protobuf:"bytes,4,opt,name=name"`
@@ -504,7 +505,7 @@ type IPAddressList struct {
 // +k8s:supportsSubresource="/status"
 type ServiceCIDR struct {
 	metav1.TypeMeta `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -520,7 +521,7 @@ type ServiceCIDR struct {
 
 // ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.
 type ServiceCIDRSpec struct {
-	// CIDRs defines the IP blocks in CIDR notation (e.g. "192.168.0.0/24" or "2001:db8::/64")
+	// cidrs defines the IP blocks in CIDR notation (e.g. "192.168.0.0/24" or "2001:db8::/64")
 	// from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family.
 	// This field is immutable.
 	// +optional

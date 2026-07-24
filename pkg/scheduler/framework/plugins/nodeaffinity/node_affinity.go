@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -37,9 +38,10 @@ import (
 
 // NodeAffinity is a plugin that checks if a pod node selector matches the node label.
 type NodeAffinity struct {
-	handle              fwk.Handle
-	addedNodeSelector   *nodeaffinity.NodeSelector
-	addedPrefSchedTerms *nodeaffinity.PreferredSchedulingTerms
+	handle                                             fwk.Handle
+	addedNodeSelector                                  *nodeaffinity.NodeSelector
+	addedPrefSchedTerms                                *nodeaffinity.PreferredSchedulingTerms
+	enableInPlacePodVerticalScalingSchedulerPreemption bool
 }
 
 var _ fwk.PreFilterPlugin = &NodeAffinity{}
@@ -146,6 +148,9 @@ func (pl *NodeAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1
 
 // PreFilter builds and writes cycle state used by Filter.
 func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil, fwk.NewStatus(fwk.Skip)
+	}
 	affinity := pod.Spec.Affinity
 	noNodeAffinity := (affinity == nil ||
 		affinity.NodeAffinity == nil ||
@@ -205,6 +210,9 @@ func (pl *NodeAffinity) PreFilterExtensions() fwk.PreFilterExtensions {
 // Filter checks if the Node matches the Pod .spec.affinity.nodeAffinity and
 // the plugin's added affinity.
 func (pl *NodeAffinity) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil
+	}
 	node := nodeInfo.Node()
 
 	if pl.addedNodeSelector != nil && !pl.addedNodeSelector.Match(node) {
@@ -303,6 +311,7 @@ func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Fea
 	}
 	pl := &NodeAffinity{
 		handle: h,
+		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
 	}
 	if args.AddedAffinity != nil {
 		if ns := args.AddedAffinity.RequiredDuringSchedulingIgnoredDuringExecution; ns != nil {

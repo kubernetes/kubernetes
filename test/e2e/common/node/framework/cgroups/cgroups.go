@@ -483,3 +483,30 @@ func IsPodOnCgroupv2Node(f *framework.Framework, podName, containerName string) 
 	// So, we need to see if "/sys/fs/cgroup" is contained in the output.
 	return strings.Contains(out, "/sys/fs/cgroup")
 }
+
+// VerifyPodHugepagesLimit verifies the pod-level hugepages limit.
+func VerifyPodHugepagesLimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, pageSize string, expectedLimit string, onCgroupV2 bool) error {
+	podCgPath, err := getPodCgroupPath(f, pod, onCgroupV2, "hugetlb")
+	if err != nil {
+		return err
+	}
+
+	var hugepageCgPath string
+	if onCgroupV2 {
+		hugepageCgPath = fmt.Sprintf("%s/hugetlb.%s.max", podCgPath, pageSize)
+	} else {
+		hugepageCgPath = fmt.Sprintf("%s/hugetlb.%s.limit_in_bytes", podCgPath, pageSize)
+	}
+	return VerifyCgroupValue(ctx, f, pod, pod.Spec.Containers[0].Name, hugepageCgPath, expectedLimit)
+}
+
+// VerifyContainerHugepagesLimit verifies the container-level hugepages limit.
+func VerifyContainerHugepagesLimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, pageSize string, expectedLimit string, onCgroupV2 bool) error {
+	var hugepageCgPath string
+	if onCgroupV2 {
+		hugepageCgPath = fmt.Sprintf("/sys/fs/cgroup/hugetlb.%s.max", pageSize)
+	} else {
+		hugepageCgPath = fmt.Sprintf("/sys/fs/cgroup/hugetlb.%s.limit_in_bytes", pageSize)
+	}
+	return VerifyCgroupValue(ctx, f, pod, containerName, hugepageCgPath, expectedLimit)
+}

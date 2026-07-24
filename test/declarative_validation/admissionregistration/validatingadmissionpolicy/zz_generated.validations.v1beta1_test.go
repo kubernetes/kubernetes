@@ -67,6 +67,10 @@ func init() {
 			"status.conditions[*].observedGeneration": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"status.conditions[*].reason": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
 			"status.conditions[*].status": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},

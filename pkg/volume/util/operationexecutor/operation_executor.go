@@ -244,6 +244,13 @@ type ActualStateOfWorldMounterUpdater interface {
 	// CheckVolumeInFailedExpansionWithFinalErrors verifies if volume expansion has failed with a final
 	// error
 	CheckVolumeInFailedExpansionWithFinalErrors(volumeName v1.UniqueVolumeName) bool
+
+	// MarkVolumeAsMountAttempted records that kubelet attempted to stage/publish this
+	// volume for the pod. Used by volume health probing for volumes that never
+	// reached mounted/uncertain ASW state.
+	MarkVolumeAsMountAttempted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName)
+	// IsVolumeMountAttempted returns true if MarkVolumeAsMountAttempted was called for this pair.
+	IsVolumeMountAttempted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) bool
 }
 
 // ActualStateOfWorldAttacherUpdater defines a set of operations updating the

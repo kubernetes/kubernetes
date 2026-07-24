@@ -479,8 +479,8 @@ func (ht *serverHandlerTransport) runStream() {
 
 func (ht *serverHandlerTransport) incrMsgRecv() {}
 
-func (ht *serverHandlerTransport) Drain(string) {
-	panic("Drain() is not implemented")
+func (ht *serverHandlerTransport) Drain(s string) {
+	ht.Close(errors.New(s))
 }
 
 // mapRecvMsgError returns the non-nil err into the appropriate

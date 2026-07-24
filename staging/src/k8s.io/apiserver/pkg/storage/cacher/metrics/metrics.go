@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
@@ -31,6 +32,37 @@ const (
 	namespace = "apiserver"
 	subsystem = "watch_cache"
 )
+
+// DispatchStage identifies a single stage of an event's lifecycle as it moves
+// through the watch cache dispatch pipeline. It is used as the "stage" label
+// value on the dispatchStageDuration metric.
+//
+// StageTotal is the end-to-end latency of a successfully delivered event.
+// The remaining stages measure individual segments of that path.
+type DispatchStage int
+
+const (
+	// StageTotal: end-to-end, etcd decode -> written to the result channel.
+	StageTotal DispatchStage = iota
+
+	// StageStorageToCache: event decoded from etcd -> event received by cacher.
+	// Captures the delay between when an event is decoded from the storage backend
+	// and when it is first processed by the cacher's reflector loop.
+	StageStorageToCache
+
+	// StageCacheToWatcher: watch.Event built -> written to watcher's result channel.
+	// Captures time spent blocked handing the event off to the client,
+	// i.e. downstream (result channel) backpressure.
+	StageCacheToWatcher
+
+	numDispatchStages
+)
+
+var dispatchStageName = [numDispatchStages]string{
+	StageTotal:          "total",
+	StageStorageToCache: "storage_to_cache",
+	StageCacheToWatcher: "cache_to_watcher",
+}
 
 /*
  * By default, all the following metrics are defined as falling under
@@ -234,6 +266,16 @@ var (
 		},
 		[]string{"group", "resource"},
 	)
+
+	DispatchStageDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      "watch_events",
+			Name:           "dispatch_duration_seconds",
+			Help:           "Histogram of watch event dispatch latency broken by resource type and pipeline stage. The 'total' stage is the end-to-end latency of a delivered event.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
+		}, []string{"group", "resource", "stage"})
 )
 
 var registerMetrics sync.Once
@@ -263,6 +305,7 @@ func Register() {
 			legacyregistry.MustRegister(WatchShardsTotal)
 			legacyregistry.MustRegister(WatchFilteredEventsTotal)
 		}
+		legacyregistry.MustRegister(DispatchStageDuration)
 	})
 }
 
@@ -304,4 +347,49 @@ func RecordsWatchCacheCapacityChange(groupResource schema.GroupResource, old, ne
 		return
 	}
 	watchCacheCapacityDecreaseTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
+}
+
+// WatcherMetricsObservers holds pre-resolved (group, resource) observers for
+// every dispatch stage, so the hot path never touches the label map.
+type WatcherMetricsObservers struct {
+	stageDurations [numDispatchStages]compbasemetrics.ObserverMetric
+}
+
+// NewWatcherMetricsObservers creates a pre-resolved metrics observer for watch connections.
+func NewWatcherMetricsObservers(groupResource schema.GroupResource) *WatcherMetricsObservers {
+	o := &WatcherMetricsObservers{}
+	for s := range numDispatchStages {
+		o.stageDurations[s] = DispatchStageDuration.WithLabelValues(groupResource.Group, groupResource.Resource, dispatchStageName[s])
+	}
+	return o
+}
+
+// ObserveStage records the duration spent in the given dispatch stage.
+func (d *WatcherMetricsObservers) ObserveStage(stage DispatchStage, duration time.Duration) {
+	if stage < 0 || stage >= numDispatchStages {
+		return
+	}
+	observe(d.stageDurations[stage], duration)
+}
+
+func observe(m compbasemetrics.ObserverMetric, duration time.Duration) {
+	if duration < 0 {
+		duration = 0
+	}
+	m.Observe(duration.Seconds())
+}
+
+type noopObserver struct{}
+
+func (noopObserver) Observe(float64) {}
+
+var noopObs noopObserver
+
+// NewNoopWatcherMetricsObservers returns a metrics observers struct that does nothing.
+func NewNoopWatcherMetricsObservers() *WatcherMetricsObservers {
+	o := &WatcherMetricsObservers{}
+	for s := range o.stageDurations {
+		o.stageDurations[s] = noopObs
+	}
+	return o
 }

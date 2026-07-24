@@ -4,6 +4,7 @@
 package loading
 
 import (
+	"errors"
 	"io/fs"
 	"net/http"
 	"os"
@@ -23,7 +24,8 @@ type (
 	}
 
 	fileOptions struct {
-		fs fs.ReadFileFS
+		fs   fs.ReadFileFS
+		root string // when non-empty, local reads are confined to this directory via os.Root
 	}
 
 	options struct {
@@ -33,6 +35,20 @@ type (
 )
 
 func (fo fileOptions) ReadFileFunc() func(string) ([]byte, error) {
+	if fo.root != "" {
+		root := fo.root
+
+		return func(name string) ([]byte, error) {
+			r, err := os.OpenRoot(root)
+			if err != nil {
+				return nil, errors.Join(err, ErrLoader)
+			}
+			defer func() { _ = r.Close() }()
+
+			return r.ReadFile(name)
+		}
+	}
+
 	if fo.fs == nil {
 		return os.ReadFile
 	}
@@ -87,14 +103,43 @@ func WithHTTPClient(client *http.Client) Option {
 // By default, the file system is the one provided by the os package.
 //
 // For example, this may be set to consume from an embedded file system, or a rooted FS.
+//
+// WithFS and [WithRoot] are mutually exclusive: the last one applied wins.
+//
+// Security note: a file system built from [os.DirFS] confines paths but does NOT protect
+// against symlinks that escape the root. To load from a directory derived from untrusted
+// input, prefer [WithRoot], which is symlink-escape resistant.
 func WithFS(filesystem fs.FS) Option {
 	return func(o *options) {
+		o.root = "" // last-wins vs WithRoot
 		if rfs, ok := filesystem.(fs.ReadFileFS); ok {
 			o.fs = rfs
 
 			return
 		}
 		o.fs = readFileFS{FS: filesystem}
+	}
+}
+
+// WithRoot confines local file loading to dir.
+//
+// Every requested path is resolved relative to dir, and any path that would escape dir —
+// whether through an absolute path, ".." traversal, or a symlink pointing outside dir — is
+// rejected. This is built on [os.Root] and is therefore resistant to the symlink escapes
+// that a plain [os.DirFS] does not prevent.
+//
+// WithRoot is the recommended option when loading specs from a location derived from
+// untrusted input. It applies to local loading only and has no effect on remote
+// (http/https) loading. WithRoot and [WithFS] are mutually exclusive: the last one applied
+// wins.
+//
+// Note: [os.Root] confines path resolution but does not, by itself, protect against
+// traversal of mount/bind boundaries, /proc special files, or device files. Point WithRoot
+// at a directory that holds only the documents you intend to expose.
+func WithRoot(dir string) Option {
+	return func(o *options) {
+		o.root = dir
+		o.fs = nil // last-wins vs WithFS
 	}
 }
 

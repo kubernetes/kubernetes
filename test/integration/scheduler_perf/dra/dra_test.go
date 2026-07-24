@@ -64,9 +64,7 @@ func TestSchedulerPerf(t *testing.T) {
 			if allocatorName == "stable" {
 				options = append(options, perf.WithPreRunFn(func(tCtx ktesting.TContext, _ *perf.Workload) (func(), error) {
 					gate := utilfeature.DefaultFeatureGate.(featuregate.MutableVersionedFeatureGate)
-					overrides := featuregatetesting.FeatureOverrides{
-						features.DRAPrioritizedList: false,
-					}
+					overrides := featuregatetesting.FeatureOverrides{}
 					// If version emulation already caused features to be off,
 					// then we do not need and maybe even cannot turn them
 					// off (pre-alpha = feature doesn't event exist).

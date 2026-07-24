@@ -66,6 +66,11 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.parentCompositePodGroupName": {
+				{ErrorType: "FieldValueForbidden"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
 			"spec.preemptionPolicy": {
 				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
@@ -123,6 +128,7 @@ func init() {
 			},
 			"spec.workloadRef": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},
 			},
 			"spec.workloadRef.templateName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
@@ -137,6 +143,10 @@ func init() {
 			},
 			"status.conditions[*].observedGeneration": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"status.conditions[*].reason": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 			},
 			"status.conditions[*].status": {
 				{ErrorType: "FieldValueNotSupported"},

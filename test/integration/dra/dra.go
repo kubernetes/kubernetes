@@ -30,7 +30,7 @@ import (
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -170,7 +170,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				})
 				runSubTest(tCtx, "ExplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, true) })
 				runSubTest(tCtx, "ImplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, false) })
-				runSubTest(tCtx, "ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
+				runSubTest(tCtx, "ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
 				runSubTest(tCtx, "DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, false) })
 				runSubTest(tCtx, "ResourceSliceController", func(tCtx ktesting.TContext) {
 					namespace := createTestNamespace(tCtx, nil)
@@ -212,15 +212,15 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				})
 			},
 		},
-		// This scenario verifies that features which have graduated to GA can
-		// still be explicitly disabled via feature gates.
-		"GA-opt-out": {
-			apis: map[schema.GroupVersion]bool{},
+		"GA-opt-out-1.36": {
+			version: "1.36",
+			apis:    map[schema.GroupVersion]bool{},
 			features: map[featuregate.Feature]bool{
-				featuregate.Feature("AllBeta"): false,
-				features.DRAPrioritizedList:    false,
+				features.DRAResourceClaimDeviceStatus: false,
+				features.DRAPrioritizedList:           false,
 			},
 			f: func(tCtx ktesting.TContext) {
+				runSubTest(tCtx, "ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
 			},
 		},
@@ -281,6 +281,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })
 				runSubTest(tCtx, "Convert", testConvert)
 				runSubTest(tCtx, "ControllerManagerMetrics", testControllerManagerMetrics)
+				runSubTest(tCtx, "ResourceSliceFieldSelectors", testResourceSliceFieldSelectors)
 				runSubTest(tCtx, "DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, true) })
 				runSubTest(tCtx, "PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, true) })
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
@@ -433,7 +434,10 @@ func createNodes(tCtx ktesting.TContext) {
 				v1.ResourceMemory: resource.MustParse(nodeMemoryCapacity),
 				v1.ResourcePods:   *resource.NewScaledQuantity(maxPodsPerNode, 0),
 			},
-			Phase: v1.NodeRunning,
+			// Required for tests in test/integration/dra/node_allocatable_resources.go.
+			// DeclaredFeatures must include DRANodeAllocatableResources to pass node feature validation during admission.
+			DeclaredFeatures: []string{"DRANodeAllocatableResources"},
+			Phase:            v1.NodeRunning,
 			Conditions: []v1.NodeCondition{
 				{
 					Type:   v1.NodeReady,
@@ -637,7 +641,7 @@ func (claimController *claimControllerSingleton) start(tCtx ktesting.TContext) {
 		klog.FromContext(claimControllerCtx),
 		claimControllerCtx.Client(),
 		claimController.informerFactory.Core().V1().Pods(),
-		claimController.informerFactory.Scheduling().V1alpha3().PodGroups(),
+		claimController.informerFactory.Scheduling().V1beta1().PodGroups(),
 		claimController.informerFactory.Resource().V1().ResourceClaims(),
 		claimController.informerFactory.Resource().V1().ResourceClaimTemplates(),
 	)

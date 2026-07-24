@@ -244,6 +244,7 @@ func TestCRIListPodStats(t *testing.T) {
 		fakeImageService,
 		NewFakeHostStatsProviderWithData(fakeStats, fakeOS),
 		false,
+		false,
 		fakeContainerStatsProvider{},
 	)
 
@@ -479,6 +480,7 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 		fakeImageService,
 		NewFakeHostStatsProviderWithData(fakeStats, fakeOS),
 		true,
+		false,
 		fakeContainerStatsProvider{},
 	)
 
@@ -657,6 +659,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		nil,
 		NewFakeHostStatsProvider(&kubecontainertest.FakeOS{}),
 		false,
+		false,
 		fakeContainerStatsProvider{},
 	)
 
@@ -812,6 +815,7 @@ func TestCRIPodCPUAndMemoryStats(t *testing.T) {
 		nil,
 		NewFakeHostStatsProvider(&kubecontainertest.FakeOS{}),
 		false,
+		false,
 		fakeContainerStatsProvider,
 	)
 
@@ -895,6 +899,7 @@ func TestCRIImagesFsStats(t *testing.T) {
 		fakeRuntimeService,
 		fakeImageService,
 		NewFakeHostStatsProvider(&kubecontainertest.FakeOS{}),
+		false,
 		false,
 		fakeContainerStatsProvider{},
 	)

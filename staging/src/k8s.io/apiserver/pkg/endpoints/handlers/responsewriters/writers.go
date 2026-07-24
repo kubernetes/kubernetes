@@ -127,7 +127,7 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 	}
 
 	// make a best effort to write the object if a failure is detected
-	utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
+	utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a %s response: %w", w.mediaType, err))
 	w.discardBufferedResponse()
 	status := ErrorToAPIStatus(err)
 	candidateStatusCode := int(status.Code)
@@ -141,7 +141,7 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 		output = []byte(fmt.Sprintf("%s: %s", status.Reason, status.Message))
 	}
 	if _, err := w.Write(output); err != nil {
-		utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a fallback JSON response: %v", err))
+		utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a fallback %s response: %w", w.mediaType, err))
 	}
 	w.Close()
 }

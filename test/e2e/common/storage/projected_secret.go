@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -44,7 +45,7 @@ var _ = SIGDescribe("Projected secret", func() {
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with default permission mode. Pod MUST be able to read the content of the key successfully and the mode MUST be -rw-r--r-- by default.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume", f.WithNodeConformance(), func(ctx context.Context) {
-		doProjectedSecretE2EWithoutMapping(ctx, f, nil /* default mode */, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
+		doProjectedSecretE2EWithoutMapping(ctx, f, nil, nil, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
 	/*
@@ -55,7 +56,7 @@ var _ = SIGDescribe("Projected secret", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		defaultMode := int32(0400)
-		doProjectedSecretE2EWithoutMapping(ctx, f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
+		doProjectedSecretE2EWithoutMapping(ctx, f, &defaultMode, nil, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
 	/*
@@ -67,7 +68,12 @@ var _ = SIGDescribe("Projected secret", func() {
 	framework.ConformanceIt("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		fsGroup := int64(1001)
-		doProjectedSecretE2EWithoutMapping(ctx, f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), &fsGroup, &nonRootTestUserID)
+		doProjectedSecretE2EWithoutMapping(ctx, f, &defaultMode, nil, "projected-secret-test-"+string(uuid.NewUUID()), &fsGroup, &nonRootTestUserID)
+	})
+
+	f.It("should be consumable from pods in volume as non-root with defaultUser set [LinuxOnly]", f.WithFeatureGate(features.AtomicWriteVolumeUserFields), func(ctx context.Context) {
+		defaultUser := int64(1000)
+		doProjectedSecretE2EWithoutMapping(ctx, f, nil, &defaultUser, "projected-secret-test-"+string(uuid.NewUUID()), nil, &nonRootTestUserID)
 	})
 
 	/*
@@ -76,7 +82,7 @@ var _ = SIGDescribe("Projected secret", func() {
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with default permission mode. The secret is also mapped to a custom path. Pod MUST be able to read the content of the key successfully and the mode MUST be -r--------on the mapped volume.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings", f.WithNodeConformance(), func(ctx context.Context) {
-		doProjectedSecretE2EWithMapping(ctx, f, nil)
+		doProjectedSecretE2EWithMapping(ctx, f, nil, nil, nil)
 	})
 
 	/*
@@ -87,7 +93,12 @@ var _ = SIGDescribe("Projected secret", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item Mode set [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		mode := int32(0400)
-		doProjectedSecretE2EWithMapping(ctx, f, &mode)
+		doProjectedSecretE2EWithMapping(ctx, f, &mode, nil, nil)
+	})
+
+	f.It("should be consumable from pods in volume with mappings and Item User set [LinuxOnly]", f.WithFeatureGate(features.AtomicWriteVolumeUserFields), func(ctx context.Context) {
+		user := int64(1000)
+		doProjectedSecretE2EWithMapping(ctx, f, nil, &user, &user)
 	})
 
 	f.It("should be able to mount in a volume regardless of a different secret existing with same name in different namespace", f.WithNodeConformance(), func(ctx context.Context) {
@@ -108,7 +119,7 @@ var _ = SIGDescribe("Projected secret", func() {
 		if secret2, err = f.ClientSet.CoreV1().Secrets(namespace2.Name).Create(ctx, secret2, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret2.Name, err)
 		}
-		doProjectedSecretE2EWithoutMapping(ctx, f, nil /* default mode */, secret2.Name, nil, nil)
+		doProjectedSecretE2EWithoutMapping(ctx, f, nil, nil, secret2.Name, nil, nil)
 	})
 
 	/*
@@ -431,7 +442,7 @@ var _ = SIGDescribe("Projected secret", func() {
 	})
 })
 
-func doProjectedSecretE2EWithoutMapping(ctx context.Context, f *framework.Framework, defaultMode *int32,
+func doProjectedSecretE2EWithoutMapping(ctx context.Context, f *framework.Framework, defaultMode *int32, defaultUser *int64,
 	secretName string, fsGroup *int64, uid *int64) {
 	var (
 		volumeName      = "projected-secret-volume"
@@ -476,7 +487,9 @@ func doProjectedSecretE2EWithoutMapping(ctx context.Context, f *framework.Framew
 					Args: []string{
 						"mounttest",
 						"--file_content=/etc/projected-secret-volume/data-1",
-						"--file_mode=/etc/projected-secret-volume/data-1"},
+						"--file_mode=/etc/projected-secret-volume/data-1",
+						"--file_owner=/etc/projected-secret-volume/data-1",
+					},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -490,8 +503,10 @@ func doProjectedSecretE2EWithoutMapping(ctx context.Context, f *framework.Framew
 	}
 
 	if defaultMode != nil {
-		//pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].Secret.DefaultMode = defaultMode
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = defaultMode
+	}
+	if defaultUser != nil {
+		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultUser = defaultUser
 	}
 
 	if fsGroup != nil || uid != nil {
@@ -506,11 +521,14 @@ func doProjectedSecretE2EWithoutMapping(ctx context.Context, f *framework.Framew
 		"content of file \"/etc/projected-secret-volume/data-1\": value-1",
 		fileModeRegexp,
 	}
+	if defaultUser != nil {
+		expectedOutput = append(expectedOutput, fmt.Sprintf("owner UID of \"/etc/projected-secret-volume/data-1\": %d", *defaultUser))
+	}
 
 	e2epodoutput.TestContainerOutputRegexp(ctx, f, "consume secrets", pod, 0, expectedOutput)
 }
 
-func doProjectedSecretE2EWithMapping(ctx context.Context, f *framework.Framework, mode *int32) {
+func doProjectedSecretE2EWithMapping(ctx context.Context, f *framework.Framework, mode *int32, user, runAsUser *int64) {
 	var (
 		name            = "projected-secret-test-map-" + string(uuid.NewUUID())
 		volumeName      = "projected-secret-volume"
@@ -560,7 +578,9 @@ func doProjectedSecretE2EWithMapping(ctx context.Context, f *framework.Framework
 					Args: []string{
 						"mounttest",
 						"--file_content=/etc/projected-secret-volume/new-path-data-1",
-						"--file_mode=/etc/projected-secret-volume/new-path-data-1"},
+						"--file_mode=/etc/projected-secret-volume/new-path-data-1",
+						"--file_owner=/etc/projected-secret-volume/new-path-data-1",
+					},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -574,14 +594,24 @@ func doProjectedSecretE2EWithMapping(ctx context.Context, f *framework.Framework
 	}
 
 	if mode != nil {
-		//pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].Secret.Items[0].Mode = mode
-		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = mode
+		pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].Secret.Items[0].Mode = mode
+	}
+	if user != nil {
+		pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].Secret.Items[0].User = user
+	}
+	if runAsUser != nil {
+		pod.Spec.SecurityContext = &v1.PodSecurityContext{
+			RunAsUser: runAsUser,
+		}
 	}
 
 	fileModeRegexp := getFileModeRegex("/etc/projected-secret-volume/new-path-data-1", mode)
 	expectedOutput := []string{
 		"content of file \"/etc/projected-secret-volume/new-path-data-1\": value-1",
 		fileModeRegexp,
+	}
+	if user != nil {
+		expectedOutput = append(expectedOutput, fmt.Sprintf("owner UID of \"/etc/projected-secret-volume/new-path-data-1\": %d", *user))
 	}
 
 	e2epodoutput.TestContainerOutputRegexp(ctx, f, "consume secrets", pod, 0, expectedOutput)

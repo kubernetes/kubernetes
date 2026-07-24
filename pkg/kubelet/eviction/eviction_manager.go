@@ -547,6 +547,11 @@ func (m *managerImpl) emptyDirLimitEviction(logger klog.Logger, podStats statsap
 	for i := range pod.Spec.Volumes {
 		source := &pod.Spec.Volumes[i].VolumeSource
 		if source.EmptyDir != nil {
+			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) && source.EmptyDir.Medium == v1.StorageMediumMemory {
+				// Memory-backed emptyDir volumes are backed by tmpfs, which has its size limit
+				// enforced by the kernel. Eviction manager enforcement is not needed.
+				continue
+			}
 			size := source.EmptyDir.SizeLimit
 			used := podVolumeUsed[pod.Spec.Volumes[i].Name]
 			if used != nil && size != nil && size.Sign() == 1 && used.Cmp(*size) > 0 {

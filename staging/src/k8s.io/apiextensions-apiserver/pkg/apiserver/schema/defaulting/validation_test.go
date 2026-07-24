@@ -73,7 +73,10 @@ func TestDefaultValidationWithCostBudget(t *testing.T) {
 							Type: "string",
 							XValidations: apiextensions.ValidationRules{
 								{
-									Rule: "self.startsWith('kube')",
+									// The estimated cost depends on the length of this
+									// substring. It was chosen just long enough to trigger
+									// an error.
+									Rule: "self.startsWith('kube-everyt')",
 								},
 							},
 							Default: jsonPtr("kube-everything"),

@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"strings"
 	"testing"
 
@@ -34,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
+	"k8s.io/client-go/util/homedir"
 	"k8s.io/klog/v2"
 )
 
@@ -513,28 +515,154 @@ extensions:
 	}
 }
 
+func TestRelativizePathWithNoBacksteps(t *testing.T) {
+	var root string
+	var base string
+	var otherBase string
+	if goruntime.GOOS == "windows" {
+		root = "C:"
+		base = root + "\\base"
+		otherBase = root + "\\" + "other"
+	} else {
+		root = ""
+		base = "/base"
+		otherBase = "/other"
+	}
+
+	tests := []struct {
+		base          string
+		name          string
+		inputPaths    []string
+		expectedPaths []string
+		expectError   bool
+	}{
+		{
+			base:          root + "/base",
+			name:          "path in subdirectory with slashes - should relativize",
+			inputPaths:    []string{root + "/base/subdir/file.txt"},
+			expectedPaths: []string{filepath.Join("subdir", "file.txt")},
+			expectError:   false,
+		},
+		{
+			base:          base,
+			name:          "path in subdirectory - should relativize",
+			inputPaths:    []string{filepath.Join(base, "subdir", "file.txt")},
+			expectedPaths: []string{filepath.Join("subdir", "file.txt")},
+			expectError:   false,
+		},
+		{
+			base:          base,
+			name:          "path in same directory - should relativize",
+			inputPaths:    []string{filepath.Join(base, "file.txt")},
+			expectedPaths: []string{"file.txt"},
+			expectError:   false,
+		},
+		{
+			base:          root + "/base",
+			name:          "absolute path requiring backsteps with slashes - should remain absolute",
+			inputPaths:    []string{root + "/other/dir/file.txt"},
+			expectedPaths: []string{root + "/other/dir/file.txt"},
+			expectError:   false,
+		},
+		{
+			base:          base,
+			name:          "absolute path requiring backsteps - should remain absolute",
+			inputPaths:    []string{filepath.Join(otherBase, "dir", "file.txt")},
+			expectedPaths: []string{filepath.Join(otherBase, "dir", "file.txt")},
+			expectError:   false,
+		},
+		{
+			base:          base,
+			name:          "relative path requiring backsteps - should error",
+			inputPaths:    []string{filepath.Join("..", "other", "file.txt")},
+			expectedPaths: []string{filepath.Join("..", "other", "file.txt")},
+			expectError:   true,
+		},
+		{
+			base:          base,
+			name:          "empty path - should remain empty",
+			inputPaths:    []string{""},
+			expectedPaths: []string{""},
+			expectError:   false,
+		},
+		{
+			base:          base,
+			name:          "multiple paths no backsteps - should relativize all",
+			inputPaths:    []string{filepath.Join(base, "file1.txt"), filepath.Join(base, "subdir", "file2.txt")},
+			expectedPaths: []string{"file1.txt", filepath.Join("subdir", "file2.txt")},
+			expectError:   false,
+		},
+		{
+			base:          base,
+			name:          "mixed paths with absolute requiring backsteps - should keep absolute unchanged",
+			inputPaths:    []string{filepath.Join(base, "file1.txt"), filepath.Join(otherBase, "file2.txt"), filepath.Join(base, "subdir", "file3.txt")},
+			expectedPaths: []string{"file1.txt", filepath.Join(otherBase, "file2.txt"), filepath.Join("subdir", "file3.txt")},
+			expectError:   false,
+		},
+		{
+			base:          base,
+			name:          "mixed with empty paths",
+			inputPaths:    []string{filepath.Join(base, "file1.txt"), "", filepath.Join(base, "subdir", "file2.txt")},
+			expectedPaths: []string{"file1.txt", "", filepath.Join("subdir", "file2.txt")},
+			expectError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create pointers to the input strings
+			refs := make([]*string, len(tt.inputPaths))
+			for i := range tt.inputPaths {
+				s := tt.inputPaths[i]
+				refs[i] = &s
+			}
+
+			// Call the function
+			err := RelativizePathWithNoBacksteps(refs, tt.base)
+
+			// Check error expectation
+			if tt.expectError && err == nil {
+				t.Errorf("expected an error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			// If no error expected, check the results
+			if !tt.expectError {
+				for i, ref := range refs {
+					if *ref != tt.expectedPaths[i] {
+						t.Errorf("path %d: expected %q, got %q", i, tt.expectedPaths[i], *ref)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestResolveRelativePaths(t *testing.T) {
+	absoluteDir := filepath.Join(t.TempDir(), "absolute")
 	pathResolutionConfig1 := clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"relative-user-1": {ClientCertificate: "relative/client/cert", ClientKey: "../relative/client/key"},
-			"absolute-user-1": {ClientCertificate: "/absolute/client/cert", ClientKey: "/absolute/client/key"},
-			"relative-cmd-1":  {Exec: &clientcmdapi.ExecConfig{Command: "../relative/client/cmd"}},
-			"absolute-cmd-1":  {Exec: &clientcmdapi.ExecConfig{Command: "/absolute/client/cmd"}},
+			"relative-user-1": {ClientCertificate: filepath.Join("relative", "client", "cert"), ClientKey: filepath.Join("..", "relative", "client", "key")},
+			"absolute-user-1": {ClientCertificate: filepath.Join(absoluteDir, "client", "cert"), ClientKey: filepath.Join(absoluteDir, "client", "key")},
+			"relative-cmd-1":  {Exec: &clientcmdapi.ExecConfig{Command: filepath.Join("..", "relative", "client", "cmd")}},
+			"absolute-cmd-1":  {Exec: &clientcmdapi.ExecConfig{Command: filepath.Join(absoluteDir, "client", "cmd")}},
 			"PATH-cmd-1":      {Exec: &clientcmdapi.ExecConfig{Command: "cmd"}},
 		},
 		Clusters: map[string]*clientcmdapi.Cluster{
-			"relative-server-1": {CertificateAuthority: "../relative/ca"},
-			"absolute-server-1": {CertificateAuthority: "/absolute/ca"},
+			"relative-server-1": {CertificateAuthority: filepath.Join("..", "relative", "ca")},
+			"absolute-server-1": {CertificateAuthority: filepath.Join(absoluteDir, "ca")},
 		},
 	}
 	pathResolutionConfig2 := clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"relative-user-2": {ClientCertificate: "relative/client/cert2", ClientKey: "../relative/client/key2"},
-			"absolute-user-2": {ClientCertificate: "/absolute/client/cert2", ClientKey: "/absolute/client/key2"},
+			"relative-user-2": {ClientCertificate: filepath.Join("relative", "client", "cert2"), ClientKey: filepath.Join("..", "relative", "client", "key2")},
+			"absolute-user-2": {ClientCertificate: filepath.Join(absoluteDir, "client", "cert2"), ClientKey: filepath.Join(absoluteDir, "client", "key2")},
 		},
 		Clusters: map[string]*clientcmdapi.Cluster{
-			"relative-server-2": {CertificateAuthority: "../relative/ca2"},
-			"absolute-server-2": {CertificateAuthority: "/absolute/ca2"},
+			"relative-server-2": {CertificateAuthority: filepath.Join("..", "relative", "ca2")},
+			"absolute-server-2": {CertificateAuthority: filepath.Join(absoluteDir, "ca2")},
 		},
 	}
 
@@ -626,29 +754,26 @@ func TestResolveRelativePaths(t *testing.T) {
 }
 
 func TestMigratingFile(t *testing.T) {
-	sourceFile, _ := os.CreateTemp("", "")
-	defer utiltesting.CloseAndRemove(t, sourceFile)
-	destinationFile, _ := os.CreateTemp("", "")
-	// delete the file so that we'll write to it
-	os.Remove(destinationFile.Name())
+	tempDir := t.TempDir()
+	sourceFile := filepath.Join(tempDir, "source")
+	destinationFile := filepath.Join(tempDir, "destination")
 
-	WriteToFile(testConfigAlfa, sourceFile.Name())
+	if err := WriteToFile(testConfigAlfa, sourceFile); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
 
 	loadingRules := ClientConfigLoadingRules{
-		MigrationRules: map[string]string{destinationFile.Name(): sourceFile.Name()},
+		MigrationRules: map[string]string{destinationFile: sourceFile},
 	}
 
 	if _, err := loadingRules.Load(); err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
-	// the load should have recreated this file
-	defer utiltesting.CloseAndRemove(t, destinationFile)
-
-	sourceContent, err := os.ReadFile(sourceFile.Name())
+	sourceContent, err := os.ReadFile(sourceFile)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
-	destinationContent, err := os.ReadFile(destinationFile.Name())
+	destinationContent, err := os.ReadFile(destinationFile)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -658,11 +783,11 @@ func TestMigratingFile(t *testing.T) {
 	}
 
 	// destination file permissions should be the same as the source file permissions
-	sourceInfo, err := os.Stat(sourceFile.Name())
+	sourceInfo, err := os.Stat(sourceFile)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
-	destinationInfo, err := os.Stat(destinationFile.Name())
+	destinationInfo, err := os.Stat(destinationFile)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -949,7 +1074,10 @@ func TestLoadingGetLoadingPrecedence(t *testing.T) {
 		precedence []string
 	}{
 		"default": {
-			precedence: []string{filepath.Join(os.Getenv("HOME"), ".kube/config")},
+			// Reconstruct the expected default path independently from the
+			// home directory so the assertion validates how RecommendedHomeFile
+			// is assembled rather than comparing it against itself.
+			precedence: []string{filepath.Join(homedir.HomeDir(), RecommendedHomeDir, RecommendedFileName)},
 		},
 		"explicit": {
 			rules: &ClientConfigLoadingRules{
@@ -962,7 +1090,7 @@ func TestLoadingGetLoadingPrecedence(t *testing.T) {
 			precedence: []string{"/env/kubeconfig"},
 		},
 		"envvar-multiple": {
-			env:        "/env/kubeconfig:/other/kubeconfig",
+			env:        strings.Join([]string{"/env/kubeconfig", "/other/kubeconfig"}, string(filepath.ListSeparator)),
 			precedence: []string{"/env/kubeconfig", "/other/kubeconfig"},
 		},
 	}

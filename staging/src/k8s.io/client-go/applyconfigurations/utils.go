@@ -47,6 +47,7 @@ import (
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	v1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
+	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
@@ -102,6 +103,7 @@ import (
 	flowcontrolv1beta3 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta3"
 	applyconfigurationsimagepolicyv1alpha1 "k8s.io/client-go/applyconfigurations/imagepolicy/v1alpha1"
 	internal "k8s.io/client-go/applyconfigurations/internal"
+	applyconfigurationslifecyclev1alpha1 "k8s.io/client-go/applyconfigurations/lifecycle/v1alpha1"
 	applyconfigurationsmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	applyconfigurationsnetworkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
 	applyconfigurationsnetworkingv1beta1 "k8s.io/client-go/applyconfigurations/networking/v1beta1"
@@ -512,6 +514,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsbatchv1.JobApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("JobCondition"):
 		return &applyconfigurationsbatchv1.JobConditionApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("JobSchedulingConfiguration"):
+		return &applyconfigurationsbatchv1.JobSchedulingConfigurationApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("JobSpec"):
 		return &applyconfigurationsbatchv1.JobSpecApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("JobStatus"):
@@ -552,6 +556,16 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscertificatesv1.CertificateSigningRequestSpecApplyConfiguration{}
 	case certificatesv1.SchemeGroupVersion.WithKind("CertificateSigningRequestStatus"):
 		return &applyconfigurationscertificatesv1.CertificateSigningRequestStatusApplyConfiguration{}
+	case certificatesv1.SchemeGroupVersion.WithKind("ClusterTrustBundle"):
+		return &applyconfigurationscertificatesv1.ClusterTrustBundleApplyConfiguration{}
+	case certificatesv1.SchemeGroupVersion.WithKind("ClusterTrustBundleSpec"):
+		return &applyconfigurationscertificatesv1.ClusterTrustBundleSpecApplyConfiguration{}
+	case certificatesv1.SchemeGroupVersion.WithKind("PodCertificateRequest"):
+		return &applyconfigurationscertificatesv1.PodCertificateRequestApplyConfiguration{}
+	case certificatesv1.SchemeGroupVersion.WithKind("PodCertificateRequestSpec"):
+		return &applyconfigurationscertificatesv1.PodCertificateRequestSpecApplyConfiguration{}
+	case certificatesv1.SchemeGroupVersion.WithKind("PodCertificateRequestStatus"):
+		return &applyconfigurationscertificatesv1.PodCertificateRequestStatusApplyConfiguration{}
 
 		// Group=certificates.k8s.io, Version=v1alpha1
 	case certificatesv1alpha1.SchemeGroupVersion.WithKind("ClusterTrustBundle"):
@@ -712,6 +726,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.EventSeriesApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("EventSource"):
 		return &applyconfigurationscorev1.EventSourceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("EvictionResponder"):
+		return &applyconfigurationscorev1.EvictionResponderApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ExecAction"):
 		return &applyconfigurationscorev1.ExecActionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("FCVolumeSource"):
@@ -792,6 +808,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.NodeAddressApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeAffinity"):
 		return &applyconfigurationscorev1.NodeAffinityApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("NodeAllocatableMappedResources"):
+		return &applyconfigurationscorev1.NodeAllocatableMappedResourcesApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("NodeAllocatableOverheadResources"):
+		return &applyconfigurationscorev1.NodeAllocatableOverheadResourcesApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeAllocatableResourceClaimStatus"):
 		return &applyconfigurationscorev1.NodeAllocatableResourceClaimStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeCondition"):
@@ -804,6 +824,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.NodeDaemonEndpointsApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeFeatures"):
 		return &applyconfigurationscorev1.NodeFeaturesApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("NodePodPreemptionPolicy"):
+		return &applyconfigurationscorev1.NodePodPreemptionPolicyApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeRuntimeHandler"):
 		return &applyconfigurationscorev1.NodeRuntimeHandlerApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeRuntimeHandlerFeatures"):
@@ -890,6 +912,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PodTemplateApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodTemplateSpec"):
 		return &applyconfigurationscorev1.PodTemplateSpecApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodVolumeHealth"):
+		return &applyconfigurationscorev1.PodVolumeHealthApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PortStatus"):
 		return &applyconfigurationscorev1.PortStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PortworxVolumeSource"):
@@ -1000,6 +1024,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.VolumeApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("VolumeDevice"):
 		return &applyconfigurationscorev1.VolumeDeviceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("VolumeHealthCondition"):
+		return &applyconfigurationscorev1.VolumeHealthConditionApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("VolumeHealthStatus"):
+		return &applyconfigurationscorev1.VolumeHealthStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("VolumeMount"):
 		return &applyconfigurationscorev1.VolumeMountApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("VolumeMountStatus"):
@@ -1337,6 +1365,34 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 	case apiserverinternalv1alpha1.SchemeGroupVersion.WithKind("StorageVersionStatus"):
 		return &applyconfigurationsapiserverinternalv1alpha1.StorageVersionStatusApplyConfiguration{}
 
+		// Group=lifecycle.k8s.io, Version=v1alpha1
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("Eviction"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionPodReference"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionPodReferenceApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionRequest"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionRequestApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionRequestPodReference"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionRequestPodReferenceApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionRequestSpec"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionRequestSpecApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionRequestStatus"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionRequestStatusApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionRequestTarget"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionRequestTargetApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionSpec"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionSpecApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionStatus"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionStatusApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("EvictionTarget"):
+		return &applyconfigurationslifecyclev1alpha1.EvictionTargetApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("Requester"):
+		return &applyconfigurationslifecyclev1alpha1.RequesterApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("ResponderStatus"):
+		return &applyconfigurationslifecyclev1alpha1.ResponderStatusApplyConfiguration{}
+	case lifecyclev1alpha1.SchemeGroupVersion.WithKind("TargetResponder"):
+		return &applyconfigurationslifecyclev1alpha1.TargetResponderApplyConfiguration{}
+
 		// Group=meta.k8s.io, Version=v1
 	case metav1.SchemeGroupVersion.WithKind("Condition"):
 		return &applyconfigurationsmetav1.ConditionApplyConfiguration{}
@@ -1632,8 +1688,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.ExactDeviceRequestApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1.NetworkDeviceDataApplyConfiguration{}
-	case resourcev1.SchemeGroupVersion.WithKind("NodeAllocatableResourceMapping"):
-		return &applyconfigurationsresourcev1.NodeAllocatableResourceMappingApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("NodeAllocatableMapping"):
+		return &applyconfigurationsresourcev1.NodeAllocatableMappingApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("NodeAllocatableOverhead"):
+		return &applyconfigurationsresourcev1.NodeAllocatableOverheadApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("NodeAllocatableResource"):
+		return &applyconfigurationsresourcev1.NodeAllocatableResourceApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
 		return &applyconfigurationsresourcev1.OpaqueDeviceConfigurationApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("ResourceClaim"):
@@ -1666,6 +1726,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.DeviceTaintRuleStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintSelector"):
 		return &resourcev1alpha3.DeviceTaintSelectorApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("PartitionTypeStatus"):
+		return &resourcev1alpha3.PartitionTypeStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("PoolStatus"):
 		return &resourcev1alpha3.PoolStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourcePoolStatusRequest"):
@@ -1674,6 +1736,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.ResourcePoolStatusRequestSpecApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourcePoolStatusRequestStatus"):
 		return &resourcev1alpha3.ResourcePoolStatusRequestStatusApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ShareableCapacityStatus"):
+		return &resourcev1alpha3.ShareableCapacityStatusApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ShareableSummaryStatus"):
+		return &resourcev1alpha3.ShareableSummaryStatusApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1beta1
 	case resourcev1beta1.SchemeGroupVersion.WithKind("AllocatedDeviceStatus"):
@@ -1734,8 +1800,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.DeviceTolerationApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1beta1.NetworkDeviceDataApplyConfiguration{}
-	case resourcev1beta1.SchemeGroupVersion.WithKind("NodeAllocatableResourceMapping"):
-		return &applyconfigurationsresourcev1beta1.NodeAllocatableResourceMappingApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("NodeAllocatableMapping"):
+		return &applyconfigurationsresourcev1beta1.NodeAllocatableMappingApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("NodeAllocatableOverhead"):
+		return &applyconfigurationsresourcev1beta1.NodeAllocatableOverheadApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("NodeAllocatableResource"):
+		return &applyconfigurationsresourcev1beta1.NodeAllocatableResourceApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
 		return &applyconfigurationsresourcev1beta1.OpaqueDeviceConfigurationApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("ResourceClaim"):
@@ -1824,8 +1894,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.ExactDeviceRequestApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1beta2.NetworkDeviceDataApplyConfiguration{}
-	case resourcev1beta2.SchemeGroupVersion.WithKind("NodeAllocatableResourceMapping"):
-		return &applyconfigurationsresourcev1beta2.NodeAllocatableResourceMappingApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("NodeAllocatableMapping"):
+		return &applyconfigurationsresourcev1beta2.NodeAllocatableMappingApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("NodeAllocatableOverhead"):
+		return &applyconfigurationsresourcev1beta2.NodeAllocatableOverheadApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("NodeAllocatableResource"):
+		return &applyconfigurationsresourcev1beta2.NodeAllocatableResourceApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
 		return &applyconfigurationsresourcev1beta2.OpaqueDeviceConfigurationApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("ResourceClaim"):
@@ -1852,6 +1926,22 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1.PriorityClassApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1alpha3
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositeDisruptionMode"):
+		return &applyconfigurationsschedulingv1alpha3.CompositeDisruptionModeApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositeGangSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1alpha3.CompositeGangSchedulingPolicyApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroup"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupSchedulingConstraints"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupSchedulingConstraintsApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupSchedulingPolicyApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupSpec"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupSpecApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupStatus"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupStatusApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupTemplate"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupTemplateApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("DisruptionMode"):
 		return &applyconfigurationsschedulingv1alpha3.DisruptionModeApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("GangSchedulingPolicy"):
@@ -1878,14 +1968,64 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1alpha3.TypedLocalObjectReferenceApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("Workload"):
 		return &applyconfigurationsschedulingv1alpha3.WorkloadApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupDisruptionMode"):
+		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupDisruptionModeApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupGangSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicyApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupResourceClaim"):
+		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupResourceClaimApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupSchedulingConstraints"):
+		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupSchedulingConstraintsApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupSchedulingPolicyApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadReference"):
 		return &applyconfigurationsschedulingv1alpha3.WorkloadReferenceApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadSpec"):
 		return &applyconfigurationsschedulingv1alpha3.WorkloadSpecApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1beta1
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositeDisruptionMode"):
+		return &applyconfigurationsschedulingv1beta1.CompositeDisruptionModeApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositeGangSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1beta1.CompositeGangSchedulingPolicyApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositePodGroupSchedulingConstraints"):
+		return &applyconfigurationsschedulingv1beta1.CompositePodGroupSchedulingConstraintsApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositePodGroupSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1beta1.CompositePodGroupSchedulingPolicyApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("CompositePodGroupTemplate"):
+		return &applyconfigurationsschedulingv1beta1.CompositePodGroupTemplateApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("DisruptionMode"):
+		return &applyconfigurationsschedulingv1beta1.DisruptionModeApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("GangSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1beta1.GangSchedulingPolicyApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("PodGroup"):
+		return &applyconfigurationsschedulingv1beta1.PodGroupApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("PodGroupResourceClaim"):
+		return &applyconfigurationsschedulingv1beta1.PodGroupResourceClaimApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("PodGroupResourceClaimStatus"):
+		return &applyconfigurationsschedulingv1beta1.PodGroupResourceClaimStatusApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("PodGroupSchedulingConstraints"):
+		return &applyconfigurationsschedulingv1beta1.PodGroupSchedulingConstraintsApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("PodGroupSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1beta1.PodGroupSchedulingPolicyApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("PodGroupSpec"):
+		return &applyconfigurationsschedulingv1beta1.PodGroupSpecApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("PodGroupStatus"):
+		return &applyconfigurationsschedulingv1beta1.PodGroupStatusApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("PodGroupTemplate"):
+		return &applyconfigurationsschedulingv1beta1.PodGroupTemplateApplyConfiguration{}
 	case schedulingv1beta1.SchemeGroupVersion.WithKind("PriorityClass"):
 		return &applyconfigurationsschedulingv1beta1.PriorityClassApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("TopologyConstraint"):
+		return &applyconfigurationsschedulingv1beta1.TopologyConstraintApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("TypedLocalObjectReference"):
+		return &applyconfigurationsschedulingv1beta1.TypedLocalObjectReferenceApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("Workload"):
+		return &applyconfigurationsschedulingv1beta1.WorkloadApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("WorkloadReference"):
+		return &applyconfigurationsschedulingv1beta1.WorkloadReferenceApplyConfiguration{}
+	case schedulingv1beta1.SchemeGroupVersion.WithKind("WorkloadSpec"):
+		return &applyconfigurationsschedulingv1beta1.WorkloadSpecApplyConfiguration{}
 
 		// Group=storage.k8s.io, Version=v1
 	case storagev1.SchemeGroupVersion.WithKind("CSIDriver"):
@@ -1898,10 +2038,16 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsstoragev1.CSINodeDriverApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("CSINodeSpec"):
 		return &applyconfigurationsstoragev1.CSINodeSpecApplyConfiguration{}
+	case storagev1.SchemeGroupVersion.WithKind("CSINodeStatus"):
+		return &applyconfigurationsstoragev1.CSINodeStatusApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("CSIStorageCapacity"):
 		return &applyconfigurationsstoragev1.CSIStorageCapacityApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("StorageClass"):
 		return &applyconfigurationsstoragev1.StorageClassApplyConfiguration{}
+	case storagev1.SchemeGroupVersion.WithKind("StorageHealth"):
+		return &applyconfigurationsstoragev1.StorageHealthApplyConfiguration{}
+	case storagev1.SchemeGroupVersion.WithKind("StorageHealthCondition"):
+		return &applyconfigurationsstoragev1.StorageHealthConditionApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("TokenRequest"):
 		return &applyconfigurationsstoragev1.TokenRequestApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("VolumeAttachment"):
@@ -1946,10 +2092,16 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsstoragev1beta1.CSINodeDriverApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("CSINodeSpec"):
 		return &applyconfigurationsstoragev1beta1.CSINodeSpecApplyConfiguration{}
+	case storagev1beta1.SchemeGroupVersion.WithKind("CSINodeStatus"):
+		return &applyconfigurationsstoragev1beta1.CSINodeStatusApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("CSIStorageCapacity"):
 		return &applyconfigurationsstoragev1beta1.CSIStorageCapacityApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("StorageClass"):
 		return &applyconfigurationsstoragev1beta1.StorageClassApplyConfiguration{}
+	case storagev1beta1.SchemeGroupVersion.WithKind("StorageHealth"):
+		return &applyconfigurationsstoragev1beta1.StorageHealthApplyConfiguration{}
+	case storagev1beta1.SchemeGroupVersion.WithKind("StorageHealthCondition"):
+		return &applyconfigurationsstoragev1beta1.StorageHealthConditionApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("TokenRequest"):
 		return &applyconfigurationsstoragev1beta1.TokenRequestApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("VolumeAttachment"):

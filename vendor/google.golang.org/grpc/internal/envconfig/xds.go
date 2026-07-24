@@ -89,4 +89,14 @@ var (
 	// filtered and prefix-propagated to the LRS server. For more details, see:
 	// https://github.com/grpc/proposal/blob/master/A85-lrs-custom-metrics-changes.md
 	XDSORCAToLRSPropEnabled = boolFromEnv("GRPC_EXPERIMENTAL_XDS_ORCA_LRS_PROPAGATION", false)
+
+	// XDSClientExtProcEnabled indicates whether ExtProc filter is enabled on
+	// the client side. For more details, see:
+	// https://github.com/grpc/proposal/blob/master/A93-xds-ext-proc.md
+	XDSClientExtProcEnabled = boolFromEnv("GRPC_EXPERIMENTAL_XDS_EXT_PROC_ON_CLIENT", false)
+
+	// GCPAuthenticationFilterEnabled enables the xDS GCP Authentication
+	// filter. For more details, see:
+	// https://github.com/grpc/proposal/blob/master/A83-xds-gcp-authn-filter.md
+	GCPAuthenticationFilterEnabled = boolFromEnv("GRPC_EXPERIMENTAL_XDS_GCP_AUTHENTICATION_FILTER", false)
 )

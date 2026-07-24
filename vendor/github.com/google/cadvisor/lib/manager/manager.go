@@ -74,6 +74,7 @@ const (
 var HousekeepingConfigFlags = HousekeepingConfig{
 	flag.Duration("max_housekeeping_interval", 60*time.Second, "Largest interval to allow between container housekeepings"),
 	flag.Bool("allow_dynamic_housekeeping", true, "Whether to allow the housekeeping interval to be dynamic"),
+	false,
 }
 
 // The Manager interface defines operations for starting a manager and getting
@@ -157,6 +158,10 @@ type Manager interface {
 type HousekeepingConfig = struct {
 	Interval     *time.Duration
 	AllowDynamic *bool
+	// When set to true, the manager will not discover or watch for new
+	// containers. Only the root container ("/") is created at startup;
+	// other cgroup paths are created on demand when first queried.
+	DisableContainerDiscovery bool
 }
 
 // New takes a memory storage and returns a new manager.
@@ -208,6 +213,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, HousekeepingConfi
 		startupTime:                           time.Now(),
 		maxHousekeepingInterval:               *HousekeepingConfig.Interval,
 		allowDynamicHousekeeping:              *HousekeepingConfig.AllowDynamic,
+		disableContainerDiscovery:             HousekeepingConfig.DisableContainerDiscovery,
 		includedMetrics:                       includedMetricsSet,
 		containerWatchers:                     []watcher.ContainerWatcher{},
 		eventsChannel:                         eventsChannel,
@@ -291,21 +297,22 @@ func (c *containerMap) Range(f func(name namespacedContainerName, data *containe
 }
 
 type manager struct {
-	containers               containerMap
-	memoryCache              *memory.InMemoryCache
-	fsInfo                   fs.FsInfo
-	sysFs                    sysfs.SysFs
-	machineMu                sync.RWMutex // protects machineInfo
-	machineInfo              info.MachineInfo
-	quitChannels             []chan error
-	cadvisorContainer        string
-	inHostNamespace          bool
-	startupTime              time.Time
-	maxHousekeepingInterval  time.Duration
-	allowDynamicHousekeeping bool
-	includedMetrics          container.MetricSet
-	containerWatchers        []watcher.ContainerWatcher
-	eventsChannel            chan watcher.ContainerEvent
+	containers                containerMap
+	memoryCache               *memory.InMemoryCache
+	fsInfo                    fs.FsInfo
+	sysFs                     sysfs.SysFs
+	machineMu                 sync.RWMutex // protects machineInfo
+	machineInfo               info.MachineInfo
+	quitChannels              []chan error
+	cadvisorContainer         string
+	inHostNamespace           bool
+	startupTime               time.Time
+	maxHousekeepingInterval   time.Duration
+	allowDynamicHousekeeping  bool
+	disableContainerDiscovery bool
+	includedMetrics           container.MetricSet
+	containerWatchers         []watcher.ContainerWatcher
+	eventsChannel             chan watcher.ContainerEvent
 	// List of raw container cgroup path prefix whitelist.
 	rawContainerCgroupPathPrefixWhiteList []string
 	// List of container env prefix whitelist, the matched container envs would be collected into metrics as extra labels.
@@ -324,18 +331,22 @@ type manager struct {
 
 // Start the container manager.
 func (m *manager) Start() error {
-	m.containerWatchers = container.InitializePlugins(m, m.fsInfo, m.includedMetrics)
+	if !m.disableContainerDiscovery {
+		m.containerWatchers = container.InitializePlugins(m, m.fsInfo, m.includedMetrics)
+	}
 
 	err := raw.Register(m, m.fsInfo, m.includedMetrics, m.rawContainerCgroupPathPrefixWhiteList)
 	if err != nil {
 		klog.Errorf("Registration of the raw container factory failed: %v", err)
 	}
 
-	rawWatcher, err := raw.NewRawContainerWatcher(m.includedMetrics)
-	if err != nil {
-		return err
+	if !m.disableContainerDiscovery {
+		rawWatcher, err := raw.NewRawContainerWatcher(m.includedMetrics)
+		if err != nil {
+			return err
+		}
+		m.containerWatchers = append(m.containerWatchers, rawWatcher)
 	}
-	m.containerWatchers = append(m.containerWatchers, rawWatcher)
 
 	// If there are no factories, don't start any housekeeping and serve the information we do have.
 	if !container.HasFactories() {
@@ -347,25 +358,30 @@ func (m *manager) Start() error {
 	if err != nil {
 		return err
 	}
-	klog.V(2).Infof("Starting recovery of all containers")
-	err = m.detectSubcontainers("/")
-	if err != nil {
-		return err
-	}
-	klog.V(2).Infof("Recovery completed")
 
-	// Watch for new container.
-	quitWatcher := make(chan error)
-	err = m.watchForNewContainers(quitWatcher)
-	if err != nil {
-		return err
-	}
-	m.quitChannels = append(m.quitChannels, quitWatcher)
+	if !m.disableContainerDiscovery {
+		klog.V(2).Infof("Starting recovery of all containers")
+		err = m.detectSubcontainers("/")
+		if err != nil {
+			return err
+		}
+		klog.V(2).Infof("Recovery completed")
 
-	// Look for new containers in the main housekeeping thread.
-	quitGlobalHousekeeping := make(chan error)
-	m.quitChannels = append(m.quitChannels, quitGlobalHousekeeping)
-	go m.globalHousekeeping(quitGlobalHousekeeping)
+		// Watch for new container.
+		quitWatcher := make(chan error)
+		err = m.watchForNewContainers(quitWatcher)
+		if err != nil {
+			return err
+		}
+		m.quitChannels = append(m.quitChannels, quitWatcher)
+
+		// Look for new containers in the main housekeeping thread.
+		quitGlobalHousekeeping := make(chan error)
+		m.quitChannels = append(m.quitChannels, quitGlobalHousekeeping)
+		go m.globalHousekeeping(quitGlobalHousekeeping)
+	} else {
+		klog.V(2).Infof("Container discovery disabled; only root container will be tracked")
+	}
 
 	quitUpdateMachineInfo := make(chan error)
 	m.quitChannels = append(m.quitChannels, quitUpdateMachineInfo)
@@ -543,10 +559,21 @@ func (m *manager) containerDataToContainerInfo(cont *containerData, query *info.
 
 func (m *manager) getContainer(containerName string) (*containerData, error) {
 	cont, ok := m.containers.Load(namespacedContainerName{Name: containerName})
-	if !ok {
-		return nil, fmt.Errorf("unknown container %q", containerName)
+	if ok {
+		return cont, nil
 	}
-	return cont, nil
+
+	if m.disableContainerDiscovery {
+		if err := m.createContainer(containerName, watcher.Raw); err != nil {
+			return nil, fmt.Errorf("on-demand creation of container %q failed: %v", containerName, err)
+		}
+		cont, ok = m.containers.Load(namespacedContainerName{Name: containerName})
+		if ok {
+			return cont, nil
+		}
+	}
+
+	return nil, fmt.Errorf("unknown container %q", containerName)
 }
 
 func (m *manager) getSubcontainers(containerName string) map[string]*containerData {

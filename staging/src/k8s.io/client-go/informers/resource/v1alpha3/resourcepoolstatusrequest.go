@@ -34,11 +34,39 @@ import (
 )
 
 // ResourcePoolStatusRequestInformer provides access to a shared informer and lister for
-// ResourcePoolStatusRequests.
+// ResourcePoolStatusRequests. Prefer using the type-safe variant (see [TypedResourcePoolStatusRequestInformer]).
 type ResourcePoolStatusRequestInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() resourcev1alpha3.ResourcePoolStatusRequestLister
 }
+
+// TypedResourcePoolStatusRequestInformer provides access to a shared informer and lister for
+// ResourcePoolStatusRequests, including the type-safe TypedInformer variant.
+// It is a superset of ResourcePoolStatusRequestInformer.
+type TypedResourcePoolStatusRequestInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ResourcePoolStatusRequestIndexInformer
+	Lister() resourcev1alpha3.ResourcePoolStatusRequestLister
+}
+
+// ResourcePoolStatusRequestIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ResourcePoolStatusRequestIndexInformer cache.TypedSharedIndexInformer[*apiresourcev1alpha3.ResourcePoolStatusRequest]
+
+// ResourcePoolStatusRequestHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for ResourcePoolStatusRequest.
+type ResourcePoolStatusRequestHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiresourcev1alpha3.ResourcePoolStatusRequest]
+
+// ResourcePoolStatusRequestDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for ResourcePoolStatusRequest.
+type ResourcePoolStatusRequestDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiresourcev1alpha3.ResourcePoolStatusRequest]
+
+// ResourcePoolStatusRequestFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for ResourcePoolStatusRequest.
+type ResourcePoolStatusRequestFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiresourcev1alpha3.ResourcePoolStatusRequest]
+
+// ResourcePoolStatusRequestIndexers is a specialization of [cache.TypedIndexers] for ResourcePoolStatusRequest.
+type ResourcePoolStatusRequestIndexers = cache.TypedIndexers[*apiresourcev1alpha3.ResourcePoolStatusRequest]
+
+// DeletedResourcePoolStatusRequest is a specialization of [cache.DeletedObject] for ResourcePoolStatusRequest.
+type DeletedResourcePoolStatusRequest = cache.DeletedObject[*apiresourcev1alpha3.ResourcePoolStatusRequest]
 
 type resourcePoolStatusRequestInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +76,49 @@ type resourcePoolStatusRequestInformer struct {
 // NewResourcePoolStatusRequestInformer constructs a new informer for ResourcePoolStatusRequest type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedResourcePoolStatusRequestInformer]).
 func NewResourcePoolStatusRequestInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewResourcePoolStatusRequestInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedResourcePoolStatusRequestInformer constructs a new informer for ResourcePoolStatusRequest type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedResourcePoolStatusRequestInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers ResourcePoolStatusRequestIndexers) ResourcePoolStatusRequestIndexInformer {
+	return NewTypedResourcePoolStatusRequestInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredResourcePoolStatusRequestInformer constructs a new informer for ResourcePoolStatusRequest type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredResourcePoolStatusRequestInformer]).
 func NewFilteredResourcePoolStatusRequestInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewResourcePoolStatusRequestInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedResourcePoolStatusRequestInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredResourcePoolStatusRequestInformer constructs a new informer for ResourcePoolStatusRequest type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredResourcePoolStatusRequestInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers ResourcePoolStatusRequestIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ResourcePoolStatusRequestIndexInformer {
+	return NewTypedResourcePoolStatusRequestInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewResourcePoolStatusRequestInformerWithOptions constructs a new informer for ResourcePoolStatusRequest type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedResourcePoolStatusRequestInformerWithOptions]).
 func NewResourcePoolStatusRequestInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedResourcePoolStatusRequestInformerWithOptions(client, options)
+}
+
+// NewTypedResourcePoolStatusRequestInformerWithOptions constructs a new informer for ResourcePoolStatusRequest type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedResourcePoolStatusRequestInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) ResourcePoolStatusRequestIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "resource.k8s.io", Version: "v1alpha3", Resource: "resourcepoolstatusrequests"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apiresourcev1alpha3.ResourcePoolStatusRequest](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,17 +151,57 @@ func NewResourcePoolStatusRequestInformerWithOptions(client kubernetes.Interface
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *resourcePoolStatusRequestInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewResourcePoolStatusRequestInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedResourcePoolStatusRequestInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *resourcePoolStatusRequestInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiresourcev1alpha3.ResourcePoolStatusRequest{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *resourcePoolStatusRequestInformer) TypedInformer() ResourcePoolStatusRequestIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiresourcev1alpha3.ResourcePoolStatusRequest](f.factory.InformerFor(&apiresourcev1alpha3.ResourcePoolStatusRequest{}, f.defaultInformer))
 }
 
 func (f *resourcePoolStatusRequestInformer) Lister() resourcev1alpha3.ResourcePoolStatusRequestLister {
 	return resourcev1alpha3.NewResourcePoolStatusRequestLister(f.Informer().GetIndexer())
+}
+
+// ToTypedResourcePoolStatusRequestInformer converts an untyped informer into a TypedResourcePoolStatusRequestInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *ResourcePoolStatusRequest. If that is not the case, calling type-safe methods of the returned
+// TypedResourcePoolStatusRequestInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedResourcePoolStatusRequestInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedResourcePoolStatusRequestInformer(informer ResourcePoolStatusRequestInformer) TypedResourcePoolStatusRequestInformer {
+	if informer, ok := informer.(TypedResourcePoolStatusRequestInformer); ok {
+		return informer
+	}
+	return &resourcePoolStatusRequestTypedInformerAdapter{informer}
+}
+
+type resourcePoolStatusRequestTypedInformerAdapter struct {
+	ResourcePoolStatusRequestInformer
+}
+
+func (a *resourcePoolStatusRequestTypedInformerAdapter) TypedInformer() ResourcePoolStatusRequestIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiresourcev1alpha3.ResourcePoolStatusRequest](a.Informer())
+}
+
+// ToResourcePoolStatusRequestIndexInformer converts an untyped informer into a ResourcePoolStatusRequestIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *ResourcePoolStatusRequest. If that is not the case, calling type-safe methods of the returned
+// ResourcePoolStatusRequestIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a ResourcePoolStatusRequestIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToResourcePoolStatusRequestIndexInformer(informer cache.SharedIndexInformer) ResourcePoolStatusRequestIndexInformer {
+	if informer, ok := informer.(ResourcePoolStatusRequestIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiresourcev1alpha3.ResourcePoolStatusRequest](informer)
 }

@@ -67,7 +67,7 @@ lintersConfig:
   #  omitzero:
   #      policy: SuggestFix | Warn | Forbid # The policy for omitzero in required fields. Defaults to `SuggestFix`.
   ssatags:
-   listTypeSetUsage: Ignore # The policy for listType=set usage on object arrays. Defaults to `Warn`.
+   listTypeSetUsage: Warn
   # uniquemarkers:
   #   customMarkers:
   #     - identifier: custom:SomeCustomMarker

@@ -41,6 +41,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
@@ -1419,6 +1420,173 @@ func TestReconcileState(t *testing.T) {
 				t.Errorf("Expected reconciliation failure for container: %s", testCase.expectFailedContainerName)
 			}
 		}
+	}
+}
+
+func TestReconcileStateBaselineLog(t *testing.T) {
+	testCases := []struct {
+		description   string
+		fgEnabled     bool
+		stAssignments state.ContainerCPUAssignments
+		stBaselines   state.ContainerCPUBaselines
+		expectLog     bool
+	}{
+		{
+			description: "feature gate disabled, current container CPU assignments differ from CPU assignments recorded at admission time, no log expected",
+			fgEnabled:   false,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePodUID": map[string]cpuset.CPUSet{
+					"fakeContainerName": cpuset.New(1, 2),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{
+				"fakePodUID": map[string]state.ContainerCPUBaseline{
+					"fakeContainerName": {Baseline: cpuset.New(3, 4)},
+				},
+			},
+			expectLog: false,
+		},
+		{
+			description: "feature gate enabled, current container CPU assignments matches CPU assignments recorded at admission time, no log expected",
+			fgEnabled:   true,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePodUID": map[string]cpuset.CPUSet{
+					"fakeContainerName": cpuset.New(1, 2),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{
+				"fakePodUID": map[string]state.ContainerCPUBaseline{
+					"fakeContainerName": {Baseline: cpuset.New(1, 2)},
+				},
+			},
+			expectLog: false,
+		},
+		{
+			description: "feature gate enabled, current container CPU assignments differs from CPU assignments recorded at admission time, log expected",
+			fgEnabled:   true,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePodUID": map[string]cpuset.CPUSet{
+					"fakeContainerName": cpuset.New(1, 2),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{
+				"fakePodUID": map[string]state.ContainerCPUBaseline{
+					"fakeContainerName": {Baseline: cpuset.New(3, 4)},
+				},
+			},
+			expectLog: true,
+		},
+		{
+			description: "feature gate enabled, no CPU assignments recorded at admission time, no log expected",
+			fgEnabled:   true,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePodUID": map[string]cpuset.CPUSet{
+					"fakeContainerName": cpuset.New(1, 2),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{},
+			expectLog:   false,
+		},
+		{
+			description:   "feature gate enabled, no current container CPU assignments, CPU assignments recorded at admission time doesn't match default shared CPU set, log expected",
+			fgEnabled:     true,
+			stAssignments: state.ContainerCPUAssignments{}, // so we will get the default CPUSet for the container
+			stBaselines: state.ContainerCPUBaselines{
+				"fakePodUID": map[string]state.ContainerCPUBaseline{
+					"fakeContainerName": {Baseline: cpuset.New(3, 4)},
+				},
+			},
+			expectLog: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, tc.fgEnabled)
+			ktesting.SetDefaultVerbosity(4)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			testPolicy, _ := NewStaticPolicy(
+				logger,
+				&topology.CPUTopology{
+					NumCPUs:    8,
+					NumSockets: 2,
+					NumCores:   4,
+					CPUDetails: map[int]topology.CPUInfo{
+						0: {CoreID: 0, SocketID: 0},
+						1: {CoreID: 1, SocketID: 0},
+						2: {CoreID: 2, SocketID: 0},
+						3: {CoreID: 3, SocketID: 0},
+						4: {CoreID: 0, SocketID: 1},
+						5: {CoreID: 1, SocketID: 1},
+						6: {CoreID: 2, SocketID: 1},
+						7: {CoreID: 3, SocketID: 1},
+					},
+				},
+				0,
+				cpuset.New(),
+				topologymanager.NewFakeManager(logger),
+				nil)
+
+			mgr := &manager{
+				policy: testPolicy,
+				state: &mockState{
+					assignments:   tc.stAssignments,
+					defaultCPUSet: cpuset.New(5, 6, 7),
+					baselines:     tc.stBaselines,
+				},
+				lastUpdateState: state.NewMemoryState(logger),
+				containerRuntime: mockRuntimeService{
+					err: nil,
+				},
+				containerMap: containermap.NewContainerMap(),
+				activePods: func() []*v1.Pod {
+					return []*v1.Pod{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "fakePodName",
+								UID:  "fakePodUID",
+							},
+							Spec: v1.PodSpec{
+								Containers: []v1.Container{
+									{Name: "fakeContainerName"},
+								},
+							},
+						},
+					}
+				},
+				podStatusProvider: mockPodStatusProvider{
+					podStatus: v1.PodStatus{
+						ContainerStatuses: []v1.ContainerStatus{
+							{
+								Name:        "fakeContainerName",
+								ContainerID: "docker://fakeContainerID",
+								State: v1.ContainerState{
+									Running: &v1.ContainerStateRunning{},
+								},
+							},
+						},
+					},
+					found: true,
+				},
+			}
+			mgr.sourcesReady = &sourcesReadyStub{}
+			mgr.reconcileState(tCtx)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("expected ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "Current container CPU assignments differ from CPU assignments recorded at admission time"
+			if tc.expectLog && !strings.Contains(logs, expectedLog) {
+				t.Errorf("expected log %q not found in logs:\n%s", expectedLog, logs)
+			}
+			if !tc.expectLog && strings.Contains(logs, expectedLog) {
+				t.Errorf("unexpected log %q found in logs:\n%s", expectedLog, logs)
+			}
+		})
 	}
 }
 

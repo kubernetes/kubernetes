@@ -21,6 +21,10 @@ limitations under the License.
 // +k8s:validation-gen-nolint
 package deep
 
+// TODO: Uncomment the following code once the generated validation code can handle NPE by
+// configuring optionality or requiredness for the intermediate fields.
+
+/**
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"
 
 var localSchemeBuilder = testscheme.New()
@@ -51,3 +55,35 @@ type OtherStruct struct {
 type SmallStruct struct {
 	StringField string `json:"stringField"`
 }
+
+type StructWithOptionalField struct {
+	// +k8s:optional
+	OptionalField string `json:"optionalField"`
+}
+
+type SetByServerStruct struct {
+	TypeMeta int `json:"typeMeta"`
+
+	// +k8s:subfield(optionalField)=+k8s:setByServer
+	SubfieldSetByServer StructWithOptionalField `json:"subfieldSetByServer"`
+
+	// +k8s:subfield(stringField)=+k8s:setByServer
+	// +k8s:subfield(stringField)=+k8s:optional
+	EmbeddedSetByServer UnvalidatedStruct `json:"embeddedSetByServer"`
+
+	// +k8s:subfield(optionalField)=+k8s:required
+	// +k8s:opaqueType
+	OpaqueSubfieldRequired StructWithOptionalField `json:"opaqueSubfieldRequired"`
+
+	// +k8s:subfield(optionalField)=+k8s:required
+	SubfieldRequired StructWithOptionalField `json:"subfieldRequired"`
+
+	// +k8s:optional
+	// +k8s:subfield(optionalField)=+k8s:setByServer
+	SubfieldPtrSetByServer *StructWithOptionalField `json:"subfieldPtrSetByServer"`
+
+	// +k8s:optional
+	// +k8s:subfield(optionalField)=+k8s:required
+	SubfieldPtrRequired *StructWithOptionalField `json:"subfieldPtrRequired"`
+}
+**/

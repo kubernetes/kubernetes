@@ -28,9 +28,9 @@ import (
 // DisruptionMode defines how individual entities within a group can be disrupted.
 // Exactly one mode can be set.
 type DisruptionModeApplyConfiguration struct {
-	// Single specifies that children can be disrupted independently from each other.
+	// single specifies that children can be disrupted independently from each other.
 	Single *schedulingv1alpha3.SingleDisruptionMode `json:"single,omitempty"`
-	// All specifies that all children can only be disrupted together.
+	// all specifies that all children can only be disrupted together.
 	All *schedulingv1alpha3.AllDisruptionMode `json:"all,omitempty"`
 }
 

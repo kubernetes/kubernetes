@@ -30,7 +30,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,7 +43,7 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/component-base/metrics/legacyregistry"
 	resourceclaimmetrics "k8s.io/dynamic-resource-allocation/resourceclaim/metrics"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
@@ -200,13 +200,14 @@ func testSyncHandler(tCtx ktesting.TContext) {
 		claimsInCache            []*resourceapi.ResourceClaim
 		pods                     []*v1.Pod
 		podsLater                []*v1.Pod
+		claimsLater              []*resourceapi.ResourceClaim
 		podGroups                []*schedulingapi.PodGroup
 		templates                []*resourceapi.ResourceClaimTemplate
 		expectedClaims           []resourceapi.ResourceClaim
 		expectedStatuses         map[string][]v1.PodResourceClaimStatus
 		expectedPodGroupStatuses map[string][]schedulingapi.PodGroupResourceClaimStatus
 		expectedError            string
-		expectedMetrics          expectedMetrics
+		expectedMetrics          claimCreateMetrics
 	}{
 		{
 			name:           "create",
@@ -219,7 +220,9 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{1, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerKind: "Pod"}: 1,
+			},
 		},
 		{
 			name:                "create-adminaccess-feature-disabled",
@@ -228,6 +231,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			templates:           []*resourceapi.ResourceClaimTemplate{templateWithAdminAccess},
 			key:                 podKey(testPodWithResource),
 			expectedError:       adminAccessFeatureOffError,
+			expectedMetrics:     claimCreateMetrics{},
 		},
 		{
 			name:                "create-adminaccess-feature-enabled",
@@ -241,7 +245,9 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaimWithAdmin.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{0, 1, 0, 0},
+			expectedMetrics: claimCreateMetrics{
+				claimCreateMetricLabels{status: "success", adminAccess: "true", ownerKind: "Pod"}: 1,
+			},
 		},
 		{
 			name:                "create-for-grouped-pod",
@@ -256,7 +262,9 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{1, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerKind: "Pod"}: 1,
+			},
 		},
 		{
 			name:                "skip-create-for-pod-podgroup-does-not-exist",
@@ -265,6 +273,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			templates:           []*resourceapi.ResourceClaimTemplate{template},
 			key:                 podKey(testPodWithResource),
 			expectedError:       `podgroup.scheduling.k8s.io "test-podgroup" not found`,
+			expectedMetrics:     claimCreateMetrics{},
 		},
 		{
 			name:                "create-for-podgroup",
@@ -278,7 +287,9 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{1, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerGroup: "scheduling.k8s.io", ownerKind: "PodGroup"}: 1,
+			},
 		},
 		{
 			name:                "skip-create-podgroup-claim-for-pod",
@@ -288,7 +299,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			templates:           []*resourceapi.ResourceClaimTemplate{template},
 			key:                 podKey(testPodWithPodGroupResource),
 			expectedClaims:      nil,
-			expectedMetrics:     expectedMetrics{0, 0, 0, 0},
+			expectedMetrics:     claimCreateMetrics{},
 		},
 		{
 			name:                "update-pod-status-with-podgroup-claim",
@@ -304,7 +315,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodWithPodGroupResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:                "skip-create-for-pod-with-podgroup-claim-genericworkload-disabled",
@@ -314,6 +325,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			templates:           []*resourceapi.ResourceClaimTemplate{template},
 			key:                 podKey(testPodWithPodGroupResource),
 			expectedError:       "GenericWorkload feature is disabled",
+			expectedMetrics:     claimCreateMetrics{},
 		},
 		{
 			name:                "skip-create-for-pod-with-podgroup-claim-workloadresourceclaims-disabled",
@@ -323,6 +335,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			templates:           []*resourceapi.ResourceClaimTemplate{template},
 			key:                 podKey(testPodWithPodGroupResource),
 			expectedError:       "DRAWorkloadResourceClaims feature is disabled",
+			expectedMetrics:     claimCreateMetrics{},
 		},
 		{
 			name:                "create-for-grouped-pod-with-claim-workloadresourceclaims-disabled",
@@ -337,7 +350,9 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{1, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerKind: "Pod"}: 1,
+			},
 		},
 		{
 			name: "nop",
@@ -357,7 +372,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:                "nop-podgroup",
@@ -378,7 +393,89 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
+		},
+		{
+			name: "nop-claim-in-mutation-cache-only",
+			pods: []*v1.Pod{func() *v1.Pod {
+				pod := testPodWithResource.DeepCopy()
+				pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
+				}
+				return pod
+			}()},
+			templates:      []*resourceapi.ResourceClaimTemplate{template},
+			key:            podKey(testPodWithResource),
+			claimsInCache:  []*resourceapi.ResourceClaim{templatedTestClaim},
+			expectedClaims: nil, // the claim only lives in the mutation cache, nothing exists in the apiserver
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodWithResource.Name: {
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
+				},
+			},
+			expectedMetrics: claimCreateMetrics{},
+		},
+		{
+			name:                "nop-claim-in-mutation-cache-only-for-podgroup",
+			featureCombinations: workloadResourceClaimsEnabled,
+			podGroups: []*schedulingapi.PodGroup{func() *schedulingapi.PodGroup {
+				podGroup := testPodGroupWithResource.DeepCopy()
+				podGroup.Status.ResourceClaimStatuses = []schedulingapi.PodGroupResourceClaimStatus{
+					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
+				}
+				return podGroup
+			}()},
+			templates:      []*resourceapi.ResourceClaimTemplate{template},
+			key:            podGroupKey(testPodGroupWithResource),
+			claimsInCache:  []*resourceapi.ResourceClaim{templatedTestPodGroupClaim},
+			expectedClaims: nil, // the claim only lives in the mutation cache, nothing exists in the apiserver
+			expectedPodGroupStatuses: map[string][]schedulingapi.PodGroupResourceClaimStatus{
+				testPodGroupWithResource.Name: {
+					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
+				},
+			},
+			expectedMetrics: claimCreateMetrics{},
+		},
+		{
+			name: "nop-claim-in-apiserver-only",
+			pods: []*v1.Pod{func() *v1.Pod {
+				pod := testPodWithResource.DeepCopy()
+				pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
+				}
+				return pod
+			}()},
+			templates:      []*resourceapi.ResourceClaimTemplate{template},
+			key:            podKey(testPodWithResource),
+			claimsLater:    []*resourceapi.ResourceClaim{templatedTestClaim},
+			expectedClaims: []resourceapi.ResourceClaim{*templatedTestClaim},
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodWithResource.Name: {
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
+				},
+			},
+			expectedMetrics: claimCreateMetrics{},
+		},
+		{
+			name:                "nop-claim-in-apiserver-only-for-podgroup",
+			featureCombinations: workloadResourceClaimsEnabled,
+			podGroups: []*schedulingapi.PodGroup{func() *schedulingapi.PodGroup {
+				podGroup := testPodGroupWithResource.DeepCopy()
+				podGroup.Status.ResourceClaimStatuses = []schedulingapi.PodGroupResourceClaimStatus{
+					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
+				}
+				return podGroup
+			}()},
+			templates:      []*resourceapi.ResourceClaimTemplate{template},
+			key:            podGroupKey(testPodGroupWithResource),
+			claimsLater:    []*resourceapi.ResourceClaim{templatedTestPodGroupClaim},
+			expectedClaims: []resourceapi.ResourceClaim{*templatedTestPodGroupClaim},
+			expectedPodGroupStatuses: map[string][]schedulingapi.PodGroupResourceClaimStatus{
+				testPodGroupWithResource.Name: {
+					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
+				},
+			},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name: "recreate",
@@ -397,7 +494,9 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{1, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerKind: "Pod"}: 1,
+			},
 		},
 		{
 			name:                "recreate-for-podgroup",
@@ -417,14 +516,17 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{1, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerGroup: "scheduling.k8s.io", ownerKind: "PodGroup"}: 1,
+			},
 		},
 		{
-			name:          "missing-template",
-			pods:          []*v1.Pod{testPodWithResource},
-			templates:     nil,
-			key:           podKey(testPodWithResource),
-			expectedError: "resource claim template \"my-template\": resourceclaimtemplate.resource.k8s.io \"my-template\" not found",
+			name:            "missing-template",
+			pods:            []*v1.Pod{testPodWithResource},
+			templates:       nil,
+			key:             podKey(testPodWithResource),
+			expectedError:   "resource claim template \"my-template\": resourceclaimtemplate.resource.k8s.io \"my-template\" not found",
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:                "missing-template-podgroup",
@@ -433,6 +535,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			templates:           nil,
 			key:                 podGroupKey(testPodGroupWithResource),
 			expectedError:       "resource claim template \"my-template\": resourceclaimtemplate.resource.k8s.io \"my-template\" not found",
+			expectedMetrics:     claimCreateMetrics{},
 		},
 		{
 			name:           "find-existing-claim-by-label",
@@ -445,7 +548,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:                "find-existing-claim-by-label-podgroup",
@@ -459,7 +562,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:          "find-created-claim-in-cache",
@@ -471,7 +574,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:                "find-created-claim-in-cache-podgroup",
@@ -484,16 +587,63 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
-			name: "no-such-pod",
-			key:  podKey(testPodWithResource),
+			name: "recreate-wrong-owner",
+			pods: []*v1.Pod{func() *v1.Pod {
+				pod := testPodWithResource.DeepCopy()
+				pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &conflictingClaim.Name},
+				}
+				return pod
+			}()},
+			templates:      []*resourceapi.ResourceClaimTemplate{template},
+			key:            podKey(testPodWithResource),
+			claims:         []*resourceapi.ResourceClaim{conflictingClaim},
+			expectedClaims: []resourceapi.ResourceClaim{*conflictingClaim, *templatedTestClaim},
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodWithResource.Name: {
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
+				},
+			},
+			expectedMetrics: claimCreateMetrics{
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerKind: "Pod"}: 1,
+			},
+		},
+		{
+			name:                "recreate-wrong-owner-podgroup",
+			featureCombinations: workloadResourceClaimsEnabled,
+			podGroups: []*schedulingapi.PodGroup{func() *schedulingapi.PodGroup {
+				podGroup := testPodGroupWithResource.DeepCopy()
+				podGroup.Status.ResourceClaimStatuses = []schedulingapi.PodGroupResourceClaimStatus{
+					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &conflictingPodGroupClaim.Name},
+				}
+				return podGroup
+			}()},
+			templates:      []*resourceapi.ResourceClaimTemplate{template},
+			key:            podGroupKey(testPodGroupWithResource),
+			claims:         []*resourceapi.ResourceClaim{conflictingPodGroupClaim},
+			expectedClaims: []resourceapi.ResourceClaim{*conflictingPodGroupClaim, *templatedTestPodGroupClaim},
+			expectedPodGroupStatuses: map[string][]schedulingapi.PodGroupResourceClaimStatus{
+				testPodGroupWithResource.Name: {
+					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
+				},
+			},
+			expectedMetrics: claimCreateMetrics{
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerGroup: "scheduling.k8s.io", ownerKind: "PodGroup"}: 1,
+			},
+		},
+		{
+			name:            "no-such-pod",
+			key:             podKey(testPodWithResource),
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:                "no-such-podgroup",
 			featureCombinations: workloadResourceClaimsEnabled,
 			key:                 podGroupKey(testPodGroupWithResource),
+			expectedMetrics:     claimCreateMetrics{},
 		},
 		{
 			name: "pod-deleted",
@@ -503,7 +653,8 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				pods[0].DeletionTimestamp = &deleted
 				return pods
 			}(),
-			key: podKey(testPodWithResource),
+			key:             podKey(testPodWithResource),
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:                "podgroup-deleted",
@@ -514,12 +665,14 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				podGroups[0].DeletionTimestamp = &deleted
 				return podGroups
 			}(),
-			key: podGroupKey(testPodGroupWithResource),
+			key:             podGroupKey(testPodGroupWithResource),
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
-			name: "no-volumes",
-			pods: []*v1.Pod{testPod},
-			key:  podKey(testPod),
+			name:            "no-volumes",
+			pods:            []*v1.Pod{testPod},
+			key:             podKey(testPod),
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:           "create-with-other-claim",
@@ -533,7 +686,9 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{1, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerKind: "Pod"}: 1,
+			},
 		},
 		{
 			name:                "create-with-other-claim-podgroup",
@@ -548,15 +703,18 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodGroupWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestPodGroupClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{1, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerGroup: "scheduling.k8s.io", ownerKind: "PodGroup"}: 1,
+			},
 		},
 		{
-			name:           "wrong-claim-owner",
-			pods:           []*v1.Pod{testPodWithResource},
-			key:            podKey(testPodWithResource),
-			claims:         []*resourceapi.ResourceClaim{conflictingClaim},
-			expectedClaims: []resourceapi.ResourceClaim{*conflictingClaim},
-			expectedError:  "resource claim template \"my-template\": resourceclaimtemplate.resource.k8s.io \"my-template\" not found",
+			name:            "wrong-claim-owner",
+			pods:            []*v1.Pod{testPodWithResource},
+			key:             podKey(testPodWithResource),
+			claims:          []*resourceapi.ResourceClaim{conflictingClaim},
+			expectedClaims:  []resourceapi.ResourceClaim{*conflictingClaim},
+			expectedError:   "resource claim template \"my-template\": resourceclaimtemplate.resource.k8s.io \"my-template\" not found",
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:                "wrong-claim-owner-podgroup",
@@ -566,14 +724,28 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			claims:              []*resourceapi.ResourceClaim{conflictingPodGroupClaim},
 			expectedClaims:      []resourceapi.ResourceClaim{*conflictingPodGroupClaim},
 			expectedError:       "resource claim template \"my-template\": resourceclaimtemplate.resource.k8s.io \"my-template\" not found",
+			expectedMetrics:     claimCreateMetrics{},
 		},
 		{
-			name:            "create-conflict",
-			pods:            []*v1.Pod{testPodWithResource},
-			templates:       []*resourceapi.ResourceClaimTemplate{template},
-			key:             podKey(testPodWithResource),
-			expectedMetrics: expectedMetrics{0, 0, 1, 0},
-			expectedError:   "create ResourceClaim : Operation cannot be fulfilled on resourceclaims.resource.k8s.io \"fake name\": fake conflict",
+			name:      "create-conflict",
+			pods:      []*v1.Pod{testPodWithResource},
+			templates: []*resourceapi.ResourceClaimTemplate{template},
+			key:       podKey(testPodWithResource),
+			expectedMetrics: claimCreateMetrics{
+				claimCreateMetricLabels{status: "failure", adminAccess: "false", ownerKind: "Pod"}: 1,
+			},
+			expectedError: "create ResourceClaim : Operation cannot be fulfilled on resourceclaims.resource.k8s.io \"fake name\": fake conflict",
+		},
+		{
+			name:                "create-conflict-admin-access",
+			featureCombinations: adminAccessEnabled,
+			pods:                []*v1.Pod{testPodWithResource},
+			templates:           []*resourceapi.ResourceClaimTemplate{templateWithAdminAccess},
+			key:                 podKey(testPodWithResource),
+			expectedMetrics: claimCreateMetrics{
+				claimCreateMetricLabels{status: "failure", adminAccess: "true", ownerKind: "Pod"}: 1,
+			},
+			expectedError: "create ResourceClaim : Operation cannot be fulfilled on resourceclaims.resource.k8s.io \"fake name\": fake conflict",
 		},
 		{
 			name:                "create-conflict-podgroup",
@@ -581,8 +753,10 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			podGroups:           []*schedulingapi.PodGroup{testPodGroupWithResource},
 			templates:           []*resourceapi.ResourceClaimTemplate{template},
 			key:                 podGroupKey(testPodGroupWithResource),
-			expectedMetrics:     expectedMetrics{0, 0, 1, 0},
-			expectedError:       "create ResourceClaim : Operation cannot be fulfilled on resourceclaims.resource.k8s.io \"fake name\": fake conflict",
+			expectedMetrics: claimCreateMetrics{
+				claimCreateMetricLabels{status: "failure", adminAccess: "false", ownerGroup: "scheduling.k8s.io", ownerKind: "PodGroup"}: 1,
+			},
+			expectedError: "create ResourceClaim : Operation cannot be fulfilled on resourceclaims.resource.k8s.io \"fake name\": fake conflict",
 		},
 		{
 			name:            "stay-reserved-seen",
@@ -590,7 +764,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			key:             claimKey(testClaimReserved),
 			claims:          []*resourceapi.ResourceClaim{testClaimReserved},
 			expectedClaims:  []resourceapi.ResourceClaim{*testClaimReserved},
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:            "stay-reserved-not-seen",
@@ -598,7 +772,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			key:             claimKey(testClaimReserved),
 			claims:          []*resourceapi.ResourceClaim{testClaimReserved},
 			expectedClaims:  []resourceapi.ResourceClaim{*testClaimReserved},
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:   "clear-reserved-structured",
@@ -611,7 +785,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				claim.Status.Allocation = nil
 				return []resourceapi.ResourceClaim{*claim}
 			}(),
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:                "clear-reserved-podgroup",
@@ -625,7 +799,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				claim.Status.Allocation = nil
 				return []resourceapi.ResourceClaim{*claim}
 			}(),
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:                "dont-clear-reserved-podgroup-feature-disabled",
@@ -634,7 +808,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			key:                 claimKey(testClaimReservedForPodGroup),
 			claims:              []*resourceapi.ResourceClaim{structuredParameters(testClaimReservedForPodGroup)},
 			expectedClaims:      []resourceapi.ResourceClaim{*structuredParameters(testClaimReservedForPodGroup)},
-			expectedMetrics:     expectedMetrics{0, 0, 0, 0},
+			expectedMetrics:     claimCreateMetrics{},
 		},
 		{
 			name: "dont-clear-reserved-structured",
@@ -646,7 +820,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				return []*resourceapi.ResourceClaim{claim}
 			}(),
 			expectedClaims:  []resourceapi.ResourceClaim{*structuredParameters(testClaimReserved)},
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name: "clear-reserved-structured-deleted",
@@ -664,7 +838,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				claim.Status.Allocation = nil
 				return []resourceapi.ResourceClaim{*claim}
 			}(),
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name: "structured-deleted",
@@ -682,7 +856,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				claim.Status.Allocation = nil
 				return []resourceapi.ResourceClaim{*claim}
 			}(),
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name: "clear-reserved-when-done",
@@ -702,7 +876,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				claims[0].OwnerReferences = nil
 				return claims
 			}(),
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:            "remove-reserved",
@@ -710,7 +884,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			key:             claimKey(testClaimReservedTwice),
 			claims:          []*resourceapi.ResourceClaim{testClaimReservedTwice},
 			expectedClaims:  []resourceapi.ResourceClaim{*testClaimReserved},
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name: "delete-claim-when-done",
@@ -722,7 +896,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			key:             claimKey(testClaimReserved),
 			claims:          []*resourceapi.ResourceClaim{testClaimReserved},
 			expectedClaims:  nil,
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:           "add-reserved",
@@ -736,7 +910,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodWithNodeName.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:                "add-reserved-podgroup",
@@ -752,7 +926,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodWithPodGroupAndNodeName.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:                "skip-add-reserved-podgroup-genericworkload-disabled",
@@ -769,7 +943,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodWithPodGroupAndNodeName.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name:                "skip-add-reserved-podgroup-workloadresourceclaims-disabled",
@@ -785,7 +959,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					{Name: testPodWithPodGroupAndNodeName.Spec.ResourceClaims[0].Name, ResourceClaimName: &templatedTestClaim.Name},
 				},
 			},
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name: "remove-pod-reservation-with-non-pod-reservation-present",
@@ -817,7 +991,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				claim.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{nonPodRef}
 				return *claim
 			}()},
-			expectedMetrics: expectedMetrics{0, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{},
 		},
 		{
 			name: "flapping-resourceclaim-statuses",
@@ -847,7 +1021,9 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				*makeClaim("claimA-object", testNamespace, makeOwnerReference(testPod, true)),
 				*makeTemplatedClaim("claimB", testPodName+"-claimB-", testNamespace, 1, makeOwnerReference(testPod, true), nil),
 			},
-			expectedMetrics: expectedMetrics{1, 0, 0, 0},
+			expectedMetrics: claimCreateMetrics{
+				claimCreateMetricLabels{status: "success", adminAccess: "false", ownerKind: "Pod"}: 1,
+			},
 		},
 	}
 
@@ -869,10 +1045,13 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			}
 
 			fakeKubeClient := createTestClient(objects...)
-			if tc.expectedMetrics.numFailures > 0 {
-				fakeKubeClient.PrependReactor("create", "resourceclaims", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
-					return true, nil, apierrors.NewConflict(action.GetResource().GroupResource(), "fake name", errors.New("fake conflict"))
-				})
+			for labels, expected := range tc.expectedMetrics {
+				if expected > 0 && labels.status == "failure" {
+					fakeKubeClient.PrependReactor("create", "resourceclaims", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, apierrors.NewConflict(action.GetResource().GroupResource(), "fake name", errors.New("fake conflict"))
+					})
+					break
+				}
 			}
 			var appliedPatches []string
 			fakeKubeClient.PrependReactor("patch", "pods", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
@@ -884,7 +1063,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			})
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
-			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
+			podGroupInformer := informerFactory.Scheduling().V1beta1().PodGroups()
 			claimInformer := informerFactory.Resource().V1().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 			setupMetrics()
@@ -908,7 +1087,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				ec.claimCache.Mutation(claim)
 			}
 
-			// Simulate race: stop informers, add more pods that the controller doesn't know about.
+			// Simulate race: stop informers, add more objects that the controller doesn't know about.
 			stopInformers()
 			for _, pod := range tc.podsLater {
 				_, err := fakeKubeClient.CoreV1().Pods(pod.Namespace).Create(tCtx, pod, metav1.CreateOptions{})
@@ -916,8 +1095,23 @@ func testSyncHandler(tCtx ktesting.TContext) {
 					tCtx.Fatalf("unexpected error while creating pod: %v", err)
 				}
 			}
+			for _, claim := range tc.claimsLater {
+				_, err := fakeKubeClient.ResourceV1().ResourceClaims(claim.Namespace).Create(tCtx, claim, metav1.CreateOptions{})
+				if err != nil {
+					tCtx.Fatalf("unexpected error while creating claim: %v", err)
+				}
+			}
 
 			err = ec.syncHandler(tCtx, tc.key)
+			if err != nil {
+				if len(tc.expectedError) == 0 {
+					assert.NoError(tCtx, err)
+				} else {
+					assert.ErrorContains(tCtx, err, tc.expectedError, "the error message should have contained the expected error message")
+				}
+
+				return
+			}
 			if tc.expectedError != "" {
 				assert.ErrorContains(tCtx, err, tc.expectedError, "the error message should have contained the expected error message")
 			} else if err != nil {
@@ -953,7 +1147,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			}
 			assert.Equal(tCtx, tc.expectedStatuses, actualStatuses, "pod resource claim statuses")
 
-			podGroups, err := fakeKubeClient.SchedulingV1alpha3().PodGroups("").List(tCtx, metav1.ListOptions{})
+			podGroups, err := fakeKubeClient.SchedulingV1beta1().PodGroups("").List(tCtx, metav1.ListOptions{})
 			if err != nil {
 				tCtx.Fatalf("unexpected error while listing podgroups: %v", err)
 			}
@@ -999,7 +1193,7 @@ func testControllerCreateDeleteRecreate(tCtx ktesting.TContext) {
 	fakeKubeClient := createTestClient(testPodWithResource, template)
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
-	podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
+	podGroupInformer := informerFactory.Scheduling().V1beta1().PodGroups()
 	claimInformer := informerFactory.Resource().V1().ResourceClaims()
 	templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 
@@ -1051,6 +1245,117 @@ func testControllerCreateDeleteRecreate(tCtx ktesting.TContext) {
 	tCtx.ExpectNoError(err)
 	if len(claims.Items) != 1 {
 		tCtx.Fatalf("expected 1 claim after second sync (recreate), got %d", len(claims.Items))
+	}
+}
+
+// TestClaimExists covering the three places it looks for a claim
+// (mutation cache, underlay informer store, storeapiserver), and a optional owner check.
+func TestClaimExists(t *testing.T) { testClaimExists(ktesting.Init(t)) }
+func testClaimExists(tCtx ktesting.TContext) {
+	alwaysOwned := func(*resourceapi.ResourceClaim) bool { return true }
+	neverOwned := func(*resourceapi.ResourceClaim) bool { return false }
+
+	for _, tc := range []struct {
+		name                 string
+		claimInMutationCache *resourceapi.ResourceClaim
+		claimInInformerCache *resourceapi.ResourceClaim
+		claimInAPIServer     *resourceapi.ResourceClaim
+		// reactor injected on GET to simulate a transient apiserver error.
+		getReactor   k8stesting.ReactionFunc
+		invalidOwner bool
+		wantExists   bool
+		wantErr      bool
+	}{
+		{
+			name:                 "found in mutation cache",
+			claimInMutationCache: templatedTestClaim,
+			wantExists:           true,
+		},
+		{
+			name:                 "found in underlay store",
+			claimInInformerCache: templatedTestClaim,
+			wantExists:           true,
+		},
+		{
+			name:             "found in apiserver fallback",
+			claimInAPIServer: templatedTestClaim,
+			wantExists:       true,
+		},
+		{
+			name:       "not found anywhere",
+			wantExists: false,
+		},
+		{
+			name: "apiserver returns error",
+			getReactor: func(k8stesting.Action) (bool, runtime.Object, error) {
+				return true, nil, apierrors.NewInternalError(errors.New("apiserver is down"))
+			},
+			wantExists: false,
+			wantErr:    true,
+		},
+		{
+			name:                 "owner check fails",
+			claimInMutationCache: templatedTestClaim,
+			invalidOwner:         true,
+			wantExists:           false,
+		},
+	} {
+		tCtx.Run(tc.name, func(tCtx ktesting.TContext) {
+			var objects []runtime.Object
+			if tc.claimInInformerCache != nil {
+				objects = append(objects, tc.claimInInformerCache)
+			}
+
+			fakeKubeClient := createTestClient(objects...)
+			if tc.getReactor != nil {
+				fakeKubeClient.PrependReactor("get", "resourceclaims", tc.getReactor)
+			}
+
+			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+			ec, err := newControllerWithFeatures(tCtx.Logger(), fakeKubeClient,
+				informerFactory.Core().V1().Pods(),
+				informerFactory.Scheduling().V1beta1().PodGroups(),
+				informerFactory.Resource().V1().ResourceClaims(),
+				informerFactory.Resource().V1().ResourceClaimTemplates(),
+				controllerFeatures{})
+			tCtx.ExpectNoError(err, "creating controller")
+
+			// Ensure informers are up-to-date.
+			informerFactory.Start(tCtx.Done())
+			stopInformers := func() {
+				tCtx.Cancel("stopping informers")
+				informerFactory.Shutdown()
+			}
+			defer stopInformers()
+			informerFactory.WaitForCacheSync(tCtx.Done())
+
+			// Add claims that only exist in the mutation cache.
+			if claim := tc.claimInMutationCache; claim != nil {
+				ec.claimCache.Mutation(claim)
+			}
+
+			// Simulate race: stop informers, add more objects that the controller doesn't know about.
+			stopInformers()
+			if claim := tc.claimInAPIServer; claim != nil {
+				_, err := fakeKubeClient.ResourceV1().ResourceClaims(claim.Namespace).Create(tCtx, claim, metav1.CreateOptions{})
+				if err != nil {
+					tCtx.Fatalf("unexpected error while creating claim: %v", err)
+				}
+			}
+
+			checkOwner := alwaysOwned
+			if tc.invalidOwner {
+				checkOwner = neverOwned
+			}
+
+			exists, err := ec.claimExists(tCtx, testNamespace, templatedTestClaim.Name, checkOwner)
+			if tc.wantErr {
+				assert.Error(tCtx, err)
+			} else {
+				assert.NoError(tCtx, err)
+			}
+			assert.Equal(tCtx, tc.wantExists, exists)
+		})
 	}
 }
 
@@ -1378,7 +1683,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			fakeKubeClient := createTestClient(test.initialObjects...)
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
-			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
+			podGroupInformer := informerFactory.Scheduling().V1beta1().PodGroups()
 			claimInformer := informerFactory.Resource().V1().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 			setupMetrics()
@@ -1982,49 +2287,47 @@ func (em numMetrics) verify(tCtx ktesting.TContext) {
 	tCtx.Expect(result.metrics).To(gomega.Equal(em.metrics))
 }
 
-type expectedMetrics struct {
-	numCreated          int
-	numCreatedWithAdmin int
-	numFailures         int
-	numFailureWithAdmin int
+type claimCreateMetricLabels struct {
+	status      string
+	adminAccess string
+	ownerGroup  string
+	ownerKind   string
 }
 
-func expectMetrics(tCtx ktesting.TContext, em expectedMetrics) {
+type claimCreateMetrics map[claimCreateMetricLabels]float64
+
+func expectMetrics(tCtx ktesting.TContext, em claimCreateMetrics) {
 	tCtx.Helper()
 
-	// Check created claims
-	actualCreated, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("success", "false"))
-	handleErr(tCtx, err, "ResourceClaimCreateSuccesses")
-	if actualCreated != float64(em.numCreated) {
-		tCtx.Errorf("Expected claims to be created %d, got %v", em.numCreated, actualCreated)
-	}
-
-	// Check created claims with admin access
-	actualCreatedWithAdmin, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("success", "true"))
-	handleErr(tCtx, err, "ResourceClaimCreateSuccessesWithAdminAccess")
-	if actualCreatedWithAdmin != float64(em.numCreatedWithAdmin) {
-		tCtx.Errorf("Expected claims with admin access to be created %d, got %v", em.numCreatedWithAdmin, actualCreatedWithAdmin)
-	}
-
-	// Check failed claims
-	actualFailed, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("failure", "false"))
-	handleErr(tCtx, err, "ResourceClaimCreateFailures")
-	if actualFailed != float64(em.numFailures) {
-		tCtx.Errorf("Expected claims to have failed %d, got %v", em.numFailures, actualFailed)
-	}
-
-	// Check failed claims with admin access
-	actualFailedWithAdmin, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("failure", "true"))
-	handleErr(tCtx, err, "ResourceClaimCreateFailuresWithAdminAccess")
-	if actualFailedWithAdmin != float64(em.numFailureWithAdmin) {
-		tCtx.Errorf("Expected claims with admin access to have failed %d, got %v", em.numFailureWithAdmin, actualFailedWithAdmin)
-	}
-}
-func handleErr(tCtx ktesting.TContext, err error, metricName string) {
+	gatheredMetrics, err := legacyregistry.DefaultGatherer.Gather()
 	if err != nil {
-		tCtx.Errorf("Failed to get %s value, err: %v", metricName, err)
+		tCtx.Errorf("failed to gather metrics: %v", err)
+		return
 	}
+
+	actualMetrics := claimCreateMetrics{}
+	for _, mf := range gatheredMetrics {
+		if mf.GetName() != "dynamic_resource_allocation_resourceclaim_creates_total" {
+			continue
+		}
+		for _, metric := range mf.GetMetric() {
+			labels := make(map[string]string)
+			for _, labelPair := range metric.GetLabel() {
+				labels[labelPair.GetName()] = labelPair.GetValue()
+			}
+
+			actualMetrics[claimCreateMetricLabels{
+				status:      labels["status"],
+				adminAccess: labels["admin_access"],
+				ownerGroup:  labels["owner_api_group"],
+				ownerKind:   labels["owner_api_kind"],
+			}] = metric.GetCounter().GetValue()
+		}
+	}
+
+	tCtx.Expect(actualMetrics).To(gomega.Equal(em))
 }
+
 func setupMetrics() {
 	// Enable test mode to prevent global custom collector registration
 	controllermetrics.SetTestMode(true)

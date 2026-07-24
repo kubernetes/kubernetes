@@ -24,7 +24,6 @@ import (
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/record/util"
 	"k8s.io/client-go/tools/reference"
@@ -91,10 +90,14 @@ func (recorder *recorderImpl) eventf(logger klog.Logger, regarding runtime.Objec
 		return
 	}
 	event := recorder.makeEvent(refRegarding, refRelated, timestamp, annotations, eventtype, reason, message, recorder.reportingController, recorder.reportingInstance, action)
-	go func() {
-		defer utilruntime.HandleCrash()
-		recorder.Action(watch.Added, event)
-	}()
+	sent, err := recorder.ActionOrDrop(watch.Added, event)
+	if err != nil {
+		logger.Error(err, "Unable to record event (will not retry!)")
+		return
+	}
+	if !sent {
+		logger.Error(nil, "Unable to record event: too many queued events, dropped event", "event", event)
+	}
 }
 
 func (recorder *recorderImpl) makeEvent(refRegarding *v1.ObjectReference, refRelated *v1.ObjectReference, timestamp metav1.MicroTime, annotations map[string]string, eventtype, reason, message string, reportingController string, reportingInstance string, action string) *eventsv1.Event {

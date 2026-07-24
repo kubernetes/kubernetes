@@ -711,6 +711,7 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 	st := &mockState{
 		assignments:   testCase.stAssignments,
 		defaultCPUSet: testCase.stDefaultCPUSet,
+		baselines:     state.ContainerCPUBaselines{},
 	}
 
 	container := &testCase.pod.Spec.Containers[0]
@@ -750,6 +751,46 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 func runStaticPolicyTestCaseWithFeatureGate(t *testing.T, testCase staticPolicyTest) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
 	runStaticPolicyTestCase(t, testCase)
+}
+
+func TestStaticPolicyAllocateRecordsBaseline(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
+
+	logger, _ := ktesting.NewTestContext(t)
+	tm := topologymanager.NewFakeManager(logger)
+	topo := topoDualSocketHT // any topology suffice, pick a simple one
+	opts := map[string]string{}
+	policy, err := NewStaticPolicy(logger, topo, 1, cpuset.New(), tm, opts)
+	if err != nil {
+		t.Fatalf("NewStaticPolicy() failed: %v", err)
+	}
+
+	st := &mockState{
+		assignments:   state.ContainerCPUAssignments{},
+		defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11), // matches the topo we use
+		baselines:     state.ContainerCPUBaselines{},
+	}
+
+	pod := makePod("testPod", "testContainer", "2000m", "2000m") // any allocation triggering exclusive CPU assignment is fine
+	container := &pod.Spec.Containers[0]                         // shortcut
+
+	if err := policy.Allocate(logger, st, pod, container, lifecycle.AddOperation); err != nil {
+		t.Fatalf("Allocate() failed: %v", err)
+	}
+
+	cset, ok := st.GetCPUSet(string(pod.UID), container.Name)
+	if !ok {
+		t.Fatal("expected container to be present in assignments")
+	}
+
+	baseline, ok := st.GetBaselineCPUSet(string(pod.UID), container.Name)
+	if !ok {
+		t.Fatal("expected container to be present in baselines")
+	}
+
+	if !baseline.Equals(cset) {
+		t.Errorf("expected baseline %s to equal allocated cpuset %s", baseline, cset)
+	}
 }
 
 func TestStaticPolicyReuseCPUs(t *testing.T) {
@@ -2530,6 +2571,60 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 			podLevelResourceManagersEnabled: true,
 			requiredMetrics: requiredMetrics{
 				expTotalErrors: 0,
+			},
+		},
+		{
+			description: "scope: pod, should reject a pod due to SMT alignment error when FullPhysicalCPUsOnly is enabled",
+			topo:        topoDualSocketHT,
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			numReservedCPUs: 2,
+			reservedCPUs:    cpuset.New(0, 1),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod: makePodWithContainersAndPodLevelResources("pod-smt-error", "3", "3", []containerSpec{}, []containerSpec{
+				{name: "gu-container", request: "3", limit: "3"},
+			}),
+			topologyHint:                    topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:                          SMTAlignmentError{RequestedCPUs: 3, CpusPerCore: 2},
+			expPodAssignments:               state.ContainerCPUAssignments{},
+			expDefaultCPUSet:                cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalErrors: 1,
+			},
+		},
+		{
+			description: "scope: pod, should successfully allocate CPUs for a pod when FullPhysicalCPUsOnly is enabled and CPU request is a multiple of SMT level",
+			topo:        topoDualSocketHT,
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			numReservedCPUs: 2,
+			reservedCPUs:    cpuset.New(0, 1),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod: makePodWithContainersAndPodLevelResources("pod-smt-success", "4", "4", []containerSpec{}, []containerSpec{
+				{name: "gu-container-1", request: "2", limit: "2"},
+				{name: "gu-container-2", request: "2", limit: "2"},
+			}),
+			topologyHint: topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:       nil,
+			expPodAssignments: state.ContainerCPUAssignments{
+				"pod-smt-success": map[string]cpuset.CPUSet{
+					"gu-container-1": cpuset.New(2, 8),
+					"gu-container-2": cpuset.New(4, 10),
+				},
+			},
+			expDefaultCPUSet:                cpuset.New(3, 5, 6, 7, 9, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              2,
+				expExclusiveAssignments:     2,
+				expPodSharedPoolAssignments: 0,
 			},
 		},
 	}

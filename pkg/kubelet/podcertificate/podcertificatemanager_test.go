@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -38,13 +38,12 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	certlistersv1beta1 "k8s.io/client-go/listers/certificates/v1beta1"
+	certlistersv1 "k8s.io/client-go/listers/certificates/v1"
 	corelistersv1 "k8s.io/client-go/listers/core/v1"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/utils/hermeticpodcertificatesigner"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/utils/clock"
 	testclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
@@ -59,7 +58,7 @@ func TestTransitionInitialToWait(t *testing.T) {
 	signerName := "foo.com/signer"
 
 	pcrStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
-	pcrLister := certlistersv1beta1.NewPodCertificateRequestLister(pcrStore)
+	pcrLister := certlistersv1.NewPodCertificateRequestLister(pcrStore)
 
 	nodeStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 	nodeLister := corelistersv1.NewNodeLister(nodeStore)
@@ -144,7 +143,7 @@ func TestTransitionInitialToWait(t *testing.T) {
 		t.Fatalf("Unexpected error while running handleProjection: %v", err)
 	}
 
-	gotPCRs, err := kc.CertificatesV1beta1().PodCertificateRequests("ns1").List(ctx, metav1.ListOptions{})
+	gotPCRs, err := kc.CertificatesV1().PodCertificateRequests("ns1").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error listing PodCertificateRequests in fake client: %v", err)
 	}
@@ -157,11 +156,11 @@ func TestTransitionInitialToWait(t *testing.T) {
 
 	// Check that the created PCR spec matches expectations.  Blank out fields on
 	// gotPCR that we don't care about.
-	wantPCR := &certsv1beta1.PodCertificateRequest{
+	wantPCR := &certsv1.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "ns1",
 		},
-		Spec: certsv1beta1.PodCertificateRequestSpec{
+		Spec: certsv1.PodCertificateRequestSpec{
 			SignerName:                workloadPod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].PodCertificate.SignerName,
 			PodName:                   workloadPod.ObjectMeta.Name,
 			PodUID:                    workloadPod.ObjectMeta.UID,
@@ -176,10 +175,8 @@ func TestTransitionInitialToWait(t *testing.T) {
 	gotPCRClone := gotPCR.DeepCopy()
 	gotPCRClone.ObjectMeta = metav1.ObjectMeta{}
 	gotPCRClone.ObjectMeta.Namespace = gotPCR.ObjectMeta.Namespace
-	gotPCRClone.Spec.PKIXPublicKey = nil
-	gotPCRClone.Spec.ProofOfPossession = nil
 	gotPCRClone.Spec.StubPKCS10Request = nil
-	gotPCRClone.Status = certsv1beta1.PodCertificateRequestStatus{}
+	gotPCRClone.Status = certsv1.PodCertificateRequestStatus{}
 	if diff := cmp.Diff(gotPCRClone, wantPCR); diff != "" {
 		t.Fatalf("PodCertificateManager created a bad PCR; diff (-got +want)\n%s", diff)
 	}
@@ -208,7 +205,7 @@ func TestPCRDeletedWhileWaiting(t *testing.T) {
 	signerName := "foo.com/signer"
 
 	pcrStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
-	pcrLister := certlistersv1beta1.NewPodCertificateRequestLister(pcrStore)
+	pcrLister := certlistersv1.NewPodCertificateRequestLister(pcrStore)
 
 	nodeStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 	nodeLister := corelistersv1.NewNodeLister(nodeStore)
@@ -297,7 +294,7 @@ func TestPCRDeletedWhileWaiting(t *testing.T) {
 	}
 
 	// Clear all PCRs and advance time past assumeDeletedThreshold.
-	if err := kc.CertificatesV1beta1().PodCertificateRequests("ns1").DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+	if err := kc.CertificatesV1().PodCertificateRequests("ns1").DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
 		t.Fatalf("Unexpected error while deleting all PCRs in ns1: %v", err)
 	}
 	clock.Step(assumeDeletedThreshold + 1*time.Minute)
@@ -310,25 +307,21 @@ func TestPCRDeletedWhileWaiting(t *testing.T) {
 }
 
 func TestFullFlow(t *testing.T) {
-	ktesting.Init(t).SyncTest("", testFullFlow)
-}
+	ctx, cancel := context.WithCancel(ktesting.Init(t))
+	defer cancel()
 
-func testFullFlow(tCtx ktesting.TContext) {
-	defer tCtx.Cancel("test completed")
-	t := tCtx.TB()
-	ctx := tCtx.Context
-
+	clock := testclock.NewFakeClock(mustRFC3339(t, "2010-01-01T00:00:00Z"))
 	kc := fake.NewSimpleClientset()
 
 	// Assign PCR name and creationTimeStamp
 	kc.Fake.PrependReactor("create", "podcertificaterequests",
 		func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
-			obj := action.(k8stesting.CreateAction).GetObject().(*certsv1beta1.PodCertificateRequest)
+			obj := action.(k8stesting.CreateAction).GetObject().(*certsv1.PodCertificateRequest)
 			// Simulate server-side GenerateName behavior
 			if obj.Name == "" {
 				obj.Name = fmt.Sprintf("%s-pcr-%d", obj.Spec.PodName, rand.Int63n(1_000_000))
 			}
-			obj.CreationTimestamp = metav1.NewTime(time.Now())
+			obj.CreationTimestamp = metav1.NewTime(clock.Now())
 
 			return false, obj, nil // allow normal processing
 		})
@@ -373,7 +366,7 @@ func testFullFlow(tCtx ktesting.TContext) {
 	if err != nil {
 		t.Fatalf("Unexpected error generating CA hierarchy: %v", err)
 	}
-	pcrSigner := hermeticpodcertificatesigner.New(clock.RealClock{}, signerName, caKeys, caCerts, kc)
+	pcrSigner := hermeticpodcertificatesigner.New(clock, signerName, caKeys, caCerts, kc)
 	go pcrSigner.Run(ctx)
 	//
 	// Configure and boot up enough Kubelet subsystems to run an IssuingManager.
@@ -396,16 +389,16 @@ func testFullFlow(tCtx ktesting.TContext) {
 		kc,
 		node1PodManager,
 		nil,
-		informerFactory.Certificates().V1beta1().PodCertificateRequests(),
+		informerFactory.Certificates().V1().PodCertificateRequests(),
 		informerFactory.Core().V1().Nodes(),
 		types.NodeName(node1.ObjectMeta.Name),
-		clock.RealClock{},
+		clock,
 	)
 	// Start informers
 	informerFactory.Start(ctx.Done())
 
 	// wait until the informers' watches are actually registered,
-	const expectedWatches = 3 // Pods, Nodes, PodCertificateRequests
+	const expectedWatches = 4 // Manager: Pods, Nodes, PodCertificateRequests. Signer: PodCertificateRequests.
 	if err := wait.PollUntilContextTimeout(
 		ctx,
 		100*time.Millisecond,
@@ -505,9 +498,9 @@ func testFullFlow(tCtx ktesting.TContext) {
 
 	// Within a few seconds, we should see a PodCertificateRequest created for
 	// this pod.
-	var gotPCR *certsv1beta1.PodCertificateRequest
+	var gotPCR *certsv1.PodCertificateRequest
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-		pcrs, err := kc.CertificatesV1beta1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
+		pcrs, err := kc.CertificatesV1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, fmt.Errorf("while listing PodCertificateRequests: %w", err)
 		}
@@ -526,11 +519,11 @@ func testFullFlow(tCtx ktesting.TContext) {
 	// Check that the created PCR spec matches expectations.  Blank out fields on
 	// gotPCR that we don't care about.  Blank out status, because the
 	// controller might have already signed it.
-	wantPCR := &certsv1beta1.PodCertificateRequest{
+	wantPCR := &certsv1.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: workloadNS.ObjectMeta.Name,
 		},
-		Spec: certsv1beta1.PodCertificateRequestSpec{
+		Spec: certsv1.PodCertificateRequestSpec{
 			SignerName:                workloadPod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].PodCertificate.SignerName,
 			PodName:                   workloadPod.ObjectMeta.Name,
 			PodUID:                    workloadPod.ObjectMeta.UID,
@@ -545,17 +538,15 @@ func testFullFlow(tCtx ktesting.TContext) {
 	gotPCRClone := gotPCR.DeepCopy()
 	gotPCRClone.ObjectMeta = metav1.ObjectMeta{}
 	gotPCRClone.ObjectMeta.Namespace = gotPCR.ObjectMeta.Namespace
-	gotPCRClone.Spec.PKIXPublicKey = nil
-	gotPCRClone.Spec.ProofOfPossession = nil
 	gotPCRClone.Spec.StubPKCS10Request = nil
-	gotPCRClone.Status = certsv1beta1.PodCertificateRequestStatus{}
+	gotPCRClone.Status = certsv1.PodCertificateRequestStatus{}
 	if diff := cmp.Diff(gotPCRClone, wantPCR); diff != "" {
 		t.Fatalf("PodCertificateManager created a bad PCR; diff (-got +want)\n%s", diff)
 	}
 
 	// Wait some more time for the PCR to be issued.
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-		pcrs, err := kc.CertificatesV1beta1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
+		pcrs, err := kc.CertificatesV1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, fmt.Errorf("while listing PodCertificateRequests: %w", err)
 		}
@@ -568,9 +559,9 @@ func testFullFlow(tCtx ktesting.TContext) {
 
 		for _, cond := range gotPCR.Status.Conditions {
 			switch cond.Type {
-			case certsv1beta1.PodCertificateRequestConditionTypeDenied,
-				certsv1beta1.PodCertificateRequestConditionTypeFailed,
-				certsv1beta1.PodCertificateRequestConditionTypeIssued:
+			case certsv1.PodCertificateRequestConditionTypeDenied,
+				certsv1.PodCertificateRequestConditionTypeFailed,
+				certsv1.PodCertificateRequestConditionTypeIssued:
 				return true, nil
 			}
 		}
@@ -581,7 +572,7 @@ func testFullFlow(tCtx ktesting.TContext) {
 	}
 
 	isIssued := slices.ContainsFunc(gotPCR.Status.Conditions, func(cond metav1.Condition) bool {
-		return cond.Type == certsv1beta1.PodCertificateRequestConditionTypeIssued
+		return cond.Type == certsv1.PodCertificateRequestConditionTypeIssued
 	})
 	if !isIssued {
 		t.Fatalf("The test signingController didn't issue the PCR:\n%+v", gotPCR)
@@ -605,7 +596,8 @@ func testFullFlow(tCtx ktesting.TContext) {
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, _, err := node1PodCertificateManager.GetPodCertificateCredentialBundle(ctx, workloadPod.ObjectMeta.Namespace, workloadPod.ObjectMeta.Name, string(workloadPod.ObjectMeta.UID), "certificate", 0)
 		if err != nil {
-			return false, err
+			t.Logf("Credential bundle not ready yet: %v", err)
+			return false, nil
 		}
 		return true, nil
 	})
@@ -622,59 +614,48 @@ func testFullFlow(tCtx ktesting.TContext) {
 		t.Fatalf("PodCertificate manager returned bad cert chain; diff (-got +want)\n%s", diff)
 	}
 
-	oldPCRName := gotPCR.ObjectMeta.Name
-
 	// Fast-forward time until it is past beginRefreshAt (including the possible 5-minute jitter).
-	time.Sleep(23*time.Hour + 37*time.Minute)
+	clock.Step(23*time.Hour + 37*time.Minute)
 
 	// Within a few seconds, we should see a new PodCertificateRequest created for
 	// this pod.
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-		pcrs, err := kc.CertificatesV1beta1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
+		pcrs, err := kc.CertificatesV1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, fmt.Errorf("while listing PodCertificateRequests: %w", err)
 		}
 
-		for _, pcr := range pcrs.Items {
-			// Old PCR is still there, make sure we get the new one.
-			if pcr.ObjectMeta.Name != oldPCRName {
-				gotPCR = &pcr
-				return true, nil
-			}
+		if len(pcrs.Items) == 0 {
+			return false, nil
 		}
 
-		return false, nil
+		gotPCR = &pcrs.Items[0]
+		return true, nil
 	})
 	if err != nil {
-		t.Fatalf("Error while waiting for new PCR to be created: %v", err)
+		t.Fatalf("Error while waiting for PCR to be created: %v", err)
 	}
 
 	// We will assume that the created PCR matches our expectations.
 
 	// Wait some more time for the new PCR to be issued.
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-		pcrs, err := kc.CertificatesV1beta1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
+		pcrs, err := kc.CertificatesV1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, fmt.Errorf("while listing PodCertificateRequests: %w", err)
 		}
 
-		var updatedPCR *certsv1beta1.PodCertificateRequest
-		for _, pcr := range pcrs.Items {
-			if pcr.ObjectMeta.Name == gotPCR.ObjectMeta.Name {
-				updatedPCR = &pcr
-				break
-			}
-		}
-		if updatedPCR == nil {
+		if len(pcrs.Items) == 0 {
 			return false, nil
 		}
-		gotPCR = updatedPCR
+
+		gotPCR = &pcrs.Items[0]
 
 		for _, cond := range gotPCR.Status.Conditions {
 			switch cond.Type {
-			case certsv1beta1.PodCertificateRequestConditionTypeDenied,
-				certsv1beta1.PodCertificateRequestConditionTypeFailed,
-				certsv1beta1.PodCertificateRequestConditionTypeIssued:
+			case certsv1.PodCertificateRequestConditionTypeDenied,
+				certsv1.PodCertificateRequestConditionTypeFailed,
+				certsv1.PodCertificateRequestConditionTypeIssued:
 				return true, nil
 			}
 		}
@@ -689,7 +670,8 @@ func testFullFlow(tCtx ktesting.TContext) {
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, certChain, err := node1PodCertificateManager.GetPodCertificateCredentialBundle(ctx, workloadPod.ObjectMeta.Namespace, workloadPod.ObjectMeta.Name, string(workloadPod.ObjectMeta.UID), "certificate", 0)
 		if err != nil {
-			return false, err
+			t.Logf("Refreshed credential bundle not ready yet: %v", err)
+			return false, nil
 		}
 
 		if string(certChain) != gotPCR.Status.CertificateChain {

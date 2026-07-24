@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -105,6 +106,12 @@ type Manager interface {
 
 	// RetryPendingResizes retries all pending resizes.
 	RetryPendingResizes(ctx context.Context, trigger string)
+
+	// HasPodAllocatedResources returns whether a pod has been allocated resources.
+	HasPodAllocatedResources(podUID types.UID) bool
+
+	// GetAllocatedPods returns all active pods with their allocated resources.
+	GetAllocatedPods() []*v1.Pod
 }
 
 type manager struct {
@@ -433,14 +440,18 @@ func updatePodFromAllocation(pod *v1.Pod, allocated state.PodResourceInfo) (*v1.
 
 	updated := false
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
-		pAlloc := allocated.PodLevelResources
-		if !apiequality.Semantic.DeepEqual(pod.Spec.Resources, pAlloc) {
-			// Allocation differs from pod spec, retrieve the allocation
-			pod = pod.DeepCopy()
-			pod.Spec.Resources = pAlloc
-			updated = true
-		}
+		pod, updated = updatePodLevelResourcesFromAllocation(pod, allocated)
 	}
+	pod, updated = updateContainerResourcesFromAllocation(pod, allocated, updated)
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		pod, updated = updateEmptyDirVolumeLimitsFromAllocation(pod, allocated, updated)
+	}
+
+	return pod, updated
+}
+
+func updateContainerResourcesFromAllocation(pod *v1.Pod, allocated state.PodResourceInfo, alreadyUpdated bool) (*v1.Pod, bool) {
+	updated := alreadyUpdated
 	containerAlloc := func(c v1.Container) (v1.ResourceRequirements, bool) {
 		if cAlloc, ok := allocated.ContainerResources[c.Name]; ok {
 			if !apiequality.Semantic.DeepEqual(c.Resources, cAlloc) {
@@ -471,12 +482,51 @@ func updatePodFromAllocation(pod *v1.Pod, allocated state.PodResourceInfo) (*v1.
 	return pod, updated
 }
 
-// SetAllocatedResources checkpoints the resources allocated to a pod's containers
-func (m *manager) SetAllocatedResources(logger klog.Logger, pod *v1.Pod) error {
-	return m.allocated.SetPodResourceInfo(logger, pod.UID, allocationFromPod(pod))
+func updatePodLevelResourcesFromAllocation(pod *v1.Pod, allocated state.PodResourceInfo) (*v1.Pod, bool) {
+	pAlloc := allocated.PodLevelResources
+	if !apiequality.Semantic.DeepEqual(pod.Spec.Resources, pAlloc) {
+		// Allocation differs from pod spec, retrieve the allocation
+		pod = pod.DeepCopy()
+		pod.Spec.Resources = pAlloc
+		return pod, true
+	}
+	return pod, false
 }
 
-func allocationFromPod(pod *v1.Pod) state.PodResourceInfo {
+func updateEmptyDirVolumeLimitsFromAllocation(pod *v1.Pod, allocated state.PodResourceInfo, alreadyUpdated bool) (*v1.Pod, bool) {
+	updated := alreadyUpdated
+	for i, vol := range pod.Spec.Volumes {
+		if !VolHasMemoryBackedEmptyDirSizeLimit(&vol) {
+			continue
+		}
+		if alloc, ok := allocated.EmptyDirVolumeLimits[vol.Name]; ok {
+			if alloc.Cmp(*vol.EmptyDir.SizeLimit) != 0 {
+				if !updated {
+					pod = pod.DeepCopy()
+					updated = true
+				}
+				allocCopy := alloc.DeepCopy()
+				pod.Spec.Volumes[i].EmptyDir.SizeLimit = &allocCopy
+			}
+		}
+	}
+	return pod, updated
+}
+
+// HasPodAllocatedResources returns whether a pod has been allocated resources.
+func (m *manager) HasPodAllocatedResources(podUID types.UID) bool {
+	_, allocated := m.allocated.GetPodResourceInfo(podUID)
+	return allocated
+}
+
+// SetAllocatedResources checkpoints the resources allocated to a pod's containers
+func (m *manager) SetAllocatedResources(logger klog.Logger, pod *v1.Pod) error {
+	return m.allocated.SetPodResourceInfo(logger, pod.UID, ResourceInfoForPod(pod))
+}
+
+// ResourceInfoForPod constructs a state.PodResourceInfo containing container resources,
+// memory-backed emptyDir volume limits, and pod-level resources for the given pod.
+func ResourceInfoForPod(pod *v1.Pod) state.PodResourceInfo {
 	var podAlloc state.PodResourceInfo
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && pod.Spec.Resources != nil {
 		podAlloc.PodLevelResources = pod.Spec.Resources.DeepCopy()
@@ -488,6 +538,19 @@ func allocationFromPod(pod *v1.Pod) state.PodResourceInfo {
 		}
 		alloc := *container.Resources.DeepCopy()
 		podAlloc.ContainerResources[container.Name] = alloc
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		for _, vol := range pod.Spec.Volumes {
+			if !VolHasMemoryBackedEmptyDirSizeLimit(&vol) {
+				continue
+			}
+			alloc := vol.EmptyDir.SizeLimit.DeepCopy()
+			if podAlloc.EmptyDirVolumeLimits == nil {
+				podAlloc.EmptyDirVolumeLimits = make(map[string]*resource.Quantity)
+			}
+			podAlloc.EmptyDirVolumeLimits[vol.Name] = &alloc
+		}
 	}
 
 	return podAlloc
@@ -541,7 +604,7 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 	_, updated := m.UpdatePodFromAllocation(pod)
 	if !updated {
 		// Desired resources == allocated resources. Pod allocation does not need to be updated.
-		m.statusManager.ClearPodResizePendingCondition(pod.UID)
+		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
 		return false, nil
 	}
 
@@ -552,7 +615,7 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 		if err := m.SetAllocatedResources(logger, pod); err != nil {
 			return false, err
 		}
-		m.statusManager.ClearPodResizePendingCondition(pod.UID)
+		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionAccepted)
 
 		// Clear any errors that may have been surfaced from a previous resize and update the
 		// generation of the resize in-progress condition.
@@ -607,11 +670,20 @@ func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
 		return activePods
 	}
 
-	allocatedPods := make([]*v1.Pod, len(activePods))
-	for i, pod := range activePods {
-		allocatedPods[i], _ = m.UpdatePodFromAllocation(pod)
+	allocatedPods := make([]*v1.Pod, 0, len(activePods))
+	for _, pod := range activePods {
+		// Filter out pods that don't yet have an allocation, which will filter pods that
+		// are potentially going to be denied at admission.
+		if m.HasPodAllocatedResources(pod.UID) {
+			allocatedPod, _ := m.UpdatePodFromAllocation(pod)
+			allocatedPods = append(allocatedPods, allocatedPod)
+		}
 	}
 	return allocatedPods
+}
+
+func (m *manager) GetAllocatedPods() []*v1.Pod {
+	return m.getAllocatedPods(m.getActivePods())
 }
 
 func IsResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {
@@ -623,4 +695,8 @@ func IsResizableContainer(container *v1.Container, containerType podutil.Contain
 	default:
 		return false
 	}
+}
+
+func VolHasMemoryBackedEmptyDirSizeLimit(vol *v1.Volume) bool {
+	return vol != nil && vol.EmptyDir != nil && vol.EmptyDir.Medium == v1.StorageMediumMemory && vol.EmptyDir.SizeLimit != nil && !vol.EmptyDir.SizeLimit.IsZero()
 }

@@ -42,6 +42,8 @@ type StatefulSetValidationOptions struct {
 	SkipValidatePodTemplateSpec bool
 	// Skip validating volume claim templates, which is used for StatefulSet update
 	SkipValidateVolumeClaimTemplates bool
+	// Allow setting Recreate strategy to StatefulSet update strategy
+	AllowStatefulSetRecreateStrategy bool
 }
 
 // ValidateStatefulSetName can be used to check whether the given StatefulSet name is valid.
@@ -135,10 +137,10 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("podManagementPolicy"), spec.PodManagementPolicy, fmt.Sprintf("must be '%s' or '%s'", apps.OrderedReadyPodManagement, apps.ParallelPodManagement)))
 	}
 
-	switch spec.UpdateStrategy.Type {
-	case "":
+	switch {
+	case spec.UpdateStrategy.Type == "":
 		allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy"), ""))
-	case apps.OnDeleteStatefulSetStrategyType:
+	case spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType:
 		if spec.UpdateStrategy.RollingUpdate != nil {
 			allErrs = append(
 				allErrs,
@@ -147,17 +149,25 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 					spec.UpdateStrategy.RollingUpdate,
 					fmt.Sprintf("only allowed for updateStrategy '%s'", apps.RollingUpdateStatefulSetStrategyType)))
 		}
-	case apps.RollingUpdateStatefulSetStrategyType:
+	case spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType:
 		if spec.UpdateStrategy.RollingUpdate != nil {
 			allErrs = append(allErrs, validateRollingUpdateStatefulSet(spec.UpdateStrategy.RollingUpdate, fldPath.Child("updateStrategy", "rollingUpdate"))...)
-
+		}
+	case spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType && setOpts.AllowStatefulSetRecreateStrategy:
+		if spec.UpdateStrategy.RollingUpdate != nil {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath.Child("updateStrategy").Child("rollingUpdate"),
+					spec.UpdateStrategy.RollingUpdate,
+					fmt.Sprintf("only allowed for updateStrategy '%s'", apps.RollingUpdateStatefulSetStrategyType)))
 		}
 	default:
-		allErrs = append(allErrs,
-			field.Invalid(fldPath.Child("updateStrategy"), spec.UpdateStrategy,
-				fmt.Sprintf("must be '%s' or '%s'",
-					apps.RollingUpdateStatefulSetStrategyType,
-					apps.OnDeleteStatefulSetStrategyType)))
+		validValues := fmt.Sprintf("must be '%s' or '%s'", apps.RollingUpdateStatefulSetStrategyType, apps.OnDeleteStatefulSetStrategyType)
+		if setOpts.AllowStatefulSetRecreateStrategy {
+			validValues = fmt.Sprintf("must be '%s', '%s', or '%s'", apps.RollingUpdateStatefulSetStrategyType, apps.OnDeleteStatefulSetStrategyType, apps.RecreateStatefulSetStrategyType)
+		}
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("updateStrategy"), spec.UpdateStrategy, validValues))
 	}
 
 	allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicy(spec.PersistentVolumeClaimRetentionPolicy, fldPath.Child("persistentVolumeClaimRetentionPolicy"))...)
@@ -225,17 +235,14 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 }
 
 // ValidateStatefulSet validates a StatefulSet.
-func ValidateStatefulSet(statefulSet *apps.StatefulSet, opts apivalidation.PodValidationOptions) field.ErrorList {
+func ValidateStatefulSet(statefulSet *apps.StatefulSet, setOpts StatefulSetValidationOptions, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&statefulSet.ObjectMeta, true, ValidateStatefulSetName, field.NewPath("metadata"))
-	setOpts := StatefulSetValidationOptions{
-		AllowInvalidServiceName: false, // require valid serviceNames in new StatefulSets
-	}
 	allErrs = append(allErrs, ValidateStatefulSetSpec(&statefulSet.Spec, field.NewPath("spec"), opts, setOpts)...)
 	return allErrs
 }
 
 // ValidateStatefulSetUpdate tests if required fields in the StatefulSet are set.
-func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, opts apivalidation.PodValidationOptions) field.ErrorList {
+func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, setOpts StatefulSetValidationOptions, opts apivalidation.PodValidationOptions) field.ErrorList {
 	// First, validate that the new statefulset is valid.  Don't call
 	// ValidateStatefulSet() because we don't want to revalidate the name on
 	// update.  This is important here because we used to allow DNS subdomain
@@ -243,10 +250,7 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, op
 	// thing to do it delete such an instance, but if there is a finalizer, it
 	// would need to pass update validation.  Name can't change anyway.
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))
-	setOpts := StatefulSetValidationOptions{
-		AllowInvalidServiceName:          true, // serviceName is immutable, tolerate existing invalid names on update
-		SkipValidateVolumeClaimTemplates: true, // volumeClaimTemplates are immutable, tolerate previously persisted invalid values on update
-	}
+
 	// In order to tolerate the existing sts, we choose to skip the validation error of old sts podTemplateSpec.
 	if len(ValidateStatefulSetSpec(&oldStatefulSet.Spec, nil, opts, setOpts)) > 0 {
 		setOpts.SkipValidatePodTemplateSpec = true

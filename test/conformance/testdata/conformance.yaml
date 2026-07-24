@@ -1422,6 +1422,77 @@
     resource must support get, update, patch.'
   release: v1.19
   file: test/e2e/auth/certificates.go
+- testname: PodCertificateRequest API operations
+  codename: '[sig-auth] PodCertificateRequest API [Privileged:ClusterAdmin] should
+    support PodCertificateRequest API operations [Conformance]'
+  description: ' The certificates.k8s.io API group MUST exist in the /apis discovery
+    document. The certificates.k8s.io/v1 API group/version MUST exist in the /apis/certificates.k8s.io
+    discovery document. The podcertificaterequests and podcertificaterequests/status
+    resources MUST exist in the /apis/certificates.k8s.io/v1 discovery document. The
+    podcertificaterequests resource must support namespaced create, read, update,
+    patch, and delete. The podcertificaterequests/status resource must support get,
+    update, patch.'
+  release: v1.37
+  file: test/e2e/auth/podcertificaterequest.go
+- testname: Projected PodCertificate Default Expiration
+  codename: '[sig-auth] Projected PodCertificate [FeatureGate:PodCertificateRequest]
+    [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection] MaxExpirationSeconds
+    validations should issue certificate with default life time (24h) when MaxExpirationSeconds
+    is not set [MinimumKubeletVersion:1.37] [Conformance]'
+  description: ' If MaxExpirationSeconds is omitted from the projected volume spec,
+    the issued certificate MUST have a default lifetime of 24 hours.'
+  release: v1.37
+  file: test/e2e/auth/projected_podcertificate.go
+- testname: Projected PodCertificate Custom Expiration
+  codename: '[sig-auth] Projected PodCertificate [FeatureGate:PodCertificateRequest]
+    [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection] MaxExpirationSeconds
+    validations should issue certificate with specified duration (1h) when MaxExpirationSeconds
+    is set [MinimumKubeletVersion:1.37] [Conformance]'
+  description: ' If MaxExpirationSeconds is specified in the projected volume spec
+    (e.g. 1 hour), the issued certificate MUST have a lifetime matching that duration.'
+  release: v1.37
+  file: test/e2e/auth/projected_podcertificate.go
+- testname: Projected PodCertificate Expiration Maximum Validation
+  codename: '[sig-auth] Projected PodCertificate [FeatureGate:PodCertificateRequest]
+    [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection] MaxExpirationSeconds
+    validations should reject pod creation when MaxExpirationSeconds exceeds maximum
+    (91d) [MinimumKubeletVersion:1.37] [Conformance]'
+  description: ' Creating a pod with a projected podCertificate volume requesting
+    a MaxExpirationSeconds exceeding the maximum of 91 days MUST be rejected by the
+    API server during admission.'
+  release: v1.37
+  file: test/e2e/auth/projected_podcertificate.go
+- testname: Projected PodCertificate Expiration Minimum Validation
+  codename: '[sig-auth] Projected PodCertificate [FeatureGate:PodCertificateRequest]
+    [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection] MaxExpirationSeconds
+    validations should reject pod creation when MaxExpirationSeconds is less than
+    minimum (1h) [MinimumKubeletVersion:1.37] [Conformance]'
+  description: ' Creating a pod with a projected podCertificate volume requesting
+    a MaxExpirationSeconds less than the minimum of 1 hour MUST be rejected by the
+    API server during admission.'
+  release: v1.37
+  file: test/e2e/auth/projected_podcertificate.go
+- testname: Projected PodCertificate mTLS Connection
+  codename: '[sig-auth] Projected PodCertificate [FeatureGate:PodCertificateRequest]
+    [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection] should
+    allow server and client pods to establish an mTLS connection [MinimumKubeletVersion:1.37]
+    [Conformance]'
+  description: ' A pod configured with a projected podCertificate volume and an associated
+    ClusterTrustBundle MUST project a valid leaf certificate chain and key. Two pods
+    configured with such certificates and keys under the same CA MUST be able to establish
+    a mutually authenticated TLS (mTLS) connection.'
+  release: v1.37
+  file: test/e2e/auth/projected_podcertificate.go
+- testname: Projected PodCertificate UserAnnotations
+  codename: '[sig-auth] Projected PodCertificate [FeatureGate:PodCertificateRequest]
+    [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection] should
+    honor UserAnnotations for SPIFFE URI path [MinimumKubeletVersion:1.37] [Conformance]'
+  description: ' The podCertificate volume projection MUST support passing unverified
+    user annotations from the pod spec to the signer. The signer MUST be able to receive
+    and process these annotations (e.g. to override the SPIFFE URI path in the generated
+    certificate SANs).'
+  release: v1.37
+  file: test/e2e/auth/projected_podcertificate.go
 - testname: OIDC Discovery (ServiceAccountIssuerDiscovery)
   codename: '[sig-auth] ServiceAccounts ServiceAccountIssuerDiscovery should support
     OIDC discovery of service account issuer [Conformance]'
@@ -1508,6 +1579,92 @@
     client call.
   release: v1.27
   file: test/e2e/auth/subjectreviews.go
+- testname: CRUD operations for clustertrustbundles
+  codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
+    CRUD Tests certificates.k8s.io/v1 ClusterTrustBundles [MinimumKubeletVersion:1.37]
+    [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for certificates.k8s.io/v1 ClusterTrustBundles
+  release: v1.37
+  file: test/e2e/auth/projected_clustertrustbundle.go
+- testname: Mounting big number (>100) of ClusterTrustBundle volumes
+  codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
+    should be able to mount a big number (>100) of CTBs [MinimumKubeletVersion:1.37]
+    [Conformance]'
+  description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+    MUST be able to mount a big number of volumes of ClusterTrustBundle type.
+  release: v1.37
+  file: test/e2e/auth/projected_clustertrustbundle.go
+- testname: Mounting a single ClusterTrustBundle
+  codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
+    should be able to mount a single ClusterTrustBundle by name [MinimumKubeletVersion:1.37]
+    [Conformance]'
+  description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+    MUST be able to mount contents of these API objects inside of pods.
+  release: v1.37
+  file: test/e2e/auth/projected_clustertrustbundle.go
+- testname: Mounting multiple ClusterTrustBundle volumes
+  codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
+    should be able to specify multiple CTB volumes [MinimumKubeletVersion:1.37] [Conformance]'
+  description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+    MUST be able to mount multiple volumes of ClusterTrustBundle type.
+  release: v1.37
+  file: test/e2e/auth/projected_clustertrustbundle.go
+- testname: Mounting multiple ClusterTrustBundles
+  codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
+    should be capable to mount multiple trust bundles by signer+labels can combine
+    all signer CTBs with an empty label selector [MinimumKubeletVersion:1.37] [Conformance]'
+  description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+    MUST be able to mount contents of these API objects inside of pods using different
+    kinds of selectors.
+  release: v1.37
+  file: test/e2e/auth/projected_clustertrustbundle.go
+- testname: Mounting multiple ClusterTrustBundles
+  codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
+    should be capable to mount multiple trust bundles by signer+labels can combine
+    multiple CTBs with signer name and label selector [MinimumKubeletVersion:1.37]
+    [Conformance]'
+  description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+    MUST be able to mount contents of these API objects inside of pods using different
+    kinds of selectors.
+  release: v1.37
+  file: test/e2e/auth/projected_clustertrustbundle.go
+- testname: Mounting multiple ClusterTrustBundles
+  codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
+    should be capable to mount multiple trust bundles by signer+labels should start
+    if only signer name and explicit label selector matches nothing + optional=true
+    [MinimumKubeletVersion:1.37] [Conformance]'
+  description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+    MUST be able to mount contents of these API objects inside of pods using different
+    kinds of selectors.
+  release: v1.37
+  file: test/e2e/auth/projected_clustertrustbundle.go
+- testname: Mounting multiple ClusterTrustBundles
+  codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
+    should be capable to mount multiple trust bundles by signer+labels should start
+    if only signer name and nil label selector + optional=true [MinimumKubeletVersion:1.37]
+    [Conformance]'
+  description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+    MUST be able to mount contents of these API objects inside of pods using different
+    kinds of selectors.
+  release: v1.37
+  file: test/e2e/auth/projected_clustertrustbundle.go
+- testname: Failing to mount improperly defined ClusterTrustBundles
+  codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
+    should prevent a pod from starting if: sets optional=false and no trust bundle
+    matches query [MinimumKubeletVersion:1.37] [Conformance]'
+  description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+    MUST fail to mount these objects if none match the provided selector.
+  release: v1.37
+  file: test/e2e/auth/projected_clustertrustbundle.go
+- testname: Failing to mount improperly defined ClusterTrustBundles
+  codename: '[sig-auth] [FeatureGate:ClusterTrustBundle] [FeatureGate:ClusterTrustBundleProjection]
+    should prevent a pod from starting if: sets optional=false and the configured
+    CTB does not exist [MinimumKubeletVersion:1.37] [Conformance]'
+  description: The API server MUST serve the ClusterTrustBundle API and the kubelet
+    MUST fail to mount these objects if none match the provided selector.
+  release: v1.37
+  file: test/e2e/auth/projected_clustertrustbundle.go
 - testname: Kubectl, guestbook application
   codename: '[sig-cli] Kubectl client Guestbook application should create and stop
     a working application [Conformance]'
@@ -2993,6 +3150,12 @@
   description: kube-apiserver must support create/update/list/patch/delete operations
     for resource.k8s.io/v1 DeviceClass.
   release: v1.35
+  file: test/e2e/dra/dra.go
+- testname: CRUD operations for devicetaintrules
+  codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 DeviceTaintRule [Conformance]'
+  description: kube-apiserver must support create/update/list/patch/delete operations
+    for resource.k8s.io/v1 DeviceTaintRule.
+  release: v1.37
   file: test/e2e/dra/dra.go
 - testname: CRUD operations for resourceclaims
   codename: '[sig-node] [DRA] CRUD Tests resource.k8s.io/v1 ResourceClaim [Conformance]'
