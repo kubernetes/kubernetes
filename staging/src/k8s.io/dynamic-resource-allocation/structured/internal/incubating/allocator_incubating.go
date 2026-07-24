@@ -102,7 +102,14 @@ type Allocator struct {
 	// The allocator might be accessed by different goroutines, so
 	// access to this map must be synchronized.
 	availableCounters map[PoolID]counterSets
-	mutex             sync.RWMutex
+	// groupedCounterSets caches, per pool, the counter sets on which an
+	// already-allocated device declares groups (read from the ResourceSlices).
+	// Like availableCounters it is computed lazily by groupedCounterSetsForPool,
+	// never changes once set, and is guarded by mutex. Incubating does not
+	// enforce DRADeviceCompatibilityGroups, but during a version skew it uses
+	// this to skip devices it cannot validate against a grouped peer.
+	groupedCounterSets map[PoolID]sets.Set[draapi.UniqueString]
+	mutex              sync.RWMutex
 	// numAllocateOneInvocations counts the number of times the allocateOne
 	// function is called for the allocator. This is a measurement of the
 	// amount of work the allocator had to do to allocate devices
@@ -142,6 +149,8 @@ func NewAllocator(ctx context.Context,
 		allSlices:         slices,
 		celCache:          celCache,
 		availableCounters: make(map[PoolID]counterSets),
+
+		groupedCounterSets: make(map[PoolID]sets.Set[draapi.UniqueString]),
 	}, nil
 }
 
@@ -1363,6 +1372,19 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	// accounted for, so a further share must not charge them again.
 	skipCounterCheck := allowMultipleAllocations && alloc.deviceCapacityInUse(device.id)
 
+	// The incubating allocator does not enforce the DRADeviceCompatibilityGroups
+	// constraint - that lives in the experimental allocator. But compatibility
+	// groups may still be present in the cluster (served by a newer apiserver
+	// during a version skew), so skip any device that cannot be validated, which
+	// lets the feature be enabled later without deleting pods. Checked before the
+	// counter availability below so a skipped device never tentatively consumes
+	// counters. Gated identically to the counter check so that additional shares
+	// of an already-allocated device (skipCounterCheck) are not re-evaluated.
+	if !skipCounterCheck && len(device.ConsumesCounters) > 0 && alloc.skipForDisabledCompatibilityGroups(device) {
+		alloc.logger.V(7).Info("Skipping device with compatibility groups because the feature is disabled", "device", device.id)
+		return false, nil, nil
+	}
+
 	// The API validation logic has checked the ConsumesCounters referred should exist inside SharedCounters.
 	// countersReserved records whether checkAvailableCounters actually reserved
 	// this device's counters. It is not the same as len(device.ConsumesCounters) > 0,
@@ -1734,6 +1756,30 @@ func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
 			consumedCounterSet[name] = consumedCounter
 		}
 	}
+}
+
+// skipForDisabledCompatibilityGroups reports whether a device must be skipped
+// while this allocator does not enforce the DRADeviceCompatibilityGroups feature
+// but compatibility groups are present in the cluster (served by a newer
+// apiserver during a version skew). To avoid allocations it cannot validate, it
+// skips any device that declares compatibility groups, and any device drawing
+// from a counter set on which an already-allocated device declared groups. This
+// lets the feature be enabled later without deleting pods which got scheduled incorrectly.
+func (alloc *allocator) skipForDisabledCompatibilityGroups(device deviceWithID) bool {
+	grouped := alloc.groupedCounterSetsForPool(device.pool)
+	for _, deviceCounterConsumption := range device.ConsumesCounters {
+		if len(deviceCounterConsumption.CompatibilityGroups) > 0 {
+			alloc.logger.V(7).Info("Skipping device: it declares compatibility groups, which this allocator does not enforce",
+				"device", device.id, "counterSet", deviceCounterConsumption.CounterSet.String())
+			return true
+		}
+		if grouped.Has(deviceCounterConsumption.CounterSet) {
+			alloc.logger.V(7).Info("Skipping device: its counter set already carries a grouped allocation this allocator cannot validate",
+				"device", device.id, "counterSet", deviceCounterConsumption.CounterSet.String())
+			return true
+		}
+	}
+	return false
 }
 
 // createNodeSelector constructs a node selector for the allocation, if needed,

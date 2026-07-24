@@ -259,9 +259,10 @@ func (DeviceConstraint) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceCounterConsumption = map[string]string{
-	"":           "DeviceCounterConsumption defines a set of counters that a device will consume from a CounterSet.",
-	"counterSet": "CounterSet is the name of the set from which the counters defined will be consumed.",
-	"counters":   "Counters defines the counters that will be consumed by the device.\n\nThe maximum number of counters is 32.",
+	"":                    "DeviceCounterConsumption defines a set of counters that a device will consume from a CounterSet.",
+	"counterSet":          "CounterSet is the name of the set from which the counters defined will be consumed.",
+	"counters":            "Counters defines the counters that will be consumed by the device.\n\nThe maximum number of counters is 32.",
+	"compatibilityGroups": "CompatibilityGroups is a list of opaque group names for this counter set consumption.\n\nDevices that consume counters from the same counter set may only be allocated at the same time (\"co-allocated\") if they all share at least one common group: the intersection of the CompatibilityGroups of all co-allocated devices on that counter set must be non-empty. Devices that consume from different counter sets are never compared via this field.\n\nAn unset field, an explicit nil, and an empty list are equivalent and mean \"no groups\": such a device is only co-allocatable with sibling devices on the same counter set that also have no groups, and is never co-allocatable with a device that declares one or more groups.\n\nGroup names are opaque and meaningful only within the publishing driver's pool.\n\nThe maximum number of groups is 2, and the names must be unique.",
 }
 
 func (DeviceCounterConsumption) SwaggerDoc() map[string]string {
