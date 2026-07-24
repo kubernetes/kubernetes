@@ -526,6 +526,28 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Duplicate(field.NewPath("spec", "skipNodeOperations").Index(1), resource.SkipNodeOperationAll),
 					},
 				},
+				// spec.devices.consumesCounters.compatibilityGroups
+				"valid: at limit device consumes counters compatibility groups": {
+					input: mkResourceSliceWithDevices(tweakDeviceConsumesCountersCompatibilityGroups(compatibilityGroupNames(resource.DeviceCompatibilityGroupsMaxSize)...)),
+				},
+				"invalid: too many device consumes counters compatibility groups": {
+					input: mkResourceSliceWithDevices(tweakDeviceConsumesCountersCompatibilityGroups(compatibilityGroupNames(resource.DeviceCompatibilityGroupsMaxSize + 1)...)),
+					expectedErrs: field.ErrorList{
+						field.TooMany(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("compatibilityGroups"), resource.DeviceCompatibilityGroupsMaxSize+1, resource.DeviceCompatibilityGroupsMaxSize).WithOrigin("maxItems"),
+					},
+				},
+				"invalid: duplicate device consumes counters compatibility groups": {
+					input: mkResourceSliceWithDevices(tweakDeviceConsumesCountersCompatibilityGroups("duplicate-group", "duplicate-group")),
+					expectedErrs: field.ErrorList{
+						field.Duplicate(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("compatibilityGroups").Index(1), "duplicate-group"),
+					},
+				},
+				"invalid: device consumes counters compatibility group bad format": {
+					input: mkResourceSliceWithDevices(tweakDeviceConsumesCountersCompatibilityGroups("InvalidKey")),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("compatibilityGroups").Index(0), "InvalidKey", "").WithOrigin("format=k8s-short-name"),
+					},
+				},
 				// TODO: Add more test cases
 			}
 
@@ -803,6 +825,32 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 						field.Duplicate(field.NewPath("spec", "skipNodeOperations").Index(1), resource.SkipNodeOperationAll),
 					},
 				},
+				// spec.devices.consumesCounters.compatibilityGroups
+				"valid update: at limit device consumes counters compatibility groups": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakDeviceConsumesCountersCompatibilityGroups(compatibilityGroupNames(resource.DeviceCompatibilityGroupsMaxSize)...)),
+				},
+				"invalid update: too many device consumes counters compatibility groups": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakDeviceConsumesCountersCompatibilityGroups(compatibilityGroupNames(resource.DeviceCompatibilityGroupsMaxSize + 1)...)),
+					expectedErrs: field.ErrorList{
+						field.TooMany(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("compatibilityGroups"), resource.DeviceCompatibilityGroupsMaxSize+1, resource.DeviceCompatibilityGroupsMaxSize).WithOrigin("maxItems"),
+					},
+				},
+				"invalid update: duplicate device consumes counters compatibility groups": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakDeviceConsumesCountersCompatibilityGroups("duplicate-group", "duplicate-group")),
+					expectedErrs: field.ErrorList{
+						field.Duplicate(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("compatibilityGroups").Index(1), "duplicate-group"),
+					},
+				},
+				"invalid update: device consumes counters compatibility group bad format": {
+					old:    mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakDeviceConsumesCountersCompatibilityGroups("InvalidKey")),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("compatibilityGroups").Index(0), "InvalidKey", "").WithOrigin("format=k8s-short-name"),
+					},
+				},
 			}
 			for k, tc := range testCases {
 
@@ -982,6 +1030,31 @@ func tweakDeviceConsumesCountersCounterSetName(counterSets ...string) func(*reso
 		}
 		rs.Spec.Devices[0].ConsumesCounters = consumesCounters
 	}
+}
+
+func tweakDeviceConsumesCountersCompatibilityGroups(groups ...string) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		rs.Spec.Devices[0].ConsumesCounters = []resource.DeviceCounterConsumption{
+			{
+				CounterSet: "shared-counter-set",
+				Counters: map[string]resource.Counter{
+					"valid-key": {},
+				},
+				CompatibilityGroups: groups,
+			},
+		}
+	}
+}
+
+// compatibilityGroupNames returns count distinct, well-formed compatibility
+// group names for exercising the maxItems (DeviceCompatibilityGroupsMaxSize)
+// limit.
+func compatibilityGroupNames(count int) []string {
+	groups := make([]string, count)
+	for i := range groups {
+		groups[i] = fmt.Sprintf("group-%d", i)
+	}
+	return groups
 }
 
 func tweakSharedCounter(counters map[string]resource.Counter) func(*resource.ResourceSlice) {
