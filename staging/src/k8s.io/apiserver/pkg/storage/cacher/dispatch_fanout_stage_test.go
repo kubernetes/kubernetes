@@ -1,0 +1,311 @@
+/*
+Copyright 2026 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package cacher
+
+import (
+	"context"
+	"fmt"
+	"math"
+	"runtime"
+	runtimemetrics "runtime/metrics"
+	"sort"
+	"testing"
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/apis/example"
+	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	testingclock "k8s.io/utils/clock/testing"
+)
+
+const dispatchDurationMetric = "apiserver_watch_events_delivery_duration_seconds"
+
+// TestDispatchStageSweep reproduces the fan-out at 100..10k watchers and reads
+// the delay straight from Richa's staged metric
+// (apiserver_watch_events_delivery_duration_seconds), comparing the new
+// stage="fanout" (the single dispatcher's serial fan-out cost) against
+// stage="total" (end-to-end). No standalone metrics -- everything rides on
+// #140336's WatcherMetricsObservers framework.
+func TestDispatchStageSweep(t *testing.T) {
+	metrics.Register()
+	// Watches created below drive watch-cache freshness waits, which record into
+	// the global WatchCacheReadWait metric. Reset it on cleanup so we don't leak
+	// observations into TestHistogramCacheReadWait, which asserts on that metric.
+	t.Cleanup(metrics.WatchCacheReadWait.Reset)
+	// This sweep creates cachers with resource "pods" and drives watch-cache
+	// freshness waits, which record into the global WatchCacheReadWait metric.
+	// Reset it on cleanup so we don't leak observations into TestHistogramCacheReadWait,
+	// which asserts on that same global metric.
+	t.Cleanup(metrics.WatchCacheReadWait.Reset)
+
+	fmt.Printf("\nGOMAXPROCS=%d\n", runtime.GOMAXPROCS(0))
+	fmt.Printf("\n%-9s | %11s %11s | %12s %12s\n",
+		"watchers", "fanout p50", "fanout p99", "sched p50", "sched p99")
+	fmt.Println("----------+-------------------------+---------------------------")
+
+	for _, numWatchers := range []int{100, 1000, 2500, 5000, 10000} {
+		fanBefore := snapshotStage(t, "fanout")
+		schedBefore := snapshotSchedLatency()
+
+		runSweep(t, numWatchers)
+
+		fan := deltaHist(snapshotStage(t, "fanout"), fanBefore)
+		sched := deltaSched(snapshotSchedLatency(), schedBefore)
+
+		fmt.Printf("%-9d | %11s %11s | %12s %12s\n",
+			numWatchers,
+			dur(histQuantile(fan, 0.50)), dur(histQuantile(fan, 0.99)),
+			dur(schedQuantile(sched, 0.50)), dur(schedQuantile(sched, 0.99)))
+	}
+	fmt.Println("\nfanout = stage=\"fanout\" (dispatch -> c.input accept, the single dispatcher's serial cost)")
+	fmt.Println("on apiserver_watch_events_delivery_duration_seconds. p99 grows with watcher count:")
+	fmt.Println("the serial single-dispatcher fan-out is the stage that scales with fan-out size.")
+	fmt.Println("")
+	fmt.Println("sched  = /sched/latencies:seconds delta over the same window (runtime-global time")
+	fmt.Println("goroutines sat runnable-but-not-running). If sched p99 climbs in lockstep with")
+	fmt.Println("fanout p99, the fan-out cost IS the goroutine-scheduling storm (claim 3 confirmed).")
+	fmt.Println("If sched stays flat while fanout grows, the cost is plain serial loop/channel work,")
+	fmt.Println("not scheduling -- claim 3 denied.")
+	fmt.Println("")
+	fmt.Println("(stage=\"total\" is not measured here: this harness uses a fake clock, and post-")
+	fmt.Println("#140851 sendWatchCacheEvent stamps sentAt from that clock, so total reads ~0.")
+	fmt.Println("Compare fanout vs total in a real-clock scale/e2e run instead.)")
+}
+
+// runSweep registers numWatchers fast-draining watchers and dispatches a burst
+// of events directly (fake clock avoids the bookmark-timer race).
+func runSweep(t *testing.T, numWatchers int) {
+	store := &cachertesting.MockStorage{}
+	cacher, _, err := newTestCacherWithoutSyncing(store, testingclock.NewFakeClock(time.Now()))
+	if err != nil {
+		t.Fatalf("new cacher: %v", err)
+	}
+	defer cacher.Stop()
+	if err := cacher.Wait(context.Background()); err != nil {
+		t.Fatalf("wait: %v", err)
+	}
+	cacher.dispatchTimeoutBudget.returnUnused(100 * time.Millisecond)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	for i := 0; i < numWatchers; i++ {
+		w, err := cacher.Watch(ctx, "/pods/", storage.ListOptions{
+			ResourceVersion: "100", Predicate: storage.Everything, Recursive: true})
+		if err != nil {
+			t.Fatalf("watch %d: %v", i, err)
+		}
+		go func(w watch.Interface) {
+			for range w.ResultChan() {
+			}
+		}(w)
+	}
+	time.Sleep(200 * time.Millisecond)
+
+	makeEvent := func(rv uint64) *watchCacheEvent {
+		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{
+			Name: "pod-x", Namespace: "ns", ResourceVersion: fmt.Sprintf("%d", rv)}}
+		return &watchCacheEvent{
+			Type: watch.Modified, Object: pod, PrevObject: pod,
+			ObjFields: podFields(pod), PrevObjFields: podFields(pod),
+			Key: "/pods/ns/pod-x", ResourceVersion: rv,
+			// RecordTime is required for the total stage to be observed.
+			RecordTime: time.Now()}
+	}
+	const burst = 500
+	for i := 0; i < burst; i++ {
+		cacher.dispatchEvent(makeEvent(uint64(20000 + i)))
+	}
+
+	// The total stage is observed asynchronously in each watcher's process
+	// goroutine; wait for the drain to settle so those samples land.
+	prev := uint64(0)
+	for i := 0; i < 40; i++ {
+		time.Sleep(100 * time.Millisecond)
+		now := snapshotStage(t, "total").count
+		if now == prev && now > 0 {
+			break
+		}
+		prev = now
+	}
+}
+
+type histSnap struct {
+	count   uint64
+	sum     float64
+	buckets []leCount // cumulative, sorted by le
+}
+type leCount struct {
+	le float64
+	c  uint64
+}
+
+// snapshotStage reads one stage of the staged delivery_duration_seconds metric.
+func snapshotStage(t *testing.T, stage string) histSnap {
+	t.Helper()
+	fams, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("gather: %v", err)
+	}
+	agg := map[float64]uint64{}
+	s := histSnap{}
+	for _, mf := range fams {
+		if mf.GetName() != dispatchDurationMetric {
+			continue
+		}
+		for _, m := range mf.GetMetric() {
+			matched := false
+			for _, lp := range m.GetLabel() {
+				if lp.GetName() == "stage" && lp.GetValue() == stage {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+			h := m.GetHistogram()
+			if h == nil {
+				continue
+			}
+			s.count += h.GetSampleCount()
+			s.sum += h.GetSampleSum()
+			for _, b := range h.GetBucket() {
+				agg[b.GetUpperBound()] += b.GetCumulativeCount()
+			}
+		}
+	}
+	for le, c := range agg {
+		s.buckets = append(s.buckets, leCount{le, c})
+	}
+	sort.Slice(s.buckets, func(i, j int) bool { return s.buckets[i].le < s.buckets[j].le })
+	return s
+}
+
+// deltaHist subtracts a prior snapshot to isolate this iteration.
+func deltaHist(after, before histSnap) histSnap {
+	d := histSnap{count: after.count - before.count, sum: after.sum - before.sum}
+	bmap := map[float64]uint64{}
+	for _, b := range before.buckets {
+		bmap[b.le] = b.c
+	}
+	for _, a := range after.buckets {
+		d.buckets = append(d.buckets, leCount{a.le, a.c - bmap[a.le]})
+	}
+	sort.Slice(d.buckets, func(i, j int) bool { return d.buckets[i].le < d.buckets[j].le })
+	return d
+}
+
+// histQuantile linear-interpolates a quantile from cumulative buckets, the same
+// way histogram_quantile() does in PromQL.
+func histQuantile(h histSnap, q float64) float64 {
+	if h.count == 0 {
+		return 0
+	}
+	target := q * float64(h.count)
+	prevLE, prevC := 0.0, uint64(0)
+	for _, b := range h.buckets {
+		if float64(b.c) >= target {
+			if math.IsInf(b.le, 1) {
+				return prevLE
+			}
+			frac := 0.0
+			if b.c > prevC {
+				frac = (target - float64(prevC)) / float64(b.c-prevC)
+			}
+			return prevLE + frac*(b.le-prevLE)
+		}
+		prevLE, prevC = b.le, b.c
+	}
+	return prevLE
+}
+
+func dur(seconds float64) string {
+	return time.Duration(seconds * float64(time.Second)).Round(time.Microsecond).String()
+}
+
+// schedSnap is a snapshot of the runtime's /sched/latencies:seconds histogram.
+// Counts[i] covers the bucket [Buckets[i], Buckets[i+1]).
+type schedSnap struct {
+	counts  []uint64
+	buckets []float64
+}
+
+// snapshotSchedLatency reads the runtime-global scheduling-latency histogram:
+// how long goroutines sit runnable before a P actually runs them. A goroutine
+// storm (dispatcher waking N process goroutines that then contend for cores)
+// shows up here as the tail climbing.
+func snapshotSchedLatency() schedSnap {
+	s := []runtimemetrics.Sample{{Name: "/sched/latencies:seconds"}}
+	runtimemetrics.Read(s)
+	h := s[0].Value.Float64Histogram()
+	c := make([]uint64, len(h.Counts))
+	copy(c, h.Counts)
+	b := make([]float64, len(h.Buckets))
+	copy(b, h.Buckets)
+	return schedSnap{counts: c, buckets: b}
+}
+
+// deltaSched isolates the scheduling latency that accrued between two snapshots
+// (the counts are cumulative since process start).
+func deltaSched(after, before schedSnap) schedSnap {
+	d := schedSnap{buckets: after.buckets, counts: make([]uint64, len(after.counts))}
+	for i := range after.counts {
+		if i < len(before.counts) {
+			d.counts[i] = after.counts[i] - before.counts[i]
+		} else {
+			d.counts[i] = after.counts[i]
+		}
+	}
+	return d
+}
+
+// schedQuantile returns the q-quantile upper bound from the runtime histogram,
+// the same cumulative-bucket walk histQuantile uses.
+func schedQuantile(s schedSnap, q float64) float64 {
+	var total uint64
+	for _, c := range s.counts {
+		total += c
+	}
+	if total == 0 {
+		return 0
+	}
+	target := q * float64(total)
+	var cum uint64
+	for i, c := range s.counts {
+		cum += c
+		if float64(cum) >= target {
+			hi := s.buckets[i+1]
+			if math.IsInf(hi, 1) {
+				return s.buckets[i]
+			}
+			return hi
+		}
+	}
+	return s.buckets[len(s.buckets)-1]
+}
+
+func podFields(pod *example.Pod) fields.Set {
+	return fields.Set{
+		"metadata.name":      pod.Name,
+		"metadata.namespace": pod.Namespace,
+	}
+}

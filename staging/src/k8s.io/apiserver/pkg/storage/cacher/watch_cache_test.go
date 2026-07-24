@@ -1228,6 +1228,9 @@ func TestHistogramCacheReadWait(t *testing.T) {
 	if err := registry.Register(metrics.WatchCacheReadWait); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	// The vec is shared package-global state; earlier tests that drive real
+	// cachers leak observations into it.
+	metrics.WatchCacheReadWait.Reset()
 	ctx := context.Background()
 	testedMetrics := "apiserver_watch_cache_read_wait_seconds"
 	store := newTestWatchCache(2, DefaultEventFreshDuration, &cache.Indexers{})

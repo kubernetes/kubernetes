@@ -607,7 +607,6 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		pred.AllowWatchBookmarks,
 		c.groupResource,
 		c.watcherMetrics,
-		c.clock,
 		identifier,
 	)
 
@@ -994,6 +993,10 @@ func setCachingObjects(event *watchCacheEvent, versioner storage.Versioner) {
 }
 
 func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
+	// Mark the start of fan-out. This is the last shared, pre-fanout timestamp;
+	// the shallow copy made below for non-bookmark events preserves it, so all
+	// watchers see the same dispatched time.
+	event.timeline.dispatched = c.clock.Now()
 	c.startDispatching(event)
 	defer c.finishDispatching()
 	// Watchers stopped after startDispatching will be delayed to finishDispatching,
@@ -1044,7 +1047,8 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 			// is running, not only the first ones in the list.
 			timer := c.timer
 			for _, watcher := range c.blockedWatchers {
-				if !watcher.add(event, timer) {
+				accepted := watcher.add(event, timer)
+				if !accepted {
 					// fired, clean the timer by set it to nil.
 					timer = nil
 				}
