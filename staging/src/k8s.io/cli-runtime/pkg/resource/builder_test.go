@@ -1361,6 +1361,21 @@ func TestNoSelectorUnknowResourceType(t *testing.T) {
 		}
 	}
 }
+
+func TestNoSelectorUnknownResourceTypeWithGroup(t *testing.T) {
+	b := newDefaultBuilder().
+		NamespaceParam("test").
+		ResourceTypeOrNameArgs(false, "unknown.somegroup")
+
+	err := b.Do().Err()
+	if err != nil {
+		if !strings.Contains(err.Error(), "server doesn't have a resource type \"unknown\" in group \"somegroup\"") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	} else {
+		t.Fatalf("expected error, got nil")
+	}
+}
 func TestSingleResourceType(t *testing.T) {
 	b := newDefaultBuilder().
 		LabelSelectorParam("a=b").
