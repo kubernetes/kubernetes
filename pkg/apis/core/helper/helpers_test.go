@@ -46,6 +46,44 @@ func TestSemantic(t *testing.T) {
 	}
 }
 
+func TestIsNativeResource(t *testing.T) {
+	testCases := []struct {
+		name     core.ResourceName
+		isNative bool
+	}{
+		{
+			name:     "pod.alpha.kubernetes.io/opaque-int-resource-foo",
+			isNative: true,
+		},
+		{
+			name:     "kubernetes.io/resource-foo",
+			isNative: true,
+		},
+		{
+			name:     "foo",
+			isNative: true,
+		},
+		{
+			name:     "a/b",
+			isNative: false,
+		},
+		{
+			name:     "mykubernetes.io/resource-foo",
+			isNative: false,
+		},
+		{
+			name:     "",
+			isNative: true,
+		},
+	}
+
+	for i, tc := range testCases {
+		if got := IsNativeResource(tc.name); got != tc.isNative {
+			t.Errorf("case[%d], resource: %q, expected %v, got %v", i, tc.name, tc.isNative, got)
+		}
+	}
+}
+
 func TestIsStandardResource(t *testing.T) {
 	testCases := []struct {
 		input  string
