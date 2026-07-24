@@ -1075,7 +1075,19 @@ func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 	// - adding or removing physical memory bank from the node
 	// - change of kubelet system-reserved, kube-reserved or pre-reserved-memory-zone parameters
 	if !areMachineStatesEqual(logger, machineState, expectedMachineState) {
-		return fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
+		// The total memory reported for a NUMA node can vary slightly across
+		// reboots because the kernel frees a variable amount of boot-time
+		// (reserved) memory, so cAdvisor reports a marginally different size
+		// (see https://issue.k8s.io/131253). Such a drift moves the recorded
+		// totals but does not invalidate the assignments, which the replay
+		// above already confirmed still fit. Tolerate a bounded drift and
+		// re-baseline onto the current machine; anything larger is treated as
+		// a genuine topology or configuration change and still fails the start.
+		if !isTolerableMachineStateDrift(logger, machineState, expectedMachineState) {
+			return fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
+		}
+		logger.Info("Tolerating a small NUMA node memory drift and re-baselining the memory manager state")
+		s.SetMachineState(expectedMachineState)
 	}
 
 	return nil
@@ -1119,6 +1131,15 @@ func (p *staticPolicy) updateExpectedMachineState(expectedMachineState state.NUM
 			requestedSize -= memoryState.Free
 			memoryState.Reserved += memoryState.Free
 			memoryState.Free = 0
+		}
+
+		// A leftover requested size means the recorded assignment no longer
+		// fits the current machine, which can happen when the memory reported
+		// for a NUMA node shrinks across a restart. Surface it instead of
+		// silently dropping the remainder, so a genuine capacity loss keeps
+		// failing the start even once a benign memory drift is tolerated.
+		if requestedSize > 0 {
+			return fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment does not fit the machine state", podUID, containerName)
 		}
 	}
 	return nil
@@ -1202,6 +1223,86 @@ func areMemoryStatesEqual(logger klog.Logger, memoryState1, memoryState2 *state.
 		return false
 	}
 	return true
+}
+
+// maxTolerableMemoryDriftBytes bounds how much the total memory reported for a
+// NUMA node may change across a restart while still being treated as the same
+// machine. The kernel frees a variable amount of boot-time (reserved) memory on
+// each boot, so cAdvisor reports a slightly different per-node total; the
+// observed variation is on the order of tens of MiB (see
+// https://issue.k8s.io/131253), whereas a real change such as adding or
+// removing a memory bank is orders of magnitude larger. A drift above this
+// bound is therefore treated as a genuine topology change and still fails the
+// start. The bound is absolute rather than a fraction of the node size because
+// the boot-time reservation does not scale with the amount of RAM, so a
+// fraction would tolerate multi-gigabyte changes on large machines and mask a
+// genuine memory loss.
+const maxTolerableMemoryDriftBytes uint64 = 256 * 1024 * 1024
+
+// isTolerableMachineStateDrift reports whether stored differs from current only
+// by a bounded change in the total memory reported per NUMA node, i.e. a benign
+// memory drift across a restart. The operator configuration (SystemReserved) and
+// the topology structure (nodes, NUMA grouping, number of assignments) must be
+// identical, and the regular-memory totals may move only within
+// maxTolerableMemoryDriftBytes. Hugepages are counted in whole pages and do not
+// drift, so any change there is a real reconfiguration and is not tolerated.
+//
+// The per-node Reserved memory is deliberately not compared: the assignments are
+// re-derived from the persisted memory blocks and confirmed to still fit by
+// updateExpectedMachineState, and a drift can legitimately change how a
+// cross-NUMA assignment is split between the nodes of its group while the total
+// stays the same. The caller re-baselines onto the recomputed state, so the
+// stored per-node split does not need to match.
+func isTolerableMachineStateDrift(logger klog.Logger, stored, current state.NUMANodeMap) bool {
+	if len(stored) != len(current) {
+		return false
+	}
+	for nodeID, storedNode := range stored {
+		currentNode, ok := current[nodeID]
+		if !ok {
+			return false
+		}
+		if storedNode.NumberOfAssignments != currentNode.NumberOfAssignments {
+			return false
+		}
+		if !areGroupsEqual(storedNode.Cells, currentNode.Cells) {
+			return false
+		}
+		if len(storedNode.MemoryMap) != len(currentNode.MemoryMap) {
+			return false
+		}
+		for resourceName, storedMem := range storedNode.MemoryMap {
+			currentMem, ok := currentNode.MemoryMap[resourceName]
+			if !ok {
+				return false
+			}
+			// SystemReserved is operator configuration and must not change for a
+			// drift to be benign.
+			if storedMem.SystemReserved != currentMem.SystemReserved {
+				return false
+			}
+			if resourceName != v1.ResourceMemory {
+				if storedMem.TotalMemSize != currentMem.TotalMemSize || storedMem.Allocatable != currentMem.Allocatable {
+					return false
+				}
+				continue
+			}
+			if absoluteDiff(storedMem.TotalMemSize, currentMem.TotalMemSize) > maxTolerableMemoryDriftBytes ||
+				absoluteDiff(storedMem.Allocatable, currentMem.Allocatable) > maxTolerableMemoryDriftBytes {
+				logger.Info("NUMA node memory drift exceeds the tolerated bound, treating it as a real topology change",
+					"node", nodeID, "storedTotalMemSize", storedMem.TotalMemSize, "currentTotalMemSize", currentMem.TotalMemSize)
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func absoluteDiff(a, b uint64) uint64 {
+	if a > b {
+		return a - b
+	}
+	return b - a
 }
 
 func (p *staticPolicy) getDefaultMachineState() state.NUMANodeMap {
