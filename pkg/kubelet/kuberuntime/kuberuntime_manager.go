@@ -915,7 +915,6 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		resizeResult.Fail(kubecontainer.ErrResizePodInPlace, fmt.Sprintf("unable to get pod cgroup cpu config for pod %q", format.Pod(pod)))
 		return resizeResult
 	}
-
 	currentPodResources := podResources
 	currentPodResources = mergeResourceConfig(currentPodResources, currentPodMemoryConfig)
 	currentPodResources = mergeResourceConfig(currentPodResources, currentPodCPUConfig)
@@ -1103,12 +1102,24 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 
 	// 2. Memory cgroups
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
-		if podResources.Memory == nil {
+		if podResources.Memory == nil && currentPodMemoryConfig != nil {
 			// Default pod memory limit to the current memory limit if unset to prevent it from updating.
 			// TODO(#128675): This does not support removing limits.
 			podResources.Memory = currentPodMemoryConfig.Memory
 		}
-		if errResize := resizeContainers(v1.ResourceMemory, int64(*currentPodMemoryConfig.Memory), *podResources.Memory, 0, 0); errResize != nil {
+		var currentMemoryLimit, desiredMemoryLimit int64
+		if podResources.Memory != nil {
+			desiredMemoryLimit = *podResources.Memory
+		}
+		if currentPodMemoryConfig != nil && currentPodMemoryConfig.Memory != nil {
+			currentMemoryLimit = *currentPodMemoryConfig.Memory
+		} else {
+			// currentPodMemoryConfig is nil (e.g. cgroupsPerQOS=false): default current to desired
+			// so resizeContainers sees no pod-level change. SetPodCgroupConfig is a no-op in this
+			// path; actuated state is still updated at the end of resizeContainers.
+			currentMemoryLimit = desiredMemoryLimit
+		}
+		if errResize := resizeContainers(v1.ResourceMemory, currentMemoryLimit, desiredMemoryLimit, 0, 0); errResize != nil {
 			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, errResize.Error())
 			return resizeResult
 		}
@@ -1131,14 +1142,34 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			return resizeResult
 		}
 
-		// Default pod CPUQuota to the current CPUQuota if no limit is set to prevent the pod limit
-		// from updating.
-		// TODO(#128675): This does not support removing limits.
-		if podResources.CPUQuota == nil {
+		if podResources.CPUQuota == nil && currentPodCPUConfig != nil {
+			// Default pod CPUQuota to the current CPUQuota if no limit is set to prevent the pod limit
+			// from updating.
+			// TODO(#128675): This does not support removing limits.
 			podResources.CPUQuota = currentPodCPUConfig.CPUQuota
 		}
-		if errResize := resizeContainers(v1.ResourceCPU, *currentPodCPUConfig.CPUQuota, *podResources.CPUQuota,
-			int64(*currentPodCPUConfig.CPUShares), int64(*podResources.CPUShares)); errResize != nil {
+		var currentCPUQuota, desiredCPUQuota int64
+		if podResources.CPUQuota != nil {
+			desiredCPUQuota = *podResources.CPUQuota
+		}
+		desiredCPUShares := int64(*podResources.CPUShares)
+		var currentCPUShares int64
+		if currentPodCPUConfig != nil {
+			if currentPodCPUConfig.CPUQuota != nil {
+				currentCPUQuota = *currentPodCPUConfig.CPUQuota
+			}
+			if currentPodCPUConfig.CPUShares != nil {
+				currentCPUShares = int64(*currentPodCPUConfig.CPUShares)
+			}
+		} else {
+			// currentPodCPUConfig is nil (e.g. cgroupsPerQOS=false): default current to desired
+			// so resizeContainers sees no pod-level change. SetPodCgroupConfig is a no-op in this
+			// path; actuated state is still updated at the end of resizeContainers.
+			currentCPUQuota = desiredCPUQuota
+			currentCPUShares = desiredCPUShares
+		}
+		if errResize := resizeContainers(v1.ResourceCPU, currentCPUQuota, desiredCPUQuota,
+			currentCPUShares, desiredCPUShares); errResize != nil {
 			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, errResize.Error())
 			return resizeResult
 		}
