@@ -634,6 +634,44 @@ func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
 	}
 }
 
+func Test_CheckAndMarkVolumeAsUncertainViaReconstruction_Negative_NilVolumeSpec(t *testing.T) {
+	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+	devicePath := "fake/device/path"
+	pod := getTestPod("pod-nil-volume-spec", "pod-nil-volume-spec-uid", "volume-name", "fake-device1")
+	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	generatedVolumeName, err := util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+	require.NoError(t, err)
+	logger, _ := ktesting.NewTestContext(t)
+	err = asw.AddAttachUncertainReconstructedVolume(logger, generatedVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	if err != nil {
+		t.Fatalf("AddAttachUncertainReconstructedVolume failed. Expected: <no error> Actual: <%v>", err)
+	}
+	podName := util.GetUniquePodName(pod)
+
+	updated, err := asw.CheckAndMarkVolumeAsUncertainViaReconstruction(operationexecutor.MarkVolumeOpts{
+		PodName:          podName,
+		PodUID:           pod.UID,
+		VolumeName:       generatedVolumeName,
+		VolumeSpec:       nil,
+		Mounter:          nil,
+		VolumeMountState: operationexecutor.VolumeMountUncertain,
+	})
+
+	if err == nil {
+		t.Fatal("CheckAndMarkVolumeAsUncertainViaReconstruction did not fail. Expected error for nil volume spec, got nil")
+	}
+	if updated {
+		t.Fatal("CheckAndMarkVolumeAsUncertainViaReconstruction reported an update for nil volume spec")
+	}
+	if asw.IsVolumeReconstructed(generatedVolumeName, podName) {
+		t.Fatal("CheckAndMarkVolumeAsUncertainViaReconstruction marked a nil volume spec as reconstructed")
+	}
+	if possiblyMountedVolumes := asw.GetPossiblyMountedVolumesForPod(podName); len(possiblyMountedVolumes) != 0 {
+		t.Fatalf("CheckAndMarkVolumeAsUncertainViaReconstruction mutated actual state. Expected no possibly mounted volumes, got %v", possiblyMountedVolumes)
+	}
+}
+
 // Call MarkVolumeAsDetached() on a volume which mounted by pod(s) should be skipped
 func Test_MarkVolumeAsDetached_Negative_PodInVolume(t *testing.T) {
 	// Arrange
@@ -812,6 +850,42 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 		asw)
 	verifyVolumeDoesntExistWithSpecNameInVolumeAsw(t, podName, volumeSpec.Name(), asw)
 	verifyVolumeMountedElsewhere(t, podName, generatedVolumeName, false /*expectedMountedElsewhere */, asw)
+}
+
+// Calls AddPodToVolume() with a nil volume spec.
+// Verifies it returns an error and leaves the actual state unchanged.
+func Test_AddPodToVolume_Negative_NilVolumeSpec(t *testing.T) {
+	// Arrange
+	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+	devicePath := "fake/device/path"
+	pod := getTestPod("pod-nil-volume-spec", "pod-nil-volume-spec-uid", "volume-name", "fake-device1")
+	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	generatedVolumeName, err := util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+	require.NoError(t, err)
+	logger, _ := ktesting.NewTestContext(t)
+	err = asw.MarkVolumeAsAttached(logger, emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	if err != nil {
+		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+	}
+	podName := util.GetUniquePodName(pod)
+
+	// Act
+	err = asw.AddPodToVolume(operationexecutor.MarkVolumeOpts{
+		PodName:          podName,
+		PodUID:           pod.UID,
+		VolumeName:       generatedVolumeName,
+		VolumeSpec:       nil,
+		VolumeMountState: operationexecutor.VolumeMounted,
+	})
+
+	// Assert
+	if err == nil {
+		t.Fatal("AddPodToVolume did not fail. Expected error for nil volume spec, got nil")
+	}
+	if mountedVolumes := asw.GetMountedVolumesForPod(podName); len(mountedVolumes) != 0 {
+		t.Fatalf("AddPodToVolume mutated actual state. Expected no mounted volumes, got %v", mountedVolumes)
+	}
 }
 
 // Calls MarkVolumeAsAttached() once to add volume
