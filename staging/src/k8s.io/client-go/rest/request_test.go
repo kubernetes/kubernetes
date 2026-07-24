@@ -2530,24 +2530,21 @@ func TestThrottledLogger(t *testing.T) {
 }
 
 func TestRequestMaxRetries(t *testing.T) {
-	successAtNthCalls := 1
-	actualCalls := 0
-	retryOneTimeHandler := func(w http.ResponseWriter, req *http.Request) {
-		defer func() { actualCalls++ }()
-		if actualCalls >= successAtNthCalls {
-			w.WriteHeader(http.StatusOK)
-			return
+	retryOneTimeHandler := func() func(w http.ResponseWriter, req *http.Request) {
+		// We use atomic.Int64 to avoid data races when concurrent HTTP handler goroutines access actualCalls.
+		// As a workaround for goroutines that might still be executing after the test returns, each subtest
+		// gets its own handler instance and its own test server.
+		var actualCalls atomic.Int64
+		return func(w http.ResponseWriter, req *http.Request) {
+			defer actualCalls.Add(1)
+			if actualCalls.Load() >= 1 {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			actualCalls.Add(1)
 		}
-		w.Header().Set("Retry-After", "1")
-		w.WriteHeader(http.StatusTooManyRequests)
-		actualCalls++
-	}
-	testServer := httptest.NewServer(http.HandlerFunc(retryOneTimeHandler))
-	defer testServer.Close()
-
-	u, err := url.Parse(testServer.URL)
-	if err != nil {
-		t.Error(err)
 	}
 
 	testCases := []struct {
@@ -2574,8 +2571,15 @@ func TestRequestMaxRetries(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer func() { actualCalls = 0 }()
-			_, err := NewRequestWithClient(u, "", defaultContentConfig(), testServer.Client()).
+			testServer := httptest.NewServer(http.HandlerFunc(retryOneTimeHandler()))
+			defer testServer.Close()
+
+			u, err := url.Parse(testServer.URL)
+			if err != nil {
+				t.Error(err)
+			}
+
+			_, err = NewRequestWithClient(u, "", defaultContentConfig(), testServer.Client()).
 				Verb("get").
 				MaxRetries(testCase.maxRetries).
 				AbsPath("/foo").
