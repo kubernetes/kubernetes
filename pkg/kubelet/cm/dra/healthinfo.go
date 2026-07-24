@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -49,6 +50,7 @@ type healthInfoCache struct {
 	sync.RWMutex
 	HealthInfo *state.DevicesHealthMap
 	stateFile  string
+	clock      clock.Clock
 }
 
 // newHealthInfoCache creates a new cache, loading from a checkpoint if present.
@@ -57,6 +59,7 @@ func newHealthInfoCache(logger klog.Logger, stateFile string) (*healthInfoCache,
 	cache := &healthInfoCache{
 		HealthInfo: &state.DevicesHealthMap{},
 		stateFile:  stateFile,
+		clock:      clock.RealClock{},
 	}
 	if err := cache.loadFromCheckpoint(); err != nil {
 		logger.Error(err, "Failed to load health checkpoint, proceeding with empty cache")
@@ -143,7 +146,7 @@ func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName str
 	}
 
 	_ = cache.withRLock(func() error {
-		now := time.Now()
+		now := cache.clock.Now()
 		if driver, ok := (*cache.HealthInfo)[driverName]; ok {
 			key := poolName + "/" + deviceName
 			if device, ok := driver.Devices[key]; ok {
@@ -175,7 +178,7 @@ func (cache *healthInfoCache) updateHealthInfo(logger klog.Logger, driverName st
 	logger = logger.WithName("dra-healthinfo")
 	changedDevices := []state.DeviceHealth{}
 	err := cache.withLock(func() error {
-		now := time.Now()
+		now := cache.clock.Now()
 		currentDriver, exists := (*cache.HealthInfo)[driverName]
 		if !exists {
 			currentDriver = state.DriverHealthState{Devices: make(map[string]state.DeviceHealth)}
@@ -257,6 +260,55 @@ func (cache *healthInfoCache) updateHealthInfo(logger klog.Logger, driverName st
 		return nil, err
 	}
 	return changedDevices, nil
+}
+
+// expireHealthInfo removes devices whose health report has expired and returns
+// the state changes together with the next expiration deadline.
+func (cache *healthInfoCache) expireHealthInfo(logger klog.Logger) (map[string][]state.DeviceHealth, time.Time) {
+	logger = logger.WithName("dra-healthinfo")
+	expiredDevices := make(map[string][]state.DeviceHealth)
+	var nextExpiration time.Time
+
+	_ = cache.withLock(func() error {
+		now := cache.clock.Now()
+		stateChanged := false
+		for driverName, driver := range *cache.HealthInfo {
+			for key, device := range driver.Devices {
+				timeout := device.HealthCheckTimeout
+				if timeout == 0 {
+					timeout = DefaultHealthTimeout
+				}
+				deadline := device.LastUpdated.Add(timeout)
+				if deadline.After(now) {
+					if nextExpiration.IsZero() || deadline.Before(nextExpiration) {
+						nextExpiration = deadline
+					}
+					continue
+				}
+
+				if device.Health != state.DeviceHealthStatusUnknown {
+					device.Health = state.DeviceHealthStatusUnknown
+					device.Message = ""
+					expiredDevices[driverName] = append(expiredDevices[driverName], device)
+				}
+				delete(driver.Devices, key)
+				stateChanged = true
+			}
+			if len(driver.Devices) == 0 {
+				delete(*cache.HealthInfo, driverName)
+				stateChanged = true
+			}
+		}
+
+		if stateChanged {
+			if err := cache.saveToCheckpointInternal(logger); err != nil {
+				logger.Error(err, "Failed to save health checkpoint after device health expiration; kubelet restart may lose device health information")
+			}
+		}
+		return nil
+	})
+
+	return expiredDevices, nextExpiration
 }
 
 // clearDriver clears all health data for a specific driver.

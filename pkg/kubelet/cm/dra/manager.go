@@ -40,6 +40,7 @@ import (
 	"k8s.io/component-base/metrics"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 
 	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1"
@@ -110,6 +111,10 @@ type Manager struct {
 
 	// update channel for resource updates
 	update chan resourceupdates.Update
+
+	// healthInfoUpdated prevents the expiration loop from sleeping past a
+	// deadline that was changed by a new report.
+	healthInfoUpdated chan struct{}
 }
 
 // NewManager creates a new DRA manager.
@@ -137,13 +142,14 @@ func NewManager(logger klog.Logger, kubeClient clientset.Interface, stateFileDir
 	reconcilePeriod := defaultReconcilePeriod
 
 	manager := &Manager{
-		cache:           claimInfoCache,
-		kubeClient:      kubeClient,
-		reconcilePeriod: reconcilePeriod,
-		activePods:      nil,
-		sourcesReady:    nil,
-		healthInfoCache: healthInfoCache,
-		update:          make(chan resourceupdates.Update, 100),
+		cache:             claimInfoCache,
+		kubeClient:        kubeClient,
+		reconcilePeriod:   reconcilePeriod,
+		activePods:        nil,
+		sourcesReady:      nil,
+		healthInfoCache:   healthInfoCache,
+		update:            make(chan resourceupdates.Update, 100),
+		healthInfoUpdated: make(chan struct{}, 1),
 	}
 
 	return manager, nil
@@ -174,6 +180,7 @@ func (m *Manager) Start(ctx context.Context, activePods ActivePodsFunc, getNode 
 	m.activePods = activePods
 	m.sourcesReady = sourcesReady
 	go wait.UntilWithContext(ctx, func(ctx context.Context) { m.reconcileLoop(ctx) }, m.reconcilePeriod)
+	go m.runHealthInfoExpirationLoop(ctx)
 	return nil
 }
 
@@ -1074,6 +1081,90 @@ func buildDeviceHealth(logger klog.Logger, device *drahealthv1.DeviceHealth) sta
 	}
 }
 
+func (m *Manager) signalHealthInfoUpdated() {
+	select {
+	case m.healthInfoUpdated <- struct{}{}:
+	default:
+	}
+}
+
+func (m *Manager) runHealthInfoExpirationLoop(ctx context.Context) {
+	logger := klog.FromContext(ctx).WithName("dra-manager")
+	for {
+		expiredDevices, nextExpiration := m.healthInfoCache.expireHealthInfo(logger)
+		for driverName, devices := range expiredDevices {
+			m.notifyPodsForDevices(logger, driverName, devices)
+		}
+
+		var timer clock.Timer
+		var timerCh <-chan time.Time
+		if !nextExpiration.IsZero() {
+			delay := max(nextExpiration.Sub(m.healthInfoCache.clock.Now()), 0)
+			timer = m.healthInfoCache.clock.NewTimer(delay)
+			timerCh = timer.C()
+		}
+
+		select {
+		case <-ctx.Done():
+			if timer != nil {
+				timer.Stop()
+			}
+			return
+		case <-m.healthInfoUpdated:
+		case <-timerCh:
+		}
+		if timer != nil {
+			timer.Stop()
+		}
+	}
+}
+
+func (m *Manager) notifyPodsForDevices(logger klog.Logger, driverName string, changedDevices []state.DeviceHealth) {
+	if len(changedDevices) == 0 {
+		return
+	}
+
+	logger.V(4).Info("Health info changed, checking affected pods", "driverName", driverName, "changedDevicesCount", len(changedDevices))
+
+	// Snapshot which pods use which of this plugin's devices. The claim info
+	// cache lock is then held once per update and only while building the index,
+	// independent of how many devices changed.
+	type deviceKey struct {
+		poolName   string
+		deviceName string
+	}
+	podsByDevice := make(map[deviceKey][]string)
+	m.cache.RLock()
+	for _, cInfo := range m.cache.claimInfo {
+		if driverState, ok := cInfo.DriverState[driverName]; ok {
+			for _, allocatedDevice := range driverState.Devices {
+				key := deviceKey{poolName: allocatedDevice.PoolName, deviceName: allocatedDevice.DeviceName}
+				podsByDevice[key] = append(podsByDevice[key], cInfo.PodUIDs.UnsortedList()...)
+			}
+		}
+	}
+	m.cache.RUnlock()
+
+	podsToUpdate := sets.New[string]()
+	for _, device := range changedDevices {
+		key := deviceKey{poolName: device.PoolName, deviceName: device.DeviceName}
+		podsToUpdate.Insert(podsByDevice[key]...)
+	}
+
+	if podsToUpdate.Len() == 0 {
+		logger.V(4).Info("Health info changed, but no active pods found using the affected devices", "driverName", driverName)
+		return
+	}
+
+	podUIDs := podsToUpdate.UnsortedList()
+	logger.Info("Sending health update notification for pods", "driverName", driverName, "pods", podUIDs)
+	select {
+	case m.update <- resourceupdates.Update{PodUIDs: podUIDs}:
+	default:
+		logger.Error(nil, "DRA health update channel is full, discarding pod update notification", "driverName", driverName, "pods", podUIDs)
+	}
+}
+
 // HandleWatchResourcesStream processes health updates from the DRA plugin.
 func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1.DRAResourceHealth_NodeWatchResourcesClient, pluginName string) error {
 	logger := klog.FromContext(ctx).WithName("dra-manager")
@@ -1085,6 +1176,7 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 		if err := m.healthInfoCache.clearDriver(logger, pluginName); err != nil {
 			logger.Error(err, "Failed to clear health info cache for driver")
 		}
+		m.signalHealthInfoUpdated()
 	}()
 
 	for {
@@ -1121,47 +1213,8 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 		if updateErr != nil {
 			logger.Error(updateErr, "Failed to update health info cache")
 		}
-		if len(changedDevices) > 0 {
-			logger.V(4).Info("Health info changed, checking affected pods", "changedDevicesCount", len(changedDevices))
-
-			// Snapshot which pods use which of this plugin's devices. The
-			// claim info cache lock is then held once per report and only
-			// while building the index, independent of how many devices
-			// changed, so that a plugin sending large reports at a high
-			// rate cannot block DRA operations on the lock.
-			type deviceKey struct {
-				poolName   string
-				deviceName string
-			}
-			podsByDevice := make(map[deviceKey][]string)
-			m.cache.RLock()
-			for _, cInfo := range m.cache.claimInfo {
-				if driverState, ok := cInfo.DriverState[pluginName]; ok {
-					for _, allocatedDevice := range driverState.Devices {
-						key := deviceKey{poolName: allocatedDevice.PoolName, deviceName: allocatedDevice.DeviceName}
-						podsByDevice[key] = append(podsByDevice[key], cInfo.PodUIDs.UnsortedList()...)
-					}
-				}
-			}
-			m.cache.RUnlock()
-
-			podsToUpdate := sets.New[string]()
-			for _, dev := range changedDevices {
-				podsToUpdate.Insert(podsByDevice[deviceKey{poolName: dev.PoolName, deviceName: dev.DeviceName}]...)
-			}
-
-			if podsToUpdate.Len() > 0 {
-				podUIDs := podsToUpdate.UnsortedList()
-				logger.Info("Sending health update notification for pods", "pods", podUIDs)
-				select {
-				case m.update <- resourceupdates.Update{PodUIDs: podUIDs}:
-				default:
-					logger.Error(nil, "DRA health update channel is full, discarding pod update notification", "pods", podUIDs)
-				}
-			} else {
-				logger.V(4).Info("Health info changed, but no active pods found using the affected devices")
-			}
-		}
+		m.signalHealthInfoUpdated()
+		m.notifyPodsForDevices(logger, pluginName, changedDevices)
 
 	}
 }
