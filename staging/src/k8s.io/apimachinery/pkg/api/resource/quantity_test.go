@@ -385,6 +385,12 @@ func TestQuantityParse(t *testing.T) {
 		{"0.05Gi", decQuantity(536870912, -1, BinarySI)},
 		{"0.025Ti", decQuantity(274877906944, -1, BinarySI)},
 
+		// Test parsing of MaxInt64
+		{strconv.FormatInt(math.MaxInt64, 10), intQuantity(math.MaxInt64, 0, DecimalSI)},
+
+		// Test parsing of MinInt64
+		{strconv.FormatInt(math.MinInt64, 10), intQuantity(math.MinInt64, 0, DecimalSI)},
+
 		// Things written by trolls
 		{"0.000000000001Ki", decQuantity(2, -9, DecimalSI)}, // rounds up, changes format
 		{".001", decQuantity(1, -3, DecimalSI)},
