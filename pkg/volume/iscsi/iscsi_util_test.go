@@ -462,3 +462,65 @@ func createFakePluginDirs() (string, error) {
 
 	return dir, err
 }
+
+// fakeDeviceUtil implements volumeutil.DeviceUtil for testing deleteDevicesForDisk.
+type fakeDeviceUtil struct {
+	findDevicesResult []string
+	findDevicesErr    error
+	multipathMap      map[string]string // device path -> multipath device path
+	findDevicesCalls  int
+	multipathCalls    int
+}
+
+func (f *fakeDeviceUtil) FindDevicesForISCSILun(targetIqn string, lun int) ([]string, error) {
+	f.findDevicesCalls++
+	return f.findDevicesResult, f.findDevicesErr
+}
+
+func (f *fakeDeviceUtil) FindMultipathDeviceForDevice(disk string) string {
+	f.multipathCalls++
+	if f.multipathMap != nil {
+		return f.multipathMap[disk]
+	}
+	return ""
+}
+
+func (f *fakeDeviceUtil) FindSlaveDevicesOnMultipath(disk string) []string { return nil }
+func (f *fakeDeviceUtil) GetISCSIPortalHostMapForTarget(targetIqn string) (map[string]int, error) {
+	return nil, nil
+}
+
+func TestDeleteDevicesForDisk(t *testing.T) {
+	fakeExec := &testingexec.FakeExec{}
+	fakeDU := &fakeDeviceUtil{
+		findDevicesResult: []string{"sda", "sdb"},
+		multipathMap:      map[string]string{"/dev/sda": "/dev/dm-0"},
+	}
+
+	scripts := []volumetest.CommandScript{
+		{
+			Cmd:  "multipath",
+			Args: []string{"-f", "/dev/dm-0"},
+		},
+	}
+	volumetest.ScriptCommands(fakeExec, scripts)
+
+	disk := &iscsiDisk{
+		Iqn: "iqn.2014-12.com.example:test.tgt00",
+		Lun: "0",
+	}
+
+	err := deleteDevicesForDisk(disk, fakeExec, fakeDU)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if fakeDU.findDevicesCalls != 1 {
+		t.Errorf("expected 1 FindDevicesForISCSILun call, got %d", fakeDU.findDevicesCalls)
+	}
+	if fakeDU.multipathCalls != 2 {
+		t.Errorf("expected 2 FindMultipathDeviceForDevice calls, got %d", fakeDU.multipathCalls)
+	}
+	if fakeExec.CommandCalls != 1 {
+		t.Errorf("expected 1 multipath flush call, got %d", fakeExec.CommandCalls)
+	}
+}
