@@ -265,10 +265,13 @@ type NodeInfo interface {
 	Node() *v1.Node
 	// GetPods returns Pods running on the node.
 	GetPods() []PodInfo
-	// GetPodsWithAffinity returns the subset of pods with affinity.
+	// GetPodsWithAffinity returns the subset of pods with inter-pod (anti-)affinity.
 	GetPodsWithAffinity() []PodInfo
-	// GetPodsWithRequiredAntiAffinity returns the subset of pods with required anti-affinity.
+	// GetPodsWithRequiredAntiAffinity returns the subset of pods with required inter-pod anti-affinity.
 	GetPodsWithRequiredAntiAffinity() []PodInfo
+	// GetPodsWithRequiredNonHostScopedAntiAffinity returns the subset of pods with required inter-pod anti-affinity that is non-hostname scoped.
+	// This must be empty when the InterPodAffinityHostnameFastPath feature gate is disabled.
+	GetPodsWithRequiredNonHostScopedAntiAffinity() []PodInfo
 	// GetUsedPorts returns the ports allocated on the node.
 	GetUsedPorts() HostPortInfo
 	// GetRequested returns total requested resources of all pods on this node. This includes assumed

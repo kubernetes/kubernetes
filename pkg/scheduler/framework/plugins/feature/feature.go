@@ -55,6 +55,7 @@ type Features struct {
 	EnableInPlacePodLevelResourcesVerticalScaling      bool
 	EnableInPlacePodVerticalScalingSchedulerPreemption bool
 	EnableTopologyAwareWorkloadScheduling              bool
+	EnableInterPodAffinityHostnameFastPath             bool
 	EnablePodGroupPreemptionPolicy                     bool
 	EnableCompositePodGroup                            bool
 }
@@ -94,5 +95,6 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnablePodGroupPreemptionPolicy:                     featureGate.Enabled(features.PodGroupPreemptionPolicy),
 		EnableDRANodeAllocatableResources:                  featureGate.Enabled(features.DRANodeAllocatableResources),
 		EnableCompositePodGroup:                            featureGate.Enabled(features.CompositePodGroup),
+		EnableInterPodAffinityHostnameFastPath:             featureGate.Enabled(features.InterPodAffinityHostnameFastPath),
 	}
 }

@@ -18,6 +18,7 @@ package interpodaffinity
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -25,8 +26,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -546,32 +550,36 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			snapshot := cache.NewSnapshot(test.pods, []*v1.Node{test.node})
-			nodeInfos, err := snapshot.NodeInfos().List()
-			if err != nil {
-				t.Fatal(err)
-			}
-			p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, namespaces)
-			state := framework.NewCycleState()
-			_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(ctx, state, test.pod, nodeInfos)
-			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
-				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
-			}
-			if !preFilterStatus.IsSuccess() {
-				return
-			}
+	for _, interPodAffinityHostnameFastPathEnabled := range []bool{true, false} {
+		for _, test := range tests {
+			t.Run(fmt.Sprintf("%s/InterPodAffinityHostnameFastPath=%v", test.name, interPodAffinityHostnameFastPathEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
 
-			nodeInfo := mustGetNodeInfo(t, snapshot, test.node.Name)
-			gotStatus := p.(fwk.FilterPlugin).Filter(ctx, state, test.pod, nodeInfo)
-			if diff := cmp.Diff(test.wantFilterStatus, gotStatus); diff != "" {
-				t.Errorf("Filter: status does not match (-want,+got):\n%s", diff)
-			}
-		})
+				_, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
+				snapshot := cache.NewSnapshot(test.pods, []*v1.Node{test.node})
+				nodeInfos, err := snapshot.NodeInfos().List()
+				if err != nil {
+					t.Fatal(err)
+				}
+				p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{EnableInterPodAffinityHostnameFastPath: interPodAffinityHostnameFastPathEnabled}, New), &config.InterPodAffinityArgs{}, snapshot, namespaces)
+				state := framework.NewCycleState()
+				_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(ctx, state, test.pod, nodeInfos)
+				if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
+					t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
+				}
+				if !preFilterStatus.IsSuccess() {
+					return
+				}
+
+				nodeInfo := mustGetNodeInfo(t, snapshot, test.node.Name)
+				gotStatus := p.(fwk.FilterPlugin).Filter(ctx, state, test.pod, nodeInfo)
+				if diff := cmp.Diff(test.wantFilterStatus, gotStatus); diff != "" {
+					t.Errorf("Filter: status does not match (-want,+got):\n%s", diff)
+				}
+			})
+		}
 	}
 }
 
@@ -960,38 +968,82 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			},
 			name: "Test incoming pod's affinity: firstly check if all affinityTerms match, and then check if all topologyKeys match, and the match logic should be satisfied on the same pod",
 		},
+		{
+			pod: st.MakePod().Namespace(defaultNamespace).PodAffinityExists("foo", v1.LabelHostname, st.PodAffinityWithRequiredReq).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Labels(map[string]string{"foo": ""}).Node("nodeA").Obj(),
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{v1.LabelHostname: "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{v1.LabelHostname: "nodeB"}}},
+			},
+			wantFilterStatuses: []*fwk.Status{
+				// Result for nodeA: Schedulable
+				nil,
+				// Result for nodeB: Unschedulable
+				fwk.NewStatus(
+					fwk.UnschedulableAndUnresolvable,
+					ErrReasonAffinityRulesNotMatch,
+				),
+			},
+			name: "Test incoming pod's host-scoped affinity (fast path)",
+		},
+		{
+			pod: st.MakePod().Namespace(defaultNamespace).PodAntiAffinityExists("foo", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Labels(map[string]string{"foo": ""}).Node("nodeA").Obj(),
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{v1.LabelHostname: "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{v1.LabelHostname: "nodeB"}}},
+			},
+			wantFilterStatuses: []*fwk.Status{
+				// Result for nodeA: Unschedulable
+				fwk.NewStatus(
+					fwk.Unschedulable,
+					ErrReasonAntiAffinityRulesNotMatch,
+				),
+				// Result for nodeB: Schedulable
+				nil,
+			},
+			name: "Test incoming pod's host-scoped anti-affinity (fast path)",
+		},
 	}
 
-	for indexTest, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			snapshot := cache.NewSnapshot(test.pods, test.nodes)
-			nodeInfos, err := snapshot.NodeInfos().List()
-			if err != nil {
-				t.Fatal(err)
-			}
-			p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot,
-				[]runtime.Object{
-					&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "NS1"}},
-				})
-			state := framework.NewCycleState()
-			_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(ctx, state, test.pod, nodeInfos)
-			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
-				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
-			}
-			if preFilterStatus.IsSkip() {
-				return
-			}
-			for indexNode, node := range test.nodes {
-				nodeInfo := mustGetNodeInfo(t, snapshot, node.Name)
-				gotStatus := p.(fwk.FilterPlugin).Filter(ctx, state, test.pod, nodeInfo)
-				if diff := cmp.Diff(test.wantFilterStatuses[indexNode], gotStatus); diff != "" {
-					t.Errorf("index: %d: Filter: status does not match (-want,+got):\n%s", indexTest, diff)
+	for _, interPodAffinityHostnameFastPathEnabled := range []bool{true, false} {
+		for indexTest, test := range tests {
+			t.Run(fmt.Sprintf("%s/InterPodAffinityHostnameFastPath=%v", test.name, interPodAffinityHostnameFastPathEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
+
+				_, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
+				snapshot := cache.NewSnapshot(test.pods, test.nodes)
+				nodeInfos, err := snapshot.NodeInfos().List()
+				if err != nil {
+					t.Fatal(err)
 				}
-			}
-		})
+				p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{EnableInterPodAffinityHostnameFastPath: interPodAffinityHostnameFastPathEnabled}, New), &config.InterPodAffinityArgs{}, snapshot,
+					[]runtime.Object{
+						&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "NS1"}},
+					})
+				state := framework.NewCycleState()
+				_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(ctx, state, test.pod, nodeInfos)
+				if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
+					t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
+				}
+				if preFilterStatus.IsSkip() {
+					return
+				}
+				for indexNode, node := range test.nodes {
+					nodeInfo := mustGetNodeInfo(t, snapshot, node.Name)
+					gotStatus := p.(fwk.FilterPlugin).Filter(ctx, state, test.pod, nodeInfo)
+					if diff := cmp.Diff(test.wantFilterStatuses[indexNode], gotStatus); diff != "" {
+						t.Errorf("index: %d: Filter: status does not match (-want,+got):\n%s", indexTest, diff)
+					}
+				}
+			})
+		}
 	}
 }
 
@@ -1238,89 +1290,163 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				{key: "zone", value: "z11"}:  2,
 			},
 		},
+		{
+			name: "preFilterState anti-affinity terms with both hostname and non-hostname are updated correctly after adding and removing a pod",
+			pendingPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: selector1},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: antiAffinityFooBar,
+					},
+				},
+			},
+			existingPods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+					Spec: v1.PodSpec{NodeName: "nodeA"},
+				},
+			},
+			addedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "addedPod", Labels: selector1},
+				Spec: v1.PodSpec{
+					NodeName: "nodeA",
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+									TopologyKey: v1.LabelHostname,
+								},
+							},
+						},
+					},
+				},
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z11", v1.LabelHostname: "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z12", v1.LabelHostname: "nodeB"}}},
+			},
+			expectedAntiAffinity: topologyToMatchedTermCount{
+				{key: "region", value: "r1"}: 2,
+			},
+			expectedAffinity: topologyToMatchedTermCount{},
+		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// getMeta creates predicate meta data given the list of pods.
-			getState := func(pods []*v1.Pod) (*InterPodAffinity, fwk.CycleState, *preFilterState, *cache.Snapshot) {
-				snapshot := cache.NewSnapshot(pods, test.nodes)
-				_, ctx := ktesting.NewTestContext(t)
-				ctx, cancel := context.WithCancel(ctx)
-				defer cancel()
-				nodeInfos, err := snapshot.NodeInfos().List()
-				if err != nil {
-					t.Fatal(err)
-				}
-				p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, nil)
-				cycleState := framework.NewCycleState()
-				_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(ctx, cycleState, test.pendingPod, nodeInfos)
-				if !preFilterStatus.IsSuccess() {
-					t.Errorf("prefilter failed with status: %v", preFilterStatus)
+	for _, interPodAffinityHostnameFastPathEnabled := range []bool{true, false} {
+		for _, test := range tests {
+			t.Run(fmt.Sprintf("%s/InterPodAffinityHostnameFastPath=%v", test.name, interPodAffinityHostnameFastPathEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
+
+				// getMeta creates predicate meta data given the list of pods.
+				getState := func(pods []*v1.Pod) (*InterPodAffinity, fwk.CycleState, *preFilterState, *cache.Snapshot) {
+					snapshot := cache.NewSnapshot(pods, test.nodes)
+					_, ctx := ktesting.NewTestContext(t)
+					ctx, cancel := context.WithCancel(ctx)
+					defer cancel()
+					nodeInfos, err := snapshot.NodeInfos().List()
+					if err != nil {
+						t.Fatal(err)
+					}
+					p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{EnableInterPodAffinityHostnameFastPath: interPodAffinityHostnameFastPathEnabled}, New), &config.InterPodAffinityArgs{}, snapshot, nil)
+					cycleState := framework.NewCycleState()
+					_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(ctx, cycleState, test.pendingPod, nodeInfos)
+					if !preFilterStatus.IsSuccess() {
+						t.Errorf("prefilter failed with status: %v", preFilterStatus)
+					}
+
+					state, err := getPreFilterState(cycleState)
+					if err != nil {
+						t.Errorf("failed to get preFilterState from cycleState: %v", err)
+					}
+
+					return p.(*InterPodAffinity), cycleState, state, snapshot
 				}
 
-				state, err := getPreFilterState(cycleState)
+				_, ctx := ktesting.NewTestContext(t)
+				// allPodsState is the state produced when all pods, including test.addedPod are given to prefilter.
+				_, _, allPodsState, _ := getState(append(test.existingPods, test.addedPod))
+
+				// state is produced for test.existingPods (without test.addedPod).
+				ipa, cycleState, state, snapshot := getState(test.existingPods)
+				// clone the state so that we can compare it later when performing Remove.
+				originalState := state.Clone()
+
+				// Add test.addedPod to state1 and verify it is equal to allPodsState.
+				nodeInfo := mustGetNodeInfo(t, snapshot, test.addedPod.Spec.NodeName)
+				if err := ipa.AddPod(ctx, cycleState, test.pendingPod, mustNewPodInfo(t, test.addedPod), nodeInfo); err != nil {
+					t.Errorf("error adding pod to meta: %v", err)
+				}
+
+				newState, err := getPreFilterState(cycleState)
 				if err != nil {
 					t.Errorf("failed to get preFilterState from cycleState: %v", err)
 				}
 
-				return p.(*InterPodAffinity), cycleState, state, snapshot
-			}
+				if diff := cmp.Diff(test.expectedAntiAffinity, newState.clusterWideAntiAffinityCounts); diff != "" {
+					t.Errorf("State is not equal (-want,+got):\n%s", diff)
+				}
 
-			_, ctx := ktesting.NewTestContext(t)
-			// allPodsState is the state produced when all pods, including test.addedPod are given to prefilter.
-			_, _, allPodsState, _ := getState(append(test.existingPods, test.addedPod))
+				if diff := cmp.Diff(test.expectedAffinity, newState.clusterWideAffinityCounts); diff != "" {
+					t.Errorf("State is not equal (-want,+got):\n%s", diff)
+				}
 
-			// state is produced for test.existingPods (without test.addedPod).
-			ipa, cycleState, state, snapshot := getState(test.existingPods)
-			// clone the state so that we can compare it later when performing Remove.
-			originalState := state.Clone()
+				if diff := cmp.Diff(allPodsState, state, preFilterStateCmpOpts...); diff != "" {
+					t.Errorf("State is not equal (-want,+got):\n%s", diff)
+				}
 
-			// Add test.addedPod to state1 and verify it is equal to allPodsState.
-			nodeInfo := mustGetNodeInfo(t, snapshot, test.addedPod.Spec.NodeName)
-			if err := ipa.AddPod(ctx, cycleState, test.pendingPod, mustNewPodInfo(t, test.addedPod), nodeInfo); err != nil {
-				t.Errorf("error adding pod to meta: %v", err)
-			}
+				// Remove the added pod pod and make sure it is equal to the original state.
+				if err := ipa.RemovePod(ctx, cycleState, test.pendingPod, mustNewPodInfo(t, test.addedPod), nodeInfo); err != nil {
+					t.Errorf("error removing pod from meta: %v", err)
+				}
+				if diff := cmp.Diff(originalState, state, preFilterStateCmpOpts...); diff != "" {
+					t.Errorf("State is not equal (-want,+got):\n%s", diff)
+				}
 
-			newState, err := getPreFilterState(cycleState)
-			if err != nil {
-				t.Errorf("failed to get preFilterState from cycleState: %v", err)
-			}
-
-			if diff := cmp.Diff(test.expectedAntiAffinity, newState.antiAffinityCounts); diff != "" {
-				t.Errorf("State is not equal (-want,+got):\n%s", diff)
-			}
-
-			if diff := cmp.Diff(test.expectedAffinity, newState.affinityCounts); diff != "" {
-				t.Errorf("State is not equal (-want,+got):\n%s", diff)
-			}
-
-			if diff := cmp.Diff(allPodsState, state, preFilterStateCmpOpts...); diff != "" {
-				t.Errorf("State is not equal (-want,+got):\n%s", diff)
-			}
-
-			// Remove the added pod pod and make sure it is equal to the original state.
-			if err := ipa.RemovePod(ctx, cycleState, test.pendingPod, mustNewPodInfo(t, test.addedPod), nodeInfo); err != nil {
-				t.Errorf("error removing pod from meta: %v", err)
-			}
-			if diff := cmp.Diff(originalState, state, preFilterStateCmpOpts...); diff != "" {
-				t.Errorf("State is not equal (-want,+got):\n%s", diff)
-			}
-		})
+				// Test pure RemovePod: start with allPodsState, remove addedPod, and verify it equals originalState.
+				ipa2, cycleState2, state2, snapshot2 := getState(append(test.existingPods, test.addedPod))
+				nodeInfo2 := mustGetNodeInfo(t, snapshot2, test.addedPod.Spec.NodeName)
+				if err := ipa2.RemovePod(ctx, cycleState2, test.pendingPod, mustNewPodInfo(t, test.addedPod), nodeInfo2); err != nil {
+					t.Errorf("error removing pod from meta: %v", err)
+				}
+				if diff := cmp.Diff(originalState, state2, preFilterStateCmpOpts...); diff != "" {
+					t.Errorf("State after pure RemovePod is not equal to originalState (-want,+got):\n%s", diff)
+				}
+			})
+		}
 	}
 }
 
 func TestPreFilterStateClone(t *testing.T) {
 	source := &preFilterState{
-		existingAntiAffinityCounts: topologyToMatchedTermCount{
+		existingClusterWideAntiAffinityCounts: topologyToMatchedTermCount{
 			{key: "name", value: "node1"}: 1,
 			{key: "name", value: "node2"}: 1,
 		},
-		affinityCounts: topologyToMatchedTermCount{
+		clusterWideAffinityCounts: topologyToMatchedTermCount{
 			{key: "name", value: "nodeA"}: 1,
 			{key: "name", value: "nodeC"}: 2,
 		},
-		antiAffinityCounts: topologyToMatchedTermCount{
+		clusterWideAntiAffinityCounts: topologyToMatchedTermCount{
 			{key: "name", value: "nodeN"}: 3,
 			{key: "name", value: "nodeM"}: 1,
 		},
@@ -1348,7 +1474,7 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 	normalPodA := newPod("aaa")
 	normalPodB := newPod("bbb")
 	normalPodAB := newPod("aaa", "bbb")
-	nodeA := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"hostname": "nodeA"}}}
+	nodeA := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{v1.LabelHostname: "nodeA"}}}
 
 	tests := []struct {
 		name                    string
@@ -1377,8 +1503,8 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 			name:         "no pod has label that violates incoming pod's affinity and anti-affinity",
 			existingPods: []*v1.Pod{normalPodB},
 			nodes:        []*v1.Node{nodeA},
-			pod: st.MakePod().Name("aaa-anti").PodAffinityExists("aaa", "hostname", st.PodAffinityWithRequiredReq).
-				PodAntiAffinityExists("aaa", "hostname", st.PodAntiAffinityWithRequiredReq).Obj(),
+			pod: st.MakePod().Name("aaa-anti").PodAffinityExists("aaa", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAntiAffinityExists("aaa", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj(),
 			wantAffinityPodsMap:     make(topologyToMatchedTermCount),
 			wantAntiAffinityPodsMap: make(topologyToMatchedTermCount),
 		},
@@ -1386,84 +1512,89 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 			name:         "existing pod matches incoming pod's affinity and anti-affinity - single term case",
 			existingPods: []*v1.Pod{normalPodA},
 			nodes:        []*v1.Node{nodeA},
-			pod: st.MakePod().Name("affi-antiaffi").PodAffinityExists("aaa", "hostname", st.PodAffinityWithRequiredReq).
-				PodAntiAffinityExists("aaa", "hostname", st.PodAntiAffinityWithRequiredReq).Obj(),
+			pod: st.MakePod().Name("affi-antiaffi").PodAffinityExists("aaa", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAntiAffinityExists("aaa", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj(),
 			wantAffinityPodsMap: topologyToMatchedTermCount{
-				{key: "hostname", value: "nodeA"}: 1,
+				{key: v1.LabelHostname, value: "nodeA"}: 1,
 			},
 			wantAntiAffinityPodsMap: topologyToMatchedTermCount{
-				{key: "hostname", value: "nodeA"}: 1,
+				{key: v1.LabelHostname, value: "nodeA"}: 1,
 			},
 		},
 		{
 			name:         "existing pod matches incoming pod's affinity and anti-affinity - multiple terms case",
 			existingPods: []*v1.Pod{normalPodAB},
 			nodes:        []*v1.Node{nodeA},
-			pod: st.MakePod().Name("affi-antiaffi").PodAffinityExists("aaa", "hostname", st.PodAffinityWithRequiredReq).
-				PodAffinityExists("bbb", "hostname", st.PodAffinityWithRequiredReq).PodAntiAffinityExists("aaa", "hostname", st.PodAntiAffinityWithRequiredReq).Obj(),
+			pod: st.MakePod().Name("affi-antiaffi").PodAffinityExists("aaa", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAffinityExists("bbb", v1.LabelHostname, st.PodAffinityWithRequiredReq).PodAntiAffinityExists("aaa", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj(),
 			wantAffinityPodsMap: topologyToMatchedTermCount{
-				{key: "hostname", value: "nodeA"}: 2, // 2 one for each term.
+				{key: v1.LabelHostname, value: "nodeA"}: 2, // 2 one for each term.
 			},
 			wantAntiAffinityPodsMap: topologyToMatchedTermCount{
-				{key: "hostname", value: "nodeA"}: 1,
+				{key: v1.LabelHostname, value: "nodeA"}: 1,
 			},
 		},
 		{
 			name:         "existing pod not match incoming pod's affinity but matches anti-affinity",
 			existingPods: []*v1.Pod{normalPodA},
 			nodes:        []*v1.Node{nodeA},
-			pod: st.MakePod().Name("affi-antiaffi").PodAffinityExists("aaa", "hostname", st.PodAffinityWithRequiredReq).
-				PodAffinityExists("bbb", "hostname", st.PodAffinityWithRequiredReq).
-				PodAntiAffinityExists("aaa", "hostname", st.PodAntiAffinityWithRequiredReq).
-				PodAntiAffinityExists("bbb", "hostname", st.PodAntiAffinityWithRequiredReq).Obj(),
+			pod: st.MakePod().Name("affi-antiaffi").PodAffinityExists("aaa", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAffinityExists("bbb", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAntiAffinityExists("aaa", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).
+				PodAntiAffinityExists("bbb", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj(),
 			wantAffinityPodsMap: make(topologyToMatchedTermCount),
 			wantAntiAffinityPodsMap: topologyToMatchedTermCount{
-				{key: "hostname", value: "nodeA"}: 1,
+				{key: v1.LabelHostname, value: "nodeA"}: 1,
 			},
 		},
 		{
 			name:         "incoming pod's anti-affinity has more than one term - existing pod violates partial term - case 1",
 			existingPods: []*v1.Pod{normalPodAB},
 			nodes:        []*v1.Node{nodeA},
-			pod: st.MakePod().Name("anaffi-antiaffiti").PodAffinityExists("aaa", "hostname", st.PodAffinityWithRequiredReq).
-				PodAffinityExists("ccc", "hostname", st.PodAffinityWithRequiredReq).
-				PodAntiAffinityExists("aaa", "hostname", st.PodAntiAffinityWithRequiredReq).
-				PodAntiAffinityExists("ccc", "hostname", st.PodAntiAffinityWithRequiredReq).Obj(),
+			pod: st.MakePod().Name("anaffi-antiaffiti").PodAffinityExists("aaa", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAffinityExists("ccc", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAntiAffinityExists("aaa", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).
+				PodAntiAffinityExists("ccc", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj(),
 			wantAffinityPodsMap: make(topologyToMatchedTermCount),
 			wantAntiAffinityPodsMap: topologyToMatchedTermCount{
-				{key: "hostname", value: "nodeA"}: 1,
+				{key: v1.LabelHostname, value: "nodeA"}: 1,
 			},
 		},
 		{
 			name:         "incoming pod's anti-affinity has more than one term - existing pod violates partial term - case 2",
 			existingPods: []*v1.Pod{normalPodB},
 			nodes:        []*v1.Node{nodeA},
-			pod: st.MakePod().Name("affi-antiaffi").PodAffinityExists("aaa", "hostname", st.PodAffinityWithRequiredReq).
-				PodAffinityExists("bbb", "hostname", st.PodAffinityWithRequiredReq).
-				PodAntiAffinityExists("aaa", "hostname", st.PodAntiAffinityWithRequiredReq).
-				PodAntiAffinityExists("bbb", "hostname", st.PodAntiAffinityWithRequiredReq).Obj(),
+			pod: st.MakePod().Name("affi-antiaffi").PodAffinityExists("aaa", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAffinityExists("bbb", v1.LabelHostname, st.PodAffinityWithRequiredReq).
+				PodAntiAffinityExists("aaa", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).
+				PodAntiAffinityExists("bbb", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj(),
 			wantAffinityPodsMap: make(topologyToMatchedTermCount),
 			wantAntiAffinityPodsMap: topologyToMatchedTermCount{
-				{key: "hostname", value: "nodeA"}: 1,
+				{key: v1.LabelHostname, value: "nodeA"}: 1,
 			},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
-			l, _ := snapshot.NodeInfos().List()
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, nil)
-			gotAffinityPodsMap, gotAntiAffinityPodsMap := p.(*InterPodAffinity).getIncomingAffinityAntiAffinityCounts(ctx, mustNewPodInfo(t, tt.pod), l)
-			if diff := cmp.Diff(tt.wantAffinityPodsMap, gotAffinityPodsMap); diff != "" {
-				t.Errorf("Unexpected getTPMapMatchingIncomingAffinityAntiAffinity() (-want,+got):\n%s", diff)
-			}
-			if diff := cmp.Diff(tt.wantAntiAffinityPodsMap, gotAntiAffinityPodsMap); diff != "" {
-				t.Errorf("Unexpected getTPMapMatchingIncomingAffinityAntiAffinity() (-want,+got):\n%s", diff)
-			}
-		})
+	for _, interPodAffinityHostnameFastPathEnabled := range []bool{true, false} {
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%s/InterPodAffinityHostnameFastPath=%v", tt.name, interPodAffinityHostnameFastPathEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
+
+				snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
+				l, _ := snapshot.NodeInfos().List()
+				_, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
+				p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{EnableInterPodAffinityHostnameFastPath: interPodAffinityHostnameFastPathEnabled}, New), &config.InterPodAffinityArgs{}, snapshot, nil)
+				podInfo := mustNewPodInfo(t, tt.pod)
+				gotAffinityPodsMap, gotAntiAffinityPodsMap := p.(*InterPodAffinity).getIncomingAffinityAntiAffinityCounts(ctx, podInfo.GetRequiredAffinityTerms(), podInfo.GetRequiredAntiAffinityTerms(), l)
+				if diff := cmp.Diff(tt.wantAffinityPodsMap, gotAffinityPodsMap); diff != "" {
+					t.Errorf("Unexpected getTPMapMatchingIncomingAffinityAntiAffinity() (-want,+got):\n%s", diff)
+				}
+				if diff := cmp.Diff(tt.wantAntiAffinityPodsMap, gotAntiAffinityPodsMap); diff != "" {
+					t.Errorf("Unexpected getTPMapMatchingIncomingAffinityAntiAffinity() (-want,+got):\n%s", diff)
+				}
+			})
+		}
 	}
 }
 
@@ -1498,5 +1629,289 @@ func TestInterPodAffinity_DeferredResizeSkipped(t *testing.T) {
 
 	if filterStatus := pl.Filter(ctx, nil, pod, nodeInfo); filterStatus.Code() != fwk.Success {
 		t.Errorf("Filter: got status %v, want Success (nil)", filterStatus.Code())
+	}
+}
+
+func TestRemovePodHostScopedAffinityCount(t *testing.T) {
+	for _, interPodAffinityHostnameFastPathEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("InterPodAffinityHostnameFastPath=%v", interPodAffinityHostnameFastPathEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
+
+			// Pending pod has self-affinity on hostname
+			pendingPod := st.MakePod().Name("pending").Labels(map[string]string{"foo": "bar"}).
+				PodAffinityIn("foo", v1.LabelHostname, []string{"bar"}, st.PodAffinityWithRequiredReq).Obj()
+
+			// Existing pod on nodeA that satisfies the affinity
+			existingPod := st.MakePod().Name("existing").Node("nodeA").Labels(map[string]string{"foo": "bar"}).Obj()
+
+			nodes := []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{v1.LabelHostname: "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{v1.LabelHostname: "nodeB"}}},
+			}
+
+			snapshot := cache.NewSnapshot([]*v1.Pod{existingPod}, nodes)
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			nodeInfos, err := snapshot.NodeInfos().List()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{EnableInterPodAffinityHostnameFastPath: interPodAffinityHostnameFastPathEnabled}, New), &config.InterPodAffinityArgs{}, snapshot, nil)
+			cycleState := framework.NewCycleState()
+
+			// 1. PreFilter
+			_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(ctx, cycleState, pendingPod, nodeInfos)
+			if !preFilterStatus.IsSuccess() {
+				t.Fatalf("prefilter failed with status: %v", preFilterStatus)
+			}
+
+			// NodeA should succeed initially because the existing pod is there, matching the affinity
+			nodeInfoA := mustGetNodeInfo(t, snapshot, "nodeA")
+			statusA := p.(fwk.FilterPlugin).Filter(ctx, cycleState, pendingPod, nodeInfoA)
+			if !statusA.IsSuccess() {
+				t.Errorf("expected Filter to succeed on nodeA initially, but got status: %v", statusA)
+			}
+
+			// NodeB should fail initially because the first pod must land on NodeA (where the existing pod is)
+			nodeInfoB := mustGetNodeInfo(t, snapshot, "nodeB")
+			status := p.(fwk.FilterPlugin).Filter(ctx, cycleState, pendingPod, nodeInfoB)
+			if status.IsSuccess() {
+				t.Errorf("expected Filter to fail on nodeB because existing pod satisfies affinity globally, but it succeeded")
+			}
+
+			// 2. Simulate Preemption (scaledown)
+			// We remove the existing pod from nodeA
+			if err := p.(fwk.PreFilterExtensions).RemovePod(ctx, cycleState, pendingPod, mustNewPodInfo(t, existingPod), nodeInfoA); err != nil {
+				t.Fatalf("error removing pod: %v", err)
+			}
+
+			// 3. Filter again on NodeA and NodeB
+			// Now there are NO pods matching "foo: bar" globally.
+			// The pending pod should satisfy self-affinity and be allowed on both NodeA and NodeB.
+			statusA = p.(fwk.FilterPlugin).Filter(ctx, cycleState, pendingPod, nodeInfoA)
+			if !statusA.IsSuccess() {
+				t.Errorf("expected Filter to succeed on nodeA after existing pod is removed, but got status: %v", statusA)
+			}
+
+			status = p.(fwk.FilterPlugin).Filter(ctx, cycleState, pendingPod, nodeInfoB)
+			if !status.IsSuccess() {
+				t.Errorf("expected Filter to succeed on nodeB after existing pod is removed, but got status: %v", status)
+			}
+		})
+	}
+}
+
+func TestMultipleAffinityTermsRequireSingleMatchingPod(t *testing.T) {
+	// 1. Setup an incoming pod with TWO required pod affinity terms: "foo=bar" and "baz=qux", using the hostname topology key (required for testing the FastPath optimization)
+	podWithTwoAffinityTerms := st.MakePod().Name("pod-1").Namespace("default").
+		PodAffinityIn("foo", v1.LabelHostname, []string{"bar"}, st.PodAffinityWithRequiredReq).
+		PodAffinityIn("baz", v1.LabelHostname, []string{"qux"}, st.PodAffinityWithRequiredReq).Obj()
+
+	// 2. Setup existing pods to test different combinations of label matches
+	// podA only matches the first term ("foo=bar")
+	podA := st.MakePod().Name("podA").Namespace("default").Label("foo", "bar").Node("node-1").Obj()
+	// podB only matches the second term ("baz=qux")
+	podB := st.MakePod().Name("podB").Namespace("default").Label("baz", "qux").Node("node-1").Obj()
+	// podC matches BOTH terms simultaneously
+	podC := st.MakePod().Name("podC").Namespace("default").Label("foo", "bar").Label("baz", "qux").Node("node-3").Obj()
+
+	// 3. Create nodes to house the existing pods: node-1 (podA, podB), node-2 (empty), node-3 (podC)
+	nodes := []*v1.Node{
+		st.MakeNode().Name("node-1").Label(v1.LabelHostname, "node-1").Obj(),
+		st.MakeNode().Name("node-2").Label(v1.LabelHostname, "node-2").Obj(),
+		st.MakeNode().Name("node-3").Label(v1.LabelHostname, "node-3").Obj(),
+	}
+
+	namespaces := []runtime.Object{
+		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default", Labels: map[string]string{}}},
+	}
+
+	for _, interPodAffinityHostnameFastPathEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("InterPodAffinityHostnameFastPath=%v", interPodAffinityHostnameFastPathEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
+
+			// 4. Initialize scheduler data structures and run the PreFilter phase
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			snapshot := cache.NewSnapshot([]*v1.Pod{podA, podB, podC}, nodes)
+			nodeInfos, err := snapshot.NodeInfos().List()
+			if err != nil {
+				t.Fatal(err)
+			}
+			p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{EnableInterPodAffinityHostnameFastPath: interPodAffinityHostnameFastPathEnabled}, New), &config.InterPodAffinityArgs{}, snapshot, namespaces)
+
+			state := framework.NewCycleState()
+			_, status := p.(fwk.PreFilterPlugin).PreFilter(ctx, state, podWithTwoAffinityTerms, nodeInfos)
+			if !status.IsSuccess() && status.Code() != fwk.Skip {
+				t.Fatalf("PreFilter failed: %v", status.Message())
+			}
+
+			// 5. Test node-1: SHOULD FAIL because InterPodAffinity requires a SINGLE existing pod to match ALL terms simultaneously (podA and podB only match one term each)
+			nodeInfo1 := mustGetNodeInfo(t, snapshot, "node-1")
+			status1 := p.(fwk.FilterPlugin).Filter(ctx, state, podWithTwoAffinityTerms, nodeInfo1)
+
+			if status1.IsSuccess() {
+				t.Errorf("Expected filtering on node-1 to FAIL (a single pod has to match all affinity terms), but got success.")
+			}
+
+			// 6. Test node-3: SHOULD SUCCEED because podC matches both terms simultaneously on this node
+			nodeInfo3 := mustGetNodeInfo(t, snapshot, "node-3")
+			status3 := p.(fwk.FilterPlugin).Filter(ctx, state, podWithTwoAffinityTerms, nodeInfo3)
+			if !status3.IsSuccess() {
+				t.Errorf("Expected filtering on node-3 to SUCCEED (podC matches both terms), but got %v", status3.Message())
+			}
+
+			// 7. Test node-2: SHOULD FAIL because the node is empty and has no pods matching the terms
+			nodeInfo2 := mustGetNodeInfo(t, snapshot, "node-2")
+			status2 := p.(fwk.FilterPlugin).Filter(ctx, state, podWithTwoAffinityTerms, nodeInfo2)
+			if status2.IsSuccess() {
+				t.Errorf("Expected filtering on node-2 to FAIL, but it SUCCEEDED")
+			}
+
+			// 8. Prepare for self-affinity test: update incoming pod itself to carry BOTH labels it requires
+			podWithTwoAffinityTermsSelf := podWithTwoAffinityTerms.DeepCopy()
+			podWithTwoAffinityTermsSelf.Labels = map[string]string{"foo": "bar", "baz": "qux"}
+
+			// 9. Evaluate against a cluster snapshot WITHOUT podC to guarantee no existing pods can satisfy the terms
+			snapshotSelf := cache.NewSnapshot([]*v1.Pod{podA, podB}, nodes)
+			nodeInfosSelf, _ := snapshotSelf.NodeInfos().List()
+			pSelf := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{EnableInterPodAffinityHostnameFastPath: interPodAffinityHostnameFastPathEnabled}, New), &config.InterPodAffinityArgs{}, snapshotSelf, namespaces)
+
+			// 10. Run self-affinity evaluation: PreFilter and Filter
+			stateSelf := framework.NewCycleState()
+			// PreFilter must succeed
+			_, preFilterStatusSelf := pSelf.(fwk.PreFilterPlugin).PreFilter(ctx, stateSelf, podWithTwoAffinityTermsSelf, nodeInfosSelf)
+			if !preFilterStatusSelf.IsSuccess() && preFilterStatusSelf.Code() != fwk.Skip {
+				t.Fatalf("PreFilter failed for self-affinity: %v", preFilterStatusSelf.Message())
+			}
+
+			nodeInfo1Self := mustGetNodeInfo(t, snapshotSelf, "node-1")
+			// Filter should succeed because the incoming pod satisfies its own affinity terms (self-affinity)
+			filterStatusSelf := pSelf.(fwk.FilterPlugin).Filter(ctx, stateSelf, podWithTwoAffinityTermsSelf, nodeInfo1Self)
+			if !filterStatusSelf.IsSuccess() {
+				t.Errorf("Expected scheduling on node-1 to SUCCEED due to self-affinity, but got status: %v", filterStatusSelf)
+			}
+		})
+	}
+}
+
+func TestFastTrackInterPodAffinity(t *testing.T) {
+	for _, interPodAffinityHostnameFastPathEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("InterPodAffinityHostnameFastPath=%v", interPodAffinityHostnameFastPathEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
+
+			// Test pods have different anti-affinity rules targeting different layers of topology and namespaces
+			// 1. Zone-scoped AntiAffinity: should taint entire zones if matches are found. (Testing cluster-wide anti-affinity)
+			podWithZoneAntiAffinity := st.MakePod().Name("pod-1").Namespace("default").Label("app", "foo").
+				PodAntiAffinityIn("app", "topology.kubernetes.io/zone", []string{"foo"}, st.PodAntiAffinityWithRequiredReq).Obj()
+
+			// 2. Hostname-scoped AntiAffinity: should taint only specific nodes. (Testing host-scoped fast path anti-affinity)
+			podWithHostAntiAffinity := st.MakePod().Name("pod-2").Namespace("default").Label("app", "bar").
+				PodAntiAffinityIn("app", v1.LabelHostname, []string{"bar"}, st.PodAntiAffinityWithRequiredReq).Obj()
+
+			// 3. Zone-scoped AntiAffinity with a complex NamespaceSelector (Testing that custom selectors remain unaffected by fast path changes)
+			podWithNamespaceAntiAffinity := st.MakePod().Name("pod-3").Namespace("other").Label("app", "baz").
+				PodAntiAffinityIn("app", "topology.kubernetes.io/zone", []string{"blocked"}, st.PodAntiAffinityWithRequiredReq).Obj()
+			// Manually adjust the NamespaceSelector for the test since MakePod doesnt support DoesNotExist natively in a chain easily
+			podWithNamespaceAntiAffinity.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].NamespaceSelector = &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "team",
+						Operator: metav1.LabelSelectorOpDoesNotExist,
+					},
+				},
+			}
+
+			// Background cluster pods:
+			// "node-1" (zone-a) will host 'foo' and 'blocked' (in a ns with team=blue)
+			podWithNoRulesFoo := st.MakePod().Name("pod-no-rules-foo").Namespace("default").Label("app", "foo").Node("node-1").Obj()
+			podInNsWithTeamLabel := st.MakePod().Name("pod-in-ns-with-team-label").Namespace("blue-ns").Label("app", "blocked").Label("team", "blue").Node("node-1").Obj()
+			// "node-2" (zone-b) will host 'bar'
+			podWithNoRulesBar := st.MakePod().Name("pod-no-rules-bar").Namespace("default").Label("app", "bar").Node("node-2").Obj()
+
+			nodes := []*v1.Node{
+				st.MakeNode().Name("node-1").Label(v1.LabelHostname, "node-1").Label("topology.kubernetes.io/zone", "zone-a").Obj(),
+				st.MakeNode().Name("node-2").Label(v1.LabelHostname, "node-2").Label("topology.kubernetes.io/zone", "zone-b").Obj(),
+			}
+
+			namespaces := []runtime.Object{
+				&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default", Labels: map[string]string{}}},
+				&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other", Labels: map[string]string{}}},
+				&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "blue-ns", Labels: map[string]string{"team": "blue"}}},
+			}
+
+			snapshot := cache.NewSnapshot(
+				[]*v1.Pod{
+					podWithNoRulesFoo,
+					podWithNoRulesBar,
+					podInNsWithTeamLabel,
+				},
+				nodes,
+			)
+			nodeInfos, _ := snapshot.NodeInfos().List()
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{EnableInterPodAffinityHostnameFastPath: interPodAffinityHostnameFastPathEnabled}, New), &config.InterPodAffinityArgs{}, snapshot, namespaces)
+
+			// 1. Zone Anti-Affinity (Cluster-Wide test):
+			// podWithZoneAntiAffinity repells "app=foo" in its zone.
+			state1 := framework.NewCycleState()
+			_, status := p.(fwk.PreFilterPlugin).PreFilter(ctx, state1, podWithZoneAntiAffinity, nodeInfos)
+			if !status.IsSuccess() && status.Code() != fwk.Skip {
+				t.Fatalf("PreFilter failed: %v", status.Message())
+			}
+
+			// node-1 fails: It resides in zone-a, which contains podWithNoRulesFoo (app=foo).
+			nodeInfo1 := mustGetNodeInfo(t, snapshot, "node-1")
+			status1Node1 := p.(fwk.FilterPlugin).Filter(ctx, state1, podWithZoneAntiAffinity, nodeInfo1)
+			if status1Node1.IsSuccess() {
+				t.Errorf("Expected node-1 to be rejected (due to zone anti-affinity), but got success.")
+			}
+
+			// node-2 succeeds: It resides in zone-b, which has no pods with app=foo.
+			nodeInfo2 := mustGetNodeInfo(t, snapshot, "node-2")
+			status1Node2 := p.(fwk.FilterPlugin).Filter(ctx, state1, podWithZoneAntiAffinity, nodeInfo2)
+			if !status1Node2.IsSuccess() {
+				t.Errorf("Expected node-2 to be scheduled successfully, but got %v", status1Node2.Message())
+			}
+
+			// 2. Host Anti-Affinity (Fast Path test):
+			// podWithHostAntiAffinity repells "app=bar" on its specific hostname.
+			state2 := framework.NewCycleState()
+			p.(fwk.PreFilterPlugin).PreFilter(ctx, state2, podWithHostAntiAffinity, nodeInfos)
+
+			// node-1 succeeds: Only has app=foo and app=blocked, doesn't match app=bar.
+			status2Node1 := p.(fwk.FilterPlugin).Filter(ctx, state2, podWithHostAntiAffinity, nodeInfo1)
+			if !status2Node1.IsSuccess() {
+				t.Errorf("Expected node-1 to allow host anti-affinity, got %v", status2Node1.Message())
+			}
+
+			// node-2 fails: Contains podWithNoRulesBar (app=bar) which violently triggers the local host-scoped anti-affinity.
+			status2Node2 := p.(fwk.FilterPlugin).Filter(ctx, state2, podWithHostAntiAffinity, nodeInfo2)
+			if status2Node2.IsSuccess() {
+				t.Errorf("Expected node-2 to fail host anti-affinity, got success.")
+			}
+
+			// 3. Namespace Anti-Affinity (Negative matching test):
+			// podWithNamespaceAntiAffinity repells "app=blocked" in ANY namespace that DOES NOT have the label "team".
+			state3 := framework.NewCycleState()
+			_, status = p.(fwk.PreFilterPlugin).PreFilter(ctx, state3, podWithNamespaceAntiAffinity, nodeInfos)
+			if !status.IsSuccess() && status.Code() != fwk.Skip {
+				t.Fatalf("PreFilter failed: %v", status.Message())
+			}
+
+			// node-1 succeeds: Even though it has podInNsWithTeamLabel (app=blocked), that pod lives in
+			// the "blue-ns" namespace which DOES have a "team" label ("team=blue").
+			// The anti-affinity term requires the target pod's namespace to NOT have a team label.
+			status3Node1 := p.(fwk.FilterPlugin).Filter(ctx, state3, podWithNamespaceAntiAffinity, nodeInfo1)
+			if !status3Node1.IsSuccess() {
+				t.Errorf("Expected node-1 to allow namespace anti-affinity (since blue-ns isn't matched), got %v", status3Node1.Message())
+			}
+		})
 	}
 }
