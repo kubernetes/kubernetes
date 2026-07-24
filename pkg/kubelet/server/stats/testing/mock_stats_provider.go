@@ -21,20 +21,14 @@ package testing
 import (
 	context "context"
 
+	infov1 "github.com/google/cadvisor/info/v1"
+	mock "github.com/stretchr/testify/mock"
 	cm "k8s.io/kubernetes/pkg/kubelet/cm"
 
-	infov1 "github.com/google/cadvisor/info/v1"
-
-	mock "github.com/stretchr/testify/mock"
-
-	types "k8s.io/apimachinery/pkg/types"
-
-	v1 "k8s.io/api/core/v1"
-
-	v1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
-
 	v2 "github.com/google/cadvisor/info/v2"
-
+	v1 "k8s.io/api/core/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	v1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	volume "k8s.io/kubernetes/pkg/volume"
 )
 
