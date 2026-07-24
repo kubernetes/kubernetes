@@ -23,6 +23,31 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
+// testInformer is a minimal fake informer for unit tests.
+type testInformer struct {
+	handler cache.ResourceEventHandler
+	indexer cache.Indexer
+	t       *testing.T
+}
+
+func (i *testInformer) AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
+	i.handler = handler
+	return nil, nil
+}
+
+func (i *testInformer) GetIndexer() cache.Indexer {
+	return i.indexer
+}
+
+func (i *testInformer) add(obj any) {
+	if err := i.indexer.Add(obj); err != nil {
+		i.t.Fatalf("failed to add object into indexer: %v", err)
+	}
+	if i.handler != nil {
+		i.handler.OnAdd(obj, false)
+	}
+}
+
 func TestPVAssumeCache(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	informer := &testInformer{
