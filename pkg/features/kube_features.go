@@ -852,6 +852,14 @@ const (
 	// Enables specifying PreemptionPolicy at podgroup level.
 	PodGroupPreemptionPolicy featuregate.Feature = "PodGroupPreemptionPolicy"
 
+	// owner: @adrianreber @rst0git
+	// kep: https://kep.k8s.io/5823
+	//
+	// Enables Pod-level checkpoint/restore: the PodCheckpoint API and its
+	// controller, the Pod spec.restoreFrom reference, and the kubelet
+	// checkpoint/restore endpoints and CRI calls.
+	PodLevelCheckpointRestore featuregate.Feature = "PodLevelCheckpointRestore"
+
 	// owner: @KevinTMtz
 	// kep: https://kep.k8s.io/5526
 	//
@@ -1923,6 +1931,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	PodLevelCheckpointRestore: {
+		// TODO: switch to 1.36. Currently the TestAuthFilters will not work with 1.35
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	PodLevelResourceManagers: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
@@ -2738,6 +2751,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodDeletionCost: {},
 
 	PodGroupPreemptionPolicy: {GenericWorkload},
+
+	PodLevelCheckpointRestore: {},
 
 	PodLevelResourceManagers: {PodLevelResources},
 

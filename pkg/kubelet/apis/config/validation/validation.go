@@ -72,6 +72,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if kc.NodeLeaseDurationSeconds <= 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: nodeLeaseDurationSeconds must be greater than 0"))
 	}
+	if kc.PodCheckpointTimeout.Duration <= 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: podCheckpointTimeout must be greater than 0"))
+	}
 	if kc.SystemCgroups != "" && kc.CgroupRoot == "" {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemCgroups (--system-cgroups) was specified and cgroupRoot (--cgroup-root) was not specified"))
 	}

@@ -603,6 +603,23 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		})
 	}
 
+	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "podcheckpoint-controller"},
+		Rules: []rbacv1.PolicyRule{
+			// Lifecycle management of PodCheckpoint objects (the restore-lock
+			// finalizer; garbage collection is a follow-up). The controller is not on
+			// the checkpoint execution path: the kubelet executes checkpoints and owns
+			// the status, so the controller neither writes status nor contacts the
+			// kubelet (KEP-5823).
+			rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(checkpointGroup).Resources("podcheckpoints").RuleOrDie(),
+			// Setting/clearing the restore-lock finalizer requires the finalizers
+			// subresource permission (OwnerReferencesPermissionEnforcement).
+			rbacv1helpers.NewRule("update").Groups(checkpointGroup).Resources("podcheckpoints/finalizers").RuleOrDie(),
+			// Watches Pods to detect when one is actively restoring from a checkpoint.
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+		},
+	})
+
 	return controllerRoles, controllerRoleBindings
 }
 

@@ -38,6 +38,7 @@ import (
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	checkpointv1alpha1 "k8s.io/api/checkpoint/v1alpha1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
@@ -104,6 +105,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	certificatesv1.AddToScheme,
 	certificatesv1beta1.AddToScheme,
 	certificatesv1alpha1.AddToScheme,
+	checkpointv1alpha1.AddToScheme,
 	coordinationv1alpha2.AddToScheme,
 	coordinationv1beta1.AddToScheme,
 	coordinationv1.AddToScheme,

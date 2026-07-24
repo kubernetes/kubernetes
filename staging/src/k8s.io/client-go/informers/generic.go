@@ -35,6 +35,7 @@ import (
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	checkpointv1alpha1 "k8s.io/api/checkpoint/v1alpha1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	v1alpha2 "k8s.io/api/coordination/v1alpha2"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
@@ -208,6 +209,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Certificates().V1beta1().ClusterTrustBundles().Informer()}, nil
 	case certificatesv1beta1.SchemeGroupVersion.WithResource("podcertificaterequests"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Certificates().V1beta1().PodCertificateRequests().Informer()}, nil
+
+		// Group=checkpoint.k8s.io, Version=v1alpha1
+	case checkpointv1alpha1.SchemeGroupVersion.WithResource("podcheckpoints"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Checkpoint().V1alpha1().PodCheckpoints().Informer()}, nil
 
 		// Group=coordination.k8s.io, Version=v1
 	case coordinationv1.SchemeGroupVersion.WithResource("leases"):

@@ -4632,6 +4632,9 @@ type PodValidationOptions struct {
 	AllowEmptyImageVolumeReference bool
 	// Allow containers to have CAP_SYS_ADMIN even if AllowPrivilegeEscalation is false
 	AllowSysAdminWhenPrivilegeEscalationFalse bool
+	// Allow the spec.restoreFrom invocation to be set (gated by
+	// PodLevelCheckpointRestore, with ratcheting for objects that already use it).
+	AllowRestoreFrom bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -4887,6 +4890,14 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 		if len(spec.EvictionResponders) > 0 {
 			// covered by alpha DV dependentForbidden
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("schedulingGroup"), "may not be set when evictionResponders is set").WithOrigin("dependentForbidden").MarkCoveredByDeclarative())
+		}
+	}
+
+	if spec.RestoreFrom != nil {
+		if !opts.AllowRestoreFrom {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("restoreFrom"), "spec.restoreFrom may not be set: the PodLevelCheckpointRestore feature gate is disabled"))
+		} else {
+			allErrs = append(allErrs, validateRestoreFrom(spec.RestoreFrom, fldPath.Child("restoreFrom"))...)
 		}
 	}
 
@@ -5939,6 +5950,13 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	mungedPodSpec.SchedulingGates = oldPod.Spec.SchedulingGates // +k8s:verify-mutation:reason=clone
 	// tolerations are checked before the deep copy, so munge those too
 	mungedPodSpec.Tolerations = oldPod.Spec.Tolerations // +k8s:verify-mutation:reason=clone
+
+	// spec.restoreFrom is immutable (KEP-5823): a Pod cannot be re-pointed at a
+	// different checkpoint after creation. Check it explicitly so the error names
+	// the field, and munge it so the catch-all comparison below does not also
+	// flag it.
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newPod.Spec.RestoreFrom, oldPod.Spec.RestoreFrom, specPath.Child("restoreFrom")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	mungedPodSpec.RestoreFrom = oldPod.Spec.RestoreFrom // +k8s:verify-mutation:reason=clone
 
 	// Relax validation of immutable fields to allow it to be set to 1 if it was previously negative.
 	if oldPod.Spec.TerminationGracePeriodSeconds != nil && *oldPod.Spec.TerminationGracePeriodSeconds < 0 &&
@@ -10076,6 +10094,23 @@ func validateSchedulingGroup(schedulingGroup *core.PodSchedulingGroup, fldPath *
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("podGroupName"), name, detail))
 		}
 	}
+	return allErrs
+}
+
+func validateRestoreFrom(restoreFrom *core.CheckpointReference, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if restoreFrom.Name == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must specify a PodCheckpoint name").MarkCoveredByDeclarative())
+		return allErrs
+	}
+
+	// Name identifies a PodCheckpoint in this pod's namespace, so it must be a
+	// valid object name.
+	for _, msg := range apimachineryvalidation.NameIsDNSSubdomain(restoreFrom.Name, false) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), restoreFrom.Name, msg).WithOrigin("format=k8s-long-name").MarkCoveredByDeclarative())
+	}
+
 	return allErrs
 }
 

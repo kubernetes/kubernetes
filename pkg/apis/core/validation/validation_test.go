@@ -15562,6 +15562,46 @@ func TestValidatePodUpdate(t *testing.T) {
 			),
 			err:  "pod updates may not change fields other than",
 			test: "updated eviction interceptors",
+		}, {
+			new: *podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage("busybox"))),
+				podtest.SetRestoreFrom("checkpoint-v2")),
+			old: *podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage("busybox"))),
+				podtest.SetRestoreFrom("checkpoint-v1")),
+			err:  "spec.restoreFrom: Invalid value",
+			opts: PodValidationOptions{AllowRestoreFrom: true},
+			test: "restoreFrom.name is immutable",
+		}, {
+			new: *podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage("busybox"))),
+				podtest.SetRestoreFrom("checkpoint-v1")),
+			old: *podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage("busybox")))),
+			err:  "spec.restoreFrom: Invalid value",
+			opts: PodValidationOptions{AllowRestoreFrom: true},
+			test: "restoreFrom cannot be set after creation",
+		}, {
+			new: *podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage("busybox")))),
+			old: *podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage("busybox"))),
+				podtest.SetRestoreFrom("checkpoint-v1")),
+			err:  "spec.restoreFrom: Invalid value",
+			opts: PodValidationOptions{AllowRestoreFrom: true},
+			test: "restoreFrom cannot be cleared after creation",
+		}, {
+			new: *podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage("busybox"))),
+				podtest.SetRestoreFrom("checkpoint-v1"),
+				podtest.SetRestoreOptions(map[string]string{"example.runtime/mode": "new"})),
+			old: *podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage("busybox"))),
+				podtest.SetRestoreFrom("checkpoint-v1"),
+				podtest.SetRestoreOptions(map[string]string{"example.runtime/mode": "old"})),
+			err:  "spec.restoreFrom: Invalid value",
+			opts: PodValidationOptions{AllowRestoreFrom: true},
+			test: "restoreFrom.options are immutable",
 		},
 	}
 
@@ -24637,6 +24677,7 @@ func TestValidateOSFields(t *testing.T) {
 		"ResourceClaims[*].ResourceClaimTemplateName",
 		"Resources",
 		"RestartPolicy",
+		"RestoreFrom",
 		"RuntimeClassName",
 		"SchedulerName",
 		"SchedulingGates[*].Name",
@@ -32806,6 +32847,119 @@ func TestValidatePodSchedulingGroup(t *testing.T) {
 		if len(errs) == 0 {
 			t.Errorf("Expected failure for %q", name)
 		}
+	}
+}
+
+func TestValidateRestoreFrom(t *testing.T) {
+	tests := []struct {
+		name        string
+		restoreFrom *core.CheckpointReference
+		wantField   string
+	}{
+		{
+			name:        "empty reference",
+			restoreFrom: &core.CheckpointReference{},
+			wantField:   "spec.restoreFrom.name",
+		},
+		{
+			name:        "valid checkpoint name",
+			restoreFrom: &core.CheckpointReference{Name: "my-checkpoint"},
+		},
+		{
+			name:        "invalid name (slash)",
+			restoreFrom: &core.CheckpointReference{Name: "bad/name"},
+			wantField:   "spec.restoreFrom.name",
+		},
+		{
+			name:        "invalid name (uppercase)",
+			restoreFrom: &core.CheckpointReference{Name: "Bad"},
+			wantField:   "spec.restoreFrom.name",
+		},
+		{
+			name: "valid checkpoint name and options",
+			restoreFrom: &core.CheckpointReference{
+				Name:    "my-checkpoint",
+				Options: map[string]string{"example.runtime/target": "node-local"},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateRestoreFrom(tc.restoreFrom, field.NewPath("spec", "restoreFrom"))
+			if tc.wantField == "" {
+				require.Empty(t, errs)
+				return
+			}
+			require.NotEmpty(t, errs)
+			assert.Equal(t, tc.wantField, errs[0].Field)
+		})
+	}
+}
+
+func TestValidateRestoreInvocation(t *testing.T) {
+	validSpec := func(restoreFrom *core.CheckpointReference) core.PodSpec {
+		return core.PodSpec{
+			TerminationGracePeriodSeconds: ptr.To[int64](30),
+			Containers: []core.Container{{
+				Name:                     "c",
+				Image:                    "busybox",
+				ImagePullPolicy:          core.PullIfNotPresent,
+				TerminationMessagePolicy: core.TerminationMessageReadFile,
+			}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			RestoreFrom:   restoreFrom,
+		}
+	}
+	base := validSpec(&core.CheckpointReference{
+		Name:    "my-checkpoint",
+		Options: map[string]string{"example.runtime/target": "node-local"},
+	})
+
+	tests := []struct {
+		name      string
+		spec      core.PodSpec
+		allow     bool
+		wantField string
+	}{
+		{name: "valid restore invocation", spec: base, allow: true},
+		{
+			name:  "unset restore invocation",
+			spec:  validSpec(nil),
+			allow: false,
+		},
+		{
+			name:      "empty restore reference",
+			spec:      validSpec(&core.CheckpointReference{}),
+			allow:     true,
+			wantField: "spec.restoreFrom.name",
+		},
+		{
+			name:      "empty restore reference is feature gated",
+			spec:      validSpec(&core.CheckpointReference{}),
+			wantField: "spec.restoreFrom",
+		},
+		{
+			name: "options require a checkpoint name",
+			spec: validSpec(&core.CheckpointReference{
+				Options: map[string]string{"example.runtime/target": "node-local"},
+			}),
+			allow:     true,
+			wantField: "spec.restoreFrom.name",
+		},
+		{name: "restore invocation is feature gated", spec: base, wantField: "spec.restoreFrom"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidatePodSpec(&tc.spec, &metav1.ObjectMeta{}, field.NewPath("spec"), PodValidationOptions{AllowRestoreFrom: tc.allow})
+			if tc.wantField == "" {
+				require.Empty(t, errs)
+				return
+			}
+			require.NotEmpty(t, errs)
+			assert.Contains(t, errs.ToAggregate().Error(), tc.wantField)
+		})
 	}
 }
 

@@ -250,6 +250,22 @@ items:
     - update
     - watch
   - apiGroups:
+    - checkpoint.k8s.io
+    resources:
+    - podcheckpoints
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - patch
+    - update
+  - apiGroups:
+    - checkpoint.k8s.io
+    resources:
+    - podcheckpoints
+    verbs:
+    - restore
+  - apiGroups:
     - resource.k8s.io
     resources:
     - resourceclaims
@@ -431,6 +447,15 @@ items:
     - ingresses
     - ingresses/status
     - networkpolicies
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - checkpoint.k8s.io
+    resources:
+    - podcheckpoints
+    - podcheckpoints/status
     verbs:
     - get
     - list
@@ -1246,6 +1271,21 @@ items:
     - persistentvolumes
     verbs:
     - get
+  - apiGroups:
+    - checkpoint.k8s.io
+    resources:
+    - podcheckpoints
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - checkpoint.k8s.io
+    resources:
+    - podcheckpoints/status
+    verbs:
+    - patch
+    - update
   - apiGroups:
     - ""
     resources:

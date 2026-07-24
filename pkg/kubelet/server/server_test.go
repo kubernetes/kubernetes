@@ -815,9 +815,10 @@ func TestAuthFilters(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	// Enable features.ContainerCheckpoint during test
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.ContainerCheckpoint:    true,
-		zpagesfeatures.ComponentStatusz: true,
-		zpagesfeatures.ComponentFlagz:   true,
+		features.ContainerCheckpoint:       true,
+		features.PodLevelCheckpointRestore: true,
+		zpagesfeatures.ComponentStatusz:    true,
+		zpagesfeatures.ComponentFlagz:      true,
 	})
 
 	fw := newServerTest(tCtx)
