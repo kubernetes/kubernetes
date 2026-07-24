@@ -30,15 +30,17 @@ type unschedulableEntities struct {
 	// unschedulableRecorder tracks standard unschedulable entities, while gatedRecorder tracks entities
 	// that are specifically blocked by scheduling gates.
 	unschedulableRecorder, gatedRecorder metrics.MetricRecorder
+	metricsRecorder                      *metrics.MetricAsyncRecorder
 }
 
 // newUnschedulableEntities initializes a new object of unschedulableEntities.
-func newUnschedulableEntities(unschedulableRecorder, gatedRecorder metrics.MetricRecorder) *unschedulableEntities {
+func newUnschedulableEntities(unschedulableRecorder, gatedRecorder metrics.MetricRecorder, metricsRecorder *metrics.MetricAsyncRecorder) *unschedulableEntities {
 	return &unschedulableEntities{
 		entityInfoMap:         make(map[string]framework.QueuedEntityInfo),
 		keyFunc:               queuedEntityKeyFunc,
 		unschedulableRecorder: unschedulableRecorder,
 		gatedRecorder:         gatedRecorder,
+		metricsRecorder:       metricsRecorder,
 	}
 }
 
@@ -74,7 +76,7 @@ func (u *unschedulableEntities) addOrUpdate(entity framework.QueuedEntityInfo, g
 		} else {
 			u.unschedulableRecorder.Add(entity)
 		}
-		recordIncomingEntitiesMetrics("unschedulable", entity, event, strategy)
+		recordIncomingEntitiesMetrics(u.metricsRecorder, "unschedulable", entity, event, strategy)
 	}
 	u.entityInfoMap[entityKey] = entity
 }

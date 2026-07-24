@@ -151,6 +151,14 @@ type gaugeVecMetricKey struct {
 	labelValue string
 }
 
+// counterVecMetric is the data structure passed in the buffer channel between the main framework thread
+// and the metricsRecorder goroutine.
+type counterVecMetric struct {
+	metric      *metrics.CounterVec
+	labelValues []string
+	valueToAdd  float64
+}
+
 // MetricAsyncRecorder records metric in a separate goroutine to avoid overhead in the critical path.
 type MetricAsyncRecorder struct {
 	// bufferCh is a channel that serves as a metrics buffer before the metricsRecorder goroutine reports it.
@@ -167,6 +175,8 @@ type MetricAsyncRecorder struct {
 	aggregatedInflightEventMetric              map[gaugeVecMetricKey]int
 	aggregatedInflightEventMetricLastFlushTime time.Time
 	aggregatedInflightEventMetricBufferCh      chan *gaugeVecMetric
+	// counterVecBufferCh keeps counter updates off the scheduling critical path.
+	counterVecBufferCh chan *counterVecMetric
 
 	// stopCh is used to stop the goroutine which periodically flushes metrics.
 	stopCh <-chan struct{}
@@ -184,6 +194,7 @@ func NewMetricsAsyncRecorder(bufferSize int, interval time.Duration, stopCh <-ch
 		aggregatedInflightEventMetric: make(map[gaugeVecMetricKey]int),
 		aggregatedInflightEventMetricLastFlushTime: time.Now(),
 		aggregatedInflightEventMetricBufferCh:      make(chan *gaugeVecMetric, bufferSize),
+		counterVecBufferCh:                         make(chan *counterVecMetric, bufferSize),
 		IsStoppedCh:                                make(chan struct{}),
 	}
 	go recorder.run()
@@ -206,6 +217,27 @@ func (r *MetricAsyncRecorder) ObservePluginDurationAsync(extensionPoint, pluginN
 // The metric will be flushed to Prometheus asynchronously.
 func (r *MetricAsyncRecorder) ObserveQueueingHintDurationAsync(pluginName, event, hint string, value float64) {
 	r.observeMetricAsync(queueingHintExecutionDuration, value, pluginName, event, hint)
+}
+
+// AddCounterVecAsync increments a CounterVec metric by valueToAdd, with the given label values.
+// The metric will be flushed to Prometheus asynchronously.
+func (r *MetricAsyncRecorder) AddCounterVecAsync(m *metrics.CounterVec, valueToAdd float64, labelsValues ...string) {
+	newMetric := &counterVecMetric{
+		metric:      m,
+		labelValues: labelsValues,
+		valueToAdd:  valueToAdd,
+	}
+	select {
+	case r.counterVecBufferCh <- newMetric:
+	default:
+		// Drop the update rather than block the scheduling critical path.
+	}
+}
+
+// IncCounterVecAsync increments a CounterVec metric by 1, with the given label values.
+// The metric will be flushed to Prometheus asynchronously.
+func (r *MetricAsyncRecorder) IncCounterVecAsync(m *metrics.CounterVec, labelsValues ...string) {
+	r.AddCounterVecAsync(m, 1, labelsValues...)
 }
 
 // ObserveInFlightEventsAsync observes the in_flight_events metric.
@@ -273,6 +305,13 @@ func (r *MetricAsyncRecorder) FlushMetrics() {
 
 		select {
 		case m := <-r.aggregatedInflightEventMetricBufferCh:
+			m.metric.WithLabelValues(m.labelValues...).Add(m.valueToAdd)
+		default:
+			// no more value
+		}
+
+		select {
+		case m := <-r.counterVecBufferCh:
 			m.metric.WithLabelValues(m.labelValues...).Add(m.valueToAdd)
 		default:
 			// no more value

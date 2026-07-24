@@ -107,15 +107,17 @@ type backoffQueue struct {
 
 	// isPopFromBackoffQEnabled indicates whether the feature gate SchedulerPopFromBackoffQ is enabled.
 	isPopFromBackoffQEnabled bool
+	metricsRecorder          *metrics.MetricAsyncRecorder
 }
 
-func newBackoffQueue(clock clock.WithTicker, podInitialBackoffDuration time.Duration, podMaxBackoffDuration time.Duration, activeQLessFn func(entity1, entity2 framework.QueuedEntityInfo) bool, popFromBackoffQEnabled bool) *backoffQueue {
+func newBackoffQueue(clock clock.WithTicker, podInitialBackoffDuration time.Duration, podMaxBackoffDuration time.Duration, activeQLessFn func(entity1, entity2 framework.QueuedEntityInfo) bool, popFromBackoffQEnabled bool, metricsRecorder *metrics.MetricAsyncRecorder) *backoffQueue {
 	bq := &backoffQueue{
 		clock:                    clock,
 		podInitialBackoff:        podInitialBackoffDuration,
 		podMaxBackoff:            podMaxBackoffDuration,
 		isPopFromBackoffQEnabled: popFromBackoffQEnabled,
 		activeQLessFn:            activeQLessFn,
+		metricsRecorder:          metricsRecorder,
 	}
 	entityBackoffQLessFn := bq.lessBackoffCompleted
 	if popFromBackoffQEnabled {
@@ -310,7 +312,7 @@ func (bq *backoffQueue) add(logger klog.Logger, entity framework.QueuedEntityInf
 			logger.Error(nil, "BackoffQueue add() was called with an entity that was already in the entityBackoffQ", "type", entity.Type(), "entity", klog.KObj(entity))
 			return
 		}
-		recordIncomingEntitiesMetrics("backoff", entity, event, strategy)
+		recordIncomingEntitiesMetrics(bq.metricsRecorder, "backoff", entity, event, strategy)
 		logger.V(5).Info("Entity moved to an internal scheduling queue", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", backoffQ)
 		return
 	}
@@ -320,7 +322,7 @@ func (bq *backoffQueue) add(logger klog.Logger, entity framework.QueuedEntityInf
 		logger.Error(nil, "BackoffQueue add() was called with an entity that was already in the entityErrorBackoffQ", "type", entity.Type(), "entity", klog.KObj(entity))
 		return
 	}
-	recordIncomingEntitiesMetrics("backoff", entity, event, strategy)
+	recordIncomingEntitiesMetrics(bq.metricsRecorder, "backoff", entity, event, strategy)
 	logger.V(5).Info("Entity moved to an internal scheduling queue", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", backoffQ)
 }
 

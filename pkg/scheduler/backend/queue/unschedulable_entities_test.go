@@ -197,7 +197,7 @@ func TestUnschedulableEntities(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			unschedulableRecorder := &mockMetricRecorder{}
 			gatedRecorder := &mockMetricRecorder{}
-			ue := newUnschedulableEntities(unschedulableRecorder, gatedRecorder)
+			ue := newUnschedulableEntities(unschedulableRecorder, gatedRecorder, nil)
 			assertMetrics := func(expectedPods []*framework.QueuedPodInfo, action string) {
 				t.Helper()
 
@@ -242,7 +242,7 @@ func TestUnschedulableEntities(t *testing.T) {
 func TestUnschedulablePodGroups_Unified(t *testing.T) {
 	unschedulableRecorder := &mockMetricRecorder{}
 	gatedRecorder := &mockMetricRecorder{}
-	ue := newUnschedulableEntities(unschedulableRecorder, gatedRecorder)
+	ue := newUnschedulableEntities(unschedulableRecorder, gatedRecorder, nil)
 
 	pgInfo := &framework.QueuedPodGroupInfo{
 		PodGroupInfo: &framework.PodGroupInfo{

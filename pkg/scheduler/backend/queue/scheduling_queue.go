@@ -444,13 +444,13 @@ func NewPriorityQueue(
 	isInPlacePodVerticalScalingSchedulerPreemptionEnabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption)
 	lessConverted := convertLessFn(lessFn)
 
-	backoffQ := newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessConverted, isPopFromBackoffQEnabled)
+	backoffQ := newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessConverted, isPopFromBackoffQEnabled, options.metricsRecorder)
 	pq := &PriorityQueue{
 		clock:                             options.clock,
 		stop:                              make(chan struct{}),
 		podMaxInUnschedulablePodsDuration: options.podMaxInUnschedulablePodsDuration,
 		backoffQ:                          backoffQ,
-		unschedulableEntities:             newUnschedulableEntities(metrics.NewUnschedulableEntitiesRecorder(), metrics.NewGatedEntitiesRecorder()),
+		unschedulableEntities:             newUnschedulableEntities(metrics.NewUnschedulableEntitiesRecorder(), metrics.NewGatedEntitiesRecorder(), options.metricsRecorder),
 		pendingPodGroupPods:               newPodGroupMemberPods(metrics.PendingPodGroupPods()),
 		incompletePodGroupPods:            newPodGroupMemberPods(metrics.IncompletePodGroupPods()),
 		workloadForest:                    newWorkloadForest(isCompositePodGroupEnabled),
@@ -2151,17 +2151,26 @@ func (p *PriorityQueue) newQueuedPodInfo(ctx context.Context, pod *v1.Pod, plugi
 }
 
 // recordIncomingEntitiesMetrics records incoming queue metrics for pod-level and entity-level (individual pod or podgroup).
+// 'recorder' is used to record the metrics asynchronously if non-nil; otherwise the metrics are recorded synchronously.
 // 'strategy' is the previous queuing strategy, helps determine if the entity moved into a different
 // queue or newly added to correctly maintain incoming entities metrics.
 // If strategy is 'nil' it means that entity is newly added.
 // If queue label defined by previous strategy is different from next queue label, it means that entity moved into a different queue.
 // In both cases, we increment the incoming entities metric for the new queue.
-func recordIncomingEntitiesMetrics(targetQueueLabel string, entity framework.QueuedEntityInfo, event string, strategy *queueingStrategy) {
-	metrics.SchedulerQueueIncomingPods.WithLabelValues(targetQueueLabel, event).Add(float64(entity.Size()))
+func recordIncomingEntitiesMetrics(recorder *metrics.MetricAsyncRecorder, targetQueueLabel string, entity framework.QueuedEntityInfo, event string, strategy *queueingStrategy) {
+	if recorder != nil {
+		recorder.AddCounterVecAsync(metrics.SchedulerQueueIncomingPods, float64(entity.Size()), targetQueueLabel, event)
+	} else {
+		metrics.SchedulerQueueIncomingPods.WithLabelValues(targetQueueLabel, event).Add(float64(entity.Size()))
+	}
 
 	if strategy == nil || targetQueueLabel != strategyToQueueLabel(*strategy) {
 		if entityLabel, ok := metrics.EntityToLabel(entity); ok {
-			metrics.SchedulerQueueIncomingEntities.WithLabelValues(targetQueueLabel, event, entityLabel).Inc()
+			if recorder != nil {
+				recorder.IncCounterVecAsync(metrics.SchedulerQueueIncomingEntities, targetQueueLabel, event, entityLabel)
+			} else {
+				metrics.SchedulerQueueIncomingEntities.WithLabelValues(targetQueueLabel, event, entityLabel).Inc()
+			}
 		}
 	}
 }
