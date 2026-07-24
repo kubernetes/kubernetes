@@ -6406,7 +6406,7 @@
     endpoint: /metrics
 - name: batch_attempts_total
   subsystem: scheduler
-  help: Counts of results when we attempt to use batching.
+  help: Counts of results when we attempt to use batching, by scheduler profile.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6417,7 +6417,7 @@
     endpoint: /metrics
 - name: batch_cache_flushed_total
   subsystem: scheduler
-  help: Counts of cache flushes by reason.
+  help: Counts of cache flushes by reason and scheduler profile.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6439,7 +6439,7 @@
 - name: dra_bindingconditions_allocations_total
   subsystem: scheduler
   help: Number of allocations using devices with BindingConditions, counted per driver
-    per scheduling attempt
+    per scheduling attempt, by scheduler profile.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6452,7 +6452,7 @@
 - name: dra_bindingconditions_wait_duration_seconds
   subsystem: scheduler
   help: Time in seconds spent waiting for BindingConditions to be satisfied during
-    PreBind.
+    PreBind, by scheduler profile.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
@@ -6502,7 +6502,8 @@
     endpoint: /metrics
 - name: generated_placements_total
   subsystem: scheduler
-  help: Number of candidate placements generated when scheduling pod groups.
+  help: Number of candidate placements generated when scheduling pod groups, by scheduler
+    profile.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6512,7 +6513,7 @@
     endpoint: /metrics
 - name: get_node_hint_duration_seconds
   subsystem: scheduler
-  help: Latency for getting a node hint.
+  help: Latency for getting a node hint, by scheduler profile.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
@@ -6557,8 +6558,8 @@
 - name: placement_evaluation_duration_seconds
   subsystem: scheduler
   help: Latency in seconds of evaluating a single candidate placement when scheduling
-    pod groups, by result. 'feasible' means the pod group fit into the placement,
-    while 'infeasible' means it did not.
+    pod groups, by result and scheduler profile. 'feasible' means the pod group fit
+    into the placement, while 'infeasible' means it did not.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
@@ -6585,9 +6586,9 @@
     endpoint: /metrics
 - name: placement_evaluations_total
   subsystem: scheduler
-  help: Number of candidate placements evaluated when scheduling pod groups, by result.
-    'feasible' means the pod group fit into the placement, while 'infeasible' means
-    it did not.
+  help: Number of candidate placements evaluated when scheduling pod groups, by result
+    and scheduler profile. 'feasible' means the pod group fit into the placement,
+    while 'infeasible' means it did not.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6608,9 +6609,9 @@
     endpoint: /metrics
 - name: podgroup_schedule_attempts_total
   subsystem: scheduler
-  help: Number of attempts to schedule pod group, by the result. 'unschedulable' means
-    a pod group could not be scheduled, while 'error' means an internal scheduler
-    problem.
+  help: Number of attempts to schedule pod group, by the result and scheduler profile.
+    'unschedulable' means a pod group could not be scheduled, while 'error' means
+    an internal scheduler problem.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6645,7 +6646,7 @@
     endpoint: /metrics
 - name: podgroup_scheduling_attempt_duration_seconds
   subsystem: scheduler
-  help: Pod group scheduling attempt latency in seconds
+  help: Pod group scheduling attempt latency in seconds, by scheduler profile.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
@@ -6869,7 +6870,8 @@
     endpoint: /metrics
 - name: store_schedule_results_duration_seconds
   subsystem: scheduler
-  help: Latency for getting a no.
+  help: Latency for storing scheduling results for opportunistic batching, by scheduler
+    profile.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
@@ -8058,7 +8060,7 @@
 - name: plugin_evaluation_total
   subsystem: scheduler
   help: Number of attempts to schedule pods by each plugin and the extension point
-    (available only in PreFilter, Filter, PreScore, and Score).
+    (available only in PreFilter, Filter, PreScore, and Score), by scheduler profile.
   type: Counter
   stabilityLevel: BETA
   labels:
@@ -8159,9 +8161,9 @@
     endpoint: /metrics
 - name: unschedulable_pods
   subsystem: scheduler
-  help: The number of unschedulable pods broken down by plugin name. A pod will increment
-    the gauge for all plugins that caused it to not schedule and so this metric have
-    meaning only when broken down by plugin.
+  help: The number of unschedulable pods broken down by plugin name and scheduler
+    profile. A pod will increment the gauge for all plugins that caused it to not
+    schedule and so this metric has meaning only when broken down by plugin.
   type: Gauge
   stabilityLevel: BETA
   labels:
@@ -8872,7 +8874,8 @@
     endpoint: /metrics/resource
 - name: framework_extension_point_duration_seconds
   subsystem: scheduler
-  help: Latency for running all plugins of a specific extension point.
+  help: Latency for running all plugins of a specific extension point, by scheduler
+    profile.
   type: Histogram
   stabilityLevel: STABLE
   labels:
@@ -8962,8 +8965,9 @@
     endpoint: /metrics
 - name: schedule_attempts_total
   subsystem: scheduler
-  help: Number of attempts to schedule pods, by the result. 'unschedulable' means
-    a pod could not be scheduled, while 'error' means an internal scheduler problem.
+  help: Number of attempts to schedule pods, by the result and scheduler profile.
+    'unschedulable' means a pod could not be scheduled, while 'error' means an internal
+    scheduler problem.
   type: Counter
   stabilityLevel: STABLE
   labels:
@@ -8974,7 +8978,8 @@
     endpoint: /metrics
 - name: scheduling_attempt_duration_seconds
   subsystem: scheduler
-  help: Scheduling attempt latency in seconds (scheduling algorithm + binding)
+  help: Scheduling attempt latency in seconds (scheduling algorithm + binding), by
+    scheduler profile.
   type: Histogram
   stabilityLevel: STABLE
   labels:
