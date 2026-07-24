@@ -38,8 +38,9 @@ import (
 )
 
 type Tester struct {
-	tester  *resttest.Tester
-	storage *genericregistry.Store
+	tester   *resttest.Tester
+	storage  *genericregistry.Store
+	defaulter runtime.ObjectDefaulter
 }
 type UpdateFunc func(runtime.Object) runtime.Object
 
@@ -169,6 +170,16 @@ func (t *Tester) SetRequestInfo(requestInfo *genericapirequest.RequestInfo) *Tes
 	return t
 }
 
+// WithDefaulter sets the ObjectDefaulter used to apply defaults to objects
+// before they are stored. This ensures that objects created through the
+// test helpers have the same defaults applied as they would through the
+// normal API server creation path (where defaults are applied during
+// decode by the versioning codec).
+func (t *Tester) WithDefaulter(d runtime.ObjectDefaulter) *Tester {
+	t.defaulter = d
+	return t
+}
+
 func (t *Tester) TestCreate(valid runtime.Object, invalid ...runtime.Object) {
 	t.tester.TestCreate(
 		valid,
@@ -250,6 +261,9 @@ func (t *Tester) getObject(ctx context.Context, obj runtime.Object) (runtime.Obj
 }
 
 func (t *Tester) createObject(ctx context.Context, obj runtime.Object) error {
+	if t.defaulter != nil {
+		t.defaulter.Default(obj)
+	}
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
@@ -266,6 +280,11 @@ func (t *Tester) setObjectsForList(objects []runtime.Object) []runtime.Object {
 	if _, err := t.storage.DeleteCollection(t.tester.TestContext(), rest.ValidateAllObjectFunc, nil, nil); err != nil {
 		t.tester.Errorf("unable to clear collection: %v", err)
 		return nil
+	}
+	if t.defaulter != nil {
+		for i := range objects {
+			t.defaulter.Default(objects[i])
+		}
 	}
 	if err := storagetesting.CreateObjList(key, t.storage.Storage.Storage, objects); err != nil {
 		t.tester.Errorf("unexpected error: %v", err)
