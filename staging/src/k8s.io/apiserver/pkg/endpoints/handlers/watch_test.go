@@ -41,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	endpointstesting "k8s.io/apiserver/pkg/endpoints/testing"
+	cachermetrics "k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -485,5 +486,78 @@ apiserver_watch_events_total{group="group",resource="resource",version="version"
 			err = metricstestutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_watch_events_sizes", "apiserver_watch_events_total")
 			require.NoError(t, err)
 		})
+	}
+}
+
+func TestWatchServeStageMetrics(t *testing.T) {
+	cachermetrics.Register()
+	ctx := t.Context()
+
+	watcher := watch.NewFake()
+	timeoutCh := make(chan time.Time)
+	doneCh := make(chan struct{})
+
+	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	require.True(t, ok)
+	require.NotNil(t, info.StreamSerializer)
+	serializer := info.StreamSerializer
+
+	watchServer := &WatchServer{
+		Scope: &RequestScope{
+			Resource: schema.GroupVersionResource{Group: "servegroup", Version: "version", Resource: "serveresource"},
+		},
+		Watching:        watcher,
+		MediaType:       "application/json",
+		Framer:          serializer.Framer,
+		Encoder:         testCodecV2,
+		EmbeddedEncoder: testCodecV2,
+		TimeoutFactory:  &fakeTimeoutFactory{timeoutCh: timeoutCh, done: doneCh},
+	}
+
+	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
+	defer s.Close()
+
+	dest, _ := url.Parse(s.URL)
+	dest.Path = "/" + namedGroupPrefix + "/" + testGroupV2.Group + "/" + testGroupV2.Version + "/simple"
+	dest.RawQuery = "watch=true"
+
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, dest.String(), nil)
+	client := http.Client{}
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
+
+	// The fake watcher's channel is unbuffered, so both events have been
+	// received by the serve loop before the timeout fires; each records one
+	// serve_encode and one serve_write observation.
+	watcher.Action(watch.Added, &endpointstesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	watcher.Action(watch.Modified, &endpointstesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+
+	close(timeoutCh)
+	<-doneCh
+
+	expected := `
+# HELP apiserver_watch_events_delivery_duration_seconds [ALPHA] Histogram of watch event dispatch latency broken by resource type and pipeline stage. The additive stages (propagation, cache_ingest, incoming_queue, fanout, watcher_queue, encode, handoff) partition the delivery path; the 'total' stage is the end-to-end latency of a delivered event. The diagnostic stages are not part of the additive partition: 'watcher_queue_parked' and 'watcher_queue_backlog' split 'watcher_queue' into goroutine wake latency vs input-channel drain backlog and sum to it, 'handoff_aborted' is the time an aborted delivery spent blocked on the result channel before the watcher was done, and 'serve_encode'/'serve_write' are per-event serve-loop intervals measured in the HTTP watch handler (result-channel receive to encoded, and encoded to written-and-flushed).
+# TYPE apiserver_watch_events_delivery_duration_seconds histogram
+apiserver_watch_events_delivery_duration_seconds_count{group="servegroup",resource="serveresource",stage="serve_encode"} 2
+apiserver_watch_events_delivery_duration_seconds_count{group="servegroup",resource="serveresource",stage="serve_write"} 2
+`
+	err = metricstestutil.GatherAndCompare(gatherWithoutHistogramDetail(), strings.NewReader(expected), "apiserver_watch_events_delivery_duration_seconds")
+	require.NoError(t, err)
+}
+
+func gatherWithoutHistogramDetail() metricstestutil.GathererFunc {
+	return func() ([]*metricstestutil.MetricFamily, error) {
+		got, err := legacyregistry.DefaultGatherer.Gather()
+		for _, mf := range got {
+			for _, m := range mf.Metric {
+				if m.Histogram == nil {
+					continue
+				}
+				m.Histogram.SampleSum = nil
+				m.Histogram.Bucket = nil
+			}
+		}
+		return got, err
 	}
 }

@@ -199,7 +199,10 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
 		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
-		c.watcherMetrics.ObserveTerminationStall(reason, len(c.result) == cap(c.result), time.Duration(time.Now().UnixNano()-c.lastDequeueAt.Load()))
+		resultFull := len(c.result) == cap(c.result)
+		stall := time.Duration(time.Now().UnixNano() - c.lastDequeueAt.Load())
+		c.watcherMetrics.ObserveTerminationStall(reason, resultFull, stall)
+		klog.V(2).InfoS("Terminating slow watcher", "identifier", c.identifier, "reason", reason, "resultFull", resultFull, "stallSeconds", stall.Seconds())
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely, we simply terminate it.
 
@@ -456,6 +459,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 
 	select {
 	case c.result <- *watchEvent:
+		c.watcherMetrics.ObserveResultDepth(len(c.result))
 		c.markBookmarkAfterRvSent(event)
 		sentAt = time.Now()
 	case <-c.done:
