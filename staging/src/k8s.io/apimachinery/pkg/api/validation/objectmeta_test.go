@@ -734,6 +734,22 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 				field.TooLong(fldPath.Child("annotations"), "", TotalAnnotationSizeLimitB).MarkFromImperative(),
 			},
 		},
+		{
+			name:              "managedFields manager too long",
+			obj:               mkMeta(tweakManagedFields(metav1.ManagedFieldsEntry{Operation: metav1.ManagedFieldsOperationUpdate, Manager: strings.Repeat("a", 129)})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.TooLong(fldPath.Child("managedFields").Index(0).Child("manager"), "", 128).WithOrigin("maxBytes").MarkAlpha(),
+			},
+		},
+		{
+			name:              "managedFields subresource too long",
+			obj:               mkMeta(tweakManagedFields(metav1.ManagedFieldsEntry{Operation: metav1.ManagedFieldsOperationUpdate, Subresource: strings.Repeat("a", 257)})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.TooLong(fldPath.Child("managedFields").Index(0).Child("subresource"), "", 256).WithOrigin("maxBytes").MarkAlpha(),
+			},
+		},
 	}
 
 	matcher := field.ErrorMatcher{}.ByField().ByType().BySource().ByOrigin()
@@ -894,6 +910,24 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
 				field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), &gracePeriod40, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		{
+			name:              "managedFields manager too long on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakManagedFields(metav1.ManagedFieldsEntry{Operation: metav1.ManagedFieldsOperationUpdate, Manager: strings.Repeat("a", 129)})),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.TooLong(fldPath.Child("managedFields").Index(0).Child("manager"), "", 128).WithOrigin("maxBytes").MarkAlpha(),
+			},
+		},
+		{
+			name:              "managedFields subresource too long on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakManagedFields(metav1.ManagedFieldsEntry{Operation: metav1.ManagedFieldsOperationUpdate, Subresource: strings.Repeat("a", 257)})),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.TooLong(fldPath.Child("managedFields").Index(0).Child("subresource"), "", 256).WithOrigin("maxBytes").MarkAlpha(),
 			},
 		},
 	}
