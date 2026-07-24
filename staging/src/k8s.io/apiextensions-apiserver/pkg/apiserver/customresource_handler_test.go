@@ -650,6 +650,123 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 	}
 }
 
+// TestServeResourceCreateRacesCRDDeletion reproduces the narrow race window described in
+// https://github.com/kubernetes/kubernetes/issues/99181: a CR create request can observe a
+// non-terminating CRD, but the CRD is marked as terminating (deletion started) while the
+// request is still in flight, before the create is actually admitted and written to storage.
+// It verifies that the create is rejected instead of being allowed to persist a CR whose CRD
+// has since started terminating.
+func TestServeResourceCreateRacesCRDDeletion(t *testing.T) {
+	cl := fake.NewSimpleClientset()
+	sharedInformers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)
+	crdInformer := sharedInformers.Apiextensions().V1().CustomResourceDefinitions()
+
+	server, storageConfig := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
+	defer server.Terminate(t)
+
+	crd := multiVersionFixture.DeepCopy()
+	// Mark the CRD as recently Established so the "create" case takes the justCreated sleep
+	// path below, which is what widens the race window in production.
+	now := metav1.Now()
+	crd.Status.Conditions = []apiextensionsv1.CustomResourceDefinitionCondition{
+		{Type: apiextensionsv1.NamesAccepted, Status: apiextensionsv1.ConditionTrue},
+		{Type: apiextensionsv1.Established, Status: apiextensionsv1.ConditionTrue, LastTransitionTime: now},
+	}
+
+	ctx := apirequest.WithNamespace(apirequest.NewContext(), metav1.NamespaceNone)
+	if _, err := cl.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crd, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := crdInformer.Informer().GetStore().Add(crd); err != nil {
+		t.Fatal(err)
+	}
+
+	etcdOptions := options.NewEtcdOptions(storageConfig)
+	etcdOptions.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+	restOptionsGetter := generic.RESTOptions{
+		StorageConfig:           etcdOptions.StorageConfig.ForResource(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural}),
+		Decorator:               generic.UndecoratedStorage,
+		EnableGarbageCollection: true,
+		DeleteCollectionWorkers: 1,
+		ResourcePrefix:          crd.Spec.Group + "/" + crd.Spec.Names.Plural,
+		CountMetricPollPeriod:   time.Minute,
+	}
+
+	handler, err := NewCustomResourceDefinitionHandler(
+		&versionDiscoveryHandler{}, &groupDiscoveryHandler{},
+		crdInformer,
+		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
+		restOptionsGetter,
+		dummyAdmissionImpl{},
+		&establish.EstablishingController{},
+		dummyServiceResolverImpl{},
+		func(r webhook.AuthenticationInfoResolver) webhook.AuthenticationInfoResolver { return r },
+		1,
+		dummyAuthorizerImpl{},
+		time.Minute, time.Minute, nil, 3*1024*1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	crdInfo, err := handler.getOrCreateServingInfoFor(crd.UID, crd.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	version := crd.Spec.Versions[0].Name // "v1beta1", the storage version
+	body := []byte(`{"apiVersion":"stable.example.com/` + version + `","kind":"MultiVersion","metadata":{"name":"race-cr"},"spec":{"num":1}}`)
+
+	requestInfo := &apirequest.RequestInfo{
+		IsResourceRequest: true,
+		Verb:              "create",
+		APIGroup:          crd.Spec.Group,
+		APIVersion:        version,
+		Resource:          crd.Status.AcceptedNames.Plural,
+		Namespace:         "",
+	}
+	reqCtx := apirequest.WithRequestInfo(apirequest.WithNamespace(apirequest.NewContext(), metav1.NamespaceNone), requestInfo)
+
+	req := httptest.NewRequest("POST", "/apis/"+crd.Spec.Group+"/"+version+"/"+crd.Status.AcceptedNames.Plural, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req = req.WithContext(reqCtx)
+
+	recorder := httptest.NewRecorder()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// terminating=false mirrors ServeHTTP having observed a non-terminating CRD before
+		// entering this call.
+		handlerFunc := handler.serveResource(recorder, req, requestInfo, crdInfo, crd, false, nil)
+		if handlerFunc == nil {
+			t.Errorf("expected non-nil handler func for create verb")
+			return
+		}
+		handlerFunc.ServeHTTP(recorder, req)
+	}()
+
+	// Give serveResource time to enter the justCreated sleep, then simulate the CRD delete
+	// completing while the create request is still in flight -- the exact race from the issue.
+	time.Sleep(500 * time.Millisecond)
+	terminatingCRD := crd.DeepCopy()
+	deletionTime := metav1.Now()
+	terminatingCRD.DeletionTimestamp = &deletionTime
+	if err := crdInformer.Informer().GetStore().Update(terminatingCRD); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("timed out waiting for create request to complete")
+	}
+
+	if recorder.Code != http.StatusForbidden {
+		t.Errorf("expected create to be forbidden once CRD deletion was recorded mid-flight, got status %d body %s", recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestDecoder(t *testing.T) {
 	multiVersionJSON := `
 	{
