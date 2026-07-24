@@ -274,6 +274,73 @@ func TestNewMap(t *testing.T) {
 	}
 }
 
+func TestFrameworkForPod(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	cfgs := []config.KubeSchedulerProfile{
+		{
+			SchedulerName: v1.DefaultSchedulerName,
+			Plugins: &config.Plugins{
+				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: "QueueSort"}}},
+				Bind:      config.PluginSet{Enabled: []config.Plugin{{Name: "Bind1"}}},
+			},
+		},
+		{
+			SchedulerName: "custom-scheduler",
+			Plugins: &config.Plugins{
+				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: "QueueSort"}}},
+				Bind:      config.PluginSet{Enabled: []config.Plugin{{Name: "Bind2"}}},
+			},
+		},
+	}
+
+	m, err := NewMap(ctx, cfgs, fakeRegistry, nilRecorderFactory)
+	if err != nil {
+		t.Fatalf("failed to create profile map: %v", err)
+	}
+	defer m.Close()
+
+	tests := []struct {
+		name          string
+		schedulerName string
+		wantErr       string
+	}{
+		{
+			name:          "explicit scheduler name matching profile",
+			schedulerName: "custom-scheduler",
+		},
+		{
+			name:          "empty scheduler name defaults to default-scheduler",
+			schedulerName: "",
+		},
+		{
+			name:          "unknown scheduler name returns error",
+			schedulerName: "non-existent",
+			wantErr:       `profile not found for scheduler name "non-existent"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{
+					SchedulerName: tt.schedulerName,
+				},
+			}
+			fwk, err := m.FrameworkForPod(pod)
+			if err := checkErr(err, tt.wantErr); err != nil {
+				t.Errorf("FrameworkForPod() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr == "" && fwk == nil {
+				t.Errorf("expected non-nil framework for scheduler name %q", tt.schedulerName)
+			}
+		})
+	}
+}
+
 type fakePlugin struct {
 	name string
 }
