@@ -114,9 +114,18 @@ func newCacheWatcher(
 	watcherMetrics *metrics.WatcherMetricsObservers,
 	identifier string,
 ) *cacheWatcher {
+	// The result buffer is sized to absorb measured client-side read pauses
+	// (<=2.5s at ~30 ev/s) so transient pauses don't terminate healthy
+	// watchers; the input buffer is intentionally untouched, as it remains the
+	// dead-client kill signal. Small chanSize (<10) is preserved because tests
+	// rely on the result channel blocking at that size.
+	resultSize := chanSize
+	if chanSize >= 10 && resultSize < 128 {
+		resultSize = 128
+	}
 	w := &cacheWatcher{
 		input:               make(chan inputEvent, chanSize),
-		result:              make(chan watch.Event, chanSize),
+		result:              make(chan watch.Event, resultSize),
 		done:                make(chan struct{}),
 		filter:              filter,
 		stopped:             false,
