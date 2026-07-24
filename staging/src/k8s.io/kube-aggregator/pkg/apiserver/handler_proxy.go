@@ -149,6 +149,8 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	location.Path = req.URL.Path
 	location.RawQuery = req.URL.Query().Encode()
 
+	originalHost := req.Host
+
 	newReq, cancelFn := apiserverproxyutil.NewRequestForProxy(location, req)
 	defer cancelFn()
 
@@ -180,6 +182,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	handler := proxy.NewUpgradeAwareHandler(location, proxyRoundTripper, true, upgrade, &responder{w: w})
+	handler.OriginalHost = originalHost
 	if r.rejectForwardingRedirects {
 		handler.RejectForwardingRedirects = true
 	}
