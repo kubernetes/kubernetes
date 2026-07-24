@@ -175,6 +175,78 @@ var objWithPrioritizedList = &resource.ResourceClaimTemplate{
 	},
 }
 
+var objWithDerivedAttributes = &resource.ResourceClaimTemplate{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim-template",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimTemplateSpec{
+		Spec: resource.ResourceClaimSpec{
+			Devices: resource.DeviceClaim{
+				Requests: []resource.DeviceRequest{
+					{
+						Name: "req-0",
+						Exactly: &resource.ExactDeviceRequest{
+							DeviceClassName: "class",
+							AllocationMode:  resource.DeviceAllocationModeAll,
+							DerivedAttributes: []resource.DeviceDerivedAttribute{
+								{
+									Name:       "derived/sharedNumaNode",
+									Expression: `device.attributes["dra.example.com"]["numa"]`,
+								},
+							},
+						},
+					},
+				},
+				Constraints: []resource.DeviceConstraint{
+					{
+						Requests:       []string{"req-0"},
+						MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode")),
+					},
+				},
+			},
+		},
+	},
+}
+
+var objWithDerivedAttributesInPrioritizedList = &resource.ResourceClaimTemplate{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim-template",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimTemplateSpec{
+		Spec: resource.ResourceClaimSpec{
+			Devices: resource.DeviceClaim{
+				Requests: []resource.DeviceRequest{
+					{
+						Name: "req-0",
+						FirstAvailable: []resource.DeviceSubRequest{
+							{
+								Name:            "subreq-0",
+								DeviceClassName: "class",
+								AllocationMode:  resource.DeviceAllocationModeExactCount,
+								Count:           1,
+								DerivedAttributes: []resource.DeviceDerivedAttribute{
+									{
+										Name:       "derived/sharedNumaNode",
+										Expression: `device.attributes["dra.example.com"]["numa"]`,
+									},
+								},
+							},
+						},
+					},
+				},
+				Constraints: []resource.DeviceConstraint{
+					{
+						Requests:       []string{"req-0"},
+						MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode")),
+					},
+				},
+			},
+		},
+	},
+}
+
 var testCapacity = map[resource.QualifiedName]apiresource.Quantity{
 	resource.QualifiedName("test-capacity"): apiresource.MustParse("1"),
 }
@@ -938,6 +1010,143 @@ func TestStrategyUpdate(t *testing.T) {
 			expectObj.ResourceVersion = "4"
 			assert.Equal(t, expectObj, newObj)
 			tc.verify(t, fakeClient.Actions())
+		})
+	}
+}
+
+func stripDerivedAttributes(obj *resource.ResourceClaimTemplate) *resource.ResourceClaimTemplate {
+	res := obj.DeepCopy()
+	for i := range res.Spec.Spec.Devices.Requests {
+		if res.Spec.Spec.Devices.Requests[i].Exactly != nil {
+			res.Spec.Spec.Devices.Requests[i].Exactly.DerivedAttributes = nil
+		}
+		for j := range res.Spec.Spec.Devices.Requests[i].FirstAvailable {
+			res.Spec.Spec.Devices.Requests[i].FirstAvailable[j].DerivedAttributes = nil
+		}
+	}
+	return res
+}
+
+func TestStrategyCreateWithDerivedAttributes(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	testcases := []struct {
+		name              string
+		obj               *resource.ResourceClaimTemplate
+		derivedAttributes bool // DRADerivedAttributes feature gate
+		expectObj         *resource.ResourceClaimTemplate
+	}{
+		{
+			name:              "should drop derivedAttributes during creation when the feature gate is disabled",
+			obj:               objWithDerivedAttributes,
+			derivedAttributes: false,
+			expectObj:         stripDerivedAttributes(objWithDerivedAttributes),
+		},
+		{
+			name:              "should preserve derivedAttributes during creation when the feature gate is enabled",
+			obj:               objWithDerivedAttributes,
+			derivedAttributes: true,
+			expectObj:         objWithDerivedAttributes,
+		},
+		{
+			name:              "should drop derivedAttributes in prioritized list during creation when the feature gate is disabled",
+			obj:               objWithDerivedAttributesInPrioritizedList,
+			derivedAttributes: false,
+			expectObj:         stripDerivedAttributes(objWithDerivedAttributesInPrioritizedList),
+		},
+		{
+			name:              "should preserve derivedAttributes in prioritized list during creation when the feature gate is enabled",
+			obj:               objWithDerivedAttributesInPrioritizedList,
+			derivedAttributes: true,
+			expectObj:         objWithDerivedAttributesInPrioritizedList,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset(ns1, ns2)
+			mockNSClient := fakeClient.CoreV1().Namespaces()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, tc.derivedAttributes)
+			strategy := NewStrategy(mockNSClient)
+
+			obj := tc.obj.DeepCopy()
+			strategy.PrepareForCreate(ctx, obj)
+			if errs := strategy.Validate(ctx, obj); len(errs) != 0 {
+				t.Fatalf("unexpected error(s): %v", errs)
+			}
+			strategy.Canonicalize(obj)
+			assert.Equal(t, tc.expectObj, obj)
+		})
+	}
+}
+
+func TestStrategyUpdateWithDerivedAttributes(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	testcases := []struct {
+		name                   string
+		oldObj                 *resource.ResourceClaimTemplate
+		newObj                 *resource.ResourceClaimTemplate
+		derivedAttributes      bool // DRADerivedAttributes feature gate
+		expectValidationErrors []string
+		expectObj              *resource.ResourceClaimTemplate
+	}{
+		{
+			name:              "should drop derivedAttributes during update when the feature gate is disabled and they were not previously in use",
+			oldObj:            stripDerivedAttributes(objWithDerivedAttributes),
+			newObj:            objWithDerivedAttributes,
+			derivedAttributes: false,
+			expectObj:         stripDerivedAttributes(objWithDerivedAttributes),
+		},
+		{
+			name:                   "should fail validation on update when the feature gate is enabled because spec is immutable",
+			oldObj:                 stripDerivedAttributes(objWithDerivedAttributes),
+			newObj:                 objWithDerivedAttributes,
+			derivedAttributes:      true,
+			expectValidationErrors: []string{fieldImmutableError}, // Spec is immutable, cannot add derived attributes.
+		},
+		{
+			name:              "should preserve derivedAttributes during update when the feature gate is enabled and they were already in use",
+			oldObj:            objWithDerivedAttributes,
+			newObj:            objWithDerivedAttributes,
+			derivedAttributes: true,
+			expectObj:         objWithDerivedAttributes,
+		},
+		{
+			name:              "should preserve derivedAttributes during update even if the feature gate is disabled because they were already in use",
+			oldObj:            objWithDerivedAttributes,
+			newObj:            objWithDerivedAttributes,
+			derivedAttributes: false,
+			expectObj:         objWithDerivedAttributes,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset(ns1, ns2)
+			mockNSClient := fakeClient.CoreV1().Namespaces()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, tc.derivedAttributes)
+			strategy := NewStrategy(mockNSClient)
+
+			oldObj := tc.oldObj.DeepCopy()
+			newObj := tc.newObj.DeepCopy()
+			newObj.ResourceVersion = "4"
+
+			strategy.PrepareForUpdate(ctx, newObj, oldObj)
+			expectedErrLen := len(tc.expectValidationErrors)
+			if errs := strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
+				if assert.Len(t, errs, expectedErrLen, "exact number of errors expected") {
+					for i, expectErr := range tc.expectValidationErrors {
+						assert.ErrorContains(t, errs[i], expectErr, "the error message should have contained the expected error message")
+					}
+					return
+				}
+			}
+			if expectedErrLen > 0 {
+				t.Fatal("expected validation error(s), got none")
+			}
+			strategy.Canonicalize(newObj)
+			expectObj := tc.expectObj.DeepCopy()
+			expectObj.ResourceVersion = "4"
+			assert.Equal(t, expectObj, newObj)
 		})
 	}
 }

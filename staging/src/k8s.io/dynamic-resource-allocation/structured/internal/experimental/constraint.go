@@ -25,6 +25,11 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// attributeProvider defines how constraints retrieve device attributes.
+type attributeProvider interface {
+	lookupAttribute(request *requestData, device *draapi.Device, deviceID DeviceID, attributeName resourceapi.FullyQualifiedName) (*resourceapi.DeviceAttribute, error)
+}
+
 // distinctAttributeConstraint compares an attribute value across devices.
 // All devices must share the same value. When the set of devices is
 // empty, any device that has the attribute can be added. After that,
@@ -33,39 +38,42 @@ import (
 // We don't need to track *which* devices are part of the set, only
 // how many.
 type distinctAttributeConstraint struct {
-	logger        klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
-	requestNames  sets.Set[string]
-	attributeName resourceapi.FullyQualifiedName
-	features      Features
+	logger            klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
+	requestNames      sets.Set[string]
+	attributeName     resourceapi.FullyQualifiedName
+	features          Features
+	attributeProvider attributeProvider
 
 	attributes []*resourceapi.DeviceAttribute
 }
 
-func (m *distinctAttributeConstraint) add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) bool {
-	if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
+func (m *distinctAttributeConstraint) add(request *requestData, device *draapi.Device, deviceID DeviceID) (bool, error) {
+	if m.requestNames.Len() > 0 && !m.matches(request) {
 		// Device not affected by constraint.
-		return true
+		return true, nil
 	}
 
-	attribute := lookupAttribute(device, deviceID, m.attributeName)
+	attribute, err := m.attributeProvider.lookupAttribute(request, device, deviceID, m.attributeName)
+	if err != nil {
+		return false, err
+	}
 	if attribute == nil {
 		// Doesn't have the attribute.
 		m.logger.V(7).Info("Constraint not satisfied, attribute not set")
-		return false
+		return false, nil
 	}
 
 	if !m.matchesAttribute(*attribute) {
 		m.logger.V(7).Info("Constraint not satisfied, has some duplicated attributes")
-		return false
+		return false, nil
 	}
 	m.attributes = append(m.attributes, attribute)
 	m.logger.V(7).Info("Constraint satisfied by device", "device", deviceID, "numDevices", len(m.attributes))
-	return true
-
+	return true, nil
 }
 
-func (m *distinctAttributeConstraint) remove(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) {
-	if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
+func (m *distinctAttributeConstraint) remove(request *requestData, device *draapi.Device, deviceID DeviceID) {
+	if m.requestNames.Len() > 0 && !m.matches(request) {
 		// Device not affected by constraint.
 		return
 	}
@@ -74,12 +82,14 @@ func (m *distinctAttributeConstraint) remove(requestName, subRequestName string,
 	m.logger.V(7).Info("Device removed from constraint set", "device", deviceID, "numDevices", len(m.attributes))
 }
 
-func (m *distinctAttributeConstraint) matches(requestName, subRequestName string) bool {
-	if subRequestName == "" {
-		return m.requestNames.Has(requestName)
-	} else {
+func (m *distinctAttributeConstraint) matches(request *requestData) bool {
+	if request.parentRequest != nil {
+		requestName := request.parentRequest.name()
+		subRequestName := request.request.name()
 		fullSubRequestName := fmt.Sprintf("%s/%s", requestName, subRequestName)
 		return m.requestNames.Has(requestName) || m.requestNames.Has(fullSubRequestName)
+	} else {
+		return m.requestNames.Has(request.request.name())
 	}
 }
 

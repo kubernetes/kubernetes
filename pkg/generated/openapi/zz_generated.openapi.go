@@ -1044,6 +1044,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1.DeviceConfiguration{}.OpenAPIModelName():                                                             schema_k8sio_api_resource_v1_DeviceConfiguration(ref),
 		resourcev1.DeviceConstraint{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1_DeviceConstraint(ref),
 		resourcev1.DeviceCounterConsumption{}.OpenAPIModelName():                                                        schema_k8sio_api_resource_v1_DeviceCounterConsumption(ref),
+		resourcev1.DeviceDerivedAttribute{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1_DeviceDerivedAttribute(ref),
 		resourcev1.DeviceRequest{}.OpenAPIModelName():                                                                   schema_k8sio_api_resource_v1_DeviceRequest(ref),
 		resourcev1.DeviceRequestAllocationResult{}.OpenAPIModelName():                                                   schema_k8sio_api_resource_v1_DeviceRequestAllocationResult(ref),
 		resourcev1.DeviceSelector{}.OpenAPIModelName():                                                                  schema_k8sio_api_resource_v1_DeviceSelector(ref),
@@ -1112,6 +1113,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta1.DeviceConfiguration{}.OpenAPIModelName():                                                        schema_k8sio_api_resource_v1beta1_DeviceConfiguration(ref),
 		resourcev1beta1.DeviceConstraint{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta1_DeviceConstraint(ref),
 		resourcev1beta1.DeviceCounterConsumption{}.OpenAPIModelName():                                                   schema_k8sio_api_resource_v1beta1_DeviceCounterConsumption(ref),
+		resourcev1beta1.DeviceDerivedAttribute{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1beta1_DeviceDerivedAttribute(ref),
 		resourcev1beta1.DeviceRequest{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta1_DeviceRequest(ref),
 		resourcev1beta1.DeviceRequestAllocationResult{}.OpenAPIModelName():                                              schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref),
 		resourcev1beta1.DeviceSelector{}.OpenAPIModelName():                                                             schema_k8sio_api_resource_v1beta1_DeviceSelector(ref),
@@ -1157,6 +1159,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta2.DeviceConfiguration{}.OpenAPIModelName():                                                        schema_k8sio_api_resource_v1beta2_DeviceConfiguration(ref),
 		resourcev1beta2.DeviceConstraint{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta2_DeviceConstraint(ref),
 		resourcev1beta2.DeviceCounterConsumption{}.OpenAPIModelName():                                                   schema_k8sio_api_resource_v1beta2_DeviceCounterConsumption(ref),
+		resourcev1beta2.DeviceDerivedAttribute{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1beta2_DeviceDerivedAttribute(ref),
 		resourcev1beta2.DeviceRequest{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta2_DeviceRequest(ref),
 		resourcev1beta2.DeviceRequestAllocationResult{}.OpenAPIModelName():                                              schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref),
 		resourcev1beta2.DeviceSelector{}.OpenAPIModelName():                                                             schema_k8sio_api_resource_v1beta2_DeviceSelector(ref),
@@ -49091,6 +49094,36 @@ func schema_k8sio_api_resource_v1_DeviceCounterConsumption(ref common.ReferenceC
 	}
 }
 
+func schema_k8sio_api_resource_v1_DeviceDerivedAttribute(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceDerivedAttribute defines a derived attribute computed via CEL.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the identifier for this derived attribute, used in constraints.\n\nIt must be a DNS subdomain followed by a slash (\"/\") followed by a C identifier (e.g. \"example.com/numaNode\" or \"derived/numaNode\").\n\nIf the chosen name matches an existing physical attribute from a driver, the derived attribute's expression will shadow the physical attribute, and its evaluated value will be used in constraints instead. When the goal is to define a derived attribute that is only used within the ResourceClaim and not meant to shadow an existing attribute, use a domain prefix that no DRA driver should be using (e.g. \"derived/myAttribute\").\n\nIt is not valid to define a derived attribute that isn't used in at least one constraint.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"expression": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Expression is a CEL expression evaluated against each candidate device. The expression must evaluate to a primitive scalar (string, integer, boolean, or semver) or a list of these scalars ([]string, []int64, []bool, []semver) to act as a virtual grouping key. Any other return type is an error and causes CEL evaluation for the device to fail.\n\nThe expression's input is an object named \"device\", which carries the same properties as in a CELDeviceSelector.\n\nWhen pod scheduling encounters CEL runtime errors (such as looking up an attribute that isn't defined) for some devices, it will abort allocation and fail scheduling for the Pod. Surfacing evaluation errors immediately prevents silent topology matching failures that are extremely hard to detect. A robust expression should, for example, check for the existence of attributes before referencing them to avoid runtime evaluation errors.\n\nThe expression gets evaluated after a device has passed the other selector expressions for the request in which this expression is used. This allows writing expressions that are tailored towards the specific devices being requested (for example, by assuming the device is from a certain vendor and skipping those checks).\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps; the combined cost of all derived attributes in a claim is capped by a shared CEL cost budget.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "expression"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_resource_v1_DeviceRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -49392,12 +49425,30 @@ func schema_k8sio_api_resource_v1_DeviceSubRequest(ref common.ReferenceCallback)
 							Ref:         ref(resourcev1.CapacityRequirements{}.OpenAPIModelName()),
 						},
 					},
+					"derivedAttributes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "DerivedAttributes defines a set of virtual attributes computed via CEL expressions for each candidate device. These virtual attributes can be referenced in `.devices.constraints` to align and match different devices (e.g., co-allocating a GPU and a NIC on the same NUMA node) even if their drivers publish different attributes. Derived attributes are not available via `device.attributes` in the CEL environment when evaluating selector expressions.\n\nDerived attributes allow you to extract, transform, or normalize topology information (such as extracting a NUMA index from a complex topology string or renaming a vendor-specific attribute) into a common virtual attribute name at scheduling time. The scheduler then evaluates these virtual attributes exactly like static attributes when matching constraints.\n\nEvery derived attribute defined in this list must be referenced by at least one MatchAttribute or DistinctAttribute constraint in the `.devices.constraints` list.\n\nThe maximum number of derived attributes is 32.\n\nThis is an alpha field and requires enabling the DRADerivedAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1.DeviceDerivedAttribute{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name", "deviceClassName"},
 			},
 		},
 		Dependencies: []string{
-			resourcev1.CapacityRequirements{}.OpenAPIModelName(), resourcev1.DeviceSelector{}.OpenAPIModelName(), resourcev1.DeviceToleration{}.OpenAPIModelName()},
+			resourcev1.CapacityRequirements{}.OpenAPIModelName(), resourcev1.DeviceDerivedAttribute{}.OpenAPIModelName(), resourcev1.DeviceSelector{}.OpenAPIModelName(), resourcev1.DeviceToleration{}.OpenAPIModelName()},
 	}
 }
 
@@ -49779,12 +49830,30 @@ func schema_k8sio_api_resource_v1_ExactDeviceRequest(ref common.ReferenceCallbac
 							Ref:         ref(resourcev1.CapacityRequirements{}.OpenAPIModelName()),
 						},
 					},
+					"derivedAttributes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "DerivedAttributes defines a set of virtual attributes computed via CEL expressions for each candidate device. These virtual attributes can be referenced in `.devices.constraints` to align and match different devices (e.g., co-allocating a GPU and a NIC on the same NUMA node) even if their drivers publish different attributes. Derived attributes are not available via `device.attributes` in the CEL environment when evaluating selector expressions.\n\nDerived attributes allow you to extract, transform, or normalize topology information (such as extracting a NUMA index from a complex topology string or renaming a vendor-specific attribute) into a common virtual attribute name at scheduling time. The scheduler then evaluates these virtual attributes exactly like static attributes when matching constraints.\n\nEvery derived attribute defined in this list must be referenced by at least one MatchAttribute or DistinctAttribute constraint in the `.devices.constraints` list.\n\nThe maximum number of derived attributes is 32.\n\nThis is an alpha field and requires enabling the DRADerivedAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1.DeviceDerivedAttribute{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"deviceClassName"},
 			},
 		},
 		Dependencies: []string{
-			resourcev1.CapacityRequirements{}.OpenAPIModelName(), resourcev1.DeviceSelector{}.OpenAPIModelName(), resourcev1.DeviceToleration{}.OpenAPIModelName()},
+			resourcev1.CapacityRequirements{}.OpenAPIModelName(), resourcev1.DeviceDerivedAttribute{}.OpenAPIModelName(), resourcev1.DeviceSelector{}.OpenAPIModelName(), resourcev1.DeviceToleration{}.OpenAPIModelName()},
 	}
 }
 
@@ -52434,6 +52503,36 @@ func schema_k8sio_api_resource_v1beta1_DeviceCounterConsumption(ref common.Refer
 	}
 }
 
+func schema_k8sio_api_resource_v1beta1_DeviceDerivedAttribute(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceDerivedAttribute defines a derived attribute computed via CEL.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the identifier for this derived attribute, used in constraints.\n\nIt must be a DNS subdomain followed by a slash (\"/\") followed by a C identifier (e.g. \"example.com/numaNode\" or \"derived/numaNode\").\n\nIf the chosen name matches an existing physical attribute from a driver, the derived attribute's expression will shadow the physical attribute, and its evaluated value will be used in constraints instead. When the goal is to define a derived attribute that is only used within the ResourceClaim and not meant to shadow an existing attribute, use a domain prefix that no DRA driver should be using (e.g. \"derived/myAttribute\").\n\nIt is not valid to define a derived attribute that isn't used in at least one constraint.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"expression": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Expression is a CEL expression evaluated against each candidate device. The expression must evaluate to a primitive scalar (string, integer, boolean, or semver) or a list of these scalars ([]string, []int64, []bool, []semver) to act as a virtual grouping key. Any other return type is an error and causes CEL evaluation for the device to fail.\n\nThe expression's input is an object named \"device\", which carries the same properties as in a CELDeviceSelector.\n\nWhen pod scheduling encounters CEL runtime errors (such as looking up an attribute that isn't defined) for some devices, it will abort allocation and fail scheduling for the Pod. Surfacing evaluation errors immediately prevents silent topology matching failures that are extremely hard to detect. A robust expression should, for example, check for the existence of attributes before referencing them to avoid runtime evaluation errors.\n\nThe expression gets evaluated after a device has passed the other selector expressions for the request in which this expression is used. This allows writing expressions that are tailored towards the specific devices being requested (for example, by assuming the device is from a certain vendor and skipping those checks).\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps; the combined cost of all derived attributes in a claim is capped by a shared CEL cost budget.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "expression"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_resource_v1beta1_DeviceRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -52539,12 +52638,30 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequest(ref common.ReferenceCallbac
 							Ref:         ref(resourcev1beta1.CapacityRequirements{}.OpenAPIModelName()),
 						},
 					},
+					"derivedAttributes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "DerivedAttributes defines a set of virtual attributes computed via CEL expressions for each candidate device. These virtual attributes can be referenced in `.devices.constraints` to align and match different devices (e.g., co-allocating a GPU and a NIC on the same NUMA node) even if their drivers publish different attributes. Derived attributes are not available via `device.attributes` in the CEL environment when evaluating selector expressions.\n\nDerived attributes allow you to extract, transform, or normalize topology information (such as extracting a NUMA index from a complex topology string or renaming a vendor-specific attribute) into a common virtual attribute name at scheduling time. The scheduler then evaluates these virtual attributes exactly like static attributes when matching constraints.\n\nEvery derived attribute defined in this list must be referenced by at least one MatchAttribute or DistinctAttribute constraint in the `.devices.constraints` list.\n\nThe maximum number of derived attributes is 32.\n\nThis is an alpha field and requires enabling the DRADerivedAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1beta1.DeviceDerivedAttribute{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name"},
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta1.CapacityRequirements{}.OpenAPIModelName(), resourcev1beta1.DeviceSelector{}.OpenAPIModelName(), resourcev1beta1.DeviceSubRequest{}.OpenAPIModelName(), resourcev1beta1.DeviceToleration{}.OpenAPIModelName()},
+			resourcev1beta1.CapacityRequirements{}.OpenAPIModelName(), resourcev1beta1.DeviceDerivedAttribute{}.OpenAPIModelName(), resourcev1beta1.DeviceSelector{}.OpenAPIModelName(), resourcev1beta1.DeviceSubRequest{}.OpenAPIModelName(), resourcev1beta1.DeviceToleration{}.OpenAPIModelName()},
 	}
 }
 
@@ -52801,12 +52918,30 @@ func schema_k8sio_api_resource_v1beta1_DeviceSubRequest(ref common.ReferenceCall
 							Ref:         ref(resourcev1beta1.CapacityRequirements{}.OpenAPIModelName()),
 						},
 					},
+					"derivedAttributes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "DerivedAttributes defines a set of virtual attributes computed via CEL expressions for each candidate device. These virtual attributes can be referenced in `.devices.constraints` to align and match different devices (e.g., co-allocating a GPU and a NIC on the same NUMA node) even if their drivers publish different attributes. Derived attributes are not available via `device.attributes` in the CEL environment when evaluating selector expressions.\n\nDerived attributes allow you to extract, transform, or normalize topology information (such as extracting a NUMA index from a complex topology string or renaming a vendor-specific attribute) into a common virtual attribute name at scheduling time. The scheduler then evaluates these virtual attributes exactly like static attributes when matching constraints.\n\nEvery derived attribute defined in this list must be referenced by at least one MatchAttribute or DistinctAttribute constraint in the `.devices.constraints` list.\n\nThe maximum number of derived attributes is 32.\n\nThis is an alpha field and requires enabling the DRADerivedAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1beta1.DeviceDerivedAttribute{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name", "deviceClassName"},
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta1.CapacityRequirements{}.OpenAPIModelName(), resourcev1beta1.DeviceSelector{}.OpenAPIModelName(), resourcev1beta1.DeviceToleration{}.OpenAPIModelName()},
+			resourcev1beta1.CapacityRequirements{}.OpenAPIModelName(), resourcev1beta1.DeviceDerivedAttribute{}.OpenAPIModelName(), resourcev1beta1.DeviceSelector{}.OpenAPIModelName(), resourcev1beta1.DeviceToleration{}.OpenAPIModelName()},
 	}
 }
 
@@ -54791,6 +54926,36 @@ func schema_k8sio_api_resource_v1beta2_DeviceCounterConsumption(ref common.Refer
 	}
 }
 
+func schema_k8sio_api_resource_v1beta2_DeviceDerivedAttribute(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceDerivedAttribute defines a derived attribute computed via CEL.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the identifier for this derived attribute, used in constraints.\n\nIt must be a DNS subdomain followed by a slash (\"/\") followed by a C identifier (e.g. \"example.com/numaNode\" or \"derived/numaNode\").\n\nIf the chosen name matches an existing physical attribute from a driver, the derived attribute's expression will shadow the physical attribute, and its evaluated value will be used in constraints instead. When the goal is to define a derived attribute that is only used within the ResourceClaim and not meant to shadow an existing attribute, use a domain prefix that no DRA driver should be using (e.g. \"derived/myAttribute\").\n\nIt is not valid to define a derived attribute that isn't used in at least one constraint.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"expression": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Expression is a CEL expression evaluated against each candidate device. The expression must evaluate to a primitive scalar (string, integer, boolean, or semver) or a list of these scalars ([]string, []int64, []bool, []semver) to act as a virtual grouping key. Any other return type is an error and causes CEL evaluation for the device to fail.\n\nThe expression's input is an object named \"device\", which carries the same properties as in a CELDeviceSelector.\n\nWhen pod scheduling encounters CEL runtime errors (such as looking up an attribute that isn't defined) for some devices, it will abort allocation and fail scheduling for the Pod. Surfacing evaluation errors immediately prevents silent topology matching failures that are extremely hard to detect. A robust expression should, for example, check for the existence of attributes before referencing them to avoid runtime evaluation errors.\n\nThe expression gets evaluated after a device has passed the other selector expressions for the request in which this expression is used. This allows writing expressions that are tailored towards the specific devices being requested (for example, by assuming the device is from a certain vendor and skipping those checks).\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps; the combined cost of all derived attributes in a claim is capped by a shared CEL cost budget.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "expression"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_resource_v1beta2_DeviceRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -55092,12 +55257,30 @@ func schema_k8sio_api_resource_v1beta2_DeviceSubRequest(ref common.ReferenceCall
 							Ref:         ref(resourcev1beta2.CapacityRequirements{}.OpenAPIModelName()),
 						},
 					},
+					"derivedAttributes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "DerivedAttributes defines a set of virtual attributes computed via CEL expressions for each candidate device. These virtual attributes can be referenced in `.devices.constraints` to align and match different devices (e.g., co-allocating a GPU and a NIC on the same NUMA node) even if their drivers publish different attributes. Derived attributes are not available via `device.attributes` in the CEL environment when evaluating selector expressions.\n\nDerived attributes allow you to extract, transform, or normalize topology information (such as extracting a NUMA index from a complex topology string or renaming a vendor-specific attribute) into a common virtual attribute name at scheduling time. The scheduler then evaluates these virtual attributes exactly like static attributes when matching constraints.\n\nEvery derived attribute defined in this list must be referenced by at least one MatchAttribute or DistinctAttribute constraint in the `.devices.constraints` list.\n\nThe maximum number of derived attributes is 32.\n\nThis is an alpha field and requires enabling the DRADerivedAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1beta2.DeviceDerivedAttribute{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name", "deviceClassName"},
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta2.CapacityRequirements{}.OpenAPIModelName(), resourcev1beta2.DeviceSelector{}.OpenAPIModelName(), resourcev1beta2.DeviceToleration{}.OpenAPIModelName()},
+			resourcev1beta2.CapacityRequirements{}.OpenAPIModelName(), resourcev1beta2.DeviceDerivedAttribute{}.OpenAPIModelName(), resourcev1beta2.DeviceSelector{}.OpenAPIModelName(), resourcev1beta2.DeviceToleration{}.OpenAPIModelName()},
 	}
 }
 
@@ -55479,12 +55662,30 @@ func schema_k8sio_api_resource_v1beta2_ExactDeviceRequest(ref common.ReferenceCa
 							Ref:         ref(resourcev1beta2.CapacityRequirements{}.OpenAPIModelName()),
 						},
 					},
+					"derivedAttributes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "DerivedAttributes defines a set of virtual attributes computed via CEL expressions for each candidate device. These virtual attributes can be referenced in `.devices.constraints` to align and match different devices (e.g., co-allocating a GPU and a NIC on the same NUMA node) even if their drivers publish different attributes. Derived attributes are not available via `device.attributes` in the CEL environment when evaluating selector expressions.\n\nDerived attributes allow you to extract, transform, or normalize topology information (such as extracting a NUMA index from a complex topology string or renaming a vendor-specific attribute) into a common virtual attribute name at scheduling time. The scheduler then evaluates these virtual attributes exactly like static attributes when matching constraints.\n\nEvery derived attribute defined in this list must be referenced by at least one MatchAttribute or DistinctAttribute constraint in the `.devices.constraints` list.\n\nThe maximum number of derived attributes is 32.\n\nThis is an alpha field and requires enabling the DRADerivedAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resourcev1beta2.DeviceDerivedAttribute{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"deviceClassName"},
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta2.CapacityRequirements{}.OpenAPIModelName(), resourcev1beta2.DeviceSelector{}.OpenAPIModelName(), resourcev1beta2.DeviceToleration{}.OpenAPIModelName()},
+			resourcev1beta2.CapacityRequirements{}.OpenAPIModelName(), resourcev1beta2.DeviceDerivedAttribute{}.OpenAPIModelName(), resourcev1beta2.DeviceSelector{}.OpenAPIModelName(), resourcev1beta2.DeviceToleration{}.OpenAPIModelName()},
 	}
 }
 
