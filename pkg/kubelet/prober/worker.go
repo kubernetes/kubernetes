@@ -347,8 +347,9 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API
 	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
-	if err != nil {
-		// Prober error, throw away the result.
+	if err != nil && result != results.Failure {
+		// The prober maps execution errors that should affect health to Failure.
+		// Other errors preserve the existing no-result behavior.
 		return true
 	}
 
