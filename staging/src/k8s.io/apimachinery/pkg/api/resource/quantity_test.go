@@ -1099,6 +1099,49 @@ func TestScaledValue(t *testing.T) {
 	}
 }
 
+func TestNegativeValueRoundsAwayFromZero(t *testing.T) {
+	// Value() and MilliValue() are documented to round to the nearest integer
+	// away from zero, but the big.Int-backed rounding path used for quantities
+	// parsed via the inf.Dec code path was rounding toward positive infinity,
+	// producing 1 for small negative values like -.484785E-7466. See #110653.
+	table := []struct {
+		input       string
+		expectValue int64
+		expectMilli int64
+	}{
+		// small negative values parsed via the inf.Dec path (large exponent
+		// forces the canonicalization to round to -1n)
+		{"-.484785E-7466", -1, -1},
+		{".484785E-7466", 1, 1},
+
+		// values representable via the int64 fast path
+		{"-.484785E-1", -1, -49},
+		{".484785E-1", 1, 49},
+		{"-0.0005", -1, -1},
+		{"0.0005", 1, 1},
+		{"-1500m", -2, -1500},
+		{"1500m", 2, 1500},
+
+		// exact integers, no rounding
+		{"-1", -1, -1000},
+		{"1", 1, 1000},
+		{"0", 0, 0},
+	}
+	for _, item := range table {
+		q, err := ParseQuantity(item.input)
+		if err != nil {
+			t.Errorf("ParseQuantity(%q) unexpected error: %v", item.input, err)
+			continue
+		}
+		if got := q.Value(); got != item.expectValue {
+			t.Errorf("ParseQuantity(%q).Value() = %d, want %d", item.input, got, item.expectValue)
+		}
+		if got := q.MilliValue(); got != item.expectMilli {
+			t.Errorf("ParseQuantity(%q).MilliValue() = %d, want %d", item.input, got, item.expectMilli)
+		}
+	}
+}
+
 func TestUninitializedNoCrash(t *testing.T) {
 	var q Quantity
 
