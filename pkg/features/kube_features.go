@@ -416,6 +416,16 @@ const (
 	// Locked to default, will remove in v1.38. Progress is reflected in KEP #1972 update
 	ExecProbeTimeout featuregate.Feature = "ExecProbeTimeout"
 
+	// owner: @rawrmonster17
+	//
+	// When enabled, probe execution errors (e.g. command not found, permission
+	// denied) are treated as probe failures and count toward the FailureThreshold.
+	// Without this gate, such errors are silently discarded by the probe worker,
+	// so a container with a permanently broken liveness probe never restarts and
+	// ContainersReady stays True indefinitely.
+	// See https://github.com/kubernetes/kubernetes/issues/106682
+	ProbeErrorAsFailure featuregate.Feature = "ProbeErrorAsFailure"
+
 	// owner: @seans3
 	// kep: http://kep.k8s.io/4006
 	//
@@ -1575,6 +1585,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in v1.38
 	},
 
+	ProbeErrorAsFailure: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	ExtendWebSocketsToKubelet: {
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2602,6 +2616,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	EvictionRequestAPI: {},
 
 	ExecProbeTimeout: {},
+
+	ProbeErrorAsFailure: {},
 
 	ExtendWebSocketsToKubelet: {NodeDeclaredFeatures},
 

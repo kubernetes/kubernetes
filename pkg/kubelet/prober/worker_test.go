@@ -1111,3 +1111,99 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 		})
 	}
 }
+
+// TestProbeErrorAsFailure verifies the ProbeErrorAsFailure feature gate behavior.
+//
+// Without the gate: a probe that returns an error (e.g. exec command not found)
+// is silently discarded — the failure threshold is never reached, the container
+// is never restarted, and ContainersReady stays True.
+//
+// With the gate: the prober maps such errors to results.Failure before returning
+// them to the worker. The worker must let those through to the normal threshold
+// and hold logic so the container actually gets restarted.
+func TestProbeErrorAsFailure(t *testing.T) {
+	probeErr := fmt.Errorf("exec: command not found")
+
+	tests := []struct {
+		name         string
+		gateEnabled  bool
+		probeType    probeType
+		// wantOnHold is true when liveness/startup should set onHold after hitting threshold.
+		wantOnHold   bool
+		// wantFailure is true when the resultsManager should reflect Failure.
+		wantFailure  bool
+	}{
+		{
+			name:        "gate disabled: liveness exec error is discarded",
+			gateEnabled: false,
+			probeType:   liveness,
+			wantOnHold:  false,
+			wantFailure: false,
+		},
+		{
+			name:        "gate disabled: readiness exec error is discarded",
+			gateEnabled: false,
+			probeType:   readiness,
+			wantOnHold:  false,
+			wantFailure: false,
+		},
+		{
+			name:        "gate enabled: liveness exec error counts as failure, triggers restart hold",
+			gateEnabled: true,
+			probeType:   liveness,
+			wantOnHold:  true,
+			wantFailure: true,
+		},
+		{
+			name:        "gate enabled: readiness exec error counts as failure",
+			gateEnabled: true,
+			probeType:   readiness,
+			wantOnHold:  false, // readiness doesn't set onHold
+			wantFailure: true,
+		},
+		{
+			name:        "gate enabled: startup exec error counts as failure, triggers restart hold",
+			gateEnabled: true,
+			probeType:   startup,
+			wantOnHold:  true,
+			wantFailure: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProbeErrorAsFailure, tc.gateEnabled)
+
+			logger, ctx := ktesting.NewTestContext(t)
+			m := newTestManager()
+			// FailureThreshold=1 so a single error-as-failure immediately triggers the hold.
+			w := newTestWorker(m, tc.probeType, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
+			m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatus())
+
+			// Simulate a probe that errors — fakeExecProber returns (probe.Failure, "", err).
+			// prober.go maps (err != nil) → results.Failure, so worker receives (results.Failure, err).
+			m.prober.exec = fakeExecProber{probe.Failure, probeErr}
+
+			expectContinue(t, w, w.doProbe(ctx), "probe error run")
+
+			if w.onHold != tc.wantOnHold {
+				t.Errorf("onHold: got %v, want %v", w.onHold, tc.wantOnHold)
+			}
+
+			result, ok := resultsManager(m, tc.probeType).Get(testContainerID)
+			if tc.wantFailure {
+				if !ok {
+					t.Errorf("expected Failure result to be set in resultsManager, but it was not")
+				} else if result != results.Failure {
+					t.Errorf("resultsManager result: got %v, want %v", result, results.Failure)
+				}
+			} else {
+				// Gate disabled: result should not have been updated (stays at initialValue).
+				if ok && result == results.Failure {
+					t.Errorf("gate disabled: resultsManager was set to Failure but should have been discarded")
+				}
+			}
+		})
+	}
+}
+
