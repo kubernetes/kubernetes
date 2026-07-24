@@ -1393,6 +1393,65 @@ func TestPrepareResourcesWithPreparedAndNewClaim(t *testing.T) {
 	}
 }
 
+// TestPrepareResourcesAfterRestartIsIdempotent is a regression test for
+// https://github.com/kubernetes/kubernetes/issues/140471: re-preparing an
+// already-prepared claim after a kubelet restart used to append the
+// NodePrepareResources response onto the checkpoint-restored device list
+// instead of replacing it, so the device list (and the checkpoint) doubled
+// on every restart. A second Manager built on the same state directory
+// simulates the restart, since it restores ClaimInfo from the checkpoint
+// with prepared=false.
+func TestPrepareResourcesAfterRestartIsIdempotent(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	fakeKubeClient := fake.NewClientset()
+	stateDir := t.TempDir()
+
+	pod := genTestPodWithClaims(claimName)
+	claim := genTestClaim(claimName, driverName, deviceName, string(pod.ObjectMeta.UID))
+	_, err := fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	resp := genPrepareResourcesResponse(claim.UID)
+	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, false, nil, resp, nil, nil)
+	require.NoError(t, err)
+	defer draServerInfo.teardownFn()
+
+	firstManager, err := NewManager(logger, fakeKubeClient, stateDir)
+	require.NoError(t, err)
+	firstManager.initDRAPluginManager(tCtx, getFakeNode, time.Second)
+	plg := firstManager.GetWatcherHandler()
+	require.NoError(t, plg.RegisterPlugin(tCtx, driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil))
+
+	require.NoError(t, firstManager.PrepareResources(tCtx, pod))
+
+	claimInfo, exists := firstManager.cache.get(claim.Name, namespace)
+	require.True(t, exists)
+	require.Len(t, claimInfo.DriverState[driverName].Devices, 1, "one device after first prepare")
+
+	// Simulate a kubelet restart: build a second Manager on the same state
+	// directory. It restores ClaimInfo from the checkpoint, always with
+	// prepared=false, so PrepareResources will call NodePrepareResources again.
+	firstManager.Stop()
+
+	secondManager, err := NewManager(logger, fakeKubeClient, stateDir)
+	require.NoError(t, err)
+	defer secondManager.Stop()
+	secondManager.initDRAPluginManager(tCtx, getFakeNode, time.Second)
+	plg = secondManager.GetWatcherHandler()
+	require.NoError(t, plg.RegisterPlugin(tCtx, driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil))
+
+	restoredClaimInfo, exists := secondManager.cache.get(claim.Name, namespace)
+	require.True(t, exists, "claim info should be restored from checkpoint")
+	assert.False(t, restoredClaimInfo.prepared, "restored claim info is never marked prepared")
+
+	require.NoError(t, secondManager.PrepareResources(tCtx, pod))
+
+	claimInfo, exists = secondManager.cache.get(claim.Name, namespace)
+	require.True(t, exists)
+	assert.Len(t, claimInfo.DriverState[driverName].Devices, 1,
+		"device list must stay at one entry after restart + re-prepare, not double")
+}
+
 // TestPrepareResourcesWithUnpreparingClaim is a regression test for the race
 // where reconcileLoop-initiated (or otherwise concurrent) unprepareResources
 // has committed to calling NodeUnprepareResources on a claim, released the
