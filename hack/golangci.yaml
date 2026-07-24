@@ -162,6 +162,7 @@ linters:
       # Commentstart - Ignore commentstart issues for existing API group
       # TODO: For each existing API group, we aim to remove it over time.
       - text: "godoc for field .* should start with '.* ...'"
+        path: "staging/src/k8s.io/api/(apps|batch|certificates|core|extensions|flowcontrol|networking|resource|scheduling)"
         path: "staging/src/k8s.io/api/(apps|batch|certificates|core|extensions|flowcontrol|resource|storagemigration)"
       
       # notimestamp: Legacy 'Timestamp' fields retained for backward compatibility
