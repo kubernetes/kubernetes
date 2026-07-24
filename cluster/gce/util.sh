@@ -3631,6 +3631,79 @@ function remove-replica-from-etcd() {
   return "${res}"
 }
 
+# Robustly try to delete a managed instance group.
+# Retry transient gcloud failures, but also treat the group as deleted if a
+# previous delete request succeeded and only the status response was lost.
+# $1: The name of the managed instance group.
+# $2: The zone of the managed instance group.
+function delete-managed-instance-group-with-retries() {
+  local -r group_name="${1}"
+  local -r zone="${2}"
+  local attempt=0
+
+  while true; do
+    if ! gcloud compute instance-groups managed describe "${group_name}" --project "${PROJECT}" --zone "${zone}" &>/dev/null; then
+      return 0
+    fi
+
+    if gcloud compute instance-groups managed delete \
+      --project "${PROJECT}" \
+      --quiet \
+      --zone "${zone}" \
+      "${group_name}"; then
+      return 0
+    fi
+
+    if ! gcloud compute instance-groups managed describe "${group_name}" --project "${PROJECT}" --zone "${zone}" &>/dev/null; then
+      echo -e "${color_yellow}Managed instance group ${group_name} was deleted by a previous attempt.${color_norm}" >&2
+      return 0
+    fi
+
+    if (( attempt > 4 )); then
+      echo -e "${color_red}Failed to delete managed instance group ${group_name} ${color_norm}" >&2
+      return 1
+    fi
+    attempt=$((attempt + 1))
+    echo -e "${color_yellow}Attempt ${attempt} failed to delete managed instance group ${group_name}. Retrying.${color_norm}" >&2
+    sleep $((attempt * 5))
+  done
+}
+
+# Robustly try to delete an instance template.
+# Retry transient gcloud failures, but also treat the template as deleted if a
+# previous delete request succeeded and only the status response was lost.
+# $1: The name of the instance template.
+function delete-instance-template-with-retries() {
+  local -r template_name="${1}"
+  local attempt=0
+
+  while true; do
+    if ! gcloud compute instance-templates describe --project "${PROJECT}" "${template_name}" &>/dev/null; then
+      return 0
+    fi
+
+    if gcloud compute instance-templates delete \
+      --project "${PROJECT}" \
+      --quiet \
+      "${template_name}"; then
+      return 0
+    fi
+
+    if ! gcloud compute instance-templates describe --project "${PROJECT}" "${template_name}" &>/dev/null; then
+      echo -e "${color_yellow}Instance template ${template_name} was deleted by a previous attempt.${color_norm}" >&2
+      return 0
+    fi
+
+    if (( attempt > 4 )); then
+      echo -e "${color_red}Failed to delete instance template ${template_name} ${color_norm}" >&2
+      return 1
+    fi
+    attempt=$((attempt + 1))
+    echo -e "${color_yellow}Attempt ${attempt} failed to delete instance template ${template_name}. Retrying.${color_norm}" >&2
+    sleep $((attempt * 5))
+  done
+}
+
 # Delete a kubernetes cluster. This is called from test-teardown.
 #
 # Assumed vars:
@@ -3665,11 +3738,7 @@ function kube-down() {
     for group in ${all_instance_groups[@]:-}; do
       {
         if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
-          gcloud compute instance-groups managed delete \
-            --project "${PROJECT}" \
-            --quiet \
-            --zone "${ZONE}" \
-            "${group}"
+          delete-managed-instance-group-with-retries "${group}" "${ZONE}"
         fi
       } &
     done
@@ -3735,10 +3804,7 @@ function kube-down() {
     for template in ${templates[@]:-}; do
       {
         if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
-          gcloud compute instance-templates delete \
-            --project "${PROJECT}" \
-            --quiet \
-            "${template}" &
+          delete-instance-template-with-retries "${template}"
         fi
       } &
     done
