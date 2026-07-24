@@ -357,8 +357,8 @@ func waitForCRDReadyWatchUnsafe(crd *apiextensionsv1.CustomResourceDefinition, a
 	return crd, nil
 }
 
-// waitForCRDReady creates the given CRD and makes sure its watch cache is primed on the server.
-func waitForCRDReady(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, dynamicClientSet dynamic.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
+// WaitForCRDWatchCacheReady waits until the given CRD's watch cache is primed on the server.
+func WaitForCRDWatchCacheReady(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, dynamicClientSet dynamic.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
 	v1CRD, err := waitForCRDReadyWatchUnsafe(crd, apiExtensionsClient)
 	if err != nil {
 		return nil, err
@@ -375,7 +375,11 @@ func waitForCRDReady(crd *apiextensionsv1.CustomResourceDefinition, apiExtension
 	// This way all the tests that are checking for watches don't have to worry about RV too old problems because crazy things *could* happen
 	// before like the created RV could be too old to watch.
 	err = wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-		return isWatchCachePrimed(v1CRD, dynamicClientSet)
+		ready, err := isWatchCachePrimed(v1CRD, dynamicClientSet)
+		if errors.IsTooManyRequests(err) || errors.IsServiceUnavailable(err) {
+			return false, nil
+		}
+		return ready, err
 	})
 	if err != nil {
 		return nil, err
