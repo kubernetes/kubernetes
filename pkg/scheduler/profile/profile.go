@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -87,6 +88,22 @@ func NewRecorderFactory(b events.EventBroadcaster) RecorderFactory {
 	return func(name string) events.EventRecorderLogger {
 		return b.NewRecorder(scheme.Scheme, name)
 	}
+}
+
+// FrameworkForPod returns the framework registered for the pod's scheduler
+// name. An empty scheduler name falls back to the default scheduler — this
+// cannot happen for pods observed via the API (the field is defaulted there),
+// but can for synthetic pods used in scheduling simulations.
+func (m Map) FrameworkForPod(pod *v1.Pod) (framework.Framework, error) {
+	name := pod.Spec.SchedulerName
+	if name == "" {
+		name = v1.DefaultSchedulerName
+	}
+	f, ok := m[name]
+	if !ok {
+		return nil, fmt.Errorf("profile not found for scheduler name %q", name)
+	}
+	return f, nil
 }
 
 type cfgValidator struct {
