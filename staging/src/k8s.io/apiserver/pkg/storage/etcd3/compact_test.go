@@ -218,3 +218,57 @@ func TestCompactConflict(t *testing.T) {
 		t.Errorf("Expect current revision = %d, get = %d", wantCurrentRev, curRev3)
 	}
 }
+
+func TestCompactMissingCompactRevKey(t *testing.T) {
+	client := testserver.RunEtcd(t, nil).Client
+	ctx := context.Background()
+
+	putResp, err := client.Put(ctx, "/somekey", "data")
+	if err != nil {
+		t.Fatalf("Put failed: %v", err)
+	}
+
+	t.Log("Compact once to advance local compact time")
+	currentVersion, currentRev, compactRev, err := Compact(ctx, client, 0, putResp.Header.Revision)
+	if err != nil {
+		t.Fatalf("compact failed: %v", err)
+	}
+	if currentVersion != 1 {
+		t.Fatalf("currentVersion = %d, expected 1", currentVersion)
+	}
+	if compactRev != putResp.Header.Revision {
+		t.Fatalf("compactRev = %d, expected %d", compactRev, putResp.Header.Revision)
+	}
+
+	t.Log("Remove compact revision key to simulate an empty recreated backend")
+	if _, err := client.Delete(ctx, compactRevKey); err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+
+	t.Log("Compact should reset local compact time instead of panicking")
+	currentVersion, currentRev, compactRev, err = Compact(ctx, client, currentVersion, currentRev)
+	if err != nil {
+		t.Fatalf("compact failed: %v", err)
+	}
+	if currentVersion != 0 {
+		t.Errorf("currentVersion = %d, expected 0", currentVersion)
+	}
+	if compactRev != 0 {
+		t.Errorf("compactRev = %d, expected 0", compactRev)
+	}
+	if currentRev == 0 {
+		t.Errorf("currentRev = %d, expected non-zero", currentRev)
+	}
+
+	t.Log("Next compaction should recreate compact revision key")
+	currentVersion, _, compactRev, err = Compact(ctx, client, currentVersion, currentRev)
+	if err != nil {
+		t.Fatalf("compact failed: %v", err)
+	}
+	if currentVersion != 1 {
+		t.Errorf("currentVersion = %d, expected 1", currentVersion)
+	}
+	if compactRev != currentRev {
+		t.Errorf("compactRev = %d, expected %d", compactRev, currentRev)
+	}
+}
