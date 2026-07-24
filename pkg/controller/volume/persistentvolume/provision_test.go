@@ -20,6 +20,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/klog/v2/ktesting"
 
 	v1 "k8s.io/api/core/v1"
@@ -216,12 +217,13 @@ func TestProvisionSync(t *testing.T) {
 			test:            wrapTestWithProvisionCalls([]provisionCall{provision1Error}, testSyncClaim),
 		},
 		{
-			// No provisioning if there is a matching volume available
+			// No provisioning if there is a matching volume available; syncClaim
+			// reserves it (writes only the PV) instead of provisioning.
 			name:            "11-6 - provisioning when there is a volume available",
 			initialVolumes:  newVolumeArray("volume11-6", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classGold),
-			expectedVolumes: newVolumeArray("volume11-6", "1Gi", "uid11-6", "claim11-6", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classGold, volume.AnnBoundByController),
+			expectedVolumes: newVolumeArray("volume11-6", "1Gi", "uid11-6", "claim11-6", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classGold, volume.AnnBoundByController),
 			initialClaims:   newClaimArray("claim11-6", "uid11-6", "1Gi", "", v1.ClaimPending, &classGold),
-			expectedClaims:  newClaimArray("claim11-6", "uid11-6", "1Gi", "volume11-6", v1.ClaimBound, &classGold, volume.AnnBoundByController, volume.AnnBindCompleted),
+			expectedClaims:  newClaimArray("claim11-6", "uid11-6", "1Gi", "", v1.ClaimPending, &classGold),
 			expectedEvents:  noevents,
 			errors:          noerrors,
 			// No provisioning plugin confingure - makes the test fail when
@@ -499,13 +501,13 @@ func TestProvisionSync(t *testing.T) {
 			test:           wrapTestWithCSIMigrationProvisionCalls(testSyncClaim),
 		},
 		{
-			// volume provisioned and available
-			// in this case, NO normal event with external provisioner should be issued
+			// volume already available; syncClaim reserves it (writes only the PV)
+			// instead of provisioning. NO normal event with external provisioner.
 			name:            "11-22 - external provisioner with volume available",
 			initialVolumes:  newVolumeArray("volume11-22", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classExternal),
-			expectedVolumes: newVolumeArray("volume11-22", "1Gi", "uid11-22", "claim11-22", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, volume.AnnBoundByController),
+			expectedVolumes: newVolumeArray("volume11-22", "1Gi", "uid11-22", "claim11-22", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classExternal, volume.AnnBoundByController),
 			initialClaims:   newClaimArray("claim11-22", "uid11-22", "1Gi", "", v1.ClaimPending, &classExternal),
-			expectedClaims:  newClaimArray("claim11-22", "uid11-22", "1Gi", "volume11-22", v1.ClaimBound, &classExternal, volume.AnnBoundByController, volume.AnnBindCompleted),
+			expectedClaims:  newClaimArray("claim11-22", "uid11-22", "1Gi", "", v1.ClaimPending, &classExternal),
 			expectedEvents:  noevents,
 			errors:          noerrors,
 			test:            wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
@@ -627,7 +629,7 @@ func TestProvisionMultiSync(t *testing.T) {
 				// operationTimestamps. Rely on the existences of the start time stamp to create a PV for binding
 				if ctrl.operationTimestamps.Has("default/claim12-2") {
 					volume := newVolume("pvc-uid12-2", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classExternal)
-					ctrl.volumes.store.Add(volume) // add the volume to controller
+					require.NoError(t, ctrl.volumes.Indexer().Add(volume)) // add the volume to controller
 					reactor.AddVolume(volume)
 				}
 			}),
@@ -666,7 +668,7 @@ func TestProvisionMultiSync(t *testing.T) {
 				// operationTimestamps. Rely on the existences of the start time stamp to create a PV for binding
 				if ctrl.operationTimestamps.Has("default/claim12-4") {
 					volume := newVolume("pvc-uid12-4", "1Gi", "uid12-4", "claim12-4", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, volume.AnnBoundByController)
-					ctrl.volumes.store.Add(volume) // add the volume to controller
+					require.NoError(t, ctrl.volumes.Indexer().Add(volume)) // add the volume to controller
 					reactor.AddVolume(volume)
 				}
 			}),
