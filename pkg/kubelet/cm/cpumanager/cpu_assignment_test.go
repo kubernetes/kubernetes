@@ -1063,7 +1063,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, false)
+			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, false, 0)
 			if err != nil {
 				if tc.expErr == "" {
 					t.Errorf("unexpected error [%v]", err)
@@ -1086,4 +1086,100 @@ func mustParseCPUSet(t *testing.T, s string) cpuset.CPUSet {
 		t.Errorf("parsing %q: %v", s, err)
 	}
 	return cpus
+}
+
+func TestTakeByTopologyNUMADistributedWithMinNUMAHint(t *testing.T) {
+	// This test verifies the fix for https://github.com/kubernetes/kubernetes/issues/139430
+	// When TopologyManager selects a 4-NUMA affinity (e.g., for GPU alignment),
+	// CPUManager should not shrink the allocation to fewer NUMA nodes even if
+	// fewer nodes could satisfy the CPU count.
+	logger, _ := ktesting.NewTestContext(t)
+
+	testCases := []struct {
+		description  string
+		topo         *topology.CPUTopology
+		availableCPUs cpuset.CPUSet
+		numCPUs      int
+		cpuGroupSize int
+		minNUMAsFromHint  int
+		expNUMAs     int // expected number of NUMA nodes in result
+	}{
+		{
+			// 4 NUMA nodes, 20 CPUs each (80 total). Request 30 CPUs.
+			// Without hint: minNUMAs=2 (30 fits in 2 NUMAs of 20 each)
+			// With hint=4: must use all 4 NUMAs
+			description:   "30 CPUs with 4-NUMA hint should distribute across all 4 NUMAs",
+			topo:          topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs: mustParseCPUSet(t, "0-79"),
+			numCPUs:       30,
+			cpuGroupSize:  1,
+			minNUMAsFromHint:   4,
+			expNUMAs:      4,
+		},
+		{
+			// Same topology, no hint (0) → should use minimum NUMAs (2)
+			description:   "30 CPUs without hint should pack into minimum NUMAs",
+			topo:          topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs: mustParseCPUSet(t, "0-79"),
+			numCPUs:       30,
+			cpuGroupSize:  1,
+			minNUMAsFromHint:   0,
+			expNUMAs:      2,
+		},
+		{
+			// 4 NUMA hint but only need 10 CPUs (fits in 1 NUMA)
+			// hint=4 should still force 4-NUMA distribution
+			description:   "10 CPUs with 4-NUMA hint should distribute across all 4 NUMAs",
+			topo:          topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs: mustParseCPUSet(t, "0-79"),
+			numCPUs:       4,
+			cpuGroupSize:  1,
+			minNUMAsFromHint:   4,
+			expNUMAs:      4,
+		},
+		{
+			// Regression guard: hint exceeds available NUMA nodes (8 > 4).
+			// Should gracefully fall back to the original algorithm behavior
+			// (minimum NUMAs needed) without panicking or erroring.
+			description:   "hint exceeds max NUMAs should fallback to minimum (regression guard)",
+			topo:          topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs: mustParseCPUSet(t, "0-79"),
+			numCPUs:       30,
+			cpuGroupSize:  1,
+			minNUMAsFromHint:   8,
+			expNUMAs:      2,
+		},
+		{
+			// Regression guard: hint smaller than computed minNUMAs.
+			// 30 CPUs on 4x20 topology → minNUMAs=2. hint=1 is below that.
+			// Should NOT reduce below the computed minimum; keeps original behavior.
+			description:   "hint smaller than minNUMAs should not reduce distribution (regression guard)",
+			topo:          topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs: mustParseCPUSet(t, "0-79"),
+			numCPUs:       30,
+			cpuGroupSize:  1,
+			minNUMAsFromHint:   1,
+			expNUMAs:      2,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, false, tc.minNUMAsFromHint)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Count how many distinct NUMA nodes are represented in the result
+			numaNodes := make(map[int]bool)
+			for _, cpuID := range result.UnsortedList() {
+				numaNodes[tc.topo.CPUDetails[cpuID].NUMANodeID] = true
+			}
+
+			if len(numaNodes) != tc.expNUMAs {
+				t.Errorf("expected CPUs distributed across %d NUMA nodes, got %d (NUMAs: %v, result: %s)",
+					tc.expNUMAs, len(numaNodes), numaNodes, result)
+			}
+		})
+	}
 }
