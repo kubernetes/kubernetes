@@ -65,6 +65,10 @@ var (
 	defaultBackoffReset  = 2 * time.Minute
 	defaultBackoffFactor = 2.0
 	defaultBackoffJitter = 1.0
+	// maxWatchListIncompleteStreams bounds how many watch-list streams may
+	// end without the "initial-events-end" bookmark before watchList gives
+	// up and falls back to a regular list.
+	maxWatchListIncompleteStreams = 3
 )
 
 // ReflectorStore is the subset of cache.Store that the reflector uses
@@ -837,6 +841,7 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 
 	initTrace := trace.New("Reflector WatchList", trace.Field{Key: "name", Value: r.name})
 	defer initTrace.LogIfLong(10 * time.Second)
+	incompleteStreams := 0
 	for {
 		select {
 		case <-stopCh:
@@ -886,6 +891,13 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 		}
 		if watchListBookmarkReceived {
 			break
+		}
+		// The stream ended without the bookmark. Retrying happens without a
+		// backoff, so a misbehaving API server could otherwise keep this
+		// informer from ever syncing while being hit with requests.
+		incompleteStreams++
+		if incompleteStreams >= maxWatchListIncompleteStreams {
+			return nil, fmt.Errorf("watch-list for %s ended %d times without the initial-events-end bookmark, giving up", r.typeDescription, incompleteStreams)
 		}
 	}
 	// We successfully got initial state from watch-list confirmed by the
