@@ -43,6 +43,7 @@ type ResourceClaimInterface interface {
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, resourceClaim *resourcev1beta2.ResourceClaim, opts v1.UpdateOptions) (*resourcev1beta2.ResourceClaim, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*resourcev1beta2.ResourceClaim, error)
 	List(ctx context.Context, opts v1.ListOptions) (*resourcev1beta2.ResourceClaimList, error)
