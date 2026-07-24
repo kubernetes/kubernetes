@@ -92,10 +92,10 @@ func TestAllowlist(t *testing.T) {
 			t.Errorf("expected to be allowlisted: %+v, got: %v", test, err)
 		}
 		if test.hostUsers {
-			pod.Spec.HostUsers = new(bool)
-			*pod.Spec.HostUsers = true
-		} else {
 			pod.Spec.HostUsers = nil
+		} else {
+			pod.Spec.HostUsers = new(bool)
+			*pod.Spec.HostUsers = false
 		}
 		pod.Spec.SecurityContext.Sysctls = []v1.Sysctl{{Name: test.sysctl, Value: test.sysctl}}
 		status := w.Admit(tCtx, attrs)
@@ -111,10 +111,10 @@ func TestAllowlist(t *testing.T) {
 		pod.Spec.HostNetwork = test.hostNet
 		pod.Spec.HostIPC = test.hostIPC
 		if test.hostUsers {
-			pod.Spec.HostUsers = new(bool)
-			*pod.Spec.HostUsers = true
-		} else {
 			pod.Spec.HostUsers = nil
+		} else {
+			pod.Spec.HostUsers = new(bool)
+			*pod.Spec.HostUsers = false
 		}
 		pod.Spec.SecurityContext.Sysctls = []v1.Sysctl{{Name: test.sysctl, Value: test.sysctl}}
 		status := w.Admit(tCtx, attrs)
