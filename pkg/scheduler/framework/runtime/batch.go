@@ -245,8 +245,7 @@ func (b *OpportunisticBatch) refreshHintCandidates(ctx context.Context, pod *v1.
 func (b *OpportunisticBatch) rescoreHintedNode(ctx context.Context, pod *v1.Pod, state fwk.CycleState, cycleCount int64,
 	lastChosenNodeInfo fwk.NodeInfo) bool {
 	logger := klog.FromContext(ctx)
-	startTime := time.Now()
-	defer metrics.BatchRescoreDuration.WithLabelValues(b.handle.ProfileName()).Observe(metrics.SinceInSeconds(startTime))
+	defer metrics.BatchRescoreDuration.ObserveSince(time.Now(), b.handle.ProfileName())()
 	metrics.BatchRescoreAttempts.WithLabelValues(b.handle.ProfileName()).Inc()
 
 	status := b.handle.RunPreScorePlugins(ctx, state, pod, []fwk.NodeInfo{lastChosenNodeInfo})
