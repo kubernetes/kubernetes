@@ -39,11 +39,25 @@ func (pl *PrioritySort) Name() string {
 
 // Less is the function used by the activeQ heap algorithm to sort entities.
 // It sorts entities based on their priority. When priorities are equal, it uses
-// the entity timestamp.
+// the entity's initial attempt timestamp, which preserves the order in which
+// entities first entered the active queue. The entity timestamp is used until
+// the initial attempt timestamp is available.
 func (pl *PrioritySort) Less(entity1, entity2 fwk.QueuedEntityInfo) bool {
 	p1 := entity1.GetPriority()
 	p2 := entity2.GetPriority()
-	return (p1 > p2) || (p1 == p2 && entity1.GetTimestamp().Before(entity2.GetTimestamp()))
+	if p1 != p2 {
+		return p1 > p2
+	}
+
+	t1 := entity1.GetTimestamp()
+	if initialAttemptTimestamp := entity1.GetInitialAttemptTimestamp(); initialAttemptTimestamp != nil {
+		t1 = *initialAttemptTimestamp
+	}
+	t2 := entity2.GetTimestamp()
+	if initialAttemptTimestamp := entity2.GetInitialAttemptTimestamp(); initialAttemptTimestamp != nil {
+		t2 = *initialAttemptTimestamp
+	}
+	return t1.Before(t2)
 }
 
 // New initializes a new plugin and returns it.

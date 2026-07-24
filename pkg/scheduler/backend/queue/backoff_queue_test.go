@@ -294,6 +294,8 @@ func TestBackoffQueue_popAllBackoffCompleted(t *testing.T) {
 func TestBackoffQueueOrdering(t *testing.T) {
 	// Align the fake clock with ordering window.
 	fakeClock := testingclock.NewFakeClock(time.Now().Truncate(backoffQOrderingWindowDuration))
+	pod2InitialAttemptTimestamp := fakeClock.Now().Add(-4 * time.Second)
+	pod4InitialAttemptTimestamp := fakeClock.Now().Add(-time.Second)
 	podInfos := []*framework.QueuedPodInfo{
 		{
 			PodInfo: &framework.PodInfo{
@@ -322,10 +324,11 @@ func TestBackoffQueueOrdering(t *testing.T) {
 				Pod: st.MakePod().Name("pod2").Priority(2).Obj(),
 			},
 			QueueingParams: framework.QueueingParams{
-				Timestamp:            fakeClock.Now().Add(-2*time.Second + time.Millisecond),
-				Attempts:             1,
-				UnschedulableCount:   1,
-				UnschedulablePlugins: sets.New("plugin"),
+				Timestamp:               fakeClock.Now().Add(-2*time.Second + time.Millisecond),
+				InitialAttemptTimestamp: &pod2InitialAttemptTimestamp,
+				Attempts:                1,
+				UnschedulableCount:      1,
+				UnschedulablePlugins:    sets.New("plugin"),
 			},
 		},
 		{
@@ -344,10 +347,11 @@ func TestBackoffQueueOrdering(t *testing.T) {
 				Pod: st.MakePod().Name("pod4").Priority(2).Obj(),
 			},
 			QueueingParams: framework.QueueingParams{
-				Timestamp:            fakeClock.Now().Add(-2 * time.Second),
-				Attempts:             1,
-				UnschedulableCount:   1,
-				UnschedulablePlugins: sets.New("plugin"),
+				Timestamp:               fakeClock.Now().Add(-2 * time.Second),
+				InitialAttemptTimestamp: &pod4InitialAttemptTimestamp,
+				Attempts:                1,
+				UnschedulableCount:      1,
+				UnschedulablePlugins:    sets.New("plugin"),
 			},
 		},
 		{
@@ -368,9 +372,9 @@ func TestBackoffQueueOrdering(t *testing.T) {
 		wantPods               []string
 	}{
 		{
-			name:                   "Pods with the same window are ordered by priority if PopFromBackoffQ is enabled",
+			name:                   "Pods with the same window are ordered by priority and initial attempt timestamp if PopFromBackoffQ is enabled",
 			popFromBackoffQEnabled: true,
-			wantPods:               []string{"pod5", "pod4", "pod2", "pod3"},
+			wantPods:               []string{"pod5", "pod2", "pod4", "pod3"},
 		},
 		{
 			name:                   "Pods priority doesn't matter if PopFromBackoffQ is disabled",
