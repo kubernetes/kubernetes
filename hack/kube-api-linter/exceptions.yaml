@@ -108,7 +108,7 @@
 # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
 # The nonpointerstructs linter is included here as well as these two should be enabled hand-in-hand on each API group.
 - text: "must be marked as optional or required|is a non-pointer struct with no required fields."
-  path: "staging/src/k8s.io/api/(admissionregistration|authorization|autoscaling|batch|certificates|core|discovery|events|extensions|networking|storage)"
+  path: "staging/src/k8s.io/api/(admissionregistration|autoscaling|batch|certificates|core|discovery|events|extensions|networking|storage)"
 
 # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
 - text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"
@@ -134,6 +134,11 @@
 # WorkloadSpec.CompositePodGroupTemplates is a union member that is conditionally optional (+k8s:ifEnabled("CompositePodGroup")=+k8s:optional), but the linter requires a static +k8s:optional tag.
 - text: "dependenttags: field WorkloadSpec\\.CompositePodGroupTemplates with marker \\+k8s:unionMember is missing required marker.*"
   path: "staging/src/k8s.io/api/scheduling/(v1alpha3|v1beta1)/types\\.go"
+
+# The (SubjectAccessReview|SelfSubjectAccessReview|LocalSubjectAccessReview).Spec fields hold a union type, but nonpointerstructs does not understand unions today.
+# Validation requires exactly one of spec.resourceAttributes or spec.nonResourceAttributes, so an empty spec is always rejected and the field is required in practice.
+- text: "nonpointerstructs: field (SubjectAccessReview|SelfSubjectAccessReview|LocalSubjectAccessReview)\\.Spec is a non-pointer struct with no required fields\\..*"
+  path: "staging/src/k8s.io/api/authorization/(v1|v1beta1)/types\\.go"
 
 # NoReferences - Existing fields that use Reference/References suffixes instead of Ref/Refs.
 # These fields use the Reference suffix, but renaming them would be a breaking change, so they are allowlisted.
