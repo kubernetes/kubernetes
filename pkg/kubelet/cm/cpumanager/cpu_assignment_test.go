@@ -2044,6 +2044,30 @@ func commonTakeByTopologyExtendedTestCasesForResize(t *testing.T) []takeByTopolo
 			expErr:        "",
 			expResult:     mustParseCPUSet(t, "0,6,2,8,1,7,5,11"),
 		},
+		// Support the scenatio that some numa allocate more than 1 remainder
+		{
+			description:   "Allocated 19 CPUs, allocated CPUs greater than distribution, allocate 67 CPUs distributed across the 4 NUMA nodes (cpuGroupSize 1)",
+			topo:          topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs: mustParseCPUSet(t, "0-79"),
+			allocatedCPUs: mustParseCPUSet(t, "0-9,40-48"),
+			baselineCPUs:  mustParseCPUSet(t, "0-9,40-48"),
+			numCPUs:       67,
+			cpuGroupSize:  1,
+			expErr:        "",
+			expResult:     mustParseCPUSet(t, "0-9,40-48,10-17,50-57,20-27,60-67,30-37,70-77"),
+		},
+		// Fallback case: If a NUMA node allocates more CPUs than distribution + neededRemainder, it will back to the CPU packed strategy.
+		{
+			description:   "1 NUMA allocated 19 CPUs, which exceeds distribution + neededRemainder, fallback to CPU packed strategy",
+			topo:          topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs: mustParseCPUSet(t, "0-79"),
+			allocatedCPUs: mustParseCPUSet(t, "0-9,40-48"),
+			baselineCPUs:  mustParseCPUSet(t, "0-9,40-48"),
+			numCPUs:       66,
+			cpuGroupSize:  1,
+			expErr:        "",
+			expResult:     mustParseCPUSet(t, "0-32,40-72"),
+		},
 		{
 			description:   "Allocated 8 CPUs on 2 NUMA nodes, scale up to 10 with cpuGroupSize 2 must stay distributed (maxNUMAs computed from full request)",
 			topo:          topoDualSocketMultiNumaPerSocketHT,
