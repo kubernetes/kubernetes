@@ -62,6 +62,8 @@ func TestLibraryCompatibility(t *testing.T) {
 		// Kubernetes <1.37>:
 		"includes",
 		// Kubernetes <1.??>:
+		"mul", "div", "divInt",
+		// Kubernetes <1.36>
 	)
 
 	// TODO: test celgo function lists
