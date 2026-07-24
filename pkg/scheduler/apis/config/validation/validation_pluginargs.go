@@ -40,6 +40,11 @@ var supportedScoringStrategyTypes = sets.New(
 	string(config.RequestedToCapacityRatio),
 )
 
+var supportedPodTopologySpreadNodePolicies = sets.New(
+	v1.NodeInclusionPolicyHonor,
+	v1.NodeInclusionPolicyIgnore,
+)
+
 // ValidateDefaultPreemptionArgs validates that DefaultPreemptionArgs are correct.
 func ValidateDefaultPreemptionArgs(path *field.Path, args *config.DefaultPreemptionArgs) error {
 	var allErrs field.ErrorList
@@ -116,6 +121,13 @@ func ValidatePodTopologySpreadArgs(path *field.Path, args *config.PodTopologySpr
 		if err := validateWhenUnsatisfiable(p.Child("whenUnsatisfiable"), c.WhenUnsatisfiable); err != nil {
 			allErrs = append(allErrs, err)
 		}
+		allErrs = append(allErrs, validateMinDomains(p.Child("minDomains"), c.MinDomains, c.WhenUnsatisfiable)...)
+		if err := validateNodeInclusionPolicy(p.Child("nodeAffinityPolicy"), c.NodeAffinityPolicy); err != nil {
+			allErrs = append(allErrs, err)
+		}
+		if err := validateNodeInclusionPolicy(p.Child("nodeTaintsPolicy"), c.NodeTaintsPolicy); err != nil {
+			allErrs = append(allErrs, err)
+		}
 		if c.LabelSelector != nil {
 			f := field.Forbidden(p.Child("labelSelector"), "constraint must not define a selector, as they deduced for each pod")
 			allErrs = append(allErrs, f)
@@ -158,6 +170,31 @@ func validateWhenUnsatisfiable(p *field.Path, v v1.UnsatisfiableConstraintAction
 	}
 	if !supportedScheduleActions.Has(string(v)) {
 		return field.NotSupported(p, v, sets.List(supportedScheduleActions))
+	}
+	return nil
+}
+
+func validateMinDomains(p *field.Path, minDomains *int32, action v1.UnsatisfiableConstraintAction) field.ErrorList {
+	if minDomains == nil {
+		return nil
+	}
+
+	var allErrs field.ErrorList
+	if *minDomains <= 0 {
+		allErrs = append(allErrs, field.Invalid(p, *minDomains, "not in valid range (0, inf)"))
+	}
+	if action != v1.DoNotSchedule {
+		allErrs = append(allErrs, field.Invalid(p, *minDomains, fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", v1.DoNotSchedule, action)))
+	}
+	return allErrs
+}
+
+func validateNodeInclusionPolicy(p *field.Path, policy *v1.NodeInclusionPolicy) *field.Error {
+	if policy == nil {
+		return nil
+	}
+	if !supportedPodTopologySpreadNodePolicies.Has(*policy) {
+		return field.NotSupported(p, *policy, sets.List(supportedPodTopologySpreadNodePolicies))
 	}
 	return nil
 }
