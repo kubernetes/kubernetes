@@ -237,12 +237,6 @@ var (
 					PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, ResourceClaimName: &claimName2}).
 					PodGroupName(podGroupName).
 					Obj()
-	groupedPodWithClaimNameScheduled = st.MakePod().Name(podName).Namespace(namespace).
-						UID(podUID).
-						Node(nodeName).
-						PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
-						PodGroupName(podGroupName).
-						Obj()
 	groupedPodWithClaimTemplateInStatus = func() *v1.Pod {
 		pod := podWithClaimTemplateInStatus.DeepCopy()
 		pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
