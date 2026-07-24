@@ -67,12 +67,50 @@ func TestLatencyTrackersFrom(t *testing.T) {
 			t.Errorf("expected admit duration: %q, but got: %q", tc.SumDurations, wd.MutatingWebhookTracker.GetLatency())
 		}
 
-		if wd.ValidatingWebhookTracker.GetLatency() != tc.MaxDuration {
-			t.Errorf("expected validate duration: %q, but got: %q", tc.MaxDuration, wd.ValidatingWebhookTracker.GetLatency())
+		if wd.ValidatingWebhookTracker.GetLatency() != 0 {
+			t.Errorf("expected validate duration before CommitRound: %q, but got: %q", time.Duration(0), wd.ValidatingWebhookTracker.GetLatency())
 		}
 
 		if wd.APFQueueWaitTracker.GetLatency() != tc.MaxDuration {
 			t.Errorf("expected priority & fairness duration: %q, but got: %q", tc.MaxDuration, wd.APFQueueWaitTracker.GetLatency())
 		}
 	})
+}
+
+func TestSumOfMaxPerRoundTracker(t *testing.T) {
+	clk := clocktesting.FakeClock{}
+	tracker := newSumOfMaxPerRoundTracker(&clk)
+
+	// round 1
+	for _, d := range []time.Duration{100, 400, 200} {
+		tracker.Track(func() { clk.Step(d) })
+	}
+	if got := tracker.GetLatency(); got != 0 {
+		t.Errorf("round 1 before CommitRound: want 0, got %v", got)
+	}
+	tracker.(RoundCommitter).CommitRound()
+	if got := tracker.GetLatency(); got != 400 {
+		t.Errorf("after round 1 CommitRound: want 400, got %v", got)
+	}
+
+	// round 2
+	for _, d := range []time.Duration{300, 150} {
+		tracker.Track(func() { clk.Step(d) })
+	}
+	tracker.(RoundCommitter).CommitRound()
+	if got := tracker.GetLatency(); got != 700 {
+		t.Errorf("after round 2 CommitRound: want 700 (400+300), got %v", got)
+	}
+
+	// round 3
+	tracker.Track(func() { clk.Step(50) })
+	tracker.(RoundCommitter).CommitRound()
+	if got := tracker.GetLatency(); got != 750 {
+		t.Errorf("after round 3 CommitRound: want 750 (400+300+50), got %v", got)
+	}
+
+	tracker.(RoundCommitter).CommitRound()
+	if got := tracker.GetLatency(); got != 750 {
+		t.Errorf("after empty CommitRound: want 750, got %v", got)
+	}
 }
