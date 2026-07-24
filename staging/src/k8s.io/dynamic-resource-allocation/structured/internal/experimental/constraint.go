@@ -38,7 +38,10 @@ type distinctAttributeConstraint struct {
 	attributeName resourceapi.FullyQualifiedName
 	features      Features
 
-	attributes []*resourceapi.DeviceAttribute
+	attributes    []*resourceapi.DeviceAttribute
+	attributeSets []*deviceAttributeListAsSet
+
+	attributeSetCache *deviceAttributeAsSetCache
 }
 
 func (m *distinctAttributeConstraint) add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) bool {
@@ -54,7 +57,17 @@ func (m *distinctAttributeConstraint) add(requestName, subRequestName string, de
 		return false
 	}
 
-	if !m.matchesAttribute(*attribute) {
+	if m.features.ListTypeAttributes {
+		if m.attributeSetCache == nil {
+			m.attributeSetCache = newDeviceAttributeAsSetCache(m.attributeName)
+		}
+		attributeSet := m.attributeSetCache.get(device, deviceID)
+		if !m.matchesAttributeSet(attributeSet) {
+			m.logger.V(7).Info("Constraint not satisfied, has some duplicated attributes")
+			return false
+		}
+		m.attributeSets = append(m.attributeSets, attributeSet)
+	} else if !m.matchesAttribute(*attribute) {
 		m.logger.V(7).Info("Constraint not satisfied, has some duplicated attributes")
 		return false
 	}
@@ -71,6 +84,9 @@ func (m *distinctAttributeConstraint) remove(requestName, subRequestName string,
 	}
 
 	m.attributes = m.attributes[:len(m.attributes)-1]
+	if m.features.ListTypeAttributes {
+		m.attributeSets = m.attributeSets[:len(m.attributeSets)-1]
+	}
 	m.logger.V(7).Info("Device removed from constraint set", "device", deviceID, "numDevices", len(m.attributes))
 }
 
@@ -81,6 +97,26 @@ func (m *distinctAttributeConstraint) matches(requestName, subRequestName string
 		fullSubRequestName := fmt.Sprintf("%s/%s", requestName, subRequestName)
 		return m.requestNames.Has(requestName) || m.requestNames.Has(fullSubRequestName)
 	}
+}
+
+func (m *distinctAttributeConstraint) matchesAttributeSet(newSet *deviceAttributeListAsSet) bool {
+	if newSet == nil {
+		m.logger.V(7).Info("Unknown attribute type")
+		return false
+	}
+
+	for _, existingSet := range m.attributeSets {
+		if existingSet == nil {
+			continue
+		}
+		if newSet.intersection(existingSet) != nil {
+			m.logger.V(7).Info("Constraint not satisfied, devices have common elements")
+			return false
+		}
+	}
+
+	m.logger.V(7).Info("Constraint satisfied, new device is disjoint from all existing devices")
+	return true
 }
 
 func (m *distinctAttributeConstraint) matchesAttribute(attribute resourceapi.DeviceAttribute) bool {
