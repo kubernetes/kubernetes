@@ -267,6 +267,13 @@
   help: The count of disabled metrics.
   type: Counter
   stabilityLevel: BETA
+- name: changes
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlice changes
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - operation
 - name: desired_endpoint_slices
   subsystem: endpoint_slice_controller
   help: Number of EndpointSlices that would exist with perfect endpoint allocation

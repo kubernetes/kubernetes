@@ -89,7 +89,7 @@ var (
 			Subsystem:      EndpointSliceSubsystem,
 			Name:           "changes",
 			Help:           "Number of EndpointSlice changes",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"operation"},
 	)
