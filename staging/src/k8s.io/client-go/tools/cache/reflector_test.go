@@ -1141,6 +1141,73 @@ func TestReflectorWatchListPageSize(t *testing.T) {
 	}
 }
 
+// TestReflectorWatchListGivesUpAfterIncompleteStream reproduces
+// https://github.com/kubernetes/kubernetes/issues/140890: if the watch-list
+// stream keeps ending without ever delivering the "initial-events-end"
+// bookmark, the reflector must eventually give up on watch-list and fall
+// back to a regular list, instead of retrying forever.
+func TestReflectorWatchListGivesUpAfterIncompleteStream(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Now())
+
+	var watchListAttempts int
+	lw := &ListWatch{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			if options.SendInitialEvents == nil || !*options.SendInitialEvents {
+				return watch.NewFake(), nil
+			}
+
+			watchListAttempts++
+			fakeClock.Step(time.Minute)
+
+			w := watch.NewFakeWithChanSize(1, false)
+			w.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "stale", ResourceVersion: "1"}})
+			w.Stop()
+			return w, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			return &v1.PodList{
+				ListMeta: metav1.ListMeta{ResourceVersion: "5"},
+				Items:    []v1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", ResourceVersion: "5"}}},
+			}, nil
+		},
+	}
+
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+	s := NewStore(MetaNamespaceKeyFunc)
+	r := NewReflectorWithOptions(lw, &v1.Pod{}, s, ReflectorOptions{Clock: fakeClock})
+
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+
+	doneCh := make(chan error, 1)
+	go func() {
+		doneCh <- r.ListAndWatchWithContext(ctx)
+	}()
+
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
+		return r.LastSyncResourceVersion() == "5", nil
+	}); err != nil {
+		cancel()
+		t.Fatalf("reflector never fell back to list and synced: %v", err)
+	}
+
+	cancel()
+	select {
+	case err := <-doneCh:
+		require.NoError(t, err)
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("timed out waiting for ListAndWatchWithContext to return")
+	}
+
+	if watchListAttempts < 2 {
+		t.Errorf("expected watch-list to be retried at least once before giving up, got %d attempt(s)", watchListAttempts)
+	}
+	results := s.List()
+	if len(results) != 1 {
+		t.Errorf("expected 1 result from the fallback list, got %d", len(results))
+	}
+}
+
 func TestReflectorNotPaginatingNotConsistentReads(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancelCause(ctx)
