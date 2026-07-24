@@ -51,10 +51,10 @@ const (
 // - Allow: unconditional Allow.
 // - Deny: unconditional Deny.
 // - NoOpinion: unconditional NoOpinion.
-// - Conditional: conditional on some previously-unseen data.
+// - ConditionsMap: conditional, expressed as a map of conditions to be evaluated later.
 // - Union: an ordered list of sub-decisions, which forms a tree of decisions.
 //
-// The zero value (ConditionsAwareDecision{}) is equivalent to ConditionsAwareDecisionDeny().
+// The zero value (ConditionsAwareDecision{}) is equivalent to ConditionsAwareDecisionDeny("", nil).
 // A ConditionsAwareDecision is passed by value.
 // Important: A ConditionsAwareDecision is immutable after construction.
 type ConditionsAwareDecision struct {
@@ -155,31 +155,32 @@ func (d ConditionsAwareDecision) IsUnconditional() bool {
 	return d.IsAllow() || d.IsDeny() || d.IsNoOpinion()
 }
 
-// unconditionalParts turns a ConditionsAwareDecision into the
-// triple that Authorize expects. If the decision is
-// conditional, the returned condition is Deny if there were at least
-// some Deny condition, otherwise NoOpinion.
-// This function is meant to be called when IsUnconditional() == true.
-//
-// If the authorizer is conditions-aware, it can choose to only implement
-// real business logic in the ConditionsAwareAuthorize method, and implement
-// Authorize() as "return self.ConditionsAwareAuthorize(ctx, attrs).unconditionalParts()"
-//
-// Private for now, to not encourage callers to perform conditions-aware logic where not needed.
-func (d ConditionsAwareDecision) unconditionalParts() (Decision, string, error) {
+// UnconditionalParts splits a ConditionsAwareDecision into the
+// standard (unconditional Decision, reason, error) triple.
+// When expectConditional is true, the caller says "return the unconditional triple or round it down".
+// When expectConditional is false, the caller says "I know d is unconditional, just split it into the triple".
+func (d ConditionsAwareDecision) UnconditionalParts(expectConditional bool) (Decision, string, error) {
 	switch {
-	case d.IsAllow():
-		return DecisionAllow, d.Reason(), d.Error()
 	case d.IsDeny():
 		return DecisionDeny, d.Reason(), d.Error()
 	case d.IsNoOpinion():
 		return DecisionNoOpinion, d.Reason(), d.Error()
+	case d.IsAllow():
+		return DecisionAllow, d.Reason(), d.Error()
+	// After this, it's known that the response is conditional
+	case expectConditional:
+		// When expectConditional is true, the caller explicitly said
+		// "return the unconditional response or round it down"
+		failureDecision := d.FailureDecision()
+		reason := fmt.Sprintf(
+			"failed closed from conditional decision (with possible outcomes %v) to %s during unconditional authorization",
+			sets.List(d.PossibleDecisions()),
+			failureDecision.String(),
+		)
+		return failureDecision, reason, nil
 	default:
-		// An error is not returned here, as that could yield a HTTP response code of 500 instead of 403.
-		// For the use-case described above with regards to calling this function in Authorize, not returning
-		// an error is important, as it is valid to always fail closed, as if this happens, no unconditional
-		// permissions were given the requestor.
-		return d.FailureDecision(), "failed closed: tried to return conditional decision to conditions-unaware authorizer", nil
+		// When expectConditional is false, down-casting the conditional decision to an unconditional one is an error
+		return d.FailureDecision(), "failed closed", fmt.Errorf("tried to return an unexpected conditional decision during unconditional authorization")
 	}
 }
 
@@ -214,8 +215,8 @@ func (d ConditionsAwareDecision) FailureDecision() Decision {
 	return DecisionNoOpinion
 }
 
-// ContainsUnconditionalAllowOrDeny returns true whether there union contains at least one
-// Allow or Deny decision within the tree of decisions.
+// ContainsUnconditionalAllowOrDeny returns true if this decision's tree contains at least
+// one unconditional Allow or Deny leaf.
 func (d ConditionsAwareDecision) ContainsUnconditionalAllowOrDeny() bool {
 	if d.IsAllow() || d.IsDeny() {
 		return true
@@ -302,6 +303,6 @@ func (d ConditionsAwareDecision) String() string {
 		return fmt.Sprintf("ConditionsMap%s", paramsStr())
 	}
 	// Deny is written such that if none of the other modes apply,
-	// IsDenied() is true.
+	// IsDeny() is true.
 	return fmt.Sprintf("Deny%s", paramsStr())
 }

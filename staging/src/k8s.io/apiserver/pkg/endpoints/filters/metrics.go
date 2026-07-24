@@ -42,9 +42,10 @@ const (
 	failureLabel = "failure"
 	errorLabel   = "error"
 
-	allowedLabel   = "allowed"
-	deniedLabel    = "denied"
-	noOpinionLabel = "no-opinion"
+	allowedLabel     = "allowed"
+	deniedLabel      = "denied"
+	noOpinionLabel   = "no-opinion"
+	conditionalLabel = "conditional"
 )
 
 var (
@@ -79,7 +80,7 @@ var (
 	authorizationAttemptsCounter = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Name:           "authorization_attempts_total",
-			Help:           "Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.",
+			Help:           "Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion', 'conditional' or 'error'.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"result"},
@@ -113,20 +114,36 @@ func RegisterMetrics() {
 	})
 }
 
-func recordAuthorizationMetrics(ctx context.Context, authorized authorizer.Decision, err error, authStart time.Time, authFinish time.Time) {
-	var resultLabel string
-
+func authorizationMetricsLabelForAuthorize(authorized authorizer.Decision, err error) string {
 	switch {
 	case authorized == authorizer.DecisionAllow:
-		resultLabel = allowedLabel
+		return allowedLabel
 	case err != nil:
-		resultLabel = errorLabel
+		return errorLabel
 	case authorized == authorizer.DecisionDeny:
-		resultLabel = deniedLabel
+		return deniedLabel
 	case authorized == authorizer.DecisionNoOpinion:
-		resultLabel = noOpinionLabel
+		return noOpinionLabel
 	}
+	return ""
+}
 
+func authorizationMetricsLabelForAuthorizeConditionsAware(decision authorizer.ConditionsAwareDecision) string {
+	switch {
+	case decision.IsAllow():
+		return allowedLabel
+	case decision.PossibleDecisions().Has(authorizer.DecisionAllow):
+		return conditionalLabel
+	case decision.Error() != nil:
+		return errorLabel
+	case decision.IsNoOpinion():
+		return noOpinionLabel
+	default:
+		return deniedLabel
+	}
+}
+
+func recordAuthorizationMetrics(ctx context.Context, resultLabel string, authStart time.Time, authFinish time.Time) {
 	authorizationAttemptsCounter.WithContext(ctx).WithLabelValues(resultLabel).Inc()
 	authorizationLatency.WithContext(ctx).WithLabelValues(resultLabel).Observe(authFinish.Sub(authStart).Seconds())
 }

@@ -21,10 +21,12 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -59,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/exclusion"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -242,6 +245,10 @@ func BuildGenericConfig(
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) {
+		genericConfig.Authorization.ConditionalAuthorizationRequestClassifier = conditionalRequestClassifier
+	}
+
 	lastErr = s.Audit.ApplyTo(genericConfig)
 	if lastErr != nil {
 		return
@@ -281,6 +288,38 @@ func BuildAuthorizer(ctx context.Context, s options.CompletedOptions, egressSele
 	authorizer, ruleResolver, err := authorizationConfig.New(ctx, apiserverID)
 
 	return authorizer, ruleResolver, enablesRBAC, err
+}
+
+// the verbs for which admission control applies to in kube-apiserver
+var admissionVerbs = sets.New("create", "update", "patch", "delete", "deletecollection")
+
+// conditionalRequestClassifier returns true if admission runs for
+func conditionalRequestClassifier(attrs authorizer.Attributes) bool {
+	// Make sure there is exactly one GVR matched. This _should_ be the case in the HTTP filter, but just to make sure.
+	if len(attrs.GetResource()) == 0 || attrs.GetResource() == "*" {
+		return false
+	}
+	if attrs.GetAPIGroup() == "*" {
+		return false
+	}
+	if len(attrs.GetAPIVersion()) == 0 || attrs.GetAPIVersion() == "*" {
+		return false
+	}
+	gr := schema.GroupResource{
+		Group:    attrs.GetAPIGroup(),
+		Resource: attrs.GetResource(),
+	}
+	// if the GroupResource is excluded from admission, we cannot enforce conditions
+	if slices.Contains(exclusion.Excluded(), gr) {
+		return false
+	}
+	// If the verb is one which is subject to admission, the ConditionsEnforcer will catch the
+	// request, and thus is the request conditions-aware.
+	// TODO(luxas): Inspect whether the API group belongs to an aggregated API server, and in that case,
+	// always consider the request to be conditions-aware, as the aggregated API server could support
+	// conditions for any kind of request.
+	// Also, support connect requests that are accessed through the GET HTTP verb.
+	return admissionVerbs.Has(attrs.GetVerb())
 }
 
 // CreateConfig takes the generic controlplane apiserver options and
