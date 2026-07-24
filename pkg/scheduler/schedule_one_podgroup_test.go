@@ -742,17 +742,28 @@ func TestScheduleOnePodGroup_FinishesAttemptWhenAllPoppedPodsAreAssumed(t *testi
 			}
 
 			cache := internalcache.New(ctx, nil, true, false)
+			queue := internalqueue.NewTestQueue(ctx, schedFwk.QueueSortFunc())
+
 			cache.AddPodGroup(podGroup)
+			queue.AddPodGroup(logger, podGroup)
+
+			// 1. p1 is added to the queue, its PodGroup is popped, and its scheduling cycle succeeds.
+			// The pod gets assumed in the cache and proceeds to binding.
 			cache.AddPodGroupMember(p1)
+
+			// 2. An assumed pod can only re-enter the queue due to a subtle race condition:
+			// an update event arrives, the event handler sees `isAssumed=false` and calls `queue.Update()`.
+			// Right before `Update()` acquires the lock, the main scheduling loop assumes the pod
+			// and calls `Done()`, removing it from `inFlightPods`. The `Update()` logic then falls
+			// through and adds the now-assumed pod back to the queue.
 			assumedP1 := p1.DeepCopy()
 			assumedP1.Spec.NodeName = "node1"
 			if err := cache.AssumePod(logger, assumedP1); err != nil {
 				t.Fatalf("Failed to assume pod: %v", err)
 			}
+			queue.Update(ctx, p1, p1)
 
-			queue := internalqueue.NewTestQueue(ctx, schedFwk.QueueSortFunc())
-			queue.AddPodGroup(logger, podGroup)
-			queue.Add(ctx, p1)
+			// 3. During the next cycle, the PodGroup is popped again and contains only the assumed pod.
 			entity, err := queue.Pop(logger)
 			if err != nil {
 				t.Fatalf("Failed to pop pod group: %v", err)
