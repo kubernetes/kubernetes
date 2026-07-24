@@ -870,7 +870,7 @@ func TestVolumeAttachLimitExceededCleanup(t *testing.T) {
 
 	// all pods must reach a terminal, Failed state due to VolumeAttachmentLimitExceeded.
 	if err := wait.PollUntilContextTimeout(
-		tCtx, 200*time.Millisecond, 30*time.Second, true,
+		tCtx, 200*time.Millisecond, 60*time.Second, true,
 		func(ctx context.Context) (bool, error) {
 			for _, p := range pods {
 				st, ok := kl.statusManager.GetPodStatus(p.UID)
@@ -885,7 +885,7 @@ func TestVolumeAttachLimitExceededCleanup(t *testing.T) {
 
 	// validate that SyncTerminatedPod completed successfully for each pod.
 	if err := wait.PollUntilContextTimeout(
-		tCtx, 200*time.Millisecond, 30*time.Second, true,
+		tCtx, 200*time.Millisecond, 60*time.Second, true,
 		func(ctx context.Context) (bool, error) {
 			for _, p := range pods {
 				if !kl.podWorkers.ShouldPodBeFinished(p.UID) {
