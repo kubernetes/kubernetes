@@ -18,6 +18,7 @@ package store
 
 import (
 	"fmt"
+	"iter"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -58,24 +59,38 @@ const (
 	btreeDegree = 16
 )
 
+// Reader is the read surface common to an immutable Snapshot and the live
+// store. A live store's Reader (see WatchCacheStorage.StoreLocked) is only
+// valid while its lock is held.
+type Reader interface {
+	GetByKey(key string) (item interface{}, exists bool, err error)
+	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
+}
+
+// Indexer is the live, lock-guarded store.
 type Indexer interface {
+	Reader
 	Add(obj interface{}) error
 	Update(obj interface{}) error
 	Delete(obj interface{}) error
 	List() []interface{}
 	ListKeys() []string
 	Get(obj interface{}) (item interface{}, exists bool, err error)
-	GetByKey(key string) (item interface{}, exists bool, err error)
 	Replace([]interface{}, string) error
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
-	Count(prefix, continueKey string) (count int)
 	Clone() Snapshot
-	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
 }
 
+// Snapshot is an immutable point-in-time view: it can be walked lazily and
+// counted with no lock held.
 type Snapshot interface {
-	GetByKey(key string) (item interface{}, exists bool, err error)
-	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
+	Reader
+	// RangePrefix iterates the elements with the given key prefix, in key
+	// order, starting from continueKey.
+	RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error]
+	// Count returns the number of items RangePrefix(prefix, continueKey)
+	// would visit.
+	Count(prefix, continueKey string) (count int)
 }
 
 func NewIndexer(indexers *cache.Indexers) Indexer {

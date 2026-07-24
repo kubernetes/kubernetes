@@ -17,6 +17,7 @@ limitations under the License.
 package store
 
 import (
+	"iter"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -74,6 +75,38 @@ func TestStoreListPrefix(t *testing.T) {
 	assert.Equal(t, []interface{}{
 		testStorageElement("bar", "baz", 4),
 	}, items)
+}
+
+// TestStoreCountAndRangePrefix checks a snapshot's Count agrees with what
+// RangePrefix visits, over whole-tree, narrower-prefix, and mid-tree
+// continueKey ranges.
+func TestStoreCountAndRangePrefix(t *testing.T) {
+	store := newThreadedBtreeStoreIndexer(nil, btreeDegree)
+	require.NoError(t, store.Add(testStorageElement("foo3", "bar3", 1)))
+	require.NoError(t, store.Add(testStorageElement("foo1", "bar2", 2)))
+	require.NoError(t, store.Add(testStorageElement("foo2", "bar1", 3)))
+	require.NoError(t, store.Add(testStorageElement("bar", "baz", 4)))
+	snap := store.Clone()
+
+	for _, tc := range []struct {
+		prefix, continueKey string
+		expectKeys          []string
+	}{
+		{prefix: "", continueKey: "", expectKeys: []string{"bar", "foo1", "foo2", "foo3"}},
+		{prefix: "foo", continueKey: "", expectKeys: []string{"foo1", "foo2", "foo3"}},
+		{prefix: "foo", continueKey: "foo1\x00", expectKeys: []string{"foo2", "foo3"}},
+		{prefix: "bar", continueKey: "", expectKeys: []string{"bar"}},
+		{prefix: "zzz", continueKey: "", expectKeys: nil},
+		{prefix: "", continueKey: "foo2", expectKeys: []string{"foo2", "foo3"}},
+	} {
+		var visited []string
+		for elem, err := range snap.RangePrefix(tc.prefix, tc.continueKey) {
+			require.NoError(t, err)
+			visited = append(visited, elem.Key)
+		}
+		assert.Equal(t, tc.expectKeys, visited, "prefix=%q continue=%q", tc.prefix, tc.continueKey)
+		assert.Equal(t, len(tc.expectKeys), snap.Count(tc.prefix, tc.continueKey), "prefix=%q continue=%q", tc.prefix, tc.continueKey)
+	}
 }
 
 func TestStoreSnapshotter(t *testing.T) {
@@ -166,6 +199,9 @@ func (f fakeIndexer) Replace([]interface{}, string) error {
 	return nil
 }
 func (f fakeIndexer) Count(prefixKey, continueKey string) int { return 0 }
+func (f fakeIndexer) RangePrefix(prefixKey, continueKey string) iter.Seq2[*Element, error] {
+	return func(yield func(*Element, error) bool) {}
+}
 
 type fakeSnapshotter struct {
 	getLessOrEqual func(rv uint64) (Snapshot, bool)
