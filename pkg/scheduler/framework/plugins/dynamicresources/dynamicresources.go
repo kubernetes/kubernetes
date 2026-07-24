@@ -1244,6 +1244,46 @@ func (pl *DynamicResources) deallocatePodGroupClaims(ctx context.Context, state 
 		}
 	}
 
+	for _, podGroupClaim := range podGroup.Spec.ResourceClaims {
+		claimName, mustCheckOwner, err := resourceclaim.NameFromPodGroup(podGroup, &podGroupClaim)
+		if err != nil {
+			return statusError(logger, err)
+		}
+		if claimName == nil {
+			continue
+		}
+		claim, err := pl.draManager.ResourceClaims().Get(podGroup.Namespace, *claimName)
+		if err != nil {
+			return statusError(logger, err)
+		}
+		if mustCheckOwner {
+			if err := resourceclaim.IsForPodGroup(podGroup, claim); err != nil {
+				continue
+			}
+		}
+
+		if claim.Status.Allocation != nil {
+			if resourceclaim.IsReservedForPod(pod, claim, pl.fts.EnableDRAWorkloadResourceClaims) {
+				// Remove PodGroup from ReservedFor. A strategic-merge-patch is used
+				// because that allows removing an individual entry without having
+				// the latest ResourceClaim.
+				patch := fmt.Sprintf(`{"metadata": {"uid": %q}, "status": { "reservedFor": [ {"$patch": "delete", "uid": %q} ] }}`,
+					claim.UID,
+					podGroup.UID,
+				)
+				logger.V(5).Info("postfilter unreserved claim", "resourceclaim", klog.KObj(claim), "pod", klog.KObj(pod), "podgroup", klog.KObj(podGroup))
+				claim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Patch(ctx, claim.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "status")
+				if err != nil {
+					// We will get here again when pod scheduling is retried.
+					logger.Error(err, "postfilter unreserving claim", "resourceclaim", klog.KObj(claim))
+					continue
+				} else {
+					return statusUnschedulable(logger, "ResourceClaim unreserved for PodGroup")
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
