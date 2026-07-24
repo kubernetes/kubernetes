@@ -58,6 +58,17 @@
       preemptorPodGroups: 1
       podsPerGroup: 100
       gangCpuRequest: 3970m
+  - name: 100Nodes_1PreemptorGang_100Pods_Evicting_1000InitPods_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      preemptorPodGroups: 1
+      podsPerGroup: 100
+      gangCpuRequest: 3970m
+    featureGates:
+      TopologyAwareWorkloadScheduling: true
+      CompositePodGroup: true
   - name: 100Nodes_10PreemptorGangs_10Pods_Evicting_1000InitPods
     labels: [performance]
     params:
@@ -66,6 +77,17 @@
       preemptorPodGroups: 10
       podsPerGroup: 10
       gangCpuRequest: 3970m
+  - name: 100Nodes_10PreemptorGangs_10Pods_Evicting_1000InitPods_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      preemptorPodGroups: 10
+      podsPerGroup: 10
+      gangCpuRequest: 3970m
+    featureGates:
+      TopologyAwareWorkloadScheduling: true
+      CompositePodGroup: true
 
 # GangPreemptionPodGroups tests preemption scenario where podgroup preempts other podgroups.
 - name: GangPreemptionPodGroups
@@ -145,6 +167,18 @@
       podsPerGroup: 100
       lowPriorityCpuRequest: 600m
       highPriorityCpuRequest: 3500m
+  - name: 100Nodes_1PreemptorGang_100Pods_Evicting_5LowPriorityGangs_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 100
+      lowPriorityGroups: 5
+      highPriorityGroups: 1
+      podsPerGroup: 100
+      lowPriorityCpuRequest: 600m
+      highPriorityCpuRequest: 3500m
+    featureGates:
+      TopologyAwareWorkloadScheduling: true
+      CompositePodGroup: true
   # Scenario where 100 nodes host 50 distinct low-priority PodGroups (10 pods each, 500 pods total).
   # Assuming uniform spreading, each node runs 5 low-priority pods, consuming 3000m CPU (5 * 600m).
   # There are 10 high-priority preemptor PodGroups (10 pods each, 100 pods total, exactly 1 per node).
@@ -162,6 +196,18 @@
       podsPerGroup: 10
       lowPriorityCpuRequest: 600m
       highPriorityCpuRequest: 3500m
+  - name: 100Nodes_10PreemptorGangs_10Pods_Evicting_50LowPriorityGangs_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 100
+      lowPriorityGroups: 50
+      highPriorityGroups: 10
+      podsPerGroup: 10
+      lowPriorityCpuRequest: 600m
+      highPriorityCpuRequest: 3500m
+    featureGates:
+      TopologyAwareWorkloadScheduling: true
+      CompositePodGroup: true
 
 # GangPreemptionAffinity benchmarks the performance of gang preemption (WorkloadAwarePreemption)
 # in the presence of pod affinity constraints.
@@ -230,6 +276,16 @@
       initPods: 1000
       preemptorPodGroups: 1
       podsPerGroup: 100
+  - name: 100Nodes_1PreemptorGang_100Pods_Evicting_1000InitPods_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      preemptorPodGroups: 1
+      podsPerGroup: 100
+    featureGates:
+      TopologyAwareWorkloadScheduling: true
+      CompositePodGroup: true
   - name: 100Nodes_10PreemptorGangs_10Pods_Evicting_1000InitPods
     labels: [performance]
     params:
@@ -237,3 +293,13 @@
       initPods: 1000
       preemptorPodGroups: 10
       podsPerGroup: 10
+  - name: 100Nodes_10PreemptorGangs_10Pods_Evicting_1000InitPods_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      preemptorPodGroups: 10
+      podsPerGroup: 10
+    featureGates:
+      TopologyAwareWorkloadScheduling: true
+      CompositePodGroup: true
