@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -74,6 +75,11 @@ type cacheWatcher struct {
 	groupResource       schema.GroupResource
 	watcherMetrics      *metrics.WatcherMetricsObservers
 
+	// lastDequeueAt is the unix-nano time this watcher last dequeued from its
+	// input channel, initialized to creation time. Written by the process
+	// goroutine, read by the dispatcher goroutine at termination time.
+	lastDequeueAt atomic.Int64
+
 	// human readable identifier that helps assigning cacheWatcher
 	// instance with request
 	identifier string
@@ -108,7 +114,7 @@ func newCacheWatcher(
 	watcherMetrics *metrics.WatcherMetricsObservers,
 	identifier string,
 ) *cacheWatcher {
-	return &cacheWatcher{
+	w := &cacheWatcher{
 		input:               make(chan inputEvent, chanSize),
 		result:              make(chan watch.Event, chanSize),
 		done:                make(chan struct{}),
@@ -122,6 +128,8 @@ func newCacheWatcher(
 		watcherMetrics:      watcherMetrics,
 		identifier:          identifier,
 	}
+	w.lastDequeueAt.Store(time.Now().UnixNano())
+	return w
 }
 
 // Implements watch.Interface.
@@ -167,9 +175,11 @@ func (c *cacheWatcher) nonblockingAdd(event *watchCacheEvent) bool {
 	}
 	select {
 	case c.input <- inputEvent{event: event, enqueuedAt: time.Now()}:
+		c.watcherMetrics.ObserveInputDepth(len(c.input))
 		c.markBookmarkAfterRvAsReceived(event)
 		return true
 	default:
+		c.watcherMetrics.IncInputFull()
 		return false
 	}
 }
@@ -184,11 +194,12 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		return true
 	}
 
-	closeFunc := func() {
+	closeFunc := func(reason metrics.TerminationReason) {
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
 		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
+		c.watcherMetrics.ObserveTerminationStall(reason, len(c.result) == cap(c.result), time.Duration(time.Now().UnixNano()-c.lastDequeueAt.Load()))
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely, we simply terminate it.
 
@@ -217,16 +228,17 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 	}
 
 	if timer == nil {
-		closeFunc()
+		closeFunc(metrics.TerminationReasonCascade)
 		return false
 	}
 
 	// OK, block sending, but only until timer fires.
 	select {
 	case c.input <- inputEvent{event: event, enqueuedAt: time.Now()}:
+		c.watcherMetrics.ObserveInputDepth(len(c.input))
 		return true
 	case <-timer.C:
-		closeFunc()
+		closeFunc(metrics.TerminationReasonBudgetExpired)
 		return false
 	}
 }
@@ -447,6 +459,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 		c.markBookmarkAfterRvSent(event)
 		sentAt = time.Now()
 	case <-c.done:
+		c.observeStage(metrics.StageHandoffAborted, builtAt, time.Now())
 	}
 	return
 }
@@ -545,24 +558,39 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 	utilflowcontrol.WatchInitialized(ctx)
 
 	for {
+		var ie inputEvent
+		var ok bool
+		// First try a non-blocking receive: if it succeeds the goroutine did
+		// not park and the event's watcher_queue time is drain backlog; if it
+		// misses, the goroutine parks in the blocking select and the next
+		// event's watcher_queue time is (almost) pure wake latency.
+		parked := false
 		select {
-		case ie, ok := <-c.input:
-			if !ok {
+		case ie, ok = <-c.input:
+		default:
+			parked = true
+		}
+		if parked {
+			select {
+			case ie, ok = <-c.input:
+			case <-ctx.Done():
 				return
 			}
-			event := ie.event
-			dequeuedAt := time.Now()
-			// only send events newer than resourceVersion
-			// or a bookmark event with an RV equal to resourceVersion
-			// if we haven't sent one to the client
-			if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && !c.wasBookmarkAfterRvSent()) {
-				builtAt, sentAt := c.sendWatchCacheEvent(event)
-				if !sentAt.IsZero() {
-					c.recordLifecycleMetrics(event, ie.enqueuedAt, dequeuedAt, builtAt, sentAt)
-				}
-			}
-		case <-ctx.Done():
+		}
+		if !ok {
 			return
+		}
+		event := ie.event
+		dequeuedAt := time.Now()
+		c.lastDequeueAt.Store(dequeuedAt.UnixNano())
+		// only send events newer than resourceVersion
+		// or a bookmark event with an RV equal to resourceVersion
+		// if we haven't sent one to the client
+		if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && !c.wasBookmarkAfterRvSent()) {
+			builtAt, sentAt := c.sendWatchCacheEvent(event)
+			if !sentAt.IsZero() {
+				c.recordLifecycleMetrics(event, ie.enqueuedAt, dequeuedAt, builtAt, sentAt, parked)
+			}
 		}
 	}
 }
@@ -572,13 +600,18 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 // shared event.timeline; enqueuedAt/dequeuedAt/builtAt/sentAt are per-watcher
 // locals measured after fan-out. Stages whose endpoints are zero (e.g. events
 // injected directly, bypassing the dispatcher) are skipped.
-func (c *cacheWatcher) recordLifecycleMetrics(event *watchCacheEvent, enqueuedAt, dequeuedAt, builtAt, sentAt time.Time) {
+func (c *cacheWatcher) recordLifecycleMetrics(event *watchCacheEvent, enqueuedAt, dequeuedAt, builtAt, sentAt time.Time, parked bool) {
 	tl := event.timeline
 	c.observeStage(metrics.StagePropagation, event.RecordTime, tl.cacheReceived)
 	c.observeStage(metrics.StageCacheIngest, tl.cacheReceived, tl.ringBuffered)
 	c.observeStage(metrics.StageIncomingQueue, tl.ringBuffered, tl.dispatched)
 	c.observeStage(metrics.StageFanout, tl.dispatched, enqueuedAt)
 	c.observeStage(metrics.StageWatcherQueue, enqueuedAt, dequeuedAt)
+	queueSplit := metrics.StageWatcherQueueBacklog
+	if parked {
+		queueSplit = metrics.StageWatcherQueueParked
+	}
+	c.observeStage(queueSplit, enqueuedAt, dequeuedAt)
 	c.observeStage(metrics.StageEncode, dequeuedAt, builtAt)
 	c.observeStage(metrics.StageHandoff, builtAt, sentAt)
 	c.observeStage(metrics.StageTotal, event.RecordTime, sentAt)
