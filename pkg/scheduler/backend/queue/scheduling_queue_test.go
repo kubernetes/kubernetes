@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -34,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -1531,6 +1533,129 @@ func TestPriorityQueue_Pop(t *testing.T) {
 				t.Errorf("Unexpected popped pods (-want, +got): %s", diff)
 			}
 		})
+	}
+}
+
+// lyingBackoffQPopper wraps a real backoffQPopper but returns 0 from lenBackoff()
+// on its very first call, regardless of the actual backoffQ length. It is used by
+// TestPriorityQueue_PopWakesOnBackoffQAdd to deterministically drive a Pop() into
+// cond.Wait() (i.e. as if the backoffQ were still empty) even though a pod is about
+// to be, or has just been, added to the backoffQ. All subsequent calls (and
+// popBackoff()) are delegated to the wrapped popper.
+type lyingBackoffQPopper struct {
+	backoffQPopper
+	calls        atomic.Int32
+	reachedCheck chan struct{}
+	release      chan struct{}
+}
+
+func (m *lyingBackoffQPopper) lenBackoff() int {
+	if m.calls.Add(1) == 1 {
+		// Signal that Pop() has reached the empty-activeQ/backoffQ check while
+		// still holding activeQueue.lock, then block until the test releases us.
+		// This keeps Pop() between the check and cond.Wait() so the producer's
+		// broadcast() can race exactly the window the fix is meant to close.
+		close(m.reachedCheck)
+		<-m.release
+		// Lie that the backoffQ is still empty, forcing Pop() into cond.Wait().
+		return 0
+	}
+	return m.backoffQPopper.lenBackoff()
+}
+
+// TestPriorityQueue_PopWakesOnBackoffQAdd is a regression test for the lost-wakeup
+// race described in https://github.com/kubernetes/kubernetes/issues/130976.
+// With the SchedulerPopFromBackoffQ feature enabled, a Pop() parked in cond.Wait()
+// (empty activeQ and backoffQ) must be woken when a pod subsequently enters the
+// backoffQ and broadcast() fires. Because the backoffQ length predicate is guarded
+// by a different lock than the condition variable, a broadcast() that does not hold
+// activeQueue.lock can land between Pop()'s emptiness check and cond.Wait() and be
+// lost. Without the fix this test hangs (the wakeup is lost); with the fix
+// broadcast() blocks on activeQueue.lock until Pop() is parked, so the pod is popped.
+func TestPriorityQueue_PopWakesOnBackoffQAdd(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPopFromBackoffQ, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	q := NewTestQueue(ctx, newDefaultQueueSort(), WithPodInitialBackoffDuration(time.Second*30), WithPodMaxBackoffDuration(time.Second*60))
+	aq := q.activeQ.(*activeQueue)
+
+	// Wrap the real backoffQPopper so the first emptiness check Pop() performs
+	// reports an empty backoffQ (forcing it into cond.Wait()) while letting the
+	// test control exactly when that check happens.
+	popper := &lyingBackoffQPopper{
+		backoffQPopper: aq.backoffQPopper,
+		reachedCheck:   make(chan struct{}),
+		release:        make(chan struct{}),
+	}
+	aq.backoffQPopper = popper
+
+	// Start a Pop() that will block: both activeQ and (as far as it can tell) the
+	// backoffQ are empty.
+	poppedChan := make(chan framework.QueuedEntityInfo, 1)
+	go func() {
+		entity, err := q.Pop(logger)
+		if err != nil {
+			t.Errorf("Failed to pop entity from scheduling queue: %s", err)
+		}
+		poppedChan <- entity
+	}()
+
+	// Wait until Pop() has reached the emptiness check and is holding activeQueue.lock.
+	select {
+	case <-popper.reachedCheck:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("timed out waiting for Pop() to reach the backoffQ emptiness check")
+	}
+
+	// While Pop() is held at the check, the producer adds a pod to the backoffQ and
+	// fires broadcast(). With the bug, broadcast() does not take activeQueue.lock and
+	// the signal is lost because Pop() is not yet in cond.Wait(). With the fix,
+	// broadcast() blocks on activeQueue.lock until Pop() parks.
+	pod := st.MakePod().Name("p1").Namespace("ns1").UID("p1").Priority(highPriority).Obj()
+	pInfo := q.newQueuedPodInfo(ctx, pod, "plugin")
+	broadcastDone := make(chan struct{})
+	go func() {
+		q.backoffQ.add(logger, pInfo, framework.EventUnscheduledPodAdd.Label())
+		q.activeQ.broadcast()
+		close(broadcastDone)
+	}()
+
+	// In the buggy version broadcast() returns immediately (it doesn't contend for
+	// activeQueue.lock), guaranteeing the signal is delivered before Pop() parks and
+	// is therefore lost. In the fixed version broadcast() blocks on activeQueue.lock,
+	// so broadcastDone won't fire until after we release Pop() below; the short wait
+	// only adds latency to the passing path and never causes flakiness.
+	select {
+	case <-broadcastDone:
+	case <-time.After(time.Second):
+	}
+
+	// Let Pop()'s first emptiness check return (reporting empty) so it proceeds to
+	// cond.Wait().
+	close(popper.release)
+
+	// With the fix, Pop() is woken by the now-unblocked broadcast(), re-checks the
+	// backoffQ (which really has the pod), and pops it. Without the fix, Pop() stays
+	// parked forever and this times out.
+	select {
+	case entity := <-poppedChan:
+		if entity == nil {
+			t.Fatal("Pop() returned no entity")
+		}
+		var gotNames []string
+		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+			gotNames = append(gotNames, pInfo.Pod.Name)
+			return true
+		})
+		if diff := cmp.Diff([]string{"p1"}, gotNames); diff != "" {
+			t.Errorf("Unexpected popped pods (-want, +got): %s", diff)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		q.Close()
+		t.Fatal("timed out waiting for Pop() to return the backoffQ pod; the wakeup was lost")
 	}
 }
 
