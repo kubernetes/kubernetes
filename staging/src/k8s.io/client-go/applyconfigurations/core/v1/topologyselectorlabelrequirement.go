@@ -26,7 +26,8 @@ package v1
 type TopologySelectorLabelRequirementApplyConfiguration struct {
 	// The label key that the selector applies to.
 	Key *string `json:"key,omitempty"`
-	// An array of string values. One value must match the label to be selected.
+	// An array of string values. A label with this key matches the selector
+	// if at least one value in this array equals the label value.
 	// Each entry in Values is ORed.
 	Values []string `json:"values,omitempty"`
 }
