@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/utils/hermeticpodcertificatesigner"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/clock"
 	testclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
@@ -307,10 +308,14 @@ func TestPCRDeletedWhileWaiting(t *testing.T) {
 }
 
 func TestFullFlow(t *testing.T) {
-	ctx, cancel := context.WithCancel(ktesting.Init(t))
-	defer cancel()
+	ktesting.Init(t).SyncTest("", testFullFlow)
+}
 
-	clock := testclock.NewFakeClock(mustRFC3339(t, "2010-01-01T00:00:00Z"))
+func testFullFlow(tCtx ktesting.TContext) {
+	defer tCtx.Cancel("test completed")
+	t := tCtx.TB()
+	ctx := tCtx.Context
+
 	kc := fake.NewSimpleClientset()
 
 	// Assign PCR name and creationTimeStamp
@@ -321,7 +326,7 @@ func TestFullFlow(t *testing.T) {
 			if obj.Name == "" {
 				obj.Name = fmt.Sprintf("%s-pcr-%d", obj.Spec.PodName, rand.Int63n(1_000_000))
 			}
-			obj.CreationTimestamp = metav1.NewTime(clock.Now())
+			obj.CreationTimestamp = metav1.NewTime(time.Now())
 
 			return false, obj, nil // allow normal processing
 		})
@@ -366,7 +371,7 @@ func TestFullFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error generating CA hierarchy: %v", err)
 	}
-	pcrSigner := hermeticpodcertificatesigner.New(clock, signerName, caKeys, caCerts, kc)
+	pcrSigner := hermeticpodcertificatesigner.New(clock.RealClock{}, signerName, caKeys, caCerts, kc)
 	go pcrSigner.Run(ctx)
 	//
 	// Configure and boot up enough Kubelet subsystems to run an IssuingManager.
@@ -392,7 +397,7 @@ func TestFullFlow(t *testing.T) {
 		informerFactory.Certificates().V1().PodCertificateRequests(),
 		informerFactory.Core().V1().Nodes(),
 		types.NodeName(node1.ObjectMeta.Name),
-		clock,
+		clock.RealClock{},
 	)
 	// Start informers
 	informerFactory.Start(ctx.Done())
@@ -596,7 +601,7 @@ func TestFullFlow(t *testing.T) {
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, _, err := node1PodCertificateManager.GetPodCertificateCredentialBundle(ctx, workloadPod.ObjectMeta.Namespace, workloadPod.ObjectMeta.Name, string(workloadPod.ObjectMeta.UID), "certificate", 0)
 		if err != nil {
-			t.Logf("Credential bundle not ready yet: %v", err)
+			tCtx.Logf("Credential bundle not ready yet: %v", err)
 			return false, nil
 		}
 		return true, nil
@@ -614,8 +619,10 @@ func TestFullFlow(t *testing.T) {
 		t.Fatalf("PodCertificate manager returned bad cert chain; diff (-got +want)\n%s", diff)
 	}
 
+	oldPCRName := gotPCR.ObjectMeta.Name
+
 	// Fast-forward time until it is past beginRefreshAt (including the possible 5-minute jitter).
-	clock.Step(23*time.Hour + 37*time.Minute)
+	time.Sleep(23*time.Hour + 37*time.Minute)
 
 	// Within a few seconds, we should see a new PodCertificateRequest created for
 	// this pod.
@@ -625,15 +632,18 @@ func TestFullFlow(t *testing.T) {
 			return false, fmt.Errorf("while listing PodCertificateRequests: %w", err)
 		}
 
-		if len(pcrs.Items) == 0 {
-			return false, nil
+		for _, pcr := range pcrs.Items {
+			// Old PCR is still there, make sure we get the new one.
+			if pcr.ObjectMeta.Name != oldPCRName {
+				gotPCR = &pcr
+				return true, nil
+			}
 		}
 
-		gotPCR = &pcrs.Items[0]
-		return true, nil
+		return false, nil
 	})
 	if err != nil {
-		t.Fatalf("Error while waiting for PCR to be created: %v", err)
+		t.Fatalf("Error while waiting for new PCR to be created: %v", err)
 	}
 
 	// We will assume that the created PCR matches our expectations.
@@ -645,11 +655,17 @@ func TestFullFlow(t *testing.T) {
 			return false, fmt.Errorf("while listing PodCertificateRequests: %w", err)
 		}
 
-		if len(pcrs.Items) == 0 {
+		var updatedPCR *certsv1.PodCertificateRequest
+		for _, pcr := range pcrs.Items {
+			if pcr.ObjectMeta.Name == gotPCR.ObjectMeta.Name {
+				updatedPCR = &pcr
+				break
+			}
+		}
+		if updatedPCR == nil {
 			return false, nil
 		}
-
-		gotPCR = &pcrs.Items[0]
+		gotPCR = updatedPCR
 
 		for _, cond := range gotPCR.Status.Conditions {
 			switch cond.Type {
@@ -670,7 +686,7 @@ func TestFullFlow(t *testing.T) {
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, certChain, err := node1PodCertificateManager.GetPodCertificateCredentialBundle(ctx, workloadPod.ObjectMeta.Namespace, workloadPod.ObjectMeta.Name, string(workloadPod.ObjectMeta.UID), "certificate", 0)
 		if err != nil {
-			t.Logf("Refreshed credential bundle not ready yet: %v", err)
+			tCtx.Logf("Refreshed credential bundle not ready yet: %v", err)
 			return false, nil
 		}
 
