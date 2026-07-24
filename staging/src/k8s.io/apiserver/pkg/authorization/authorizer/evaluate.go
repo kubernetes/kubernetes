@@ -102,13 +102,13 @@ func (r ConditionEvaluationResult) IsUnevaluatable() bool {
 func (c ConditionsMap) Evaluate(ctx context.Context, data ConditionsData, evaluateConditionFn EvaluateConditionFunc) (Decision, string, error) {
 	// This is a translation between the generic, private function, and the interface we want to expose to callers.
 	return partiallyEvaluateConditionsMapInternal(ctx, c, data, func(ctx context.Context, cond Condition, condData ConditionsData) ConditionEvaluationResult {
-		// Because we never return "unevaluatable", the returned ConditionsAwareDecision is always one of Allow/Deny/NoOpinion, and thus can we split it into unconditionalParts
+		// Because we never return "unevaluatable", the returned ConditionsAwareDecision is always one of Allow/Deny/NoOpinion, and thus can we split it into UnconditionalParts
 		applied, err := evaluateConditionFn(ctx, cond, condData)
 		if err != nil {
 			return ConditionEvaluationResultError(err)
 		}
 		return ConditionEvaluationResultBoolean(applied)
-	}).unconditionalParts()
+	}).UnconditionalParts(false)
 }
 
 // partiallyEvaluateConditionsMapInternal evaluates the ConditionsMap primarily using the Conditions' own Evaluate() function,
@@ -244,9 +244,11 @@ func PartiallyEvaluateConditionsAwareDecision(ctx context.Context, unevaluatedDe
 
 		collectTailAfterConditionalDecision := false
 		for authorizerName, unevaluatedSubDecision := range unevaluatedDecision.UnionedDecisions() {
-			// If collectAndShortcircuitOnly == true, a conditional decision that couldn't
-			// be evaluated to Allow/Deny/NoOpinion was encountered during a previous
-			// loop iteration. Then all latter decisions stay unevaluated.
+			// If collectTailAfterConditionalDecision == true, a conditional decision that could
+			// not be reduced to Allow/Deny/NoOpinion was encountered during a previous
+			// loop iteration. All later decisions stay unevaluated to preserve the lazy
+			// chain semantics (a later leaf must not be evaluated before the still-conditional
+			// leaf above it has resolved).
 			if collectTailAfterConditionalDecision {
 				newDecisionChain.Add(authorizerName, unevaluatedSubDecision)
 				continue
@@ -274,7 +276,7 @@ func PartiallyEvaluateConditionsAwareDecision(ctx context.Context, unevaluatedDe
 		// If all decisions were NoOpinions, the constructor folds into a single NoOpinion decision.
 		return newDecisionChain.ToDecision()
 	default:
-		// No simplification possible
+		// Already fully evaluated (Allow/Deny/NoOpinion leaf); nothing to reduce.
 		return unevaluatedDecision
 	}
 }

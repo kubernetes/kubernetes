@@ -326,7 +326,7 @@ func (a *evalTestAuthz) Authorize(ctx context.Context, attrs authorizer.Attribut
 
 func (a *evalTestAuthz) ConditionsAwareAuthorize(ctx context.Context, attrs authorizer.Attributes) authorizer.ConditionsAwareDecision {
 	if a.conditionEffect != effectNone {
-		cond := []authorizer.Condition{authorizer.GenericCondition{ID: "test-cond", Condition: "test"}}
+		cond := []authorizer.Condition{authorizer.GenericCondition{ID: "example.com/test-cond", Condition: "test"}}
 		var deny, noOpinion, allow []authorizer.Condition
 		switch a.conditionEffect {
 		case effectAllow:
