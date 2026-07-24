@@ -26,6 +26,7 @@ import (
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/klog/v2"
@@ -201,6 +202,9 @@ type ClusterEventWithHint struct {
 	// the scheduling of Pods will be always retried with backoff when this Event happens.
 	// (the same as Queue)
 	QueueingHintFn QueueingHintFn
+	// PreQueueingHintFn is called once per event to narrow the set of pods to evaluate with QueueingHint.
+	// If set, only pods identified in the returned PreQueueingHintResult are checked.
+	PreQueueingHintFn PreQueueingHintFn
 }
 
 // QueueingHintFn returns a hint that signals whether the event can make a Pod,
@@ -215,6 +219,24 @@ type ClusterEventWithHint struct {
 //   - `oldObj` is nil if the event is add event.
 //   - `newObj` is nil if the event is delete event.
 type QueueingHintFn func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (QueueingHint, error)
+
+// PreQueueingHintResult is the return value of PreQueueingHintFn.
+// When AllPods is true, all unschedulable pods are evaluated (existing behavior).
+// When AllPods is false, only pods listed in Pods are evaluated.
+type PreQueueingHintResult struct {
+	AllPods bool
+	Pods    []types.NamespacedName
+}
+
+// PreQueueingHintFn is called once per event before iterating unschedulable pods.
+// PreQueueingHintFn will not be called when the deleted object is unknown (both oldObj and newObj are nil).
+// It returns a PreQueueingHintResult indicating which pods should be evaluated
+// by QueueingHintFn for this event. If it returns an error, the error is logged
+// and the result is treated as AllPods (all unschedulable pods are evaluated).
+//
+// - oldObj is the old object in update events, or the deleted object in delete events.
+// - newObj is the new/added object. It is nil for delete events.
+type PreQueueingHintFn func(logger klog.Logger, oldObj, newObj interface{}) (PreQueueingHintResult, error)
 
 type QueueingHint int
 

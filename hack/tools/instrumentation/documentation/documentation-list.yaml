@@ -6670,6 +6670,18 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
+- name: pre_queueing_hint_evaluations_total
+  subsystem: scheduler
+  help: Number of PreQueueingHint evaluations, labeled by plugin and result (all_pods
+    or narrowed).
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - plugin
+  - result
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
 - name: preemption_evaluation_duration_seconds
   subsystem: scheduler
   help: Duration in seconds for identifying the target preemption victims.
