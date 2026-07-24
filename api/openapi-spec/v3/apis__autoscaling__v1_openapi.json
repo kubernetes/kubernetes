@@ -186,10 +186,6 @@
             "type": "integer"
           }
         },
-        "required": [
-          "currentReplicas",
-          "desiredReplicas"
-        ],
         "type": "object"
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.APIResource": {

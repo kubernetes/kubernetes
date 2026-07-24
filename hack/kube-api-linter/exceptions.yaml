@@ -108,7 +108,7 @@
 # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
 # The nonpointerstructs linter is included here as well as these two should be enabled hand-in-hand on each API group.
 - text: "must be marked as optional or required|is a non-pointer struct with no required fields."
-  path: "staging/src/k8s.io/api/(admissionregistration|authorization|autoscaling|batch|certificates|core|discovery|events|extensions|networking|storage)"
+  path: "staging/src/k8s.io/api/(admissionregistration|authorization|batch|certificates|core|discovery|events|extensions|networking|storage)"
 
 # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
 - text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"
@@ -151,3 +151,14 @@
   path: "staging/src/k8s.io/api/lifecycle/v1alpha1/types.go"
 - text: "optionalfields: field Eviction.Status should be a pointer."
   path: "staging/src/k8s.io/api/lifecycle/v1alpha1/types.go"
+
+# These status fields are non-pointer structs whose inner fields are required, but the status structs themselves
+# have no validation, so the fields must be marked optional rather than required.
+- text: "nonpointerstructs: field ObjectMetricStatus.Target is a non-pointer struct with required fields. It must be marked as required."
+  path: "staging/src/k8s.io/api/autoscaling/v1/types.go"
+- text: "nonpointerstructs: field ObjectMetricStatus.(Metric|DescribedObject) is a non-pointer struct with required fields. It must be marked as required."
+  path: "staging/src/k8s.io/api/autoscaling/v2/types.go"
+- text: "nonpointerstructs: field PodsMetricStatus.Metric is a non-pointer struct with required fields. It must be marked as required."
+  path: "staging/src/k8s.io/api/autoscaling/v2/types.go"
+- text: "nonpointerstructs: field ExternalMetricStatus.Metric is a non-pointer struct with required fields. It must be marked as required."
+  path: "staging/src/k8s.io/api/autoscaling/v2/types.go"
