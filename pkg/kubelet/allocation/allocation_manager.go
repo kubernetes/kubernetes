@@ -126,8 +126,9 @@ type manager struct {
 	getActivePods  func() []*v1.Pod
 	getPodByUID    func(types.UID) (*v1.Pod, bool)
 
-	allocationMutex        sync.Mutex
-	podsWithPendingResizes []types.UID
+	allocationMutex           sync.Mutex
+	podsWithPendingResizes    []types.UID
+	podsWithPendingCheckpoint []types.UID
 
 	recorder record.EventRecorderLogger
 }
@@ -209,6 +210,10 @@ func (m *manager) Run(ctx context.Context) {
 				for _, po := range successfulResizes {
 					logger.Info("Successfully retried resize after timeout", "pod", klog.KObj(po))
 				}
+				successfulCheckpoints := m.retryPendingCheckpoints(ctx)
+				for _, po := range successfulCheckpoints {
+					logger.Info("Successfully persisted pod allocation checkpoint after previous failure", "pod", klog.KObj(po))
+				}
 			case <-ctx.Done():
 				m.ticker.Stop()
 				return
@@ -275,6 +280,49 @@ func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1
 
 	m.podsWithPendingResizes = newPendingResizes
 	return successfulResizes
+}
+
+// retryPendingCheckpoints retries persisting the allocation checkpoint for any pod whose
+// SetAllocatedResources call previously failed to write to disk (the in-memory allocation
+// was already updated at that point, so this only needs to retry the write). Returns the
+// pods that were successfully persisted.
+func (m *manager) retryPendingCheckpoints(ctx context.Context) []*v1.Pod {
+	logger := klog.FromContext(ctx)
+	m.allocationMutex.Lock()
+	defer m.allocationMutex.Unlock()
+
+	if len(m.podsWithPendingCheckpoint) == 0 {
+		return nil
+	}
+
+	var stillPending []types.UID
+	var successful []*v1.Pod
+	for _, uid := range m.podsWithPendingCheckpoint {
+		pod, found := m.getPodByUID(uid)
+		if !found {
+			logger.V(4).Info("Pod not found; removing from pending checkpoint retries", "podUID", uid)
+			continue
+		}
+
+		if err := m.SetAllocatedResources(logger, pod); err != nil {
+			logger.Error(err, "Retry of pod allocation checkpoint failed; will retry again later", "pod", klog.KObj(pod))
+			stillPending = append(stillPending, uid)
+			continue
+		}
+		successful = append(successful, pod)
+	}
+
+	m.podsWithPendingCheckpoint = stillPending
+	return successful
+}
+
+// pushPendingCheckpointLocked queues a pod whose allocation checkpoint failed to persist for
+// later retry. Callers must already hold allocationMutex.
+func (m *manager) pushPendingCheckpointLocked(uid types.UID) {
+	if slices.Contains(m.podsWithPendingCheckpoint, uid) {
+		return
+	}
+	m.podsWithPendingCheckpoint = append(m.podsWithPendingCheckpoint, uid)
 }
 
 func (m *manager) PushPendingResize(logger klog.Logger, uid types.UID) {
@@ -580,8 +628,14 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 	if ok && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
 		if err := m.SetAllocatedResources(logger, pod); err != nil {
-			// TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
-			logger.Error(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
+			// The in-memory allocation is already updated at this point (SetPodResourceInfo
+			// updates the cache before attempting to persist it), so the pod is admitted with
+			// the correct resources for this kubelet's lifetime; only the on-disk checkpoint
+			// write failed. Queue it for periodic retry so a transient write failure (e.g. a
+			// full disk) doesn't leave the checkpoint permanently stale, which would surface
+			// stale allocations after a kubelet restart.
+			logger.Error(err, "SetPodAllocation failed; will retry persisting the checkpoint periodically", "pod", klog.KObj(pod))
+			m.pushPendingCheckpointLocked(pod.UID)
 		}
 	}
 
@@ -593,6 +647,12 @@ func (m *manager) RemovePod(logger klog.Logger, uid types.UID) {
 		// If the deletion fails, it will be retried by RemoveOrphanedPods, so we can safely ignore the error.
 		logger.V(3).Info("Failed to delete pod allocation", "podUID", uid, "err", err)
 	}
+
+	m.allocationMutex.Lock()
+	defer m.allocationMutex.Unlock()
+	m.podsWithPendingCheckpoint = slices.DeleteFunc(m.podsWithPendingCheckpoint, func(pending types.UID) bool {
+		return pending == uid
+	})
 }
 
 func (m *manager) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
