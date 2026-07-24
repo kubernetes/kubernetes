@@ -17,6 +17,9 @@ limitations under the License.
 package apiserver
 
 import (
+	"strconv"
+	"time"
+
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -46,7 +49,41 @@ var x509InsecureSHA1Counter = metrics.NewCounter(
 	},
 )
 
+var aggregatorRequestCounter = metrics.NewCounterVec(
+	&metrics.CounterOpts{
+		Subsystem:      "kube_aggregator",
+		Namespace:      "apiserver",
+		Name:           "request_total",
+		Help:           "Counter of requests proxied by the kube-aggregator to extension API servers, broken down by verb, group, version, and HTTP response code.",
+		StabilityLevel: metrics.ALPHA,
+	},
+	[]string{"verb", "group", "version", "code"},
+)
+
+var aggregatorRequestDuration = metrics.NewHistogramVec(
+	&metrics.HistogramOpts{
+		Subsystem:      "kube_aggregator",
+		Namespace:      "apiserver",
+		Name:           "request_duration_seconds",
+		Help:           "Request duration in seconds for requests proxied by the kube-aggregator to extension API servers, broken down by verb, group, version, and HTTP response code.",
+		Buckets:        []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 25, 60},
+		StabilityLevel: metrics.ALPHA,
+	},
+	[]string{"verb", "group", "version", "code"},
+)
+
 func init() {
 	legacyregistry.MustRegister(x509MissingSANCounter)
 	legacyregistry.MustRegister(x509InsecureSHA1Counter)
+	legacyregistry.MustRegister(aggregatorRequestCounter)
+	legacyregistry.MustRegister(aggregatorRequestDuration)
+}
+
+// recordAggregatorRequest reports a request proxied to an extension API server.
+// status is the response status code observed at the kube-aggregator boundary;
+// callers must pass a non-zero status (200 by convention if no header was written).
+func recordAggregatorRequest(verb, group, version string, status int, latency time.Duration) {
+	code := strconv.Itoa(status)
+	aggregatorRequestCounter.WithLabelValues(verb, group, version, code).Inc()
+	aggregatorRequestDuration.WithLabelValues(verb, group, version, code).Observe(latency.Seconds())
 }
