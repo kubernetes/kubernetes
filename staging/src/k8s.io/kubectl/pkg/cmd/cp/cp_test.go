@@ -70,6 +70,28 @@ func TestExtractFileSpec(t *testing.T) {
 			expectedFile:      "/some/file",
 		},
 		{
+			spec:         "pod/pod:/some/file",
+			expectedPod:  "pod",
+			expectedFile: "/some/file",
+		},
+		{
+			spec:         "pods/pod:/some/file",
+			expectedPod:  "pod",
+			expectedFile: "/some/file",
+		},
+		{
+			spec:              "namespace/pod/pod:/some/file",
+			expectedPod:       "pod",
+			expectedNamespace: "namespace",
+			expectedFile:      "/some/file",
+		},
+		{
+			spec:              "namespace/pods/pod:/some/file",
+			expectedPod:       "pod",
+			expectedNamespace: "namespace",
+			expectedFile:      "/some/file",
+		},
+		{
 			spec:         "pod:/some/file",
 			expectedPod:  "pod",
 			expectedFile: "/some/file",
@@ -83,7 +105,11 @@ func TestExtractFileSpec(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			spec:      "namespace/pod/invalid:/some/file",
+			spec:      "namespace/deployment/invalid:/some/file",
+			expectErr: true,
+		},
+		{
+			spec:      "namespace/pod/pod/invalid:/some/file",
 			expectErr: true,
 		},
 		{
