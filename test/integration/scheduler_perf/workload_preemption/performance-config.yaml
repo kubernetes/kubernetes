@@ -237,3 +237,69 @@
       initPods: 1000
       preemptorPodGroups: 10
       podsPerGroup: 10
+
+# GangPreemptionTopologySpreading benchmarks the performance of gang preemption
+# when the gang pods also have topology spreading constraints.
+#
+# The scenario flow is:
+# 1. Create a set of nodes distributed across multiple zones (topology.kubernetes.io/zone).
+# 2. Fill the cluster with low-priority pods.
+# 3. Submit high-priority PodGroups (gangs) where the individual pods have topology spreading constraints.
+# 4. This forces the scheduler to preempt low-priority pods while ensuring the gang pods
+#    are spread across zones.
+- name: GangPreemptionTopologySpreading
+  featureGates:
+    GenericWorkload: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+    labelNodePrepareStrategy:
+      labelKey: "topology.kubernetes.io/zone"
+      labelValues: ["zone-1", "zone-2", "zone-3"]
+  - opcode: createNamespaces
+    prefix: gang-preempt
+    count: 2
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: templates/pod-low-priority.yaml
+    namespace: gang-preempt-1
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $initPods
+  - opcode: createPodGroups
+    countParam: $preemptorPodGroups
+    namespace: gang-preempt-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      priority: 9999999
+  - opcode: createPods
+    collectMetrics: true
+    countParam: $preemptorPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: gang-preempt-0
+    podTemplatePath: templates/gang-pod-with-topology-spreading.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      cpuRequest: $gangCpuRequest
+      priority: 9999999
+  workloads:
+  - name: 3Nodes_1PreemptorGang_3Pods_Evicting_12InitPods
+    labels: [short, integration-test]
+    params:
+      initNodes: 3
+      initPods: 12
+      preemptorPodGroups: 1
+      podsPerGroup: 3
+      gangCpuRequest: 3900m
+  - name: 100Nodes_6PreemptorGangs_16Pods_Evicting_1000InitPods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      preemptorPodGroups: 6
+      podsPerGroup: 16
+      gangCpuRequest: 3970m
+
+
