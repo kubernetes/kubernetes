@@ -300,6 +300,10 @@ type endpointInfo struct {
 	ready       bool
 	serving     bool
 	terminating bool
+
+	// topology hints
+	zoneHints sets.Set[string]
+	nodeHints sets.Set[string]
 }
 
 // String is part of proxy.Endpoint interface.
@@ -329,12 +333,12 @@ func (info *endpointInfo) IsTerminating() bool {
 
 // ZoneHints returns the zone hints for the endpoint.
 func (info *endpointInfo) ZoneHints() sets.Set[string] {
-	return sets.Set[string]{}
+	return info.zoneHints
 }
 
 // NodeHints returns the node hints for the endpoint.
 func (info *endpointInfo) NodeHints() sets.Set[string] {
-	return sets.Set[string]{}
+	return info.nodeHints
 }
 
 // IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.
@@ -484,6 +488,9 @@ func (proxier *Proxier) newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, _ *pro
 		ready:       baseInfo.IsReady(),
 		serving:     baseInfo.IsServing(),
 		terminating: baseInfo.IsTerminating(),
+
+		zoneHints: baseInfo.ZoneHints(),
+		nodeHints: baseInfo.NodeHints(),
 	}
 
 	return info
@@ -635,6 +642,10 @@ type Proxier struct {
 	// These are effectively const and do not need the mutex to be held.
 	nodeName string
 	nodeIP   net.IP
+
+	// topologyLabels stores the node's topology labels for topology-aware
+	// routing (KEP-2433 and KEP-4444). Protected by mu.
+	topologyLabels map[string]string
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       *healthcheck.ProxyHealthServer
@@ -1081,12 +1092,22 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 // in any of the ServiceCIDRs, and provides complete list of service cidrs.
 func (proxier *Proxier) OnServiceCIDRsChanged(_ []string) {}
 
-// TODO(imroc): implement OnTopologyChanged for winkernel proxier.
 // OnTopologyChange is called whenever node topology labels are changed.
 // The informer is tweaked to listen for updates of the node where this
 // instance of kube-proxy is running, this guarantees the changed labels
 // are for this node.
-func (proxier *Proxier) OnTopologyChange(topologyLabels map[string]string) {}
+func (proxier *Proxier) OnTopologyChange(topologyLabels map[string]string) {
+	proxier.mu.Lock()
+	proxier.topologyLabels = topologyLabels
+	// Reset policyApplied on all services to force re-evaluation with new topology.
+	// Winkernel proxier uses per-service policyApplied flags so
+	// 'cleanupAllPolicies()' achieves the same effect as 'needFullSync=true'.
+	proxier.cleanupAllPolicies()
+	proxier.mu.Unlock()
+
+	klog.V(3).InfoS("Updated proxier node topology labels", "labels", topologyLabels)
+	proxier.Sync()
+}
 
 func (proxier *Proxier) cleanupAllPolicies() {
 	for svcName, svc := range proxier.svcPortMap {
@@ -1309,48 +1330,53 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 
 		var hnsEndpoints []endpointInfo
 		var hnsLocalEndpoints []endpointInfo
+		var hnsClusterEndpoints []endpointInfo
 		klog.V(4).InfoS("Applying Policy", "serviceInfo", svcName)
-		// Create Remote endpoints for every endpoint, corresponding to the service
+
+		// CategorizeEndpoints returns topology-aware (zone/node hints) endpoint lists,
+		// filtering for readiness and falling back to serving-terminating endpoints.
+		// allReachableEndpoints excludes remote endpoints when UsesClusterEndpoints()==false
+		// (i.e. both traffic policies are Local), so the loop below only creates HNS
+		// endpoints for reachable ones. DSR-awareness is not needed at this stage because
+		// DSR only affects which LB policy uses which endpoint list, handled below via
+		// svcInfo.localTrafficDSR.
+		allEndpoints := proxier.endpointsMap[svcName]
+		clusterEndpoints, localEndpoints, allReachableEndpoints, hasAnyEndpoints := proxy.CategorizeEndpoints(allEndpoints, svcInfo, proxier.nodeName, proxier.topologyLabels)
+
+		if !hasAnyEndpoints {
+			klog.V(3).InfoS("Service has no usable endpoints", "serviceName", svcName)
+		}
+
+		// Build endpoint key sets for classifying HNS endpoints during the loop below.
+		clusterEndpointSet := make(map[string]bool, len(clusterEndpoints))
+		for _, ep := range clusterEndpoints {
+			clusterEndpointSet[ep.String()] = true
+		}
+		localEndpointSet := make(map[string]bool, len(localEndpoints))
+		for _, ep := range localEndpoints {
+			localEndpointSet[ep.String()] = true
+		}
+
+		// Create Remote endpoints for every reachable endpoint, corresponding to the service
 		containsPublicIP := false
 		containsNodeIP := false
 		var allEndpointsTerminating, allEndpointsNonServing bool
-		someEndpointsServing := true
 
 		if len(svcInfo.loadBalancerIngressIPs) > 0 {
 			// Check should be done only if comes under the feature gate or enabled
 			// The check should be done only if Spec.Type == Loadbalancer.
 			allEndpointsTerminating = proxier.isAllEndpointsTerminating(svcName, svcInfo.localTrafficDSR)
 			allEndpointsNonServing = proxier.isAllEndpointsNonServing(svcName, svcInfo.localTrafficDSR)
-			someEndpointsServing = !allEndpointsNonServing
 			klog.V(4).InfoS("Terminating status checked for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "allEndpointsTerminating", allEndpointsTerminating, "allEndpointsNonServing", allEndpointsNonServing, "localTrafficDSR", svcInfo.localTrafficDSR)
 		} else {
 			klog.V(4).InfoS("Skipped terminating status check for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "ingressLBCount", len(svcInfo.loadBalancerIngressIPs))
 		}
 
-		for _, epInfo := range proxier.endpointsMap[svcName] {
+		for _, epInfo := range allReachableEndpoints {
 			ep, ok := epInfo.(*endpointInfo)
 			if !ok {
 				klog.ErrorS(nil, "Failed to cast endpointInfo", "serviceName", svcName)
 				continue
-			}
-
-			if svcInfo.internalTrafficLocal && svcInfo.localTrafficDSR && !ep.IsLocal() {
-				// No need to use or create remote endpoint when internal and external traffic policy is remote
-				klog.V(3).InfoS("Skipping the endpoint. Both internalTraffic and external traffic policies are local", "EpIP", ep.ip, " EpPort", ep.port)
-				continue
-			}
-
-			if someEndpointsServing {
-
-				if !allEndpointsTerminating && !ep.IsReady() {
-					klog.V(3).InfoS("Skipping the endpoint for LB creation. Endpoint is either not ready or all not all endpoints are terminating", "EpIP", ep.ip, " EpPort", ep.port, "allEndpointsTerminating", allEndpointsTerminating, "IsEpReady", ep.IsReady())
-					continue
-				}
-				if !ep.IsServing() {
-					klog.V(3).InfoS("Skipping the endpoint for LB creation. Endpoint is not serving", "EpIP", ep.ip, " EpPort", ep.port, "IsEpServing", ep.IsServing())
-					continue
-				}
-
 			}
 
 			var newHnsEndpoint *endpointInfo
@@ -1455,9 +1481,16 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			klog.V(1).InfoS("Hns endpoint resource", "endpointInfo", newHnsEndpoint)
 
 			hnsEndpoints = append(hnsEndpoints, *newHnsEndpoint)
-			if newHnsEndpoint.IsLocal() {
+			// Classify into cluster/local HNS endpoint lists using
+			// the sets built from CategorizeEndpoints results.
+			epKey := epInfo.String()
+			if clusterEndpointSet[epKey] {
+				hnsClusterEndpoints = append(hnsClusterEndpoints, *newHnsEndpoint)
+			}
+			if localEndpointSet[epKey] {
 				hnsLocalEndpoints = append(hnsLocalEndpoints, *newHnsEndpoint)
-			} else {
+			}
+			if !newHnsEndpoint.IsLocal() {
 				// We only share the refCounts for remote endpoints
 				ep.refCount = proxier.endPointsRefCount.getRefCount(newHnsEndpoint.hnsID)
 				*ep.refCount++
@@ -1499,10 +1532,14 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			klog.InfoS("Session Affinity is not supported on this version of Windows")
 		}
 
+		// Note: we use the DSR-aware isAllEndpointsTerminating/isAllEndpointsNonServing checks
+		// rather than len(hnsEndpoints) > 0, because on a DSR-enabled host where all local
+		// endpoints are terminating but remote endpoints are healthy, len(hnsEndpoints) > 0
+		// would be true but we should not create LBs for DSR-local traffic.
 		endpointsAvailableForLB := !allEndpointsTerminating && !allEndpointsNonServing
 
 		// clusterIPEndpoints is the endpoint list used for creating ClusterIP loadbalancer.
-		clusterIPEndpoints := hnsEndpoints
+		clusterIPEndpoints := hnsClusterEndpoints
 		if svcInfo.internalTrafficLocal {
 			// Take local endpoints for clusterip loadbalancer when internal traffic policy is local.
 			clusterIPEndpoints = hnsLocalEndpoints
@@ -1560,7 +1597,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		if svcInfo.NodePort() > 0 {
 			// If the preserve-destination service annotation is present, we will disable routing mesh for NodePort.
 			// This means that health services can use Node Port without falsely getting results from a different node.
-			nodePortEndpoints := hnsEndpoints
+			nodePortEndpoints := hnsClusterEndpoints
 			if svcInfo.preserveDIP || svcInfo.localTrafficDSR {
 				nodePortEndpoints = hnsLocalEndpoints
 			}
@@ -1617,7 +1654,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		// Create a Load Balancer Policy for each external IP
 		for _, externalIP := range svcInfo.externalIPs {
 			// Disable routing mesh if ExternalTrafficPolicy is set to local
-			externalIPEndpoints := hnsEndpoints
+			externalIPEndpoints := hnsClusterEndpoints
 			if svcInfo.localTrafficDSR {
 				externalIPEndpoints = hnsLocalEndpoints
 			}
@@ -1672,7 +1709,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		// Create a Load Balancer Policy for each loadbalancer ingress
 		for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
 			// Try loading existing policies, if already available
-			lbIngressEndpoints := hnsEndpoints
+			lbIngressEndpoints := hnsClusterEndpoints
 			if svcInfo.preserveDIP || svcInfo.localTrafficDSR {
 				lbIngressEndpoints = hnsLocalEndpoints
 			}
