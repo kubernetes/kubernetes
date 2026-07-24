@@ -4362,6 +4362,37 @@ func Test_getPodRequestedResources(t *testing.T) {
 			},
 		},
 		{
+			description: "resource requested only by a regular init container",
+			pod: getPodWithInitContainers(
+				"",
+				[]v1.Container{
+					{
+						Name: "app-container",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+				[]v1.Container{
+					{
+						Name: "init-container",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("1Gi"),
+								hugepages1Gi:      resource.MustParse("2Gi"),
+							},
+						},
+					},
+				},
+			),
+			expected: map[v1.ResourceName]uint64{
+				v1.ResourceMemory: 1 * gb,
+				hugepages1Gi:      2 * gb,
+			},
+		},
+		{
 			description: "maximum resources of init containers < total resources of containers",
 			pod: getPodWithInitContainers(
 				"",
