@@ -259,10 +259,32 @@ func (cache *healthInfoCache) updateHealthInfo(logger klog.Logger, driverName st
 	return changedDevices, nil
 }
 
-// clearDriver clears all health data for a specific driver.
-func (cache *healthInfoCache) clearDriver(logger klog.Logger, driverName string) error {
-	return cache.withLock(func() error {
+// clearDriver clears all health data for a specific driver and returns devices
+// whose externally visible health information changed.
+func (cache *healthInfoCache) clearDriver(logger klog.Logger, driverName string) ([]state.DeviceHealth, error) {
+	changedDevices := []state.DeviceHealth{}
+	err := cache.withLock(func() error {
+		now := time.Now()
+		driver, exists := (*cache.HealthInfo)[driverName]
+		if !exists {
+			return nil
+		}
+		for _, device := range driver.Devices {
+			timeout := device.HealthCheckTimeout
+			if timeout == 0 {
+				timeout = DefaultHealthTimeout
+			}
+			if now.Sub(device.LastUpdated) > timeout {
+				continue
+			}
+			if device.Health != state.DeviceHealthStatusUnknown || device.Message != "" {
+				device.Health = state.DeviceHealthStatusUnknown
+				device.Message = ""
+				changedDevices = append(changedDevices, device)
+			}
+		}
 		delete(*cache.HealthInfo, driverName)
 		return cache.saveToCheckpointInternal(logger)
 	})
+	return changedDevices, err
 }
