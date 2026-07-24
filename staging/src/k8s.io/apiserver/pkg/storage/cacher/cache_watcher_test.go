@@ -695,7 +695,7 @@ func TestCacheWatcherDispatchStageMetric(t *testing.T) {
 	// The event was enqueued before the process goroutine started, so it is
 	// picked up by the non-blocking receive and classified as backlog.
 	want := `
-# HELP apiserver_watch_events_delivery_duration_seconds [ALPHA] Histogram of watch event dispatch latency broken by resource type and pipeline stage. The additive stages (propagation, cache_ingest, incoming_queue, fanout, watcher_queue, encode, handoff) partition the delivery path; the 'total' stage is the end-to-end latency of a delivered event. The diagnostic stages are not part of the additive partition: 'watcher_queue_parked' and 'watcher_queue_backlog' split 'watcher_queue' into goroutine wake latency vs input-channel drain backlog and sum to it, and 'handoff_aborted' is the time an aborted delivery spent blocked on the result channel before the watcher was done.
+# HELP apiserver_watch_events_delivery_duration_seconds [ALPHA] Histogram of watch event dispatch latency broken by resource type and pipeline stage. The additive stages (propagation, cache_ingest, incoming_queue, fanout, watcher_queue, encode, handoff) partition the delivery path; the 'total' stage is the end-to-end latency of a delivered event. The diagnostic stages are not part of the additive partition: 'watcher_queue_parked' and 'watcher_queue_backlog' split 'watcher_queue' into goroutine wake latency vs input-channel drain backlog and sum to it, 'handoff_aborted' is the time an aborted delivery spent blocked on the result channel before the watcher was done, and 'serve_encode'/'serve_write' are per-event serve-loop intervals measured in the HTTP watch handler (result-channel receive to encoded, and encoded to written-and-flushed).
 # TYPE apiserver_watch_events_delivery_duration_seconds histogram
 apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="cache_ingest"} 0
 apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="encode"} 1
@@ -704,6 +704,8 @@ apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",
 apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="handoff_aborted"} 0
 apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="incoming_queue"} 0
 apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="propagation"} 0
+apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="serve_encode"} 0
+apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="serve_write"} 0
 apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="total"} 1
 apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="watcher_queue"} 1
 apiserver_watch_events_delivery_duration_seconds_count{group="",resource="pods",stage="watcher_queue_backlog"} 1
@@ -862,6 +864,31 @@ func TestCacheWatcherHandoffAbortedMetric(t *testing.T) {
 	}
 	if got := stageSampleCount(t, "handoff"); got != 0 {
 		t.Fatalf("handoff count = %d, want 0", got)
+	}
+}
+
+func TestCacheWatcherResultDepthMetric(t *testing.T) {
+	metrics.Register()
+	legacyregistry.Reset()
+	t.Cleanup(legacyregistry.Reset)
+
+	w := newCacheWatcher(2, func(string, labels.Set, fields.Set, runtime.Object) bool { return true }, func(bool) {}, storage.APIObjectVersioner{}, time.Now().Add(time.Minute), false, schema.GroupResource{Resource: "pods"}, metrics.NewWatcherMetricsObservers(schema.GroupResource{Resource: "pods"}), "")
+
+	if _, sentAt := w.sendWatchCacheEvent(makeWatchCacheEvent(1)); sentAt.IsZero() {
+		t.Fatal("expected the event to be sent")
+	}
+	if _, sentAt := w.sendWatchCacheEvent(makeWatchCacheEvent(2)); sentAt.IsZero() {
+		t.Fatal("expected the event to be sent")
+	}
+
+	// Depths observed at the two sends are 1 and 2 with no reader draining.
+	want := `
+# HELP apiserver_watch_watcher_result_depth [ALPHA] Histogram of the per-watcher result channel depth observed at each successful event send, broken by resource type.
+# TYPE apiserver_watch_watcher_result_depth histogram
+apiserver_watch_watcher_result_depth_count{group="",resource="pods"} 2
+`
+	if err := testutil.GatherAndCompare(gatherWithoutDurations(), strings.NewReader(want), "apiserver_watch_watcher_result_depth"); err != nil {
+		t.Fatal(err)
 	}
 }
 

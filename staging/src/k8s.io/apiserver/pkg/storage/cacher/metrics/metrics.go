@@ -77,6 +77,13 @@ const (
 	// watcher was done before the result channel accepted the event. Aborted
 	// deliveries record no other stage.
 	StageHandoffAborted
+	// StageServeEncode and StageServeWrite are measured per event in the HTTP
+	// watch serve loop (endpoints/handlers), not in the cacher: result-channel
+	// receive -> outgoing event encoded, and encoded -> written to the
+	// ResponseWriter and flushed (the part that blocks on HTTP flow control
+	// when the client stops reading).
+	StageServeEncode
+	StageServeWrite
 
 	numDispatchStages
 )
@@ -93,6 +100,8 @@ var dispatchStageName = [numDispatchStages]string{
 	StageWatcherQueueParked:  "watcher_queue_parked",
 	StageWatcherQueueBacklog: "watcher_queue_backlog",
 	StageHandoffAborted:      "handoff_aborted",
+	StageServeEncode:         "serve_encode",
+	StageServeWrite:          "serve_write",
 }
 
 // TerminationReason identifies why a watcher was terminated through the
@@ -115,6 +124,13 @@ const (
 var terminationReasonName = [numTerminationReasons]string{
 	TerminationReasonBudgetExpired: "budget_expired",
 	TerminationReasonCascade:       "cascade",
+}
+
+func (r TerminationReason) String() string {
+	if r < 0 || r >= numTerminationReasons {
+		return "unknown"
+	}
+	return terminationReasonName[r]
 }
 
 // Termination states for the "state" label: whether the watcher's result
@@ -341,7 +357,7 @@ var (
 			Namespace:      namespace,
 			Subsystem:      "watch_events",
 			Name:           "delivery_duration_seconds",
-			Help:           "Histogram of watch event dispatch latency broken by resource type and pipeline stage. The additive stages (propagation, cache_ingest, incoming_queue, fanout, watcher_queue, encode, handoff) partition the delivery path; the 'total' stage is the end-to-end latency of a delivered event. The diagnostic stages are not part of the additive partition: 'watcher_queue_parked' and 'watcher_queue_backlog' split 'watcher_queue' into goroutine wake latency vs input-channel drain backlog and sum to it, and 'handoff_aborted' is the time an aborted delivery spent blocked on the result channel before the watcher was done.",
+			Help:           "Histogram of watch event dispatch latency broken by resource type and pipeline stage. The additive stages (propagation, cache_ingest, incoming_queue, fanout, watcher_queue, encode, handoff) partition the delivery path; the 'total' stage is the end-to-end latency of a delivered event. The diagnostic stages are not part of the additive partition: 'watcher_queue_parked' and 'watcher_queue_backlog' split 'watcher_queue' into goroutine wake latency vs input-channel drain backlog and sum to it, 'handoff_aborted' is the time an aborted delivery spent blocked on the result channel before the watcher was done, and 'serve_encode'/'serve_write' are per-event serve-loop intervals measured in the HTTP watch handler (result-channel receive to encoded, and encoded to written-and-flushed).",
 			StabilityLevel: compbasemetrics.ALPHA,
 			Buckets:        []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
 		}, []string{"group", "resource", "stage"})
@@ -372,6 +388,16 @@ var (
 			Name:           "watcher_input_full_total",
 			Help:           "Counter of failed non-blocking enqueues onto a watcher's full input channel, broken by resource type.",
 			StabilityLevel: compbasemetrics.ALPHA,
+		}, []string{"group", "resource"})
+
+	watcherResultDepth = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      "watch",
+			Name:           "watcher_result_depth",
+			Help:           "Histogram of the per-watcher result channel depth observed at each successful event send, broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024},
 		}, []string{"group", "resource"})
 )
 
@@ -406,6 +432,7 @@ func Register() {
 		legacyregistry.MustRegister(terminatedWatchersDuration)
 		legacyregistry.MustRegister(watcherInputDepth)
 		legacyregistry.MustRegister(watcherInputFull)
+		legacyregistry.MustRegister(watcherResultDepth)
 		legacyregistry.CustomMustRegister(newSchedLatenciesCollector())
 	})
 }
@@ -456,6 +483,7 @@ type WatcherMetricsObservers struct {
 	stageDurations    [numDispatchStages]compbasemetrics.ObserverMetric
 	inputDepth        compbasemetrics.ObserverMetric
 	inputFull         compbasemetrics.CounterMetric
+	resultDepth       compbasemetrics.ObserverMetric
 	terminationStalls [numTerminationReasons][numTerminationStates]compbasemetrics.ObserverMetric
 }
 
@@ -467,6 +495,7 @@ func NewWatcherMetricsObservers(groupResource schema.GroupResource) *WatcherMetr
 	}
 	o.inputDepth = watcherInputDepth.WithLabelValues(groupResource.Group, groupResource.Resource)
 	o.inputFull = watcherInputFull.WithLabelValues(groupResource.Group, groupResource.Resource)
+	o.resultDepth = watcherResultDepth.WithLabelValues(groupResource.Group, groupResource.Resource)
 	for r := TerminationReason(0); r < numTerminationReasons; r++ {
 		for s := 0; s < numTerminationStates; s++ {
 			o.terminationStalls[r][s] = terminatedWatchersDuration.WithLabelValues(groupResource.Group, groupResource.Resource, terminationReasonName[r], terminationStateName[s])
@@ -491,6 +520,11 @@ func (d *WatcherMetricsObservers) ObserveInputDepth(depth int) {
 // IncInputFull counts a failed non-blocking enqueue onto a full input channel.
 func (d *WatcherMetricsObservers) IncInputFull() {
 	d.inputFull.Inc()
+}
+
+// ObserveResultDepth records the result channel depth seen at a successful send.
+func (d *WatcherMetricsObservers) ObserveResultDepth(depth int) {
+	d.resultDepth.Observe(float64(depth))
 }
 
 // ObserveTerminationStall records how long a watcher terminated through the
@@ -525,6 +559,31 @@ type noopCounter struct{}
 func (noopCounter) Inc()        {}
 func (noopCounter) Add(float64) {}
 
+// ServeStageObservers holds pre-resolved (group, resource) observers for the
+// serve-loop stages recorded by the HTTP watch handler.
+type ServeStageObservers struct {
+	encode compbasemetrics.ObserverMetric
+	write  compbasemetrics.ObserverMetric
+}
+
+// NewServeStageObservers creates pre-resolved observers for the serve-loop stages.
+func NewServeStageObservers(groupResource schema.GroupResource) *ServeStageObservers {
+	return &ServeStageObservers{
+		encode: dispatchStageDuration.WithLabelValues(groupResource.Group, groupResource.Resource, dispatchStageName[StageServeEncode]),
+		write:  dispatchStageDuration.WithLabelValues(groupResource.Group, groupResource.Resource, dispatchStageName[StageServeWrite]),
+	}
+}
+
+// ObserveEncode records the result-channel-receive -> encoded interval.
+func (s *ServeStageObservers) ObserveEncode(duration time.Duration) {
+	observe(s.encode, duration)
+}
+
+// ObserveWrite records the encoded -> written-and-flushed interval.
+func (s *ServeStageObservers) ObserveWrite(duration time.Duration) {
+	observe(s.write, duration)
+}
+
 // NewNoopWatcherMetricsObservers returns a metrics observers struct that does nothing.
 func NewNoopWatcherMetricsObservers() *WatcherMetricsObservers {
 	o := &WatcherMetricsObservers{}
@@ -533,6 +592,7 @@ func NewNoopWatcherMetricsObservers() *WatcherMetricsObservers {
 	}
 	o.inputDepth = noopObs
 	o.inputFull = noopCounter{}
+	o.resultDepth = noopObs
 	for r := range o.terminationStalls {
 		for s := range o.terminationStalls[r] {
 			o.terminationStalls[r][s] = noopObs
