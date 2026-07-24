@@ -328,6 +328,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "UsesAllResources", testUsesAllResources)
 				runSubTest(tCtx, "DRANodeAllocatableResources", func(tCtx ktesting.TContext) { testNodeAllocatableResources(tCtx, true) })
 				runSubTest(tCtx, "PodGroup", testPodGroup)
+				runSubTest(tCtx, "PodGroupDRAAllocationConflict", testPodGroupDRAAllocationConflict)
 				runSubTest(tCtx, "WorkloadResourceClaims", func(tCtx ktesting.TContext) { testWorkloadResourceClaims(tCtx, true, true) })
 			},
 		},
