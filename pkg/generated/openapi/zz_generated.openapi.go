@@ -71571,7 +71571,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_AttachDetachController
 				Properties: map[string]spec.Schema{
 					"DisableAttachDetachReconcilerSync": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Reconciler runs a periodic loop to reconcile the desired state of the with the actual state of the world by triggering attach detach operations. This flag enables or disables reconcile.  Is false by default, and thus enabled.",
+							Description: "DisableAttachDetachReconcilerSync disables the periodic sync that verifies volumes in the actual state of the world are still attached. Defaults to false.",
 							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
