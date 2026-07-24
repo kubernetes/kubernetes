@@ -17,6 +17,7 @@ limitations under the License.
 package reconciler
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -88,11 +89,17 @@ func TestReconstructVolumes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("can't make a temp directory for kubeletPods: %v", err)
 			}
-			defer os.RemoveAll(tmpKubeletDir)
+			defer func() {
+				if err := os.RemoveAll(tmpKubeletDir); err != nil {
+					t.Errorf("failed to remove temp dir: %v", err)
+				}
+			}()
 
 			// create kubelet pod directory
 			tmpKubeletPodDir := filepath.Join(tmpKubeletDir, "pods")
-			os.MkdirAll(tmpKubeletPodDir, 0755)
+			if err := os.MkdirAll(tmpKubeletPodDir, 0755); err != nil {
+				t.Fatalf("failed to create pod dir: %v", err)
+			}
 
 			mountPaths := []string{}
 
@@ -100,7 +107,9 @@ func TestReconstructVolumes(t *testing.T) {
 			for _, volumePath := range tc.volumePaths {
 				vp := filepath.Join(tmpKubeletPodDir, volumePath)
 				mountPaths = append(mountPaths, vp)
-				os.MkdirAll(vp, 0755)
+				if err := os.MkdirAll(vp, 0755); err != nil {
+					t.Fatalf("failed to create volume path: %v", err)
+				}
 			}
 
 			rc, fakePlugin := getReconciler(tmpKubeletDir, t, mountPaths, nil /*custom kubeclient*/)
@@ -183,11 +192,17 @@ func TestCleanOrphanVolumes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("can't make a temp directory for kubeletPods: %v", err)
 			}
-			defer os.RemoveAll(tmpKubeletDir)
+			defer func() {
+				if err := os.RemoveAll(tmpKubeletDir); err != nil {
+					t.Errorf("failed to remove temp dir: %v", err)
+				}
+			}()
 
 			// create kubelet pod directory
 			tmpKubeletPodDir := filepath.Join(tmpKubeletDir, "pods")
-			os.MkdirAll(tmpKubeletPodDir, 0755)
+			if err := os.MkdirAll(tmpKubeletPodDir, 0755); err != nil {
+				t.Fatalf("failed to create pod dir: %v", err)
+			}
 
 			mountPaths := []string{}
 
@@ -204,7 +219,11 @@ func TestCleanOrphanVolumes(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Error adding volume %s to dsow: %v", volumeSpec.Name(), err)
 				}
-				rcInstance.actualStateOfWorld.MarkVolumeAsAttached(logger, volumeName, volumeSpec, nodeName, "")
+				if err := rcInstance.actualStateOfWorld.MarkVolumeAsAttached(
+					logger, volumeName, volumeSpec, nodeName, "",
+				); err != nil {
+					t.Fatalf("failed to mark volume as attached: %v", err)
+				}
 			}
 
 			// Act
@@ -286,16 +305,24 @@ func TestReconstructVolumesMount(t *testing.T) {
 			if err != nil {
 				t.Fatalf("can't make a temp directory for kubeletPods: %v", err)
 			}
-			defer os.RemoveAll(tmpKubeletDir)
+			defer func() {
+				if err := os.RemoveAll(tmpKubeletDir); err != nil {
+					t.Errorf("failed to remove temp dir: %v", err)
+				}
+			}()
 
 			// create kubelet pod directory
 			tmpKubeletPodDir := filepath.Join(tmpKubeletDir, "pods")
-			os.MkdirAll(tmpKubeletPodDir, 0755)
+			if err := os.MkdirAll(tmpKubeletPodDir, 0755); err != nil {
+				t.Fatalf("failed to create pod dir: %v", err)
+			}
 
 			// create pod and volume directories so as reconciler can find them.
 			vp := filepath.Join(tmpKubeletPodDir, tc.volumePath)
 			mountPaths := []string{vp}
-			os.MkdirAll(vp, 0755)
+			if err := os.MkdirAll(vp, 0755); err != nil {
+				t.Fatalf("failed to create volume path: %v", err)
+			}
 
 			// Arrange 2 - populate DSW
 			outerName := filepath.Base(tc.volumePath)
@@ -329,7 +356,11 @@ func TestReconstructVolumesMount(t *testing.T) {
 				t.Fatalf("Error adding volume %s to dsow: %v", volumeSpec.Name(), err)
 			}
 			logger, _ := ktesting.NewTestContext(t)
-			rcInstance.actualStateOfWorld.MarkVolumeAsAttached(logger, volumeName, volumeSpec, nodeName, "")
+			if err := rcInstance.actualStateOfWorld.MarkVolumeAsAttached(
+				logger, volumeName, volumeSpec, nodeName, "",
+			); err != nil {
+				t.Fatalf("failed to mark volume as attached: %v", err)
+			}
 
 			rcInstance.populatorHasAddedPods = func() bool {
 				// Mark DSW populated to allow unmounting of volumes.
@@ -394,8 +425,182 @@ func TestReconstructVolumesMount(t *testing.T) {
 			}
 
 			// Unmount was *not* attempted in any case
-			verifyTearDownCalls(fakePlugin, 0)
+			if err := verifyTearDownCalls(fakePlugin, 0); err != nil {
+				t.Fatalf("unexpected teardown calls: %v", err)
+			}
 		})
+	}
+}
+
+func TestReconstructCSIGlobalMountOnly(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	tmpKubeletDir, err := os.MkdirTemp("", "kubelet")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(tmpKubeletDir); err != nil {
+			t.Errorf("failed to remove temp dir: %v", err)
+		}
+	}()
+
+	// Create CSI globalmount structure:
+	// plugins/kubernetes.io/csi/<driver>/<volume>/globalmount
+	driver := "fake.csi.driver"
+	volumeID := "test-volume-id"
+
+	globalMountPath := filepath.Join(
+		tmpKubeletDir,
+		"plugins",
+		"kubernetes.io",
+		"csi",
+		driver,
+		volumeID,
+		"globalmount",
+	)
+
+	volDataPath := filepath.Join(
+		tmpKubeletDir,
+		"plugins",
+		"kubernetes.io",
+		"csi",
+		driver,
+		volumeID,
+		"vol_data.json",
+	)
+
+	// Create directories
+	if err := os.MkdirAll(globalMountPath, 0755); err != nil {
+		t.Fatalf("failed to create globalmount dir: %v", err)
+	}
+
+	// Create vol_data.json
+	volData := map[string]interface{}{
+		"driverName":   driver,
+		"volumeHandle": volumeID,
+		"fsType":       "ext4",
+	}
+
+	data, _ := json.Marshal(volData)
+	if err := os.WriteFile(volDataPath, data, 0644); err != nil {
+		t.Fatalf("failed to write vol_data.json: %v", err)
+	}
+
+	// NOTE: No pod directory created → this is the core of the test
+
+	// Setup reconciler
+	rc, fakePlugin := getReconciler(tmpKubeletDir, t, nil, nil)
+	rcInstance, _ := rc.(*reconciler)
+
+	// Act
+	rcInstance.reconstructVolumes(logger)
+
+	// Assert
+
+	// 1. No volumes should be marked as fully mounted
+	mounted := rcInstance.actualStateOfWorld.GetMountedVolumes()
+	if len(mounted) != 0 {
+		t.Fatalf("expected 0 mounted volumes, got %d", len(mounted))
+	}
+
+	if len(rcInstance.volumesNeedUpdateFromNodeStatus) != 1 {
+		t.Fatalf("expected 1 volume needing node status update, got %d",
+			len(rcInstance.volumesNeedUpdateFromNodeStatus))
+	}
+
+	// 2. Volume should exist as UNCERTAIN
+	devices := rcInstance.actualStateOfWorld.GetUnmountedVolumes()
+	if len(devices) != 1 {
+		t.Fatalf("expected 1 reconstructed (uncertain) device volume, got %d", len(devices))
+	}
+
+	// 3. Ensure it is marked as reconstructed (uncertain)
+	if !rcInstance.actualStateOfWorld.IsVolumeDeviceReconstructed(devices[0].VolumeName) {
+		t.Fatalf("expected volume %s to be marked as device-reconstructed", devices[0].VolumeName)
+	}
+
+	// 4. Ensure no teardown (unmount) was triggered
+	if err := verifyTearDownCalls(fakePlugin, 0); err != nil {
+		t.Fatalf("unexpected teardown calls: %v", err)
+	}
+}
+
+func TestReconstructCSIGlobalMountMissingVolData(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	tmpKubeletDir, _ := os.MkdirTemp("", "kubelet")
+	defer func() {
+		if err := os.RemoveAll(tmpKubeletDir); err != nil {
+			t.Errorf("failed to remove temp dir: %v", err)
+		}
+	}()
+
+	driver := "fake.csi.driver"
+	volumeID := "test-volume-id"
+
+	globalMountPath := filepath.Join(
+		tmpKubeletDir,
+		"plugins", "kubernetes.io", "csi",
+		driver, volumeID, "globalmount",
+	)
+
+	if err := os.MkdirAll(globalMountPath, 0755); err != nil {
+		t.Fatalf("failed to create globalMountPath: %v", err)
+	}
+
+	rc, _ := getReconciler(tmpKubeletDir, t, nil, nil)
+	rcInstance := rc.(*reconciler)
+
+	rcInstance.reconstructVolumes(logger)
+
+	all := rcInstance.actualStateOfWorld.GetAllMountedVolumes()
+	if len(all) != 0 {
+		t.Fatalf("expected no volumes reconstructed, got %d", len(all))
+	}
+}
+
+func TestReconstructCSIGlobalMountMissingGlobalMountDir(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	tmpKubeletDir, _ := os.MkdirTemp("", "kubelet")
+	defer func() {
+		if err := os.RemoveAll(tmpKubeletDir); err != nil {
+			t.Errorf("failed to remove temp dir: %v", err)
+		}
+	}()
+
+	driver := "fake.csi.driver"
+	volumeID := "test-volume-id"
+
+	basePath := filepath.Join(
+		tmpKubeletDir,
+		"plugins", "kubernetes.io", "csi",
+		driver, volumeID,
+	)
+
+	if err := os.MkdirAll(basePath, 0755); err != nil {
+		t.Fatalf("failed to create basePath: %v", err)
+	}
+
+	// Only vol_data.json, NO globalmount
+	volData := map[string]interface{}{
+		"driverName":   driver,
+		"volumeHandle": volumeID,
+	}
+	data, _ := json.Marshal(volData)
+	if err := os.WriteFile(filepath.Join(basePath, "vol_data.json"), data, 0644); err != nil {
+		t.Fatalf("failed to write vol_data.json: %v", err)
+	}
+
+	rc, _ := getReconciler(tmpKubeletDir, t, nil, nil)
+	rcInstance := rc.(*reconciler)
+
+	rcInstance.reconstructVolumes(logger)
+
+	all := rcInstance.actualStateOfWorld.GetAllMountedVolumes()
+	if len(all) != 0 {
+		t.Fatalf("expected no volumes reconstructed without globalmount dir, got %d", len(all))
 	}
 }
 

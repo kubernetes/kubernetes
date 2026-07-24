@@ -78,6 +78,12 @@ type ActualStateOfWorld interface {
 	// attached volumes, an error is returned.
 	SetDeviceMountState(volumeName v1.UniqueVolumeName, deviceMountState operationexecutor.DeviceMountState, devicePath, deviceMountPath, seLinuxMountContext string) error
 
+	// MarkDeviceAsUncertainViaReconstruction marks the device as uncertain and
+	// registers the volume in foundDuringReconstruction. This is used for
+	// CSI globalmount-only volumes found on disk during kubelet restart where
+	// no pod volume directory exists.
+	MarkDeviceAsUncertainViaReconstruction(volumeName v1.UniqueVolumeName, devicePath, deviceMountPath, seLinuxMountContext string) error
+
 	// DeletePodFromVolume removes the given pod from the given volume in the
 	// cache indicating the volume has been successfully unmounted from the pod.
 	// If a pod with the same unique name does not exist under the specified
@@ -564,6 +570,26 @@ func (asw *actualStateOfWorld) MarkDeviceAsMounted(
 func (asw *actualStateOfWorld) MarkDeviceAsUncertain(
 	volumeName v1.UniqueVolumeName, devicePath, deviceMountPath, seLinuxMountContext string) error {
 	return asw.SetDeviceMountState(volumeName, operationexecutor.DeviceMountUncertain, devicePath, deviceMountPath, seLinuxMountContext)
+}
+
+func (asw *actualStateOfWorld) MarkDeviceAsUncertainViaReconstruction(
+	volumeName v1.UniqueVolumeName, devicePath, deviceMountPath, seLinuxMountContext string) error {
+	if err := asw.SetDeviceMountState(
+		volumeName,
+		operationexecutor.DeviceMountUncertain,
+		devicePath,
+		deviceMountPath,
+		seLinuxMountContext,
+	); err != nil {
+		return err
+	}
+
+	asw.Lock()
+	defer asw.Unlock()
+	if _, ok := asw.foundDuringReconstruction[volumeName]; !ok {
+		asw.foundDuringReconstruction[volumeName] = map[volumetypes.UniquePodName]types.UID{}
+	}
+	return nil
 }
 
 func (asw *actualStateOfWorld) MarkVolumeMountAsUncertain(markVolumeOpts operationexecutor.MarkVolumeOpts) error {

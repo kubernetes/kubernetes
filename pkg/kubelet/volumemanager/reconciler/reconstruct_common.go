@@ -17,6 +17,7 @@ limitations under the License.
 package reconciler
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -51,6 +52,19 @@ type podVolume struct {
 	pluginName     string
 	volumeMode     v1.PersistentVolumeMode
 }
+
+type csiVolumeData struct {
+	DriverName       string            `json:"driverName"`
+	VolumeHandle     string            `json:"volumeHandle"`
+	FSType           string            `json:"fsType,omitempty"`
+	ReadOnly         bool              `json:"readOnly,omitempty"`
+	VolumeAttributes map[string]string `json:"volumeAttributes,omitempty"`
+}
+
+const (
+	reconstructedCSIGlobalMountPodName = volumetypes.UniquePodName("csi-globalmount")
+	reconstructedCSIGlobalMountPodUID  = types.UID("csi-globalmount")
+)
 
 func (p podVolume) MarshalLog() interface{} {
 	return struct {
@@ -245,6 +259,116 @@ func getVolumesFromPodDir(logger klog.Logger, podDir string) ([]podVolume, error
 	for _, volume := range volumes {
 		logger.V(4).Info("Get volume from pod directory", "path", podDir, "volume", volume)
 	}
+	return volumes, nil
+}
+
+func buildCSIVolumeSpec(volData *csiVolumeData) *volumepkg.Spec {
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: volData.VolumeHandle,
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				CSI: &v1.CSIPersistentVolumeSource{
+					Driver:           volData.DriverName,
+					VolumeHandle:     volData.VolumeHandle,
+					FSType:           volData.FSType,
+					ReadOnly:         volData.ReadOnly,
+					VolumeAttributes: volData.VolumeAttributes,
+				},
+			},
+		},
+	}
+
+	return volumepkg.NewSpecFromPersistentVolume(pv, false)
+}
+
+func (rc *reconciler) getVolumesFromCSIGlobalDir(
+	logger klog.Logger,
+	kubeletRootDir string,
+) ([]*reconstructedVolume, error) {
+
+	var volumes []*reconstructedVolume
+
+	pluginDir := filepath.Join(
+		kubeletRootDir,
+		"plugins",
+		"kubernetes.io",
+		"csi",
+	)
+
+	drivers, err := os.ReadDir(pluginDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return volumes, nil
+		}
+		return nil, err
+	}
+
+	for _, driver := range drivers {
+		if !driver.IsDir() {
+			continue
+		}
+
+		driverDir := filepath.Join(pluginDir, driver.Name())
+		volumeDirs, err := os.ReadDir(driverDir)
+		if err != nil {
+			continue
+		}
+
+		for _, volDir := range volumeDirs {
+			if !volDir.IsDir() {
+				continue
+			}
+
+			volPath := filepath.Join(driverDir, volDir.Name())
+			volDataPath := filepath.Join(volPath, "vol_data.json")
+			data, err := os.ReadFile(volDataPath)
+			if err != nil {
+				continue
+			}
+
+			globalMountPath := filepath.Join(volPath, "globalmount")
+			if _, err := os.Stat(globalMountPath); err != nil {
+				continue
+			}
+
+			var volData csiVolumeData
+			if err := json.Unmarshal(data, &volData); err != nil {
+				logger.Error(err, "Failed to parse vol_data.json", "path", volDataPath)
+				continue
+			}
+
+			volumeSpec := buildCSIVolumeSpec(&volData)
+			plugin, err := rc.volumePluginMgr.FindPluginBySpec(volumeSpec)
+			if err != nil {
+				logger.Error(err, "Failed to find volume plugin for CSI globalmount volume", "path", volDataPath)
+				continue
+			}
+
+			pv := podVolume{
+				podName:        reconstructedCSIGlobalMountPodName,
+				volumeSpecName: volData.VolumeHandle,
+				volumePath:     volPath,
+				pluginName:     plugin.GetPluginName(),
+				volumeMode:     v1.PersistentVolumeFilesystem,
+			}
+
+			rv, err := rc.reconstructVolume(pv)
+			if err != nil {
+				logger.Error(err, "Failed to reconstruct CSI globalmount volume",
+					"volPath", volPath,
+				)
+				continue
+			}
+
+			logger.V(4).Info("Reconstructed CSI globalmount-only volume",
+				"volumeName", rv.volumeName,
+				"volPath", volPath)
+			volumes = append(volumes, rv)
+		}
+	}
+
 	return volumes, nil
 }
 
