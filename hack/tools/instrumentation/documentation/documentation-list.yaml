@@ -6426,6 +6426,39 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
+- name: batch_rescore_attempts_total
+  subsystem: scheduler
+  help: Counts of rescore attempts during opportunistic batching.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - profile
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: batch_rescore_duration_seconds
+  subsystem: scheduler
+  help: Latency for rescoring a node during opportunistic batching.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - profile
+  buckets:
+  - 1e-05
+  - 2e-05
+  - 4e-05
+  - 8e-05
+  - 0.00016
+  - 0.00032
+  - 0.00064
+  - 0.00128
+  - 0.00256
+  - 0.00512
+  - 0.01024
+  - 0.02048
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
 - name: cache_size
   subsystem: scheduler
   help: Number of nodes, pods, and assumed (bound) pods in the scheduler cache.
@@ -6869,7 +6902,7 @@
     endpoint: /metrics
 - name: store_schedule_results_duration_seconds
   subsystem: scheduler
-  help: Latency for getting a no.
+  help: Latency for storing scheduling results.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
