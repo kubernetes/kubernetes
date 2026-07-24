@@ -362,7 +362,7 @@ func verifyOomScoreAdj(ctx context.Context, f *framework.Framework, pod *v1.Pod,
 	})).WithTimeout(framework.PollShortTimeout).Should(gomega.Succeed())
 }
 
-func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, pod *v1.Pod, expectedContainers []ResizableContainerInfo) *v1.Pod {
+func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, pod *v1.Pod) *v1.Pod {
 	ginkgo.GinkgoHelper()
 	// Wait for resize to complete.
 

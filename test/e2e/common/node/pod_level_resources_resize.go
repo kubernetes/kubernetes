@@ -560,7 +560,7 @@ func doPodLevelResourcesMemoryLimitDecreaseTest(f *framework.Framework) {
 		podresize.VerifyPodResources(testPod, containers, viableLoweredLimitPLR)
 
 		ginkgo.By("waiting for viable lowered limit to be actuated")
-		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod, containers)
+		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod)
 		podresize.ExpectPodResized(ctx, f, resizedPod, containers)
 
 		// There is some latency after container startup before memory usage is scraped. On CRI-O
@@ -638,7 +638,7 @@ func doPodLevelResourcesMemoryLimitDecreaseTest(f *framework.Framework) {
 		podresize.VerifyPodResources(testPod, containers, originalPLR)
 
 		ginkgo.By("waiting for the original values to be actuated")
-		resizedPod = podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod, containers)
+		resizedPod = podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod)
 		podresize.ExpectPodResized(ctx, f, resizedPod, containers)
 
 		ginkgo.By("deleting pod")
@@ -733,7 +733,7 @@ func patchAndVerifyPLR(ctx context.Context, f *framework.Framework, podClient *e
 	expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, expectedContainers)
 
 	podresize.VerifyPodResources(patchedPod, expected, expectedPodResources)
-	resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPod, expected)
+	resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPod)
 	podresize.ExpectPodResized(ctx, f, resizedPod, expected)
 	// Uncomment pod-level status verification after patch in 1.36 release.
 	// convesion of cgroup values -> Pod.Status.Resources -> cgroup values is
