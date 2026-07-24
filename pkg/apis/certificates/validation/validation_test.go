@@ -2542,7 +2542,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.NotSupported(field.NewPath("status", "conditions", "[0]", "type"), "Unknown", []string{capi.PodCertificateRequestConditionTypeIssued, capi.PodCertificateRequestConditionTypeDenied, capi.PodCertificateRequestConditionTypeFailed}),
+				field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("type"), "Unknown", []string{capi.PodCertificateRequestConditionTypeIssued, capi.PodCertificateRequestConditionTypeDenied, capi.PodCertificateRequestConditionTypeFailed}),
 			},
 		},
 		{
@@ -2595,7 +2595,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.NotSupported(field.NewPath("status", "conditions", "[0]", "status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
+				field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
 			},
 		},
 		{
@@ -2648,7 +2648,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.NotSupported(field.NewPath("status", "conditions", "[0]", "status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
+				field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
 			},
 		},
 		{
@@ -2701,7 +2701,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.NotSupported(field.NewPath("status", "conditions", "[0]", "status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
+				field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("status"), metav1.ConditionFalse, []metav1.ConditionStatus{metav1.ConditionTrue}),
 			},
 		},
 		{
@@ -3157,7 +3157,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.Invalid(field.NewPath("status", "conditions", "[1]", "type"), "Failed", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
+				field.Invalid(field.NewPath("status", "conditions").Index(1).Child("type"), "Failed", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
 			},
 		},
 		{
@@ -3221,7 +3221,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.Invalid(field.NewPath("status", "conditions", "[1]", "type"), "Denied", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
+				field.Invalid(field.NewPath("status", "conditions").Index(1).Child("type"), "Denied", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
 			},
 		},
 		{
@@ -3285,7 +3285,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.Invalid(field.NewPath("status", "conditions", "[1]", "type"), "Failed", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
+				field.Invalid(field.NewPath("status", "conditions").Index(1).Child("type"), "Failed", `There may be at most one condition with type "Issued", "Denied", or "Failed"`),
 			},
 		},
 		{

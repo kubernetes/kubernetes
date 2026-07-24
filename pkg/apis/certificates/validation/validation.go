@@ -28,7 +28,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/mail"
-	"strconv"
 	"strings"
 	"time"
 
@@ -825,13 +824,13 @@ func ValidatePodCertificateRequestStatusUpdate(newReq, oldReq *certificates.PodC
 		case certificates.PodCertificateRequestConditionTypeIssued, certificates.PodCertificateRequestConditionTypeDenied, certificates.PodCertificateRequestConditionTypeFailed:
 			numKnownConditions++
 			if numKnownConditions > 1 {
-				allErrors = append(allErrors, field.Invalid(field.NewPath("status", "conditions", formatIndex(i), "type"), cond.Type, `There may be at most one condition with type "Issued", "Denied", or "Failed"`))
+				allErrors = append(allErrors, field.Invalid(field.NewPath("status", "conditions").Index(i).Child("type"), cond.Type, `There may be at most one condition with type "Issued", "Denied", or "Failed"`))
 			}
 			if cond.Status != metav1.ConditionTrue {
-				allErrors = append(allErrors, field.NotSupported(field.NewPath("status", "conditions", formatIndex(i), "status"), cond.Status, []metav1.ConditionStatus{metav1.ConditionTrue}))
+				allErrors = append(allErrors, field.NotSupported(field.NewPath("status", "conditions").Index(i).Child("status"), cond.Status, []metav1.ConditionStatus{metav1.ConditionTrue}))
 			}
 		default:
-			allErrors = append(allErrors, field.NotSupported(field.NewPath("status", "conditions", formatIndex(i), "type"), cond.Type, []string{certificates.PodCertificateRequestConditionTypeIssued, certificates.PodCertificateRequestConditionTypeDenied, certificates.PodCertificateRequestConditionTypeFailed}))
+			allErrors = append(allErrors, field.NotSupported(field.NewPath("status", "conditions").Index(i).Child("type"), cond.Type, []string{certificates.PodCertificateRequestConditionTypeIssued, certificates.PodCertificateRequestConditionTypeDenied, certificates.PodCertificateRequestConditionTypeFailed}))
 		}
 	}
 
@@ -1046,10 +1045,6 @@ func pcrIsFailed(pcr *certificates.PodCertificateRequest) bool {
 		}
 	}
 	return false
-}
-
-func formatIndex(i int) string {
-	return "[" + strconv.Itoa(i) + "]"
 }
 
 // Similar to apivalidation.ValidateImmutableField but we can supply our own detail string.
