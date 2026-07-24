@@ -23,11 +23,11 @@ package v1beta1
 //
 // IngressLoadBalancerIngress represents the status of a load-balancer ingress point.
 type IngressLoadBalancerIngressApplyConfiguration struct {
-	// IP is set for load-balancer ingress points that are IP based.
+	// ip is set for load-balancer ingress points that are IP based.
 	IP *string `json:"ip,omitempty"`
-	// Hostname is set for load-balancer ingress points that are DNS based.
+	// hostname is set for load-balancer ingress points that are DNS based.
 	Hostname *string `json:"hostname,omitempty"`
-	// Ports provides information about the ports exposed by this LoadBalancer.
+	// ports provides information about the ports exposed by this LoadBalancer.
 	Ports []IngressPortStatusApplyConfiguration `json:"ports,omitempty"`
 }
 
