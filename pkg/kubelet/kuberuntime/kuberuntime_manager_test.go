@@ -1480,6 +1480,42 @@ func TestComputePodActions(t *testing.T) {
 				ContainersToStart: []int{1},
 			},
 		},
+		"do not start container when running duplicate exists (issue 139670)": {
+                        mutatePodFn: func(pod *v1.Pod) {
+                                pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+                        },
+                        mutateStatusFn: func(status *kubecontainer.PodStatus) {
+                                // Simulate issue #139670: a CRI StartContainer call timed out
+                                // in kubelet but succeeded in the runtime. kubelet sees the
+                                // first status as Exited (its stale view), but containerd has
+                                // a second Running container with the same name.
+                                // FindContainerStatusByName returns only the first (Exited) match,
+                                // so without the fix, computePodActions would schedule another start.
+                                duplicate := &kubecontainer.Status{
+                                        ID:    kubecontainer.ContainerID{Type: "test", ID: "duplicate-running-id"},
+                                        Name:  status.ContainerStatuses[0].Name,
+                                        State: kubecontainer.ContainerStateRunning,
+                                        Hash:  status.ContainerStatuses[0].Hash,
+                                }
+                                // Mark first status as Exited so FindContainerStatusByName
+                                // returns the stale Exited view
+                                status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+                                // Insert duplicate Running entry after the Exited one
+                                // so FindContainerStatusByName finds Exited first
+                                rest := status.ContainerStatuses[1:]
+                                status.ContainerStatuses = append(
+                                        []*kubecontainer.Status{status.ContainerStatuses[0], duplicate},
+                                        rest...,
+                                )
+                        },
+                        actions: podActions{
+                                SandboxID: baseStatus.SandboxStatuses[0].Id,
+                                // Container 0 (foo1) must NOT be in ContainersToStart —
+                                // a running duplicate already exists in the runtime.
+                                ContainersToStart: []int{},
+                                ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
+                        },
+                },
 	} {
 		pod, status := makeBasePodAndStatus()
 		if test.mutatePodFn != nil {
