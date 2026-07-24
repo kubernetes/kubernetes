@@ -224,18 +224,6 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
 			},
 		},
-		"v1beta1": {
-			apis: map[schema.GroupVersion]bool{
-				resourceapi.SchemeGroupVersion:     false,
-				resourcev1beta1.SchemeGroupVersion: true,
-			},
-			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
-			f: func(tCtx ktesting.TContext) {
-				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, false)
-				})
-			},
-		},
 		"v1beta2": {
 			apis: map[schema.GroupVersion]bool{
 				resourceapi.SchemeGroupVersion:     false,

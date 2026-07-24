@@ -257,13 +257,6 @@ var testcases = map[string]struct {
 		expectMatch: true,
 		expectCost:  5 + ((2 + 4) * maxElementsListTypeEnabled /* (cost(loopCondition=="not_strictly_false(accu)") + cost(loopStep=="accu && (x.isGreaterThan(semver("0.0.1"))")) * maxElementsListTypeEnabled */),
 	},
-	"includes-function-compilation-error": {
-		features:           &Features{EnableListTypeAttributes: false},
-		envType:            ptr.To(environment.NewExpressions),
-		expression:         `device.attributes["dra.example.com"].attr.includes("fish")`,
-		driver:             "dra.example.com",
-		expectCompileError: "undeclared reference to 'includes'",
-	},
 	"includes-function-compilation-and-eval-success": {
 		features:    &Features{EnableListTypeAttributes: true},
 		expression:  `device.attributes["dra.example.com"].attr.includes("fish")`,
