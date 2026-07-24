@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -28,7 +27,7 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		IntField:              1,
-		IntPtrField:           ptr.To(0),
+		IntPtrField:           new(0),
 		IntTypedefField:       41,
 		ValidatedTypedefField: 99,
 	}).ExpectValid()
@@ -42,7 +41,7 @@ func Test(t *testing.T) {
 
 	invalid := &Struct{
 		IntField:              0,
-		IntPtrField:           ptr.To(-1),
+		IntPtrField:           new(-1),
 		IntTypedefField:       42,
 		ValidatedTypedefField: 100,
 	}

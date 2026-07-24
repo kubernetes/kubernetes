@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func TestK8sExtendedResourceName(t *testing.T) {
@@ -28,19 +27,19 @@ func TestK8sExtendedResourceName(t *testing.T) {
 
 	st.Value(&MyType{
 		NameField:        "example.com/my-resource",
-		NamePtrField:     ptr.To("my-domain.org/foo"),
+		NamePtrField:     new("my-domain.org/foo"),
 		NameTypedefField: "example.com/another-resource",
 	}).ExpectValid()
 
 	st.Value(&MyType{
 		NameField:        "example.com/my_resource",
-		NamePtrField:     ptr.To("example.com/My-Resource"),
+		NamePtrField:     new("example.com/My-Resource"),
 		NameTypedefField: "example.com/my.resource",
 	}).ExpectValid()
 
 	invalidStruct := &MyType{
 		NameField:        "kubernetes.io/my-resource",
-		NamePtrField:     ptr.To("requests.example.com/my-resource"),
+		NamePtrField:     new("requests.example.com/my-resource"),
 		NameTypedefField: "my-resource",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
@@ -54,7 +53,7 @@ func TestK8sExtendedResourceName(t *testing.T) {
 	const commonDetail = "a valid extended resource name must consist of a domain name prefix and a path segment separated by a slash, where the path segment consists of alphanumeric characters, '-', and must start and end with an alphanumeric character, and the domain name prefix is a valid DNS subdomain name, with the exception that 'requests' is a valid domain name prefix"
 	invalidStruct = &MyType{
 		NameField:        "example.com/my-resource-",
-		NamePtrField:     ptr.To("example.com/-my-resource"),
+		NamePtrField:     new("example.com/-my-resource"),
 		NameTypedefField: "example.com/",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{

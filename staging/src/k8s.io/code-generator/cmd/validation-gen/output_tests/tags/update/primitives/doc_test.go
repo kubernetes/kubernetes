@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func TestUpdateTags(t *testing.T) {
@@ -32,10 +31,10 @@ func TestUpdateTags(t *testing.T) {
 	old := baseStruct
 	old.StringNoSet = "" // unset
 
-	new := baseStruct
-	new.StringNoSet = "value"
+	newWithValue := baseStruct
+	newWithValue.StringNoSet = "value"
 
-	st.Value(&new).OldValue(&old).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+	st.Value(&newWithValue).OldValue(&old).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
 		field.Invalid(field.NewPath("stringNoSet"), nil, "field cannot be set once created").WithOrigin("update"),
 	})
 
@@ -261,7 +260,7 @@ func TestUpdateTags(t *testing.T) {
 
 	// Pointer NoSet
 	withSet := baseStruct
-	withSet.PointerNoSet = ptr.To("value")
+	withSet.PointerNoSet = new("value")
 
 	// Cannot set after creation (nil to non-nil)
 	st.Value(&withSet).OldValue(&baseStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
@@ -270,7 +269,7 @@ func TestUpdateTags(t *testing.T) {
 
 	// Pointer NoUnset
 	withPointer := baseStruct
-	withPointer.PointerNoUnset = ptr.To("value")
+	withPointer.PointerNoUnset = new("value")
 
 	// Can set initially
 	st.Value(&withPointer).OldValue(&baseStruct).ExpectValid()
@@ -282,10 +281,10 @@ func TestUpdateTags(t *testing.T) {
 
 	// Pointer NoModify
 	withPointer = baseStruct
-	withPointer.PointerNoModify = ptr.To("value")
+	withPointer.PointerNoModify = new("value")
 
 	modifiedPointer := baseStruct
-	modifiedPointer.PointerNoModify = ptr.To("different")
+	modifiedPointer.PointerNoModify = new("different")
 
 	// Can set initially
 	st.Value(&withPointer).OldValue(&baseStruct).ExpectValid()
@@ -300,10 +299,10 @@ func TestUpdateTags(t *testing.T) {
 
 	// Pointer Fully Restricted
 	withPointer = baseStruct
-	withPointer.PointerFullyRestricted = ptr.To("value")
+	withPointer.PointerFullyRestricted = new("value")
 
 	modifiedPointer = baseStruct
-	modifiedPointer.PointerFullyRestricted = ptr.To("different")
+	modifiedPointer.PointerFullyRestricted = new("different")
 
 	// Cannot set (NoSet)
 	st.Value(&withPointer).OldValue(&baseStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
@@ -322,10 +321,10 @@ func TestUpdateTags(t *testing.T) {
 
 	// Int Pointer NoModify
 	withPointer = baseStruct
-	withPointer.IntPointerNoModify = ptr.To(42)
+	withPointer.IntPointerNoModify = new(42)
 
 	modifiedPointer = baseStruct
-	modifiedPointer.IntPointerNoModify = ptr.To(100)
+	modifiedPointer.IntPointerNoModify = new(100)
 
 	// Can set initially
 	st.Value(&withPointer).OldValue(&baseStruct).ExpectValid()
