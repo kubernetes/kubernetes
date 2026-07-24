@@ -114,7 +114,7 @@ type Allocator struct {
 	// version-skew skip, so it is only ever populated while the feature is
 	// disabled; enforcement (feature on) uses the richer
 	// compatibilityGroupsBaseline below.
-	groupedCounterSets map[PoolID]sets.Set[string]
+	groupedCounterSets map[PoolID]sets.Set[draapi.UniqueString]
 	// compatibilityGroupsBaseline caches, per resource pool, the
 	// compatibility-group intersection contributed by already-allocated devices
 	// (their groups read live from the source ResourceSlice). Like
@@ -162,7 +162,7 @@ func NewAllocator(ctx context.Context,
 		allSlices:          slices,
 		celCache:           celCache,
 		availableCounters:  make(map[PoolID]counterSets),
-		groupedCounterSets: make(map[PoolID]sets.Set[string]),
+		groupedCounterSets: make(map[PoolID]sets.Set[draapi.UniqueString]),
 
 		compatibilityGroupsBaseline: make(map[PoolID]map[string]compatibilityGroupIntersection),
 	}
@@ -2149,7 +2149,7 @@ func (alloc *allocator) skipForDisabledCompatibilityGroups(device deviceWithID) 
 				"device", device.id, "counterSet", deviceCounterConsumption.CounterSet.String())
 			return true
 		}
-		if grouped.Has(deviceCounterConsumption.CounterSet.String()) {
+		if grouped.Has(deviceCounterConsumption.CounterSet) {
 			alloc.logger.V(7).Info("Skipping device: its counter set already carries a grouped allocation this allocator cannot validate",
 				"device", device.id, "counterSet", deviceCounterConsumption.CounterSet.String())
 			return true

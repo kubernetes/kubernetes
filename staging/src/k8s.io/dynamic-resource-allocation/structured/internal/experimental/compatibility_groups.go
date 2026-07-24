@@ -112,7 +112,7 @@ func compatibilityGroupSet(groups []string) sets.Set[string] {
 // cached, mirroring availableCounters: pools whose devices never reach the
 // skip - including every pool in a cluster that does not use compatibility
 // groups - never pay for the walk.
-func (alloc *allocator) groupedCounterSetsForPool(pool *Pool) sets.Set[string] {
+func (alloc *allocator) groupedCounterSetsForPool(pool *Pool) sets.Set[draapi.UniqueString] {
 	poolID := pool.PoolID
 
 	alloc.mutex.RLock()
@@ -125,7 +125,7 @@ func (alloc *allocator) groupedCounterSetsForPool(pool *Pool) sets.Set[string] {
 	// Computed without holding the lock; concurrent goroutines may duplicate
 	// the work, but the input is the same for all of them, so the result is,
 	// too.
-	grouped = sets.New[string]()
+	grouped = sets.New[draapi.UniqueString]()
 	for _, resourceSlices := range [][]*draapi.ResourceSlice{pool.DeviceSlicesTargetingNode, pool.DeviceSlicesNotTargetingNode} {
 		for _, slice := range resourceSlices {
 			for _, device := range slice.Spec.Devices {
@@ -135,7 +135,7 @@ func (alloc *allocator) groupedCounterSetsForPool(pool *Pool) sets.Set[string] {
 				}
 				for _, deviceCounterConsumption := range device.ConsumesCounters {
 					if len(deviceCounterConsumption.CompatibilityGroups) > 0 {
-						grouped.Insert(deviceCounterConsumption.CounterSet.String())
+						grouped.Insert(deviceCounterConsumption.CounterSet)
 					}
 				}
 			}
