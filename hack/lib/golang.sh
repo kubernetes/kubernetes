@@ -949,6 +949,12 @@ kube::golang::build_binaries() {
       grpcnotrace=",grpcnotrace"
   fi
 
+  # Disable Go VCS stamping if git can't read the repo (e.g. multi-pack-index version mismatch).
+  if ! git -C "${KUBE_ROOT}" status --porcelain &>/dev/null; then
+    kube::log::warning "git status failed; disabling VCS stamping (-buildvcs=false)"
+    goflags+=("-buildvcs=false")
+  fi
+
   # Extract tags if any specified in GOFLAGS
   gotags="selinux,notest${grpcnotrace},$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
 
