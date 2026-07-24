@@ -327,6 +327,28 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 					//nolint:errcheck
 					fmt.Fprintf(errOut, "error when evicting pods/%q -n %q (will retry after %v): %v\n", activePod.Name, activePod.Namespace, d.EvictErrorRetryDelay, err)
 					time.Sleep(d.EvictErrorRetryDelay)
+					// Re-verify the pod state after 429 error to check if it has been migrated
+					freshPod, err := getPodFn(activePod.Namespace, activePod.Name)
+					if err != nil {
+						if apierrors.IsNotFound(err) {
+							// Pod no longer exists on the source node; consider eviction complete
+							returnCh <- nil
+							return
+						}
+						// For other API errors, log and continue with the original pod
+						//nolint:errcheck
+						fmt.Fprintf(d.ErrOut, "warning: failed to re-verify pod %q -n %q after eviction error: %v\n", activePod.Name, activePod.Namespace, err)
+					} else if freshPod.Spec.NodeName != pod.Spec.NodeName {
+						// Pod has been migrated/rescheduled to a different node
+						// (common in StatefulSets); eviction is complete for the target node
+						//nolint:errcheck
+						fmt.Fprintf(d.Out, "pod %s/%s has been rescheduled to node %s, skipping eviction\n", freshPod.Namespace, freshPod.Name, freshPod.Spec.NodeName)
+						returnCh <- nil
+						return
+					} else {
+						// Pod is still on the target node, update and retry
+						activePod = *freshPod
+					}
 				} else if !activePod.ObjectMeta.DeletionTimestamp.IsZero() && apierrors.IsForbidden(err) && apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
 					// an eviction request in a deleting namespace will throw a forbidden error,
 					// if the pod is already marked deleted, we can ignore this error, an eviction
@@ -343,10 +365,13 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 					return
 				}
 
-				freshPod, err := getPodFn(activePod.Namespace, activePod.Name)
-				// we ignore errors and let eviction sort it out with the original pod.
-				if err == nil {
-					activePod = *freshPod
+				// For non-429 errors, refresh the pod state for retry
+				if err != nil && !apierrors.IsTooManyRequests(err) {
+					freshPod, err := getPodFn(activePod.Namespace, activePod.Name)
+					// we ignore errors and let eviction sort it out with the original pod.
+					if err == nil {
+						activePod = *freshPod
+					}
 				}
 			}
 			if d.DryRunStrategy == cmdutil.DryRunServer {
