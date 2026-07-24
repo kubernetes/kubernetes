@@ -2465,25 +2465,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		// For non-running containers this will be the reported values.
 		// For non-resizable resources, these values will also be used.
 		resources := allocatedContainer.Resources.DeepCopy()
-		if resources.Limits != nil {
-			if cStatus.Resources != nil && cStatus.Resources.CPULimit != nil {
-				// If both the allocated & actual resources are at or below the minimum effective limit, preserve the
-				// allocated value in the API to avoid confusion and simplify comparisons.
-				if cStatus.Resources.CPULimit.MilliValue() > cm.MinMilliCPULimit ||
-					resources.Limits.Cpu().MilliValue() > cm.MinMilliCPULimit {
-					resources.Limits[v1.ResourceCPU] = cStatus.Resources.CPULimit.DeepCopy()
-				}
-			} else {
-				preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Limits, resources.Limits)
-			}
-			if cStatus.Resources != nil && cStatus.Resources.MemoryLimit != nil {
-				resources.Limits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
-			} else {
-				preserveOldResourcesValue(v1.ResourceMemory, oldStatus.Resources.Limits, resources.Limits)
-			}
-		}
 		if resources.Requests != nil {
-			if cStatus.Resources != nil && cStatus.Resources.CPURequest != nil {
+			if cStatus.Resources != nil && cStatus.Resources.CPURequest != nil && !cStatus.Resources.CPURequest.IsZero() {
 				// If both the allocated & actual resources are at or below MinShares, preserve the
 				// allocated value in the API to avoid confusion and simplify comparisons.
 				if cStatus.Resources.CPURequest.MilliValue() > cm.MinShares ||
@@ -2497,6 +2480,29 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 				resources.Requests[v1.ResourceMemory] = cStatus.Resources.MemoryRequest.DeepCopy()
 			} else {
 				preserveOldResourcesValue(v1.ResourceMemory, oldStatus.Resources.Requests, resources.Requests)
+			}
+		}
+		if resources.Limits != nil {
+			if cStatus.Resources != nil && cStatus.Resources.CPULimit != nil && !cStatus.Resources.CPULimit.IsZero() {
+				// If both the allocated & actual resources are at or below the minimum effective limit, preserve the
+				// allocated value in the API to avoid confusion and simplify comparisons.
+				if cStatus.Resources.CPULimit.MilliValue() > cm.MinMilliCPULimit ||
+					resources.Limits.Cpu().MilliValue() > cm.MinMilliCPULimit {
+					resources.Limits[v1.ResourceCPU] = cStatus.Resources.CPULimit.DeepCopy()
+				}
+			} else {
+				// CPU quota is disabled for containers with exclusive CPUs.
+				// Default the CPU limit to match the request, as it must for exclusive CPU allocation.
+				if kl.containerManager.ContainerHasExclusiveCPUs(logger, pod, allocatedContainer) {
+					resources.Limits[v1.ResourceCPU] = resources.Requests[v1.ResourceCPU].DeepCopy()
+				} else {
+					preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Limits, resources.Limits)
+				}
+			}
+			if cStatus.Resources != nil && cStatus.Resources.MemoryLimit != nil {
+				resources.Limits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
+			} else {
+				preserveOldResourcesValue(v1.ResourceMemory, oldStatus.Resources.Limits, resources.Limits)
 			}
 		}
 

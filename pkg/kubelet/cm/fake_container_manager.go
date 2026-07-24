@@ -48,6 +48,8 @@ type FakeContainerManager struct {
 	nodeConfig                          NodeConfig
 	cpuManager                          cpumanager.Manager
 	memoryManager                       memorymanager.Manager
+	// ExclusiveCPUs controls the return value of ContainerHasExclusiveCPUs and PodHasExclusiveCPUs.
+	ExclusiveCPUs bool
 }
 
 var _ ContainerManager = &FakeContainerManager{}
@@ -301,9 +303,9 @@ func (cm *FakeContainerManager) Updates() <-chan resourceupdates.Update {
 }
 
 func (cm *FakeContainerManager) PodHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod) bool {
-	return false
+	return cm.ExclusiveCPUs
 }
 
 func (cm *FakeContainerManager) ContainerHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod, container *v1.Container) bool {
-	return false
+	return cm.ExclusiveCPUs
 }
