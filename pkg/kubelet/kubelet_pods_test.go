@@ -54,6 +54,7 @@ import (
 	"k8s.io/cri-streaming/pkg/streaming/remotecommand"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -6657,7 +6658,6 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 }
 
 func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
 	if goruntime.GOOS != "linux" {
 		t.Skip("InPlacePodVerticalScaling cgroup resource reporting is only supported on Linux")
 	}
@@ -6713,7 +6713,9 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 	}
 
 	CPU1AndMem1G := v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")}
+	CPU1AndMem2G := v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("2Gi")}
 	CPU2AndMem2G := v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("2Gi")}
+	Mem2G := v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")}
 	CPU1AndMem1GAndStorage2G := CPU1AndMem1G.DeepCopy()
 	CPU1AndMem1GAndStorage2G[v1.ResourceEphemeralStorage] = resource.MustParse("2Gi")
 	CPU1AndMem1GAndStorage2G[v1.ResourceStorage] = resource.MustParse("2Gi")
@@ -6743,12 +6745,13 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 
 	idx := 0
 	for tdesc, tc := range map[string]struct {
-		State              kubecontainer.State // Defaults to Running
-		Resources          v1.ResourceRequirements
-		AllocatedResources *v1.ResourceRequirements          // Defaults to Resources
-		ActualResources    *kubecontainer.ContainerResources // Defaults to Resources equivalent
-		OldStatus          v1.ContainerStatus
-		Expected           v1.ContainerStatus
+		State                kubecontainer.State // Defaults to Running
+		Resources            v1.ResourceRequirements
+		AllocatedResources   *v1.ResourceRequirements          // Defaults to Resources
+		ActualResources      *kubecontainer.ContainerResources // Defaults to Resources equivalent
+		OldStatus            v1.ContainerStatus
+		Expected             v1.ContainerStatus
+		MockHasExclusiveCPUs bool // Defines what FakeContainerManager returns
 	}{
 		"GuaranteedQoSPod with CPU and memory CRI status": {
 			Resources: v1.ResourceRequirements{Limits: CPU1AndMem1G, Requests: CPU1AndMem1G},
@@ -7095,8 +7098,97 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
 			},
 		},
+		"resizing Pod with update of resources without exclusive CPUs": {
+			Resources:          v1.ResourceRequirements{Limits: CPU2AndMem2G, Requests: CPU2AndMem2G},
+			AllocatedResources: &v1.ResourceRequirements{Limits: CPU2AndMem2G, Requests: CPU2AndMem2G},
+			OldStatus: v1.ContainerStatus{
+				Name:      testContainerName,
+				Image:     "img",
+				ImageID:   "img1234",
+				State:     v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+				Resources: &v1.ResourceRequirements{Limits: CPU1AndMem1G, Requests: CPU1AndMem1G},
+			},
+			Expected: v1.ContainerStatus{
+				Name:               testContainerName,
+				ContainerID:        testContainerID.String(),
+				Image:              "img",
+				ImageID:            "img1234",
+				State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
+				AllocatedResources: CPU2AndMem2G,
+				Resources:          &v1.ResourceRequirements{Limits: CPU2AndMem2G, Requests: CPU2AndMem2G},
+			},
+			MockHasExclusiveCPUs: false,
+		},
+		"resizing Pod with update of resources with exclusive CPUs": {
+			Resources:          v1.ResourceRequirements{Limits: CPU2AndMem2G, Requests: CPU2AndMem2G},
+			AllocatedResources: &v1.ResourceRequirements{Limits: CPU2AndMem2G, Requests: CPU2AndMem2G},
+			OldStatus: v1.ContainerStatus{
+				Name:      testContainerName,
+				Image:     "img",
+				ImageID:   "img1234",
+				State:     v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+				Resources: &v1.ResourceRequirements{Limits: CPU1AndMem1G, Requests: CPU1AndMem1G},
+			},
+			Expected: v1.ContainerStatus{
+				Name:               testContainerName,
+				ContainerID:        testContainerID.String(),
+				Image:              "img",
+				ImageID:            "img1234",
+				State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
+				AllocatedResources: CPU2AndMem2G,
+				Resources:          &v1.ResourceRequirements{Limits: CPU2AndMem2G, Requests: CPU2AndMem2G},
+			},
+			MockHasExclusiveCPUs: true,
+		},
+		"resizing Pod with update of resources having no CPU limits without exclusive CPUs": {
+			Resources:          v1.ResourceRequirements{Limits: Mem2G, Requests: CPU2AndMem2G},
+			AllocatedResources: &v1.ResourceRequirements{Limits: CPU2AndMem2G, Requests: CPU2AndMem2G},
+			OldStatus: v1.ContainerStatus{
+				Name:        testContainerName,
+				ContainerID: testContainerID.String(),
+				Image:       "img",
+				ImageID:     "img1234",
+				State:       v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+				Resources:   &v1.ResourceRequirements{Limits: CPU1AndMem1G, Requests: CPU1AndMem1G},
+			},
+			Expected: v1.ContainerStatus{
+				Name:               testContainerName,
+				ContainerID:        testContainerID.String(),
+				Image:              "img",
+				ImageID:            "img1234",
+				State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
+				AllocatedResources: CPU2AndMem2G,
+				// This is behavior expected in this test case: CPU Limit is not updated and preserves old status value (1 CPU).
+				Resources: &v1.ResourceRequirements{Limits: CPU1AndMem2G, Requests: CPU2AndMem2G},
+			},
+			MockHasExclusiveCPUs: false,
+		},
+		"resizing Pod with update of resources having no CPU limits with exclusive CPUs": {
+			Resources:          v1.ResourceRequirements{Limits: Mem2G, Requests: CPU2AndMem2G},
+			AllocatedResources: &v1.ResourceRequirements{Limits: CPU2AndMem2G, Requests: CPU2AndMem2G},
+			OldStatus: v1.ContainerStatus{
+				Name:        testContainerName,
+				ContainerID: testContainerID.String(),
+				Image:       "img",
+				ImageID:     "img1234",
+				State:       v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+				Resources:   &v1.ResourceRequirements{Limits: CPU1AndMem1G, Requests: CPU1AndMem1G},
+			},
+			Expected: v1.ContainerStatus{
+				Name:               testContainerName,
+				ContainerID:        testContainerID.String(),
+				Image:              "img",
+				ImageID:            "img1234",
+				State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
+				AllocatedResources: CPU2AndMem2G,
+				Resources:          &v1.ResourceRequirements{Limits: CPU2AndMem2G, Requests: CPU2AndMem2G},
+			},
+			MockHasExclusiveCPUs: true,
+		},
 	} {
 		t.Run(tdesc, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
+
 			tPod := testPod.DeepCopy()
 			tPod.Name = fmt.Sprintf("%s-%d", testPod.Name, idx)
 
@@ -7121,6 +7213,11 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				state = tc.State
 			}
 			podStatus := testPodStatus(state, resources)
+			if fakeCM, ok := kubelet.containerManager.(*cm.FakeContainerManager); ok {
+				fakeCM.ExclusiveCPUs = tc.MockHasExclusiveCPUs
+				hasExclusiveCPUs := kubelet.containerManager.ContainerHasExclusiveCPUs(logger, tPod, &tPod.Spec.Containers[0])
+				assert.Equal(t, tc.MockHasExclusiveCPUs, hasExclusiveCPUs)
+			}
 			cStatuses := kubelet.convertToAPIContainerStatuses(tCtx, tPod, podStatus, []v1.ContainerStatus{tc.OldStatus}, tPod.Spec.Containers, nil, false, false, false)
 			actual := cStatuses[0]
 			// Explicitly test AllocatedResources and Resources separately for debuggability.
