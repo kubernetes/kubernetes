@@ -658,25 +658,60 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-value").MarkFromImperative(),
 			},
 		},
-	}
-
-	if strategy.NamespaceScoped() {
-		testCases = append(testCases, struct {
-			Name         string
-			Modify       func(old, new metav1.Object)
-			ExpectedErrs field.ErrorList
-		}{
-			Name: "update: namespace: immutable",
+		{
+			Name: "update: namespace: changed to different value",
 			Modify: func(old, new metav1.Object) {
 				old.SetResourceVersion("1")
 				new.SetResourceVersion("2")
 				old.SetNamespace("ns-one")
 				new.SetNamespace("ns-two")
 			},
-			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("namespace"), "", "field is immutable").MarkFromImperative(),
+			ExpectedErrs: func() field.ErrorList {
+				errs := field.ErrorList{
+					field.Invalid(fldPath.Child("namespace"), "", "").WithOrigin("immutable").MarkAlpha(),
+				}
+				if !strategy.NamespaceScoped() {
+					errs = append(errs, field.Forbidden(fldPath.Child("namespace"), "not allowed on this type").MarkFromImperative())
+				}
+				return errs
+			}(),
+		},
+		{
+			Name: "update: namespace: empty to non-empty",
+			Modify: func(old, new metav1.Object) {
+				old.SetResourceVersion("1")
+				new.SetResourceVersion("2")
+				old.SetNamespace("")
+				new.SetNamespace("ns-set")
 			},
-		})
+			ExpectedErrs: func() field.ErrorList {
+				errs := field.ErrorList{
+					field.Invalid(fldPath.Child("namespace"), "", "").WithOrigin("immutable").MarkAlpha(),
+				}
+				if !strategy.NamespaceScoped() {
+					errs = append(errs, field.Forbidden(fldPath.Child("namespace"), "not allowed on this type").MarkFromImperative())
+				}
+				return errs
+			}(),
+		},
+		{
+			Name: "update: namespace: non-empty to empty",
+			Modify: func(old, new metav1.Object) {
+				old.SetResourceVersion("1")
+				new.SetResourceVersion("2")
+				old.SetNamespace("ns-set")
+				new.SetNamespace("")
+			},
+			ExpectedErrs: func() field.ErrorList {
+				errs := field.ErrorList{
+					field.Invalid(fldPath.Child("namespace"), "", "").WithOrigin("immutable").MarkAlpha(),
+				}
+				if strategy.NamespaceScoped() {
+					errs = append(errs, field.Required(fldPath.Child("namespace"), "").MarkFromImperative())
+				}
+				return errs
+			}(),
+		},
 	}
 
 	for _, tc := range testCases {

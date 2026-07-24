@@ -812,7 +812,25 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			oldObj:            mkMeta(tweakNamespace("old-ns"), tweakResourceVersion("1")),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("namespace"), "new-ns", "").MarkFromImperative(),
+				field.Invalid(fldPath.Child("namespace"), "new-ns", "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		{
+			name:              "namespace empty to some value on update",
+			obj:               mkMeta(tweakNamespace("new-ns"), tweakResourceVersion("2")),
+			oldObj:            mkMeta(tweakNamespace(""), tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("namespace"), "new-ns", "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		{
+			name:              "namespace some value to empty on update",
+			obj:               mkMeta(tweakNamespace(""), tweakResourceVersion("2")),
+			oldObj:            mkMeta(tweakNamespace("old-ns"), tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("namespace"), "", "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		{
