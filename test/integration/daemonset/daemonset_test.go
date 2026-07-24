@@ -89,6 +89,7 @@ func setupWithServerSetup(t *testing.T, serverSetup framework.TestServerSetup) (
 		informers.Core().V1().Nodes(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "daemonset-controller")),
 		flowcontrol.NewBackOff(5*time.Second, 15*time.Minute),
+		daemon.DefaultBurstReplicas,
 	)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
