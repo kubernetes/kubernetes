@@ -183,6 +183,10 @@ type NodeInfo struct {
 	// The subset of pods with required anti-affinity.
 	PodsWithRequiredAntiAffinity []fwk.PodInfo
 
+	// The subset of pods with required anti-affinity that is non-host-scoped (topologyKey other than hostname).
+	// This slice must be empty when the InterPodAffinityHostnameFastPath feature gate is disabled.
+	PodsWithRequiredNonHostScopedAntiAffinity []fwk.PodInfo
+
 	// Ports allocated on the node.
 	UsedPorts fwk.HostPortInfo
 
@@ -225,6 +229,10 @@ func (n *NodeInfo) GetPodsWithAffinity() []fwk.PodInfo {
 
 func (n *NodeInfo) GetPodsWithRequiredAntiAffinity() []fwk.PodInfo {
 	return n.PodsWithRequiredAntiAffinity
+}
+
+func (n *NodeInfo) GetPodsWithRequiredNonHostScopedAntiAffinity() []fwk.PodInfo {
+	return n.PodsWithRequiredNonHostScopedAntiAffinity
 }
 
 func (n *NodeInfo) GetUsedPorts() fwk.HostPortInfo {
@@ -327,6 +335,9 @@ func (n *NodeInfo) SnapshotConcrete() *NodeInfo {
 	if len(n.PodsWithRequiredAntiAffinity) > 0 {
 		clone.PodsWithRequiredAntiAffinity = append([]fwk.PodInfo(nil), n.PodsWithRequiredAntiAffinity...)
 	}
+	if len(n.PodsWithRequiredNonHostScopedAntiAffinity) > 0 {
+		clone.PodsWithRequiredNonHostScopedAntiAffinity = append([]fwk.PodInfo(nil), n.PodsWithRequiredNonHostScopedAntiAffinity...)
+	}
 	if len(n.ImageStates) > 0 {
 		state := make(map[string]*fwk.ImageStateSummary, len(n.ImageStates))
 		for imageName, imageState := range n.ImageStates {
@@ -361,6 +372,9 @@ func (n *NodeInfo) AddPodInfo(podInfo fwk.PodInfo) {
 	if podWithRequiredAntiAffinity(podInfo.GetPod()) {
 		n.PodsWithRequiredAntiAffinity = append(n.PodsWithRequiredAntiAffinity, podInfo)
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InterPodAffinityHostnameFastPath) && podWithRequiredNonHostScopedAntiAffinity(podInfo.GetPod()) {
+		n.PodsWithRequiredNonHostScopedAntiAffinity = append(n.PodsWithRequiredNonHostScopedAntiAffinity, podInfo)
+	}
 	n.update(podInfo, 1)
 }
 
@@ -381,6 +395,18 @@ func podWithRequiredAntiAffinity(p *v1.Pod) bool {
 	affinity := p.Spec.Affinity
 	return affinity != nil && affinity.PodAntiAffinity != nil &&
 		len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0
+}
+
+func podWithRequiredNonHostScopedAntiAffinity(p *v1.Pod) bool {
+	affinity := p.Spec.Affinity
+	if affinity != nil && affinity.PodAntiAffinity != nil {
+		for _, term := range affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
+			if term.TopologyKey != v1.LabelHostname {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func removeFromSlice(logger klog.Logger, s []fwk.PodInfo, k string) ([]fwk.PodInfo, fwk.PodInfo) {
@@ -419,6 +445,9 @@ func (n *NodeInfo) RemovePod(logger klog.Logger, pod *v1.Pod) error {
 	}
 	if podWithRequiredAntiAffinity(pod) {
 		n.PodsWithRequiredAntiAffinity, _ = removeFromSlice(logger, n.PodsWithRequiredAntiAffinity, k)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InterPodAffinityHostnameFastPath) && podWithRequiredNonHostScopedAntiAffinity(pod) {
+		n.PodsWithRequiredNonHostScopedAntiAffinity, _ = removeFromSlice(logger, n.PodsWithRequiredNonHostScopedAntiAffinity, k)
 	}
 
 	var removedPod fwk.PodInfo
