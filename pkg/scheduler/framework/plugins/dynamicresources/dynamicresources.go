@@ -177,15 +177,23 @@ type nodeAllocation struct {
 
 // DynamicResources is a plugin that ensures that ResourceClaims are allocated.
 type DynamicResources struct {
-	enabled        bool
-	fts            feature.Features
-	filterTimeout  time.Duration
-	bindingTimeout time.Duration
-	fh             fwk.Handle
-	clientset      kubernetes.Interface
-	celCache       *cel.Cache
-	draManager     fwk.SharedDRAManager
+	enabled               bool
+	fts                   feature.Features
+	filterTimeout         time.Duration
+	bindingTimeout        time.Duration
+	fh                    fwk.Handle
+	clientset             kubernetes.Interface
+	celCache              *cel.Cache
+	draManager            fwk.SharedDRAManager
+	podIndexer            cache.Indexer
+	podResourceClaimIndex string
 }
+
+const (
+	// podResourceClaimIndexPrefix is the prefix for the index function which indexes pods by
+	// the ResourceClaims that they reference. The key for looking up pods is "<namespace>/<name>".
+	podResourceClaimIndexPrefix = "schedulerPodResourceClaim"
+)
 
 var (
 	ErrDeviceBindingTimeout = errors.New("device binding timeout")
@@ -226,6 +234,15 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 		}),
 		draManager: fh.SharedDRAManager(),
 	}
+
+	// Set up pod indexer for PreQueueingHint to look up pods by claim.
+	podInformer := fh.SharedInformerFactory().Core().V1().Pods()
+	podResourceClaimIndex := podResourceClaimIndexPrefix + "-" + fh.ProfileName()
+	if err := podInformer.Informer().AddIndexers(cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc}); err != nil {
+		return nil, fmt.Errorf("failed to add pod resource claim indexer: %w", err)
+	}
+	pl.podIndexer = podInformer.Informer().GetIndexer()
+	pl.podResourceClaimIndex = podResourceClaimIndex
 
 	return pl, nil
 }
@@ -268,7 +285,7 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		// A new or updated node may make pods schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeAllocatable}},
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
-		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update | fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterClaimChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update | fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterClaimChange, PreQueueingHintFn: pl.preQueueingHint},
 		// Adding the ResourceClaim name to the pod status makes pods waiting for their ResourceClaim schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate},
 		// A pod might be waiting for a class to get created or modified.
@@ -294,7 +311,68 @@ func (pl *DynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status
 	return nil
 }
 
-// isSchedulableAfterClaimChange is invoked for add/update/delete claim events reported by
+// podResourceClaimIndexFunc is an index function that returns ResourceClaim keys
+// (namespace/name) for any ResourceClaim referenced by a pod.
+func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
+	pod, ok := obj.(*v1.Pod)
+	if !ok {
+		return nil, nil
+	}
+	keySet := sets.New[string]()
+	for _, podClaim := range pod.Spec.ResourceClaims {
+		claimName, _, err := resourceclaim.Name(pod, &podClaim)
+		if err != nil || claimName == nil {
+			continue
+		}
+		keySet.Insert(pod.Namespace + "/" + *claimName)
+	}
+	return keySet.UnsortedList(), nil
+}
+
+// preQueueingHint returns the pods affected by a ResourceClaim event.
+func (pl *DynamicResources) preQueueingHint(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
+	if oldObj != nil && newObj != nil {
+		if oldClaim, ok := oldObj.(*resourceapi.ResourceClaim); ok {
+			if newClaim, ok := newObj.(*resourceapi.ResourceClaim); ok {
+				// Deallocation frees resources that may make other pods schedulable.
+				if oldClaim.Status.Allocation != nil && newClaim.Status.Allocation == nil {
+					return fwk.PreQueueingHintResult{AllPods: true}, nil
+				}
+			}
+		}
+	}
+
+	// Deletion of an allocated claim frees resources that may make other pods schedulable.
+	if newObj == nil && oldObj != nil {
+		if oldClaim, ok := oldObj.(*resourceapi.ResourceClaim); ok {
+			if oldClaim.Status.Allocation != nil {
+				return fwk.PreQueueingHintResult{AllPods: true}, nil
+			}
+		}
+	}
+
+	obj := newObj
+	if obj == nil {
+		obj = oldObj
+	}
+	claim, ok := obj.(*resourceapi.ResourceClaim)
+	if !ok {
+		return fwk.PreQueueingHintResult{AllPods: true}, nil
+	}
+	objs, err := pl.podIndexer.ByIndex(pl.podResourceClaimIndex, claim.Namespace+"/"+claim.Name)
+	if err != nil {
+		return fwk.PreQueueingHintResult{}, fmt.Errorf("failed to look up pods by claim %s/%s: %w", claim.Namespace, claim.Name, err)
+	}
+	pods := make([]types.NamespacedName, 0, len(objs))
+	for _, obj := range objs {
+		if pod, ok := obj.(*v1.Pod); ok {
+			pods = append(pods, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace})
+		}
+	}
+	return fwk.PreQueueingHintResult{Pods: pods}, nil
+}
+
+// isSchedulableAfterClaimChange is invoked for add and update claim events reported by
 // an informer. It checks whether that change made a previously unschedulable
 // pod schedulable. It errs on the side of letting a pod scheduling attempt
 // happen.
