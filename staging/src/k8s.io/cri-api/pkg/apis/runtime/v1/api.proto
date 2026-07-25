@@ -1117,6 +1117,25 @@ message LinuxContainerSecurityContext {
     //
     // Default: "", which is identical with unconfined.
     string seccomp_profile_path = 10 [deprecated=true];
+    // cgroup_mount_mode controls how the cgroup filesystem is mounted in the
+    // container.
+    CgroupMountMode cgroup_mount_mode = 18;
+}
+
+// CgroupMountMode defines how the cgroup filesystem is mounted in a container.
+// The runtime MUST fail container creation if it cannot honor the requested
+// mode.
+enum CgroupMountMode {
+    // CGROUP_MOUNT_MODE_UNSPECIFIED uses the runtime's default mount mode.
+    CGROUP_MOUNT_MODE_UNSPECIFIED = 0;
+    // CGROUP_MOUNT_MODE_READ_ONLY mounts the cgroup filesystem read-only.
+    // A privileged container's cgroup filesystem is always writable. The
+    // runtime fails creation of a privileged container that requests this
+    // mode.
+    CGROUP_MOUNT_MODE_READ_ONLY = 1;
+    // CGROUP_MOUNT_MODE_WRITABLE mounts the cgroup filesystem read-write.
+    // This mode requires the host to mount cgroup v2 with nsdelegate.
+    CGROUP_MOUNT_MODE_WRITABLE = 2;
 }
 
 // LinuxContainerConfig contains platform-specific configuration for
@@ -1904,6 +1923,9 @@ message RuntimeFeatures {
     // mount_options is set to true if the runtime supports additional bind
     // mount options (noexec, nodev, nosuid) on container mounts.
     bool mount_options = 3;
+    // cgroup_mount_mode is set to true if the runtime supports the
+    // cgroup_mount_mode field of LinuxContainerSecurityContext.
+    bool cgroup_mount_mode = 4;
 }
 
 message StatusResponse {
