@@ -57,7 +57,7 @@ var _ = SIGDescribe("EvictionRequest API", func() {
 	   The evictionrequests resource must support create, get, list, watch,
 	     update, patch, delete, and deletecollection.
 	*/
-	framework.ConformanceIt("should support EvictionRequest API operations", func(ctx context.Context) {
+	framework.It("lifecycle.k8s.io/v1alpha1 EvictionRequest", func(ctx context.Context) {
 		erVersion := "v1alpha1"
 
 		ginkgo.By("getting /apis")
