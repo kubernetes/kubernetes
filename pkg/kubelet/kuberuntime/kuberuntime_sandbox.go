@@ -394,7 +394,9 @@ func applyPodSysctls(sysctls, podSysctls map[string]string, pod *v1.Pod) {
 			continue
 		}
 		if strings.HasPrefix(normalizedKey, "user.") {
-			if pod.Spec.HostUsers == nil || !*pod.Spec.HostUsers {
+			// The default for HostUsers is true, so a nil HostUsers means the
+			// pod runs in the host user namespace.
+			if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
 				// Set the user parameters unless the pod runs in the host user
 				// namespace.
 				sysctls[normalizedKey] = v
