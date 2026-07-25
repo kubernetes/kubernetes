@@ -471,8 +471,14 @@ func TestBatchRescore(t *testing.T) {
 		{
 			name:                   "rescored node competes and wins on highest score",
 			score:                  100,
-			expectedHint:           "n3",
+			expectedHint:           "n2",
 			expectedRemainingNodes: []string{"n1"},
+		},
+		{
+			name:                   "rescored node competes and loses to cached score",
+			score:                  10,
+			expectedHint:           "n1",
+			expectedRemainingNodes: []string{"n2"},
 		},
 		{
 			name:         "score error flushes state and gives no hint",
@@ -503,21 +509,24 @@ func TestBatchRescore(t *testing.T) {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
 
-			// First pod: non-blocking, chosen node is n3, n1 left as other candidate.
+			// First pod: non-blocking, chosen node is n2, n1 left as other candidate.
 			pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID(nonBlockingPodID("1"))}}
 			sig := fwk.PodSignature("sig")
 			batch := newOpportunisticBatch(testFwk, false)
 			state := framework.NewCycleState()
 
+			cachedNodes := framework.NewSortedScoredNodes([]fwk.NodePluginScores{
+				{Name: "n1", RawScores: []fwk.PluginScore{{Name: "scoringBatchTest", Score: 50}}},
+			})
 			batch.GetNodeHint(ctx, pod1, sig, state, 1)
-			batch.StoreScheduleResults(ctx, []byte("sig"), "", "n3", newTestNodes([]string{"n1"}), 1)
+			batch.StoreScheduleResults(ctx, []byte("sig"), "", "n2", cachedNodes, 1)
 
-			// Put n3 in the lister so refreshHintCandidates can find it.
+			// Put n2 in the lister so refreshHintCandidates can find it.
 			// Non-blocking pods always pass the filter, so rescoreHintedNode is triggered.
 			if !tt.chosenNodeMissing {
-				n3Info := framework.NewNodeInfo(pod1)
-				n3Info.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n3", UID: "n3"}})
-				lister.nodes = nodeInfoLister{n3Info}
+				n2Info := framework.NewNodeInfo(pod1)
+				n2Info.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n2", UID: "n2"}})
+				lister.nodes = nodeInfoLister{n2Info}
 			}
 
 			pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID(nonBlockingPodID("2"))}}
@@ -541,58 +550,5 @@ func TestBatchRescore(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// TestBatchRescoreCachedRawScores verifies that NormalizeAndWeightScores during rescoring
-// uses the raw scores stored in the cached node list, not just the freshly rescored node's scores.
-func TestBatchRescoreCachedRawScores(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	// Plugin returns score 10 for any node it scores (i.e., n3 during rescore).
-	// n1's cached raw score of 50 is higher, so n1 should win.
-	scorePl := &configurableScorePlugin{score: 10}
-	testFwk, lister, err := newBatchTestFramework(ctx, scorePl)
-	if err != nil {
-		t.Fatalf("Failed to create framework: %v", err)
-	}
-
-	batch := newOpportunisticBatch(testFwk, false)
-	state := framework.NewCycleState()
-	sig := fwk.PodSignature("sig")
-
-	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID(nonBlockingPodID("1"))}}
-	batch.GetNodeHint(ctx, pod1, sig, state, 1)
-
-	// Store n1 with a raw score of 50, simulating what a full pipeline run would produce.
-	otherNodes := framework.NewSortedScoredNodes([]fwk.NodePluginScores{
-		{Name: "n1", RawScores: []fwk.PluginScore{{Name: "scoringBatchTest", Score: 50}}},
-	})
-	batch.StoreScheduleResults(ctx, []byte("sig"), "", "n3", otherNodes, 1)
-
-	// Put n3 in the lister; non-blocking pods pass the filter, triggering rescoreHintedNode.
-	n3Info := framework.NewNodeInfo(pod1)
-	n3Info.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n3", UID: "n3"}})
-	lister.nodes = nodeInfoLister{n3Info}
-
-	pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID(nonBlockingPodID("2"))}}
-	hint := batch.GetNodeHint(ctx, pod2, sig, state, 2)
-
-	// n1's cached raw score (50) beats n3's rescored raw score (10).
-	if hint != "n1" {
-		t.Fatalf("got hint %q, want %q", hint, "n1")
-	}
-
-	// n3 should be the only remaining node after the hint pop.
-	if batch.state == nil || batch.state.sortedNodes == nil {
-		t.Fatal("expected non-nil batch state after hint")
-	}
-	if got := batch.state.sortedNodes.Len(); got != 1 {
-		t.Fatalf("remaining node count: got %d, want 1", got)
-	}
-	if got := batch.state.sortedNodes.Pop().Name; got != "n3" {
-		t.Fatalf("remaining node: got %q, want %q", got, "n3")
 	}
 }
