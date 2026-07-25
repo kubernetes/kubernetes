@@ -1180,14 +1180,18 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 			)},
 		},
-		// With the feature disabled, a device declaring compatibility groups is
-		// skipped (the scheduler cannot validate it), but a sibling without groups
-		// on the same counter set is still allocated. This is the version-skew
-		// "Devices skipped" behavior and is verified across all allocator variants.
-		"compatibility-groups-disabled-skips-grouped-device": {
+		// With the feature disabled, a slice with a device declaring
+		// compatibility groups is ignored during pool gathering (the scheduler
+		// cannot validate it), which leaves its pool incomplete and blocks the
+		// pool as a whole. A separate pool without groups is still allocatable.
+		// This is the feature-off safety behavior and is verified across all
+		// allocator variants.
+		"compatibility-groups-disabled-skips-grouped-pool": {
 			// CompatibilityGroups is set explicitly to false so this case keeps
 			// exercising the feature-disabled path unchanged after the feature
-			// graduates to on-by-default.
+			// graduates to on-by-default. The scope is the pool: device1's pool1
+			// is off-limits, but device2 in the group-free pool2 is still
+			// allocated.
 			features: Features{PartitionableDevices: true, CompatibilityGroups: false},
 			claimsToAllocate: objects(claim(claim0).withRequests(
 				deviceRequest(req0, classA, 1),
@@ -1198,74 +1202,53 @@ func TestAllocator(t *testing.T,
 					device(device1, nil, nil).withDeviceCounterConsumption(
 						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "mig"),
 					),
-					device(device2, nil, nil).withDeviceCounterConsumption(
-						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{capacity0: two}),
-					),
 				),
 				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
 					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+				sliceWithDevices(slice3, node1, resourcePool(pool2, 2), driverA,
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet2, map[string]resource.Quantity{capacity0: two}),
+					),
+				),
+				sliceWithCounterSets(slice4, node1, resourcePool(pool2, 2), driverA,
+					counterSet(counterSet2, map[string]resource.Quantity{capacity0: four}),
 				),
 			),
 			node: node(node1, region1),
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device2, false),
+				deviceAllocationResult(req0, driverA, pool2, device2, false),
 			)},
 		},
-		// With the feature disabled but a grouped device already allocated on the
-		// counter set (version skew), a candidate that declares no groups must not
-		// join that counter set - it cannot be validated against the grouped peer.
-		// The peer's groups are read live from the slice, so this is verified
-		// across all allocator variants, including stable.
-		"compatibility-groups-disabled-skips-peer-on-grouped-counterset": {
+		// With the feature disabled, a candidate that declares no groups is not
+		// allocatable either when another device of the same pool declares them:
+		// only the slice with the grouped device1 gets ignored during pool
+		// gathering, but that leaves the pool incomplete, which also blocks
+		// device2 in the remaining device slice - whether or not device1 is
+		// allocated, so that the outcome does not depend on allocation order.
+		// Verified across all allocator variants, including stable.
+		"compatibility-groups-disabled-skips-ungrouped-device-in-grouped-pool": {
 			features:         Features{PartitionableDevices: true, CompatibilityGroups: false},
 			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
-			allocatedDevices: []DeviceID{MakeDeviceID(driverA, pool1, device1)},
 			classes:          objects(class(classA, driverA)),
 			slices: unwrapResourceSlices(
-				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA,
 					device(device1, nil, nil).withDeviceCounterConsumption(
 						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
 					),
+				),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA,
 					device(device2, nil, nil).withDeviceCounterConsumption(
 						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{capacity0: one}),
 					),
 				),
-				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 3), driverA,
 					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
 				),
 			),
 			node:          node(node1, region1),
 			expectResults: nil,
-		},
-		// A skipped grouped device must leave the counter accounting untouched:
-		// the skip runs before its counters are reserved, so nothing may leak
-		// into the in-flight tally. Capacities are tight (a leaked reservation
-		// from device1 would take 1 of 2, device2 needs 2), so any leak flips
-		// the result from device2 to unschedulable. Verified across all
-		// allocator variants.
-		"compatibility-groups-disabled-skip-does-not-leak-counters": {
-			features:         Features{PartitionableDevices: true, CompatibilityGroups: false},
-			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
-			classes:          objects(class(classA, driverA)),
-			slices: unwrapResourceSlices(
-				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
-					device(device1, nil, nil).withDeviceCounterConsumption(
-						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
-					),
-					device(device2, nil, nil).withDeviceCounterConsumption(
-						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{capacity0: two}),
-					),
-				),
-				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
-					counterSet(counterSet1, map[string]resource.Quantity{capacity0: two}),
-				),
-			),
-			node: node(node1, region1),
-			expectResults: []any{allocationResult(
-				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device2, false),
-			)},
 		},
 		// Groups are tracked per counter set: two devices whose groups are
 		// disjoint can still be co-allocated when they draw from different

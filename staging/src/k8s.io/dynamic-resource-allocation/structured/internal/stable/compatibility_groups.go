@@ -17,54 +17,39 @@ limitations under the License.
 package stable
 
 import (
-	"k8s.io/apimachinery/pkg/util/sets"
-	draapi "k8s.io/dynamic-resource-allocation/api"
-	"k8s.io/dynamic-resource-allocation/structured/internal"
+	resourceapi "k8s.io/api/resource/v1"
 )
 
-// groupedCounterSetsForPool returns the counter sets of the pool on which an
-// already-allocated device declares at least one compatibility group, read
-// directly from the pool's ResourceSlices. A device that declares no groups
-// contributes nothing. Used only by the version-skew skip while the
-// DRADeviceCompatibilityGroups feature is disabled.
+// sliceUsesCompatibilityGroups reports whether any device in the slice declares
+// compatibility groups on one of its counter consumptions.
 //
-// The result is computed lazily the first time a pool is touched and then
-// cached, mirroring availableCounters: pools whose devices never reach the
-// skip - including every pool in a cluster that does not use compatibility
-// groups - never pay for the walk.
-func (alloc *allocator) groupedCounterSetsForPool(pool *Pool) sets.Set[draapi.UniqueString] {
-	poolID := pool.PoolID
-
-	alloc.mutex.RLock()
-	grouped, found := alloc.groupedCounterSets[poolID]
-	alloc.mutex.RUnlock()
-	if found {
-		return grouped
-	}
-
-	// Computed without holding the lock; concurrent goroutines may duplicate
-	// the work, but the input is the same for all of them, so the result is,
-	// too.
-	allocatedState := AllocatedState{AllocatedDevices: alloc.allocatedDevices}
-	grouped = sets.New[draapi.UniqueString]()
-	for _, resourceSlices := range [][]*draapi.ResourceSlice{pool.DeviceSlicesTargetingNode, pool.DeviceSlicesNotTargetingNode} {
-		for _, slice := range resourceSlices {
-			for _, device := range slice.Spec.Devices {
-				deviceID := DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: device.Name}
-				if !internal.IsDeviceAllocated(deviceID, &allocatedState) {
-					continue
-				}
-				for _, deviceCounterConsumption := range device.ConsumesCounters {
-					if len(deviceCounterConsumption.CompatibilityGroups) > 0 {
-						grouped.Insert(deviceCounterConsumption.CounterSet)
-					}
-				}
+// While the DRADeviceCompatibilityGroups feature is disabled, GatherPools
+// ignores such slices entirely: this allocator cannot validate co-allocation
+// against compatibility groups, so those devices must not be allocated, and
+// ignoring the slice makes the pool incomplete, which prevents allocating the
+// pool's other devices, too. Whether any of the devices are already allocated
+// is deliberately irrelevant, keeping the outcome independent of allocation
+// order. This lets the feature be enabled later without deleting pods.
+func sliceUsesCompatibilityGroups(slice *resourceapi.ResourceSlice) bool {
+	for _, device := range slice.Spec.Devices {
+		for _, deviceCounterConsumption := range device.ConsumesCounters {
+			if len(deviceCounterConsumption.CompatibilityGroups) > 0 {
+				return true
 			}
 		}
 	}
+	return false
+}
 
-	alloc.mutex.Lock()
-	alloc.groupedCounterSets[poolID] = grouped
-	alloc.mutex.Unlock()
-	return grouped
+// slicesWithoutCompatibilityGroups returns the slices which do not match
+// sliceUsesCompatibilityGroups, preserving their order.
+func slicesWithoutCompatibilityGroups(slices []*resourceapi.ResourceSlice) []*resourceapi.ResourceSlice {
+	filtered := make([]*resourceapi.ResourceSlice, 0, len(slices))
+	for _, slice := range slices {
+		if sliceUsesCompatibilityGroups(slice) {
+			continue
+		}
+		filtered = append(filtered, slice)
+	}
+	return filtered
 }

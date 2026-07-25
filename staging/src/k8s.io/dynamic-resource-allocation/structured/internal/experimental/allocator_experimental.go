@@ -107,14 +107,6 @@ type Allocator struct {
 	// The allocator might be accessed by different goroutines, so
 	// access to this map must be synchronized.
 	availableCounters map[PoolID]counterSets
-	// groupedCounterSets caches, per pool, the counter sets on which an
-	// already-allocated device declares groups (read from the ResourceSlices).
-	// Like availableCounters it is computed lazily by groupedCounterSetsForPool,
-	// never changes once set, and is guarded by mutex. Used only by the
-	// version-skew skip, so it is only ever populated while the feature is
-	// disabled; enforcement (feature on) uses the richer
-	// compatibilityGroupsBaseline below.
-	groupedCounterSets map[PoolID]sets.Set[draapi.UniqueString]
 	// compatibilityGroupsBaseline caches, per resource pool, the
 	// compatibility-group intersection contributed by already-allocated devices
 	// (their groups read live from the source ResourceSlice). Like
@@ -154,15 +146,14 @@ func NewAllocator(ctx context.Context,
 		}
 	}
 	a := &Allocator{
-		features:           features,
-		allocatedState:     allocatedState,
-		classLister:        classLister,
-		slicesOnNode:       slicesOnNode,
-		slicesShared:       slicesShared,
-		allSlices:          slices,
-		celCache:           celCache,
-		availableCounters:  make(map[PoolID]counterSets),
-		groupedCounterSets: make(map[PoolID]sets.Set[draapi.UniqueString]),
+		features:          features,
+		allocatedState:    allocatedState,
+		classLister:       classLister,
+		slicesOnNode:      slicesOnNode,
+		slicesShared:      slicesShared,
+		allSlices:         slices,
+		celCache:          celCache,
+		availableCounters: make(map[PoolID]counterSets),
 
 		compatibilityGroupsBaseline: make(map[PoolID]map[string]compatibilityGroupIntersection),
 	}
@@ -1644,23 +1635,16 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	// their declared compatibility groups intersect. This is gated identically to
 	// the counter check below so that additional shares of an already-allocated
 	// device (skipCounterCheck) are not re-evaluated, and runs before it so that
-	// a rejection or skip returns before any counters have been reserved.
-	if !skipCounterCheck && len(device.ConsumesCounters) > 0 {
-		if alloc.features.CompatibilityGroups {
-			ok, restore := alloc.checkAndConsumeCompatibilityGroups(device)
-			if !ok {
-				alloc.logger.V(7).Info("Incompatible compatibility groups", "device", device.id)
-				return false, nil, nil
-			}
-			state.restoreCompatibilityGroups = restore
-		} else if alloc.skipForDisabledCompatibilityGroups(device) {
-			// The feature is disabled but compatibility groups are present in the
-			// cluster (version skew with the apiserver). Skip rather than risk an
-			// allocation that cannot be validated, so the feature can be enabled
-			// later without deleting pods.
-			alloc.logger.V(7).Info("Skipping device with compatibility groups because the feature is disabled", "device", device.id)
+	// a rejection returns before any counters have been reserved. While the
+	// feature is disabled there is nothing to check: GatherPools already ignored
+	// all slices with compatibility groups.
+	if alloc.features.CompatibilityGroups && !skipCounterCheck && len(device.ConsumesCounters) > 0 {
+		ok, restore := alloc.checkAndConsumeCompatibilityGroups(device)
+		if !ok {
+			alloc.logger.V(7).Info("Incompatible compatibility groups", "device", device.id)
 			return false, nil, nil
 		}
+		state.restoreCompatibilityGroups = restore
 	}
 
 	// The API validation logic has checked the ConsumesCounters referred should exist inside SharedCounters.
@@ -2127,35 +2111,6 @@ func (alloc *allocator) checkAndConsumeCompatibilityGroups(device deviceWithID) 
 	}
 
 	return true, rollback
-}
-
-// skipForDisabledCompatibilityGroups reports whether a device must be skipped
-// while the DRADeviceCompatibilityGroups feature is disabled in this scheduler
-// but compatibility groups are still present in the cluster (served by the
-// apiserver during a version skew). To avoid allocations it cannot validate, the
-// scheduler ignores any device that declares compatibility groups, and any
-// device drawing from a counter set on which an already-allocated device has
-// declared groups. This lets the feature be enabled later without having to
-// delete pods.
-//
-// This is the same version-skew skip used by the stable and incubating
-// allocators; enforcement (feature on) uses checkAndConsumeCompatibilityGroups
-// and the richer per-pool baseline instead.
-func (alloc *allocator) skipForDisabledCompatibilityGroups(device deviceWithID) bool {
-	grouped := alloc.groupedCounterSetsForPool(device.pool)
-	for _, deviceCounterConsumption := range device.ConsumesCounters {
-		if len(deviceCounterConsumption.CompatibilityGroups) > 0 {
-			alloc.logger.V(7).Info("Skipping device: it declares compatibility groups, which this allocator does not enforce",
-				"device", device.id, "counterSet", deviceCounterConsumption.CounterSet.String())
-			return true
-		}
-		if grouped.Has(deviceCounterConsumption.CounterSet) {
-			alloc.logger.V(7).Info("Skipping device: its counter set already carries a grouped allocation this allocator cannot validate",
-				"device", device.id, "counterSet", deviceCounterConsumption.CounterSet.String())
-			return true
-		}
-	}
-	return false
 }
 
 // createNodeSelector constructs a node selector for the allocation, if needed,
