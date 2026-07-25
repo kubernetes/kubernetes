@@ -203,6 +203,12 @@ const (
 	// DRAConsumableCapacity
 	DRAConsumableCapacity featuregate.Feature = "DRAConsumableCapacity"
 
+	// owner: @gauravkghildiyal
+	// kep: http://kep.k8s.io/6080
+	//
+	// Enables support for derived attributes in Dynamic Resource Allocation (DRA).
+	DRADerivedAttributes featuregate.Feature = "DRADerivedAttributes"
+
 	// owner: @KobayashiD27
 	// kep: http://kep.k8s.io/5007
 	// alpha: v1.34
@@ -608,6 +614,7 @@ const (
 	KubeletFineGrainedAuthz featuregate.Feature = "KubeletFineGrainedAuthz"
 
 	// owner: @AkihiroSuda
+	// kep: https://kep.k8s.io/2033
 	//
 	// Enables support for running kubelet in a user namespace.
 	// The user namespace has to be created before running kubelet.
@@ -1054,6 +1061,12 @@ const (
 	// This allows to process potentially schedulable pods ASAP, eliminating a penalty effect of the backoff queue.
 	SchedulerPopFromBackoffQ featuregate.Feature = "SchedulerPopFromBackoffQ"
 
+	// owner: @geetasg
+	// kep: https://kep.k8s.io/6132
+	//
+	// Enables PreQueueingHint extension point to narrow pod evaluation on events.
+	SchedulerPreQueueingHints featuregate.Feature = "SchedulerPreQueueingHints"
+
 	// owner: @atosatto @yuanchen8911
 	// kep: http://kep.k8s.io/3902
 	//
@@ -1427,6 +1440,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	DRADerivedAttributes: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DRADeviceBindingConditions: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
@@ -1724,6 +1741,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	KubeletInUserNamespace: {
 		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	KubeletPSI: {
@@ -2072,6 +2090,9 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	SchedulerPopFromBackoffQ: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+	SchedulerPreQueueingHints: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	SeparateTaintEvictionController: {
@@ -2535,6 +2556,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	DRAConsumableCapacity: {DynamicResourceAllocation},
 
+	DRADerivedAttributes: {DynamicResourceAllocation},
+
 	DRADeviceBindingConditions: {DynamicResourceAllocation, DRAResourceClaimDeviceStatus},
 
 	DRADeviceTaintRules: {DRADeviceTaints}, // DynamicResourceAllocation is indirect.
@@ -2789,7 +2812,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	SchedulerAsyncPreemption: {},
 
-	SchedulerPopFromBackoffQ: {},
+	SchedulerPopFromBackoffQ:  {},
+	SchedulerPreQueueingHints: {},
 
 	SeparateTaintEvictionController: {},
 

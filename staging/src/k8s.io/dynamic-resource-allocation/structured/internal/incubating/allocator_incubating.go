@@ -529,6 +529,12 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 		request:       request,
 		parentRequest: parentRequest,
 	}
+	// The DerivedAttributes feature is currently an alpha-only feature and is
+	// not supported in the incubating variant. Implementation will be added
+	// once the feature's support is extended to this variant.
+	if len(request.derivedAttributes()) > 0 {
+		return requestData, fmt.Errorf("claim %s, request %s: cannot handle request with derived attributes, the feature is disabled", klog.KObj(claim), request.name())
+	}
 	for i, selector := range request.selectors() {
 		if selector.CEL == nil {
 			// Unknown future selector type!
@@ -1801,6 +1807,7 @@ type requestAccessor interface {
 	selectors() []resourceapi.DeviceSelector
 	tolerations() []resourceapi.DeviceToleration
 	capacities() *resourceapi.CapacityRequirements
+	derivedAttributes() []resourceapi.DeviceDerivedAttribute
 }
 
 // exactDeviceRequestAccessor is an implementation of the
@@ -1831,6 +1838,13 @@ func (d *exactDeviceRequestAccessor) adminAccess() bool {
 
 func (d *exactDeviceRequestAccessor) hasAdminAccess() bool {
 	return d.request.Exactly.AdminAccess != nil
+}
+
+func (d *exactDeviceRequestAccessor) derivedAttributes() []resourceapi.DeviceDerivedAttribute {
+	if d.request.Exactly != nil {
+		return d.request.Exactly.DerivedAttributes
+	}
+	return nil
 }
 
 func (d *exactDeviceRequestAccessor) selectors() []resourceapi.DeviceSelector {
@@ -1873,6 +1887,10 @@ func (d *deviceSubRequestAccessor) adminAccess() bool {
 
 func (d *deviceSubRequestAccessor) hasAdminAccess() bool {
 	return false
+}
+
+func (d *deviceSubRequestAccessor) derivedAttributes() []resourceapi.DeviceDerivedAttribute {
+	return d.subRequest.DerivedAttributes
 }
 
 func (d *deviceSubRequestAccessor) selectors() []resourceapi.DeviceSelector {

@@ -61,12 +61,12 @@ import (
 var ResourceNormalizationRules = []field.NormalizationRule{
 	{
 		// ResourceClaim
-		Regexp:      regexp.MustCompile(`spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations)`),
+		Regexp:      regexp.MustCompile(`spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations|derivedAttributes)`),
 		Replacement: "spec.devices.requests[$1].exactly.$2",
 	},
 	{
 		// ResourceClaimTemplate (RCT.Spec.Spec adds an extra "spec." prefix)
-		Regexp:      regexp.MustCompile(`spec\.spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations)`),
+		Regexp:      regexp.MustCompile(`spec\.spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations|derivedAttributes)`),
 		Replacement: "spec.spec.devices.requests[$1].exactly.$2",
 	},
 	{
@@ -147,12 +147,76 @@ func validateResourceClaimSpec(spec *resource.ResourceClaimSpec, fldPath *field.
 	return allErrs
 }
 
+// deviceValidationOptions holds validation options and shared state (like accumulators)
+// that are used during the validation of a DeviceClaim.
+type deviceValidationOptions struct {
+	// stored indicates whether the object being validated is already stored
+	// in the API server. If true, certain previously valid fields (like CEL expressions) are
+	// considered valid without re-evaluation, allowing for relaxed validation on updates.
+	stored bool
+
+	// totalDerivedAttrCost tracks the cumulative compilation cost of all derived
+	// attribute CEL expressions across the entire DeviceClaim. This ensures their
+	// combined cost does not exceed the allowed budget.
+	totalDerivedAttrCost *uint64
+
+	// constraintAttributes maps a request/subrequest reference ("req" or
+	// "req/subreq") to the set of attribute names referenced by constraints
+	// targeting it:
+	// - If an attribute name is in the "" key, it applies to all requests.
+	// - If an attribute name is in the "req" key, it applies to all subrequests
+	//   of "req".
+	// - If an attribute name is in the "req/subreq" key, it applies to that
+	//   specific subrequest.
+	constraintAttributes map[string]sets.Set[string]
+}
+
+func gatherConstraintAttributes(constraints []resource.DeviceConstraint) map[string]sets.Set[string] {
+	attrs := make(map[string]sets.Set[string])
+	for _, constraint := range constraints {
+		var attrName string
+		if constraint.MatchAttribute != nil {
+			attrName = string(*constraint.MatchAttribute)
+		} else if constraint.DistinctAttribute != nil {
+			attrName = string(*constraint.DistinctAttribute)
+		} else {
+			continue
+		}
+
+		if len(constraint.Requests) == 0 {
+			// A constraint with an empty requests list applies globally, so we
+			// use the empty string key to represent all requests.
+			if attrs[""] == nil {
+				attrs[""] = sets.New[string]()
+			}
+			attrs[""].Insert(attrName)
+		} else {
+			// A constraint might target multiple explicit requests or subrequests,
+			// so we track the attribute usage for each individual target.
+			for _, req := range constraint.Requests {
+				if attrs[req] == nil {
+					attrs[req] = sets.New[string]()
+				}
+				attrs[req].Insert(attrName)
+			}
+		}
+	}
+	return attrs
+}
+
 func validateDeviceClaim(deviceClaim *resource.DeviceClaim, fldPath *field.Path, stored bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	requestNames := gatherRequestNames(deviceClaim)
+
+	var totalDerivedAttrCost uint64
+	opts := deviceValidationOptions{
+		stored:               stored,
+		totalDerivedAttrCost: &totalDerivedAttrCost,
+		constraintAttributes: gatherConstraintAttributes(deviceClaim.Constraints),
+	}
 	allErrs = append(allErrs, validateSet(deviceClaim.Requests, resource.DeviceRequestsMaxSize,
 		func(request resource.DeviceRequest, fldPath *field.Path) field.ErrorList {
-			return validateDeviceRequest(request, fldPath, stored)
+			return validateDeviceRequest(request, fldPath, opts)
 		},
 		func(request resource.DeviceRequest) string {
 			return request.Name
@@ -166,6 +230,10 @@ func validateDeviceClaim(deviceClaim *resource.DeviceClaim, fldPath *field.Path,
 		func(config resource.DeviceClaimConfiguration, fldPath *field.Path) field.ErrorList {
 			return validateDeviceClaimConfiguration(config, fldPath, requestNames, stored)
 		}, fldPath.Child("config"), sizeCovered)...)
+	if totalDerivedAttrCost > resource.DeviceClaimDerivedAttributeCELMaxCost {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "too complex, total cost of derived attribute CEL expressions in the claim exceeds cost limit"))
+	}
+
 	return allErrs
 }
 
@@ -219,7 +287,7 @@ func gatherAllocatedDevices(allocationResult *resource.DeviceAllocationResult) s
 	return allocatedDevices
 }
 
-func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, stored bool) field.ErrorList {
+func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, opts deviceValidationOptions) field.ErrorList {
 	allErrs := validateRequestName(request.Name, fldPath.Child("name"))
 	numDeviceRequestType := 0
 
@@ -241,22 +309,23 @@ func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, 
 	case hasFirstAvailable:
 		allErrs = append(allErrs, validateSet(request.FirstAvailable, resource.FirstAvailableDeviceRequestMaxSize,
 			func(subRequest resource.DeviceSubRequest, fldPath *field.Path) field.ErrorList {
-				return validateDeviceSubRequest(subRequest, fldPath, stored)
+				return validateDeviceSubRequest(subRequest, fldPath, opts, request.Name)
 			},
 			func(subRequest resource.DeviceSubRequest) string {
 				return subRequest.Name
 			},
 			fldPath.Child("firstAvailable"), sizeCovered, uniquenessCovered)...)
 	case hasExactly:
-		allErrs = append(allErrs, validateExactDeviceRequest(*request.Exactly, fldPath.Child("exactly"), stored)...)
+		allErrs = append(allErrs, validateExactDeviceRequest(*request.Exactly, fldPath.Child("exactly"), opts, request.Name)...)
 	}
 	return allErrs
 }
 
-func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *field.Path, stored bool) field.ErrorList {
+func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *field.Path, opts deviceValidationOptions, parentRequestName string) field.ErrorList {
 	allErrs := validateRequestName(subRequest.Name, fldPath.Child("name"))
 	allErrs = append(allErrs, validateDeviceClass(subRequest.DeviceClassName, fldPath.Child("deviceClassName")).MarkCoveredByDeclarative()...)
-	allErrs = append(allErrs, validateSelectorSlice(subRequest.Selectors, fldPath.Child("selectors"), stored)...)
+	allErrs = append(allErrs, validateSelectorSlice(subRequest.Selectors, fldPath.Child("selectors"), opts)...)
+	allErrs = append(allErrs, validateDeviceDerivedAttributes(subRequest.DerivedAttributes, fldPath.Child("derivedAttributes"), opts, parentRequestName+"/"+subRequest.Name)...)
 	allErrs = append(allErrs, validateDeviceAllocationMode(subRequest.AllocationMode, subRequest.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
 	for i, toleration := range subRequest.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
@@ -264,10 +333,11 @@ func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *fie
 	return allErrs
 }
 
-func validateExactDeviceRequest(request resource.ExactDeviceRequest, fldPath *field.Path, stored bool) field.ErrorList {
+func validateExactDeviceRequest(request resource.ExactDeviceRequest, fldPath *field.Path, opts deviceValidationOptions, requestName string) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDeviceClass(request.DeviceClassName, fldPath.Child("deviceClassName"))...)
-	allErrs = append(allErrs, validateSelectorSlice(request.Selectors, fldPath.Child("selectors"), stored)...)
+	allErrs = append(allErrs, validateSelectorSlice(request.Selectors, fldPath.Child("selectors"), opts)...)
+	allErrs = append(allErrs, validateDeviceDerivedAttributes(request.DerivedAttributes, fldPath.Child("derivedAttributes"), opts, requestName)...)
 	allErrs = append(allErrs, validateDeviceAllocationMode(request.AllocationMode, request.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
 	for i, toleration := range request.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
@@ -305,32 +375,37 @@ func validateDeviceClass(deviceClass string, fldPath *field.Path) field.ErrorLis
 	return allErrs
 }
 
-func validateSelectorSlice(selectors []resource.DeviceSelector, fldPath *field.Path, stored bool) field.ErrorList {
+func validateSelectorSlice(selectors []resource.DeviceSelector, fldPath *field.Path, opts deviceValidationOptions) field.ErrorList {
 	return validateSlice(selectors, resource.DeviceSelectorsMaxSize,
 		func(selector resource.DeviceSelector, fldPath *field.Path) field.ErrorList {
-			return validateSelector(selector, fldPath, stored)
+			return validateSelector(selector, fldPath, opts)
 		},
 		fldPath, sizeCovered)
 }
 
-func validateSelector(selector resource.DeviceSelector, fldPath *field.Path, stored bool) field.ErrorList {
+func validateSelector(selector resource.DeviceSelector, fldPath *field.Path, opts deviceValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	if selector.CEL == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("cel"), ""))
 	} else {
-		allErrs = append(allErrs, validateCELSelector(*selector.CEL, fldPath.Child("cel"), stored)...)
+		allErrs = append(allErrs, validateCELExpression(selector.CEL.Expression, fldPath.Child("cel", "expression"), opts, false)...)
 	}
 	return allErrs
 }
 
-func validateCELSelector(celSelector resource.CELDeviceSelector, fldPath *field.Path, stored bool) field.ErrorList {
-	var allErrs field.ErrorList
-	envType := environment.NewExpressions
-	if stored {
-		envType = environment.StoredExpressions
+func validateCELExpression(expression string, fldPath *field.Path, opts deviceValidationOptions, derivedAttribute bool) field.ErrorList {
+	if opts.stored {
+		// If a CEL expression is stored, it must have been valid at the
+		// time it was stored and thus must also be valid now. Returning
+		// early here allows relaxing validation more quickly without
+		// ratcheting and is cheaper.
+		return nil
 	}
-	if len(celSelector.Expression) > resource.CELSelectorExpressionMaxLength {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("expression"), "" /*unused*/, resource.CELSelectorExpressionMaxLength))
+	envType := environment.NewExpressions
+
+	var allErrs field.ErrorList
+	if len(expression) > resource.CELSelectorExpressionMaxLength {
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.CELSelectorExpressionMaxLength))
 		// Don't bother compiling too long expressions.
 		return allErrs
 	}
@@ -338,11 +413,23 @@ func validateCELSelector(celSelector resource.CELDeviceSelector, fldPath *field.
 	result := dracel.GetCompiler(dracel.Features{
 		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
 		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
-	}).CompileCELExpression(celSelector.Expression, dracel.Options{EnvType: &envType})
+	}).CompileCELExpression(expression, dracel.Options{
+		EnvType:          &envType,
+		DerivedAttribute: derivedAttribute,
+	})
 	if result.Error != nil {
-		allErrs = append(allErrs, convertCELErrorToValidationError(fldPath.Child("expression"), celSelector.Expression, result.Error))
-	} else if result.MaxCost > resource.CELSelectorExpressionMaxCost {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("expression"), "too complex, exceeds cost limit"))
+		allErrs = append(allErrs, convertCELErrorToValidationError(fldPath, expression, result.Error))
+	} else {
+		if derivedAttribute {
+			if result.MaxCost > min(resource.CELSelectorExpressionMaxCost, resource.DeviceClaimDerivedAttributeCELMaxCost) {
+				allErrs = append(allErrs, field.Forbidden(fldPath, "too complex, exceeds cost limit"))
+			}
+			if opts.totalDerivedAttrCost != nil {
+				*opts.totalDerivedAttrCost += result.MaxCost
+			}
+		} else if result.MaxCost > resource.CELSelectorExpressionMaxCost {
+			allErrs = append(allErrs, field.Forbidden(fldPath, "too complex, exceeds cost limit"))
+		}
 	}
 
 	return allErrs
@@ -363,6 +450,56 @@ func convertCELErrorToValidationError(fldPath *field.Path, expression string, er
 	return field.InternalError(fldPath, fmt.Errorf("unsupported error type: %w", err))
 }
 
+func isAttributeUsedByConstraint(attrName, reqName string, constraintAttributes map[string]sets.Set[string]) bool {
+	// Check if the attribute is used by a globally applied constraint.
+	if globalAttrs, ok := constraintAttributes[""]; ok && globalAttrs.Has(attrName) {
+		return true
+	}
+	// Check if the attribute is used by a constraint explicitly targeting this
+	// request or subrequest.
+	if reqAttrs, ok := constraintAttributes[reqName]; ok && reqAttrs.Has(attrName) {
+		return true
+	}
+	// If this is a subrequest (e.g. "req/subreq"), check if the attribute is
+	// used by a constraint targeting the parent request ("req"), as that
+	// applies to all of its subrequests.
+	if parentReqName, _, found := strings.Cut(reqName, "/"); found {
+		if parentAttrs, ok := constraintAttributes[parentReqName]; ok && parentAttrs.Has(attrName) {
+			return true
+		}
+	}
+	return false
+}
+
+func validateDeviceDerivedAttributes(attrs []resource.DeviceDerivedAttribute, fldPath *field.Path, opts deviceValidationOptions, requestName string) field.ErrorList {
+	return validateSet(attrs, -1,
+		func(attr resource.DeviceDerivedAttribute, fldPath *field.Path) field.ErrorList {
+			return validateDeviceDerivedAttribute(attr, fldPath, opts, requestName)
+		},
+		func(attr resource.DeviceDerivedAttribute) string {
+			return string(attr.Name)
+		},
+		fldPath)
+}
+
+func validateDeviceDerivedAttribute(attr resource.DeviceDerivedAttribute, fldPath *field.Path, opts deviceValidationOptions, requestName string) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// Declarative validation checks for non-empty value,
+	// no need to check that here.
+	if attr.Name != "" {
+		if !isAttributeUsedByConstraint(string(attr.Name), requestName, opts.constraintAttributes) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), attr.Name, "must be referenced by at least one matchAttribute or distinctAttribute constraint targeting this request"))
+		}
+	}
+	// Declarative validation checks for non-empty value,
+	// no need to check that here.
+	if attr.Expression != "" {
+		allErrs = append(allErrs, validateCELExpression(attr.Expression, fldPath.Child("expression"), opts, true)...)
+	}
+	return allErrs
+}
+
 func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *field.Path, requestNames requestNames) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateSet(constraint.Requests, resource.DeviceRequestsMaxSize,
@@ -373,7 +510,7 @@ func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *fie
 	if constraint.MatchAttribute != nil {
 		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.MatchAttribute, fldPath.Child("matchAttribute")).MarkCoveredByDeclarative()...)
 	} else if constraint.DistinctAttribute != nil {
-		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.DistinctAttribute, fldPath.Child("distinctAttribute"))...)
+		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.DistinctAttribute, fldPath.Child("distinctAttribute")).MarkCoveredByDeclarative()...)
 	} else if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) {
 		allErrs = append(allErrs, field.Required(fldPath, `exactly one of "matchAttribute" or "distinctAttribute" is required, but multiple fields are set`))
 	} else {
@@ -594,7 +731,7 @@ func validateDeviceClassSpec(spec, oldSpec *resource.DeviceClassSpec, fldPath *f
 	}
 	allErrs = append(allErrs, validateSlice(spec.Selectors, resource.DeviceSelectorsMaxSize,
 		func(selector resource.DeviceSelector, fldPath *field.Path) field.ErrorList {
-			return validateSelector(selector, fldPath, stored)
+			return validateSelector(selector, fldPath, deviceValidationOptions{stored: stored})
 		},
 		fldPath.Child("selectors"), sizeCovered)...)
 	// Same logic as above for configs.

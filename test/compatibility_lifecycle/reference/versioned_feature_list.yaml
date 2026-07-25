@@ -513,6 +513,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
+- name: DRADerivedAttributes
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: DRADeviceBindingConditions
   versionedSpecs:
   - default: false
@@ -1049,6 +1055,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.22"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: KubeletPodResourcesDynamicResources
   versionedSpecs:
   - default: false
@@ -1817,6 +1827,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+- name: SchedulerPreQueueingHints
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: SELinuxChangePolicy
   versionedSpecs:
   - default: false

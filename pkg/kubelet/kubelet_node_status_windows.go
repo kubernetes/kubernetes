@@ -31,3 +31,8 @@ func getOSSpecificLabels() (map[string]string, error) {
 
 	return map[string]string{v1.LabelWindowsBuild: osInfo.GetBuild()}, nil
 }
+
+// runningInUserNS returns a pointer to true if the Kubelet is running in a user namespace.
+func (kl *Kubelet) runningInUserNS() *bool {
+	return nil
+}

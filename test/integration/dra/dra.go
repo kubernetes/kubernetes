@@ -283,6 +283,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				features.DRADeviceBindingConditions:   true,
 				features.DRAConsumableCapacity:        true,
 				features.DRADeviceTaintRules:          true,
+				features.DRADerivedAttributes:         true,
 				features.DRAListTypeAttributes:        true,
 				features.DRAOptionalNodeOperations:    true,
 				features.DRAPartitionableDevices:      true,
@@ -301,6 +302,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "Convert", testConvert)
 				runSubTest(tCtx, "ControllerManagerMetrics", testControllerManagerMetrics)
 				runSubTest(tCtx, "ResourceSliceFieldSelectors", testResourceSliceFieldSelectors)
+				runSubTest(tCtx, "DerivedAttributes", testDerivedAttributes)
 				runSubTest(tCtx, "DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, true) })
 				runSubTest(tCtx, "OptionalNodeOperations", func(tCtx ktesting.TContext) { testOptionalNodeOperations(tCtx, true) })
 				runSubTest(tCtx, "PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, true) })

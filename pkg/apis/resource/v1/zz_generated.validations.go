@@ -1583,7 +1583,37 @@ func Validate_DeviceConstraint(
 		errs = append(errs, fn(fldPath.Child("matchAttribute"), obj.MatchAttribute, oldVal, oldObj != nil)...)
 	}
 
-	// field resourcev1.DeviceConstraint.DistinctAttribute has no validation
+	{ // field resourcev1.DeviceConstraint.DistinctAttribute
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resourcev1.FullyQualifiedName,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.ResourceFullyQualifiedName(ctx, op, fldPath, obj, oldObj).MarkBeta(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.DeviceConstraint) *resourcev1.FullyQualifiedName {
+				return oldObj.DistinctAttribute
+			})
+		errs = append(errs, fn(fldPath.Child("distinctAttribute"), obj.DistinctAttribute, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -1655,6 +1685,76 @@ func Validate_DeviceCounterConsumption(
 				return oldObj.Counters
 			})
 		errs = append(errs, fn(fldPath.Child("counters"), obj.Counters, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_DeviceDerivedAttribute validates an instance of DeviceDerivedAttribute according
+// to declarative validation rules in the API schema.
+func Validate_DeviceDerivedAttribute(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *resourcev1.DeviceDerivedAttribute) (errs field.ErrorList) {
+
+	{ // field resourcev1.DeviceDerivedAttribute.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *resourcev1.FullyQualifiedName,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.ResourceFullyQualifiedName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.DeviceDerivedAttribute) *resourcev1.FullyQualifiedName {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
+
+	{ // field resourcev1.DeviceDerivedAttribute.Expression
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.DeviceDerivedAttribute) *string {
+				return &oldObj.Expression
+			})
+		errs = append(errs, fn(fldPath.Child("expression"), &obj.Expression, oldVal, oldObj != nil)...)
 	}
 
 	return errs
@@ -2126,6 +2226,43 @@ func Validate_DeviceSubRequest(
 	}
 
 	// field resourcev1.DeviceSubRequest.Capacity has no validation
+
+	{ // field resourcev1.DeviceSubRequest.DerivedAttributes
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []resourcev1.DeviceDerivedAttribute,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceDerivedAttribute); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.DeviceSubRequest) []resourcev1.DeviceDerivedAttribute {
+				return oldObj.DerivedAttributes
+			})
+		errs = append(errs, fn(fldPath.Child("derivedAttributes"), obj.DerivedAttributes, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -2571,6 +2708,43 @@ func Validate_ExactDeviceRequest(
 	}
 
 	// field resourcev1.ExactDeviceRequest.Capacity has no validation
+
+	{ // field resourcev1.ExactDeviceRequest.DerivedAttributes
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []resourcev1.DeviceDerivedAttribute,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceDerivedAttribute); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.ExactDeviceRequest) []resourcev1.DeviceDerivedAttribute {
+				return oldObj.DerivedAttributes
+			})
+		errs = append(errs, fn(fldPath.Child("derivedAttributes"), obj.DerivedAttributes, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 

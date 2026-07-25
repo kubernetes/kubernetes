@@ -84,6 +84,17 @@ func Convert_v1beta1_DeviceRequest_To_resource_DeviceRequest(in *resourcev1beta1
 			}
 			exactDeviceRequest.Capacity = &capacity
 		}
+		if in.DerivedAttributes != nil {
+			derivedAttributes := make([]resource.DeviceDerivedAttribute, 0, len(in.DerivedAttributes))
+			for i := range in.DerivedAttributes {
+				var derivedAttribute resource.DeviceDerivedAttribute
+				if err := Convert_v1beta1_DeviceDerivedAttribute_To_resource_DeviceDerivedAttribute(&in.DerivedAttributes[i], &derivedAttribute, s); err != nil {
+					return err
+				}
+				derivedAttributes = append(derivedAttributes, derivedAttribute)
+			}
+			exactDeviceRequest.DerivedAttributes = derivedAttributes
+		}
 
 		out.Exactly = &exactDeviceRequest
 	}
@@ -97,7 +108,8 @@ func hasAnyMainRequestFieldsSet(deviceRequest *resourcev1beta1.DeviceRequest) bo
 		deviceRequest.Count != 0 ||
 		deviceRequest.AdminAccess != nil ||
 		deviceRequest.Tolerations != nil ||
-		deviceRequest.Capacity != nil
+		deviceRequest.Capacity != nil ||
+		deviceRequest.DerivedAttributes != nil
 }
 
 func Convert_resource_DeviceRequest_To_v1beta1_DeviceRequest(in *resource.DeviceRequest, out *resourcev1beta1.DeviceRequest, s conversion.Scope) error {
@@ -136,6 +148,17 @@ func Convert_resource_DeviceRequest_To_v1beta1_DeviceRequest(in *resource.Device
 				return err
 			}
 			out.Capacity = &capacity
+		}
+		if in.Exactly.DerivedAttributes != nil {
+			derivedAttributes := make([]resourcev1beta1.DeviceDerivedAttribute, 0, len(in.Exactly.DerivedAttributes))
+			for i := range in.Exactly.DerivedAttributes {
+				var derivedAttribute resourcev1beta1.DeviceDerivedAttribute
+				if err := Convert_resource_DeviceDerivedAttribute_To_v1beta1_DeviceDerivedAttribute(&in.Exactly.DerivedAttributes[i], &derivedAttribute, s); err != nil {
+					return err
+				}
+				derivedAttributes = append(derivedAttributes, derivedAttribute)
+			}
+			out.DerivedAttributes = derivedAttributes
 		}
 	}
 	return nil

@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !windows && !linux
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -20,4 +20,9 @@ package kubelet
 
 func getOSSpecificLabels() (map[string]string, error) {
 	return nil, nil
+}
+
+// runningInUserNS returns a pointer to true if the Kubelet is running in a user namespace.
+func (kl *Kubelet) runningInUserNS() *bool {
+	return nil
 }

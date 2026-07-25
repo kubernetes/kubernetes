@@ -128,7 +128,13 @@
                   "requests": {
                     "requestsKey": "0"
                   }
-                }
+                },
+                "derivedAttributes": [
+                  {
+                    "name": "nameValue",
+                    "expression": "expressionValue"
+                  }
+                ]
               }
             ],
             "tolerations": [
@@ -144,7 +150,13 @@
               "requests": {
                 "requestsKey": "0"
               }
-            }
+            },
+            "derivedAttributes": [
+              {
+                "name": "nameValue",
+                "expression": "expressionValue"
+              }
+            ]
           }
         ],
         "constraints": [

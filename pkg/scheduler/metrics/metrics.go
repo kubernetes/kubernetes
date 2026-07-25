@@ -157,6 +157,7 @@ var (
 	PodSchedulingSLIDuration        *metrics.HistogramVec
 	PodSchedulingAttempts           *metrics.Histogram
 	PodScheduledAfterFlush          *metrics.Counter
+	PreQueueingHintEvaluations      *metrics.CounterVec
 	FrameworkExtensionPointDuration *metrics.HistogramVec
 	PluginExecutionDuration         *metrics.HistogramVec
 
@@ -380,6 +381,15 @@ func InitMetrics() {
 			Help:           "Number of pods that were successfully scheduled after being flushed from unschedulableEntities due to timeout. This metric helps detect potential queueing hint misconfigurations or event handling issues.",
 			StabilityLevel: metrics.ALPHA,
 		})
+
+	PreQueueingHintEvaluations = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "pre_queueing_hint_evaluations_total",
+			Help:           "Number of PreQueueingHint evaluations, labeled by plugin and result (all_pods or narrowed).",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"plugin", "result"})
 
 	FrameworkExtensionPointDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -687,6 +697,7 @@ func InitMetrics() {
 		StoreScheduleResultsDuration,
 		queueingHintExecutionDuration,
 		InFlightEvents,
+		PreQueueingHintEvaluations,
 	}
 }
 

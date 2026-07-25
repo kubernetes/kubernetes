@@ -279,6 +279,8 @@ func subRequest(name, class string, count int64, fields ...any) wrapDeviceSubReq
 			subRequest.Selectors = append(subRequest.Selectors, typedField)
 		case resourceapi.DeviceToleration:
 			subRequest.Tolerations = append(subRequest.Tolerations, typedField)
+		case []resourceapi.DeviceDerivedAttribute:
+			subRequest.DerivedAttributes = append(subRequest.DerivedAttributes, typedField...)
 		default:
 			panic(fmt.Sprintf("unsupported field for DeviceSubRequest: %T", field))
 		}
@@ -973,6 +975,12 @@ type AllocatorTestCase struct {
 	// expectNumAllocateOneInvocationsByChannel is only needed as long as we have "worse"
 	// implementations.
 	expectNumAllocateOneInvocationsByChannel map[internal.AllocatorChannel]int64
+}
+
+func requestWithDerivedAttributes(name, class string, count int64, derivedAttrs []resourceapi.DeviceDerivedAttribute, selectors ...resourceapi.DeviceSelector) resourceapi.DeviceRequest {
+	req := request(name, class, count, selectors...)
+	req.Exactly.DerivedAttributes = derivedAttrs
+	return req
 }
 
 // TestAllocator runs as many of the shared tests against a specific allocator implementation as possible.
@@ -8408,6 +8416,282 @@ func TestAllocator(t *testing.T,
 			expectNumAllocateOneInvocationsByChannel: map[internal.AllocatorChannel]int64{
 				internal.Stable: 32,
 			},
+		},
+
+		// "derived-attributes" is the primary test case. It mirrors the
+		// cross-request hardware alignment example from the KEP.
+		// It defines two requests and synthesizes a virtual grouping
+		// key ("sharedNumaNode") across their differing
+		// attribute names. The allocator must backtrack past the
+		// incompatible first device to successfully co-allocate.
+		"derived-attributes": {
+			features: Features{
+				DerivedAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						Requests:       []string{req0, req1},
+						MatchAttribute: ptr.To(resourceapi.FullyQualifiedName("derived/sharedNumaNode")),
+					},
+				},
+				requestWithDerivedAttributes(
+					req0,
+					classA,
+					1,
+					[]resourceapi.DeviceDerivedAttribute{
+						{
+							Name:       "derived/sharedNumaNode",
+							Expression: fmt.Sprintf(`device.attributes["%s"]["numa"]`, driverA),
+						},
+					},
+				),
+				requestWithDerivedAttributes(
+					req1,
+					classB,
+					1,
+					[]resourceapi.DeviceDerivedAttribute{
+						{
+							Name:       "derived/sharedNumaNode",
+							Expression: fmt.Sprintf(`device.attributes["%s"]["numaNode"]`, driverB),
+						},
+					},
+				),
+			)),
+			classes: objects(
+				class(classA, driverA),
+				class(classB, driverB),
+			),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numa": {StringValue: new("numa-0")},
+					}),
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numa": {StringValue: new("numa-1")},
+					}),
+				),
+				sliceWithDevices(slice2, node1, pool2, driverB,
+					device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numaNode": {StringValue: new("numa-1")},
+					}),
+					device(device4, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numaNode": {StringValue: new("numa-2")},
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverB, pool2, device3, false),
+			)},
+		},
+		// "derived-attributes-with-prioritized-list" verifies that
+		// the allocator correctly evaluates derived attributes that are
+		// defined differently across alternatives in a prioritized list.
+		// It expects the allocator to skip the first alternative (because its
+		// derived attribute violates the cross-request match constraint)
+		// and successfully allocate using the second alternative which
+		// correctly satisfies the constraint with the other request.
+		"derived-attributes-with-prioritized-list": {
+			features: Features{
+				DerivedAttributes: true,
+				PrioritizedList:   true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						Requests:       []string{req0, req1},
+						MatchAttribute: ptr.To(resourceapi.FullyQualifiedName("derived/match")),
+					},
+				},
+				requestWithPrioritizedList(req0,
+					// First alternative pulls physical attribute "foo" ("A").
+					// This won't match req1 which pulls "baz" ("B").
+					subRequest(subReq0, classA, 1, []resourceapi.DeviceDerivedAttribute{
+						{
+							Name:       resourceapi.FullyQualifiedName("derived/match"),
+							Expression: fmt.Sprintf(`device.attributes["%s"]["foo"]`, driverA),
+						},
+					}),
+					// Second alternative pulls physical attribute "bar" ("B").
+					// This matches req1.
+					subRequest(subReq1, classA, 1, []resourceapi.DeviceDerivedAttribute{
+						{
+							Name:       resourceapi.FullyQualifiedName("derived/match"),
+							Expression: fmt.Sprintf(`device.attributes["%s"]["bar"]`, driverA),
+						},
+					}),
+				).obj(),
+				requestWithDerivedAttributes(
+					req1,
+					classB, // Notice req1 uses classB (driverB)
+					1,
+					[]resourceapi.DeviceDerivedAttribute{
+						{
+							Name:       resourceapi.FullyQualifiedName("derived/match"),
+							Expression: fmt.Sprintf(`device.attributes["%s"]["baz"]`, driverB),
+						},
+					},
+				),
+			)),
+			classes: objects(
+				class(classA, driverA),
+				class(classB, driverB),
+			),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"foo": {StringValue: new("A")},
+						"bar": {StringValue: new("B")},
+					}),
+				),
+				sliceWithDevices(slice2, node1, pool2, driverB,
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"baz": {StringValue: new("B")},
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0SubReq1, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverB, pool2, device2, false),
+			)},
+		},
+		// "derived-attributes-override" verifies that derived
+		// attributes shadow/override physical attributes of the same
+		// name. It also proves that this shadowing is strictly
+		// request-scoped and does not leak or affect other requests
+		// (which continue to fall back to physical attributes).
+		"derived-attributes-override": {
+			features: Features{
+				DerivedAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						// Require match on "myAttr".
+						Requests:       []string{req0, req1},
+						MatchAttribute: ptr.To(resourceapi.FullyQualifiedName("dra.example.com/myAttr")),
+					},
+				},
+				requestWithDerivedAttributes(
+					req0,
+					classA,
+					1,
+					[]resourceapi.DeviceDerivedAttribute{
+						{
+							// Overrides physical attribute to "value-2".
+							Name:       resourceapi.FullyQualifiedName("dra.example.com/myAttr"),
+							Expression: `"value-2"`,
+						},
+					},
+				),
+				// Falls back to physical attribute.
+				request(req1, classA, 1),
+			)),
+			classes: objects(class(classA, "dra.example.com")),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, "dra.example.com",
+				// Mismatched physical attributes.
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"myAttr": {StringValue: new("value-1")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"myAttr": {StringValue: new("value-2")},
+				}),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				// req0 overridden to "value-2" -> device1. req1 uses physical "value-2" -> device2.
+				deviceAllocationResult(req0, "dra.example.com", pool1, device1, false),
+				deviceAllocationResult(req1, "dra.example.com", pool1, device2, false),
+			)},
+		},
+		// "derived-attributes-cel-missing-attribute" verifies that
+		// CEL runtime evaluation errors (such as looking up a key
+		// that isn't defined on a candidate device) are caught
+		// immediately. The allocator aborts allocation and
+		// propagates the explicit CEL error, preventing silent
+		// topology matching failures.
+		"derived-attributes-cel-missing-attribute": {
+			features: Features{
+				DerivedAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						Requests:       []string{req0},
+						MatchAttribute: ptr.To(resourceapi.FullyQualifiedName("derived/missing")),
+					},
+				},
+				requestWithDerivedAttributes(
+					req0,
+					classA,
+					1,
+					[]resourceapi.DeviceDerivedAttribute{
+						{
+							Name:       resourceapi.FullyQualifiedName("derived/missing"),
+							Expression: fmt.Sprintf(`device.attributes["%s"]["missingAttr"]`, driverA),
+						},
+					},
+				),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"existingAttr": {StringValue: new("yes")},
+				}),
+			)),
+			node:        node(node1, region1),
+			expectError: gomega.MatchError(gomega.ContainSubstring("no such key: missingAttr")),
+		},
+		// "derived-attributes-type-mismatch" verifies that when CEL
+		// dynamically evaluates to different value types for the same
+		// attribute across candidate devices (e.g., string vs int),
+		// the MatchAttribute constraint safely rejects the mismatch
+		// rather than panicking or throwing an unhandled error.
+		"derived-attributes-type-mismatch": {
+			features: Features{
+				DerivedAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						Requests:       []string{req0},
+						MatchAttribute: ptr.To(resourceapi.FullyQualifiedName("derived/myAttr")),
+					},
+				},
+				requestWithDerivedAttributes(
+					req0,
+					classA,
+					2,
+					[]resourceapi.DeviceDerivedAttribute{
+						{
+							Name:       resourceapi.FullyQualifiedName("derived/myAttr"),
+							Expression: fmt.Sprintf(`device.attributes["%s"]["static"]`, driverA),
+						},
+					},
+				),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"static": {StringValue: new("value")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"static": {IntValue: new(int64(1))},
+				}),
+			)),
+			node:          node(node1, region1),
+			expectResults: nil,
 		},
 	}
 

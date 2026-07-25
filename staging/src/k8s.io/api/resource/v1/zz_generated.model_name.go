@@ -132,6 +132,11 @@ func (in DeviceCounterConsumption) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in DeviceDerivedAttribute) OpenAPIModelName() string {
+	return "io.k8s.api.resource.v1.DeviceDerivedAttribute"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in DeviceRequest) OpenAPIModelName() string {
 	return "io.k8s.api.resource.v1.DeviceRequest"
 }

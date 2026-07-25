@@ -6549,6 +6549,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: runningInUserNamespace
+      type:
+        scalar: boolean
     - name: swap
       type:
         namedType: io.k8s.api.core.v1.NodeSwapStatus
@@ -13189,6 +13192,17 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1.Counter
+- name: io.k8s.api.resource.v1.DeviceDerivedAttribute
+  map:
+    fields:
+    - name: expression
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1.DeviceRequest
   map:
     fields:
@@ -13277,6 +13291,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: count
       type:
         scalar: numeric
+    - name: derivedAttributes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceDerivedAttribute
+          elementRelationship: atomic
     - name: deviceClassName
       type:
         scalar: string
@@ -13402,6 +13422,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: count
       type:
         scalar: numeric
+    - name: derivedAttributes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceDerivedAttribute
+          elementRelationship: atomic
     - name: deviceClassName
       type:
         scalar: string
@@ -14216,6 +14242,17 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.Counter
+- name: io.k8s.api.resource.v1beta1.DeviceDerivedAttribute
+  map:
+    fields:
+    - name: expression
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1beta1.DeviceRequest
   map:
     fields:
@@ -14231,6 +14268,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: count
       type:
         scalar: numeric
+    - name: derivedAttributes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceDerivedAttribute
+          elementRelationship: atomic
     - name: deviceClassName
       type:
         scalar: string
@@ -14329,6 +14372,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: count
       type:
         scalar: numeric
+    - name: derivedAttributes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceDerivedAttribute
+          elementRelationship: atomic
     - name: deviceClassName
       type:
         scalar: string
@@ -14961,6 +15010,17 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1beta2.Counter
+- name: io.k8s.api.resource.v1beta2.DeviceDerivedAttribute
+  map:
+    fields:
+    - name: expression
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1beta2.DeviceRequest
   map:
     fields:
@@ -15049,6 +15109,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: count
       type:
         scalar: numeric
+    - name: derivedAttributes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceDerivedAttribute
+          elementRelationship: atomic
     - name: deviceClassName
       type:
         scalar: string
@@ -15174,6 +15240,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: count
       type:
         scalar: numeric
+    - name: derivedAttributes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceDerivedAttribute
+          elementRelationship: atomic
     - name: deviceClassName
       type:
         scalar: string
