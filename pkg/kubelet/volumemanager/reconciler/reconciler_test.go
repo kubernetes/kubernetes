@@ -2608,6 +2608,11 @@ func TestReconstructedVolumeShouldUnmountSucceedAfterSetupFailed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Timed out waiting for failed mount operation to stop being pending")
 	}
+	// The mount must have reached SetUp, otherwise the test would not exercise
+	// the failed-setup path it is named after.
+	if err := volumetesting.VerifySetUpCallCount(1, fakePlugin); err != nil {
+		t.Fatalf("Expected SetUp() to be called: %v", err)
+	}
 
 	waitForUncertainPodMount(t, generatedVolumeName, podName, asw)
 
