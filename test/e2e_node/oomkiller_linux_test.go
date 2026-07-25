@@ -389,8 +389,9 @@ func getOOMTargetContainerMultiProcessThenSigterm(name string) v1.Container {
 			// The backgrounded dd process gets OOM-killed shortly after it starts, which bumps the container
 			// cgroup's cumulative oom_kill counter. The foreground sleep then keeps the container running well
 			// past that point, before the shell sends itself a SIGTERM to simulate a later, unrelated graceful
-			// termination.
-			"trap 'exit 143' TERM; (sleep 5 && dd if=/dev/zero of=/dev/null bs=20M) & sleep 30; kill -TERM $$",
+			// termination. PID 1 is used directly instead of $$, since the Kubernetes command/args field
+			// collapses "$$" to a single "$" as part of its $(VAR_NAME) escaping, which breaks self-signaling.
+			"trap 'exit 143' TERM; (sleep 5 && dd if=/dev/zero of=/dev/null bs=20M) & sleep 30; kill -TERM 1",
 		},
 		Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
