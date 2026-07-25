@@ -48,6 +48,7 @@ import (
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
+	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -2591,18 +2592,25 @@ func TestReconstructedVolumeShouldUnmountSucceedAfterSetupFailed(t *testing.T) {
 	// Act first reconcile to trigger mount reconstructed volume
 	reconciler.reconcile(ctx)
 
-	// Wait for the async mount operation to actually complete before proceeding.
-	// The mount runs in a goroutine and creates directories on disk. We must
-	// wait for it to finish so the subsequent unmount is not blocked by a
-	// pending mount operation.
+	// Wait for the async mount operation to actually complete before proceeding:
+	// unmountVolumes() skips volumes that have a pending operation, so the second
+	// reconcile() below would never call UnmountVolume(). SetUpCallCount is not a
+	// usable signal here, because FakeVolume.SetUp increments it before running
+	// SetUpHook, i.e. while the mount operation is still pending.
 	err = retryWithExponentialBackOff(
 		testOperationBackOffDuration,
 		func() (bool, error) {
-			return volumetesting.VerifySetUpCallCount(1, fakePlugin) == nil, nil
+			return !reconciler.operationExecutor.IsOperationPending(
+				generatedVolumeName, podName, nestedpendingoperations.EmptyNodeName), nil
 		},
 	)
 	if err != nil {
 		t.Fatalf("Timed out waiting for mount operation to complete")
+	}
+	// The mount must have reached SetUp, otherwise the test would not exercise
+	// the failed-setup path it is named after.
+	if err := volumetesting.VerifySetUpCallCount(1, fakePlugin); err != nil {
+		t.Fatalf("Expected SetUp() to be called: %v", err)
 	}
 
 	waitForUncertainPodMount(t, generatedVolumeName, podName, asw)
