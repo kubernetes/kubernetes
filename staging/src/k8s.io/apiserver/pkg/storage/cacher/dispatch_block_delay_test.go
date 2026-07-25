@@ -110,7 +110,9 @@ func TestBlockDelayBlastRadius(t *testing.T) {
 			case dt := <-delivered:
 				lat = append(lat, dt.Sub(inject[len(lat)]))
 			case <-timeout:
-				t.Fatalf("only %d/%d events delivered to victim", len(lat), burst)
+				_, open := <-victim.ResultChan()
+				t.Fatalf("only %d/%d events delivered to victim (victim chan open=%v, registered watchers=%d)",
+					len(lat), burst, open, registeredWatchers(cacher))
 			}
 		}
 		sort.Slice(lat, func(i, j int) bool { return lat[i] < lat[j] })
