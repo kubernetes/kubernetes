@@ -18,27 +18,18 @@ package lifecycle
 
 import (
 	"context"
-	"fmt"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	lifecycleapi "k8s.io/api/lifecycle/v1alpha1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/resourceversion"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/util/retry"
-	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econformance "k8s.io/kubernetes/test/e2e/framework/conformance"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("EvictionRequest API", func() {
@@ -118,17 +109,11 @@ var _ = SIGDescribe("EvictionRequest API", func() {
 			}
 		}
 
-		client := f.ClientSet.LifecycleV1alpha1().EvictionRequests(f.Namespace.Name)
-		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-
-		labelKey, labelValue := "example-e2e-er-label", utilrand.String(8)
-		label := fmt.Sprintf("%s=%s", labelKey, labelValue)
-
 		ginkgo.By("creating a target pod for EvictionRequest")
-		podName := "e2e-er-target-" + utilrand.String(5)
+		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: podName,
+				Name: "e2e-er-target-" + utilrand.String(5),
 			},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
@@ -142,138 +127,32 @@ var _ = SIGDescribe("EvictionRequest API", func() {
 		pod, err := podClient.Create(ctx, pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
-		ginkgo.DeferCleanup(func(ctx context.Context) {
-			err := client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: label})
-			framework.ExpectNoError(err)
-		})
-
-		template := &lifecycleapi.EvictionRequest{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "e2e-example-er-",
-				Labels: map[string]string{
-					labelKey: labelValue,
-				},
-			},
-			Spec: lifecycleapi.EvictionRequestSpec{
-				Target: lifecycleapi.EvictionRequestTarget{
-					Pod: &lifecycleapi.EvictionRequestPodReference{
-						Name: pod.Name,
-						UID:  pod.UID,
+		e2econformance.TestResource(ctx, f,
+			&e2econformance.ResourceTestcase[*lifecycleapi.EvictionRequest]{
+				GVR:        lifecycleapi.SchemeGroupVersion.WithResource("evictionrequests"),
+				Namespaced: ptr.To(true),
+				InitialSpec: &lifecycleapi.EvictionRequest{
+					Spec: lifecycleapi.EvictionRequestSpec{
+						Target: lifecycleapi.EvictionRequestTarget{
+							Pod: &lifecycleapi.EvictionRequestPodReference{
+								Name: pod.Name,
+								UID:  pod.UID,
+							},
+						},
+						Requester: "e2e-test.example.com/evictionrequest",
+						Intent:    lifecycleapi.EvictionRequestIntentEviction,
 					},
 				},
-				Requester: "e2e-test.example.com/evictionrequest",
-				Intent:    lifecycleapi.EvictionRequestIntentEviction,
+				UpdateSpec: func(obj *lifecycleapi.EvictionRequest) *lifecycleapi.EvictionRequest {
+					obj.Labels["foo"] = "bar"
+					return obj
+				},
+				UpdateStatus: func(obj *lifecycleapi.EvictionRequest) *lifecycleapi.EvictionRequest {
+					obj.Status.ObservedGeneration = ptr.To(obj.Generation)
+					return obj
+				},
+				StrategicMergePatchSpec: `{"metadata": {"labels": {"baz": "qux"}}}`,
 			},
-		}
-
-		ginkgo.By("creating")
-		_, err = client.Create(ctx, template, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-		_, err = client.Create(ctx, template, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-		erCreated, err := client.Create(ctx, template, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-
-		ginkgo.By("getting")
-		erRead, err := client.Get(ctx, erCreated.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		gomega.Expect(erRead.UID).To(gomega.Equal(erCreated.UID))
-		gomega.Expect(erRead).To(apimachineryutils.HaveValidResourceVersion())
-
-		ginkgo.By("listing")
-		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: label})
-		framework.ExpectNoError(err)
-		gomega.Expect(list.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
-
-		ginkgo.By("watching")
-		framework.Logf("starting watch")
-		erWatch, err := client.Watch(ctx, metav1.ListOptions{ResourceVersion: list.ResourceVersion, LabelSelector: label})
-		framework.ExpectNoError(err)
-
-		ginkgo.By("patching")
-		patchBytes := []byte(`{"metadata":{"annotations":{"patched":"true"}}}`)
-		erPatched, err := client.Patch(ctx, erCreated.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-		framework.ExpectNoError(err)
-		gomega.Expect(erPatched.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
-		gomega.Expect(resourceversion.CompareResourceVersion(erRead.ResourceVersion, erPatched.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
-
-		ginkgo.By("updating")
-		var erUpdated *lifecycleapi.EvictionRequest
-		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			er, err := client.Get(ctx, erCreated.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
-
-			erToUpdate := er.DeepCopy()
-			erToUpdate.Annotations["updated"] = "true"
-
-			erUpdated, err = client.Update(ctx, erToUpdate, metav1.UpdateOptions{})
-			return err
-		})
-		framework.ExpectNoError(err, "failed to update evictionrequest %q", erCreated.Name)
-		gomega.Expect(erUpdated.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
-
-		framework.Logf("waiting for watch events with expected annotations")
-		for sawAnnotation := false; !sawAnnotation; {
-			select {
-			case evt, ok := <-erWatch.ResultChan():
-				if !ok {
-					framework.Fail("watch channel should not close")
-				}
-				gomega.Expect(evt.Type).To(gomega.Equal(watch.Modified))
-				erWatched, isER := evt.Object.(*lifecycleapi.EvictionRequest)
-				if !isER {
-					framework.Failf("expected an object of type: %T, but got %T", &lifecycleapi.EvictionRequest{}, evt.Object)
-				}
-				if erWatched.Annotations["patched"] == "true" {
-					sawAnnotation = true
-					erWatch.Stop()
-				} else {
-					framework.Logf("missing expected annotations, waiting: %#v", erWatched.Annotations)
-				}
-			case <-time.After(wait.ForeverTestTimeout):
-				framework.Fail("timed out waiting for watch event")
-			}
-		}
-
-		ginkgo.By("getting /status")
-		erStatusRead, err := f.DynamicClient.Resource(lifecycleapi.SchemeGroupVersion.WithResource("evictionrequests")).Namespace(f.Namespace.Name).Get(ctx, erCreated.Name, metav1.GetOptions{}, "status")
-		framework.ExpectNoError(err)
-		gomega.Expect(erStatusRead.GetObjectKind().GroupVersionKind()).To(gomega.Equal(lifecycleapi.SchemeGroupVersion.WithKind("EvictionRequest")))
-		gomega.Expect(erStatusRead.GetUID()).To(gomega.Equal(erCreated.UID))
-
-		ginkgo.By("updating /status")
-		var erStatusUpdated *lifecycleapi.EvictionRequest
-		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			er, err := client.Get(ctx, erCreated.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
-
-			erStatusToUpdate := er.DeepCopy()
-			erStatusToUpdate.Status.ObservedGeneration = ptr.To(erStatusToUpdate.Generation)
-
-			erStatusUpdated, err = client.UpdateStatus(ctx, erStatusToUpdate, metav1.UpdateOptions{})
-			return err
-		})
-		framework.ExpectNoError(err, "failed to update status of evictionrequest %q", erCreated.Name)
-		gomega.Expect(erStatusUpdated.Status.ObservedGeneration).To(gomega.Equal(ptr.To(erStatusUpdated.Generation)))
-
-		ginkgo.By("deleting")
-		err = client.Delete(ctx, erCreated.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
-		_, err = client.Get(ctx, erCreated.Name, metav1.GetOptions{})
-		if !apierrors.IsNotFound(err) {
-			framework.Failf("expected 404, got %#v", err)
-		}
-
-		list, err = client.List(ctx, metav1.ListOptions{LabelSelector: label})
-		framework.ExpectNoError(err)
-		gomega.Expect(list.Items).To(gomega.HaveLen(2), "filtered list should have 2 items")
-
-		ginkgo.By("deleting a collection")
-		err = client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: label})
-		framework.ExpectNoError(err)
-
-		list, err = client.List(ctx, metav1.ListOptions{LabelSelector: label})
-		framework.ExpectNoError(err)
-		gomega.Expect(list.Items).To(gomega.BeEmpty(), "filtered list should have 0 items")
+		)
 	})
 })
