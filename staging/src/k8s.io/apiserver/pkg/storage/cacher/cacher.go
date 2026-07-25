@@ -141,16 +141,32 @@ const (
 	// batching from pushing healthy watchers into the blocking path, and it
 	// independently caps a chunk below every watcher's input headroom.
 	//
-	// 4 is chosen to sit just above the batch size the dispatcher is expected
-	// to reach on its own. Batching here is opportunistic - it takes whatever
-	// has already queued and never waits - so the batch size settles near
-	// 1/(1-utilisation) at the queue, and the endpointslice dispatcher on a
-	// 5k-node cluster runs at roughly 0.56 utilisation, i.e. a working point
-	// under 2. A cap of 4 therefore leaves headroom above the common case
-	// while bounding the serialization caches held per pass. It is expected to
-	// bind only during bursts, which is exactly where it should be revisited
-	// once there is fan-out stage data from a scale run to justify raising it.
-	maxDispatchBatchSize = 4
+	// Batching here is opportunistic - it takes whatever has already queued and
+	// never waits - so under Poisson arrivals the batch size settles near
+	// 1/(1-utilisation), and the endpointslice dispatcher on a 5k-node cluster
+	// runs at roughly 0.56 utilisation, i.e. a working point under 2. That
+	// reasoning argued for a cap of 4.
+	//
+	// BenchmarkDispatchBurst says the reasoning is not enough to size this on.
+	// The mean batch size it reports pins at exactly the cap for every burst of
+	// 8 or more, at every watcher count: once the dispatcher is behind at all,
+	// the queue holds more than the cap allows, so the cap - not the offered
+	// load - is what sets the batch size. Real arrivals are correlated (a pod
+	// churn wave rewrites many endpointslices at once), so assuming Poisson
+	// here understates the batch that is available to be taken.
+	//
+	// 16 rather than 4 because the two are indistinguishable in the regime the
+	// utilisation argument describes - a queue holding 2 events yields batches
+	// of 2 under either - while at a burst they differ by roughly 15% of
+	// end-to-end delivery latency. The cap only bites when there is a real
+	// burst to absorb, which is exactly the case worth absorbing. Raising it is
+	// bounded by memory, not safety: chunkLimit independently caps a chunk
+	// below every watcher's input headroom, and the blast-radius guard test
+	// passes at 16 under -race.
+	//
+	// apiserver_watch_dispatch_batch_size reports what is actually achieved, so
+	// this no longer has to be argued from a model.
+	maxDispatchBatchSize = 16
 )
 
 type watchersMap map[int]*cacheWatcher
@@ -1102,6 +1118,10 @@ func (c *Cacher) dispatchEventBatch(events []*watchCacheEvent) {
 				events[j].timeline.dispatched = dispatchedAt
 			}
 		}
+		// Recorded per pass rather than per drain: a drain whose watcher set is
+		// not uniform gets split into several passes, and it is the pass that
+		// determines the cost.
+		c.watcherMetrics.ObserveBatchSize(n)
 		// Watchers stopped after startDispatching will be delayed to finishDispatching.
 		c.fanout(events[i : i+n])
 		c.finishDispatching()

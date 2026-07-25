@@ -29,7 +29,36 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
+
+// meanBatchSize reports the mean size of the fan-out passes recorded so far, and
+// how many passes that was. Benchmarks read it as a delta around the measured
+// section so that a latency number can be tied to the batch size the load
+// actually produced: batching is opportunistic, so an arm that shows no win
+// because no batch ever formed and an arm that shows no win despite batching are
+// otherwise indistinguishable.
+func meanBatchSize() (sum float64, count uint64) {
+	families, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		return 0, 0
+	}
+	for _, f := range families {
+		if f.GetName() != "apiserver_watch_dispatch_batch_size" {
+			continue
+		}
+		// Summed across label sets: the benchmark builds a fresh cacher per
+		// iteration, and they all share one group/resource.
+		for _, m := range f.GetMetric() {
+			if h := m.GetHistogram(); h != nil {
+				sum += h.GetSampleSum()
+				count += h.GetSampleCount()
+			}
+		}
+	}
+	return sum, count
+}
 
 // BenchmarkDispatchBurst measures the full dispatcher path -- processEvent ->
 // c.incoming -> dispatchEvents -> fan-out -> cacheWatcher.process -> result --
@@ -43,7 +72,7 @@ import (
 // all N watchers, amortized over the burst.
 func BenchmarkDispatchBurst(b *testing.B) {
 	for _, nWatchers := range []int{100, 1000, 5000} {
-		for _, burst := range []int{1, 8, 32} {
+		for _, burst := range []int{1, 2, 3, 8, 32} {
 			b.Run(fmt.Sprintf("watchers=%d/burst=%d", nWatchers, burst), func(b *testing.B) {
 				runDispatchBurst(b, nWatchers, burst)
 			})
@@ -52,6 +81,10 @@ func BenchmarkDispatchBurst(b *testing.B) {
 }
 
 func runDispatchBurst(b *testing.B, nWatchers, burst int) {
+	// newTestCacher does not register the cacher metrics, so without this the
+	// batch-size histogram gathers nothing. A real apiserver registers them from
+	// pkg/server/routes/metrics.go.
+	metrics.Register()
 	pods := makeWakestormPods(64)
 	store := newWakestormStorage(pods)
 	cacher, _, err := newTestCacher(store)
@@ -100,6 +133,8 @@ func runDispatchBurst(b *testing.B, nWatchers, burst int) {
 
 	rv := int64(wakestormEventRVBase)
 
+	sum0, count0 := meanBatchSize()
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i += burst {
 		n := burst
@@ -126,6 +161,9 @@ func runDispatchBurst(b *testing.B, nWatchers, burst int) {
 	}
 	b.StopTimer()
 
+	if sum1, count1 := meanBatchSize(); count1 > count0 {
+		b.ReportMetric((sum1-sum0)/float64(count1-count0), "batch-size")
+	}
 	b.ReportMetric(float64(registeredWatchers(cacher)), "alive-watchers")
 }
 

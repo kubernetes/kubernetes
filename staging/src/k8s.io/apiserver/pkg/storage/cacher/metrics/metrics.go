@@ -381,6 +381,22 @@ var (
 			Buckets:        []float64{0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024},
 		}, []string{"group", "resource"})
 
+	dispatchBatchSize = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: "watch",
+			Name:      "dispatch_batch_size",
+			// Without this a fan-out latency change cannot be attributed.
+			// Batching is opportunistic, so a batch of 1 means the dispatcher
+			// found nothing already queued and behaved exactly as it always
+			// has. This is what separates "batching never engaged" from
+			// "batching engaged and did not help", which look identical in
+			// every other metric.
+			Help:           "Histogram of how many events a single fan-out pass carried, broken by resource type. 1 means the dispatcher found no further event already queued.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{1, 2, 3, 4, 6, 8, 16, 32},
+		}, []string{"group", "resource"})
+
 	watcherInputFull = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Namespace:      namespace,
@@ -431,6 +447,7 @@ func Register() {
 		legacyregistry.MustRegister(dispatchStageDuration)
 		legacyregistry.MustRegister(terminatedWatchersDuration)
 		legacyregistry.MustRegister(watcherInputDepth)
+		legacyregistry.MustRegister(dispatchBatchSize)
 		legacyregistry.MustRegister(watcherInputFull)
 		legacyregistry.MustRegister(watcherResultDepth)
 		legacyregistry.CustomMustRegister(newSchedLatenciesCollector())
@@ -482,6 +499,7 @@ func RecordsWatchCacheCapacityChange(groupResource schema.GroupResource, old, ne
 type WatcherMetricsObservers struct {
 	stageDurations    [numDispatchStages]compbasemetrics.ObserverMetric
 	inputDepth        compbasemetrics.ObserverMetric
+	batchSize         compbasemetrics.ObserverMetric
 	inputFull         compbasemetrics.CounterMetric
 	resultDepth       compbasemetrics.ObserverMetric
 	terminationStalls [numTerminationReasons][numTerminationStates]compbasemetrics.ObserverMetric
@@ -494,6 +512,7 @@ func NewWatcherMetricsObservers(groupResource schema.GroupResource) *WatcherMetr
 		o.stageDurations[s] = dispatchStageDuration.WithLabelValues(groupResource.Group, groupResource.Resource, dispatchStageName[s])
 	}
 	o.inputDepth = watcherInputDepth.WithLabelValues(groupResource.Group, groupResource.Resource)
+	o.batchSize = dispatchBatchSize.WithLabelValues(groupResource.Group, groupResource.Resource)
 	o.inputFull = watcherInputFull.WithLabelValues(groupResource.Group, groupResource.Resource)
 	o.resultDepth = watcherResultDepth.WithLabelValues(groupResource.Group, groupResource.Resource)
 	for r := TerminationReason(0); r < numTerminationReasons; r++ {
@@ -515,6 +534,11 @@ func (d *WatcherMetricsObservers) ObserveStage(stage DispatchStage, duration tim
 // ObserveInputDepth records the input channel depth seen at a successful enqueue.
 func (d *WatcherMetricsObservers) ObserveInputDepth(depth int) {
 	d.inputDepth.Observe(float64(depth))
+}
+
+// ObserveBatchSize records how many events one fan-out pass carried.
+func (d *WatcherMetricsObservers) ObserveBatchSize(size int) {
+	d.batchSize.Observe(float64(size))
 }
 
 // IncInputFull counts a failed non-blocking enqueue onto a full input channel.
