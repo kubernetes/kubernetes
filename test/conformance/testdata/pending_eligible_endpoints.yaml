@@ -1,1 +1,2 @@
-
+# https://github.com/kubernetes/kubernetes/issues/140523
+- getLifecycleAPIGroup
