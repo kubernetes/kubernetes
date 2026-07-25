@@ -25,6 +25,8 @@ import (
 type BootstrapToken struct {
 	// Token is used for establishing bidirectional trust between nodes and control-planes.
 	// Used for joining nodes in the cluster.
+	// If this field is not specified in an InitConfiguration, kubeadm generates
+	// a random token at runtime.
 	Token *BootstrapTokenString `json:"token" datapolicy:"token"`
 	// Description sets a human-friendly message why this token exists and what it's used
 	// for, so other administrators can know its purpose.
