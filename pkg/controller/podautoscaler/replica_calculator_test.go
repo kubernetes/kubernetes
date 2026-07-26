@@ -899,6 +899,16 @@ func TestReplicaCalcExternalPerPodMetric(t *testing.T) {
 			expectedUsage:     math.MaxInt64,
 		},
 		{
+			name: "statusReplicas zero does not overflow usage",
+			fixture: calcScenario{
+				currentReplicas: 0,
+				metric:          externalPerPodMetric(20000),
+			},
+			perPodTargetUsage: 5000,
+			expectedReplicas:  4,
+			expectedUsage:     20000,
+		},
+		{
 			name: "scale up",
 			fixture: calcScenario{
 				currentReplicas: 3,
@@ -1207,6 +1217,16 @@ func TestReplicaCalcObjectPerPodMetric(t *testing.T) {
 			perPodTargetUsage: 5000,
 			expectedReplicas:  5,
 			expectedUsage:     5052,
+		},
+		{
+			name: "statusReplicas zero does not overflow usage",
+			fixture: calcScenario{
+				currentReplicas: 0,
+				metric:          perPodMetric(20000),
+			},
+			perPodTargetUsage: 5000,
+			expectedReplicas:  4,
+			expectedUsage:     20000,
 		},
 	}
 
