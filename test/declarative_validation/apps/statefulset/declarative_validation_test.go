@@ -116,6 +116,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		baseObj.Spec.Template.Spec.EvictionResponders = responders
 		baseObj.Spec.Template.Spec.SchedulingGroup = schedulingGroup
 	})
+	poddeclarativevalidation.RunDeclarativeValidateActiveDeadlineSecondsForbiddenTestCases(t, ctx, registry.Strategy, field.NewPath("spec", "template", "spec"), new(mkValidStatefulSet()), func(baseObj *apps.StatefulSet, val *int64) {
+		baseObj.Spec.Template.Spec.ActiveDeadlineSeconds = val
+	})
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
