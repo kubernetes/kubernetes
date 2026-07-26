@@ -1417,6 +1417,39 @@ func TestValidateEvictionStatusUpdate(t *testing.T) {
 				field.Invalid(field.NewPath("status", "responders").Index(1), "", validation.FieldImmutableErrorMsg).WithOrigin("immutable"),
 			},
 		},
+		"first sync cannot pre-populate inactive responder times": {
+			oldInput: mkValidEvictionStatus(0),
+			input: mkValidEvictionStatus(3,
+				setRespondersStartTime(clock, 1, 2),
+				setRespondersCompletionTime(clock, 1, 2)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders").Index(1), "", "can only set name during initialization when not active"),
+			},
+		},
+		"first sync cannot pre-populate active responder completionTime": {
+			oldInput: mkValidEvictionStatus(0),
+			input: mkValidEvictionStatus(3,
+				setRespondersCompletionTime(clock, 0, 1)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders").Index(0), "", "can only set name and startTime during initialization when active"),
+			},
+		},
+		"first sync cannot pre-populate active responder heartbeatTime": {
+			oldInput: mkValidEvictionStatus(0),
+			input: mkValidEvictionStatus(3,
+				setRespondersHeartBeatTime(clock, 0, 1)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders").Index(0), "", "can only set name and startTime during initialization when active"),
+			},
+		},
+		"first sync cannot pre-populate active responder message": {
+			oldInput: mkValidEvictionStatus(0),
+			input: mkValidEvictionStatus(2,
+				setRespondersMessage(0, 1)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "responders").Index(0), "", "can only set name and startTime during initialization when active"),
+			},
+		},
 		// status responder name
 		"invalid status responders names - short circuited by targetResponders key order": {
 			oldInput: mkValidEvictionStatus(0),
@@ -1481,8 +1514,7 @@ func TestValidateEvictionStatusUpdate(t *testing.T) {
 				setStateFor(lifecycle.ResponderStateActive, 0),
 				setRespondersHeartBeatTime(clockBefore(2*time.Second), 0, 1)),
 			errors: []*field.Error{
-				field.Required(field.NewPath("status", "responders").Index(0).Child("startTime"), "is required for an active responder"),
-				field.Invalid(field.NewPath("status", "responders").Index(0).Child("heartbeatTime"), "", "cannot be set before status.responders[0].startTime"),
+				field.Invalid(field.NewPath("status", "responders").Index(0), "", "can only set name and startTime during initialization when active"),
 			},
 		},
 		"heartbeatTime cannot be decreased": {
@@ -1531,8 +1563,7 @@ func TestValidateEvictionStatusUpdate(t *testing.T) {
 				setStateFor(lifecycle.ResponderStateActive, 0),
 				setRespondersExpectedCompletionTime(clockBefore(2*time.Second), 0, 1)),
 			errors: []*field.Error{
-				field.Required(field.NewPath("status", "responders").Index(0).Child("startTime"), "is required for an active responder"),
-				field.Invalid(field.NewPath("status", "responders").Index(0).Child("expectedCompletionTime"), "", "cannot be set before status.responders[0].startTime"),
+				field.Invalid(field.NewPath("status", "responders").Index(0), "", "can only set name and startTime during initialization when active"),
 			},
 		},
 		"expectedCompletionTime cannot be set before startTime even with a skew": {
@@ -1579,8 +1610,7 @@ func TestValidateEvictionStatusUpdate(t *testing.T) {
 				setStateFor(lifecycle.ResponderStateActive, 0),
 				setRespondersCompletionTime(clockBefore(2*time.Second), 0, 1)),
 			errors: []*field.Error{
-				field.Required(field.NewPath("status", "responders").Index(0).Child("startTime"), "is required for an active responder"),
-				field.Invalid(field.NewPath("status", "responders").Index(0).Child("completionTime"), "", "cannot be set before status.responders[0].startTime"),
+				field.Invalid(field.NewPath("status", "responders").Index(0), "", "can only set name and startTime during initialization when active"),
 			},
 		},
 		"completionTime cannot be set before startTime even with a skew": {
