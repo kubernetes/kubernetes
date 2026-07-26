@@ -210,7 +210,7 @@ type Config struct {
 	// for ECDSA the minimum curve size must be 256 bits. ML-DSA keys have no
 	// minimum requirement.
 	GenerateKey func() (crypto.Signer, error)
-	// CertifcateRenewFailureTotal will record a metric that keeps track of
+	// CertificateRenewFailureTotal will record a metric that keeps track of
 	// certificate renewal failures.
 	CertificateRenewFailureTotal Counter
 	// Name is an optional string that will be used when writing log output
