@@ -74,5 +74,17 @@ func checkForNativeLogger(ctx context.Context, service string) bool {
 
 	// journalctl won't return an error if we try to fetch logs for a non-existent service,
 	// hence we search for it in the list of services known to journalctl
-	return strings.Contains(string(output), service+".service")
+	return isNativeLogger(output, service)
+}
+
+// isNativeLogger reports whether output from `journalctl --field _SYSTEMD_UNIT`
+// contains the requested service unit.
+func isNativeLogger(output []byte, service string) bool {
+	serviceUnit := service + ".service"
+	for _, unit := range strings.Fields(string(output)) {
+		if unit == serviceUnit {
+			return true
+		}
+	}
+	return false
 }
