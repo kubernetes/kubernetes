@@ -320,7 +320,9 @@ func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(statusReplicas int32, 
 		// update number of replicas if change is large enough
 		replicaCount = int32(math.Ceil(float64(usage) / float64(targetAverageUsage)))
 	}
-	usage = int64(math.Ceil(float64(usage) / float64(statusReplicas)))
+	if statusReplicas != 0 {
+		usage = int64(math.Ceil(float64(usage) / float64(statusReplicas)))
+	}
 	return replicaCount, usage, timestamp, nil
 }
 
@@ -413,7 +415,7 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 	// Handle usage overflow cases
 	if float64(usage) >= float64(math.MaxInt64) {
 		usage = math.MaxInt64
-	} else {
+	} else if statusReplicas != 0 {
 		usage = int64(math.Ceil(float64(usage) / float64(statusReplicas)))
 	}
 	return replicaCount, usage, timestamp, nil
