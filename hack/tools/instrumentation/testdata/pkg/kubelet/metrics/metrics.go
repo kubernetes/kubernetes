@@ -265,7 +265,7 @@ var (
 		},
 	)
 
-	// PLEGDiscardEvents is a Counter that tracks the number of discarding events in the Kubelet's Pod Lifecycle Event Generator (PLEG).
+	// PLEGDiscardEventsTotal is a Counter that tracks the number of discarding events in the Kubelet's Pod Lifecycle Event Generator (PLEG).
 	PLEGDiscardEventsTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
@@ -343,7 +343,7 @@ var (
 		[]string{"eviction_signal"},
 	)
 
-	// Evictions is a Counter that tracks the cumulative number of pod evictions initiated by the kubelet.
+	// EvictionsTotal is a Counter that tracks the cumulative number of pod evictions initiated by the kubelet.
 	// Broken down by eviction signal.
 	EvictionsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -381,7 +381,7 @@ var (
 		[]string{"preemption_signal"},
 	)
 
-	// Preemptions is a Counter that tracks the cumulative number of pod preemptions initiated by the kubelet.
+	// PreemptionsTotal is a Counter that tracks the cumulative number of pod preemptions initiated by the kubelet.
 	// Broken down by preemption signal. A preemption is only recorded for one resource, the sum of all signals
 	// is the number of preemptions on the given node.
 	PreemptionsTotal = metrics.NewCounterVec(
@@ -481,7 +481,7 @@ var (
 		[]string{"server_api_version"},
 	)
 
-	// PodResourcesEndpointRequestsListCount is a Counter that tracks the number of requests to the PodResource List() endpoint.
+	// PodResourcesEndpointRequestsListCountTotal is a Counter that tracks the number of requests to the PodResource List() endpoint.
 	// Broken down by server API version.
 	PodResourcesEndpointRequestsListCountTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -506,7 +506,7 @@ var (
 		[]string{"server_api_version"},
 	)
 
-	// PodResourcesEndpointRequestsGetAllocatableCount is a Counter that tracks the number of requests to the PodResource GetAllocatableResources() endpoint.
+	// PodResourcesEndpointRequestsGetAllocatableCountTotal is a Counter that tracks the number of requests to the PodResource GetAllocatableResources() endpoint.
 	// Broken down by server API version.
 	PodResourcesEndpointRequestsGetAllocatableCountTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -531,9 +531,9 @@ var (
 		[]string{"server_api_version"},
 	)
 
-	// PodResourcesEndpointErrorsListCount is a Counter that tracks the number of errors returned by he PodResource List() endpoint.
+	// PodResourcesEndpointErrorsListCountTotal is a Counter that tracks the number of errors returned by he PodResource List() endpoint.
 	// Broken down by server API version.
-	PodResourcesEndpointErrorsListCount = metrics.NewCounterVec(
+	PodResourcesEndpointErrorsListCountTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           PodResourcesEndpointErrorsListTotalKey,
@@ -556,7 +556,7 @@ var (
 		[]string{"server_api_version"},
 	)
 
-	// PodResourcesEndpointErrorsGetAllocatableCount is a Counter that tracks the number of errors returned by the PodResource GetAllocatableResources() endpoint.
+	// PodResourcesEndpointErrorsGetAllocatableCountTotal is a Counter that tracks the number of errors returned by the PodResource GetAllocatableResources() endpoint.
 	// Broken down by server API version.
 	PodResourcesEndpointErrorsGetAllocatableCountTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{

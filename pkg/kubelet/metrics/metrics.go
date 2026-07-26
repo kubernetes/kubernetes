@@ -164,10 +164,10 @@ const (
 	MemoryManagerPinningErrorsTotalKey   = "memory_manager_pinning_errors_total"
 
 	// Metrics to track the Topology manager behavior
-	TopologyManagerAdmissionRequestsTotalKey  = "topology_manager_admission_requests_total"
-	TopologyManagerAdmissionErrorsTotalKey    = "topology_manager_admission_errors_total"
-	TopologyManagerAdmissionDurationKey       = "topology_manager_admission_duration_ms"
-	TopologyManagerAdmissionDurationSecondKey = "topology_manager_admission_duration_seconds"
+	TopologyManagerAdmissionRequestsTotalKey   = "topology_manager_admission_requests_total"
+	TopologyManagerAdmissionErrorsTotalKey     = "topology_manager_admission_errors_total"
+	TopologyManagerAdmissionDurationKey        = "topology_manager_admission_duration_ms"
+	TopologyManagerAdmissionDurationSecondsKey = "topology_manager_admission_duration_seconds"
 
 	// Metrics to track orphan pod cleanup
 	orphanPodCleanedVolumesKey       = "orphan_pod_cleaned_volumes"
@@ -465,7 +465,7 @@ var (
 		},
 	)
 
-	// PLEGDiscardEvents is a Counter that tracks the number of discarding events in the Kubelet's Pod Lifecycle Event Generator (PLEG).
+	// PLEGDiscardEventsTotal is a Counter that tracks the number of discarding events in the Kubelet's Pod Lifecycle Event Generator (PLEG).
 	PLEGDiscardEventsTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
@@ -520,7 +520,7 @@ var (
 		},
 	)
 
-	// EventedPLEGConnErr is a Counter that tracks the number of errors encountered during
+	// EventedPLEGConnErrTotal is a Counter that tracks the number of errors encountered during
 	// the establishment of streaming connection with the CRI runtime.
 	EventedPLEGConnErrTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
@@ -543,7 +543,7 @@ var (
 		},
 	)
 
-	// EventedPLEGConn is a Counter that tracks the number of times a streaming client
+	// EventedPLEGConnTotal is a Counter that tracks the number of times a streaming client
 	// was obtained to receive CRI Events.
 	EventedPLEGConnTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
@@ -623,7 +623,7 @@ var (
 		[]string{"eviction_signal"},
 	)
 
-	// Evictions is a Counter that tracks the cumulative number of pod evictions initiated by the kubelet.
+	// EvictionsTotal is a Counter that tracks the cumulative number of pod evictions initiated by the kubelet.
 	// Broken down by eviction signal.
 	EvictionsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -661,7 +661,7 @@ var (
 		[]string{"preemption_signal"},
 	)
 
-	// Preemptions is a Counter that tracks the cumulative number of pod preemptions initiated by the kubelet.
+	// PreemptionsTotal is a Counter that tracks the cumulative number of pod preemptions initiated by the kubelet.
 	// Broken down by preemption signal. A preemption is only recorded for one resource, the sum of all signals
 	// is the number of preemptions on the given node.
 	PreemptionsTotal = metrics.NewCounterVec(
@@ -734,7 +734,7 @@ var (
 		[]string{"server_api_version"},
 	)
 
-	// PodResourcesEndpointRequestsListCount is a Counter that tracks the number of requests to the PodResource List() endpoint.
+	// PodResourcesEndpointRequestsListCountTotal is a Counter that tracks the number of requests to the PodResource List() endpoint.
 	// Broken down by server API version.
 	PodResourcesEndpointRequestsListCountTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -759,7 +759,7 @@ var (
 		[]string{"server_api_version"},
 	)
 
-	// PodResourcesEndpointRequestsGetAllocatableCount is a Counter that tracks the number of requests to the PodResource GetAllocatableResources() endpoint.
+	// PodResourcesEndpointRequestsGetAllocatableCountTotal is a Counter that tracks the number of requests to the PodResource GetAllocatableResources() endpoint.
 	// Broken down by server API version.
 	PodResourcesEndpointRequestsGetAllocatableCountTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -784,7 +784,7 @@ var (
 		[]string{"server_api_version"},
 	)
 
-	// PodResourcesEndpointErrorsListCount is a Counter that tracks the number of errors returned by he PodResource List() endpoint.
+	// PodResourcesEndpointErrorsListCountTotal is a Counter that tracks the number of errors returned by he PodResource List() endpoint.
 	// Broken down by server API version.
 	PodResourcesEndpointErrorsListCountTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -809,7 +809,7 @@ var (
 		[]string{"server_api_version"},
 	)
 
-	// PodResourcesEndpointErrorsGetAllocatableCount is a Counter that tracks the number of errors returned by the PodResource GetAllocatableResources() endpoint.
+	// PodResourcesEndpointErrorsGetAllocatableCountTotal is a Counter that tracks the number of errors returned by the PodResource GetAllocatableResources() endpoint.
 	// Broken down by server API version.
 	PodResourcesEndpointErrorsGetAllocatableCountTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -834,7 +834,7 @@ var (
 		[]string{"server_api_version"},
 	)
 
-	// PodResourcesEndpointRequestsGetCount is a Counter that tracks the number of requests to the PodResource Get() endpoint.
+	// PodResourcesEndpointRequestsGetCountTotal is a Counter that tracks the number of requests to the PodResource Get() endpoint.
 	// Broken down by server API version.
 	PodResourcesEndpointRequestsGetCountTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -859,7 +859,7 @@ var (
 		[]string{"server_api_version"},
 	)
 
-	// PodResourcesEndpointErrorsGetCount is a Counter that tracks the number of errors returned by he PodResource List() endpoint.
+	// PodResourcesEndpointErrorsGetCountTotal is a Counter that tracks the number of errors returned by he PodResource List() endpoint.
 	// Broken down by server API version.
 	PodResourcesEndpointErrorsGetCountTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -1140,7 +1140,7 @@ var (
 		},
 	)
 
-	// CPUManagerExclusiveCPUsAllocationCount reports the total number of CPUs exclusively allocated to containers running on this node
+	// CPUManagerExclusiveCPUsAllocation reports the total number of CPUs exclusively allocated to containers running on this node
 	CPUManagerExclusiveCPUsAllocation = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
@@ -1195,7 +1195,7 @@ var (
 		[]string{ContainerAlignedComputeResourcesScopeLabelKey, ContainerAlignedComputeResourcesBoundaryLabelKey},
 	)
 
-	// ContainerAlignedComputeResourcesFailure reports the count of resources allocation attempts which failed to align resources, per alignment boundary
+	// ContainerAlignedComputeResourcesFailureTotal reports the count of resources allocation attempts which failed to align resources, per alignment boundary
 	ContainerAlignedComputeResourcesFailureTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
@@ -1276,11 +1276,11 @@ var (
 		},
 	)
 
-	// TopologyManagerAdmissionDuration is a Histogram that tracks the duration (in seconds) to serve a pod admission request.
-	TopologyManagerAdmissionDurationSecond = metrics.NewHistogram(
+	// TopologyManagerAdmissionDurationSeconds is a Histogram that tracks the duration (in seconds) to serve a pod admission request.
+	TopologyManagerAdmissionDurationSeconds = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           TopologyManagerAdmissionDurationSecondKey,
+			Name:           TopologyManagerAdmissionDurationSecondsKey,
 			Help:           "Duration in seconds to serve a pod admission request.",
 			Buckets:        metrics.ExponentialBuckets(.00005, 2, 15),
 			StabilityLevel: metrics.ALPHA,
@@ -1814,7 +1814,7 @@ func Register() {
 		legacyregistry.MustRegister(TopologyManagerAdmissionRequestsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionErrorsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionDuration)
-		legacyregistry.MustRegister(TopologyManagerAdmissionDurationSecond)
+		legacyregistry.MustRegister(TopologyManagerAdmissionDurationSeconds)
 		legacyregistry.MustRegister(OrphanPodCleanedVolumes)
 		legacyregistry.MustRegister(OrphanPodCleanedVolumesErrors)
 
