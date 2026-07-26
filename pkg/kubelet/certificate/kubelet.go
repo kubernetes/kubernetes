@@ -237,7 +237,7 @@ func NewKubeletClientCertificateManager(
 			DeprecatedVersion: "1.40.0",
 		},
 	)
-	legacyregistry.Register(certificateRenewFailure)
+	_ = legacyregistry.Register(certificateRenewFailure)
 
 	var certificateRenewFailureTotal = compbasemetrics.NewCounter(
 		&compbasemetrics.CounterOpts{
@@ -248,7 +248,7 @@ func NewKubeletClientCertificateManager(
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 	)
-	legacyregistry.Register(certificateRenewFailureTotal)
+	_ = legacyregistry.Register(certificateRenewFailureTotal)
 
 	m, err := certificate.NewManager(&certificate.Config{
 		ClientsetFn: clientsetFn,
