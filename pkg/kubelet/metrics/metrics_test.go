@@ -190,7 +190,7 @@ kubelet_cpu_manager_exclusive_cpu_allocated 2
 func TestPrometheusCompliantTopologyManagerAdmissionDurationMetric(t *testing.T) {
 	Register()
 
-	TopologyManagerAdmissionDurationSecond.Observe(0.1)
+	TopologyManagerAdmissionDurationSeconds.Observe(0.1)
 
 	expected := `# HELP kubelet_topology_manager_admission_duration_seconds [ALPHA] Duration in seconds to serve a pod admission request.
 # TYPE kubelet_topology_manager_admission_duration_seconds histogram

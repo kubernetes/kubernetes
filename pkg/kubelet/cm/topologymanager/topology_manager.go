@@ -278,10 +278,11 @@ func (m *manager) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes
 	metrics.TopologyManagerAdmissionRequestsTotal.Inc()
 
 	startTime := time.Now()
+	duration := time.Since(startTime)
 
 	podAdmitResult := m.scope.Admit(ctx, attrs.Pod, attrs.Operation)
-	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
-	metrics.TopologyManagerAdmissionDurationSecond.Observe(float64(time.Since(startTime).Seconds()))
+	metrics.TopologyManagerAdmissionDuration.Observe(float64(duration.Milliseconds()))
+	metrics.TopologyManagerAdmissionDurationSeconds.Observe(duration.Seconds())
 
 	logger.V(4).Info("Pod Admit Result", "Message", podAdmitResult.Message, "pod", klog.KObj(attrs.Pod))
 	return podAdmitResult
