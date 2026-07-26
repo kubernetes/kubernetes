@@ -156,6 +156,10 @@ func run(tCtx ktesting.TContext, whatRE string) {
 			features: map[featuregate.Feature]bool{},
 			f: func(tCtx ktesting.TContext) {
 				runSubTest(tCtx, "Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
+				runSubTest(tCtx, "CompatibilityGroups", func(tCtx ktesting.TContext) { testCompatibilityGroups(tCtx, false) })
+				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
+					testPublishResourceSlices(tCtx, true, features.DRADeviceCompatibilityGroups, features.DRAOptionalNodeOperations)
+				})
 				runSubTest(tCtx, "EvictClusterWithV1Rule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useV1Rule) })
 				runSubTest(tCtx, "EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useNoRule) })
 				runSubTest(tCtx, "NoScheduleWithSlices", func(tCtx ktesting.TContext) { testNoScheduleRule(tCtx, useNoRule) })
@@ -163,6 +167,23 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				// without a timeout, the test doesn't run too long, but long enough that a short timeout triggers.
 				runSubTest(tCtx, "FilterTimeout", func(tCtx ktesting.TContext) { testFilterTimeout(tCtx, 21) })
 				runSubTest(tCtx, "UsesAllResources", testUsesAllResources)
+			},
+		},
+		// Compatibility groups with consumable capacity explicitly disabled.
+		// The two gates are independent, and the scheduler plugin assembles
+		// the allocator's view of existing allocations differently when
+		// DRAConsumableCapacity is off - the allocated-device membership that
+		// the enforcement baseline keys on must still reach the allocator on
+		// that path.
+		"compatibility-groups-without-consumable-capacity": {
+			apis: map[schema.GroupVersion]bool{},
+			features: map[featuregate.Feature]bool{
+				features.DRAConsumableCapacity:        false,
+				features.DRADeviceCompatibilityGroups: true,
+				features.DRAPartitionableDevices:      true,
+			},
+			f: func(tCtx ktesting.TContext) {
+				runSubTest(tCtx, "CompatibilityGroups", func(tCtx ktesting.TContext) { testCompatibilityGroups(tCtx, true) })
 			},
 		},
 		// This covers the *current* Kubernetes version with only GA features enabled.
@@ -246,7 +267,10 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				resourceapi.SchemeGroupVersion:     false,
 				resourcev1beta1.SchemeGroupVersion: true,
 			},
-			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
+			features: map[featuregate.Feature]bool{
+				features.DynamicResourceAllocation:    true,
+				features.DRADeviceCompatibilityGroups: true,
+			},
 			f: func(tCtx ktesting.TContext) {
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
 					testPublishResourceSlices(tCtx, false, features.DRAOptionalNodeOperations)
@@ -259,8 +283,9 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				resourcev1beta2.SchemeGroupVersion: true,
 			},
 			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation: true,
-				features.DRADeviceTaintRules:       true,
+				features.DynamicResourceAllocation:    true,
+				features.DRADeviceTaintRules:          true,
+				features.DRADeviceCompatibilityGroups: true,
 			},
 			f: func(tCtx ktesting.TContext) {
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
@@ -282,6 +307,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				features.DRAAdminAccess:               true,
 				features.DRADeviceBindingConditions:   true,
 				features.DRAConsumableCapacity:        true,
+				features.DRADeviceCompatibilityGroups: true,
 				features.DRADeviceTaintRules:          true,
 				features.DRADerivedAttributes:         true,
 				features.DRAListTypeAttributes:        true,
@@ -306,6 +332,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, true) })
 				runSubTest(tCtx, "OptionalNodeOperations", func(tCtx ktesting.TContext) { testOptionalNodeOperations(tCtx, true) })
 				runSubTest(tCtx, "PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, true) })
+				runSubTest(tCtx, "CompatibilityGroups", func(tCtx ktesting.TContext) { testCompatibilityGroups(tCtx, true) })
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				runSubTest(tCtx, "PrioritizedListScoring", func(tCtx ktesting.TContext) { testPrioritizedListScoring(tCtx) })
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx, true) })

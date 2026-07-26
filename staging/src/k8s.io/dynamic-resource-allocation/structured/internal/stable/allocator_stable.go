@@ -41,6 +41,7 @@ type DeviceClassLister = internal.DeviceClassLister
 type Features = internal.Features
 type DeviceID = internal.DeviceID
 type Stats = internal.Stats
+type AllocatedState = internal.AllocatedState
 
 func MakeDeviceID(driver, pool, device string) DeviceID {
 	return internal.MakeDeviceID(driver, pool, device)

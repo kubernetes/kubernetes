@@ -86,6 +86,14 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 			toggledGates:        []string{"DRAWorkloadResourceClaims"},
 			extraRuntimeConfig:  "scheduling.k8s.io/v1beta1",
 		},
+		"compatibility-groups": {
+			test:                compatibilityGroupsGateCycle,
+			driverResourcesFunc: compatibilityGroupsDriverResources,
+			toggledGates:        []string{"DRADeviceCompatibilityGroups"},
+			// DRADeviceCompatibilityGroups is alpha and toggleable starting in 1.37;
+			// emulate that version so the test keeps working once the gate locks.
+			emulatedVersion: "1.37",
+		},
 	}
 
 	for name, def := range subTests {
@@ -132,6 +140,12 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 
 			// ---- Phase 1: gate(s) OFF ----
 			phase = "phase-1-gate-off"
+			// With the gate off, the apiserver is expected to drop the gated fields
+			// from any ResourceSlice the driver (re)publishes - the kubelet wipes the
+			// slices when it restarts, so the driver re-creates them and the create is
+			// stripped. Tolerate those expected drops until the gate is back on and the
+			// slices have been re-published.
+			driver.SetExpectDroppedFields(true)
 			cluster.ToggleFeatureGates(tCtx, phase, turnFgOn(def.enabledGates)+","+turnFgOff(def.toggledGates))
 			waitForSlices(tCtx, name, builder, def.driverResourcesFunc(nodes))
 
@@ -143,7 +157,18 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 			// ---- Phase 2: gate(s) ON again ----
 			phase = "phase-2-gate-on-again"
 			cluster.ToggleFeatureGates(tCtx, phase, turnFgOn(def.enabledGates)+","+turnFgOn(def.toggledGates))
+			// While the gate was off, the apiserver dropped the gated fields, and the
+			// resourceslice controller latched its desired state to the stored
+			// (stripped) result to avoid a hot update loop. Without re-publishing, the
+			// driver keeps publishing slices without the gated fields even though the
+			// apiserver now accepts them. ToggleFeatureGates only returns once the
+			// gate-on apiserver is ready, so this re-publish is guaranteed to reach an
+			// apiserver that preserves the fields.
+			driver.PublishResources(tCtx, def.driverResourcesFunc(nodes))
 			waitForSlices(tCtx, name, builder, def.driverResourcesFunc(nodes))
+			// The gate is back on and the slices have been re-published with the gated
+			// fields, so from here on any dropped-field error would be a real bug.
+			driver.SetExpectDroppedFields(false)
 
 			tCtx.Run(phase, func(tCtx ktesting.TContext) {
 				gateOnAgainFn(tCtx)

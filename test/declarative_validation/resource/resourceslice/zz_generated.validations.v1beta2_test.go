@@ -79,6 +79,13 @@ func init() {
 			"spec.devices[*].consumesCounters[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 			},
+			"spec.devices[*].consumesCounters[*].compatibilityGroups": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"spec.devices[*].consumesCounters[*].compatibilityGroups[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
+			},
 			"spec.devices[*].consumesCounters[*].counterSet": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
 				{ErrorType: "FieldValueRequired"},
