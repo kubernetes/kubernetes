@@ -1467,9 +1467,9 @@
     version: "1.24"
 - name: OpenAPIV2LazyBuild
   versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
-    preRelease: Alpha
+    preRelease: Beta
     version: "1.37"
 - name: OpportunisticBatching
   versionedSpecs:
