@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/routes"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -53,7 +54,7 @@ type Controller struct {
 
 	queue workqueue.TypedRateLimitingInterface[string]
 
-	staticSpec *spec.Swagger
+	staticSpecSource cached.Value[*spec.Swagger]
 
 	openAPIService *handler.OpenAPIService
 
@@ -135,13 +136,25 @@ func NewController(crdInformer informers.CustomResourceDefinitionInformer) *Cont
 
 // Run sets openAPIAggregationManager and starts workers
 func (c *Controller) Run(staticSpec *spec.Swagger, openAPIService *handler.OpenAPIService, stopCh <-chan struct{}) {
+	c.runWithStaticSpecSource(cached.Static(staticSpec, "static-spec"), openAPIService, stopCh)
+}
+
+// RunWithLazyStaticSpec is like Run, but the base spec that CRD specs are
+// merged into is built on first use instead of being provided up front. It is
+// used when the OpenAPIV2LazyBuild feature gate is enabled, so that on
+// clusters where /openapi/v2 is never requested no spec is built at all.
+func (c *Controller) RunWithLazyStaticSpec(staticSpecFn func() (*spec.Swagger, error), openAPIService *handler.OpenAPIService, stopCh <-chan struct{}) {
+	c.runWithStaticSpecSource(routes.NewLazyOpenAPIV2SpecSource(staticSpecFn), openAPIService, stopCh)
+}
+
+func (c *Controller) runWithStaticSpecSource(staticSpecSource cached.Value[*spec.Swagger], openAPIService *handler.OpenAPIService, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 	defer klog.Infof("Shutting down OpenAPI controller")
 
 	klog.Infof("Starting OpenAPI controller")
 
-	c.staticSpec = staticSpec
+	c.staticSpecSource = staticSpecSource
 	c.openAPIService = openAPIService
 
 	if !cache.WaitForCacheSync(stopCh, c.crdsSynced) {
@@ -254,7 +267,11 @@ func (c *Controller) updateSpecLocked() {
 				localCRDSpec = append(localCRDSpec, results[k].Value)
 			}
 		}
-		mergedSpec, err := builder.MergeSpecs(c.staticSpec, localCRDSpec...)
+		staticSpec, _, err := c.staticSpecSource.Get()
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to get base spec: %w", err)
+		}
+		mergedSpec, err := builder.MergeSpecs(staticSpec, localCRDSpec...)
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to merge specs: %v", err)
 		}
