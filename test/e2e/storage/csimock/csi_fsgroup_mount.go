@@ -70,7 +70,7 @@ var _ = utils.SIGDescribe("CSI Mock fsgroup as mount option", func() {
 				_, _, pod := m.createPodWithFSGroup(ctx, fsGroup) /* persistent volume */
 
 				err := e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "failed to start pod")
+				framework.ExpectNoError(err, "failed to e2epod.WaitForPodNameRunningInNamespace")
 
 				if t.enableVolumeMountGroup {
 					gomega.Expect(nodeStageFsGroup).To(gomega.Equal(fsGroupStr), "Expect NodeStageVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to equal %q; got: %q", fsGroupStr, nodeStageFsGroup)

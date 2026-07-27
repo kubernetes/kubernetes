@@ -216,7 +216,7 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		ginkgo.By(fmt.Sprintf("Patching the CSIDriver %q", createdDriver2.Name))
 		payload := "{\"metadata\":{\"labels\":{\"" + createdDriver2.Name + "\":\"patched\"}}}"
 		patchedCSIDriver, err := client.Patch(ctx, createdDriver2.Name, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch CSIDriver %q", createdDriver2.Name)
+		framework.ExpectNoError(err, "failed to client.Patch", createdDriver2.Name)
 		gomega.Expect(patchedCSIDriver.Labels[createdDriver2.Name]).To(gomega.ContainSubstring("patched"), "Checking that patched label has been applied")
 		gomega.Expect(resourceversion.CompareResourceVersion(createdDriver2.ResourceVersion, patchedCSIDriver.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
@@ -231,7 +231,7 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 
 			return err
 		})
-		framework.ExpectNoError(err, "failed to update CSIDriver %q", createdDriver2.Name)
+		framework.ExpectNoError(err, "failed to client.Update", createdDriver2.Name)
 		gomega.Expect(updatedCSIDriver.Labels[createdDriver2.Name]).To(gomega.ContainSubstring("updated"), "Checking that updated label has been applied")
 
 		ginkgo.By(fmt.Sprintf("Listing all CSIDrivers with the labelSelector: %q", csiDriverLabelSelector))

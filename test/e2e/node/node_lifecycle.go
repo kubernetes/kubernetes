@@ -80,7 +80,7 @@ var _ = SIGDescribe("Node Lifecycle", func() {
 
 		ginkgo.By(fmt.Sprintf("Create %q", fakeNode.Name))
 		createdNode, err := nodeClient.Create(ctx, &fakeNode, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create node %q", fakeNode.Name)
+		framework.ExpectNoError(err, "failed to nodeClient.Create", fakeNode.Name)
 		gomega.Expect(createdNode.Name).To(gomega.Equal(fakeNode.Name), "Checking that the node has been created")
 		gomega.Expect(createdNode).To(apimachineryutils.HaveValidResourceVersion())
 
@@ -99,7 +99,7 @@ var _ = SIGDescribe("Node Lifecycle", func() {
 
 		ginkgo.By(fmt.Sprintf("Listing nodes with LabelSelector %q", patchedSelector))
 		nodes, err := nodeClient.List(ctx, metav1.ListOptions{LabelSelector: patchedSelector})
-		framework.ExpectNoError(err, "failed to list nodes")
+		framework.ExpectNoError(err, "failed to nodeClient.List")
 		gomega.Expect(nodes.Items).To(gomega.HaveLen(1), "confirm that the patched node has been found")
 
 		ginkgo.By(fmt.Sprintf("Updating %q", fakeNode.Name))
@@ -113,12 +113,12 @@ var _ = SIGDescribe("Node Lifecycle", func() {
 
 			return err
 		})
-		framework.ExpectNoError(err, "failed to update %q", fakeNode.Name)
+		framework.ExpectNoError(err, "failed to nodeClient.Update", fakeNode.Name)
 		gomega.Expect(updatedNode.Labels).To(gomega.HaveKeyWithValue(fakeNode.Name, "updated"), "Checking that updated label has been applied")
 
 		ginkgo.By(fmt.Sprintf("Delete %q", fakeNode.Name))
 		err = nodeClient.Delete(ctx, fakeNode.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "failed to delete node")
+		framework.ExpectNoError(err, "failed to nodeClient.Delete")
 
 		ginkgo.By(fmt.Sprintf("Confirm deletion of %q", fakeNode.Name))
 		gomega.Eventually(ctx, func(ctx context.Context) error {

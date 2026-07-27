@@ -47,18 +47,18 @@ func CreateStatefulSet(ctx context.Context, c clientset.Interface, manifestPath,
 
 	framework.Logf("Parsing statefulset from %v", mkpath("statefulset.yaml"))
 	ss, err := e2emanifest.StatefulSetFromManifest(mkpath("statefulset.yaml"), ns)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2emanifest.StatefulSetFromManifest")
 	framework.Logf("Parsing service from %v", mkpath("service.yaml"))
 	svc, err := e2emanifest.SvcFromManifest(mkpath("service.yaml"))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2emanifest.SvcFromManifest")
 
 	framework.Logf("creating %s service", ss.Name)
 	_, err = c.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.CoreV1.Services.Create")
 
 	framework.Logf("creating statefulset %v/%v with %d replicas and selector %+v", ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector)
 	_, err = c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.AppsV1.StatefulSets.Create")
 	WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 	return ss
 }
@@ -76,7 +76,7 @@ func GetPodList(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulS
 // DeleteAllStatefulSets deletes all StatefulSet API Objects in Namespace ns.
 func DeleteAllStatefulSets(ctx context.Context, c clientset.Interface, ns string) {
 	ssList, err := c.AppsV1().StatefulSets(ns).List(ctx, metav1.ListOptions{LabelSelector: labels.Everything().String()})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.AppsV1.StatefulSets.List")
 
 	// Scale down each statefulset, then delete it completely.
 	// Deleting a pvc without doing this will leak volumes, #25101.
@@ -141,7 +141,7 @@ func DeleteAllStatefulSets(ctx context.Context, c clientset.Interface, ns string
 		errList = append(errList, "Timeout waiting for pv provisioner to delete pvs, this might mean the test leaked pvs.")
 	}
 	if len(errList) != 0 {
-		framework.ExpectNoError(fmt.Errorf("%v", strings.Join(errList, "\n")))
+		framework.ExpectNoError(fmt.Errorf("%v", strings.Join(errList, "\n")), "failed to fmt.Errorf")
 	}
 }
 
@@ -187,7 +187,7 @@ func UpdateReplicas(ctx context.Context, c clientset.Interface, ss *appsv1.State
 func Restart(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet) {
 	oldReplicas := *(ss.Spec.Replicas)
 	ss, err := Scale(ctx, c, ss, 0)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to Scale")
 	// Wait for controller to report the desired number of Pods.
 	// This way we know the controller has observed all Pod deletions
 	// before we scale it back up.

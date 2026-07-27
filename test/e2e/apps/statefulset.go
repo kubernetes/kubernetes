@@ -1081,9 +1081,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 					},
 				},
 			})
-			framework.ExpectNoError(err, "failed to Marshal StatefulSet JSON patch")
+			framework.ExpectNoError(err, "failed to json.Marshal")
 			patchedSs, err := f.ClientSet.AppsV1().StatefulSets(ns).Patch(ctx, ssName, types.StrategicMergePatchType, []byte(ssPatch), metav1.PatchOptions{})
-			framework.ExpectNoError(err, "failed to patch Set")
+			framework.ExpectNoError(err, "failed to f.ClientSet.AppsV1.StatefulSets.Patch")
 			gomega.Expect(resourceversion.CompareResourceVersion(ss.ResourceVersion, patchedSs.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 			ss, err = c.AppsV1().StatefulSets(ns).Get(ctx, ssName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "Failed to get statefulset resource: %v", err)
@@ -1094,16 +1094,16 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Listing all StatefulSets")
 			ssList, err := c.AppsV1().StatefulSets("").List(ctx, metav1.ListOptions{LabelSelector: "test-ss=patched"})
-			framework.ExpectNoError(err, "failed to list StatefulSets")
+			framework.ExpectNoError(err, "failed to patched"}"}")
 			gomega.Expect(ssList.Items).To(gomega.HaveLen(1), "filtered list wasn't found")
 
 			ginkgo.By("Delete all of the StatefulSets")
 			err = c.AppsV1().StatefulSets(ns).DeleteCollection(ctx, metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{LabelSelector: "test-ss=patched"})
-			framework.ExpectNoError(err, "failed to delete StatefulSets")
+			framework.ExpectNoError(err, "failed to patched"}"}")
 
 			ginkgo.By("Verify that StatefulSets have been deleted")
 			ssList, err = c.AppsV1().StatefulSets("").List(ctx, metav1.ListOptions{LabelSelector: "test-ss=patched"})
-			framework.ExpectNoError(err, "failed to list StatefulSets")
+			framework.ExpectNoError(err, "failed to patched"}"}")
 			gomega.Expect(ssList.Items).To(gomega.BeEmpty(), "filtered list should have no Statefulsets")
 		})
 
@@ -1125,7 +1125,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				},
 			}
 			ssList, err := c.AppsV1().StatefulSets("").List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-			framework.ExpectNoError(err, "failed to list StatefulSets")
+			framework.ExpectNoError(err, "failed to c.AppsV1.StatefulSets.List")
 
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
@@ -1201,7 +1201,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				framework.Logf("Observed %v event: %+v", object, event.Type)
 				return false, nil
 			})
-			framework.ExpectNoError(err, "failed to locate Statefulset %v in namespace %v", ss.ObjectMeta.Name, ns)
+			framework.ExpectNoError(err, "failed to watchtools.Until", ss.ObjectMeta.Name, ns)
 			framework.Logf("Statefulset %s has an updated status", ssName)
 
 			ginkgo.By("patching the Statefulset Status")

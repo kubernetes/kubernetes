@@ -75,7 +75,7 @@ var _ = sigDescribe(feature.Windows, "DNS", skipUnlessWindows(func() {
 				framework.Failf("Failed to delete pod %s: %v", testPod.Name, err)
 			}
 		}()
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, testPod.Name, f.Namespace.Name), "failed to wait for pod %s to be running", testPod.Name)
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, testPod.Name, f.Namespace.Name), "failed to e2epod.WaitForPodNameRunningInNamespace", testPod.Name)
 
 		// This isn't the best 'test' but it is a great diagnostic, see later test for the 'real' test.
 		ginkgo.By("Calling ipconfig to get debugging info for this pod's DNS and confirm that a dns server 1.1.1.1 can be injected, along with ")

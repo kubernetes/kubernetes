@@ -202,7 +202,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 					Labels: map[string]string{"test-rc": "patched"},
 				},
 			})
-			framework.ExpectNoError(err, "failed to marshal json of replicationcontroller label patch")
+			framework.ExpectNoError(err, "failed to json.Marshal")
 			// Patch the ReplicationController
 			ginkgo.By("patching ReplicationController")
 			testRcPatched, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(ctx, testRcName, types.StrategicMergePatchType, []byte(rcLabelPatchPayload), metav1.PatchOptions{})
@@ -340,7 +340,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			// Get the ReplicationController
 			ginkgo.By("fetching ReplicationController; ensuring that it's patched")
 			rc, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Get(ctx, testRcName, metav1.GetOptions{})
-			framework.ExpectNoError(err, "failed to fetch ReplicationController")
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.ReplicationControllers.Get")
 			gomega.Expect(rc.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-rc", "patched"), "ReplicationController is missing a label from earlier patch")
 
 			rcStatusUpdatePayload := rc
@@ -350,7 +350,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			// Replace the ReplicationController's status
 			ginkgo.By("updating ReplicationController status")
 			_, err = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).UpdateStatus(ctx, rcStatusUpdatePayload, metav1.UpdateOptions{})
-			framework.ExpectNoError(err, "failed to update ReplicationControllerStatus")
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.ReplicationControllers.UpdateStatus")
 
 			ginkgo.By("waiting for RC to be modified")
 			eventFound = false
@@ -372,7 +372,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 			ginkgo.By("listing all ReplicationControllers")
 			rcs, err := f.ClientSet.CoreV1().ReplicationControllers("").List(ctx, metav1.ListOptions{LabelSelector: "test-rc-static=true"})
-			framework.ExpectNoError(err, "failed to list ReplicationController")
+			framework.ExpectNoError(err, "failed to true"}"}")
 			gomega.Expect(rcs.Items).ToNot(gomega.BeEmpty(), "Expected to find a ReplicationController but none was found")
 
 			ginkgo.By("checking that ReplicationController has expected values")
@@ -436,7 +436,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.ExpectNoError(err, "Failed to create ReplicationController: %v", err)
 
 		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, checkReplicationControllerStatusReplicaCount(f, rcName, initialRCReplicaCount))
-		framework.ExpectNoError(err, "failed to confirm the quantity of ReplicationController replicas")
+		framework.ExpectNoError(err, "failed to wait.PollUntilContextTimeout")
 
 		ginkgo.By(fmt.Sprintf("Getting scale subresource for ReplicationController %q", rcName))
 		scale, err := rcClient.GetScale(ctx, rcName, metav1.GetOptions{})
@@ -451,7 +451,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 		ginkgo.By(fmt.Sprintf("Verifying replicas where modified for replication controller %q", rcName))
 		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, checkReplicationControllerStatusReplicaCount(f, rcName, expectedRCReplicaCount))
-		framework.ExpectNoError(err, "failed to confirm the quantity of ReplicationController replicas")
+		framework.ExpectNoError(err, "failed to wait.PollUntilContextTimeout")
 	})
 })
 

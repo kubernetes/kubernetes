@@ -1496,7 +1496,7 @@ func testWebhook(ctx context.Context, f *framework.Framework) {
 		},
 	}
 	_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configmap, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to client.CoreV1.ConfigMaps.Create", configmap.Name, f.Namespace.Name)
 
 	ginkgo.By("update (PUT) the admitted configmap to a non-compliant one should be rejected by the webhook")
 	toNonCompliantFn := func(cm *v1.ConfigMap) {
@@ -1531,7 +1531,7 @@ func testWebhook(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("create a configmap that violates the webhook policy but is in a whitelisted namespace")
 	configmap = nonCompliantConfigMap(f)
 	_, err = client.CoreV1().ConfigMaps(skipNamespaceName).Create(ctx, configmap, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create configmap %s in namespace: %s", configmap.Name, skipNamespaceName)
+	framework.ExpectNoError(err, "failed to client.CoreV1.ConfigMaps.Create", configmap.Name, skipNamespaceName)
 }
 
 func testAttachingPodWebhook(ctx context.Context, f *framework.Framework) {
@@ -1539,7 +1539,7 @@ func testAttachingPodWebhook(ctx context.Context, f *framework.Framework) {
 	client := f.ClientSet
 	pod := toBeAttachedPod(f)
 	_, err := client.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod.Name, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to client.CoreV1.Pods.Create", pod.Name, f.Namespace.Name)
 	err = e2epod.WaitForPodNameRunningInNamespace(ctx, client, pod.Name, f.Namespace.Name)
 	framework.ExpectNoError(err, "error while waiting for pod %s to go to Running phase in namespace: %s", pod.Name, f.Namespace.Name)
 
@@ -2221,7 +2221,7 @@ func testBlockingCustomResourceUpdateDeletion(ctx context.Context, f *framework.
 		},
 	}
 	_, err := customResourceClient.Create(ctx, crInstance, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to customResourceClient.Create", crInstanceName, f.Namespace.Name)
 
 	ginkgo.By("Updating the custom resource with disallowed data should be denied")
 	toNonCompliantFn := func(cr *unstructured.Unstructured) {
@@ -2256,11 +2256,11 @@ func testBlockingCustomResourceUpdateDeletion(ctx context.Context, f *framework.
 		data["webhook-e2e-test"] = "webhook-allow"
 	}
 	_, err = updateCustomResource(ctx, customResourceClient, f.Namespace.Name, crInstanceName, toCompliantFn)
-	framework.ExpectNoError(err, "failed to update custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to updateCustomResource", crInstanceName, f.Namespace.Name)
 
 	ginkgo.By("Deleting the updated custom resource should be successful")
 	err = customResourceClient.Delete(ctx, crInstanceName, metav1.DeleteOptions{})
-	framework.ExpectNoError(err, "failed to delete custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to customResourceClient.Delete", crInstanceName, f.Namespace.Name)
 
 }
 
@@ -2281,7 +2281,7 @@ func testMutatingCustomResourceWebhook(ctx context.Context, f *framework.Framewo
 		},
 	}
 	mutatedCR, err := customResourceClient.Create(ctx, cr, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create custom resource %s in namespace: %s", crName, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to customResourceClient.Create", crName, f.Namespace.Name)
 	expectedCRData := map[string]interface{}{
 		"mutation-start":   "yes",
 		"mutation-stage-1": "yes",
@@ -2312,7 +2312,7 @@ func testMultiVersionCustomResourceWebhook(ctx context.Context, f *framework.Fra
 		},
 	}
 	_, err := customResourceClient.Create(ctx, cr, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create custom resource %s in namespace: %s", crName, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to customResourceClient.Create", crName, f.Namespace.Name)
 
 	ginkgo.By("Patching Custom Resource Definition to set v2 as storage")
 	apiVersionWithV2StoragePatch := `{
@@ -2338,12 +2338,12 @@ func testMultiVersionCustomResourceWebhook(ctx context.Context, f *framework.Fra
        }
     }`
 	_, err = testcrd.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Patch(ctx, testcrd.Crd.Name, types.StrategicMergePatchType, []byte(apiVersionWithV2StoragePatch), metav1.PatchOptions{})
-	framework.ExpectNoError(err, "failed to patch custom resource definition %s in namespace: %s", testcrd.Crd.Name, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to testcrd.APIExtensionClient.ApiextensionsV1.CustomResourceDefinitions.Patch", testcrd.Crd.Name, f.Namespace.Name)
 
 	ginkgo.By("Patching the custom resource while v2 is storage version")
 	crDummyPatch := fmt.Sprint(`[{ "op": "add", "path": "/dummy", "value": "test" }]`)
 	mutatedCR, err := testcrd.DynamicClients["v2"].Patch(ctx, crName, types.JSONPatchType, []byte(crDummyPatch), metav1.PatchOptions{})
-	framework.ExpectNoError(err, "failed to patch custom resource %s in namespace: %s", crName, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to testcrd.DynamicClients", crName, f.Namespace.Name)
 	expectedCRData := map[string]interface{}{
 		"mutation-start":   "yes",
 		"mutation-stage-1": "yes",

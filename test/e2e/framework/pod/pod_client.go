@@ -149,10 +149,10 @@ func (c *PodClient) TryCreate(ctx context.Context, pod *v1.Pod) (*v1.Pod, error)
 func (c *PodClient) CreateSync(ctx context.Context, pod *v1.Pod) *v1.Pod {
 	ginkgo.GinkgoHelper()
 	p := c.Create(ctx, pod)
-	framework.ExpectNoError(WaitTimeoutForPodReadyInNamespace(ctx, c.f.ClientSet, p.Name, c.namespace, framework.PodStartTimeout))
+	framework.ExpectNoError(WaitTimeoutForPodReadyInNamespace(ctx, c.f.ClientSet, p.Name, c.namespace, framework.PodStartTimeout), "failed to WaitTimeoutForPodReadyInNamespace")
 	// Get the newest pod after it becomes running and ready, some status may change after pod created, such as pod ip.
 	p, err := c.Get(ctx, p.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.Get")
 	return p
 }
 
@@ -193,7 +193,7 @@ func (c *PodClient) Update(ctx context.Context, name string, updateFn func(pod *
 			return false, nil
 		}
 		return false, fmt.Errorf("failed to update pod %q: %w", name, err)
-	}))
+	}), "failed to c.PodInterface.Update(ctx, pod, metav1.UpdateOptions{})")
 }
 
 // AddEphemeralContainerSync adds an EphemeralContainer to a pod and waits for it to be running.
@@ -214,7 +214,7 @@ func (c *PodClient) AddEphemeralContainerSync(ctx context.Context, pod *v1.Pod, 
 		return err
 	}
 
-	framework.ExpectNoError(WaitForContainerRunning(ctx, c.f.ClientSet, c.namespace, pod.Name, ec.Name, timeout))
+	framework.ExpectNoError(WaitForContainerRunning(ctx, c.f.ClientSet, c.namespace, pod.Name, ec.Name, timeout), "failed to WaitForContainerRunning")
 	return nil
 }
 
@@ -368,7 +368,7 @@ func (c *PodClient) MatchContainerOutput(ctx context.Context, name string, conta
 // PodIsReady returns true if the specified pod is ready. Otherwise false.
 func (c *PodClient) PodIsReady(ctx context.Context, name string) bool {
 	pod, err := c.Get(ctx, name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.Get")
 	return podutils.IsPodReady(pod)
 }
 

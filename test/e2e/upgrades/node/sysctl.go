@@ -59,14 +59,14 @@ func (t *SysctlUpgradeTest) Test(ctx context.Context, f *framework.Framework, do
 	case upgrades.MasterUpgrade, upgrades.ClusterUpgrade:
 		ginkgo.By("Checking the safe sysctl pod keeps running on master upgrade")
 		pod, err := f.ClientSet.CoreV1().Pods(t.validPod.Namespace).Get(ctx, t.validPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Get")
 		gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodRunning))
 	}
 
 	ginkgo.By("Checking the old unsafe sysctl pod was not suddenly started during an upgrade")
 	pod, err := f.ClientSet.CoreV1().Pods(t.invalidPod.Namespace).Get(ctx, t.invalidPod.Name, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Get")
 	}
 	if err == nil {
 		gomega.Expect(pod.Status.Phase).NotTo(gomega.Equal(v1.PodRunning))
@@ -90,7 +90,7 @@ func (t *SysctlUpgradeTest) verifySafeSysctlWork(ctx context.Context, f *framewo
 
 	ginkgo.By("Making sure the valid pod launches")
 	_, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, t.validPod)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2epod.NewPodClient.WaitForErrorEventOrSuccess")
 	e2eoutput.TestContainerOutput(ctx, f, "pod with safe sysctl launched", t.validPod, 0, []string{fmt.Sprintf("%s = %s", safeSysctl, safeSysctlValue)})
 
 	return validPod
@@ -105,7 +105,7 @@ func (t *SysctlUpgradeTest) verifyUnsafeSysctlsAreRejected(ctx context.Context, 
 
 	ginkgo.By("Making sure the invalid pod failed")
 	ev, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, invalidPod)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2epod.NewPodClient.WaitForErrorEventOrSuccess")
 	gomega.Expect(ev.Reason).To(gomega.Equal(sysctl.ForbiddenReason))
 
 	return invalidPod

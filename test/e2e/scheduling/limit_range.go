@@ -80,7 +80,7 @@ var _ = SIGDescribe("LimitRange", func() {
 
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(ctx, options)
-		framework.ExpectNoError(err, "failed to query for limitRanges")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.LimitRanges.List")
 		gomega.Expect(limitRanges.Items).To(gomega.BeEmpty())
 
 		lw := &cache.ListWatch{
@@ -341,11 +341,11 @@ var _ = SIGDescribe("LimitRange", func() {
 
 		ginkgo.By(fmt.Sprintf("Delete LimitRange %q by Collection with labelSelector: %q", lrName, patchedLabelSelector))
 		err = lrClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: patchedLabelSelector})
-		framework.ExpectNoError(err, "failed to delete the LimitRange by Collection")
+		framework.ExpectNoError(err, "failed to lrClient.DeleteCollection")
 
 		ginkgo.By(fmt.Sprintf("Confirm that the limitRange %q has been deleted", lrName))
 		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, checkLimitRangeListQuantity(f, patchedLabelSelector, 0))
-		framework.ExpectNoError(err, "failed to count the required limitRanges")
+		framework.ExpectNoError(err, "failed to wait.PollUntilContextTimeout")
 		framework.Logf("LimitRange %q has been deleted.", lrName)
 
 		ginkgo.By(fmt.Sprintf("Confirm that a single LimitRange still exists with label %q", e2eLabelSelector))

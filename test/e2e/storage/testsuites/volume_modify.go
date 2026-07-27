@@ -318,7 +318,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 		ginkgo.By("Deleting the pod gracefully")
 		err = e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
-		framework.ExpectNoError(err, "failed to delete pod")
+		framework.ExpectNoError(err, "failed to e2epod.DeletePodWithWait")
 
 		ginkgo.By("Update the PV reclaim policy to retain")
 		pvc, err := f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Get(ctx, l.resource.Pvc.Name, metav1.GetOptions{})

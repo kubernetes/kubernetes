@@ -83,11 +83,11 @@ var _ = common.SIGDescribe("Endpoints", func() {
 			},
 		}
 		endpointsList, err := f.ClientSet.CoreV1().Endpoints("").List(ctx, metav1.ListOptions{LabelSelector: "test-endpoint-static=true"})
-		framework.ExpectNoError(err, "failed to list Endpoints")
+		framework.ExpectNoError(err, "failed to true"}"}")
 
 		ginkgo.By("creating an Endpoint")
 		createdEP, err := f.ClientSet.CoreV1().Endpoints(testNamespaceName).Create(ctx, &testEndpoints, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create Endpoint")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Endpoints.Create")
 		gomega.Expect(createdEP).To(apimachineryutils.HaveValidResourceVersion())
 		ginkgo.By("waiting for available Endpoint")
 		ctxUntil, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -105,11 +105,11 @@ var _ = common.SIGDescribe("Endpoints", func() {
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see %v event", watch.Added)
+		framework.ExpectNoError(err, "failed to watchtools.Until", watch.Added)
 
 		ginkgo.By("listing all Endpoints")
 		endpointsList, err = f.ClientSet.CoreV1().Endpoints("").List(ctx, metav1.ListOptions{LabelSelector: "test-endpoint-static=true"})
-		framework.ExpectNoError(err, "failed to list Endpoints")
+		framework.ExpectNoError(err, "failed to true"}"}")
 		eventFound := false
 		var foundEndpoint v1.Endpoints
 		for _, endpoint := range endpointsList.Items {
@@ -126,7 +126,7 @@ var _ = common.SIGDescribe("Endpoints", func() {
 		ginkgo.By("updating the Endpoint")
 		foundEndpoint.ObjectMeta.Labels["test-service"] = "updated"
 		_, err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).Update(ctx, &foundEndpoint, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "failed to update Endpoint with new label")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Endpoints.Update")
 
 		ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
@@ -143,11 +143,11 @@ var _ = common.SIGDescribe("Endpoints", func() {
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see %v event", watch.Modified)
+		framework.ExpectNoError(err, "failed to watchtools.Until", watch.Modified)
 
 		ginkgo.By("fetching the Endpoint")
 		endpoints, err := f.ClientSet.CoreV1().Endpoints(testNamespaceName).Get(ctx, testEndpointName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to fetch Endpoint")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Endpoints.Get")
 		gomega.Expect(foundEndpoint.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-service", "updated"), "failed to update Endpoint %v in namespace %v label not updated", testEndpointName, testNamespaceName)
 
 		endpointPatch, err := json.Marshal(map[string]interface{}{
@@ -172,10 +172,10 @@ var _ = common.SIGDescribe("Endpoints", func() {
 				},
 			},
 		})
-		framework.ExpectNoError(err, "failed to marshal JSON for WatchEvent patch")
+		framework.ExpectNoError(err, "failed to json.Marshal")
 		ginkgo.By("patching the Endpoint")
 		patchedEP, err := f.ClientSet.CoreV1().Endpoints(testNamespaceName).Patch(ctx, testEndpointName, types.StrategicMergePatchType, []byte(endpointPatch), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch Endpoint")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Endpoints.Patch")
 		gomega.Expect(resourceversion.CompareResourceVersion(createdEP.ResourceVersion, patchedEP.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
@@ -193,11 +193,11 @@ var _ = common.SIGDescribe("Endpoints", func() {
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see %v event", watch.Modified)
+		framework.ExpectNoError(err, "failed to watchtools.Until", watch.Modified)
 
 		ginkgo.By("fetching the Endpoint")
 		endpoints, err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).Get(ctx, testEndpointName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to fetch Endpoint")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Endpoints.Get")
 		gomega.Expect(endpoints.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-service", "patched"), "failed to patch Endpoint with Label")
 		endpointSubsetOne := endpoints.Subsets[0]
 		endpointSubsetOneAddresses := endpointSubsetOne.Addresses[0]
@@ -208,7 +208,7 @@ var _ = common.SIGDescribe("Endpoints", func() {
 
 		ginkgo.By("deleting the Endpoint by Collection")
 		err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-endpoint-static=true"})
-		framework.ExpectNoError(err, "failed to delete Endpoint by Collection")
+		framework.ExpectNoError(err, "failed to true"}"}")
 
 		ginkgo.By("waiting for Endpoint deletion")
 		ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
@@ -226,7 +226,7 @@ var _ = common.SIGDescribe("Endpoints", func() {
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see %v event", watch.Deleted)
+		framework.ExpectNoError(err, "failed to watchtools.Until", watch.Deleted)
 
 		ginkgo.By("fetching the Endpoint")
 		_, err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).Get(ctx, testEndpointName, metav1.GetOptions{})

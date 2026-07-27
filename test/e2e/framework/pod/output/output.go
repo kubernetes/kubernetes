@@ -92,7 +92,7 @@ func RunHostCmdWithFullOutput(ns, name, cmd string) (string, string, error) {
 func RunHostCmdOrDie(ns, name, cmd string) string {
 	stdout, err := RunHostCmd(ns, name, cmd)
 	framework.Logf("stdout: %v", stdout)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to RunHostCmd")
 	return stdout
 }
 
@@ -125,7 +125,7 @@ func LookForStringInLog(ns, podName, container, expectedString string, timeout t
 func LookForStringInLogWithoutKubectl(ctx context.Context, client clientset.Interface, ns string, podName string, container string, expectedString string, timeout time.Duration) (result string, err error) {
 	return lookForString(expectedString, timeout, func() string {
 		podLogs, err := e2epod.GetPodLogs(ctx, client, ns, podName, container)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.GetPodLogs")
 		return podLogs
 	})
 }
@@ -260,7 +260,7 @@ func TestContainerOutputMatcher(ctx context.Context, f *framework.Framework,
 	if containerIndex < 0 || containerIndex >= len(pod.Spec.Containers) {
 		framework.Failf("Invalid container index: %d", containerIndex)
 	}
-	framework.ExpectNoError(MatchContainerOutput(ctx, f, pod, pod.Spec.Containers[containerIndex].Name, expectedOutput, matcher))
+	framework.ExpectNoError(MatchContainerOutput(ctx, f, pod, pod.Spec.Containers[containerIndex].Name, expectedOutput, matcher), "failed to MatchContainerOutput")
 }
 
 func TestContainerOutputsMatcher(ctx context.Context, f *framework.Framework,
@@ -278,6 +278,6 @@ func TestContainerOutputsMatcher(ctx context.Context, f *framework.Framework,
 		}
 		expectedNameOutputs[pod.Spec.Containers[containerIndex].Name] = expectedOutput
 	}
-	framework.ExpectNoError(MatchMultipleContainerOutputs(ctx, f, pod, expectedNameOutputs, matcher))
+	framework.ExpectNoError(MatchMultipleContainerOutputs(ctx, f, pod, expectedNameOutputs, matcher), "failed to MatchMultipleContainerOutputs")
 
 }

@@ -141,7 +141,7 @@ type CreateTestingNSFn func(ctx context.Context, baseName string, c clientset.In
 // APIAddress returns a address of an instance.
 func APIAddress() string {
 	instanceURL, err := url.Parse(TestContext.Host)
-	ExpectNoError(err)
+	ExpectNoError(err, "failed to url.Parse(TestContext.Host)")
 	return instanceURL.Hostname()
 }
 

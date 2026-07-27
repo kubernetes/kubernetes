@@ -236,7 +236,7 @@ func createSecondNodePortService(ctx context.Context, f *framework.Framework, co
 	createdService := config.CreateService(ctx, svc)
 
 	err := e2eendpointslice.WaitForEndpointCount(ctx, f.ClientSet, config.Namespace, secondNodePortSvcName, len(config.EndpointPods))
-	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", secondNodePortSvcName, config.Namespace)
+	framework.ExpectNoError(err, "failed to e2eendpointslice.WaitForEndpointCount", secondNodePortSvcName, config.Namespace)
 
 	var httpPort int
 	for _, p := range createdService.Spec.Ports {

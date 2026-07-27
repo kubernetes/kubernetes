@@ -87,7 +87,7 @@ func init() {
 							// Always record the summary, even if there was an error.
 							f.TestSummaries = append(f.TestSummaries, summary)
 							// Now fail if there was an error.
-							framework.ExpectNoError(resourceViolationError)
+							framework.ExpectNoError(resourceViolationError, "failed to resourceViolationError")
 						})
 					})
 				})

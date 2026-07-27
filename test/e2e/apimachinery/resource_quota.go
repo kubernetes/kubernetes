@@ -1044,7 +1044,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Patching the ResourceQuota")
 		payload := "{\"metadata\":{\"labels\":{\"" + rqName + "\":\"patched\"}},\"spec\":{\"hard\":{ \"memory\":\"750Mi\"}}}"
 		patchedResourceQuota, err := client.CoreV1().ResourceQuotas(ns).Patch(ctx, rqName, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch ResourceQuota %s in namespace %s", rqName, ns)
+		framework.ExpectNoError(err, "failed to client.CoreV1.ResourceQuotas.Patch", rqName, ns)
 		gomega.Expect(patchedResourceQuota.Labels[rqName]).To(gomega.Equal("patched"), "Failed to find the label for this ResourceQuota. Current labels: %v", patchedResourceQuota.Labels)
 		gomega.Expect(*patchedResourceQuota.Spec.Hard.Memory()).To(gomega.Equal(resource.MustParse("750Mi")), "Hard memory value for ResourceQuota %q is %s not 750Mi.", patchedResourceQuota.ObjectMeta.Name, patchedResourceQuota.Spec.Hard.Memory().String())
 		gomega.Expect(resourceversion.CompareResourceVersion(rq.Items[0].ResourceVersion, patchedResourceQuota.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
@@ -1090,7 +1090,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		}
 
 		rqList, err := f.ClientSet.CoreV1().ResourceQuotas("").List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-		framework.ExpectNoError(err, "failed to list Services")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.ResourceQuotas.List")
 
 		ginkgo.By(fmt.Sprintf("Creating resourceQuota %q", rqName))
 		resourceQuota := &v1.ResourceQuota{
@@ -1149,12 +1149,12 @@ var _ = SIGDescribe("ResourceQuota", func() {
 			framework.Logf("Observed event: %+v", event.Object)
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to locate ResourceQuota %q in namespace %q", updatedResourceQuota.Name, ns)
+		framework.ExpectNoError(err, "failed to watchtools.Until", updatedResourceQuota.Name, ns)
 		framework.Logf("ResourceQuota %q /status was updated", updatedResourceQuota.Name)
 
 		// Sync resourceQuota list before patching /status
 		rqList, err = f.ClientSet.CoreV1().ResourceQuotas("").List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-		framework.ExpectNoError(err, "failed to list Services")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.ResourceQuotas.List")
 
 		ginkgo.By("Patching hard spec values for cpu & memory")
 		xResourceQuota, err := rqClient.Patch(ctx, updatedResourceQuota.Name, types.StrategicMergePatchType,
@@ -1193,7 +1193,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 			framework.Logf("Observed event: %+v", event.Object)
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to locate ResourceQuota %q in namespace %q", patchedResourceQuota.Name, ns)
+		framework.ExpectNoError(err, "failed to watchtools.Until", patchedResourceQuota.Name, ns)
 		framework.Logf("ResourceQuota %q /status was patched", patchedResourceQuota.Name)
 
 		ginkgo.By(fmt.Sprintf("Get %q /status", rqName))
@@ -1211,7 +1211,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		// Sync resourceQuota list before repatching /status
 		rqList, err = f.ClientSet.CoreV1().ResourceQuotas("").List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-		framework.ExpectNoError(err, "failed to list Services")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.ResourceQuotas.List")
 
 		ginkgo.By(fmt.Sprintf("Repatching %q /status before checking Spec is unchanged", rqName))
 		newHardLimits := v1.ResourceList{
@@ -1247,7 +1247,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 			framework.Logf("Observed event: %+v", event.Object)
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to locate ResourceQuota %q in namespace %q", patchedResourceQuota.Name, ns)
+		framework.ExpectNoError(err, "failed to watchtools.Until", patchedResourceQuota.Name, ns)
 
 		// the resource_quota_controller ignores changes to the status so we have to wait for a full resync of the controller
 		// to reconcile the status again, this full resync is set every 5 minutes by default so we need to poll at least one

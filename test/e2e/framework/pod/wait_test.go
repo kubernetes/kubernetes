@@ -55,7 +55,7 @@ var _ = ginkgo.Describe("pod", func() {
 	})
 
 	ginkgo.It("not found, retry", func(ctx context.Context) {
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, clientSet, "no-such-pod", "default", timeout))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, clientSet, "no-such-pod", "default", timeout), "failed to e2epod.WaitTimeoutForPodRunningInNamespace")
 	})
 
 	ginkgo.It("not found, retry with wrappers", func(ctx context.Context) {
@@ -68,11 +68,11 @@ var _ = ginkgo.Describe("pod", func() {
 
 	ginkgo.It("not running", func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("waiting for pod %s to run", podName))
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, clientSet, podName, podNamespace, timeout))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, clientSet, podName, podNamespace, timeout), "failed to e2epod.WaitTimeoutForPodRunningInNamespace")
 	})
 
 	ginkgo.It("failed", func(ctx context.Context) {
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, clientSet, failedPodName, podNamespace, timeout))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, clientSet, failedPodName, podNamespace, timeout), "failed to e2epod.WaitTimeoutForPodRunningInNamespace")
 	})
 
 	ginkgo.It("gets reported with API error", func(ctx context.Context) {

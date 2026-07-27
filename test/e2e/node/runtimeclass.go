@@ -55,7 +55,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		runtimeClass := newRuntimeClass(f.Namespace.Name, "conflict-runtimeclass")
 		runtimeClass.Scheduling = scheduling
 		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(ctx, runtimeClass, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+		framework.ExpectNoError(err, "failed to f.ClientSet.NodeV1.RuntimeClasses.Create")
 
 		pod := e2eruntimeclass.NewRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{
@@ -110,7 +110,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass")
 		runtimeClass.Scheduling = scheduling
 		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(ctx, runtimeClass, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+		framework.ExpectNoError(err, "failed to f.ClientSet.NodeV1.RuntimeClasses.Create")
 
 		pod := e2eruntimeclass.NewRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{
@@ -156,7 +156,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass")
 		runtimeClass.Scheduling = scheduling
 		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(ctx, runtimeClass, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+		framework.ExpectNoError(err, "failed to f.ClientSet.NodeV1.RuntimeClasses.Create")
 
 		pod := e2eruntimeclass.NewRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{

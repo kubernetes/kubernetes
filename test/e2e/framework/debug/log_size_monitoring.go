@@ -159,7 +159,7 @@ func (d *LogsSizeData) addNewData(ip, path string, timestamp time.Time, size int
 // NewLogsVerifier creates a new LogsSizeVerifier which will stop when stopChannel is closed
 func NewLogsVerifier(ctx context.Context, c clientset.Interface) *LogsSizeVerifier {
 	nodeAddresses, err := e2essh.NodeSSHHosts(ctx, c)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2essh.NodeSSHHosts")
 	instanceAddress := framework.APIAddress() + ":22"
 
 	workChannel := make(chan WorkItem, len(nodeAddresses)+1)

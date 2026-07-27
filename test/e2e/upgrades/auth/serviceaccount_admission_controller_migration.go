@@ -63,7 +63,7 @@ func (t *ServiceAccountAdmissionControllerMigrationTest) Test(ctx context.Contex
 	ginkgo.By("Starting post-upgrade check")
 	ginkgo.By("Checking pod-before-migration makes successful requests using in cluster config")
 	podBeforeMigration, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, podBeforeMigrationName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Get")
 	if podBeforeMigration.GetUID() != t.pod.GetUID() {
 		framework.Failf("Pod %q GetUID() = %q, want %q.", podBeforeMigration.Name, podBeforeMigration.GetUID(), t.pod.GetUID())
 	}
@@ -130,7 +130,7 @@ func createPod(ctx context.Context, f *framework.Framework, podName string) *v1.
 	}
 
 	createdPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Create")
 	framework.Logf("Created pod %s", podName)
 
 	if !e2epod.CheckPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, []string{pod.Name}, time.Minute) {

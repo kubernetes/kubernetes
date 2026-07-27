@@ -134,7 +134,7 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		// We collect 1 additional topology, if possible, for the conflicting topology test
 		// case, but it's not needed for the positive test
 		l.allTopologies, err = t.getCurrentTopologies(ctx, cs, keys, dInfo.NumAllowedTopologies+1)
-		framework.ExpectNoError(err, "failed to get current driver topologies")
+		framework.ExpectNoError(err, "failed to t.getCurrentTopologies")
 		if len(l.allTopologies) < dInfo.NumAllowedTopologies {
 			e2eskipper.Skipf("Not enough topologies in cluster -- skipping")
 		}

@@ -98,7 +98,7 @@ func GetIngressPoint(ing *v1.LoadBalancerIngress) string {
 // GetServiceLoadBalancerCreationTimeout returns a timeout value for creating a load balancer of a service.
 func GetServiceLoadBalancerCreationTimeout(ctx context.Context, cs clientset.Interface) time.Duration {
 	nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2enode.GetReadySchedulableNodes")
 	if len(nodes.Items) > LargeClusterMinNodesNumber {
 		return loadBalancerCreateTimeoutLarge
 	}
@@ -108,7 +108,7 @@ func GetServiceLoadBalancerCreationTimeout(ctx context.Context, cs clientset.Int
 // GetServiceLoadBalancerPropagationTimeout returns a timeout value for propagating a load balancer of a service.
 func GetServiceLoadBalancerPropagationTimeout(ctx context.Context, cs clientset.Interface) time.Duration {
 	nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2enode.GetReadySchedulableNodes")
 	if len(nodes.Items) > LargeClusterMinNodesNumber {
 		return loadBalancerPropagationTimeoutLarge
 	}

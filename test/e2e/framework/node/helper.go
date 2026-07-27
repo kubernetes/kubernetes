@@ -62,14 +62,14 @@ func WaitForAllNodesSchedulable(ctx context.Context, c clientset.Interface, time
 
 // AddOrUpdateLabelOnNode adds the given label key and value to the given node or updates value.
 func AddOrUpdateLabelOnNode(c clientset.Interface, nodeName string, labelKey, labelValue string) {
-	framework.ExpectNoError(testutils.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}))
+	framework.ExpectNoError(testutils.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}), "failed to testutils.AddLabelsToNode")
 }
 
 // ExpectNodeHasLabel expects that the given node has the given label pair.
 func ExpectNodeHasLabel(ctx context.Context, c clientset.Interface, nodeName string, labelKey string, labelValue string) {
 	ginkgo.By("verifying the node has the label " + labelKey + " " + labelValue)
 	node, err := c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.CoreV1.Nodes.Get")
 	gomega.Expect(node.Labels).To(gomega.HaveKeyWithValue(labelKey, labelValue))
 }
 
@@ -77,17 +77,17 @@ func ExpectNodeHasLabel(ctx context.Context, c clientset.Interface, nodeName str
 // won't fail if target label doesn't exist or has been removed.
 func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKey string) {
 	ginkgo.By("removing the label " + labelKey + " off the node " + nodeName)
-	framework.ExpectNoError(testutils.RemoveLabelOffNode(c, nodeName, []string{labelKey}))
+	framework.ExpectNoError(testutils.RemoveLabelOffNode(c, nodeName, []string{labelKey}), "failed to testutils.RemoveLabelOffNode")
 
 	ginkgo.By("verifying the node doesn't have the label " + labelKey)
-	framework.ExpectNoError(testutils.VerifyLabelsRemoved(c, nodeName, []string{labelKey}))
+	framework.ExpectNoError(testutils.VerifyLabelsRemoved(c, nodeName, []string{labelKey}), "failed to testutils.VerifyLabelsRemoved")
 }
 
 // ExpectNodeHasTaint expects that the node has the given taint.
 func ExpectNodeHasTaint(ctx context.Context, c clientset.Interface, nodeName string, taint *v1.Taint) {
 	ginkgo.By("verifying the node has the taint " + taint.ToString())
 	if has, err := NodeHasTaint(ctx, c, nodeName, taint); !has {
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to NodeHasTaint; !has")
 		framework.Failf("Failed to find taint %s on node %s", taint.ToString(), nodeName)
 	}
 }
@@ -204,7 +204,7 @@ func AddExtendedResource(ctx context.Context, clientSet clientset.Interface, nod
 	framework.ExpectNoError(err, "Failed to marshal node JSON")
 
 	_, err = clientSet.CoreV1().Nodes().Patch(ctx, nodeName, types.StrategicMergePatchType, []byte(patchPayload), metav1.PatchOptions{}, "status")
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to clientSet.CoreV1.Nodes.Patch")
 }
 
 // RemoveExtendedResource removes a fake resource from the Node.
@@ -222,7 +222,7 @@ func RemoveExtendedResource(ctx context.Context, clientSet clientset.Interface, 
 		_, err = clientSet.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
 		return err
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to clientSet.CoreV1.Nodes.UpdateStatus")
 }
 
 func HealthCheck(url string) bool {

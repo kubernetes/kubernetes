@@ -84,7 +84,7 @@ func CheckPresentOnNodes(ctx context.Context, c clientset.Interface, ds *appsv1.
 func SchedulableNodes(ctx context.Context, c clientset.Interface, ds *appsv1.DaemonSet) []string {
 	logger := klog.FromContext(ctx)
 	nodeList, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.CoreV1.Nodes.List")
 	nodeNames := make([]string, 0)
 	for _, node := range nodeList.Items {
 		shouldRun, _ := daemon.NodeShouldRunDaemonPod(logger, &node, ds)

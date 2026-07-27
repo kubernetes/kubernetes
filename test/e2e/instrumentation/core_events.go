@@ -78,7 +78,7 @@ var _ = common.SIGDescribe("Events", func() {
 				Namespace: f.Namespace.Name,
 			},
 		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create test event")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Events.Create")
 
 		ginkgo.By("listing all events in all namespaces")
 		// get a list of Events in all namespaces to ensure endpoint coverage
@@ -106,21 +106,21 @@ var _ = common.SIGDescribe("Events", func() {
 		eventPatch, err := json.Marshal(map[string]interface{}{
 			"message": eventPatchMessage,
 		})
-		framework.ExpectNoError(err, "failed to marshal the patch JSON payload")
+		framework.ExpectNoError(err, "failed to json.Marshal")
 
 		_, err = f.ClientSet.CoreV1().Events(f.Namespace.Name).Patch(ctx, eventTestName, types.StrategicMergePatchType, []byte(eventPatch), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch the test event")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Events.Patch")
 
 		ginkgo.By("fetching the test event")
 		// get event by name
 		event, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).Get(ctx, eventCreatedName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to fetch the test event")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Events.Get")
 		gomega.Expect(event.Message).To(gomega.Equal(eventPatchMessage), "test event message does not match patch message")
 
 		ginkgo.By("updating the test event")
 
 		testEvent, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).Get(ctx, event.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get test event")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Events.Get")
 
 		testEvent.Series = &v1.EventSeries{
 			Count:            100,
@@ -132,11 +132,11 @@ var _ = common.SIGDescribe("Events", func() {
 		testEvent.ObjectMeta.ManagedFields = nil
 
 		_, err = f.ClientSet.CoreV1().Events(f.Namespace.Name).Update(ctx, testEvent, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "failed to update the test event")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Events.Update")
 
 		ginkgo.By("getting the test event")
 		event, err = f.ClientSet.CoreV1().Events(f.Namespace.Name).Get(ctx, testEvent.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get test event")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Events.Get")
 		// clear ResourceVersion and ManagedFields which are set by control-plane
 		event.ObjectMeta.ResourceVersion = ""
 		event.ObjectMeta.ManagedFields = nil
@@ -147,7 +147,7 @@ var _ = common.SIGDescribe("Events", func() {
 		ginkgo.By("deleting the test event")
 		// delete original event
 		err = f.ClientSet.CoreV1().Events(f.Namespace.Name).Delete(ctx, eventCreatedName, metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "failed to delete the test event")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Events.Delete")
 
 		ginkgo.By("listing all events in all namespaces")
 		// get a list of Events list namespace
@@ -194,7 +194,7 @@ var _ = common.SIGDescribe("Events", func() {
 					Namespace: f.Namespace.Name,
 				},
 			}, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create event")
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Events.Create")
 			framework.Logf("created %v", eventTestName)
 		}
 
@@ -203,7 +203,7 @@ var _ = common.SIGDescribe("Events", func() {
 		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{
 			LabelSelector: "testevent-set=true",
 		})
-		framework.ExpectNoError(err, "failed to get a list of events")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Events.List")
 
 		gomega.Expect(eventList.Items).To(gomega.HaveLen(len(eventTestNames)), "looking for expected number of pod templates events")
 
@@ -213,12 +213,12 @@ var _ = common.SIGDescribe("Events", func() {
 		framework.Logf("requesting DeleteCollection of events")
 		err = f.ClientSet.CoreV1().Events(f.Namespace.Name).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "testevent-set=true"})
-		framework.ExpectNoError(err, "failed to delete the test event")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Events.DeleteCollection")
 
 		ginkgo.By("check that the list of events matches the requested quantity")
 
 		err = wait.PollUntilContextTimeout(ctx, eventRetryPeriod, eventRetryTimeout, true, checkEventListQuantity(f, "testevent-set=true", 0))
-		framework.ExpectNoError(err, "failed to count required events")
+		framework.ExpectNoError(err, "failed to true", 0", 0")
 	})
 
 })
