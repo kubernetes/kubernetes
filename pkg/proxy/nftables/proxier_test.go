@@ -476,6 +476,104 @@ func TestOverallNFTablesRules(t *testing.T) {
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 }
 
+// TestEndpointDNATRules tests the rules written to the per-service chains for
+// both IP families. In particular, the single-endpoint rule must use the
+// "dnat to addr:port" form, because the "dnat ip6 addr . port to addr . port"
+// form makes nft crash (https://issues.k8s.io/131605).
+func TestEndpointDNATRules(t *testing.T) {
+	testCases := []struct {
+		name         string
+		family       v1.IPFamily
+		svcIP        string
+		epIPs        []string
+		expectedRule string
+	}{
+		{
+			name:         "ipv4 single endpoint",
+			family:       v1.IPv4Protocol,
+			svcIP:        "172.30.0.41",
+			epIPs:        []string{"10.180.0.1"},
+			expectedRule: "meta l4proto tcp dnat to 10.180.0.1:80",
+		},
+		{
+			name:         "ipv6 single endpoint",
+			family:       v1.IPv6Protocol,
+			svcIP:        "fd00:172:30::41",
+			epIPs:        []string{"fd00:10:180::1"},
+			expectedRule: "meta l4proto tcp dnat to [fd00:10:180::1]:80",
+		},
+		{
+			name:         "ipv4 multiple endpoints",
+			family:       v1.IPv4Protocol,
+			svcIP:        "172.30.0.41",
+			epIPs:        []string{"10.180.0.1", "10.180.0.2"},
+			expectedRule: "meta l4proto tcp dnat ip addr . port to numgen random mod 2 map { 0 : 10.180.0.1 . 80 , 1 : 10.180.0.2 . 80 }",
+		},
+		{
+			name:         "ipv6 multiple endpoints",
+			family:       v1.IPv6Protocol,
+			svcIP:        "fd00:172:30::41",
+			epIPs:        []string{"fd00:10:180::1", "fd00:10:180::2"},
+			expectedRule: "meta l4proto tcp dnat ip6 addr . port to numgen random mod 2 map { 0 : fd00:10:180::1 . 80 , 1 : fd00:10:180::2 . 80 }",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			nft, fp := NewFakeProxier(tc.family)
+
+			makeServiceMap(fp,
+				makeTestService("ns1", "svc1", func(svc *v1.Service) {
+					svc.Spec.Type = v1.ServiceTypeClusterIP
+					svc.Spec.ClusterIP = tc.svcIP
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p80",
+						Port:     80,
+						Protocol: v1.ProtocolTCP,
+					}}
+				}),
+			)
+
+			populateEndpointSlices(fp,
+				makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
+					if tc.family == v1.IPv4Protocol {
+						eps.AddressType = discovery.AddressTypeIPv4
+					} else {
+						eps.AddressType = discovery.AddressTypeIPv6
+					}
+					for _, ip := range tc.epIPs {
+						eps.Endpoints = append(eps.Endpoints, discovery.Endpoint{
+							Addresses: []string{ip},
+							NodeName:  new(testNodeName),
+						})
+					}
+					eps.Ports = []discovery.EndpointPort{{
+						Name:     new("p80"),
+						Port:     new(int32(80)),
+						Protocol: new(v1.ProtocolTCP),
+					}}
+				}),
+			)
+
+			if err := fp.syncProxyRules(); err != nil {
+				t.Fatalf("syncProxyRules failed: %v", err)
+			}
+
+			svcChain := "service-ULMVA6XW-ns1/svc1/tcp/p80"
+			rules, err := nft.ListRules(context.Background(), svcChain)
+			if err != nil {
+				t.Fatalf("could not list rules in %s: %v", svcChain, err)
+			}
+			if len(rules) != 1 {
+				t.Fatalf("expected exactly 1 rule in %s, got %d", svcChain, len(rules))
+			}
+			if rules[0].Rule != tc.expectedRule {
+				t.Errorf("wrong DNAT rule:\nexpected %q\ngot      %q", tc.expectedRule, rules[0].Rule)
+			}
+		})
+	}
+}
+
 func TestTruncateNFTablesComment(t *testing.T) {
 	tests := []struct {
 		name  string
