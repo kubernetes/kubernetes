@@ -90,7 +90,7 @@ func extinguish(ctx context.Context, f *framework.Framework, totalNS int, maxAll
 				return false, nil
 			}
 			return true, nil
-		}))
+		}), "failed to f.ClientSet.CoreV1().Namespaces().List(ctx, metav1.ListOp...")
 }
 
 func ensurePodsAreRemovedWhenNamespaceIsDeleted(ctx context.Context, f *framework.Framework) {
@@ -122,7 +122,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(ctx context.Context, f *framewor
 	framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", podName, namespace.Name)
 
 	ginkgo.By("Waiting for the pod to have running status")
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "failed to e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)")
 
 	ginkgo.By("Deleting the namespace")
 	err = f.ClientSet.CoreV1().Namespaces().Delete(ctx, namespace.Name, metav1.DeleteOptions{})
@@ -137,7 +137,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(ctx context.Context, f *framewor
 				return true, nil
 			}
 			return false, nil
-		}))
+		}), "failed to f.ClientSet.CoreV1().Namespaces().Get(ctx, namespace.Name...")
 
 	ginkgo.By("Recreating the namespace")
 	namespace, err = f.CreateNamespace(ctx, namespaceName, nil)
@@ -194,7 +194,7 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(ctx context.Context, f *fram
 				return true, nil
 			}
 			return false, nil
-		}))
+		}), "failed to f.ClientSet.CoreV1().Namespaces().Get(ctx, namespace.Name...")
 
 	ginkgo.By("Recreating the namespace")
 	namespace, err = f.CreateNamespace(ctx, namespaceName, nil)
@@ -527,7 +527,7 @@ func ensurePodsAreRemovedFirstInOrderedNamespaceDeletion(ctx context.Context, f 
 	framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", podName, nsName)
 
 	ginkgo.By("Waiting for the pod to have running status")
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "failed to e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)")
 
 	configMapName := "test-configmap"
 	ginkgo.By(fmt.Sprintf("Creating a configmap %q in namespace %q", configMapName, nsName))
@@ -622,7 +622,7 @@ func ensurePodsAreRemovedFirstInOrderedNamespaceDeletion(ctx context.Context, f 
 	framework.ExpectNoError(err, "failed to update pod %q and remove finalizer in namespace %q", podName, nsName)
 
 	ginkgo.By("Waiting for the pod to not be present in the namespace")
-	framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podName, nsName, f.Timeouts.PodDelete))
+	framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podName, nsName, f.Timeouts.PodDelete), "failed to e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podName, nsName, f.Tim...")
 
 	ginkgo.By("Waiting for the namespace to be removed.")
 	framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, 1*time.Second, framework.DefaultNamespaceDeletionTimeout, true,
@@ -632,5 +632,5 @@ func ensurePodsAreRemovedFirstInOrderedNamespaceDeletion(ctx context.Context, f 
 				return true, nil
 			}
 			return false, nil
-		}))
+		}), "failed to f.ClientSet.CoreV1().Namespaces().Get(ctx, namespace.Name...")
 }

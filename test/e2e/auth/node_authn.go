@@ -44,7 +44,7 @@ var _ = SIGDescribe("NodeAuthenticator", func() {
 		ns = f.Namespace.Name
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, 1)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, 1)")
 
 		family := v1.IPv4Protocol
 		if framework.TestContext.ClusterIsIPv6() {

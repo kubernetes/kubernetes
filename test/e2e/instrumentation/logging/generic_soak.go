@@ -84,7 +84,7 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance]", framework.With
 func RunLogPodsWithSleepOf(ctx context.Context, f *framework.Framework, sleep time.Duration, podname string, timeout time.Duration) {
 
 	nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)")
 	totalPods := len(nodes.Items)
 	gomega.Expect(nodes.Items).ToNot(gomega.BeEmpty())
 

@@ -41,7 +41,7 @@ var _ = SIGDescribe("Server request timeout", func() {
 		req := newRequest(f, "invalid")
 
 		response, err := rt.RoundTrip(req)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to rt.RoundTrip(req)")
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusBadRequest {
@@ -60,7 +60,7 @@ var _ = SIGDescribe("Server request timeout", func() {
 		req := newRequest(f, "3m")
 
 		response, err := rt.RoundTrip(req)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to rt.RoundTrip(req)")
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
@@ -73,7 +73,7 @@ var _ = SIGDescribe("Server request timeout", func() {
 		req := newRequest(f, "0s")
 
 		response, err := rt.RoundTrip(req)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to rt.RoundTrip(req)")
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
@@ -89,7 +89,7 @@ func getRoundTripper(f *framework.Framework) http.RoundTripper {
 	config.Timeout = 0
 
 	roundTripper, err := rest.TransportFor(config)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to rest.TransportFor(config)")
 
 	return roundTripper
 }
@@ -97,14 +97,14 @@ func getRoundTripper(f *framework.Framework) http.RoundTripper {
 func newRequest(f *framework.Framework, timeout string) *http.Request {
 	req, err := http.NewRequest(http.MethodGet, f.ClientSet.CoreV1().RESTClient().Get().
 		Param("timeout", timeout).AbsPath("version").URL().String(), nil)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to http.NewRequest(http.MethodGet, f.ClientSet.CoreV1().RESTClient().Get().")
 
 	return req
 }
 
 func readBody(response *http.Response) string {
 	raw, err := io.ReadAll(response.Body)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to io.ReadAll(response.Body)")
 
 	return string(raw)
 }

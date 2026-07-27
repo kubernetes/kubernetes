@@ -68,7 +68,7 @@ var _ = SIGDescribe("kubectl debug", func() {
 			}
 
 			tmpDir, err := os.MkdirTemp("", "test-custom-profile-debug")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to os.MkdirTemp('', 'test-custom-profile-debug')")
 			defer os.Remove(tmpDir) //nolint:errcheck
 			customProfileFile := "custom.yaml"
 			framework.ExpectNoError(os.WriteFile(filepath.Join(tmpDir, customProfileFile), []byte(`
@@ -92,7 +92,7 @@ env:
 				"sleep 3600")
 
 			ginkgo.By("verifying the container debugger is running")
-			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, c, ns, debugPodName, "debugger", framework.PodStartShortTimeout))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, c, ns, debugPodName, "debugger", framework.PodStartShortTimeout), "failed to e2epod.WaitForContainerRunning(ctx, c, ns, debugPodName, 'debugger', framewor...")
 			output := e2ekubectl.RunKubectlOrDie(ns, "get", "pod", debugPodName, "-o", "jsonpath={.spec.ephemeralContainers[*]}")
 			ginkgo.By("verifying NET_ADMIN is added")
 			gomega.Expect(output).To(gomega.ContainSubstring("NET_ADMIN"))
@@ -122,7 +122,7 @@ env:
 			}
 
 			tmpDir, err := os.MkdirTemp("", "test-custom-profile-debug")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to os.MkdirTemp('', 'test-custom-profile-debug')")
 			defer os.Remove(tmpDir) //nolint:errcheck
 			customProfileFile := "custom.yaml"
 			framework.ExpectNoError(os.WriteFile(filepath.Join(tmpDir, customProfileFile), []byte(`
@@ -147,7 +147,7 @@ env:
 				"sleep 3600")
 
 			ginkgo.By("verifying the container in pod my-debugger is running")
-			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, c, ns, "my-debugger", "debugger", framework.PodStartShortTimeout))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, c, ns, "my-debugger", "debugger", framework.PodStartShortTimeout), "failed to e2epod.WaitForContainerRunning(ctx, c, ns, 'my-debugger', 'debugger', framewo...")
 
 			output := e2ekubectl.RunKubectlOrDie(ns, "get", "pod", "my-debugger", "-o", "jsonpath={.spec.containers[*]}")
 			ginkgo.By("verifying NET_ADMIN is added")

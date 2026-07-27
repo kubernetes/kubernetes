@@ -140,14 +140,14 @@ var _ = SIGDescribe("health handlers", func() {
 
 		ginkgo.By("/health")
 		err := testPath(ctx, f.ClientSet, "/healthz?verbose=1", requiredHealthzChecks)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to testPath(ctx, f.ClientSet, '/healthz?verbose=1', requiredHealthzChecks)")
 
 		ginkgo.By("/livez")
 		err = testPath(ctx, f.ClientSet, "/livez?verbose=1", requiredLivezChecks)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to testPath(ctx, f.ClientSet, '/livez?verbose=1', requiredLivezChecks)")
 
 		ginkgo.By("/readyz")
 		err = testPath(ctx, f.ClientSet, "/readyz?verbose=1", requiredReadyzChecks)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to testPath(ctx, f.ClientSet, '/readyz?verbose=1', requiredReadyzChecks)")
 	})
 })

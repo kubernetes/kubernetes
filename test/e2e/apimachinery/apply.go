@@ -1013,7 +1013,7 @@ spec:
 		_, err = e2edeployment.UpdateDeploymentWithRetries(client, ns, "deployment-shared-map-item-removal", func(update *appsv1.Deployment) {
 			update.Spec.Replicas = &replicas
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2edeployment.UpdateDeploymentWithRetries(client, ns, 'deployment-shared-map-...")
 
 		// applier omits replicas
 		apply = []byte(`{

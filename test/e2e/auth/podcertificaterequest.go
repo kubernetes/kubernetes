@@ -50,7 +50,7 @@ var _ = SIGDescribe("PodCertificateRequest API [Privileged:ClusterAdmin]", func(
 	*/
 	framework.ConformanceIt("should support PodCertificateRequest API operations", func(ctx context.Context) {
 		_, csrData, pemCert, notBefore, notAfter, err := generateKeyCSRAndCert()
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to generateKeyCSRAndCert()")
 
 		nowTime := metav1.NewTime(time.Now())
 		notBeforeTime := metav1.NewTime(notBefore)
@@ -78,7 +78,7 @@ var _ = SIGDescribe("PodCertificateRequest API [Privileged:ClusterAdmin]", func(
 			},
 		}
 		statusPatchJSON, err := json.Marshal(statusPatch)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to json.Marshal(statusPatch)")
 		statusPatchStr := string(statusPatchJSON)
 
 		strategicStatusPatchStr := statusPatchStr

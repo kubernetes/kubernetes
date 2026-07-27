@@ -88,7 +88,7 @@ var _ = SIGDescribe("kube-apiserver identity", feature.APIServerIdentity, func()
 
 		var controlPlaneNodes []v1.Node
 		nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})")
 
 		for _, node := range nodes.Items {
 			if _, ok := node.Labels["node-role.kubernetes.io/control-plane"]; ok {
@@ -117,12 +117,12 @@ var _ = SIGDescribe("kube-apiserver identity", feature.APIServerIdentity, func()
 		leases, err := client.CoordinationV1().Leases(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "apiserver.kubernetes.io/identity=kube-apiserver",
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to client.CoordinationV1().Leases(metav1.NamespaceSystem).List(context.TODO(), m...")
 		gomega.Expect(leases.Items).To(gomega.HaveLen(len(controlPlaneNodes)), "unexpected number of leases")
 
 		for _, node := range controlPlaneNodes {
 			hostname, err := getControlPlaneHostname(ctx, &node)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to getControlPlaneHostname(ctx, &node)")
 
 			b := cryptobyte.NewBuilder(nil)
 			b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
@@ -133,17 +133,17 @@ var _ = SIGDescribe("kube-apiserver identity", feature.APIServerIdentity, func()
 			})
 
 			hashData, err := b.Bytes()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to b.Bytes()")
 			hash := sha256.Sum256(hashData)
 			leaseName := "apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
 
 			lease, err := client.CoordinationV1().Leases(metav1.NamespaceSystem).Get(context.TODO(), leaseName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to client.CoordinationV1().Leases(metav1.NamespaceSystem).Get(context.TODO(), le...")
 			oldHolderIdentity := lease.Spec.HolderIdentity
 			lastRenewedTime := lease.Spec.RenewTime
 
 			err = restartAPIServer(ctx, &node)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to restartAPIServer(ctx, &node)")
 
 			err = wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 				lease, err = client.CoordinationV1().Leases(metav1.NamespaceSystem).Get(context.TODO(), leaseName, metav1.GetOptions{})
@@ -173,7 +173,7 @@ var _ = SIGDescribe("kube-apiserver identity", feature.APIServerIdentity, func()
 		leases, err = client.CoordinationV1().Leases(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: "apiserver.kubernetes.io/identity=kube-apiserver",
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to client.CoordinationV1().Leases(metav1.NamespaceSystem).List(context.TODO(), m...")
 		gomega.Expect(leases.Items).To(gomega.HaveLen(len(controlPlaneNodes)), "unexpected number of leases")
 	})
 })

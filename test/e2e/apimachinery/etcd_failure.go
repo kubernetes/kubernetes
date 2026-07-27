@@ -57,7 +57,7 @@ var _ = SIGDescribe("Etcd failure", framework.WithDisruptive(), framework.WithPr
 			Image:     imageutils.GetPauseImageName(),
 			Replicas:  1,
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2erc.RunRC(ctx, testutils.RCConfig{")
 	})
 
 	ginkgo.It("should recover from network partition with master", func(ctx context.Context) {
@@ -143,7 +143,7 @@ func checkExistingRCRecovers(ctx context.Context, f *framework.Framework) {
 		}
 		framework.Logf("apiserver has recovered")
 		return true, nil
-	}))
+	}), "failed to podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))")
 
 	ginkgo.By("waiting for replication controller to recover")
 	framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, time.Millisecond*500, time.Second*60, false, func(ctx context.Context) (bool, error) {
@@ -156,5 +156,5 @@ func checkExistingRCRecovers(ctx context.Context, f *framework.Framework) {
 			}
 		}
 		return false, nil
-	}))
+	}), "failed to podClient.List(ctx, options)")
 }

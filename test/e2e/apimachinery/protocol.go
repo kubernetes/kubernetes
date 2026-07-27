@@ -60,9 +60,9 @@ var _ = SIGDescribe("client-go should negotiate", func() {
 			configMapName := "e2e-client-go-test-negotiation"
 			testConfigMap := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: configMapName}}
 			before, err := client.List(context.TODO(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to client.List(context.TODO(), metav1.ListOptions{})")
 			_, err = client.Create(context.TODO(), testConfigMap, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to client.Create(context.TODO(), testConfigMap, metav1.CreateOptions{})")
 			opts := metav1.ListOptions{
 				ResourceVersion: before.ResourceVersion,
 				FieldSelector:   fields.SelectorFromSet(fields.Set{"metadata.name": configMapName}).String(),
@@ -70,13 +70,13 @@ var _ = SIGDescribe("client-go should negotiate", func() {
 
 			g.By("watching for changes on the object")
 			cfg, err := framework.LoadConfig()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to framework.LoadConfig()")
 
 			cfg.AcceptContentTypes = accept
 
 			c := kubernetes.NewForConfigOrDie(cfg)
 			w, err := c.CoreV1().ConfigMaps(ns).Watch(context.TODO(), opts)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().ConfigMaps(ns).Watch(context.TODO(), opts)")
 			defer w.Stop()
 
 			evt, ok := <-w.ResultChan()
@@ -115,13 +115,13 @@ var _ = SIGDescribe("CBOR", feature.CBOR, func() {
 		clientfeaturestesting.SetFeatureDuringTest(g.GinkgoTB(), clientfeatures.ClientsPreferCBOR, true)
 
 		clientConfig, err := framework.LoadConfig()
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to framework.LoadConfig()")
 
 		aggregatorClient, err := aggregatorclientset.NewForConfig(clientConfig)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to aggregatorclientset.NewForConfig(clientConfig)")
 
 		dynamicClient, err := dynamic.NewForConfig(clientConfig)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to dynamic.NewForConfig(clientConfig)")
 
 		objectNames := generateSampleAPIServerObjectNames(f.Namespace.Name)
 		g.DeferCleanup(func(ctx context.Context) {
@@ -137,7 +137,7 @@ var _ = SIGDescribe("CBOR", feature.CBOR, func() {
 
 		g.By("making requests with a generated client", func() {
 			sampleClient, err := samplev1alpha1client.NewForConfig(clientConfig)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to samplev1alpha1client.NewForConfig(clientConfig)")
 
 			_, err = sampleClient.Flunders(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "a,!a"})
 			framework.ExpectNoError(err, "Failed to list with generated client")
@@ -151,7 +151,7 @@ var _ = SIGDescribe("CBOR", feature.CBOR, func() {
 
 		g.By("making requests with a dynamic client", func() {
 			unstructuredFlunderContent, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&flunder)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to runtime.DefaultUnstructuredConverter.ToUnstructured(&flunder)")
 			unstructuredFlunder := &unstructured.Unstructured{Object: unstructuredFlunderContent}
 
 			flunderDynamicClient := dynamicClient.Resource(samplev1alpha1.SchemeGroupVersion.WithResource("flunders")).Namespace(f.Namespace.Name)

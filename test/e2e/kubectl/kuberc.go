@@ -99,7 +99,7 @@ var _ = SIGDescribe("kubectl kuberc", func() {
 	ginkgo.Describe("given preferences", func() {
 		kubercContent := fmt.Sprintf(kuberc, imageutils.GetE2EImage(imageutils.BusyBox), ns, ns)
 		tmpDir, err := os.MkdirTemp("", "test-kuberc")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to os.MkdirTemp('', 'test-kuberc')")
 		defer os.Remove(tmpDir) //nolint:errcheck
 		kubercFile := filepath.Join(tmpDir, "kuberc.yaml")
 		framework.ExpectNoError(os.WriteFile(kubercFile, []byte(kubercContent), os.FileMode(0755)), "creating a kuberc.yaml in temp directory")
@@ -110,7 +110,7 @@ var _ = SIGDescribe("kubectl kuberc", func() {
 			output := e2ekubectl.NewKubectlCommand(ns, args...).ExecOrDie(ns)
 			var namespace v1.Namespace
 			err = json.Unmarshal([]byte(output), &namespace)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to json.Unmarshal([]byte(output), &namespace)")
 			gomega.Expect(namespace.Name).To(gomega.Equal(ns))
 
 			ginkgo.By("verifying that alias for run is working")
@@ -121,7 +121,7 @@ var _ = SIGDescribe("kubectl kuberc", func() {
 			podOutput := e2ekubectl.NewKubectlCommand(ns, args...).ExecOrDie(ns)
 			var pod v1.Pod
 			err = json.Unmarshal([]byte(podOutput), &pod)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to json.Unmarshal([]byte(podOutput), &pod)")
 			gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(imageutils.GetE2EImage(imageutils.BusyBox)))
 			gomega.Expect(pod.Labels).To(gomega.HaveKeyWithValue("app", "test"))
 			gomega.Expect(pod.Labels).To(gomega.HaveKeyWithValue("env", "test"))
@@ -140,7 +140,7 @@ var _ = SIGDescribe("kubectl kuberc", func() {
 			output := e2ekubectl.NewKubectlCommand(ns, args...).ExecOrDie(ns)
 			var namespace v1.Namespace
 			err = yaml.Unmarshal([]byte(output), &namespace)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to yaml.Unmarshal([]byte(output), &namespace)")
 			gomega.Expect(namespace.Name).To(gomega.Equal(ns))
 
 			ginkgo.By("verifying that explicitly passed flag surpasses the flag in kuberc alias")
@@ -150,7 +150,7 @@ var _ = SIGDescribe("kubectl kuberc", func() {
 			podOutput := e2ekubectl.NewKubectlCommand(ns, args...).ExecOrDie(ns)
 			var pod v1.Pod
 			err = yaml.Unmarshal([]byte(podOutput), &pod)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to yaml.Unmarshal([]byte(podOutput), &pod)")
 			gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(imageutils.GetE2EImage(imageutils.Nginx)))
 			gomega.Expect(pod.Labels).To(gomega.HaveKeyWithValue("app", "test"))
 			gomega.Expect(pod.Labels).To(gomega.HaveKeyWithValue("env", "test"))
@@ -170,12 +170,12 @@ var _ = SIGDescribe("kubectl kuberc", func() {
 		ginkgo.BeforeEach(func() {
 			var err error
 			tmpDir, err = os.MkdirTemp("", "test-kuberc-cmd")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to os.MkdirTemp('', 'test-kuberc-cmd')")
 			kubercFile = filepath.Join(tmpDir, "kuberc.yaml")
 			minimalKuberc := `apiVersion: kubectl.config.k8s.io/v1beta1
 kind: Preference
 `
-			framework.ExpectNoError(os.WriteFile(kubercFile, []byte(minimalKuberc), os.FileMode(0644)))
+			framework.ExpectNoError(os.WriteFile(kubercFile, []byte(minimalKuberc), os.FileMode(0644)), "failed to os.WriteFile(kubercFile, []byte(minimalKuberc), os.FileMode(0644))")
 		})
 
 		ginkgo.AfterEach(func() {
@@ -187,7 +187,7 @@ kind: Preference
 		ginkgo.It("view should display kuberc file", func(ctx context.Context) {
 			ginkgo.By("creating a kuberc file with defaults and aliases")
 			kubercContent := fmt.Sprintf(kuberc, imageutils.GetE2EImage(imageutils.BusyBox), ns, ns)
-			framework.ExpectNoError(os.WriteFile(kubercFile, []byte(kubercContent), os.FileMode(0755)))
+			framework.ExpectNoError(os.WriteFile(kubercFile, []byte(kubercContent), os.FileMode(0755)), "failed to os.WriteFile(kubercFile, []byte(kubercContent), os.FileMode(0755))")
 
 			ginkgo.By("viewing the kuberc file and parsing as Preference")
 			output := e2ekubectl.RunKubectlOrDie(ns, "kuberc", "view", fmt.Sprintf("--kuberc=%s", kubercFile))
@@ -276,7 +276,7 @@ kind: Preference
 			output := e2ekubectl.RunKubectlOrDie(ns, "get", "pod", "test-pod", "-n", ns, "-oyaml")
 			var pod v1.Pod
 			err := yaml.Unmarshal([]byte(output), &pod)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to yaml.Unmarshal([]byte(output), &pod)")
 
 			if len(pod.Spec.Containers) == 0 {
 				framework.Failf("expected pod to have at least one container")

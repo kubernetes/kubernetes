@@ -221,7 +221,7 @@ func (t *cleTest) createAndRunFakeController(name string, namespace string, targ
 		compatibilityVersion,
 		preferredStrategy,
 	)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to leaderelection.NewCandidate(")
 	ctx, cancel := context.WithCancel(t.ctx)
 	t.mu.Lock()
 	t.ctxList[name+"/"+namespace] = ctxCancelPair{ctx, cancel}
@@ -291,7 +291,7 @@ func (t *cleTest) pollForLease(ctx context.Context, name, namespace string, hold
 		}
 		return lease.Spec.HolderIdentity != nil && *lease.Spec.HolderIdentity == *holder, nil
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to t.clientset.CoordinationV1().Leases(namespace).Get(ctx, n...")
 
 }
 

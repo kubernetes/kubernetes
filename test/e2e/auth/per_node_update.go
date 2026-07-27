@@ -111,27 +111,27 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy", func() {
 
 		var err error
 		_, err = f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, admissionToCreate, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ct...")
 		g.DeferCleanup(f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicies().Delete, admissionToCreate.Name, metav1.DeleteOptions{})
 
 		_, err = f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, admissionBindingToCreate, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Cre...")
 		g.DeferCleanup(f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete, admissionBindingToCreate.Name, metav1.DeleteOptions{})
 
 		// create permissions that will allow unrestricted access to mutate configmaps in this namespace.
 		// We limited these permissions in the step above.
 		// This means the admission policy must fail closed or permissions will be too broad.
 		_, err = f.ClientSet.RbacV1().RoleBindings(f.Namespace.Name).Create(ctx, saTokenRoleBinding, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.RbacV1().RoleBindings(f.Namespace.Name).Create(ctx, saTokenRoleBi...")
 
 		// run an actual pod to prove that the token is injected, not just creatable via the API
 		actualPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, sleeperPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, sleeperPod, metav1.Cr...")
 		err = e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, actualPod.Name, actualPod.Namespace)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, actualPod.Name, act...")
 		// need the pod that contains the node name
 		actualPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, actualPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, actualPod.Name, metav1.G...")
 
 		// get the actual projected token from the pod.
 		nodeScopedSAToken, stderr, err := e2epod.Exec(f.TContext(ctx), e2epod.ExecOptions{
@@ -143,16 +143,16 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy", func() {
 			CaptureStderr:      true,
 			PreserveWhitespace: true,
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.Exec(f.TContext(ctx), e2epod.ExecOptions{")
 		o.Expect(stderr).To(o.BeEmpty(), "stderr from cat")
 
 		// make a kubeconfig with the token and confirm the kube-apiserver has the expected claims
 		nodeScopedClientConfig := rest.AnonymousClientConfig(f.ClientConfig())
 		nodeScopedClientConfig.BearerToken = nodeScopedSAToken
 		nodeScopedClient, err := kubernetes.NewForConfig(nodeScopedClientConfig)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to kubernetes.NewForConfig(nodeScopedClientConfig)")
 		saUser, err := nodeScopedClient.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to nodeScopedClient.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authent...")
 		expectedUser := serviceaccount.MakeUsername(f.Namespace.Name, "default")
 		o.Expect(saUser.Status.UserInfo.Username).To(o.Equal(expectedUser))
 		expectedNode := authenticationv1.ExtraValue([]string{actualPod.Spec.NodeName})
@@ -173,30 +173,30 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy", func() {
 		disallowedMessage := fmt.Sprintf("this user running on node '%s' may not modify ConfigMap '%s' because the name does not match the node name", actualPod.Spec.NodeName, disallowedConfigMap.Name)
 
 		actualAllowedConfigMap, err := nodeScopedClient.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, allowedConfigMap, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to nodeScopedClient.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, allowedCon...")
 		_, err = nodeScopedClient.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, disallowedConfigMap, metav1.CreateOptions{})
 		o.Expect(err).To(o.HaveOccurred())
 		o.Expect(err.Error()).To(o.ContainSubstring(disallowedMessage))
 
 		// now create so we can see the update cases
 		actualDisallowedConfigMap, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, disallowedConfigMap, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, disallowedConfi...")
 
 		actualAllowedConfigMap, err = nodeScopedClient.CoreV1().ConfigMaps(f.Namespace.Name).Update(ctx, actualAllowedConfigMap, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to nodeScopedClient.CoreV1().ConfigMaps(f.Namespace.Name).Update(ctx, actualAllo...")
 		_, err = nodeScopedClient.CoreV1().ConfigMaps(f.Namespace.Name).Update(ctx, actualDisallowedConfigMap, metav1.UpdateOptions{})
 		o.Expect(err).To(o.HaveOccurred())
 		o.Expect(err.Error()).To(o.ContainSubstring(disallowedMessage))
 
 		err = nodeScopedClient.CoreV1().ConfigMaps(f.Namespace.Name).Delete(ctx, actualAllowedConfigMap.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to nodeScopedClient.CoreV1().ConfigMaps(f.Namespace.Name).Delete(ctx, actualAllo...")
 		err = nodeScopedClient.CoreV1().ConfigMaps(f.Namespace.Name).Delete(ctx, actualDisallowedConfigMap.Name, metav1.DeleteOptions{})
 		o.Expect(err).To(o.HaveOccurred())
 		o.Expect(err.Error()).To(o.ContainSubstring(disallowedMessage))
 
 		// recreate the allowedConfigMap and then do a delete collection
 		_, err = nodeScopedClient.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, allowedConfigMap, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to nodeScopedClient.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, allowedCon...")
 		err = nodeScopedClient.CoreV1().ConfigMaps(f.Namespace.Name).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 		o.Expect(err).To(o.HaveOccurred())
 		// Delete collection can happen in random/racy orders.  We'll match on everything except the name
@@ -210,15 +210,15 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy", func() {
 			},
 		}
 		tokenRequestResponse, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).CreateToken(ctx, "default", tokenRequest, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).CreateToken(ctx, 'defa...")
 		serviceAccountConfigWithoutNodeClaim := rest.AnonymousClientConfig(f.ClientConfig())
 		serviceAccountConfigWithoutNodeClaim.BearerToken = tokenRequestResponse.Status.Token
 		serviceAccountClientWithoutNodeClaim, err := kubernetes.NewForConfig(serviceAccountConfigWithoutNodeClaim)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to kubernetes.NewForConfig(serviceAccountConfigWithoutNodeClaim)")
 		// now confirm this token lacks a node name claim.
 		selfSubjectResults, err := serviceAccountClientWithoutNodeClaim.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
 		framework.Logf("Token: %q expires at %v", serviceAccountConfigWithoutNodeClaim.BearerToken, tokenRequestResponse.Status.ExpirationTimestamp)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to serviceAccountClientWithoutNodeClaim.AuthenticationV1().SelfSubjectReviews()....")
 		o.Expect(selfSubjectResults.Status.UserInfo.Extra["authentication.kubernetes.io/node-name"]).To(o.BeEmpty())
 
 		noNodeAssociationMessage := "no node association found for user, this user must run in a pod on a node and ServiceAccountTokenPodNodeInfo must be enabled"

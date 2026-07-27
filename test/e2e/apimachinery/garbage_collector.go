@@ -59,7 +59,7 @@ import (
 // safe to run concurrently as they consume a large number of pods.
 func estimateMaximumPods(ctx context.Context, c clientset.Interface, min, max int32) int32 {
 	nodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2enode.GetReadySchedulableNodes(ctx, c)")
 
 	availablePods := int32(0)
 	// estimate some reasonable overhead per-node for pods that are non-test

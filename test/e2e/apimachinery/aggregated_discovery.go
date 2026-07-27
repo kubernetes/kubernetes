@@ -193,11 +193,11 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 	*/
 	framework.ConformanceIt("should support raw aggregated discovery request for CRDs", func(ctx context.Context) {
 		config, err := framework.LoadConfig()
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to framework.LoadConfig()")
 		apiExtensionClient, err := apiextensionclientset.NewForConfig(config)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to apiextensionclientset.NewForConfig(config)")
 		dynamicClient, err := dynamic.NewForConfig(config)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to dynamic.NewForConfig(config)")
 		resourceName := "testcrd"
 		// Generate a CRD with random group name to avoid group conflict with other tests that run in parallel.
 		groupName := fmt.Sprintf("%s.example.com", names.SimpleNameGenerator.GenerateName("group"))
@@ -224,7 +224,7 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 		}
 		gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Versions[0].Name, Resource: resourceName + "s"}
 		_, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamic...")
 		defer func() {
 			_ = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
 		}()
@@ -302,11 +302,11 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 	*/
 	framework.ConformanceIt("should support aggregated discovery interface for CRDs", func(ctx context.Context) {
 		config, err := framework.LoadConfig()
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to framework.LoadConfig()")
 		apiExtensionClient, err := apiextensionclientset.NewForConfig(config)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to apiextensionclientset.NewForConfig(config)")
 		dynamicClient, err := dynamic.NewForConfig(config)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to dynamic.NewForConfig(config)")
 		resourceName := "testcrd"
 		// Generate a CRD with random group name to avoid group conflict with other tests that run in parallel.
 		groupName := fmt.Sprintf("%s.example.com", names.SimpleNameGenerator.GenerateName("group"))
@@ -333,7 +333,7 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 		}
 		gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Versions[0].Name, Resource: resourceName + "s"}
 		_, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamic...")
 		defer func() {
 			_ = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
 		}()

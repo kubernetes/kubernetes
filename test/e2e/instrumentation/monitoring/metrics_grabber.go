@@ -58,7 +58,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
 			e2eskipper.Skipf("%v", err)
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to grabber.GrabFromAPIServer(ctx)")
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
 
@@ -68,9 +68,9 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
 			e2eskipper.Skipf("%v", err)
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)")
 		response, err := grabber.GrabFromKubelet(ctx, node.Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to grabber.GrabFromKubelet(ctx, node.Name)")
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
 
@@ -80,7 +80,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
 			e2eskipper.Skipf("%v", err)
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to grabber.GrabFromScheduler(ctx)")
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
 
@@ -90,7 +90,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
 			e2eskipper.Skipf("%v", err)
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to grabber.GrabFromControllerManager(ctx)")
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
 
@@ -100,7 +100,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
 			e2eskipper.Skipf("%v", err)
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to grabber.GrabMetricsSLIsFromAPIServer(ctx)")
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
 })

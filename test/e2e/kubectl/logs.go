@@ -173,7 +173,7 @@ var _ = SIGDescribe("Kubectl logs", func() {
 
 			ginkgo.By("checking for a matching strings")
 			_, err := e2eoutput.LookForStringInLog(ns, podName, containerName, "/api/v1/namespaces/kube-system", framework.PodStartTimeout)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2eoutput.LookForStringInLog(ns, podName, containerName, '/api/v1/namespaces/...")
 
 			ginkgo.By("limiting log lines")
 			out := e2ekubectl.RunKubectlOrDie(ns, "logs", podName, containerName, "--tail=1")
