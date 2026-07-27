@@ -1841,9 +1841,9 @@
     version: "1.33"
 - name: SchedulerPreQueueingHints
   versionedSpecs:
-  - default: true
+  - default: false
     lockToDefault: false
-    preRelease: Beta
+    preRelease: Alpha
     version: "1.37"
 - name: SELinuxChangePolicy
   versionedSpecs:
