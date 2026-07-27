@@ -142,7 +142,7 @@ var _ = SIGDescribe("Kubelet PodOverhead handling [LinuxOnly]", framework.WithNo
 					pod := makePodToVerifyCgroupSize(cgroupsToVerify, "30000", "251658240")
 					pod = e2epod.NewPodClient(f).Create(ctx, pod)
 					err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 			})
 		})

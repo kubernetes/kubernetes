@@ -51,7 +51,7 @@ func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
 
 			// The tests for guaranteed pods include extended resources.
 			nodes, err := e2enode.GetReadySchedulableNodes(context.Background(), f.ClientSet)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2enode.GetReadySchedulableNodes")
 			for _, node := range nodes.Items {
 				e2enode.AddExtendedResource(ctx, f.ClientSet, node.Name, fakeExtendedResource, resource.MustParse("123"))
 			}
@@ -442,7 +442,7 @@ var _ = SIGDescribe("PLR Pod InPlace Resize", framework.WithSlow(), framework.Wi
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 		if framework.NodeOSDistroIs("windows") {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
@@ -554,7 +554,7 @@ func doPodLevelResourcesMemoryLimitDecreaseTest(f *framework.Framework) {
 		patch := podresize.MakeResizePatch(containers, containers, originalPLR, viableLoweredLimitPLR)
 		testPod, pErr := f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx, testPod.Name,
 			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(pErr, "failed to patch pod for viable lowered limit")
+		framework.ExpectNoError(pErr, "failed to pErr")
 
 		ginkgo.By("verifying pod patched for viable lowered limit")
 		podresize.VerifyPodResources(testPod, containers, viableLoweredLimitPLR)
@@ -585,7 +585,7 @@ func doPodLevelResourcesMemoryLimitDecreaseTest(f *framework.Framework) {
 		patch = podresize.MakeResizePatch(containers, containers, viableLoweredLimitPLR, nonViableLoweredLimitPLR)
 		testPod, pErr = f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx, testPod.Name,
 			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(pErr, "failed to patch pod for viable lowered limit")
+		framework.ExpectNoError(pErr, "failed to pErr")
 
 		framework.ExpectNoError(framework.Gomega().
 			Eventually(ctx, framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(testPod.Namespace).Get, testPod.Name, metav1.GetOptions{}))).
@@ -622,17 +622,17 @@ func doPodLevelResourcesMemoryLimitDecreaseTest(f *framework.Framework) {
 					}, nil
 				}
 				return nil, nil
-			})),
+			})), "failed to framework.Gomega().Expect(gotPod.Status.AllocatedResource...",
 		)
 		ginkgo.By("verifying pod status resources still match the viable resize")
-		framework.ExpectNoError(podresize.VerifyPodStatusResources(testPod, containers))
+		framework.ExpectNoError(podresize.VerifyPodStatusResources(testPod, containers), "failed to podresize.VerifyPodStatusResources")
 
 		// 3. Revert the limit back to the original value - should succeed
 		ginkgo.By("Patching pod to revert to original state")
 		patch = podresize.MakeResizePatch(containers, containers, viableLoweredLimitPLR, originalPLR)
 		testPod, pErr = f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx, testPod.Name,
 			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(pErr, "failed to patch pod back to original values")
+		framework.ExpectNoError(pErr, "failed to pErr")
 
 		ginkgo.By("verifying pod patched for original values")
 		podresize.VerifyPodResources(testPod, containers, originalPLR)
@@ -669,7 +669,7 @@ func doInitialCreationNoResizeEventTest(f *framework.Framework) {
 
 		ginkgo.By("verifying no ResizeCompleted event was emitted")
 		events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).SearchWithContext(ctx, scheme.Scheme, testPod)
-		framework.ExpectNoError(err, "failed to list events")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Events.SearchWithContext")
 
 		for _, event := range events.Items {
 			if event.Reason == kubeletevents.ResizeCompleted {
@@ -685,7 +685,7 @@ func doPatchAndRollbackPLR(ctx context.Context, f *framework.Framework, original
 	newPod := createAndVerifyPodPLR(ctx, f, podClient, originalContainers, originalPodResources, mountPodCgroup)
 
 	if expectedPodResources != nil {
-		framework.ExpectNoError(VerifyPodLevelStatus(newPod))
+		framework.ExpectNoError(VerifyPodLevelStatus(newPod), "failed to VerifyPodLevelStatus")
 	}
 	ginkgo.By(fmt.Sprintf("patching and verifying pod for resize %s: %v", newPod.Name, newPod.UID))
 	patchAndVerifyPLR(ctx, f, podClient, newPod, originalContainers, expectedContainers, originalPodResources, expectedPodResources, "resize")
@@ -740,7 +740,7 @@ func patchAndVerifyPLR(ctx context.Context, f *framework.Framework, podClient *e
 	// resulting in values off by a small number.
 	// framework.ExpectNoError(VerifyPodLevelStatus(resizedPod))
 	if expectedPodResources != nil {
-		framework.ExpectNoError(podresize.VerifyPodCgroupValues(ctx, f, resizedPod))
+		framework.ExpectNoError(podresize.VerifyPodCgroupValues(ctx, f, resizedPod), "failed to podresize.VerifyPodCgroupValues")
 	}
 
 	// Verify CPU weight moved in the right direction
@@ -800,11 +800,11 @@ func createAndVerifyPodPLR(ctx context.Context, f *framework.Framework, podClien
 	podresize.VerifyPodResources(newPod, originalContainers, podResources)
 
 	podresize.VerifyPodResizePolicy(newPod, originalContainers)
-	framework.ExpectNoError(podresize.VerifyPodStatusResources(newPod, originalContainers))
+	framework.ExpectNoError(podresize.VerifyPodStatusResources(newPod, originalContainers), "failed to podresize.VerifyPodStatusResources")
 
-	framework.ExpectNoError(podresize.VerifyPodContainersCgroupValues(ctx, f, newPod, originalContainers))
+	framework.ExpectNoError(podresize.VerifyPodContainersCgroupValues(ctx, f, newPod, originalContainers), "failed to podresize.VerifyPodContainersCgroupValues")
 	if podResources != nil {
-		framework.ExpectNoError(podresize.VerifyPodCgroupValues(ctx, f, newPod))
+		framework.ExpectNoError(podresize.VerifyPodCgroupValues(ctx, f, newPod), "failed to podresize.VerifyPodCgroupValues")
 	}
 	return newPod
 }

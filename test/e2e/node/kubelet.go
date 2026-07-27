@@ -164,13 +164,13 @@ func createPodUsingNfs(ctx context.Context, f *framework.Framework, c clientset.
 		},
 	}
 	rtnPod, err := c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.CoreV1.Pods.Create")
 
 	err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, rtnPod.Name, f.Namespace.Name, framework.PodStartTimeout) // running & ready
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2epod.WaitTimeoutForPodReadyInNamespace // running & ready")
 
 	rtnPod, err = c.CoreV1().Pods(ns).Get(ctx, rtnPod.Name, metav1.GetOptions{}) // return fresh pod
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.CoreV1.Pods.Get // return fresh pod")
 	return rtnPod
 }
 
@@ -210,7 +210,7 @@ func checkPodCleanup(ctx context.Context, c clientset.Interface, pod *v1.Pod, ex
 	mountDir := filepath.Join(podDir, "volumes", "kubernetes.io~nfs")
 	// use ip rather than hostname in GCE
 	nodeIP, err := getHostExternalAddress(ctx, c, pod)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to getHostExternalAddress")
 
 	condMsg := "deleted"
 	if !expectClean {
@@ -237,7 +237,7 @@ func checkPodCleanup(ctx context.Context, c clientset.Interface, pod *v1.Pod, ex
 		framework.Logf("Wait up to %v for host's (%v) %q to be %v", timeout, nodeIP, test.feature, condMsg)
 		err = wait.PollUntilContextTimeout(ctx, poll, timeout, false, func(ctx context.Context) (bool, error) {
 			result, err := e2essh.NodeExec(ctx, nodeIP, test.cmd, framework.TestContext.Provider)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2essh.NodeExec")
 			e2essh.LogResult(result)
 			ok := result.Code == 0 && len(result.Stdout) > 0 && len(result.Stderr) == 0
 			if expectClean && ok { // keep trying
@@ -295,7 +295,7 @@ var _ = SIGDescribe("kubelet", func() {
 			nodeLabels["kubelet_cleanup"] = "true"
 			nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, c, maxNodesToCheck)
 			numNodes = len(nodes.Items)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2enode.GetBoundedReadySchedulableNodes")
 			nodeNames = sets.NewString()
 			for i := 0; i < len(nodes.Items); i++ {
 				nodeNames.Insert(nodes.Items[i].Name)
@@ -311,7 +311,7 @@ var _ = SIGDescribe("kubelet", func() {
 			// the actual number of nodes in the cluster, to avoid running resourceMonitor
 			// against large clusters.
 			actualNodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2enode.GetReadySchedulableNodes")
 
 			// Start resourceMonitor only in small clusters.
 			if len(actualNodes.Items) <= maxNodesToCheck {
@@ -338,13 +338,13 @@ var _ = SIGDescribe("kubelet", func() {
 					Replicas:     totalPods,
 					NodeSelector: nodeLabels,
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to e2erc.RunRC")
 				// Perform a sanity check so that we know all desired pods are
 				// running on the nodes according to kubelet. The timeout is set to
 				// only 30 seconds here because e2erc.RunRC already waited for all pods to
 				// transition to the running status.
 				err = waitTillNPodsRunningOnNodes(ctx, f.ClientSet, nodeNames, rcName, ns, totalPods, time.Second*30)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to waitTillNPodsRunningOnNodes")
 				if resourceMonitor != nil {
 					resourceMonitor.LogLatest()
 				}
@@ -360,7 +360,7 @@ var _ = SIGDescribe("kubelet", func() {
 				//   - docker slow to delete pods (or resource problems causing slowness)
 				start := time.Now()
 				err = waitTillNPodsRunningOnNodes(ctx, f.ClientSet, nodeNames, rcName, ns, 0, itArg.timeout)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to waitTillNPodsRunningOnNodes")
 				framework.Logf("Deleting %d pods on %d nodes completed in %v after the RC was deleted", totalPods, len(nodeNames),
 					time.Since(start))
 				if resourceMonitor != nil {
@@ -444,7 +444,7 @@ var _ = SIGDescribe("kubelet", func() {
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			allNodes, err := e2enode.GetReadyNodesIncludingTainted(ctx, c)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2enode.GetReadyNodesIncludingTainted")
 			if len(allNodes.Items) == 0 {
 				framework.Fail("Expected at least one node to be present")
 			}
@@ -672,13 +672,13 @@ var _ = SIGDescribe("specific log stream", feature.PodLogsQuerySplitStreams, fra
 			},
 		}
 		rtnPod, err := c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to c.CoreV1.Pods.Create")
 
 		err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, rtnPod.Name, f.Namespace.Name, framework.PodStartTimeout) // running & ready
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitTimeoutForPodReadyInNamespace // running & ready")
 
 		rtnPod, err = c.CoreV1().Pods(ns).Get(ctx, rtnPod.Name, metav1.GetOptions{}) // return fresh pod
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to c.CoreV1.Pods.Get // return fresh pod")
 
 		ginkgo.By("Starting the command")
 		tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
@@ -769,7 +769,7 @@ func assertNotContains(expectedString string, result string) {
 
 func commandOnNode(nodeName string, cmd string) string {
 	result, err := e2essh.NodeExec(context.Background(), nodeName, cmd, framework.TestContext.Provider)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2essh.NodeExec")
 	e2essh.LogResult(result)
 	return result.Stdout
 }

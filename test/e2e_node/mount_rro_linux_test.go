@@ -49,10 +49,10 @@ var _ = SIGDescribe("Mount recursive read-only [LinuxOnly]", framework.WithNodeC
 				ginkgo.By("creating a pod", func() {
 					pod = e2epod.NewPodClient(f).Create(ctx,
 						podForRROSupported("mount-rro-"+string(uuid.NewUUID()), f.Namespace.Name))
-					framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace))
+					framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace), "unexpected error")
 					var err error
 					pod, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				}) // By
 				ginkgo.By("checking containerStatuses.volumeMounts", func() {
 					gomega.Expect(pod.Status.InitContainerStatuses).To(gomega.HaveLen(3)) // "mount", "test", "unmount"
@@ -139,10 +139,10 @@ var _ = SIGDescribe("Mount recursive read-only [LinuxOnly]", framework.WithNodeC
 				ginkgo.By("creating a pod", func() {
 					pod = e2epod.NewPodClient(f).Create(ctx,
 						podForRROUnsupported("mount-ro-"+string(uuid.NewUUID()), f.Namespace.Name))
-					framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace))
+					framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace), "unexpected error")
 					var err error
 					pod, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				}) // By
 				ginkgo.By("checking containerStatuses.volumeMounts", func() {
 					gomega.Expect(pod.Status.InitContainerStatuses).To(gomega.HaveLen(3)) // "mount", "test", "unmount"
@@ -210,10 +210,10 @@ var _ = SIGDescribe("Mount recursive read-only [LinuxOnly]", framework.WithNodeC
 						},
 					}
 					pod = e2epod.NewPodClient(f).Create(ctx, pod)
-					framework.ExpectNoError(e2epod.WaitForPodContainerToFail(ctx, f.ClientSet, pod.Namespace, pod.Name, 0, "CreateContainerConfigError", framework.PodStartShortTimeout))
+					framework.ExpectNoError(e2epod.WaitForPodContainerToFail(ctx, f.ClientSet, pod.Namespace, pod.Name, 0, "CreateContainerConfigError", framework.PodStartShortTimeout), "unexpected error")
 					var err error
 					pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					gomega.Expect(pod.Status.ContainerStatuses[0].State.Waiting.Message).To(
 						gomega.ContainSubstring("failed to resolve recursive read-only mode: volume \"mnt\" requested recursive read-only mode, but it is not supported by the runtime"))
 				}) // By
@@ -224,7 +224,7 @@ var _ = SIGDescribe("Mount recursive read-only [LinuxOnly]", framework.WithNodeC
 
 func supportsRRO(ctx context.Context, f *framework.Framework) bool {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	// Assuming that there is only one node, because this is a node e2e test.
 	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1))
 	node := nodeList.Items[0]

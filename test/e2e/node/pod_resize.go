@@ -69,7 +69,7 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 
 		ginkgo.By("Creating a ResourceQuota")
 		_, rqErr := f.ClientSet.CoreV1().ResourceQuotas(f.Namespace.Name).Create(ctx, &resourceQuota, metav1.CreateOptions{})
-		framework.ExpectNoError(rqErr, "failed to create resource quota")
+		framework.ExpectNoError(rqErr, "failed to rqErr")
 		// pod creation using this quota will fail until the quota status is populated, so we need to wait to
 		// prevent races with the resourcequota controller
 		ginkgo.By("Waiting for ResourceQuota status to populate")
@@ -98,7 +98,7 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 			if wantError == "" {
 				patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPods[0].Namespace).Patch(ctx,
 					newPods[0].Name, types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
-				framework.ExpectNoError(pErr, "failed to patch pod for resize")
+				framework.ExpectNoError(pErr, "failed to pErr")
 
 				expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, expectedContainers)
 				ginkgo.By("verifying pod resources are as expected post patch, pre-actuation")
@@ -122,14 +122,14 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 						return pErr
 					}).
 					WithTimeout(f.Timeouts.PodStart).
-					Should(gomega.MatchError(gomega.ContainSubstring(wantError))))
+					Should(gomega.MatchError(gomega.ContainSubstring(wantError))), "failed to execute test operation")
 
 				expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, expectedContainers)
 				ginkgo.By("verifying pod patched for resize with error remains unchanged")
 				patchedPod, pErrEx2 := podClient.Get(ctx, newPods[0].Name, metav1.GetOptions{})
-				framework.ExpectNoError(pErrEx2, "failed to get pod post failed resize")
+				framework.ExpectNoError(pErrEx2, "failed to pErrEx2")
 				podresize.VerifyPodResources(patchedPod, expected, nil)
-				framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPod, expected))
+				framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPod, expected), "failed to podresize.VerifyPodStatusResources")
 			}
 		},
 
@@ -256,11 +256,11 @@ func doPodResizeLimitRangerTests(f *framework.Framework) {
 			},
 		}
 		_, lrErr := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Create(context.Background(), lr, metav1.CreateOptions{})
-		framework.ExpectNoError(lrErr, "failed to create limit ranger")
+		framework.ExpectNoError(lrErr, "failed to lrErr")
 
 		ginkgo.By("Fetching the LimitRange to ensure it has proper values")
 		gotLr, lrErr := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Get(ctx, lr.Name, metav1.GetOptions{})
-		framework.ExpectNoError(lrErr)
+		framework.ExpectNoError(lrErr, "failed to lrErr")
 
 		if !apiequality.Semantic.DeepEqual(lr.Spec.Limits, gotLr.Spec.Limits) {
 			framework.Failf("retrieved LimitRange does not match created one: got %v; expected %v", gotLr.Spec.Limits, lr.Spec.Limits)
@@ -288,7 +288,7 @@ func doPodResizeLimitRangerTests(f *framework.Framework) {
 			if len(wantErrors) == 0 {
 				patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPods[0].Namespace).Patch(ctx,
 					newPods[0].Name, types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
-				framework.ExpectNoError(pErr, "failed to patch pod for resize")
+				framework.ExpectNoError(pErr, "failed to pErr")
 
 				expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, expectedContainers)
 				ginkgo.By("verifying pod resources are as expected post patch, pre-actuation")
@@ -317,14 +317,14 @@ func doPodResizeLimitRangerTests(f *framework.Framework) {
 						return pErr
 					}).
 					WithTimeout(f.Timeouts.PodStart).
-					Should(gomega.MatchError(gomega.And(errMatchers...))))
+					Should(gomega.MatchError(gomega.And(errMatchers...))), "failed to execute test operation")
 
 				expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, expectedContainers)
 				ginkgo.By("verifying pod patched for resize with error remains unchanged")
 				patchedPod, pErrEx2 := podClient.Get(ctx, newPods[0].Name, metav1.GetOptions{})
-				framework.ExpectNoError(pErrEx2, "failed to get pod post failed resize")
+				framework.ExpectNoError(pErrEx2, "failed to pErrEx2")
 				podresize.VerifyPodResources(patchedPod, expected, nil)
-				framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPod, expected))
+				framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPod, expected), "failed to podresize.VerifyPodStatusResources")
 			}
 		},
 
@@ -496,14 +496,14 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 	ginkgo.It("pod-resize-scheduler-tests", func(ctx context.Context) {
 		podClient := e2epod.NewPodClient(f)
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-		framework.ExpectNoError(err, "failed to get running nodes")
+		framework.ExpectNoError(err, "failed to e2enode.GetReadySchedulableNodes")
 		gomega.Expect(nodes.Items).ShouldNot(gomega.BeEmpty())
 		framework.Logf("Found %d schedulable nodes", len(nodes.Items))
 
 		ginkgo.By("Find node CPU resources available for allocation!")
 		node := nodes.Items[0]
 		nodeAllocatableCPU, nodeAvailableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
-		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
+		framework.ExpectNoError(err, "failed to e2enode.GetNodeAllocatableAndAvailableQuantities")
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableCPU.MilliValue(), nodeAvailableCPU.MilliValue())
 
@@ -559,18 +559,18 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		ginkgo.By(fmt.Sprintf("TEST1: Create pod '%s' that won't fit node '%s' with pod '%s' on it", testPod2.Name, node.Name, testPod1.Name))
 		testPod2 = podClient.Create(ctx, testPod2)
 		err = e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, testPod2.Name, testPod2.Namespace)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodNameUnschedulableInNamespace")
 		gomega.Expect(testPod2.Status.Phase).To(gomega.Equal(v1.PodPending))
 		gomega.Expect(testPod2.Generation).To(gomega.BeEquivalentTo(1))
 
 		ginkgo.By(fmt.Sprintf("TEST1: Resize pod '%s' to fit in node '%s'", testPod2.Name, node.Name))
 		testPod2, pErr := f.ClientSet.CoreV1().Pods(testPod2.Namespace).Patch(ctx,
 			testPod2.Name, types.StrategicMergePatchType, []byte(patchTestpod2ToFitNode), metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(pErr, "failed to patch pod for resize")
+		framework.ExpectNoError(pErr, "failed to pErr")
 		gomega.Expect(testPod2.Generation).To(gomega.BeEquivalentTo(2))
 
 		ginkgo.By(fmt.Sprintf("TEST1: Verify that pod '%s' is running after resize", testPod2.Name))
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, testPod2))
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, testPod2), "failed to e2epod.WaitForPodRunningInNamespace")
 
 		// Scheduler focused pod resize E2E test case #2
 		//     1. With pod1 + pod2 running on node above, create pod3 that requests more CPU than available, verify pending.
@@ -578,7 +578,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		//     3. Verify that pod3 is scheduled and running.
 		//
 		nodeAllocatableCPU2, nodeAvailableCPU2, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
-		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
+		framework.ExpectNoError(err, "failed to e2enode.GetNodeAllocatableAndAvailableQuantities")
 		framework.Logf("TEST2: Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableCPU2.MilliValue(), nodeAvailableCPU2.MilliValue())
 		testPod3CPUQuantity := resource.NewMilliQuantity(nodeAvailableCPU2.MilliValue()+testPod1CPUQuantity.MilliValue()/4, resource.DecimalSI)
@@ -610,21 +610,21 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		ginkgo.By(fmt.Sprintf("TEST2: Create testPod3 '%s' that cannot fit node '%s' due to insufficient CPU.", testPod3.Name, node.Name))
 		testPod3 = podClient.Create(ctx, testPod3)
 		p3Err := e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, testPod3.Name, testPod3.Namespace)
-		framework.ExpectNoError(p3Err, "failed to create pod3 or pod3 did not become pending!")
+		framework.ExpectNoError(p3Err, "failed to p3Err")
 		gomega.Expect(testPod3.Status.Phase).To(gomega.Equal(v1.PodPending))
 		gomega.Expect(testPod3.Generation).To(gomega.BeEquivalentTo(1))
 
 		ginkgo.By(fmt.Sprintf("TEST2: Resize pod '%s' to make enough space for pod '%s'", testPod1.Name, testPod3.Name))
 		testPod1, p1Err := f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
 			testPod1.Name, types.StrategicMergePatchType, []byte(patchTestpod1ToMakeSpaceForPod3), metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(p1Err, "failed to patch pod for resize")
+		framework.ExpectNoError(p1Err, "failed to p1Err")
 		gomega.Expect(testPod1.Generation).To(gomega.BeEquivalentTo(2))
 
 		ginkgo.By(fmt.Sprintf("TEST2: Verify pod '%s' is running after successfully resizing pod '%s'", testPod3.Name, testPod1.Name))
 		framework.Logf("TEST2: Pod '%s' CPU requests '%dm'", testPod1.Name, testPod1.Spec.Containers[0].Resources.Requests.Cpu().MilliValue())
 		framework.Logf("TEST2: Pod '%s' CPU requests '%dm'", testPod2.Name, testPod2.Spec.Containers[0].Resources.Requests.Cpu().MilliValue())
 		framework.Logf("TEST2: Pod '%s' CPU requests '%dm'", testPod3.Name, testPod3.Spec.Containers[0].Resources.Requests.Cpu().MilliValue())
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, testPod3))
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, testPod3), "failed to e2epod.WaitForPodRunningInNamespace")
 
 		// Scheduler focused pod resize E2E test case #3
 		//     1. With pod1 + pod2 + pod3 running on node above, attempt to scale up pod1 to requests more CPU than available, verify deferred.
@@ -657,7 +657,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		ginkgo.By(fmt.Sprintf("TEST3: Resize pod '%s' exceed node available capacity", testPod1.Name))
 		testPod1, p1Err = f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
 			testPod1.Name, types.StrategicMergePatchType, []byte(patchTestpod1ExceedNodeAvailable), metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(p1Err, "failed to patch pod for resize")
+		framework.ExpectNoError(p1Err, "failed to p1Err")
 		gomega.Expect(testPod1.Generation).To(gomega.BeEquivalentTo(3))
 		waitForPodDeferred(ctx, f, testPod1)
 
@@ -690,7 +690,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 
 		ginkgo.By("deleting pod 1")
 		delErr1 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod1)
-		framework.ExpectNoError(delErr1, "failed to delete pod %s", testPod1.Name)
+		framework.ExpectNoError(delErr1, "failed to delErr1", testPod1.Name)
 	})
 }
 
@@ -706,14 +706,14 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 
 		podClient := e2epod.NewPodClient(f)
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-		framework.ExpectNoError(err, "failed to get running nodes")
+		framework.ExpectNoError(err, "failed to e2enode.GetReadySchedulableNodes")
 		gomega.Expect(nodes.Items).ShouldNot(gomega.BeEmpty())
 		framework.Logf("Found %d schedulable nodes", len(nodes.Items))
 
 		ginkgo.By("Find node CPU resources available for allocation!")
 		node := nodes.Items[0]
 		nodeAllocatableCPU, nodeAvailableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
-		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
+		framework.ExpectNoError(err, "failed to e2enode.GetNodeAllocatableAndAvailableQuantities")
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableCPU.MilliValue(), nodeAvailableCPU.MilliValue())
 
@@ -757,7 +757,7 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 
 		ginkgo.By("Verify remaining CPU is less than the 3 parts required for Pod B's resize")
 		_, nodeAvailableCPU2, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
-		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
+		framework.ExpectNoError(err, "failed to e2enode.GetNodeAllocatableAndAvailableQuantities")
 
 		threePartsCPU := onePartCPU * 3
 		framework.Logf("Remaining CPU = %dm. Pod B needs %dm more to resize.", nodeAvailableCPU2.MilliValue(), threePartsCPU)
@@ -795,13 +795,13 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		ginkgo.By(fmt.Sprintf("Resize Pod B '%s' to 6 parts (will be deferred due to insufficient CPU)", podB.Name))
 		podB, err = f.ClientSet.CoreV1().Pods(podB.Namespace).Patch(ctx,
 			podB.Name, types.StrategicMergePatchType, []byte(patchPodBToDeferred), metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(err, "failed to patch Pod B for resize")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Patch")
 		waitForPodDeferred(ctx, f, podB)
 
 		ginkgo.By(fmt.Sprintf("Resize Pod A '%s' down to 2 parts, freeing up exactly 3 parts for Pod B", podA.Name))
 		podA, err = f.ClientSet.CoreV1().Pods(podA.Namespace).Patch(ctx,
 			podA.Name, types.StrategicMergePatchType, []byte(patchPodAToMakeSpace), metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(err, "failed to patch Pod A to free up space")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Patch")
 		gomega.Expect(podA.Generation).To(gomega.BeEquivalentTo(2))
 
 		ginkgo.By("Verify Pod B successfully actuates the deferred resize after space is freed")
@@ -828,7 +828,7 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 
 		podClient := e2epod.NewPodClient(f)
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-		framework.ExpectNoError(err, "failed to get running nodes")
+		framework.ExpectNoError(err, "failed to e2enode.GetReadySchedulableNodes")
 		gomega.Expect(nodes.Items).ShouldNot(gomega.BeEmpty())
 		framework.Logf("Found %d schedulable nodes", len(nodes.Items))
 
@@ -836,7 +836,7 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		node := nodes.Items[0]
 
 		nodeAllocatableCPU, nodeAvailableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
-		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
+		framework.ExpectNoError(err, "failed to e2enode.GetNodeAllocatableAndAvailableQuantities")
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableCPU.MilliValue(), nodeAvailableCPU.MilliValue())
 
@@ -884,9 +884,9 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 			},
 			Value: 1000,
 		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.SchedulingV1.PriorityClasses.Create")
 		defer func() {
-			framework.ExpectNoError(f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, pc.Name, metav1.DeleteOptions{}))
+			framework.ExpectNoError(f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, pc.Name, metav1.DeleteOptions{}), "failed to f.ClientSet.SchedulingV1.PriorityClasses.Delete")
 		}()
 
 		testPod2.Spec.PriorityClassName = pc.Name
@@ -941,34 +941,34 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		ginkgo.By(fmt.Sprintf("Resize pod '%s'", testPod4.Name))
 		testPod4, err = f.ClientSet.CoreV1().Pods(testPod4.Namespace).Patch(ctx,
 			testPod4.Name, types.StrategicMergePatchType, []byte(patchTestPod), metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(err, "failed to patch pod for resize")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Patch")
 		waitForPodDeferred(ctx, f, testPod4)
 
 		// Attempt pod3 resize request to 2/3 of the node allocatable CPU, verify deferred.
 		ginkgo.By(fmt.Sprintf("Resize pod '%s'", testPod3.Name))
 		testPod3, err = f.ClientSet.CoreV1().Pods(testPod3.Namespace).Patch(ctx,
 			testPod3.Name, types.StrategicMergePatchType, []byte(patchTestPod), metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(err, "failed to patch pod for resize")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Patch")
 		waitForPodDeferred(ctx, f, testPod3)
 
 		// Attempt pod2 resize request to 2/3 of the node allocatable CPU, verify deferred.
 		ginkgo.By(fmt.Sprintf("Resize pod '%s'", testPod2.Name))
 		testPod2, err = f.ClientSet.CoreV1().Pods(testPod2.Namespace).Patch(ctx,
 			testPod2.Name, types.StrategicMergePatchType, []byte(patchTestPod), metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(err, "failed to patch pod for resize")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Patch")
 		waitForPodDeferred(ctx, f, testPod2)
 
 		// Attempt pod5 resize request to 2/3 of the node allocatable CPU, verify deferred.
 		ginkgo.By(fmt.Sprintf("Resize pod '%s'", testPod5.Name))
 		testPod5, err = f.ClientSet.CoreV1().Pods(testPod5.Namespace).Patch(ctx,
 			testPod5.Name, types.StrategicMergePatchType, []byte(patchTestPod), metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(err, "failed to patch pod for resize")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Patch")
 		waitForPodDeferred(ctx, f, testPod5)
 
 		// Delete pod1. Verify pod2's resize has completed, while the others are still deferred.
 		ginkgo.By("deleting pod1")
 		delErr1 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod1)
-		framework.ExpectNoError(delErr1, "failed to delete pod %s", testPod1.Name)
+		framework.ExpectNoError(delErr1, "failed to delErr1", testPod1.Name)
 
 		ginkgo.By(fmt.Sprintf("Verify pod '%s' is resized successfully after pod '%s' deleted", testPod2.Name, testPod1.Name))
 		expected := []podresize.ResizableContainerInfo{
@@ -986,7 +986,7 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		// Delete pod2. Verify pod3's resize has completed, while the others are still deferred.
 		ginkgo.By("deleting pod2")
 		delErr2 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod2)
-		framework.ExpectNoError(delErr2, "failed to delete pod %s", testPod2.Name)
+		framework.ExpectNoError(delErr2, "failed to delErr2", testPod2.Name)
 
 		ginkgo.By(fmt.Sprintf("Verify pod '%s' is resized successfully after pod '%s' deleted", testPod3.Name, testPod2.Name))
 		expected = []podresize.ResizableContainerInfo{
@@ -1008,7 +1008,7 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		// Delete pod3. Verify pod4's resize has completed, while the others are still deferred.
 		ginkgo.By("deleting pod3")
 		delErr3 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod3)
-		framework.ExpectNoError(delErr3, "failed to delete pod %s", testPod3.Name)
+		framework.ExpectNoError(delErr3, "failed to delErr3", testPod3.Name)
 
 		ginkgo.By(fmt.Sprintf("Verify pod '%s' is resized successfully after pod '%s' deleted", testPod4.Name, testPod3.Name))
 		expected = []podresize.ResizableContainerInfo{
@@ -1024,7 +1024,7 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		// Delete pod4. Verify pod5's resize has completed.
 		ginkgo.By("deleting pod4")
 		delErr4 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod4)
-		framework.ExpectNoError(delErr4, "failed to delete pod %s", testPod4.Name)
+		framework.ExpectNoError(delErr4, "failed to delErr4", testPod4.Name)
 
 		ginkgo.By(fmt.Sprintf("Verify pod '%s' is resized successfully after pod '%s' deleted", testPod5.Name, testPod4.Name))
 		expected = []podresize.ResizableContainerInfo{
@@ -1038,7 +1038,7 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 
 		ginkgo.By("deleting pod5")
 		delErr5 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod5)
-		framework.ExpectNoError(delErr5, "failed to delete pod %s", testPod5.Name)
+		framework.ExpectNoError(delErr5, "failed to delErr5", testPod5.Name)
 	})
 
 	ginkgo.It("pod-resize-retry-deferred-test-3", func(ctx context.Context) {
@@ -1055,7 +1055,7 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 
 		podClient := e2epod.NewPodClient(f)
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-		framework.ExpectNoError(err, "failed to get running nodes")
+		framework.ExpectNoError(err, "failed to e2enode.GetReadySchedulableNodes")
 		gomega.Expect(nodes.Items).ShouldNot(gomega.BeEmpty())
 		framework.Logf("Found %d schedulable nodes", len(nodes.Items))
 
@@ -1063,12 +1063,12 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		node := nodes.Items[0]
 
 		nodeAllocatableCPU, initNodeAvailableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
-		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
+		framework.ExpectNoError(err, "failed to e2enode.GetNodeAllocatableAndAvailableQuantities")
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableCPU.MilliValue(), initNodeAvailableCPU.MilliValue())
 
 		nodeAllocatableMem, initNodeAvailableMem, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceMemory)
-		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
+		framework.ExpectNoError(err, "failed to e2enode.GetNodeAllocatableAndAvailableQuantities")
 		framework.Logf("Node '%s': NodeAllocatable Memory = %d. Memory currently available to allocate = %d.",
 			node.Name, nodeAllocatableMem.Value(), initNodeAvailableMem.Value())
 
@@ -1157,13 +1157,13 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 			ginkgo.By(fmt.Sprintf("Resize pod '%s' that cannot fit node due to insufficient CPU or memory", testPod.Name))
 			testPod, err = f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx,
 				testPod.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "resize")
-			framework.ExpectNoError(err, "failed to patch pod for resize")
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Patch")
 			waitForPodDeferred(ctx, f, testPod)
 		}
 
 		ginkgo.By("deleting pod 1")
 		delErr1 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod1)
-		framework.ExpectNoError(delErr1, "failed to delete pod %s", testPod1.Name)
+		framework.ExpectNoError(delErr1, "failed to delErr1", testPod1.Name)
 
 		ginkgo.By(fmt.Sprintf("Verify pod '%s' is resized successfully after pod deletion '%s'", testPod2.Name, testPod1.Name))
 		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod2, expectedTestPod2Resized)
@@ -1186,12 +1186,12 @@ func doPodResizeDeferredPreemptionTests(f *framework.Framework) {
 	ginkgo.It("preempt a lower-priority pod to satisfy a deferred resize", func(ctx context.Context) {
 		podClient := e2epod.NewPodClient(f)
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-		framework.ExpectNoError(err, "failed to get running nodes")
+		framework.ExpectNoError(err, "failed to e2enode.GetReadySchedulableNodes")
 		gomega.Expect(nodes.Items).ShouldNot(gomega.BeEmpty())
 
 		node := nodes.Items[0]
 		_, nodeAvailableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
-		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
+		framework.ExpectNoError(err, "failed to e2enode.GetNodeAllocatableAndAvailableQuantities")
 
 		availableMillis := nodeAvailableCPU.MilliValue()
 		framework.Logf("Node '%s' available CPU = %dm", node.Name, availableMillis)
@@ -1231,7 +1231,7 @@ func doPodResizeDeferredPreemptionTests(f *framework.Framework) {
 			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("preemptor-priority-%s", f.Namespace.Name)},
 			Value:      1000,
 		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.SchedulingV1.PriorityClasses.Create")
 		defer func() {
 			_ = f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, pcPreemptor.Name, metav1.DeleteOptions{})
 		}()
@@ -1240,7 +1240,7 @@ func doPodResizeDeferredPreemptionTests(f *framework.Framework) {
 			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("midpri-priority-%s", f.Namespace.Name)},
 			Value:      500,
 		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.SchedulingV1.PriorityClasses.Create")
 		defer func() {
 			_ = f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, pcMid.Name, metav1.DeleteOptions{})
 		}()
@@ -1249,7 +1249,7 @@ func doPodResizeDeferredPreemptionTests(f *framework.Framework) {
 			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("victim-priority-%s", f.Namespace.Name)},
 			Value:      100,
 		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.SchedulingV1.PriorityClasses.Create")
 		defer func() {
 			_ = f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, pcVictim.Name, metav1.DeleteOptions{})
 		}()
@@ -1261,7 +1261,7 @@ func doPodResizeDeferredPreemptionTests(f *framework.Framework) {
 		ginkgo.By(fmt.Sprintf("Patch node '%s' to disable resize preemption initially", node.Name))
 		patchDisablePreemption := []byte(`{"spec": {"podPreemptionPolicy": {"disableResizePreemption": ["test-disable-preemption"]}}}`)
 		_, err = f.ClientSet.CoreV1().Nodes().Patch(ctx, node.Name, types.StrategicMergePatchType, patchDisablePreemption, metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch node to disable resize preemption")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Nodes.Patch")
 		defer func() {
 			patchReset := []byte(`{"spec": {"podPreemptionPolicy": null}}`)
 			_, _ = f.ClientSet.CoreV1().Nodes().Patch(ctx, node.Name, types.MergePatchType, patchReset, metav1.PatchOptions{})
@@ -1302,13 +1302,13 @@ func doPodResizeDeferredPreemptionTests(f *framework.Framework) {
 		ginkgo.By(fmt.Sprintf("Resize mid-priority pod '%s' to 45%% CPU (exceeds free node capacity, should defer)", midPriPod.Name))
 		midPriPod, err = f.ClientSet.CoreV1().Pods(midPriPod.Namespace).Patch(ctx,
 			midPriPod.Name, types.StrategicMergePatchType, []byte(patchMidPriToDeferred), metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(err, "failed to patch mid-pri pod for resize")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Patch")
 		waitForPodDeferred(ctx, f, midPriPod)
 
 		ginkgo.By(fmt.Sprintf("Resize high-priority preemptor pod '%s' to 50%% CPU (exceeds free node capacity, should defer)", preemptor.Name))
 		preemptor, err = f.ClientSet.CoreV1().Pods(preemptor.Namespace).Patch(ctx,
 			preemptor.Name, types.StrategicMergePatchType, []byte(patchPreemptorToDeferred), metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(err, "failed to patch preemptor pod for resize")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Patch")
 		waitForPodDeferred(ctx, f, preemptor)
 
 		ginkgo.By(fmt.Sprintf("Assert that victim pod '%s' is NOT preempted while policy is disabled", victim.Name))
@@ -1321,7 +1321,7 @@ func doPodResizeDeferredPreemptionTests(f *framework.Framework) {
 		ginkgo.By(fmt.Sprintf("Remove disable policy from node '%s' to enable resize preemption", node.Name))
 		patchReset := []byte(`{"spec": {"podPreemptionPolicy": null}}`)
 		_, err = f.ClientSet.CoreV1().Nodes().Patch(ctx, node.Name, types.MergePatchType, patchReset, metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch node to enable resize preemption")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Nodes.Patch")
 
 		ginkgo.By(fmt.Sprintf("Verify that victim pod '%s' gets preempted/evicted by high-priority preemptor after enabling resize preemption", victim.Name))
 		err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, victim.Name, victim.Namespace, 5*time.Minute)
@@ -1353,7 +1353,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (sched
 	f := framework.NewDefaultFramework("pod-resize-scheduler-tests")
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
@@ -1365,7 +1365,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (defer
 	f := framework.NewDefaultFramework("pod-resize-deferred-resize-tests")
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
@@ -1378,7 +1378,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container (resource-quota)", framework.W
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
@@ -1391,7 +1391,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container (limit-ranger)", framework.Wit
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
@@ -1406,7 +1406,7 @@ var _ = SIGDescribe(framework.WithSerial(), framework.WithSlow(), "Pod InPlace R
 		f := framework.NewDefaultFramework("pod-resize-deferred-preemption-tests")
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 			if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
 				e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 			}
@@ -1428,19 +1428,19 @@ func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaN
 func waitForPodDeferred(ctx context.Context, f *framework.Framework, testPod *v1.Pod) {
 	framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, testPod.Namespace, testPod.Name, "display pod resize status as deferred", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
 		return helpers.IsPodResizeDeferred(pod), nil
-	}))
+	}), "failed to c.CoreV1().ResourceQuotas(ns).Get(ctx, quotaName, metav1....")
 }
 
 func doPodResizeMemoryVolumeDeferredTests(f *framework.Framework) {
 	ginkgo.It("should isolate volume updates when container resource resize is deferred", func(ctx context.Context) {
 		podClient := e2epod.NewPodClient(f)
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-		framework.ExpectNoError(err, "failed to get running nodes")
+		framework.ExpectNoError(err, "failed to e2enode.GetReadySchedulableNodes")
 		gomega.Expect(nodes.Items).ShouldNot(gomega.BeEmpty())
 		node := nodes.Items[0]
 
 		_, nodeAvailableCPU, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
-		framework.ExpectNoError(err, "failed to get available CPU")
+		framework.ExpectNoError(err, "failed to e2enode.GetNodeAllocatableAndAvailableQuantities")
 
 		// Conceptually divide the available CPU into 10 parts.
 		onePartCPU := nodeAvailableCPU.MilliValue() / 10
@@ -1496,7 +1496,7 @@ func doPodResizeMemoryVolumeDeferredTests(f *framework.Framework) {
 
 		ginkgo.By("verifying initial mounted emptyDir volume size via df inside container")
 		stdout, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, podB.Name, "c1", "df", "-m", "/cache")
-		framework.ExpectNoError(err, "failed to run df")
+		framework.ExpectNoError(err, "failed to e2epod.ExecCommandInContainerWithFullOutput")
 		gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(qty64Mi.Value()/(1024*1024), 10)))
 
 		initialRestarts := podB.Status.ContainerStatuses[0].RestartCount
@@ -1529,19 +1529,19 @@ func doPodResizeMemoryVolumeDeferredTests(f *framework.Framework) {
 
 		patchedPod, pErr := f.ClientSet.CoreV1().Pods(podB.Namespace).Patch(ctx, podB.Name,
 			types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(pErr, "failed to patch pod for resize and sizeLimit")
+		framework.ExpectNoError(pErr, "failed to pErr")
 
 		ginkgo.By("waiting for pod resize to be marked as deferred")
 		waitForPodDeferred(ctx, f, patchedPod)
 
 		ginkgo.By("verifying that the volume mount inside the container remains at 64Mi (atomic isolation)")
 		stdout, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, patchedPod.Name, "c1", "df", "-m", "/cache")
-		framework.ExpectNoError(err, "failed to run df inside container")
+		framework.ExpectNoError(err, "failed to e2epod.ExecCommandInContainerWithFullOutput")
 		gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(qty64Mi.Value()/(1024*1024), 10)))
 		gomega.Expect(stdout).ToNot(gomega.ContainSubstring(strconv.FormatInt(qty128Mi.Value()/(1024*1024), 10)))
 
 		gotPod, getErr := podClient.Get(ctx, patchedPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(getErr)
+		framework.ExpectNoError(getErr, "failed to getErr")
 		gomega.Expect(gotPod.Status.ContainerStatuses[0].RestartCount).To(gomega.Equal(initialRestarts))
 
 		ginkgo.By("deleting pods")
@@ -1553,7 +1553,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Memory-Backed Vo
 	f := framework.NewDefaultFramework("pod-resize-memory-vol-deferred-tests")
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}

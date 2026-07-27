@@ -742,7 +742,7 @@ func createPodWithFsGroupTest(ctx context.Context, config *localTestConfig, test
 	pod, err := createLocalPod(ctx, config, testVol, &fsGroup)
 	framework.ExpectNoError(err)
 	_, err = e2eoutput.LookForStringInPodExec(config.ns, pod.Name, []string{"stat", "-c", "%g", volumeDir}, strconv.FormatInt(expectedFsGroup, 10), time.Second*3)
-	framework.ExpectNoError(err, "failed to get expected fsGroup %d on directory %s in pod %s", fsGroup, volumeDir, pod.Name)
+	framework.ExpectNoError(err, "failed to e2eoutput.LookForStringInPodExec", fsGroup, volumeDir, pod.Name)
 	return pod
 }
 

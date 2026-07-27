@@ -47,7 +47,7 @@ var _ = SIGDescribe("Kubelet running in user namespace", "[LinuxOnly]", feature.
 			ginkgo.DeferCleanup(hostExec.Cleanup)
 
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 			gomega.Expect(node.Status.NodeInfo.RunningInUserNamespace).NotTo(gomega.BeNil(), "expected Node.Status.NodeInfo.RunningInUserNamespace to be set")
 
 			kubeletPid := pidOfKubelet(ctx, hostExec, node)

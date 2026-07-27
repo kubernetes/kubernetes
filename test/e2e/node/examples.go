@@ -60,12 +60,12 @@ var _ = SIGDescribe(feature.Example, func() {
 		// lying around so we don't have to race any caches
 		err := e2eauth.BindClusterRoleInNamespace(ctx, c.RbacV1(), "edit", f.Namespace.Name,
 			rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2eauth.BindClusterRoleInNamespace")
 
 		err = e2eauth.WaitForAuthorizationUpdate(ctx, c.AuthorizationV1(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 			f.Namespace.Name, "create", schema.GroupResource{Resource: "pods"}, true)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2eauth.WaitForAuthorizationUpdate")
 	})
 
 	ginkgo.Describe("Liveness", func() {
@@ -82,7 +82,7 @@ var _ = SIGDescribe(feature.Example, func() {
 			passed := true
 			checkRestart := func(podName string, timeout time.Duration) {
 				err := e2epod.WaitForPodNameRunningInNamespace(ctx, c, podName, ns)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to e2epod.WaitForPodNameRunningInNamespace")
 				for t := time.Now(); time.Since(t) < timeout; time.Sleep(framework.Poll) {
 					pod, err := c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 					framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
@@ -127,11 +127,11 @@ var _ = SIGDescribe(feature.Example, func() {
 			e2ekubectl.RunKubectlOrDieInput(ns, secretYaml, "create", "-f", "-")
 			e2ekubectl.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
 			err := e2epod.WaitForPodNoLongerRunningInNamespace(ctx, c, podName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2epod.WaitForPodNoLongerRunningInNamespace")
 
 			ginkgo.By("checking if secret was read correctly")
 			_, err = e2eoutput.LookForStringInLog(ns, "secret-test-pod", "test-container", "value-1", serverStartTimeout)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2eoutput.LookForStringInLog")
 		})
 	})
 
@@ -144,13 +144,13 @@ var _ = SIGDescribe(feature.Example, func() {
 			ginkgo.By("creating the pod")
 			e2ekubectl.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
 			err := e2epod.WaitForPodNoLongerRunningInNamespace(ctx, c, podName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2epod.WaitForPodNoLongerRunningInNamespace")
 
 			ginkgo.By("checking if name and namespace were passed correctly")
 			_, err = e2eoutput.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAMESPACE=%v", ns), serverStartTimeout)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to %v", ns")
 			_, err = e2eoutput.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAME=%v", podName), serverStartTimeout)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to %v", podName")
 		})
 	})
 })

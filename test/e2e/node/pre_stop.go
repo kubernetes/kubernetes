@@ -180,15 +180,15 @@ var _ = SIGDescribe("PreStop", func() {
 		podClient.Create(ctx, pod)
 
 		ginkgo.By("waiting for pod running")
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "failed to e2epod.WaitForPodNameRunningInNamespace")
 
 		var err error
 		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to GET scheduled pod")
+		framework.ExpectNoError(err, "failed to podClient.Get")
 
 		ginkgo.By("deleting the pod gracefully")
 		err = podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(gracefulTerminationPeriodSeconds))
-		framework.ExpectNoError(err, "failed to delete pod")
+		framework.ExpectNoError(err, "failed to podClient.Delete")
 
 		// wait for less than the gracePeriod termination ensuring the
 		// preStop hook is still executing.
@@ -198,9 +198,9 @@ var _ = SIGDescribe("PreStop", func() {
 		result := &v1.PodList{}
 		err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
 			client, err := e2ekubelet.ProxyRequest(ctx, f.ClientSet, pod.Spec.NodeName, "pods", ports.KubeletPort)
-			framework.ExpectNoError(err, "failed to get the pods of the node")
+			framework.ExpectNoError(err, "failed to e2ekubelet.ProxyRequest")
 			err = client.Into(result)
-			framework.ExpectNoError(err, "failed to parse the pods of the node")
+			framework.ExpectNoError(err, "failed to client.Into")
 
 			for _, kubeletPod := range result.Items {
 				if pod.Name != kubeletPod.Name {

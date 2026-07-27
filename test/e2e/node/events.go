@@ -76,13 +76,13 @@ var _ = SIGDescribe("Events", func() {
 			framework.Failf("Failed to create pod: %v", err)
 		}
 
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "failed to e2epod.WaitForPodNameRunningInNamespace")
 
 		ginkgo.By("verifying the pod is in kubernetes")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(ctx, options)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.List")
 		gomega.Expect(pods.Items).To(gomega.HaveLen(1))
 
 		ginkgo.By("retrieving the pod")
@@ -111,7 +111,7 @@ var _ = SIGDescribe("Events", func() {
 				return true, nil
 			}
 			return false, nil
-		}))
+		}), "failed to f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, o...")
 		// Check for kubelet event about the pod.
 		ginkgo.By("checking for kubelet event about the pod")
 		framework.ExpectNoError(wait.Poll(framework.Poll, 5*time.Minute, func() (bool, error) {
@@ -131,6 +131,6 @@ var _ = SIGDescribe("Events", func() {
 				return true, nil
 			}
 			return false, nil
-		}))
+		}), "failed to f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, o...")
 	})
 })

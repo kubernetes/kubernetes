@@ -608,7 +608,7 @@ func testVolumeClient(ctx context.Context, f *framework.Framework, config TestCo
 	ec.Name = "volume-ephemeral-container"
 	err = e2epod.NewPodClient(f).AddEphemeralContainerSync(ctx, clientPod, ec, timeouts.PodStart)
 	// The API server will return NotFound for the subresource when the feature is disabled
-	framework.ExpectNoError(err, "failed to add ephemeral container for re-test")
+	framework.ExpectNoError(err, "failed to e2epod.NewPodClient.AddEphemeralContainerSync")
 	testVolumeContent(ctx, f, clientPod, ec.Name, fsGroup, fsType, tests)
 }
 

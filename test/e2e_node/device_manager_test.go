@@ -208,7 +208,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 				defer ginkgo.GinkgoRecover()
 				framework.Logf("Deleting the control file: %q to trigger registration", triggerPathFile)
 				err := os.Remove(triggerPathFile)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}()
 
 			ginkgo.By("Waiting for devices to become available on the local node")
@@ -249,15 +249,15 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 
 			ginkgo.By("stopping all the local containers - using CRI")
 			rs, _, err := getCRIClient(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			for _, sandbox := range sandboxes {
 				gomega.Expect(sandbox.Metadata).ToNot(gomega.BeNil())
 				ginkgo.By(fmt.Sprintf("deleting pod using CRI: %s/%s -> %s", sandbox.Metadata.Namespace, sandbox.Metadata.Name, sandbox.Id))
 
 				err := rs.RemovePodSandbox(ctx, sandbox.Id)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}
 
 			ginkgo.By("restarting the kubelet")
@@ -276,7 +276,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 			var devicePluginPodAfterRestart *v1.Pod
 
 			devicePluginPodAfterRestart, err = e2epod.NewPodClient(f).Get(ctx, devicePluginPod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, devicePluginPodAfterRestart.Namespace, devicePluginPodAfterRestart.Name, "Ready", 120*time.Second, testutils.PodRunningReady)
 			framework.ExpectNoError(err, "pod %s/%s did not go running", devicePluginPodAfterRestart.Namespace, devicePluginPodAfterRestart.Name)
@@ -325,11 +325,11 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 
 			ginkgo.By("Deleting the directory and file setup for controlling registration")
 			err = os.RemoveAll(triggerPathDir)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Deleting any Pods created by the test")
 			l, err := e2epod.NewPodClient(f).List(context.TODO(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			for _, p := range l.Items {
 				if p.Namespace != f.Namespace.Name {
 					continue

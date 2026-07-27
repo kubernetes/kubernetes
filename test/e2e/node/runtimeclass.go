@@ -55,7 +55,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		runtimeClass := newRuntimeClass(f.Namespace.Name, "conflict-runtimeclass")
 		runtimeClass.Scheduling = scheduling
 		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(ctx, runtimeClass, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+		framework.ExpectNoError(err, "failed to f.ClientSet.NodeV1.RuntimeClasses.Create")
 
 		pod := e2eruntimeclass.NewRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{
@@ -110,7 +110,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass")
 		runtimeClass.Scheduling = scheduling
 		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(ctx, runtimeClass, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+		framework.ExpectNoError(err, "failed to f.ClientSet.NodeV1.RuntimeClasses.Create")
 
 		pod := e2eruntimeclass.NewRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{
@@ -118,11 +118,11 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		}
 		pod = e2epod.NewPodClient(f).Create(ctx, pod)
 
-		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, f.Namespace.Name, pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, f.Namespace.Name, pod.Name), "failed to e2epod.WaitForPodNotPending")
 
 		// check that pod got scheduled on specified node.
 		scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Get")
 		gomega.Expect(nodeName).To(gomega.Equal(scheduledPod.Spec.NodeName))
 		gomega.Expect(nodeSelector).To(gomega.Equal(pod.Spec.NodeSelector))
 		gomega.Expect(pod.Spec.Tolerations).To(gomega.ContainElement(tolerations[0]))
@@ -156,7 +156,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass")
 		runtimeClass.Scheduling = scheduling
 		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(ctx, runtimeClass, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+		framework.ExpectNoError(err, "failed to f.ClientSet.NodeV1.RuntimeClasses.Create")
 
 		pod := e2eruntimeclass.NewRuntimeClassPod(rc.GetName())
 		pod.Spec.NodeSelector = map[string]string{
@@ -164,11 +164,11 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		}
 		pod = e2epod.NewPodClient(f).Create(ctx, pod)
 
-		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, f.Namespace.Name, pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, f.Namespace.Name, pod.Name), "failed to e2epod.WaitForPodNotPending")
 
 		// check that pod got scheduled on specified node.
 		scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Get")
 		gomega.Expect(nodeName).To(gomega.Equal(scheduledPod.Spec.NodeName))
 		gomega.Expect(nodeSelector).To(gomega.Equal(pod.Spec.NodeSelector))
 	})

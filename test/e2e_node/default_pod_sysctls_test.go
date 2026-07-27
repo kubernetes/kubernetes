@@ -66,7 +66,7 @@ var _ = SIGDescribe("DefaultPodSysctls [LinuxOnly]", framework.WithSerial(), fra
 				},
 			}
 			pod = e2epod.NewPodClient(f).Create(ctx, pod)
-			framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+			framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "unexpected error")
 			ginkgo.DeferCleanup(e2epod.NewPodClient(f).DeleteSync, pod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
 			ginkgo.By("checking pod logs for default sysctl values")
@@ -104,7 +104,7 @@ var _ = SIGDescribe("DefaultPodSysctls [LinuxOnly]", framework.WithSerial(), fra
 				},
 			}
 			pod = e2epod.NewPodClient(f).Create(ctx, pod)
-			framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+			framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "unexpected error")
 			ginkgo.DeferCleanup(e2epod.NewPodClient(f).DeleteSync, pod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
 			ginkgo.By("checking pod logs for overridden sysctl values")

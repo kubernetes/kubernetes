@@ -69,7 +69,7 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 				}
 				return nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			pod := e2epod.NewPodClient(f).Create(ctx, newPullImageAlwaysPod())
 			podErr := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "ImagePullBackOff", 1*time.Minute, func(pod *v1.Pod) (bool, error) {
@@ -81,7 +81,7 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 			gomega.Expect(podErr).To(gomega.HaveOccurred())
 
 			eventMsg, err := getFailedToPullImageMsg(ctx, f, pod.Name)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			isExpectedErrMsg := strings.Contains(eventMsg, expectedErr.Error())
 			gomega.Expect(isExpectedErrMsg).To(gomega.BeTrueBecause("we injected an exception into the PullImage interface of the cri proxy"))
 		})
@@ -152,7 +152,7 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 			var err error
 			gomega.Eventually(func() []v1.ContainerStatus {
 				pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.Background(), pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				return pod.Status.ContainerStatuses
 			}).WithPolling(5*time.Second).WithTimeout(2*time.Minute).Should(gomega.HaveLen(1), "couldn't find expected container status")
@@ -186,7 +186,7 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 				}
 				return nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			pod := getImageVolumePod()
 			pod = e2epod.NewPodClient(f).Create(ctx, pod)
@@ -242,14 +242,14 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 				}
 				return nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			pod := e2epod.NewPodClient(f).Create(ctx, newPullImageAlwaysPod())
 			podErr := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-			framework.ExpectNoError(podErr)
+			framework.ExpectNoError(podErr, "unexpected error")
 
 			imagePullDuration, err := getPodImagePullDuration(ctx, f, pod.Name)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			gomega.Expect(imagePullDuration).To(gomega.BeNumerically(">=", delayTime), "PullImages should take more than 10 seconds")
 		})
@@ -273,7 +273,7 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 				apiCalled[apiName] = true
 				return nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Wait for kubelet to make list calls (which should use streaming when enabled)
 			gomega.Eventually(func(g gomega.Gomega) {
@@ -311,7 +311,7 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 				}
 				return nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Wait for the mid-stream error to be triggered at least once
 			gomega.Eventually(func() bool {
@@ -348,7 +348,7 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 				}
 				return nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Ensure the number of containers sent per streaming call never exceeds 2,
 			// because the connection timeout is set to 2 mins.
@@ -400,7 +400,7 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 				}
 				return nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			gomega.Eventually(func() bool {
 				return listCallCount.Load() > 0

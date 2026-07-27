@@ -873,16 +873,16 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 
 		ginkgo.By("listing all DaemonSets")
 		dsList, err := cs.AppsV1().DaemonSets("").List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-		framework.ExpectNoError(err, "failed to list Daemon Sets")
+		framework.ExpectNoError(err, "failed to cs.AppsV1.DaemonSets.List")
 		gomega.Expect(dsList.Items).To(gomega.HaveLen(1), "filtered list wasn't found")
 
 		ginkgo.By("DeleteCollection of the DaemonSets")
 		err = dsClient.DeleteCollection(ctx, metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{LabelSelector: labelSelector})
-		framework.ExpectNoError(err, "failed to delete DaemonSets")
+		framework.ExpectNoError(err, "failed to dsClient.DeleteCollection")
 
 		ginkgo.By("Verify that ReplicaSets have been deleted")
 		dsList, err = c.AppsV1().DaemonSets("").List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-		framework.ExpectNoError(err, "failed to list DaemonSets")
+		framework.ExpectNoError(err, "failed to c.AppsV1.DaemonSets.List")
 		gomega.Expect(dsList.Items).To(gomega.BeEmpty(), "filtered list should have no daemonset")
 	})
 
@@ -907,7 +907,7 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 		}
 
 		dsList, err := cs.AppsV1().DaemonSets("").List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-		framework.ExpectNoError(err, "failed to list Daemon Sets")
+		framework.ExpectNoError(err, "failed to cs.AppsV1.DaemonSets.List")
 
 		ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
 		testDaemonset, err := c.AppsV1().DaemonSets(ns).Create(ctx, newDaemonSetWithLabel(dsName, image, label), metav1.CreateOptions{})
@@ -977,7 +977,7 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 			framework.Logf("Observed %v event: %+v", object, event.Type)
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to locate daemon set %v in namespace %v", testDaemonset.ObjectMeta.Name, ns)
+		framework.ExpectNoError(err, "failed to watchtools.Until", testDaemonset.ObjectMeta.Name, ns)
 		framework.Logf("Daemon set %s has an updated status", dsName)
 
 		ginkgo.By("patching the DaemonSet Status")
@@ -1021,7 +1021,7 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 			framework.Logf("Observed %v event: %v", object, event.Type)
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to locate daemon set %v in namespace %v", testDaemonset.ObjectMeta.Name, ns)
+		framework.ExpectNoError(err, "failed to watchtools.Until", testDaemonset.ObjectMeta.Name, ns)
 		framework.Logf("Daemon set %s has a patched status", dsName)
 	})
 })

@@ -94,7 +94,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 				// number of items per page and number of pages are non-trivial.
 				opts.Limit = 17
 				list, err := client.List(ctx, opts)
-				framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
+				framework.ExpectNoError(err, "failed to client.List", ns, opts.Limit)
 				framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
 				gomega.Expect(len(list.Items)).To(gomega.BeNumerically("<=", opts.Limit))
 
@@ -123,7 +123,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		ginkgo.By("retrieving those results all at once")
 		opts := metav1.ListOptions{Limit: numberOfTotalResources + 1}
 		list, err := client.List(ctx, opts)
-		framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
+		framework.ExpectNoError(err, "failed to client.List", ns, opts.Limit)
 		gomega.Expect(list.Items).To(gomega.HaveLen(numberOfTotalResources))
 	})
 
@@ -151,7 +151,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		opts := metav1.ListOptions{}
 		opts.Limit = oneTenth
 		list, err := client.List(ctx, opts)
-		framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
+		framework.ExpectNoError(err, "failed to client.List", ns, opts.Limit)
 		firstToken := list.Continue
 		firstRV := list.ResourceVersion
 		if list.GetContinue() == "" {
@@ -190,7 +190,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		ginkgo.By("retrieving the second page again with the token received with the error message")
 		opts.Continue = inconsistentToken
 		list, err = client.List(ctx, opts)
-		framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given inconsistent continue token %s and limit: %d", ns, opts.Continue, opts.Limit)
+		framework.ExpectNoError(err, "failed to client.List", ns, opts.Continue, opts.Limit)
 		gomega.Expect(list.ResourceVersion).ToNot(gomega.Equal(firstRV))
 		gomega.Expect(len(list.Items)).To(gomega.BeNumerically("==", opts.Limit))
 		found := int(oneTenth)
@@ -211,7 +211,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		lastRV := list.ResourceVersion
 		for {
 			list, err := client.List(ctx, opts)
-			framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
+			framework.ExpectNoError(err, "failed to client.List", ns, opts.Limit)
 			if list.GetContinue() == "" {
 				gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
 			} else {

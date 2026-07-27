@@ -69,23 +69,23 @@ var _ = utils.SIGDescribe("StorageClasses", func() {
 
 			ginkgo.By("Creating a StorageClass")
 			createdStorageClass, err := scClient.Create(ctx, initialSC, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create the requested StorageClass")
+			framework.ExpectNoError(err, "failed to scClient.Create")
 			gomega.Expect(createdStorageClass).To(apimachineryutils.HaveValidResourceVersion())
 
 			ginkgo.By(fmt.Sprintf("Get StorageClass %q", createdStorageClass.Name))
 			retrievedStorageClass, err := scClient.Get(ctx, createdStorageClass.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "failed to get StorageClass %q", createdStorageClass.Name)
+			framework.ExpectNoError(err, "failed to scClient.Get", createdStorageClass.Name)
 
 			ginkgo.By(fmt.Sprintf("Patching the StorageClass %q", retrievedStorageClass.Name))
 			payload := "{\"metadata\":{\"labels\":{\"" + retrievedStorageClass.Name + "\":\"patched\"}}}"
 			patchedStorageClass, err := scClient.Patch(ctx, retrievedStorageClass.Name, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
-			framework.ExpectNoError(err, "failed to patch StorageClass %q", retrievedStorageClass.Name)
+			framework.ExpectNoError(err, "failed to scClient.Patch", retrievedStorageClass.Name)
 			gomega.Expect(patchedStorageClass.Labels).To(gomega.HaveKeyWithValue(patchedStorageClass.Name, "patched"), "checking that patched label has been applied")
 			gomega.Expect(resourceversion.CompareResourceVersion(retrievedStorageClass.ResourceVersion, patchedStorageClass.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 			ginkgo.By(fmt.Sprintf("Delete StorageClass %q", patchedStorageClass.Name))
 			err = scClient.Delete(ctx, patchedStorageClass.Name, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "failed to delete StorageClass %q", patchedStorageClass.Name)
+			framework.ExpectNoError(err, "failed to scClient.Delete", patchedStorageClass.Name)
 
 			ginkgo.By(fmt.Sprintf("Confirm deletion of StorageClass %q", patchedStorageClass.Name))
 
@@ -125,7 +125,7 @@ var _ = utils.SIGDescribe("StorageClasses", func() {
 			}
 
 			replacementStorageClass, err := scClient.Create(ctx, replacementSC, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create replacement StorageClass")
+			framework.ExpectNoError(err, "failed to scClient.Create")
 
 			ginkgo.By(fmt.Sprintf("Updating StorageClass %q", replacementStorageClass.Name))
 			var updatedStorageClass *storagev1.StorageClass
@@ -138,18 +138,18 @@ var _ = utils.SIGDescribe("StorageClasses", func() {
 
 				return err
 			})
-			framework.ExpectNoError(err, "failed to update StorageClass %q", replacementStorageClass.Name)
+			framework.ExpectNoError(err, "failed to scClient.Update", replacementStorageClass.Name)
 			gomega.Expect(updatedStorageClass.Labels).To(gomega.HaveKeyWithValue(replacementStorageClass.Name, "updated"), "checking that updated label has been applied")
 
 			scSelector = labels.Set{replacementStorageClass.Name: "updated"}.AsSelector().String()
 			ginkgo.By(fmt.Sprintf("Listing all StorageClass with the labelSelector: %q", scSelector))
 			scList, err := scClient.List(ctx, metav1.ListOptions{LabelSelector: scSelector})
-			framework.ExpectNoError(err, "failed to list StorageClasses with the labelSelector: %q", scSelector)
+			framework.ExpectNoError(err, "failed to scClient.List", scSelector)
 			gomega.Expect(scList.Items).To(gomega.HaveLen(1))
 
 			ginkgo.By(fmt.Sprintf("Deleting StorageClass %q via DeleteCollection", updatedStorageClass.Name))
 			err = scClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: scSelector})
-			framework.ExpectNoError(err, "failed to delete StorageClass %q", updatedStorageClass.Name)
+			framework.ExpectNoError(err, "failed to scClient.DeleteCollection", updatedStorageClass.Name)
 
 			ginkgo.By(fmt.Sprintf("Confirm deletion of StorageClass %q", updatedStorageClass.Name))
 

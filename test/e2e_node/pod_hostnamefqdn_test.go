@@ -186,7 +186,7 @@ var _ = SIGDescribe("Hostname of Pod", framework.WithNodeConformance(), func() {
 		expectSandboxFailureEvent(ctx, f, launchedPod, expectedMessage)
 		// Check Pod is in Pending Phase
 		err := checkPodIsPending(ctx, f, launchedPod.ObjectMeta.Name, launchedPod.ObjectMeta.Namespace)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 	})
 })
@@ -201,7 +201,7 @@ func expectSandboxFailureEvent(ctx context.Context, f *framework.Framework, pod 
 		"reason":                   events.FailedCreatePodSandBox,
 	}.AsSelector().String()
 	framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(ctx,
-		f.ClientSet, f.Namespace.Name, eventSelector, msg, framework.PodEventTimeout))
+		f.ClientSet, f.Namespace.Name, eventSelector, msg, framework.PodEventTimeout), "unexpected error")
 }
 
 func checkPodIsPending(ctx context.Context, f *framework.Framework, podName, namespace string) error {

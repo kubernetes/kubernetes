@@ -607,7 +607,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 				return err
 			})
-			framework.ExpectNoError(err, "failed to update PV %q", pvName)
+			framework.ExpectNoError(err, "failed to pvClient.Update", pvName)
 			gomega.Expect(updatedPV.Labels).To(gomega.HaveKeyWithValue(updatedPV.Name, "updated"), "Checking that updated label has been applied")
 
 			ginkgo.By(fmt.Sprintf("Updating the PVC %q", pvcName))
@@ -624,7 +624,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 				return err
 			})
-			framework.ExpectNoError(err, "failed to update PVC %q", pvcName)
+			framework.ExpectNoError(err, "failed to pvcClient.Update", pvcName)
 			gomega.Expect(updatedPVC.Labels).To(gomega.HaveKeyWithValue(updatedPVC.Name, "updated"), "Checking that updated label has been applied")
 
 			ginkgo.By(fmt.Sprintf("Listing PVCs in all namespaces with the labelSelector: %q", pvcSelector))

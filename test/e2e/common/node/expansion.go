@@ -285,7 +285,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 
 		ginkgo.By("deleting the pod gracefully")
 		err = e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
-		framework.ExpectNoError(err, "failed to delete pod")
+		framework.ExpectNoError(err, "failed to e2epod.DeletePodWithWait")
 	})
 
 	/*
@@ -369,7 +369,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 
 		ginkgo.By("deleting the pod gracefully")
 		err = e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
-		framework.ExpectNoError(err, "failed to delete pod")
+		framework.ExpectNoError(err, "failed to e2epod.DeletePodWithWait")
 	})
 
 	/*

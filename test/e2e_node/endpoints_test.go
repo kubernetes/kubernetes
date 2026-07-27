@@ -123,7 +123,7 @@ var _ = SIGDescribe("Kubelet Endpoints", framework.WithNodeConformance(), framew
 
 			ginkgo.By("getting updated /configz")
 			resp, err := getKubeletConfigz(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			updatedConfig := &resp.ComponentConfig
 
 			gomega.Expect(updatedConfig.APIVersion).To(gomega.Equal("kubelet.config.k8s.io/v1beta1"))

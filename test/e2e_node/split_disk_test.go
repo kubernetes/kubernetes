@@ -132,9 +132,9 @@ func runImageFsPressureTest(f *framework.Framework, pressureTimeout time.Duratio
 
 		ginkgo.It("should evict all of the correct pods", func(ctx context.Context) {
 			_, is, err := getCRIClient(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			resp, err := is.ImageFsInfo(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(resp.ImageFilesystems).NotTo(gomega.BeEmpty())
 			gomega.Expect(resp.ImageFilesystems[0].FsId).NotTo(gomega.BeNil())
 			diskToPressure := filepath.Dir(resp.ImageFilesystems[0].FsId.Mountpoint)
@@ -219,7 +219,7 @@ func runImageFsPressureTest(f *framework.Framework, pressureTimeout time.Duratio
 					// The disk eviction test may cause the pre-pulled images to be evicted,
 					// so pre-pull those images again to ensure this test does not affect subsequent tests.
 					err := PrePullAllImages(ctx)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				}
 			}
 			// Run pre-pull for images using a `defer` to ensure that images are pulled even when the subsequent assertions fail.
@@ -303,9 +303,9 @@ func removeDiskPressure(diskToPressure string) error {
 
 func hasSplitFileSystem(ctx context.Context) bool {
 	_, is, err := getCRIClient(ctx)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	resp, err := is.ImageFsInfo(ctx)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	if resp.ContainerFilesystems == nil || resp.ImageFilesystems == nil || len(resp.ContainerFilesystems) == 0 || len(resp.ImageFilesystems) == 0 {
 		return false
 	}

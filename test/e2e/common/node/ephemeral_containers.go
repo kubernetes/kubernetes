@@ -81,7 +81,7 @@ var _ = SIGDescribe("Ephemeral Containers", framework.WithNodeConformance(), fun
 
 		ginkgo.By("verifying the pod's generation is 2")
 		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to query for pod")
+		framework.ExpectNoError(err, "failed to podClient.Get")
 		gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(2))
 
 		ginkgo.By("checking pod container endpoints")
@@ -138,7 +138,7 @@ var _ = SIGDescribe("Ephemeral Containers", framework.WithNodeConformance(), fun
 
 		ginkgo.By("verifying the pod's generation is 2")
 		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to query for pod")
+		framework.ExpectNoError(err, "failed to podClient.Get")
 		gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(2))
 
 		ginkgo.By("checking pod container endpoints")

@@ -68,7 +68,7 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Sanity tes
 
 		ginkgo.By("Getting logs from the pod")
 		log, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.GetPodLogs")
 
 		ginkgo.By("Checking output from nvidia-smi")
 		gomega.Expect(log).To(gomega.ContainSubstring("NVIDIA-SMI"))
@@ -96,7 +96,7 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using
 
 		ginkgo.By("Getting logs from the pod")
 		log, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.GetPodLogs")
 
 		ginkgo.By("Checking output from nvidia-smi")
 		framework.Logf("Got container logs for %s:\n%v", pod.Spec.Containers[0].Name, log)
@@ -121,20 +121,20 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using
 		StartJob(ctx, f, completions)
 
 		job, err := e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, "cuda-add")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2ejob.GetJob")
 
 		// make sure job is running by waiting for its first pod to start running
 		err = e2ejob.WaitForJobPodsRunningWithTimeout(ctx, f.ClientSet, f.Namespace.Name, job.Name, 1, e2ejob.JobTimeout*2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2ejob.WaitForJobPodsRunningWithTimeout")
 
 		numNodes, err := e2enode.TotalRegistered(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.TotalRegistered")
 		_, err = e2enode.CheckReady(ctx, f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.CheckReady")
 
 		ginkgo.By("Waiting for gpu job to finish")
 		err = e2ejob.WaitForJobFinishWithTimeout(ctx, f.ClientSet, f.Namespace.Name, job.Name, e2ejob.JobTimeout*2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2ejob.WaitForJobFinishWithTimeout")
 		ginkgo.By("Done with gpu job")
 
 		gomega.Expect(job.Status.Failed).To(gomega.BeZero(), "Job pods failed during node recreation: %v", job.Status.Failed)
@@ -155,13 +155,13 @@ func createAndValidatePod(ctx context.Context, f *framework.Framework, podClient
 			return false, nil
 		}
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2epod.WaitForPodCondition")
 
 	ginkgo.By("Waiting for pod completion")
 	err = e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout*6)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2epod.WaitTimeoutForPodNoLongerRunningInNamespace")
 	pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to podClient.Get")
 
 	ginkgo.By("Checking that the pod succeeded")
 	gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
@@ -306,7 +306,7 @@ func SetupEnvironmentAndSkipIfNeeded(ctx context.Context, f *framework.Framework
 	}
 
 	nodes, err := e2enode.GetReadySchedulableNodes(ctx, clientSet)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2enode.GetReadySchedulableNodes")
 	capacity := 0
 	allocatable := 0
 	for _, node := range nodes.Items {
@@ -394,9 +394,9 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework) {
 		// Using default local DaemonSet
 		framework.Logf("Using default local nvidia-driver-installer daemonset manifest.")
 		data, err := e2etestfiles.Read("test/e2e/testing-manifests/gpu/gce/nvidia-driver-installer.yaml")
-		framework.ExpectNoError(err, "failed to read local manifest for nvidia-driver-installer daemonset")
+		framework.ExpectNoError(err, "failed to e2etestfiles.Read")
 		ds, err = e2emanifest.DaemonSetFromData(data)
-		framework.ExpectNoError(err, "failed to parse local manifest for nvidia-driver-installer daemonset")
+		framework.ExpectNoError(err, "failed to e2emanifest.DaemonSetFromData")
 	}
 
 	prev, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Get(ctx, ds.Name, metav1.GetOptions{})
@@ -405,21 +405,21 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework) {
 	} else {
 		ds.Namespace = f.Namespace.Name
 		_, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(ctx, ds, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
+		framework.ExpectNoError(err, "failed to f.ClientSet.AppsV1.DaemonSets.Create")
 		framework.Logf("Successfully created daemonset to install Nvidia drivers.")
 	}
 
 	data, err := e2etestfiles.Read("test/e2e/testing-manifests/gpu/gce/nvidia-gpu-device-plugin.yaml")
-	framework.ExpectNoError(err, "failed to read local manifest for nvidia-gpu-device-plugin daemonset")
+	framework.ExpectNoError(err, "failed to e2etestfiles.Read")
 	ds, err = e2emanifest.DaemonSetFromData(data)
-	framework.ExpectNoError(err, "failed to parse local manifest for nvidia-gpu-device-plugin daemonset")
+	framework.ExpectNoError(err, "failed to e2emanifest.DaemonSetFromData")
 
 	prev, err = f.ClientSet.AppsV1().DaemonSets(ds.Namespace).Get(ctx, ds.Name, metav1.GetOptions{})
 	if err == nil && prev != nil {
 		framework.Logf("nvidia-gpu-device-plugin Daemonset already installed, skipping...")
 	} else {
 		_, err = f.ClientSet.AppsV1().DaemonSets(ds.Namespace).Create(ctx, ds, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create nvidia-gpu-device-plugin daemonset")
+		framework.ExpectNoError(err, "failed to f.ClientSet.AppsV1.DaemonSets.Create")
 		framework.Logf("Successfully created daemonset to install Nvidia device plugin.")
 	}
 
@@ -428,7 +428,7 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework) {
 
 func waitForGPUs(ctx context.Context, f *framework.Framework, namespace, name string) {
 	pods, err := e2eresource.WaitForControlledPods(ctx, f.ClientSet, namespace, name, extensionsinternal.Kind("DaemonSet"))
-	framework.ExpectNoError(err, "failed to get pods controlled by the nvidia-driver-installer daemonset")
+	framework.ExpectNoError(err, "failed to e2eresource.WaitForControlledPods")
 
 	devicepluginPods, err := e2eresource.WaitForControlledPods(ctx, f.ClientSet, "kube-system", "nvidia-gpu-device-plugin", extensionsinternal.Kind("DaemonSet"))
 	if err == nil {
@@ -512,7 +512,7 @@ print(f"Test PASSED")
 	}
 	ns := f.Namespace.Name
 	_, err := e2ejob.CreateJob(ctx, f.ClientSet, ns, testJob)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2ejob.CreateJob")
 	framework.Logf("Created job %v", testJob)
 }
 
@@ -528,7 +528,7 @@ func podNames(pods []v1.Pod) []string {
 func VerifyJobNCompletions(ctx context.Context, f *framework.Framework, completions int32) {
 	ns := f.Namespace.Name
 	pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, "cuda-add")
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2ejob.GetJobPods")
 	createdPods := pods.Items
 	createdPodNames := podNames(createdPods)
 	framework.Logf("Got the following pods for job cuda-add: %v", createdPodNames)

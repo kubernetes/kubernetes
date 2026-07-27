@@ -259,7 +259,7 @@ func (a asyncAssertion) WithPolling(interval time.Duration) AsyncAssertion {
 }
 
 // FailureError is an error where the error string is meant to be passed to
-// ginkgo.Fail directly, i.e. adding some prefix like "unexpected error" is not
+// ginkgo.Fail directly, i.e. adding some prefix like "failed to execute test operation" is not
 // necessary. It is also not necessary to dump the error struct.
 type FailureError struct {
 	msg            string

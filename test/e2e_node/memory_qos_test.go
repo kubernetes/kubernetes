@@ -192,7 +192,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 
 		var err error
 		oldCfg, err = getCurrentKubeletConfig(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		cgroupDriver = oldCfg.CgroupDriver
 	})
 
@@ -207,7 +207,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 		newCfg.CgroupsPerQOS = true
 		newCfg.EnforceNodeAllocatable = []string{"pods"}
 
-		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg), "unexpected error")
 		restartKubelet(ctx, true)
 		waitForKubeletToStart(ctx, f)
 	}
@@ -224,14 +224,14 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 		newCfg.CgroupsPerQOS = true
 		newCfg.EnforceNodeAllocatable = []string{"pods"}
 
-		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg), "unexpected error")
 		restartKubelet(ctx, true)
 		waitForKubeletToStart(ctx, f)
 	}
 
 	restoreConfig := func(ctx context.Context) {
 		if oldCfg != nil {
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
+			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg), "unexpected error")
 			restartKubelet(ctx, true)
 			waitForKubeletToStart(ctx, f)
 		}
@@ -293,7 +293,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 
 			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
 			podMemMin, err := memqosReadCgroupInt64(podCgroupPath, cgroupMemoryMin)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			framework.Logf("Guaranteed pod memory.min: got=%d, expected=%d", podMemMin, mem.Value())
 			gomega.Expect(podMemMin).To(gomega.Equal(mem.Value()),
@@ -324,7 +324,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 
 			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
 			podMemMin, err := memqosReadCgroupInt64(podCgroupPath, cgroupMemoryMin)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			framework.Logf("BestEffort pod memory.min: got=%d, expected=0", podMemMin)
 			gomega.Expect(podMemMin).To(gomega.Equal(int64(0)),
@@ -372,7 +372,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
 
 			podMemMin, err := memqosReadCgroupInt64(podCgroupPath, cgroupMemoryLow)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			expectedPodMin := req1.Value() + req2.Value()
 			framework.Logf("Multi-container pod memory.low: got=%d, expected=%d", podMemMin, expectedPodMin)
@@ -516,7 +516,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 				containerCgroupPath := memqosGetContainerCgroupPath(podCgroupPath, cs.ContainerID, cgroupDriver)
 
 				containerMemHigh, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryHigh)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				expected := memqosExpectedMemoryHigh(requestsMem.Value(), limitsMem.Value(), 1.0)
 				framework.Logf("Container %s memory.high with factor=1.0: got=%d, expected=%d (limit=%d)",
@@ -545,7 +545,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 				containerCgroupPath := memqosGetContainerCgroupPath(podCgroupPath, cs.ContainerID, cgroupDriver)
 
 				containerMemHigh, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryHigh)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				framework.Logf("Container %s memory.high (no limit): got=%d", cs.Name, containerMemHigh)
 				// memory.high should be set using node allocatable instead of limit
@@ -566,7 +566,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			newCfg.CgroupsPerQOS = true
 			newCfg.EnforceNodeAllocatable = []string{"pods"}
 
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg), "unexpected error")
 			restartKubelet(ctx, true)
 			waitForKubeletToStart(ctx, f)
 
@@ -645,7 +645,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
 
 			memMin, err := memqosReadCgroupInt64(podCgroupPath, cgroupMemoryLow)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(memMin).To(gomega.BeNumerically(">", 0),
 				"memory.low should be set when MemoryQoS is enabled")
 
@@ -698,7 +698,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			containerCgroupPath := memqosGetContainerCgroupPath(podCgroupPath, pod.Status.ContainerStatuses[0].ContainerID, cgroupDriver)
 
 			memHigh, err := memqosReadCgroupFile(containerCgroupPath, cgroupMemoryHigh)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			framework.Logf("memory.high with MemoryQoS enabled: %s", memHigh)
 			gomega.Expect(memHigh).NotTo(gomega.Equal("max"),
 				"memory.high should be a computed value when MemoryQoS is enabled")
@@ -713,19 +713,19 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			updateKubeletConfig(ctx, f, newCfg, true)
 
 			memHighStale, err := memqosReadCgroupFile(containerCgroupPath, cgroupMemoryHigh)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			framework.Logf("memory.high after disabling MemoryQoS (stale): %s", memHighStale)
 			gomega.Expect(memHighStale).NotTo(gomega.Equal("max"),
 				"memory.high should still be stale before resize")
 
 			ginkgo.By("Resizing the container to trigger updateContainerResources")
 			pod, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("160Mi")
 			pod.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("320Mi")
 			_, err = f.ClientSet.CoreV1().Pods(pod.Namespace).UpdateResize(ctx, pod.Name, pod, metav1.UpdateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			gomega.Eventually(ctx, func() string {
 				val, _ := memqosReadCgroupFile(containerCgroupPath, cgroupMemoryHigh)
@@ -745,7 +745,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			newCfg.CgroupsPerQOS = true
 			newCfg.EnforceNodeAllocatable = []string{"pods"}
 
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg), "unexpected error")
 			restartKubelet(ctx, true)
 			waitForKubeletToStart(ctx, f)
 
@@ -772,7 +772,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			containerCgroupPath := memqosGetContainerCgroupPath(podCgroupPath, pod.Status.ContainerStatuses[0].ContainerID, cgroupDriver)
 
 			memHigh, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryHigh)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			framework.Logf("memory.high with nil factor: %d (expect max/-1)", memHigh)
 			gomega.Expect(memHigh).To(gomega.Equal(int64(-1)),
 				"memory.high should be max when memoryThrottlingFactor is nil")
@@ -782,21 +782,21 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			configureMemoryQoS(ctx, throttlingFactor)
 
 			memHighStale, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryHigh)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			framework.Logf("memory.high after setting factor=0.9 (stale): %d (expect max/-1)", memHighStale)
 			gomega.Expect(memHighStale).To(gomega.Equal(int64(-1)),
 				"memory.high should still be max before resize (no reconciliation for config-only changes)")
 
 			ginkgo.By("Resizing the container to trigger updateContainerResources")
 			pod, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			newRequestsMem := resource.MustParse("160Mi")
 			newLimitsMem := resource.MustParse("320Mi")
 			pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = newRequestsMem
 			pod.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = newLimitsMem
 			_, err = f.ClientSet.CoreV1().Pods(pod.Namespace).UpdateResize(ctx, pod.Name, pod, metav1.UpdateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			expected := memqosExpectedMemoryHigh(newRequestsMem.Value(), newLimitsMem.Value(), throttlingFactor)
 			gomega.Eventually(ctx, func() int64 {
@@ -908,10 +908,10 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 					containerCgroupPath := memqosGetContainerCgroupPath(podCgroupPath, cs.ContainerID, cgroupDriver)
 
 					containerMemHigh, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryHigh)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					containerMemMin, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryLow)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					if reqMem.Value() == limMem.Value() {
 						// Guaranteed pod - memory.high should be max
@@ -950,14 +950,14 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
 
 			podMemMin, err := memqosReadCgroupInt64(podCgroupPath, cgroupMemoryLow)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			framework.Logf("Policy=None: pod memory.low=%d", podMemMin)
 			gomega.Expect(podMemMin).To(gomega.Equal(int64(0)))
 
 			for _, cs := range pod.Status.ContainerStatuses {
 				containerCgroupPath := memqosGetContainerCgroupPath(podCgroupPath, cs.ContainerID, cgroupDriver)
 				containerMemMin, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryLow)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				framework.Logf("Policy=None: container %s memory.low=%d", cs.Name, containerMemMin)
 				gomega.Expect(containerMemMin).To(gomega.Equal(int64(0)))
 			}
@@ -980,7 +980,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			for _, cs := range pod.Status.ContainerStatuses {
 				containerCgroupPath := memqosGetContainerCgroupPath(podCgroupPath, cs.ContainerID, cgroupDriver)
 				containerMemHigh, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryHigh)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				expected := memqosExpectedMemoryHigh(requestsMem.Value(), limitsMem.Value(), 0.9)
 				framework.Logf("Policy=None: container %s memory.high=%d, expected=%d",
@@ -1004,7 +1004,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
 
 			podMemMin, err := memqosReadCgroupInt64(podCgroupPath, cgroupMemoryLow)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			framework.Logf("Policy=TieredReservation: pod memory.low=%d, expected=%d", podMemMin, requestsMem.Value())
 			gomega.Expect(podMemMin).To(gomega.Equal(requestsMem.Value()))
 		})
@@ -1026,7 +1026,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			}
 
 			burstableMemMin, err := memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryLow)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			framework.Logf("Before rollback: burstable QoS memory.low=%d", burstableMemMin)
 			gomega.Expect(burstableMemMin).To(gomega.BeNumerically(">", 0))
 
@@ -1085,7 +1085,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			}).WithTimeout(60 * time.Second).WithPolling(2 * time.Second).Should(gomega.Equal(v1.PodRunning))
 
 			pod, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
 
 			for _, cs := range pod.Status.ContainerStatuses {
@@ -1101,7 +1101,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 					"memory.events high counter should increment when usage exceeds memory.high")
 
 				events, err := memqosReadMemoryEvents(containerCgroupPath)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				framework.Logf("Container %s memory.events: high=%d, max=%d, oom=%d, oom_kill=%d",
 					cs.Name, events["high"], events["max"], events["oom"], events["oom_kill"])
 				gomega.Expect(events["oom_kill"]).To(gomega.Equal(int64(0)))
@@ -1196,13 +1196,13 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 				gomega.Expect(containerCgroupPath).NotTo(gomega.BeEmpty())
 
 				memLow, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryLow)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				framework.Logf("Container %s memory.low=%d, expected=%d", cs.Name, memLow, memSize.Value())
 				gomega.Expect(memLow).To(gomega.Equal(memSize.Value()),
 					"Burstable pod with CPU mismatch should get memory.low")
 
 				memMin, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryMin)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				gomega.Expect(memMin).To(gomega.Equal(int64(0)),
 					"Burstable pod should have memory.min=0")
 			}
@@ -1225,7 +1225,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			}
 
 			kubepodsMemMin, err := memqosReadCgroupInt64(kubepodsCgroupPath, cgroupMemoryMin)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			framework.Logf("kubepods memory.min=%d, pod requests=%d", kubepodsMemMin, requestsMem.Value())
 			gomega.Expect(kubepodsMemMin).To(gomega.BeNumerically(">=", requestsMem.Value()),
 				"kubepods memory.min must include burstable pod requests")
@@ -1242,7 +1242,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			}
 
 			beforeLow, err := memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryLow)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			framework.Logf("burstable QoS memory.low before: %d", beforeLow)
 
 			requestsMem := resource.MustParse("200Mi")
@@ -1284,7 +1284,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			gomega.Expect(containerCgroupPath).NotTo(gomega.BeEmpty())
 
 			memLowBefore, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryLow)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(memLowBefore).To(gomega.Equal(requestsMem.Value()))
 
 			ginkgo.By("Disabling MemoryQoS")
@@ -1294,7 +1294,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			}
 			newCfg.FeatureGates["MemoryQoS"] = false
 			newCfg.MemoryReservationPolicy = kubeletconfig.NoneMemoryReservationPolicy
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg), "unexpected error")
 			restartKubelet(ctx, true)
 			waitForKubeletToStart(ctx, f)
 
@@ -1336,21 +1336,21 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 
 			ginkgo.By("Verifying initial memory.low matches request")
 			podMemLow, err := memqosReadCgroupInt64(podCgroupPath, cgroupMemoryLow)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			framework.Logf("Pod memory.low before resize: got=%d, expected=%d", podMemLow, initialRequest.Value())
 			gomega.Expect(podMemLow).To(gomega.Equal(initialRequest.Value()),
 				"pod memory.low should equal initial request before resize")
 
 			ginkgo.By("Resizing memory request and limit via IPPR")
 			pod, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			newRequest := resource.MustParse("192Mi")
 			newLimit := resource.MustParse("384Mi")
 			pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = newRequest
 			pod.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = newLimit
 			_, err = f.ClientSet.CoreV1().Pods(pod.Namespace).UpdateResize(ctx, pod.Name, pod, metav1.UpdateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Verifying pod-level memory.low updated to new request")
 			gomega.Eventually(ctx, func() int64 {

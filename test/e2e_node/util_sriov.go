@@ -34,7 +34,7 @@ const (
 
 func requireSRIOVDevices() {
 	sriovdevCount, err := countSRIOVDevices()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	if sriovdevCount > 0 {
 		return // all good

@@ -141,7 +141,7 @@ func waitUntilPodInfoInLog(ctx context.Context, m *mockDriverSetup, expectPodInf
 			if expectPodInfo {
 				ginkgo.By("checking for CSIInlineVolumes feature")
 				csiInlineVolumesEnabled, err = testsuites.CSIInlineVolumesEnabled(ctx, m.cs, m.f.Timeouts, m.f.Namespace.Name)
-				framework.ExpectNoError(err, "failed to test for CSIInlineVolumes")
+				framework.ExpectNoError(err, "failed to testsuites.CSIInlineVolumesEnabled")
 			}
 
 			ginkgo.By("Deleting the previously created pod")

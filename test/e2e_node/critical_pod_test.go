@@ -81,7 +81,7 @@ var _ = SIGDescribe("CriticalPod", framework.WithSerial(), framework.WithDisrupt
 
 			// Check that non-critical pods other than the besteffort have been evicted
 			updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			for _, p := range updatedPodList.Items {
 				if p.Name == nonCriticalBestEffort.Name {
 					gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodRunning), "pod: %v should not be preempted with status: %#v", p.Name, p.Status)
@@ -124,7 +124,7 @@ var _ = SIGDescribe("CriticalPod", framework.WithSerial(), framework.WithDisrupt
 
 			// Check that non-critical pods other than the besteffort have been evicted
 			updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			for _, p := range updatedPodList.Items {
 				ginkgo.By(fmt.Sprintf("verify that the non-critical pod %q is preempted and has the DisruptionTarget condition", klog.KObj(&p)))
 				gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded), "pod: %v should be preempted with status: %#v", p.Name, p.Status)
@@ -184,7 +184,7 @@ var _ = SIGDescribe("CriticalPodWithPodLevelResources", framework.WithSerial(), 
 
 			// Check that non-critical pods other than the besteffort have been evicted
 			updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			for _, p := range updatedPodList.Items {
 				if p.Name == nonCriticalBestEffort.Name {
 					gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodRunning), "pod: %v should not be preempted with status: %#v", p.Name, p.Status)
@@ -209,7 +209,7 @@ var _ = SIGDescribe("CriticalPodWithPodLevelResources", framework.WithSerial(), 
 
 func getNodeCPUAndMemoryCapacity(ctx context.Context, f *framework.Framework) v1.ResourceList {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	// Assuming that there is only one node, because this is a node e2e test.
 	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1))
 	capacity := nodeList.Items[0].Status.Allocatable
@@ -221,7 +221,7 @@ func getNodeCPUAndMemoryCapacity(ctx context.Context, f *framework.Framework) v1
 
 func getNodeName(ctx context.Context, f *framework.Framework) string {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	// Assuming that there is only one node, because this is a node e2e test.
 	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1))
 	return nodeList.Items[0].GetName()

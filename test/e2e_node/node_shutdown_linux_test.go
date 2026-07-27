@@ -109,7 +109,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 		ginkgo.AfterEach(func() {
 			ginkgo.By("Emitting Shutdown false signal; cancelling the shutdown")
 			err := emitSignalPrepareForShutdown(false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		})
 
 		ginkgo.It("should add the DisruptionTarget pod failure condition to the evicted pods", func(ctx context.Context) {
@@ -133,7 +133,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 				FieldSelector: nodeSelector,
 			})
 
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
 
 			list, err = e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{
@@ -157,7 +157,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 
 			ginkgo.By("Emitting shutdown signal")
 			err = emitSignalPrepareForShutdown(true)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Verifying that all pods are shutdown")
 			// All pod should be shutdown
@@ -215,7 +215,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("Emitting Shutdown false signal; cancelling the shutdown")
 			err := emitSignalPrepareForShutdown(false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		})
 
 		ginkgo.It("should be able to gracefully shutdown pods with various grace periods", func(ctx context.Context) {
@@ -238,7 +238,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 			list, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{
 				FieldSelector: nodeSelector,
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
 
 			ctx, cancel := context.WithCancel(ctx)
@@ -278,7 +278,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 
 			ginkgo.By("Emitting shutdown signal")
 			err = emitSignalPrepareForShutdown(true)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Verifying that non-critical pods are shutdown")
 			// Not critical pod should be shutdown
@@ -356,7 +356,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 		ginkgo.It("should be able to handle a cancelled shutdown", func(ctx context.Context) {
 			ginkgo.By("Emitting Shutdown signal")
 			err := emitSignalPrepareForShutdown(true)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				isReady := getNodeReadyStatus(ctx, f)
 				if isReady {
@@ -367,7 +367,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 
 			ginkgo.By("Emitting Shutdown false signal; cancelling the shutdown")
 			err = emitSignalPrepareForShutdown(false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				isReady := getNodeReadyStatus(ctx, f)
 				if !isReady {
@@ -407,7 +407,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 		ginkgo.AfterEach(func() {
 			ginkgo.By("Emitting Shutdown false signal; cancelling the shutdown")
 			err := emitSignalPrepareForShutdown(false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		})
 
 		ginkgo.It("should continue renewing the node lease during graceful shutdown", func(ctx context.Context) {
@@ -428,7 +428,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 
 			ginkgo.By("Emitting shutdown signal")
 			err := emitSignalPrepareForShutdown(true)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Waiting for graceful shutdown to become active")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -443,8 +443,8 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 			}, nodeStatusUpdateTimeout, framework.Poll).Should(gomega.Succeed())
 
 			shutdownLease, err := leaseClient.Get(ctx, nodeName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			framework.ExpectNoError(expectNodeLease(shutdownLease, nodeName))
+			framework.ExpectNoError(err, "unexpected error")
+			framework.ExpectNoError(expectNodeLease(shutdownLease, nodeName), "unexpected error")
 			framework.Logf("Graceful shutdown is active, starting node lease observation at renewTime=%v", shutdownLease.Spec.RenewTime.Time)
 
 			ginkgo.By("Verifying the node lease continues to renew during graceful shutdown")
@@ -527,7 +527,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 			for _, customClass := range customClasses {
 				_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, customClass, metav1.CreateOptions{})
 				if err != nil && !apierrors.IsAlreadyExists(err) {
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				}
 			}
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -544,7 +544,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 		ginkgo.AfterEach(func() {
 			ginkgo.By("Emitting Shutdown false signal; cancelling the shutdown")
 			err := emitSignalPrepareForShutdown(false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		})
 
 		ginkgo.It("should be able to gracefully shutdown pods with various grace periods", func(ctx context.Context) {
@@ -606,7 +606,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 			list, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{
 				FieldSelector: nodeSelector,
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
 
 			ginkgo.By("Verifying batch pods are running")
@@ -618,7 +618,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 
 			ginkgo.By("Emitting shutdown signal")
 			err = emitSignalPrepareForShutdown(true)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Verifying that pods are shutdown")
 
@@ -661,7 +661,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 			ginkgo.By("should have state file")
 			stateFile := "/var/lib/kubelet/graceful_node_shutdown_state"
 			_, err = os.Stat(stateFile)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		})
 	})
 })

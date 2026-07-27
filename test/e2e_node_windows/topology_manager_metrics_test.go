@@ -64,7 +64,7 @@ var _ = SIGWindowsDescribe(feature.TopologyManager, feature.Windows, framework.W
 			var err error
 			if oldCfg == nil {
 				oldCfg, err = getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}
 
 			minCPUsPerNUMA, maxCPUsPerNUMA = windowsHostCheckForTopologyMetrics()
@@ -214,10 +214,10 @@ func windowsHostCheckForTopologyMetrics() (int, int) {
 
 func windowsDetectTotalLogicalCPUs() int {
 	outData, err := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", "(Get-CimInstance Win32_Processor | Measure-Object -Property NumberOfLogicalProcessors -Sum).Sum").Output()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	logicalCPUs, err := strconv.Atoi(strings.TrimSpace(string(outData)))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	return logicalCPUs
 }

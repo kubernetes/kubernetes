@@ -48,7 +48,7 @@ var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.
 			var err error
 			if oldCfg == nil {
 				oldCfg, err = getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}
 
 			_, _, _, cpusNumPerNUMA = hostCheck()

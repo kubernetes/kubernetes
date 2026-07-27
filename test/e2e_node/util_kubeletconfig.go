@@ -52,7 +52,7 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ctx
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		var err error
 		oldCfg, err = getCurrentKubeletConfig(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		newCfg := oldCfg.DeepCopy()
 		updateFunction(ctx, newCfg)
@@ -88,7 +88,7 @@ func updateKubeletConfigWithOptions(ctx context.Context, f *framework.Framework,
 			deleteStateFile(usernsStateFiles)
 		}
 
-		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
+		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig), "unexpected error")
 	})
 
 }
@@ -166,7 +166,7 @@ func withStoppedKubelet(ctx context.Context, f *framework.Framework, ensureConsi
 func getNodeReadyStatus(ctx context.Context, f *framework.Framework) bool {
 	ginkgo.GinkgoHelper()
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	// Assuming that there is only one node, because this is a node e2e test.
 	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1), "the number of nodes is not as expected")
 	return isNodeReady(&nodeList.Items[0])

@@ -56,16 +56,16 @@ var _ = SIGDescribe("Lock contention", framework.WithSlow(), framework.WithDisru
 		// and the function definition of Acquire is here:
 		// https://github.com/kubernetes/kubernetes/blob/9d2b361ebc7ef28f7cb75596ef40b7c239732d37/pkg/util/flock/flock_unix.go#L26
 		fd, err := unix.Open(contentionLockFile, unix.O_CREAT|unix.O_RDWR|unix.O_CLOEXEC, 0600)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		// Defer the lock release in case test fails and we don't reach the step of the release
 		// lock. This ensures that we release the lock for sure.
 		defer func() {
 			err = unix.Flock(fd, unix.LOCK_UN)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}()
 		// Acquire lock.
 		err = unix.Flock(fd, unix.LOCK_EX)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("verifying the kubelet is not healthy as there was a lock contention.")
 		// Once the lock is acquired, check if the kubelet is in healthy state or not.

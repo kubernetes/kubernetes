@@ -192,7 +192,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("running the pod", func() {
 					err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 
 				ginkgo.By("updating the image", func() {
@@ -210,7 +210,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 							}
 							return false, nil
 						})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 
 				ginkgo.By("verifying that the other container did not restart", func() {
@@ -218,7 +218,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 						containerStatus := pod.Status.ContainerStatuses[1]
 						return containerStatus.State.Running != nil && containerStatus.RestartCount < 1, nil
 					})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 			}
 
@@ -310,7 +310,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 							containerStatus := pod.Status.InitContainerStatuses[0]
 							return containerStatus.State.Running != nil && *containerStatus.Started, nil
 						})
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 					})
 
 					ginkgo.By("Changing the image of the regular container", func() {
@@ -322,7 +322,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					ginkgo.By("verifying the regular container does not start", func() {
 						gomega.Consistently(ctx, func() bool {
 							pod, err := client.Get(ctx, pod.Name, metav1.GetOptions{})
-							framework.ExpectNoError(err)
+							framework.ExpectNoError(err, "unexpected error")
 							if pod.Status.Phase != v1.PodPending {
 								return false
 							}
@@ -345,7 +345,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 							}
 							return pod.Status.ContainerStatuses[0].Image == updatedImage, nil
 						})
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 					})
 				})
 			}
@@ -416,7 +416,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("Waiting for the regular container to restart", func() {
 					err := WaitForPodContainerRestartCount(ctx, f.ClientSet, pod.Namespace, pod.Name, 0, 1, 2*time.Minute)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 
 				ginkgo.By("Changing the image of the failed regular container", func() {
@@ -431,7 +431,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 							containerStatus := pod.Status.ContainerStatuses[0]
 							return containerStatus.Image == updatedImage && containerStatus.RestartCount > 1, nil
 						})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 			}
 
@@ -499,7 +499,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("Waiting for the regular container to restart", func() {
 					err := WaitForPodContainerRestartCount(ctx, f.ClientSet, pod.Namespace, pod.Name, 0, 1, 2*time.Minute)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 
 				ginkgo.By("Changing the image of the failed regular container", func() {
@@ -514,7 +514,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 							containerStatus := pod.Status.ContainerStatuses[0]
 							return containerStatus.Image == updatedImage && containerStatus.RestartCount > 1, nil
 						})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 			}
 
@@ -572,12 +572,12 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("Running the pod", func() {
 					err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 
 				ginkgo.By("Deleting the pod", func() {
 					err := client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &podTerminationGracePeriodSeconds})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 
 				ginkgo.By("Updating the image", func() {
@@ -589,7 +589,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				ginkgo.By("ensuring the restartable init container does not restart during termination", func() {
 					gomega.Consistently(ctx, func() bool {
 						pod, err := client.Get(ctx, pod.Name, metav1.GetOptions{})
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 						status := pod.Status.ContainerStatuses[0]
 						if status.State.Terminated == nil || status.State.Terminated.ExitCode != 0 {
 							return true
@@ -721,23 +721,23 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 				ginkgo.By("Waiting for the pod to finish")
 				err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 1*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Parsing results")
 				podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results := parseOutput(ctx, f, podSpec)
 
 				// which we then use to make assertions regarding container ordering
 				ginkgo.By("Analyzing results")
-				framework.ExpectNoError(results.StartsBefore(init1, init2))
-				framework.ExpectNoError(results.ExitsBefore(init1, init2))
+				framework.ExpectNoError(results.StartsBefore(init1, init2), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(init1, init2), "unexpected error")
 
-				framework.ExpectNoError(results.StartsBefore(init2, init3))
-				framework.ExpectNoError(results.ExitsBefore(init2, init3))
+				framework.ExpectNoError(results.StartsBefore(init2, init3), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(init2, init3), "unexpected error")
 
-				framework.ExpectNoError(results.StartsBefore(init3, regular1))
-				framework.ExpectNoError(results.ExitsBefore(init3, regular1))
+				framework.ExpectNoError(results.StartsBefore(init3, regular1), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(init3, regular1), "unexpected error")
 			})
 		})
 
@@ -782,19 +782,19 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 				ginkgo.By("Waiting for the pod to fail")
 				err := e2epod.WaitForPodFailedReason(ctx, f.ClientSet, podSpec, "", 1*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Parsing results")
 				podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results := parseOutput(ctx, f, podSpec)
 
 				ginkgo.By("Analyzing results")
 				// init container should start and exit with an error, and the regular container should never start
-				framework.ExpectNoError(results.Starts(init1))
-				framework.ExpectNoError(results.Exits(init1))
+				framework.ExpectNoError(results.Starts(init1), "unexpected error")
+				framework.ExpectNoError(results.Exits(init1), "unexpected error")
 
-				framework.ExpectNoError(results.DoesntStart(regular1))
+				framework.ExpectNoError(results.DoesntStart(regular1), "unexpected error")
 			})
 		})
 
@@ -854,19 +854,19 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 				ginkgo.By("Waiting for the pod to finish")
 				err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 1*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Parsing results")
 				podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results := parseOutput(ctx, f, podSpec)
 
 				ginkgo.By("Analyzing results")
 				// init container should start and exit with an error, and the regular container should never start
-				framework.ExpectNoError(results.StartsBefore(init1, prefixedName(PostStartPrefix, regular1)))
-				framework.ExpectNoError(results.ExitsBefore(init1, prefixedName(PostStartPrefix, regular1)))
+				framework.ExpectNoError(results.StartsBefore(init1, prefixedName(PostStartPrefix, regular1)), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(init1, prefixedName(PostStartPrefix, regular1)), "unexpected error")
 
-				framework.ExpectNoError(results.RunTogether(regular1, prefixedName(PostStartPrefix, regular1)))
+				framework.ExpectNoError(results.RunTogether(regular1, prefixedName(PostStartPrefix, regular1)), "unexpected error")
 			})
 		})
 
@@ -900,18 +900,18 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 				ginkgo.By("Waiting for the pod, it will not finish")
 				err := WaitForPodContainerRestartCount(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, 0, 3, 2*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Parsing results")
 				podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results := parseOutput(ctx, f, podSpec)
 
 				ginkgo.By("Analyzing results")
 				// container must be restarted
-				framework.ExpectNoError(results.Starts(regular1))
-				framework.ExpectNoError(results.StartsBefore(regular1, regular1))
-				framework.ExpectNoError(results.ExitsBefore(regular1, regular1))
+				framework.ExpectNoError(results.Starts(regular1), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(regular1, regular1), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(regular1, regular1), "unexpected error")
 			})
 		})
 
@@ -970,17 +970,17 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 				ginkgo.By("Waiting for the pod to finish")
 				err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 1*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Parsing results")
 				podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results := parseOutput(ctx, f, podSpec)
 
 				ginkgo.By("Analyzing results")
 				// second container should not start before the PostStart of a first container completed
-				framework.ExpectNoError(results.StartsBefore(prefixedName(PostStartPrefix, regular1), regular2))
-				framework.ExpectNoError(results.ExitsBefore(prefixedName(PostStartPrefix, regular1), regular2))
+				framework.ExpectNoError(results.StartsBefore(prefixedName(PostStartPrefix, regular1), regular2), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(prefixedName(PostStartPrefix, regular1), regular2), "unexpected error")
 			})
 		})
 
@@ -1027,17 +1027,17 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					podSpec = client.Create(ctx, podSpec)
 
 					err := WaitForPodInitContainerToFail(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, 0, "ImagePullBackOff", f.Timeouts.PodStart)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					results = parseOutput(ctx, f, podSpec)
 				})
 				ginkgo.It("should not start an init container", func() {
-					framework.ExpectNoError(results.DoesntStart(init1))
+					framework.ExpectNoError(results.DoesntStart(init1), "unexpected error")
 				})
 				ginkgo.It("should not start a regular container", func() {
-					framework.ExpectNoError(results.DoesntStart(regular1))
+					framework.ExpectNoError(results.DoesntStart(regular1), "unexpected error")
 				})
 			})
 		})
@@ -1100,29 +1100,29 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 				ginkgo.By("Waiting for the pod to restart a few times")
 				err := WaitForPodContainerRestartCount(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, 0, 3, 2*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Parsing results")
 				podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results := parseOutput(ctx, f, podSpec)
 
 				ginkgo.By("Analyzing results")
-				framework.ExpectNoError(results.StartsBefore(init1, init2))
-				framework.ExpectNoError(results.ExitsBefore(init1, init2))
+				framework.ExpectNoError(results.StartsBefore(init1, init2), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(init1, init2), "unexpected error")
 
-				framework.ExpectNoError(results.StartsBefore(init2, init3))
-				framework.ExpectNoError(results.ExitsBefore(init2, init3))
+				framework.ExpectNoError(results.StartsBefore(init2, init3), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(init2, init3), "unexpected error")
 
-				framework.ExpectNoError(results.StartsBefore(init3, regular1))
-				framework.ExpectNoError(results.ExitsBefore(init3, regular1))
+				framework.ExpectNoError(results.StartsBefore(init3, regular1), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(init3, regular1), "unexpected error")
 
 				// ensure that the init containers never restarted
-				framework.ExpectNoError(results.HasNotRestarted(init1))
-				framework.ExpectNoError(results.HasNotRestarted(init2))
-				framework.ExpectNoError(results.HasNotRestarted(init3))
+				framework.ExpectNoError(results.HasNotRestarted(init1), "unexpected error")
+				framework.ExpectNoError(results.HasNotRestarted(init2), "unexpected error")
+				framework.ExpectNoError(results.HasNotRestarted(init3), "unexpected error")
 				// while the regular container did
-				framework.ExpectNoError(results.HasRestarted(regular1))
+				framework.ExpectNoError(results.HasRestarted(regular1), "unexpected error")
 			})
 		})
 
@@ -1163,15 +1163,15 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("ensuring the pod is running")
 				err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("deleting the pod gracefully")
 				err = client.Delete(ctx, pod.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("ensuring the pod is terminated within the grace period seconds + buffer seconds")
 				err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, time.Duration(gracePeriod+bufferSeconds)*time.Second)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			})
 
 			f.It("should respect termination grace period seconds with long-running preStop hook", f.WithNodeConformance(), func(ctx context.Context) {
@@ -1194,15 +1194,15 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("ensuring the pod is running")
 				err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("deleting the pod gracefully")
 				err = client.Delete(ctx, pod.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("ensuring the pod is terminated within the grace period seconds + buffer seconds")
 				err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, time.Duration(gracePeriod+bufferSeconds)*time.Second)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			})
 		})
 
@@ -1262,17 +1262,17 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 					ginkgo.By("Waiting for the pod to complete")
 					err := e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					ginkgo.By("Parsing results")
 					podSpec, err = client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					results := parseOutput(ctx, f, podSpec)
 
 					ginkgo.By("Analyzing results")
-					framework.ExpectNoError(results.RunTogether(regular1, prefixedName(PreStopPrefix, regular1)))
-					framework.ExpectNoError(results.Starts(prefixedName(PreStopPrefix, regular1)))
-					framework.ExpectNoError(results.Exits(regular1))
+					framework.ExpectNoError(results.RunTogether(regular1, prefixedName(PreStopPrefix, regular1)), "unexpected error")
+					framework.ExpectNoError(results.Starts(prefixedName(PreStopPrefix, regular1)), "unexpected error")
+					framework.ExpectNoError(results.Exits(regular1), "unexpected error")
 				})
 			})
 
@@ -1331,17 +1331,17 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 					ginkgo.By("Waiting for the pod to complete")
 					err := e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					ginkgo.By("Parsing results")
 					podSpec, err = client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					results := parseOutput(ctx, f, podSpec)
 
 					ginkgo.By("Analyzing results")
-					framework.ExpectNoError(results.RunTogether(regular1, prefixedName(PreStopPrefix, regular1)))
-					framework.ExpectNoError(results.Starts(prefixedName(PreStopPrefix, regular1)))
-					framework.ExpectNoError(results.Exits(regular1))
+					framework.ExpectNoError(results.RunTogether(regular1, prefixedName(PreStopPrefix, regular1)), "unexpected error")
+					framework.ExpectNoError(results.Starts(prefixedName(PreStopPrefix, regular1)), "unexpected error")
+					framework.ExpectNoError(results.Exits(regular1), "unexpected error")
 				})
 
 				ginkgo.When("a pod is terminating because its liveness probe fails", func() {
@@ -1418,16 +1418,16 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 						ginkgo.By("Waiting for the pod to complete")
 						err := e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 
 						ginkgo.By("Parsing results")
 						podSpec, err = client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 						results := parseOutput(ctx, f, podSpec)
 
 						ginkgo.By("Analyzing results")
 						// readiness probes are called during pod termination
-						framework.ExpectNoError(results.RunTogetherLhsFirst(prefixedName(PreStopPrefix, regular1), prefixedName(ReadinessPrefix, regular1)))
+						framework.ExpectNoError(results.RunTogetherLhsFirst(prefixedName(PreStopPrefix, regular1), prefixedName(ReadinessPrefix, regular1)), "unexpected error")
 						// liveness probes are not called during pod termination
 						err = results.RunTogetherLhsFirst(prefixedName(PreStopPrefix, regular1), prefixedName(LivenessPrefix, regular1))
 						gomega.Expect(err).To(gomega.HaveOccurred())
@@ -1482,11 +1482,11 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 						ginkgo.By("Waiting for the pod to complete")
 						err := e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 
 						ginkgo.By("Parsing results")
 						podSpec, err = client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 						results := parseOutput(ctx, f, podSpec)
 
 						ginkgo.By("Analyzing results")
@@ -1547,7 +1547,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("running the pod", func() {
 					err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 
 				ginkgo.By("updating the image", func() {
@@ -1558,17 +1558,17 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("verifying that the containers do not restart", func() {
 					podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					err = e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "the init container terminated regularly", 30*time.Second, func(pod *v1.Pod) (bool, error) {
 						containerStatus := pod.Status.InitContainerStatuses[0]
 						return containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 0 &&
 							containerStatus.Image != updatedImage && containerStatus.RestartCount < 1, nil
 					})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					results := parseOutput(ctx, f, podSpec)
-					framework.ExpectNoError(results.HasNotRestarted(init1))
+					framework.ExpectNoError(results.HasNotRestarted(init1), "unexpected error")
 				})
 			})
 
@@ -1610,7 +1610,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("running the pod", func() {
 					err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 
 				ginkgo.By("updating the image", func() {
@@ -1621,17 +1621,17 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("verifying that the containers do not restart", func() {
 					podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					err = e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "the init container terminated regularly", 30*time.Second, func(pod *v1.Pod) (bool, error) {
 						containerStatus := pod.Status.InitContainerStatuses[0]
 						return containerStatus.State.Terminated != nil && containerStatus.State.Terminated.ExitCode == 0 &&
 							containerStatus.Image != invalidImage && containerStatus.RestartCount < 1, nil
 					})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					results := parseOutput(ctx, f, podSpec)
-					framework.ExpectNoError(results.HasNotRestarted(init1))
+					framework.ExpectNoError(results.HasNotRestarted(init1), "unexpected error")
 				})
 			})
 
@@ -1672,9 +1672,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("deleting the pod", func() {
 					err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, podSpec)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					err = client.Delete(ctx, podSpec.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 				})
 
@@ -1686,12 +1686,12 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("verifying that the containers do not restart", func() {
 					podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					// subtract a buffer so that the pod still exists
 					gomega.Consistently(ctx, func() bool {
 						podSpec, err = client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 						for _, status := range podSpec.Status.InitContainerStatuses {
 							if status.State.Terminated == nil || status.State.Terminated.ExitCode != 0 {
 								continue
@@ -1776,16 +1776,16 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 			pod = client.Create(ctx, pod)
 			ginkgo.By("Waiting for the pod to be initialized and run")
 			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Getting the current pod sandbox ID")
 			rs, _, err := getCRIClient(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{
 				LabelSelector: podLabels,
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(sandboxes).To(gomega.HaveLen(1))
 			podSandboxID := sandboxes[0].Id
 
@@ -1794,7 +1794,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 
 			ginkgo.By("Stopping the pod sandbox to simulate the node reboot")
 			err = rs.StopPodSandbox(ctx, podSandboxID)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Restarting the kubelet")
 			restartKubelet(ctx)
@@ -1809,39 +1809,39 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 				}
 				return true, nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Parsing results")
 			pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			results := parseOutput(ctx, f, pod)
 
 			ginkgo.By("Analyzing results")
 			init1Started, err := results.FindIndex(init1, "Started", 0)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			init2Started, err := results.FindIndex(init2, "Started", 0)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			init3Started, err := results.FindIndex(init3, "Started", 0)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			regular1Started, err := results.FindIndex(regular1, "Started", 0)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			init1Restarted, err := results.FindIndex(init1, "Started", init1Started+1)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			init2Restarted, err := results.FindIndex(init2, "Started", init2Started+1)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			init3Restarted, err := results.FindIndex(init3, "Started", init3Started+1)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			regular1Restarted, err := results.FindIndex(regular1, "Started", regular1Started+1)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
-			framework.ExpectNoError(init1Started.IsBefore(init2Started))
-			framework.ExpectNoError(init2Started.IsBefore(init3Started))
-			framework.ExpectNoError(init3Started.IsBefore(regular1Started))
+			framework.ExpectNoError(init1Started.IsBefore(init2Started), "unexpected error")
+			framework.ExpectNoError(init2Started.IsBefore(init3Started), "unexpected error")
+			framework.ExpectNoError(init3Started.IsBefore(regular1Started), "unexpected error")
 
-			framework.ExpectNoError(init1Restarted.IsBefore(init2Restarted))
-			framework.ExpectNoError(init2Restarted.IsBefore(init3Restarted))
-			framework.ExpectNoError(init3Restarted.IsBefore(regular1Restarted))
+			framework.ExpectNoError(init1Restarted.IsBefore(init2Restarted), "unexpected error")
+			framework.ExpectNoError(init2Restarted.IsBefore(init3Restarted), "unexpected error")
+			framework.ExpectNoError(init3Restarted.IsBefore(regular1Restarted), "unexpected error")
 		})
 	})
 
@@ -1906,7 +1906,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 				pod = client.Create(ctx, pod)
 				ginkgo.By("Waiting for the pod to be initialized and run")
 				err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			})
 
 			ginkgo.It("should not restart any completed init container after the kubelet restart", func(ctx context.Context) {
@@ -1919,7 +1919,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 				ginkgo.By("ensuring that no completed init container is restarted")
 				gomega.Consistently(ctx, func() bool {
 					pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					for _, status := range pod.Status.InitContainerStatuses {
 						if status.State.Terminated == nil || status.State.Terminated.ExitCode != 0 {
 							continue
@@ -1934,15 +1934,15 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 
 				ginkgo.By("Parsing results")
 				pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results := parseOutput(ctx, f, pod)
 
 				ginkgo.By("Analyzing results")
-				framework.ExpectNoError(results.StartsBefore(init1, init2))
-				framework.ExpectNoError(results.ExitsBefore(init1, init2))
+				framework.ExpectNoError(results.StartsBefore(init1, init2), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(init1, init2), "unexpected error")
 
-				framework.ExpectNoError(results.StartsBefore(init2, init3))
-				framework.ExpectNoError(results.ExitsBefore(init2, init3))
+				framework.ExpectNoError(results.StartsBefore(init2, init3), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(init2, init3), "unexpected error")
 
 				gomega.Expect(pod.Status.InitContainerStatuses[0].RestartCount).To(gomega.Equal(int32(0)))
 				gomega.Expect(pod.Status.InitContainerStatuses[1].RestartCount).To(gomega.Equal(int32(0)))
@@ -1955,10 +1955,10 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 
 				ginkgo.By("removing the completed init container statuses from the container runtime")
 				rs, _, err := getCRIClient(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				for _, c := range pod.Status.InitContainerStatuses {
 					if c.State.Terminated == nil || c.State.Terminated.ExitCode != 0 {
@@ -1971,7 +1971,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 					containerID := tokens[1]
 
 					err := rs.RemoveContainer(ctx, containerID)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				}
 
 				ginkgo.By("restarting the kubelet")
@@ -1980,7 +1980,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 				ginkgo.By("ensuring that no completed init container is restarted")
 				gomega.Consistently(ctx, func() bool {
 					pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					for _, status := range pod.Status.InitContainerStatuses {
 						if status.State.Terminated == nil || status.State.Terminated.ExitCode != 0 {
 							continue
@@ -2073,7 +2073,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 					}
 					return false, nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			})
 
 			ginkgo.It("should not restart any completed init container after the kubelet restart", func(ctx context.Context) {
@@ -2086,7 +2086,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 				ginkgo.By("ensuring that no completed init container is restarted")
 				gomega.Consistently(ctx, func() bool {
 					pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					for _, status := range pod.Status.InitContainerStatuses {
 						if status.State.Terminated == nil || status.State.Terminated.ExitCode != 0 {
 							continue
@@ -2101,12 +2101,12 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 
 				ginkgo.By("Parsing results")
 				pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results := parseOutput(ctx, f, pod)
 
 				ginkgo.By("Analyzing results")
-				framework.ExpectNoError(results.StartsBefore(init1, init2))
-				framework.ExpectNoError(results.ExitsBefore(init1, init2))
+				framework.ExpectNoError(results.StartsBefore(init1, init2), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(init1, init2), "unexpected error")
 
 				gomega.Expect(pod.Status.InitContainerStatuses[0].RestartCount).To(gomega.Equal(int32(0)))
 				gomega.Expect(pod.Status.InitContainerStatuses[1].RestartCount).To(gomega.Equal(int32(0)))
@@ -2118,10 +2118,10 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 
 				ginkgo.By("removing the completed init container statuses from the container runtime")
 				rs, _, err := getCRIClient(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				for _, c := range pod.Status.InitContainerStatuses {
 					if c.State.Terminated == nil || c.State.Terminated.ExitCode != 0 {
@@ -2134,7 +2134,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 					containerID := tokens[1]
 
 					err := rs.RemoveContainer(ctx, containerID)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				}
 
 				ginkgo.By("restarting the kubelet")
@@ -2143,7 +2143,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 				ginkgo.By("ensuring that no completed init container is restarted")
 				gomega.Consistently(ctx, func() bool {
 					pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					for _, status := range pod.Status.InitContainerStatuses {
 						if status.State.Terminated == nil || status.State.Terminated.ExitCode != 0 {
 							continue
@@ -2251,10 +2251,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 			podSpec = client.Create(ctx, podSpec)
 
 			err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 5*time.Minute)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			podSpec, err := client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// pod should exit successfully
 			gomega.Expect(podSpec.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
@@ -2263,37 +2263,37 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 		})
 
 		ginkgo.It("should run the first init container to completion before starting first restartable init container", func() {
-			framework.ExpectNoError(results.StartsBefore(init1, restartableInit1))
-			framework.ExpectNoError(results.ExitsBefore(init1, restartableInit1))
+			framework.ExpectNoError(results.StartsBefore(init1, restartableInit1), "unexpected error")
+			framework.ExpectNoError(results.ExitsBefore(init1, restartableInit1), "unexpected error")
 		})
 
 		ginkgo.It("should run first init container and first restartable init container together", func() {
-			framework.ExpectNoError(results.RunTogetherLhsFirst(restartableInit1, init2))
+			framework.ExpectNoError(results.RunTogetherLhsFirst(restartableInit1, init2), "unexpected error")
 		})
 
 		ginkgo.It("should run second init container to completion before starting second restartable init container", func() {
-			framework.ExpectNoError(results.StartsBefore(init2, restartableInit2))
-			framework.ExpectNoError(results.ExitsBefore(init2, restartableInit2))
+			framework.ExpectNoError(results.StartsBefore(init2, restartableInit2), "unexpected error")
+			framework.ExpectNoError(results.ExitsBefore(init2, restartableInit2), "unexpected error")
 		})
 
 		ginkgo.It("should start second restartable init container before third init container", func() {
-			framework.ExpectNoError(results.StartsBefore(restartableInit2, init3))
+			framework.ExpectNoError(results.StartsBefore(restartableInit2, init3), "unexpected error")
 		})
 
 		ginkgo.It("should run both restartable init containers and third init container together", func() {
-			framework.ExpectNoError(results.RunTogether(restartableInit1, restartableInit2))
-			framework.ExpectNoError(results.RunTogether(restartableInit1, init3))
-			framework.ExpectNoError(results.RunTogether(restartableInit2, init3))
+			framework.ExpectNoError(results.RunTogether(restartableInit1, restartableInit2), "unexpected error")
+			framework.ExpectNoError(results.RunTogether(restartableInit1, init3), "unexpected error")
+			framework.ExpectNoError(results.RunTogether(restartableInit2, init3), "unexpected error")
 		})
 
 		ginkgo.It("should run third init container to completion before starting regular container", func() {
-			framework.ExpectNoError(results.StartsBefore(init3, regular1))
-			framework.ExpectNoError(results.ExitsBefore(init3, regular1))
+			framework.ExpectNoError(results.StartsBefore(init3, regular1), "unexpected error")
+			framework.ExpectNoError(results.ExitsBefore(init3, regular1), "unexpected error")
 		})
 
 		ginkgo.It("should run both restartable init containers and a regular container together", func() {
-			framework.ExpectNoError(results.RunTogether(restartableInit1, regular1))
-			framework.ExpectNoError(results.RunTogether(restartableInit2, regular1))
+			framework.ExpectNoError(results.RunTogether(restartableInit1, regular1), "unexpected error")
+			framework.ExpectNoError(results.RunTogether(restartableInit2, regular1), "unexpected error")
 		})
 	})
 
@@ -2392,7 +2392,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					containerStatus := pod.Status.InitContainerStatuses[2]
 					return containerStatus.State.Running != nil && *containerStatus.Started, nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			})
 
 			ginkgo.By("Changing the image of the restartable init container", func() {
@@ -2407,31 +2407,31 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					return containerStatus.State.Running != nil &&
 						containerStatus.RestartCount > 0 && containerStatus.Image == updatedImage, nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			})
 
 			pod, err := client.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			results := parseOutput(ctx, f, pod)
 
 			ginkgo.By("verifying started the containers in order", func() {
-				framework.ExpectNoError(results.StartsBefore(init1, restartableInit1))
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, init2))
-				framework.ExpectNoError(results.Starts(init1))
-				framework.ExpectNoError(results.Starts(restartableInit1))
-				framework.ExpectNoError(results.Starts(init2))
-				framework.ExpectNoError(results.DoesntStart(restartableInit2))
-				framework.ExpectNoError(results.DoesntStart(regular1))
+				framework.ExpectNoError(results.StartsBefore(init1, restartableInit1), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, init2), "unexpected error")
+				framework.ExpectNoError(results.Starts(init1), "unexpected error")
+				framework.ExpectNoError(results.Starts(restartableInit1), "unexpected error")
+				framework.ExpectNoError(results.Starts(init2), "unexpected error")
+				framework.ExpectNoError(results.DoesntStart(restartableInit2), "unexpected error")
+				framework.ExpectNoError(results.DoesntStart(regular1), "unexpected error")
 			})
 
 			ginkgo.By("verifying not restarted any regular init container", func() {
-				framework.ExpectNoError(results.HasNotRestarted(init1))
-				framework.ExpectNoError(results.HasNotRestarted(init2))
+				framework.ExpectNoError(results.HasNotRestarted(init1), "unexpected error")
+				framework.ExpectNoError(results.HasNotRestarted(init2), "unexpected error")
 			})
 
 			ginkgo.By("verifying restarted the restartable init container whose image changed", func() {
-				framework.ExpectNoError(results.HasRestarted(restartableInit1))
+				framework.ExpectNoError(results.HasRestarted(restartableInit1), "unexpected error")
 			})
 		})
 
@@ -2456,7 +2456,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					containerStatus := pod.Status.InitContainerStatuses[2]
 					return containerStatus.State.Running != nil && *containerStatus.Started, nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			})
 
 			ginkgo.By("Changing the image of the restartable init container", func() {
@@ -2471,31 +2471,31 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					return containerStatus.State.Running != nil &&
 						containerStatus.RestartCount > 0 && containerStatus.Image == updatedImage, nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			})
 
 			pod, err := client.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			results := parseOutput(ctx, f, pod)
 
 			ginkgo.By("verifying it started the containers in order", func() {
-				framework.ExpectNoError(results.StartsBefore(init1, restartableInit1))
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, init2))
-				framework.ExpectNoError(results.Starts(init1))
-				framework.ExpectNoError(results.Starts(restartableInit1))
-				framework.ExpectNoError(results.Starts(init2))
-				framework.ExpectNoError(results.DoesntStart(restartableInit2))
-				framework.ExpectNoError(results.DoesntStart(regular1))
+				framework.ExpectNoError(results.StartsBefore(init1, restartableInit1), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, init2), "unexpected error")
+				framework.ExpectNoError(results.Starts(init1), "unexpected error")
+				framework.ExpectNoError(results.Starts(restartableInit1), "unexpected error")
+				framework.ExpectNoError(results.Starts(init2), "unexpected error")
+				framework.ExpectNoError(results.DoesntStart(restartableInit2), "unexpected error")
+				framework.ExpectNoError(results.DoesntStart(regular1), "unexpected error")
 			})
 
 			ginkgo.By("verifying not restarted any regular init container", func() {
-				framework.ExpectNoError(results.HasNotRestarted(init1))
-				framework.ExpectNoError(results.HasNotRestarted(init2))
+				framework.ExpectNoError(results.HasNotRestarted(init1), "unexpected error")
+				framework.ExpectNoError(results.HasNotRestarted(init2), "unexpected error")
 			})
 
 			ginkgo.By("verifying restarted the restartable init container whose image changed", func() {
-				framework.ExpectNoError(results.HasRestarted(restartableInit1))
+				framework.ExpectNoError(results.HasRestarted(restartableInit1), "unexpected error")
 			})
 		})
 
@@ -2521,7 +2521,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					containerStatus := pod.Status.InitContainerStatuses[2]
 					return containerStatus.State.Running != nil && *containerStatus.Started, nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			})
 
 			ginkgo.By("Changing the image of the restartable init container", func() {
@@ -2536,44 +2536,44 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					return containerStatus.State.Running != nil &&
 						containerStatus.RestartCount > 0 && containerStatus.Image == updatedImage, nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			})
 
 			// Init containers don't restart when restartPolicy=Never
 			ginkgo.By("Waiting for the pod to fail", func() {
 				err := e2epod.WaitForPodTerminatedInNamespace(ctx, f.ClientSet, pod.Name, "", pod.Namespace)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			})
 
 			pod, err := client.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			results := parseOutput(ctx, f, pod)
 
 			ginkgo.By("verifying started the containers in order", func() {
-				framework.ExpectNoError(results.StartsBefore(init1, restartableInit1))
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, init2))
-				framework.ExpectNoError(results.Starts(init1))
-				framework.ExpectNoError(results.Starts(restartableInit1))
-				framework.ExpectNoError(results.Starts(init2))
-				framework.ExpectNoError(results.DoesntStart(restartableInit2))
-				framework.ExpectNoError(results.DoesntStart(regular1))
+				framework.ExpectNoError(results.StartsBefore(init1, restartableInit1), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, init2), "unexpected error")
+				framework.ExpectNoError(results.Starts(init1), "unexpected error")
+				framework.ExpectNoError(results.Starts(restartableInit1), "unexpected error")
+				framework.ExpectNoError(results.Starts(init2), "unexpected error")
+				framework.ExpectNoError(results.DoesntStart(restartableInit2), "unexpected error")
+				framework.ExpectNoError(results.DoesntStart(regular1), "unexpected error")
 			})
 
 			ginkgo.By("verifying not restarted any regular init container", func() {
-				framework.ExpectNoError(results.HasNotRestarted(init1))
-				framework.ExpectNoError(results.HasNotRestarted(init2))
+				framework.ExpectNoError(results.HasNotRestarted(init1), "unexpected error")
+				framework.ExpectNoError(results.HasNotRestarted(init2), "unexpected error")
 			})
 
 			ginkgo.By("verifying restarted the restartable init container whose image changed", func() {
-				framework.ExpectNoError(results.HasRestarted(restartableInit1))
+				framework.ExpectNoError(results.HasRestarted(restartableInit1), "unexpected error")
 			})
 
 			ginkgo.By("verifying terminated init containers in reverse order", func() {
-				framework.ExpectNoError(results.Exits(init2))
-				framework.ExpectNoError(results.Exits(restartableInit1))
-				framework.ExpectNoError(results.Exits(init1))
-				framework.ExpectNoError(results.ExitsBefore(init2, restartableInit1))
+				framework.ExpectNoError(results.Exits(init2), "unexpected error")
+				framework.ExpectNoError(results.Exits(restartableInit1), "unexpected error")
+				framework.ExpectNoError(results.Exits(init1), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(init2, restartableInit1), "unexpected error")
 
 			})
 		})
@@ -2623,10 +2623,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 
 				err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 5*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				// pod should exit successfully
 				gomega.Expect(podSpec.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
@@ -2634,10 +2634,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should not restart a restartable init container", func() {
-				framework.ExpectNoError(results.HasNotRestarted(restartableInit1))
+				framework.ExpectNoError(results.HasNotRestarted(restartableInit1), "unexpected error")
 			})
 			ginkgo.It("should run a regular container to completion", func() {
-				framework.ExpectNoError(results.Exits(regular1))
+				framework.ExpectNoError(results.Exits(regular1), "unexpected error")
 			})
 
 			ginkgo.It("should restart when updated with a new image", func(ctx context.Context) {
@@ -2692,7 +2692,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("running the pod", func() {
 					err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 
 				ginkgo.By("updating the image", func() {
@@ -2707,20 +2707,20 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 							containerStatus := pod.Status.InitContainerStatuses[0]
 							return containerStatus.State.Running != nil && containerStatus.Image == updatedImage, nil
 						})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					results := parseOutput(ctx, f, podSpec)
 					ginkgo.By("Verifying not restarted the regular container", func() {
-						framework.ExpectNoError(results.HasNotRestarted(regular1))
+						framework.ExpectNoError(results.HasNotRestarted(regular1), "unexpected error")
 					})
 					ginkgo.By("Verifying has restarted the restartable init container", func() {
-						framework.ExpectNoError(results.HasRestarted(restartableInit1))
+						framework.ExpectNoError(results.HasRestarted(restartableInit1), "unexpected error")
 					})
 					ginkgo.By("Verifying not restarted the other restartable init container", func() {
-						framework.ExpectNoError(results.HasNotRestarted(restartableInit2))
+						framework.ExpectNoError(results.HasNotRestarted(restartableInit2), "unexpected error")
 					})
 				})
 			})
@@ -2770,17 +2770,17 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				// restartable init container should be in image pull backoff
 				err := WaitForPodInitContainerToFail(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, 0, "ImagePullBackOff", f.Timeouts.PodStart)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should not start a restartable init container", func() {
-				framework.ExpectNoError(results.DoesntStart(restartableInit1))
+				framework.ExpectNoError(results.DoesntStart(restartableInit1), "unexpected error")
 			})
 			ginkgo.It("should not start a regular container", func() {
-				framework.ExpectNoError(results.DoesntStart(regular1))
+				framework.ExpectNoError(results.DoesntStart(regular1), "unexpected error")
 			})
 		})
 
@@ -2836,23 +2836,23 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 
 				err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 5*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				// pod should exit successfully
 				gomega.Expect(podSpec.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should restart a restartable init container before the regular container started", func() {
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1))
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1), "unexpected error")
 			})
 			ginkgo.It("should restart a restartable init container after the regular container started", func() {
-				framework.ExpectNoError(results.StartsBefore(regular1, restartableInit1))
+				framework.ExpectNoError(results.StartsBefore(regular1, restartableInit1), "unexpected error")
 			})
 			ginkgo.It("should run a regular container to completion", func() {
-				framework.ExpectNoError(results.Exits(regular1))
+				framework.ExpectNoError(results.Exits(regular1), "unexpected error")
 			})
 		})
 
@@ -2907,10 +2907,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 
 				err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 5*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				// pod should exit successfully
 				gomega.Expect(podSpec.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
@@ -2918,13 +2918,13 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should restart a restartable init container before the regular container started", func() {
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1))
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1), "unexpected error")
 			})
 			ginkgo.It("should restart a restartable init container after the regular container started", func() {
-				framework.ExpectNoError(results.StartsBefore(regular1, restartableInit1))
+				framework.ExpectNoError(results.StartsBefore(regular1, restartableInit1), "unexpected error")
 			})
 			ginkgo.It("should run a regular container to completion", func() {
-				framework.ExpectNoError(results.Exits(regular1))
+				framework.ExpectNoError(results.Exits(regular1), "unexpected error")
 			})
 		})
 
@@ -2980,17 +2980,17 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 
 				err := e2epod.WaitForPodFailedReason(ctx, f.ClientSet, podSpec, "", 1*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should mark an Init container as failed", func() {
-				framework.ExpectNoError(results.Exits(init1))
+				framework.ExpectNoError(results.Exits(init1), "unexpected error")
 			})
 			ginkgo.It("should not start restartable init container", func() {
-				framework.ExpectNoError(results.DoesntStart(restartableInit1))
+				framework.ExpectNoError(results.DoesntStart(restartableInit1), "unexpected error")
 			})
 		})
 
@@ -3046,19 +3046,19 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 
 				err := e2epod.WaitForPodFailedReason(ctx, f.ClientSet, podSpec, "", 1*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should mark an Init container as failed", func() {
-				framework.ExpectNoError(results.Exits(init1))
+				framework.ExpectNoError(results.Exits(init1), "unexpected error")
 			})
 			// TODO: how will we be able to test it if restartable init container
 			// will never fail and there will be no termination log? Or will be?
 			ginkgo.It("should be running restartable init container and a failed Init container in parallel", func() {
-				framework.ExpectNoError(results.RunTogether(restartableInit1, init1))
+				framework.ExpectNoError(results.RunTogether(restartableInit1, init1), "unexpected error")
 			})
 		})
 
@@ -3109,10 +3109,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 
 				err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 5*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				// pod should exit successfully
 				gomega.Expect(podSpec.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
@@ -3120,10 +3120,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should not restart a restartable init container", func() {
-				framework.ExpectNoError(results.HasNotRestarted(restartableInit1))
+				framework.ExpectNoError(results.HasNotRestarted(restartableInit1), "unexpected error")
 			})
 			ginkgo.It("should run a regular container to completion", func() {
-				framework.ExpectNoError(results.Exits(regular1))
+				framework.ExpectNoError(results.Exits(regular1), "unexpected error")
 			})
 
 			ginkgo.It("should restart when updated with a new image", func(ctx context.Context) {
@@ -3178,7 +3178,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("running the pod", func() {
 					err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 
 				ginkgo.By("updating the image", func() {
@@ -3193,22 +3193,22 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 							containerStatus := pod.Status.InitContainerStatuses[0]
 							return containerStatus.State.Running != nil && containerStatus.Image == updatedImage, nil
 						})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					results := parseOutput(ctx, f, podSpec)
 					ginkgo.By("Verifying not restarted the regular container", func() {
-						framework.ExpectNoError(results.HasNotRestarted(regular1))
+						framework.ExpectNoError(results.HasNotRestarted(regular1), "unexpected error")
 					})
 					ginkgo.By("Verifying has restarted the restartable init container", func() {
-						framework.ExpectNoError(results.HasRestarted(restartableInit1))
+						framework.ExpectNoError(results.HasRestarted(restartableInit1), "unexpected error")
 					})
 					ginkgo.By("Verifying not restarted the other restartable init container", func() {
-						framework.ExpectNoError(results.HasNotRestarted(restartableInit2))
+						framework.ExpectNoError(results.HasNotRestarted(restartableInit2), "unexpected error")
 					})
 				})
 			})
@@ -3258,17 +3258,17 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				// restartable init container should be in image pull backoff
 				err := WaitForPodInitContainerToFail(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, 0, "ImagePullBackOff", f.Timeouts.PodStart)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should not start a restartable init container", func() {
-				framework.ExpectNoError(results.DoesntStart(restartableInit1))
+				framework.ExpectNoError(results.DoesntStart(restartableInit1), "unexpected error")
 			})
 			ginkgo.It("should not start a regular container", func() {
-				framework.ExpectNoError(results.DoesntStart(regular1))
+				framework.ExpectNoError(results.DoesntStart(regular1), "unexpected error")
 			})
 		})
 
@@ -3325,10 +3325,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 
 				err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 5*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				// pod should exit successfully
 				gomega.Expect(podSpec.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
@@ -3336,13 +3336,13 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should restart a restartable init container before the regular container started", func() {
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1))
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1), "unexpected error")
 			})
 			ginkgo.It("should restart a restartable init container after the regular container started", func() {
-				framework.ExpectNoError(results.StartsBefore(regular1, restartableInit1))
+				framework.ExpectNoError(results.StartsBefore(regular1, restartableInit1), "unexpected error")
 			})
 			ginkgo.It("should run a regular container to completion", func() {
-				framework.ExpectNoError(results.Exits(regular1))
+				framework.ExpectNoError(results.Exits(regular1), "unexpected error")
 			})
 		})
 
@@ -3399,10 +3399,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 
 				err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace, 5*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				// pod should exit successfully
 				gomega.Expect(podSpec.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
@@ -3410,13 +3410,13 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should restart a restartable init container before the regular container started", func() {
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1))
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1), "unexpected error")
 			})
 			ginkgo.It("should restart a restartable init container after the regular container started", func() {
-				framework.ExpectNoError(results.StartsBefore(regular1, restartableInit1))
+				framework.ExpectNoError(results.StartsBefore(regular1, restartableInit1), "unexpected error")
 			})
 			ginkgo.It("should run a regular container to completion", func() {
-				framework.ExpectNoError(results.Exits(regular1))
+				framework.ExpectNoError(results.Exits(regular1), "unexpected error")
 			})
 		})
 
@@ -3481,17 +3481,17 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					containerStatus := pod.Status.InitContainerStatuses[0]
 					return containerStatus.RestartCount >= 3, nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should have Init container restartCount greater than 0", func() {
-				framework.ExpectNoError(results.HasRestarted(init1))
+				framework.ExpectNoError(results.HasRestarted(init1), "unexpected error")
 			})
 			ginkgo.It("should not start restartable init container", func() {
-				framework.ExpectNoError(results.DoesntStart(restartableInit1))
+				framework.ExpectNoError(results.DoesntStart(restartableInit1), "unexpected error")
 			})
 		})
 
@@ -3556,18 +3556,18 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					containerStatus := pod.Status.InitContainerStatuses[0]
 					return containerStatus.RestartCount >= 3, nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should have Init container restartCount greater than 0", func() {
-				framework.ExpectNoError(results.HasRestarted(init1))
+				framework.ExpectNoError(results.HasRestarted(init1), "unexpected error")
 			})
 			// TODO: how will we be able to test it if restartable init container will never fail and there will be no termination log? Or will be?
 			ginkgo.It("should be running restartable init container and a failed Init container in parallel", func() {
-				framework.ExpectNoError(results.RunTogether(restartableInit1, init1))
+				framework.ExpectNoError(results.RunTogether(restartableInit1, init1), "unexpected error")
 			})
 		})
 	})
@@ -3618,19 +3618,19 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 
 				err := WaitForPodContainerRestartCount(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, 0, 2, 2*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results = parseOutput(ctx, f, podSpec)
 			})
 
 			ginkgo.It("should not restart a restartable init container", func() {
-				framework.ExpectNoError(results.HasNotRestarted(restartableInit1))
+				framework.ExpectNoError(results.HasNotRestarted(restartableInit1), "unexpected error")
 			})
 			// this test case is different from restartPolicy=Never
 			ginkgo.It("should start a regular container", func() {
-				framework.ExpectNoError(results.HasRestarted(regular1))
+				framework.ExpectNoError(results.HasRestarted(regular1), "unexpected error")
 			})
 
 			ginkgo.It("should restart when updated with a new image", func(ctx context.Context) {
@@ -3685,7 +3685,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("running the pod", func() {
 					err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 
 				ginkgo.By("updating the image", func() {
@@ -3696,24 +3696,24 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("analyzing results", func() {
 					err := WaitForPodContainerRestartCount(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, 0, 2, 2*time.Minute)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					err = e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "wait for container to update image",
 						time.Duration(2)*time.Minute, func(pod *v1.Pod) (bool, error) {
 							containerStatus := pod.Status.InitContainerStatuses[0]
 							return containerStatus.State.Running != nil && containerStatus.Image == updatedImage, nil
 						})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					results := parseOutput(ctx, f, podSpec)
 					ginkgo.By("Verifying has restarted the restartable init container", func() {
-						framework.ExpectNoError(results.HasRestarted(restartableInit1))
+						framework.ExpectNoError(results.HasRestarted(restartableInit1), "unexpected error")
 					})
 					ginkgo.By("Verifying not restarted the other restartable init container", func() {
-						framework.ExpectNoError(results.HasNotRestarted(restartableInit2))
+						framework.ExpectNoError(results.HasNotRestarted(restartableInit2), "unexpected error")
 					})
 				})
 			})
@@ -3763,17 +3763,17 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				// restartable init container should be in image pull backoff
 				err := WaitForPodInitContainerToFail(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, 0, "ImagePullBackOff", f.Timeouts.PodStart)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should not start a restartable init container", func() {
-				framework.ExpectNoError(results.DoesntStart(restartableInit1))
+				framework.ExpectNoError(results.DoesntStart(restartableInit1), "unexpected error")
 			})
 			ginkgo.It("should not start a regular container", func() {
-				framework.ExpectNoError(results.DoesntStart(regular1))
+				framework.ExpectNoError(results.DoesntStart(regular1), "unexpected error")
 			})
 		})
 
@@ -3829,20 +3829,20 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 
 				err := WaitForPodContainerRestartCount(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, 0, 1, 2*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should restart a restartable init container before the regular container started", func() {
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1))
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1), "unexpected error")
 			})
 			ginkgo.It("should restart a restartable init container after the regular container started", func() {
-				framework.ExpectNoError(results.StartsBefore(regular1, restartableInit1))
+				framework.ExpectNoError(results.StartsBefore(regular1, restartableInit1), "unexpected error")
 			})
 			ginkgo.It("should start a regular container", func() {
-				framework.ExpectNoError(results.Starts(regular1))
+				framework.ExpectNoError(results.Starts(regular1), "unexpected error")
 			})
 		})
 
@@ -3899,20 +3899,20 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				podSpec = client.Create(ctx, podSpec)
 
 				err := WaitForPodContainerRestartCount(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, 0, 1, 2*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should restart a restartable init container before the regular container started", func() {
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1))
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1), "unexpected error")
 			})
 			ginkgo.It("should restart a restartable init container after the regular container started", func() {
-				framework.ExpectNoError(results.StartsBefore(regular1, restartableInit1))
+				framework.ExpectNoError(results.StartsBefore(regular1, restartableInit1), "unexpected error")
 			})
 			ginkgo.It("should start a regular container", func() {
-				framework.ExpectNoError(results.Starts(regular1))
+				framework.ExpectNoError(results.Starts(regular1), "unexpected error")
 			})
 		})
 
@@ -3977,17 +3977,17 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					containerStatus := pod.Status.InitContainerStatuses[0]
 					return containerStatus.RestartCount >= 3, nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should have Init container restartCount greater than 0", func() {
-				framework.ExpectNoError(results.HasRestarted(init1))
+				framework.ExpectNoError(results.HasRestarted(init1), "unexpected error")
 			})
 			ginkgo.It("should not start restartable init container", func() {
-				framework.ExpectNoError(results.DoesntStart(restartableInit1))
+				framework.ExpectNoError(results.DoesntStart(restartableInit1), "unexpected error")
 			})
 		})
 
@@ -4052,18 +4052,18 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					containerStatus := pod.Status.InitContainerStatuses[0]
 					return containerStatus.RestartCount >= 3, nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				results = parseOutput(ctx, f, podSpec)
 			})
 			ginkgo.It("should have Init container restartCount greater than 0", func() {
-				framework.ExpectNoError(results.HasRestarted(init1))
+				framework.ExpectNoError(results.HasRestarted(init1), "unexpected error")
 			})
 			// TODO: how will we be able to test it if restartable init container will never fail and there will be no termination log? Or will be?
 			ginkgo.It("should be running restartable init container and a failed Init container in parallel", func() {
-				framework.ExpectNoError(results.RunTogether(restartableInit1, init1))
+				framework.ExpectNoError(results.RunTogether(restartableInit1, init1), "unexpected error")
 			})
 		})
 	})
@@ -4137,15 +4137,15 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 			ginkgo.By("Waiting for the pod to finish")
 			err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, 5*time.Minute)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			results := parseOutput(ctx, f, pod)
 
 			ginkgo.By("Analyzing results")
-			framework.ExpectNoError(results.StartsBefore(restartableInit1, restartableInit2))
-			framework.ExpectNoError(results.StartsBefore(restartableInit2, regular1))
+			framework.ExpectNoError(results.StartsBefore(restartableInit1, restartableInit2), "unexpected error")
+			framework.ExpectNoError(results.StartsBefore(restartableInit2, regular1), "unexpected error")
 		})
 
 		ginkgo.When("the image is updated after the restartable init container's startup probe fails", func() {
@@ -4219,7 +4219,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("Waiting for the restartable init container to restart", func() {
 					err := WaitForPodInitContainerRestartCount(ctx, f.ClientSet, pod.Namespace, pod.Name, 1, 1, 2*time.Minute)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 
 				ginkgo.By("Changing the image of the initializing restartable init container", func() {
@@ -4233,27 +4233,27 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 						2*time.Minute, func(pod *v1.Pod) (bool, error) {
 							return pod.Status.Phase == v1.PodPending, nil
 						})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					err = WaitForPodInitContainerRestartCount(ctx, f.ClientSet, pod.Namespace, pod.Name, 1, 2, 2*time.Minute)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "init container attempted to run with updated image",
 						time.Duration(30)*time.Second, func(pod *v1.Pod) (bool, error) {
 							containerStatus := pod.Status.InitContainerStatuses[1]
 							return containerStatus.Image == updatedImage && containerStatus.RestartCount > 1, nil
 						})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					ginkgo.By("the regular container doesn't start")
 					results := parseOutput(ctx, f, pod)
-					framework.ExpectNoError(results.DoesntStart(regular1))
+					framework.ExpectNoError(results.DoesntStart(regular1), "unexpected error")
 
 					ginkgo.By("the other restartable init container never restarts")
-					framework.ExpectNoError(results.HasNotRestarted(restartableInit1))
+					framework.ExpectNoError(results.HasNotRestarted(restartableInit1), "unexpected error")
 				})
 			}
 
@@ -4342,10 +4342,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("Waiting for the restartable init container to restart")
 				err := WaitForPodInitContainerRestartCount(ctx, f.ClientSet, pod.Namespace, pod.Name, 0, 2, 2*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				if pod.Status.Phase != v1.PodPending {
 					framework.Failf("pod %q is not pending, it's %q", pod.Name, pod.Status.Phase)
@@ -4354,10 +4354,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				results := parseOutput(ctx, f, pod)
 
 				ginkgo.By("Analyzing results")
-				framework.ExpectNoError(results.RunTogether(restartableInit1, prefixedName(PreStopPrefix, restartableInit1)))
-				framework.ExpectNoError(results.Starts(prefixedName(PreStopPrefix, restartableInit1)))
-				framework.ExpectNoError(results.Exits(restartableInit1))
-				framework.ExpectNoError(results.DoesntStart(regular1))
+				framework.ExpectNoError(results.RunTogether(restartableInit1, prefixedName(PreStopPrefix, restartableInit1)), "unexpected error")
+				framework.ExpectNoError(results.Starts(prefixedName(PreStopPrefix, restartableInit1)), "unexpected error")
+				framework.ExpectNoError(results.Exits(restartableInit1), "unexpected error")
+				framework.ExpectNoError(results.DoesntStart(regular1), "unexpected error")
 			})
 		})
 	})
@@ -4430,21 +4430,21 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 			ginkgo.By("Waiting for the restartable init container to restart")
 			err := WaitForPodInitContainerRestartCount(ctx, f.ClientSet, pod.Namespace, pod.Name, 0, 2, 2*time.Minute)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			err = WaitForPodContainerRestartCount(ctx, f.ClientSet, pod.Namespace, pod.Name, 0, 1, 2*time.Minute)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			results := parseOutput(ctx, f, pod)
 
 			ginkgo.By("Analyzing results")
-			framework.ExpectNoError(results.RunTogether(restartableInit1, prefixedName(PreStopPrefix, restartableInit1)))
-			framework.ExpectNoError(results.Starts(prefixedName(PreStopPrefix, restartableInit1)))
-			framework.ExpectNoError(results.Exits(restartableInit1))
-			framework.ExpectNoError(results.Starts(regular1))
+			framework.ExpectNoError(results.RunTogether(restartableInit1, prefixedName(PreStopPrefix, restartableInit1)), "unexpected error")
+			framework.ExpectNoError(results.Starts(prefixedName(PreStopPrefix, restartableInit1)), "unexpected error")
+			framework.ExpectNoError(results.Exits(restartableInit1), "unexpected error")
+			framework.ExpectNoError(results.Starts(regular1), "unexpected error")
 		})
 
 		ginkgo.When("A restartable init container has its image changed after its liveness probe fails", func() {
@@ -4518,7 +4518,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("Waiting for the restartable init container to restart", func() {
 					err := WaitForPodInitContainerRestartCount(ctx, f.ClientSet, pod.Namespace, pod.Name, 1, 1, 2*time.Minute)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 
 				ginkgo.By("Changing the image of the initializing restartable init container", func() {
@@ -4529,14 +4529,14 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("verifying that the image changed", func() {
 					err := WaitForPodInitContainerRestartCount(ctx, f.ClientSet, pod.Namespace, pod.Name, 1, 2, 2*time.Minute)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "init container attempted to run with updated image",
 						time.Duration(30)*time.Second, func(pod *v1.Pod) (bool, error) {
 							containerStatus := pod.Status.InitContainerStatuses[1]
 							return containerStatus.Image == updatedImage, nil
 						})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 			}
 
@@ -4546,12 +4546,12 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				ginkgo.By("verifying the other containers did not restart", func() {
 					client := e2epod.NewPodClient(f)
 					pod, err := client.Get(ctx, originalPodSpec.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					results := parseOutput(ctx, f, pod)
-					framework.ExpectNoError(results.Starts(regular1))
-					framework.ExpectNoError(results.HasNotRestarted(regular1))
-					framework.ExpectNoError(results.HasNotRestarted(restartableInit1))
+					framework.ExpectNoError(results.Starts(regular1), "unexpected error")
+					framework.ExpectNoError(results.HasNotRestarted(regular1), "unexpected error")
+					framework.ExpectNoError(results.HasNotRestarted(restartableInit1), "unexpected error")
 				})
 			})
 			ginkgo.It("should update the image when restartPolicy=OnFailure", func(ctx context.Context) {
@@ -4563,12 +4563,12 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				ginkgo.By("verifying the other containers did not restart", func() {
 					client := e2epod.NewPodClient(f)
 					pod, err := client.Get(ctx, originalPodSpec.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					results := parseOutput(ctx, f, pod)
-					framework.ExpectNoError(results.Starts(regular1))
-					framework.ExpectNoError(results.HasNotRestarted(regular1))
-					framework.ExpectNoError(results.HasNotRestarted(restartableInit1))
+					framework.ExpectNoError(results.Starts(regular1), "unexpected error")
+					framework.ExpectNoError(results.HasNotRestarted(regular1), "unexpected error")
+					framework.ExpectNoError(results.HasNotRestarted(restartableInit1), "unexpected error")
 				})
 			})
 			ginkgo.It("should update the image when restartPolicy=Always", func(ctx context.Context) {
@@ -4582,12 +4582,12 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				ginkgo.By("verifying the other containers did not restart", func() {
 					client := e2epod.NewPodClient(f)
 					pod, err := client.Get(ctx, originalPodSpec.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					results := parseOutput(ctx, f, pod)
-					framework.ExpectNoError(results.Starts(regular1))
-					framework.ExpectNoError(results.HasRestarted(regular1))
-					framework.ExpectNoError(results.HasNotRestarted(restartableInit1))
+					framework.ExpectNoError(results.Starts(regular1), "unexpected error")
+					framework.ExpectNoError(results.HasRestarted(regular1), "unexpected error")
+					framework.ExpectNoError(results.HasNotRestarted(restartableInit1), "unexpected error")
 				})
 			})
 		})
@@ -4667,10 +4667,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				pod = client.Create(ctx, pod)
 
 				err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, 5*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				expectPodTerminationContainerStatuses(pod.Status.InitContainerStatuses, map[string]podTerminationContainerStatus{
 					restartableInit1: {exitCode: int32(0), reason: "Completed"},
@@ -4681,20 +4681,20 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				results := parseOutput(ctx, f, pod)
 
 				ginkgo.By("Analyzing results")
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, restartableInit2))
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, restartableInit3))
-				framework.ExpectNoError(results.StartsBefore(restartableInit2, restartableInit3))
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1))
-				framework.ExpectNoError(results.StartsBefore(restartableInit2, regular1))
-				framework.ExpectNoError(results.StartsBefore(restartableInit3, regular1))
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, restartableInit2), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, restartableInit3), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit2, restartableInit3), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit2, regular1), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit3, regular1), "unexpected error")
 
 				// main containers exit first
-				framework.ExpectNoError(results.ExitsBefore(regular1, restartableInit1))
-				framework.ExpectNoError(results.ExitsBefore(regular1, restartableInit2))
-				framework.ExpectNoError(results.ExitsBefore(regular1, restartableInit3))
+				framework.ExpectNoError(results.ExitsBefore(regular1, restartableInit1), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(regular1, restartableInit2), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(regular1, restartableInit3), "unexpected error")
 				// followed by sidecars in reverse order
-				framework.ExpectNoError(results.ExitsBefore(restartableInit3, restartableInit2))
-				framework.ExpectNoError(results.ExitsBefore(restartableInit2, restartableInit1))
+				framework.ExpectNoError(results.ExitsBefore(restartableInit3, restartableInit2), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(restartableInit2, restartableInit1), "unexpected error")
 			})
 
 			ginkgo.When("A restartable init container has its image updated during pod termination", func() {
@@ -4772,11 +4772,11 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 					ginkgo.By("Running the pod")
 					err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					ginkgo.By("Deleting the pod")
 					err = client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &podTerminationGracePeriodSeconds})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					ginkgo.By("Updating the image")
 					client.Update(ctx, pod.Name, func(pod *v1.Pod) {
@@ -4788,7 +4788,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					ginkgo.By("ensuring the restartable init container does not restart during termination", func() {
 						gomega.Consistently(ctx, func() bool {
 							pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-							framework.ExpectNoError(err)
+							framework.ExpectNoError(err, "unexpected error")
 							for _, status := range pod.Status.InitContainerStatuses {
 								if status.State.Terminated == nil || status.State.Terminated.ExitCode != 0 {
 									continue
@@ -4918,10 +4918,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				pod = client.Create(ctx, pod)
 
 				err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, 5*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				// all restartable init containers are sigkilled with exit code 137
 				expectPodTerminationContainerStatuses(pod.Status.InitContainerStatuses, map[string]podTerminationContainerStatus{
@@ -4933,26 +4933,26 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				results := parseOutput(ctx, f, pod)
 
 				ginkgo.By("Analyzing results")
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, restartableInit2))
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, restartableInit3))
-				framework.ExpectNoError(results.StartsBefore(restartableInit2, restartableInit3))
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1))
-				framework.ExpectNoError(results.StartsBefore(restartableInit2, regular1))
-				framework.ExpectNoError(results.StartsBefore(restartableInit3, regular1))
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, restartableInit2), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, restartableInit3), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit2, restartableInit3), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit2, regular1), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit3, regular1), "unexpected error")
 
 				ps1, err := results.TimeOfStart(prefixedName(PreStopPrefix, restartableInit1))
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				ps2, err := results.TimeOfStart(prefixedName(PreStopPrefix, restartableInit2))
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				ps3, err := results.TimeOfStart(prefixedName(PreStopPrefix, restartableInit3))
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ps1Last, err := results.TimeOfLastLoop(prefixedName(PreStopPrefix, restartableInit1))
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				ps2Last, err := results.TimeOfLastLoop(prefixedName(PreStopPrefix, restartableInit2))
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				ps3Last, err := results.TimeOfLastLoop(prefixedName(PreStopPrefix, restartableInit3))
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				const simulToleration = 1000 // milliseconds
 				// should all end together since they loop infinitely and exceed their grace period
@@ -5064,10 +5064,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				pod = client.Create(ctx, pod)
 
 				err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, 5*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				expectPodTerminationContainerStatuses(pod.Status.InitContainerStatuses, map[string]podTerminationContainerStatus{
 					restartableInit1: {exitCode: int32(0), reason: "Completed"},
@@ -5078,29 +5078,29 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				results := parseOutput(ctx, f, pod)
 
 				ginkgo.By("Analyzing results")
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, restartableInit2))
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, restartableInit3))
-				framework.ExpectNoError(results.StartsBefore(restartableInit2, restartableInit3))
-				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1))
-				framework.ExpectNoError(results.StartsBefore(restartableInit2, regular1))
-				framework.ExpectNoError(results.StartsBefore(restartableInit3, regular1))
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, restartableInit2), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, restartableInit3), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit2, restartableInit3), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit1, regular1), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit2, regular1), "unexpected error")
+				framework.ExpectNoError(results.StartsBefore(restartableInit3, regular1), "unexpected error")
 
 				// main containers exit first
-				framework.ExpectNoError(results.ExitsBefore(regular1, restartableInit1))
-				framework.ExpectNoError(results.ExitsBefore(regular1, restartableInit2))
-				framework.ExpectNoError(results.ExitsBefore(regular1, restartableInit3))
+				framework.ExpectNoError(results.ExitsBefore(regular1, restartableInit1), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(regular1, restartableInit2), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(regular1, restartableInit3), "unexpected error")
 
 				// followed by sidecars in reverse order
-				framework.ExpectNoError(results.ExitsBefore(restartableInit3, restartableInit2))
-				framework.ExpectNoError(results.ExitsBefore(restartableInit2, restartableInit1))
+				framework.ExpectNoError(results.ExitsBefore(restartableInit3, restartableInit2), "unexpected error")
+				framework.ExpectNoError(results.ExitsBefore(restartableInit2, restartableInit1), "unexpected error")
 
 				// and the pre-stop hooks should have been called simultaneously
 				ps1, err := results.TimeOfStart(prefixedName(PreStopPrefix, restartableInit1))
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				ps2, err := results.TimeOfStart(prefixedName(PreStopPrefix, restartableInit2))
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				ps3, err := results.TimeOfStart(prefixedName(PreStopPrefix, restartableInit3))
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				const toleration = 1000 // milliseconds
 				gomega.Expect(ps1-ps2).To(gomega.BeNumerically("~", 0, toleration),
@@ -5212,14 +5212,14 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					containerStatus := pod.Status.InitContainerStatuses[0]
 					return *containerStatus.Started && containerStatus.State.Running != nil, nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				// the init container is running, so we stop the pod before the sidecars even start
 				start := time.Now()
 				grace := int64(3)
 				ginkgo.By("deleting the pod")
 				err = client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &grace})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				ginkgo.By("waiting for the pod to disappear")
 				err = framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*v1.Pod, error) {
 					pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
@@ -5228,7 +5228,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					}
 					return pod, err
 				})).WithTimeout(120 * time.Second).WithPolling(100 * time.Millisecond).Should(gomega.BeNil())
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				buffer := int64(2)
 				deleteTime := time.Since(start).Seconds()
@@ -5323,11 +5323,11 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					return containerStatus.State.Running != nil &&
 						(containerStatus.Started == nil || *containerStatus.Started == false), nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Deleting the pod")
 				err = client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &podTerminationGracePeriodSeconds})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Waiting for the pod to terminate gracefully before its terminationGracePeriodSeconds")
 				err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace,
@@ -5412,11 +5412,11 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("Waiting for the pod to be initialized and run")
 				err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Deleting the pod")
 				err = client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &podTerminationGracePeriodSeconds})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By(fmt.Sprintf("Waiting for the pod (%s/%s) to be transitioned into the Succeeded phase", pod.Namespace, pod.Name))
 				err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
@@ -5528,11 +5528,11 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("Waiting for the pod to be initialized and run")
 				err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Deleting the pod")
 				err = client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &podTerminationGracePeriodSeconds})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By(fmt.Sprintf("Waiting for the pod (%s/%s) to be transitioned into the Succeeded phase", pod.Namespace, pod.Name))
 				err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
@@ -5629,11 +5629,11 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("Waiting for the pod to be initialized and run")
 				err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Deleting the pod")
 				err = client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &podTerminationGracePeriodSeconds})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By(fmt.Sprintf("Waiting for the pod (%s/%s) to be transitioned into the Failed phase", pod.Namespace, pod.Name))
 				err = e2epod.WaitForPodTerminatedInNamespace(ctx, f.ClientSet, pod.Name, "", f.Namespace.Name)
@@ -5739,11 +5739,11 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("Waiting for the pod to be initialized and run")
 				err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Deleting the pod")
 				err = client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &podTerminationGracePeriodSeconds})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By(fmt.Sprintf("Waiting for the pod (%s/%s) to be transitioned into the Succeeded phase", pod.Namespace, pod.Name))
 				err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
@@ -5859,11 +5859,11 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("Waiting for the pod to be initialized and run")
 				err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Deleting the pod")
 				err = client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &podTerminationGracePeriodSeconds})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By(fmt.Sprintf("Waiting for the pod (%s/%s) to be transitioned into the Failed phase", pod.Namespace, pod.Name))
 				err = e2epod.WaitForPodTerminatedInNamespace(ctx, f.ClientSet, pod.Name, "", f.Namespace.Name)
@@ -5976,11 +5976,11 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 				ginkgo.By("Waiting for the pod to be initialized and run")
 				err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Deleting the pod")
 				err = client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &podTerminationGracePeriodSeconds})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By(fmt.Sprintf("Waiting for the pod (%s/%s) to be transitioned into the Succeeded phase", pod.Namespace, pod.Name))
 				err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
@@ -6077,7 +6077,7 @@ fi`},
 							}
 						}
 						return false, nil
-					}),
+					}), "unexpected error",
 			)
 
 			ginkgo.By("Waiting for init container to be running after restart")
@@ -6092,7 +6092,7 @@ fi`},
 							}
 						}
 						return false, nil
-					}),
+					}), "unexpected error",
 			)
 
 			ginkgo.By("Waiting for regular container to start")
@@ -6107,7 +6107,7 @@ fi`},
 							}
 						}
 						return false, nil
-					}),
+					}), "unexpected error",
 			)
 		})
 	})
@@ -6182,16 +6182,16 @@ var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithSerial(), "Co
 			pod = client.Create(ctx, pod)
 			ginkgo.By("Waiting for the pod to be initialized and run")
 			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Getting the current pod sandbox ID")
 			rs, _, err := getCRIClient(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{
 				LabelSelector: podLabels,
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(sandboxes).To(gomega.HaveLen(1))
 			podSandboxID := sandboxes[0].Id
 
@@ -6200,7 +6200,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithSerial(), "Co
 
 			ginkgo.By("Stopping the pod sandbox to simulate the node reboot")
 			err = rs.StopPodSandbox(ctx, podSandboxID)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Restarting the kubelet")
 			restartKubelet(ctx)
@@ -6215,7 +6215,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithSerial(), "Co
 				}
 				return true, nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Waiting for regular container to start running")
 			err = e2epod.WaitForContainerRunning(ctx, f.ClientSet, pod.Namespace, pod.Name, regular1, f.Timeouts.PodStart)
@@ -6223,35 +6223,35 @@ var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithSerial(), "Co
 
 			ginkgo.By("Parsing results")
 			pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			results := parseOutput(ctx, f, pod)
 
 			ginkgo.By("Analyzing results")
 			init1Started, err := results.FindIndex(init1, "Started", 0)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			restartableInit2Started, err := results.FindIndex(restartableInit2, "Started", 0)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			init3Started, err := results.FindIndex(init3, "Started", 0)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			regular1Started, err := results.FindIndex(regular1, "Started", 0)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			init1Restarted, err := results.FindIndex(init1, "Started", init1Started+1)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			restartableInit2Restarted, err := results.FindIndex(restartableInit2, "Started", restartableInit2Started+1)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			init3Restarted, err := results.FindIndex(init3, "Started", init3Started+1)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			regular1Restarted, err := results.FindIndex(regular1, "Started", regular1Started+1)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
-			framework.ExpectNoError(init1Started.IsBefore(restartableInit2Started))
-			framework.ExpectNoError(restartableInit2Started.IsBefore(init3Started))
-			framework.ExpectNoError(init3Started.IsBefore(regular1Started))
+			framework.ExpectNoError(init1Started.IsBefore(restartableInit2Started), "unexpected error")
+			framework.ExpectNoError(restartableInit2Started.IsBefore(init3Started), "unexpected error")
+			framework.ExpectNoError(init3Started.IsBefore(regular1Started), "unexpected error")
 
-			framework.ExpectNoError(init1Restarted.IsBefore(restartableInit2Restarted))
-			framework.ExpectNoError(restartableInit2Restarted.IsBefore(init3Restarted))
-			framework.ExpectNoError(init3Restarted.IsBefore(regular1Restarted))
+			framework.ExpectNoError(init1Restarted.IsBefore(restartableInit2Restarted), "unexpected error")
+			framework.ExpectNoError(restartableInit2Restarted.IsBefore(init3Restarted), "unexpected error")
+			framework.ExpectNoError(init3Restarted.IsBefore(regular1Restarted), "unexpected error")
 		})
 
 		ginkgo.When("A node is rebooting and receives an update request", func() {
@@ -6325,16 +6325,16 @@ var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithSerial(), "Co
 				pod := client.Create(ctx, originalPodSpec)
 				ginkgo.By("Waiting for the pod to be initialized and run")
 				err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Getting the current pod sandbox ID")
 				rs, _, err := getCRIClient(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{
 					LabelSelector: podLabels,
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				gomega.Expect(sandboxes).To(gomega.HaveLen(1))
 				podSandboxID := sandboxes[0].Id
 
@@ -6344,7 +6344,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithSerial(), "Co
 				if nodeReboot {
 					ginkgo.By("Stopping the pod sandbox to simulate the node reboot")
 					err = rs.StopPodSandbox(ctx, podSandboxID)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				}
 
 				ginkgo.By("Restarting the kubelet")
@@ -6377,14 +6377,14 @@ var _ = SIGDescribe(framework.WithNodeConformance(), framework.WithSerial(), "Co
 						return true, nil
 					})
 				}
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Ensuring the image got updated")
 				err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Image updated", f.Timeouts.PodStart+time.Duration(1)*time.Minute, func(pod *v1.Pod) (bool, error) {
 					status := pod.Status.InitContainerStatuses[1]
 					return status.RestartCount > 0 && status.Image == updatedImage, nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}
 
 			ginkgo.It("should handle an update during the node reboot", func(ctx context.Context) {
@@ -6420,11 +6420,11 @@ var _ = SIGDescribe(framework.WithSerial(), "Not Change Container Status", frame
 					}
 					return false, nil
 				})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Double check the initial state before starting the concurrent check
 			p, err := client.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(p.Status.ContainerStatuses).ToNot(gomega.BeEmpty())
 			for _, status := range p.Status.ContainerStatuses {
 				gomega.Expect(status.RestartCount).To(gomega.BeZero())
@@ -6762,11 +6762,11 @@ var _ = SIGDescribe(framework.WithSerial(), "Not Change Container Status", frame
 					}
 					return false, nil
 				})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Double check the initial state before starting the concurrent check
 			p, err := client.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(p.Status.InitContainerStatuses).ToNot(gomega.BeEmpty())
 			gomega.Expect(p.Status.InitContainerStatuses[0].RestartCount).To(gomega.BeZero())
 			gomega.Expect(p.Status.InitContainerStatuses[0].Started).ToNot(gomega.BeNil())
@@ -6965,7 +6965,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Not Change Container Status", frame
 					}
 					return false, nil
 				})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Removing the readiness marker file from all containers to make the pod NotReady")
 			for _, c := range pod.Spec.Containers {
@@ -6983,11 +6983,11 @@ var _ = SIGDescribe(framework.WithSerial(), "Not Change Container Status", frame
 					}
 					return false, nil
 				})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Double check the initial state before starting the concurrent check
 			p, err := client.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(p.Status.ContainerStatuses).ToNot(gomega.BeEmpty())
 			for _, status := range p.Status.ContainerStatuses {
 				gomega.Expect(status.RestartCount).To(gomega.BeZero())
@@ -7216,7 +7216,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Not Change Container Status", frame
 					}
 					return false, nil
 				})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Removing the readiness marker file from the restartable init container to make the pod NotReady")
 			_, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, pod.Spec.InitContainers[0].Name, "rm", "/tmp/ready")
@@ -7232,11 +7232,11 @@ var _ = SIGDescribe(framework.WithSerial(), "Not Change Container Status", frame
 					}
 					return false, nil
 				})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Double check the initial state before starting the concurrent check
 			p, err := client.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(p.Status.InitContainerStatuses).ToNot(gomega.BeEmpty())
 			gomega.Expect(p.Status.InitContainerStatuses[0].RestartCount).To(gomega.BeZero())
 			gomega.Expect(p.Status.InitContainerStatuses[0].Started).ToNot(gomega.BeNil())
@@ -7415,7 +7415,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Not Change Container Status", frame
 					}
 					return false, nil
 				})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// The grace period for kubelet startup is 10 seconds, so we wait here for 11 seconds.
 			time.Sleep(time.Second * 11)
@@ -7442,7 +7442,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Not Change Container Status", frame
 
 			ginkgo.By("Verifying sidecar is still running")
 			p, err := client.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(p.Status.InitContainerStatuses).ToNot(gomega.BeEmpty())
 			for _, status := range p.Status.InitContainerStatuses {
 				if status.Name == "sidecar" {

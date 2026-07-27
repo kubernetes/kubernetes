@@ -141,10 +141,10 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 	ginkgo.BeforeAll(func(ctx context.Context) {
 		var err error
 		oldCfg, err = getCurrentKubeletConfig(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		onlineCPUs, err = getOnlineCPUs() // this should not change at all, at least during this suite lifetime
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		framework.Logf("Online CPUs: %s", onlineCPUs)
 
 		smtLevel = smtLevelFromSysFS() // this should not change at all, at least during this suite lifetime
@@ -970,11 +970,11 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				}
 				return false, nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("ensuring the testing pod is failed for the expected reason")
 			pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod).To(BeAPodInPhase(v1.PodFailed))
 			gomega.Expect(pod).To(HaveStatusReasonMatchingRegex(`SMT.*Alignment.*Error`))
 		})
@@ -1245,11 +1245,11 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 					}
 					return false, nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("ensuring the testing pod is failed for the expected reason")
 				pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				gomega.Expect(pod).To(BeAPodInPhase(v1.PodFailed))
 				gomega.Expect(pod).To(HaveStatusReasonMatchingRegex(`SMT.*Alignment.*Error`))
 			})
@@ -1653,7 +1653,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 
 				ginkgo.By("validating the container is allocated within a single socket")
 				cpus, err := getContainerAllowedCPUs(pod, "test-gu-container-align-by-socket", false)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				gomega.Expect(cpus.Size()).To(gomega.Equal(cpuReq))
 				gomega.Expect(cpus).To(BeAllocatedToSingleSocket())
 			})
@@ -1690,7 +1690,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 
 				ginkgo.By("validating CPUs are evenly distributed across NUMA nodes")
 				cpus, err := getContainerAllowedCPUs(pod, "test-gu-container-distribute-cpus-across-numa-only", false)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				gomega.Expect(pod).To(HaveContainerCPUsAlignedTo("test-gu-container-distribute-cpus-across-numa-only", smtLevel))
 				gomega.Expect(pod).To(HaveContainerCPUsThreadSiblings("test-gu-container-distribute-cpus-across-numa-only"))
 
@@ -1730,7 +1730,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 
 				ginkgo.By("validating CPUs are socket-aligned and evenly distributed across NUMA nodes on that socket")
 				cpus, err := getContainerAllowedCPUs(pod, "test-gu-container-align-by-socket-distribute-across-numa", false)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				gomega.Expect(pod).To(HaveContainerCPUsAlignedTo("test-gu-container-align-by-socket-distribute-across-numa", smtLevel))
 				gomega.Expect(pod).To(HaveContainerCPUsThreadSiblings("test-gu-container-align-by-socket-distribute-across-numa"))
 				gomega.Expect(cpus).To(BeAllocatedToSingleSocket())
@@ -2146,8 +2146,8 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			framework.ExpectNoError(err, "failed to see all containers restart")
 
 			// Wait for the container to be running which indicates that CPU assignment is kept
-			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "affinity-checker", 3*time.Minute))
-			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "affinity-checker", 3*time.Minute), "unexpected error")
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute), "unexpected error")
 		})
 	})
 })
@@ -2171,10 +2171,10 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 	ginkgo.BeforeAll(func(ctx context.Context) {
 		var err error
 		oldCfg, err = getCurrentKubeletConfig(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		onlineCPUs, err = getOnlineCPUs() // this should not change at all, at least during this suite lifetime
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		framework.Logf("Online CPUs: %s", onlineCPUs)
 
 		smtLevel = smtLevelFromSysFS() // this should not change at all, at least during this suite lifetime
@@ -2549,10 +2549,10 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
 				return pod.Status.Phase == v1.PodFailed, nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod).To(BeAPodInPhase(v1.PodFailed))
 		})
 
@@ -2614,9 +2614,9 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 			ginkgo.By("verifying CPU allocation for the first pod")
 			gomega.Expect(pod1).To(HavePodExclusiveCPUs(cpuCount))
 			guCpus1, err := getContainerAllowedCPUs(pod1, guaranteedContainerName, false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			nguCpus1, err := getContainerAllowedCPUs(pod1, nonGuaranteedContainerName, false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			totalCpus1 := guCpus1.Union(nguCpus1)
 			framework.Logf("Pod 1 allocated total CPUs: %s", totalCpus1.String())
 
@@ -2634,9 +2634,9 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 			ginkgo.By("verifying CPU allocation for the second pod")
 			gomega.Expect(pod2).To(HavePodExclusiveCPUs(cpuCount))
 			guCpus2, err := getContainerAllowedCPUs(pod2, guaranteedContainerName, false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			nguCpus2, err := getContainerAllowedCPUs(pod2, nonGuaranteedContainerName, false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			totalCpus2 := guCpus2.Union(nguCpus2)
 			framework.Logf("Pod 2 allocated total CPUs: %s", totalCpus2.String())
 
@@ -2718,7 +2718,7 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), 3)
 
 			currentCfg, err := getCurrentKubeletConfig(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(currentCfg, &cpuManagerKubeletArguments{
 				policyName:                     string(cpumanager.PolicyStatic),
 				topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -2755,10 +2755,10 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 			podA = createPodSync(ctx, podA)
 
 			ginkgo.By("waiting for long-container to be running")
-			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, podA.Namespace, podA.Name, "long-container", 2*time.Minute))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, podA.Namespace, podA.Name, "long-container", 2*time.Minute), "unexpected error")
 
 			ginkgo.By("waiting for short-container to terminate")
-			framework.ExpectNoError(e2epod.WaitForContainerTerminated(ctx, f.ClientSet, podA.Namespace, podA.Name, "short-container", 2*time.Minute))
+			framework.ExpectNoError(e2epod.WaitForContainerTerminated(ctx, f.ClientSet, podA.Namespace, podA.Name, "short-container", 2*time.Minute), "unexpected error")
 
 			// Even when a non-guaranteed container from Pod A finished early, Pod B should not have access to any pod shared pool resources.
 			podB := makeCPUManagerPod("pod-b-attacker", []ctnAttribute{
@@ -2784,13 +2784,13 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 
 			ginkgo.By("verifying Pod B does NOT overlap with Pod A's long-running container")
 			cpusA, err := getContainerAllowedCPUs(podA, "long-container", false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Verify Pod A's shared pool size remains correct
 			gomega.Expect(cpusA.Size()).To(gomega.Equal(2), "Pod A shared pool size should remain 2")
 
 			cpusB, err := getContainerAllowedCPUs(podB, "attacker-container", false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			framework.Logf("Pod A (long) CPUs: %v", cpusA)
 			framework.Logf("Pod B (attacker) CPUs: %v", cpusB)
@@ -2849,8 +2849,8 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 			pod2 = createPodSync(ctx, pod2)
 
 			ginkgo.By("waiting for both pods to be running")
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod1))
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod2))
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod1), "unexpected error")
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod2), "unexpected error")
 
 			ginkgo.By("verifying CPU allocation for both pods")
 			gomega.Expect(pod1).To(HavePodExclusiveCPUs(cpuCountPerPod))
@@ -2860,9 +2860,9 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 
 			// It's sufficient to check one container from each pod, as all containers in a pod share the same pod-level cpuset.
 			cpus1, err := getContainerAllowedCPUs(pod1, "ngu-container-1", false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			cpus2, err := getContainerAllowedCPUs(pod2, "ngu-container-1", false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(cpus1.Intersection(cpus2).IsEmpty()).To(gomega.BeTrueBecause("CPU sets of the two pods should not overlap"))
 		})
 
@@ -3054,7 +3054,7 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith("gu-container", reservedCPUs))
 
 			exclusiveCPUs, err := getContainerAllowedCPUs(pod, "gu-container", false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			expectedSharedCPUs := onlineCPUs.Difference(exclusiveCPUs)
 			gomega.Expect(pod).To(HaveContainerCPUsEqualTo("ngu-container", expectedSharedCPUs))
 		})
@@ -3118,7 +3118,7 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith("gu-container", reservedCPUs))
 
 			exclusiveCPUs, err := getContainerAllowedCPUs(pod, "gu-container", false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			expectedSharedCPUs := onlineCPUs.Difference(exclusiveCPUs)
 			gomega.Expect(pod).To(HaveContainerCPUsEqualTo("ngu-container", expectedSharedCPUs))
 		})
@@ -3242,9 +3242,9 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith("gu-container-2", reservedCPUs))
 
 			exclusiveCPUs1, err := getContainerAllowedCPUs(pod, "gu-container-1", false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			exclusiveCPUs2, err := getContainerAllowedCPUs(pod, "gu-container-2", false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			exclusiveCPUs := exclusiveCPUs1.Union(exclusiveCPUs2)
 			expectedSharedCPUs := onlineCPUs.Difference(exclusiveCPUs)
 			gomega.Expect(pod).To(HaveContainerCPUsEqualTo("ngu-container", expectedSharedCPUs))
@@ -3973,7 +3973,7 @@ func makeThreadSiblingCPUSet(cpus cpuset.CPUSet) cpuset.CPUSet {
 
 func updateKubeletConfigIfNeeded(ctx context.Context, f *framework.Framework, desiredCfg *kubeletconfig.KubeletConfiguration) *v1.Node {
 	curCfg, err := getCurrentKubeletConfig(ctx)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	if equalKubeletConfiguration(curCfg, desiredCfg) {
 		framework.Logf("Kubelet configuration already compliant, nothing to do")
@@ -4030,11 +4030,11 @@ func smtLevelFromSysFS() int {
 
 func cpuSiblingListFromSysFS(cpuID int64) cpuset.CPUSet {
 	data, err := os.ReadFile(fmt.Sprintf("/sys/devices/system/cpu/cpu%d/topology/thread_siblings_list", cpuID))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	// how many thread sibling you have = SMT level
 	// example: 2-way SMT means 2 threads sibling for each thread
 	cpus, err := cpuset.Parse(strings.TrimSpace(string(data)))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return cpus
 }
 

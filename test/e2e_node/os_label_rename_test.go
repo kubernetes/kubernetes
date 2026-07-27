@@ -54,13 +54,13 @@ var _ = SIGDescribe("OSArchLabelReconciliation", framework.WithSerial(), framewo
 			newNode.Labels[v1.LabelOSStable] = "dummyOS"
 			newNode.Labels[v1.LabelArchStable] = "dummyArch"
 			_, _, err := nodeutil.PatchNodeStatus(f.ClientSet.CoreV1(), types.NodeName(node.Name), node, newNode)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			// Restart kubelet
 			restartKubelet(ctx)
-			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, framework.RestartNodeReadyAgainTimeout))
+			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, framework.RestartNodeReadyAgainTimeout), "unexpected error")
 			// If this happens right, node should have all the labels reset properly
 			err = waitForNodeLabels(ctx, f.ClientSet.CoreV1(), node.Name, 5*time.Minute)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		})
 		ginkgo.It("should reconcile the OS and Arch labels when running", func(ctx context.Context) {
 
@@ -73,9 +73,9 @@ var _ = SIGDescribe("OSArchLabelReconciliation", framework.WithSerial(), framewo
 			newNode.Labels[v1.LabelOSStable] = "dummyOS"
 			newNode.Labels[v1.LabelArchStable] = "dummyArch"
 			_, _, err := nodeutil.PatchNodeStatus(f.ClientSet.CoreV1(), types.NodeName(node.Name), node, newNode)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			err = waitForNodeLabels(ctx, f.ClientSet.CoreV1(), node.Name, 5*time.Minute)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		})
 	})
 })

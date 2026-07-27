@@ -114,7 +114,7 @@ func runSnapshotMetadataVerifier(pod *v1.Pod, toolCommand string) {
 		pod.Namespace,
 		strings.Split(toolCommand, " ")...,
 	)
-	framework.ExpectNoError(err, "failed to run snapshot-metadata-verifier tool")
+	framework.ExpectNoError(err, "failed to e2ekubectl.RunKubectlWithFullOutput")
 	if stderr != "" {
 		framework.Failf("failed to run snapshot-metadata-verifier tool:\nstdout:%s\nstderr:%s\n", stdout, stderr)
 	}

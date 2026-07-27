@@ -49,7 +49,7 @@ var _ = SIGDescribe("Pod Level Resources", framework.WithSerial(), feature.PodLe
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 
 		if framework.NodeOSDistroIs("windows") {
 			e2eskipper.Skipf("not supported on windows -- skipping")
@@ -88,7 +88,7 @@ func isCgroupv2Node(f *framework.Framework, ctx context.Context) bool {
 	defer func() {
 		framework.Logf("Deleting %q pod", cgroupv2Testpod.Name)
 		delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
-		framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+		framework.ExpectNoError(delErr, "failed to delErr", delErr)
 	}()
 
 	return cgroups.IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.Containers[0].Name)
@@ -431,15 +431,15 @@ func podLevelResourcesTests(f *framework.Framework) {
 
 			ginkgo.By("verifying pod cgroup values")
 			err := cgroups.VerifyPodCgroups(ctx, f, pod, tc.expected.totalPodResources)
-			framework.ExpectNoError(err, "failed to verify pod's cgroup values: %v", err)
+			framework.ExpectNoError(err, "failed to cgroups.VerifyPodCgroups", err)
 
 			ginkgo.By("verifying containers cgroup limits are same as pod container's cgroup limits")
 			err = verifyContainersCgroupLimits(ctx, f, pod)
-			framework.ExpectNoError(err, "failed to verify containers cgroup values: %v", err)
+			framework.ExpectNoError(err, "failed to verifyContainersCgroupLimits", err)
 
 			ginkgo.By("deleting pods")
 			delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
-			framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+			framework.ExpectNoError(delErr, "failed to delErr", delErr)
 		})
 	}
 }
@@ -495,15 +495,15 @@ func podLevelResourcesFixDefaultingTests(f *framework.Framework) {
 
 		ginkgo.By("verifying pod cgroup values")
 		err := cgroups.VerifyPodCgroups(ctx, f, pod, expectedResources)
-		framework.ExpectNoError(err, "failed to verify pod's cgroup values: %v", err)
+		framework.ExpectNoError(err, "failed to cgroups.VerifyPodCgroups", err)
 
 		ginkgo.By("verifying containers cgroup limits are same as pod container's cgroup limits")
 		err = verifyContainersCgroupLimits(ctx, f, pod)
-		framework.ExpectNoError(err, "failed to verify containers cgroup values: %v", err)
+		framework.ExpectNoError(err, "failed to verifyContainersCgroupLimits", err)
 
 		ginkgo.By("deleting pod")
 		delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
-		framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+		framework.ExpectNoError(delErr, "failed to delErr", delErr)
 	})
 
 	// When only a CPU request is set at pod level (no memory request or limits), defaulting
@@ -533,14 +533,14 @@ func podLevelResourcesFixDefaultingTests(f *framework.Framework) {
 		patch := []byte(`{"metadata":{"annotations":{"test-annotation":"trigger-defaulting"}}}`)
 		updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Patch(
 			ctx, pod.Name, types.MergePatchType, patch, metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch pod annotation")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Patch")
 
 		ginkgo.By("verifying pod resources after annotation update: defaulted memory request and limits remain unchanged")
 		verifyPodResources(*updatedPod, podResources, expectedResources)
 
 		ginkgo.By("deleting pod")
 		delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
-		framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+		framework.ExpectNoError(delErr, "failed to delErr", delErr)
 	})
 }
 
@@ -550,7 +550,7 @@ var _ = SIGDescribe("Pod Level Resources Fix Defaulting", framework.WithSerial()
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 
 		if framework.NodeOSDistroIs("windows") {
 			e2eskipper.Skipf("not supported on windows -- skipping")

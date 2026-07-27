@@ -63,7 +63,7 @@ var _ = SIGDescribe("HugepageAwareMemoryReporting", framework.WithSlow(), framew
 
 	getNodeMemoryCapacity := func(ctx context.Context) int64 {
 		node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		cap := node.Status.Capacity[v1.ResourceMemory]
 		return cap.Value()
 	}

@@ -66,7 +66,7 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 		cs := f.ClientSet
 		ns := f.Namespace.Name
 		_, err := cs.SchedulingV1beta1().PodGroups(ns).Create(ctx, pg, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create PodGroup %s", pg.Name)
+		framework.ExpectNoError(err, "failed to cs.SchedulingV1beta1.PodGroups.Create", pg.Name)
 	}
 
 	deletePodGroup := func(ctx context.Context, name string) {
@@ -74,20 +74,20 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 		ns := f.Namespace.Name
 		ginkgo.By("Deleting PodGroup")
 		err := cs.SchedulingV1beta1().PodGroups(ns).Delete(ctx, name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "failed to delete PodGroup")
+		framework.ExpectNoError(err, "failed to cs.SchedulingV1beta1.PodGroups.Delete")
 	}
 
 	createPriorityClass := func(ctx context.Context, pc *schedulingv1.PriorityClass) {
 		cs := f.ClientSet
 		_, err := cs.SchedulingV1().PriorityClasses().Create(ctx, pc, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create priority class %s", pc.Name)
+		framework.ExpectNoError(err, "failed to cs.SchedulingV1.PriorityClasses.Create", pc.Name)
 	}
 
 	deletePriorityClass := func(ctx context.Context, name string) {
 		cs := f.ClientSet
 		ginkgo.By("Deleting priority class")
 		err := cs.SchedulingV1().PriorityClasses().Delete(ctx, name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "failed to delete priority class: %s", name)
+		framework.ExpectNoError(err, "failed to cs.SchedulingV1.PriorityClasses.Delete", name)
 	}
 
 	addExtendedResource := func(ctx context.Context, nodeName string) {
@@ -131,7 +131,7 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 
 	getNodeName := func(ctx context.Context) string {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err, "failed to get a ready schedulable node")
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 		return node.Name
 	}
 
@@ -143,7 +143,7 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 			if apierrors.IsNotFound(err) {
 				return true
 			}
-			framework.ExpectNoError(err, "failed to get pod %s", podName)
+			framework.ExpectNoError(err, "failed to cs.CoreV1.Pods.Get", podName)
 		}
 		return pod.DeletionTimestamp != nil
 	}
@@ -153,7 +153,7 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 		ns := f.Namespace.Name
 		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, cs, podName, ns), "pod %s failed to run", podName)
 		pod, err := cs.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get pod %s", podName)
+		framework.ExpectNoError(err, "failed to cs.CoreV1.Pods.Get", podName)
 		gomega.Expect(pod.Spec.NodeName).To(gomega.Equal(nodeName))
 	}
 
@@ -240,7 +240,7 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 			ginkgo.By(fmt.Sprintf("Creating low-priority pod %s belonging to PG-victim", name))
 			p := makePod(nodeName, name, pgVictimName, lowPriorityName)
 			createdPod, err := cs.CoreV1().Pods(ns).Create(ctx, p, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create pod %s", name)
+			framework.ExpectNoError(err, "failed to cs.CoreV1.Pods.Create", name)
 			pods = append(pods, createdPod)
 		}
 
@@ -264,7 +264,7 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 		hp1 := makePod(nodeName, "hp1", pgPreemptorName, highPriorityName)
 		var err error
 		hp1, err = cs.CoreV1().Pods(ns).Create(ctx, hp1, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pod hp1")
+		framework.ExpectNoError(err, "failed to cs.CoreV1.Pods.Create")
 
 		ginkgo.By("Verifying high priority pods are running")
 		verifyPodRunningOnNode(ctx, hp1.Name, nodeName)

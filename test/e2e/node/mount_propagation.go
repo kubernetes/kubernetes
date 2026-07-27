@@ -96,7 +96,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 
 		// Pick a node where all pods will run.
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 
 		// Fail the test if the namespace is not set. We expect that the
 		// namespace is unique and we might delete user data if it's not.
@@ -149,7 +149,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// can check mount propagation from the host to pods.
 		cmd := fmt.Sprintf("mkdir %[1]q/host; mount -t tmpfs e2e-mount-propagation-host %[1]q/host; echo host > %[1]q/host/file", hostDir)
 		err = hostExec.IssueCommand(ctx, cmd, node)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to hostExec.IssueCommand")
 
 		ginkgo.DeferCleanup(func(ctx context.Context) error {
 			cmd := fmt.Sprintf("umount %q/host", hostDir)

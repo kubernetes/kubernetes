@@ -110,7 +110,7 @@ var _ = SIGDescribe("NodeProblemDetector", feature.NodeProblemDetector, framewor
 
 			nodeTime = time.Now()
 			bootTime, err = util.GetBootTime(klog.FromContext(ctx))
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Set lookback duration longer than node up time.
 			// Assume the test won't take more than 1 hour, in fact it usually only takes 90 seconds.
@@ -197,7 +197,7 @@ current-context: local-context
 					path.Base(kubeConfigFile): kubeConfig,
 				},
 			}, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Create the node problem detector")
 			hostPathType := new(v1.HostPathType)
@@ -396,7 +396,7 @@ current-context: local-context
 				if test.messageNum > 0 {
 					ginkgo.By(fmt.Sprintf("Inject %d logs: %q", test.messageNum, test.message))
 					err := injectLog(hostLogFile, test.timestamp, test.message, test.messageNum)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				}
 
 				ginkgo.By(fmt.Sprintf("Wait for %d temp events generated", test.tempEvents))
@@ -431,11 +431,11 @@ current-context: local-context
 				framework.Logf("Node Problem Detector logs:\n %s", log)
 			}
 			ginkgo.By("Delete the node problem detector")
-			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, name, *metav1.NewDeleteOptions(0)))
+			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, name, *metav1.NewDeleteOptions(0)), "unexpected error")
 			ginkgo.By("Wait for the node problem detector to disappear")
 			gomega.Expect(e2epod.WaitForPodNotFoundInNamespace(ctx, c, name, ns, pollTimeout)).To(gomega.Succeed())
 			ginkgo.By("Delete the config map")
-			framework.ExpectNoError(c.CoreV1().ConfigMaps(ns).Delete(ctx, configName, metav1.DeleteOptions{}))
+			framework.ExpectNoError(c.CoreV1().ConfigMaps(ns).Delete(ctx, configName, metav1.DeleteOptions{}), "unexpected error")
 			ginkgo.By("Clean up the events")
 			gomega.Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(ctx, *metav1.NewDeleteOptions(0), eventListOptions)).To(gomega.Succeed())
 			ginkgo.By("Clean up the node condition")

@@ -77,7 +77,7 @@ var _ = SIGWindowsDescribe(feature.TopologyManager, framework.WithSerial(), func
 			var err error
 			if oldCfg == nil {
 				oldCfg, err = getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}
 
 			criClient, _, err = getCRIClient(ctx)

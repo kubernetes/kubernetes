@@ -54,7 +54,7 @@ var _ = SIGWindowsDescribe(feature.MemoryManager, feature.Windows, framework.Wit
 			var err error
 			if oldCfg == nil {
 				oldCfg, err = getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}
 
 			// Switching the memory manager policy (None <-> BestEffort) invalidates

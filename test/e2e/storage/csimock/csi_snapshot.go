@@ -99,7 +99,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				// TODO: Test VolumeSnapshots with Retain policy
 				parameters := map[string]string{}
 				snapshotClass, snapshot := storageframework.CreateSnapshot(ctx, sDriver, m.config, storageframework.DynamicSnapshotDelete, claim.Name, claim.Namespace, f.Timeouts, parameters)
-				framework.ExpectNoError(err, "failed to create snapshot")
+				framework.ExpectNoError(err, "failed to m.cs.StorageV1.StorageClasses.Create")
 				m.vsc[snapshotClass.GetName()] = snapshotClass
 				volumeSnapshotName := snapshot.GetName()
 
@@ -117,7 +117,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 
 				ginkgo.By(fmt.Sprintf("Delete PVC %s", claim.Name))
 				err = e2epv.DeletePersistentVolumeClaim(ctx, m.cs, claim.Name, claim.Namespace)
-				framework.ExpectNoError(err, "failed to delete pvc")
+				framework.ExpectNoError(err, "failed to e2epv.DeletePersistentVolumeClaim")
 
 				ginkgo.By("Get PVC from API server and verify deletion timestamp is set")
 				claim, err = m.cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Get(context.TODO(), claim.Name, metav1.GetOptions{})
@@ -156,7 +156,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				if claim != nil && claim.Spec.VolumeName != "" {
 					ginkgo.By(fmt.Sprintf("Wait for PV %s to be deleted", claim.Spec.VolumeName))
 					err = e2epv.WaitForPersistentVolumeDeleted(ctx, m.cs, claim.Spec.VolumeName, framework.Poll, 3*time.Minute)
-					framework.ExpectNoError(err, fmt.Sprintf("failed to delete PV %s", claim.Spec.VolumeName))
+					framework.ExpectNoError(err, fmt.Sprintf("failed to e2epv.WaitForPersistentVolumeDeleted", claim.Spec.VolumeName))
 				}
 
 				ginkgo.By(fmt.Sprintf("Verify VolumeSnapshot %s contains finalizer %s", snapshot.GetName(), volumeSnapshotBoundFinalizer))
@@ -165,11 +165,11 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 
 				ginkgo.By("Delete VolumeSnapshot")
 				err = utils.DeleteAndWaitSnapshot(ctx, m.config.Framework.DynamicClient, f.Namespace.Name, volumeSnapshotName, framework.Poll, framework.SnapshotDeleteTimeout)
-				framework.ExpectNoError(err, fmt.Sprintf("failed to delete VolumeSnapshot %s", volumeSnapshotName))
+				framework.ExpectNoError(err, fmt.Sprintf("failed to utils.DeleteAndWaitSnapshot", volumeSnapshotName))
 
 				ginkgo.By(fmt.Sprintf("Wait for VolumeSnapshotContent %s to be deleted", volumeSnapshotContentName))
 				err = utils.WaitForGVRDeletion(ctx, m.config.Framework.DynamicClient, utils.SnapshotContentGVR, volumeSnapshotContentName, framework.Poll, framework.SnapshotDeleteTimeout)
-				framework.ExpectNoError(err, fmt.Sprintf("failed to delete VolumeSnapshotContent %s", volumeSnapshotContentName))
+				framework.ExpectNoError(err, fmt.Sprintf("failed to utils.WaitForGVRDeletion", volumeSnapshotContentName))
 			})
 		}
 	})
@@ -267,7 +267,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				}
 
 				_, snapshot := storageframework.CreateSnapshot(ctx, sDriver, m.config, storageframework.DynamicSnapshotDelete, pvc.Name, pvc.Namespace, f.Timeouts, parameters)
-				framework.ExpectNoError(err, "failed to create snapshot")
+				framework.ExpectNoError(err, "failed to nil")
 				snapshotcontent := utils.GetSnapshotContentFromSnapshot(ctx, m.config.Framework.DynamicClient, snapshot, f.Timeouts.SnapshotCreate)
 				if annotations, ok = snapshotcontent.Object["metadata"].(map[string]interface{})["annotations"]; !ok {
 					framework.Failf("Unable to get volume snapshot content annotations")
@@ -363,14 +363,14 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				ginkgo.By("Creating snapshot")
 				parameters := map[string]string{}
 				sr := storageframework.CreateSnapshotResource(ctx, sDriver, m.config, test.pattern, pvc.Name, pvc.Namespace, f.Timeouts, parameters)
-				framework.ExpectNoError(err, "failed to create snapshot")
+				framework.ExpectNoError(err, "failed to e2epv.WaitForPVClaimBoundPhase")
 
 				ginkgo.By("Checking for CreateSnapshot metrics")
 				createSnapshotMetrics.waitForSnapshotControllerMetric(ctx, originalCreateSnapshotCount+1.0, f.Timeouts.SnapshotControllerMetrics)
 
 				ginkgo.By("Checking for CreateSnapshotAndReady metrics")
 				err = utils.WaitForSnapshotReady(ctx, m.config.Framework.DynamicClient, pvc.Namespace, sr.Vs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate)
-				framework.ExpectNoError(err, "failed to wait for snapshot ready")
+				framework.ExpectNoError(err, "failed to utils.WaitForSnapshotReady")
 				createSnapshotAndReadyMetrics.waitForSnapshotControllerMetric(ctx, originalCreateSnapshotAndReadyCount+1.0, f.Timeouts.SnapshotControllerMetrics)
 
 				// delete the snapshot and check if the snapshot is deleted

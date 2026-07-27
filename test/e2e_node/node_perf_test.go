@@ -54,7 +54,7 @@ func setKubeletConfig(ctx context.Context, f *framework.Framework, cfg *kubeletc
 		ginkgo.By("Stopping the kubelet")
 		restartKubelet := mustStopKubelet(ctx, f)
 
-		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(cfg))
+		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(cfg), "unexpected error")
 
 		ginkgo.By("Restarting the kubelet")
 		restartKubelet(ctx)
@@ -63,7 +63,7 @@ func setKubeletConfig(ctx context.Context, f *framework.Framework, cfg *kubeletc
 	// Wait for the Kubelet to be ready.
 	gomega.Eventually(ctx, func(ctx context.Context) bool {
 		nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		return nodes == 1
 	}, time.Minute, time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in ready state"))
 }
@@ -81,11 +81,11 @@ var _ = SIGDescribe("Node Performance Testing", framework.WithSerial(), framewor
 	)
 	ginkgo.JustBeforeEach(func(ctx context.Context) {
 		err := wl.PreTestExec()
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		oldCfg, err = getCurrentKubeletConfig(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		newCfg, err = wl.KubeletConfig(oldCfg)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		setKubeletConfig(ctx, f, newCfg)
 	})
 
@@ -106,7 +106,7 @@ var _ = SIGDescribe("Node Performance Testing", framework.WithSerial(), framewor
 		time.Sleep(15 * time.Second)
 		ginkgo.By("running the post test exec from the workload")
 		err := wl.PostTestExec()
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		setKubeletConfig(ctx, f, oldCfg)
 	}
 
@@ -131,13 +131,13 @@ var _ = SIGDescribe("Node Performance Testing", framework.WithSerial(), framewor
 			},
 		)
 		podLogs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if podErr != nil {
 			framework.Logf("dumping pod logs due to pod error detected: \n%s", podLogs)
 			framework.Failf("pod error: %v", podErr)
 		}
 		perf, err := wl.ExtractPerformanceFromLogs(podLogs)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		framework.Logf("Time to complete workload %s: %v", wl.Name(), perf)
 		// using framework.ExpectNoError for consistency would cause changes the output format
 		gomega.Expect(podErr).To(gomega.Succeed(), "wait for pod %q to succeed", pod.Name)

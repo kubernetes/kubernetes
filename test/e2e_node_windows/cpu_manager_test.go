@@ -122,7 +122,7 @@ var _ = SIGWindowsDescribe(feature.CPUManager, feature.Windows, ginkgo.Ordered, 
 
 			ginkgo.By("verifying no exclusive CPU affinity is set")
 			affinities, err := getWindowsContainerCPUAffinity(ctx, criClient, pod, "burstable-ctr")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			cpuCount := countCPUsInAffinities(affinities)
 			hostCPUs := int(getLocalNode(ctx, f).Status.Capacity.Cpu().Value())
 			gomega.Expect(cpuCount).To(gomega.Equal(hostCPUs),
@@ -160,9 +160,9 @@ var _ = SIGWindowsDescribe(feature.CPUManager, feature.Windows, ginkgo.Ordered, 
 
 			ginkgo.By("verifying burstable container runs on the shared pool, not exclusively pinned")
 			buAff, err := getWindowsContainerCPUAffinity(ctx, criClient, buPod, "bu-ctr")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			guAff, err := getWindowsContainerCPUAffinity(ctx, criClient, guPod, "gu-ctr")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			// The shared pool used by burstable containers shrinks as guaranteed pods
 			// take exclusive CPUs, so the expected size is hostCPUs - guaranteedExclusive.
 			buCPUs := countCPUsInAffinities(buAff)

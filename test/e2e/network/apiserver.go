@@ -47,7 +47,7 @@ var _ = common.SIGDescribe("API Server", func() {
 	*/
 	framework.ConformanceIt("should provide secure master service", func(ctx context.Context) {
 		_, err := cs.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, "kubernetes", metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to fetch the service object for the service named kubernetes")
+		framework.ExpectNoError(err, "failed to cs.CoreV1.Services.Get")
 	})
 
 	/*

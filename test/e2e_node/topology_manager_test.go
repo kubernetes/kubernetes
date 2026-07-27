@@ -74,40 +74,40 @@ type tmCtnAttribute struct {
 
 func detectNUMANodes() int {
 	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"NUMA node(s):\" | cut -d \":\" -f 2").Output()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	numaNodes, err := strconv.Atoi(strings.TrimSpace(string(outData)))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	return numaNodes
 }
 
 func detectCoresPerSocket() int {
 	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Core(s) per socket:\" | cut -d \":\" -f 2").Output()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	coreCount, err := strconv.Atoi(strings.TrimSpace(string(outData)))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	return coreCount
 }
 
 func detectSockets() int {
 	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Socket(s):\" | cut -d \":\" -f 2").Output()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	socketCount, err := strconv.Atoi(strings.TrimSpace(string(outData)))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	return socketCount
 }
 
 func detectThreadPerCore() int {
 	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Thread(s) per core:\" | cut -d \":\" -f 2").Output()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	threadCount, err := strconv.Atoi(strings.TrimSpace(string(outData)))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	return threadCount
 }
@@ -139,13 +139,13 @@ func detectNUMADistances(numaNodes int) map[int][]int {
 	nodeToDistances := make(map[int][]int)
 	for i := range numaNodes {
 		outData, err := os.ReadFile(fmt.Sprintf("/sys/devices/system/node/node%d/distance", i))
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		nodeToDistances[i] = make([]int, 0, numaNodes)
 
 		for _, distance := range strings.Split(strings.TrimSpace(string(outData)), " ") {
 			distanceValue, err := strconv.Atoi(strings.TrimSpace(distance))
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			nodeToDistances[i] = append(nodeToDistances[i], distanceValue)
 		}
@@ -288,7 +288,7 @@ func configureTopologyManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguratio
 	if nodeNum, ok := findNUMANodeWithoutSRIOVDevices(configMap, numaNodes); ok {
 		cpus, err := getCPUsPerNUMANode(nodeNum)
 		framework.Logf("NUMA Node %d doesn't seem to have attached SRIOV devices and has cpus=%v", nodeNum, cpus)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		newCfg.ReservedSystemCPUs = fmt.Sprintf("%d", cpus[len(cpus)-1])
 	} else {
 		// The Kubelet panics if either kube-reserved or system-reserved is not set
@@ -500,7 +500,7 @@ func runTopologyManagerPositiveTest(ctx context.Context, f *framework.Framework,
 		if envInfo.scope == podScopeTopology {
 			for _, pod := range podMap {
 				err := validatePodAlignmentWithPodScope(ctx, f, pod, envInfo)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}
 		}
 	}
@@ -520,9 +520,9 @@ func runTopologyManagerNegativeTest(ctx context.Context, f *framework.Framework,
 		}
 		return false, nil
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	if pod.Status.Phase != v1.PodFailed {
 		framework.Failf("pod %s not failed: %v", pod.Name, pod.Status)
@@ -607,12 +607,12 @@ func createSRIOVPodOrFail(ctx context.Context, f *framework.Framework) *v1.Pod {
 
 	ginkgo.By("Create SRIOV device plugin pod")
 	dpPod, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(ctx, dp, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	if err = e2epod.WaitForPodCondition(ctx, f.ClientSet, metav1.NamespaceSystem, dp.Name, "Ready", 120*time.Second, testutils.PodRunningReady); err != nil {
 		framework.Logf("SRIOV Pod %v took too long to enter running/ready: %v", dp.Name, err)
 	}
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	return dpPod
 }
@@ -643,7 +643,7 @@ func deleteSRIOVPodOrFail(ctx context.Context, f *framework.Framework, sd *sriov
 
 	ginkgo.By(fmt.Sprintf("Delete SRIOV device plugin pod %s/%s", sd.pod.Namespace, sd.pod.Name))
 	err = f.ClientSet.CoreV1().Pods(sd.pod.Namespace).Delete(ctx, sd.pod.Name, deleteOptions)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	waitForAllContainerRemoval(ctx, sd.pod.Name, sd.pod.Namespace)
 }
 
@@ -656,11 +656,11 @@ func removeSRIOVConfigOrFail(ctx context.Context, f *framework.Framework, sd *sr
 
 	ginkgo.By(fmt.Sprintf("Deleting configMap %v/%v", metav1.NamespaceSystem, sd.configMap.Name))
 	err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(ctx, sd.configMap.Name, deleteOptions)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By(fmt.Sprintf("Deleting serviceAccount %v/%v", metav1.NamespaceSystem, sd.serviceAccount.Name))
 	err = f.ClientSet.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Delete(ctx, sd.serviceAccount.Name, deleteOptions)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 func teardownSRIOVConfigOrFail(ctx context.Context, f *framework.Framework, sd *sriovData) {
@@ -1158,7 +1158,7 @@ func runPreferClosestNUMAOptimalAllocationTest(ctx context.Context, f *framework
 		numCores := 0
 		for nodeNum := 0 + 2*podID; nodeNum <= 1+2*podID; nodeNum++ {
 			cpus, err := getCPUsPerNUMANode(nodeNum)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			// subtract one to accommodate reservedCPUs. It'll only work if more than 2 cpus per NUMA node.
 			cpusPerNUMA := len(cpus)
 			if cpusPerNUMA < 3 {
@@ -1193,7 +1193,7 @@ func runPreferClosestNUMASubOptimalAllocationTest(ctx context.Context, f *framew
 
 	// expect same amount of cpus per NUMA
 	cpusPerNUMA, err := getCPUsPerNUMANode(0)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	if len(cpusPerNUMA) < 5 {
 		e2eskipper.Skipf("Less than 5 cpus per NUMA node on this system. Skipping test.")
 	}
@@ -1202,7 +1202,7 @@ func runPreferClosestNUMASubOptimalAllocationTest(ctx context.Context, f *framew
 		// asks for all but one cpus from one less than half NUMA nodes, and half from the other
 		// plus add one less than half NUMA nodes, to accommodate for reserved cpus
 		numCores := ((numaNodes/2)-1)*(len(cpusPerNUMA)-1) + (len(cpusPerNUMA) / 2) + (numaNodes/2 - 1)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		coresReq := fmt.Sprintf("%dm", numCores*1000)
 		ctnAttrs := []tmCtnAttribute{
@@ -1306,7 +1306,7 @@ func runTopologyManagerTests(f *framework.Framework, topologyOptions map[string]
 
 	ginkgo.It("run Topology Manager policy test suite", func(ctx context.Context) {
 		oldCfg, err = getCurrentKubeletConfig(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		scope := containerScopeTopology
 		for _, policy := range policies {
@@ -1327,7 +1327,7 @@ func runTopologyManagerTests(f *framework.Framework, topologyOptions map[string]
 		configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
 
 		oldCfg, err = getCurrentKubeletConfig(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		sd := setupSRIOVConfigOrFail(ctx, f, configMap)
 		ginkgo.DeferCleanup(teardownSRIOVConfigOrFail, f, sd)
@@ -1351,7 +1351,7 @@ func runTopologyManagerTests(f *framework.Framework, topologyOptions map[string]
 		configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
 
 		oldCfg, err = getCurrentKubeletConfig(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		policy := topologymanager.PolicySingleNumaNode
 		scope := podScopeTopology
@@ -1383,7 +1383,7 @@ func runPreferClosestNUMATests(f *framework.Framework) {
 		numaDistances := detectNUMADistances(numaNodes)
 
 		oldCfg, err = getCurrentKubeletConfig(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		policy := topologymanager.PolicyBestEffort
 		scope := containerScopeTopology
@@ -1492,7 +1492,7 @@ func runNonGuPodTest(ctx context.Context, f *framework.Framework, cpuCap int64, 
 
 	ginkgo.By("checking if the expected cpuset was assigned")
 	expAllowedCPUs, err := cpuset.Parse(fmt.Sprintf("0-%d", cpuCap-1))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	expAllowedCPUs = expAllowedCPUs.Difference(strictReservedCPUs)
 	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", expAllowedCPUs.String())
 	gomega.Eventually(ctx, func() error {
@@ -1732,6 +1732,6 @@ func runMultipleGuPods(ctx context.Context, f *framework.Framework) {
 
 func mustParseCPUSet(s string) cpuset.CPUSet {
 	res, err := cpuset.Parse(s)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return res
 }

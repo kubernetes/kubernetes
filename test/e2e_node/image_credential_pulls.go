@@ -51,11 +51,11 @@ var _ = SIGDescribe("Ensure Credential Pulled Images", func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			var err error
 			_, is, err = getCRIClient(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			var registryNodeNames []string
 			registryAddress, registryNodeNames, err = e2eregistry.SetupRegistry(ctx, f, true)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(registryNodeNames).ToNot(gomega.BeEmpty(), "registry should run on at least one node")
 			// this is to wait for the complete removal of all registry pods between tests
 			ginkgo.DeferCleanup(func(ctx context.Context) {
@@ -68,7 +68,7 @@ var _ = SIGDescribe("Ensure Credential Pulled Images", func() {
 			testSecret = e2eregistry.User1DockerSecret(registryAddress)
 			testSecret.GenerateName = f.UniqueName
 			testSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, testSecret, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			// Use the registry node for scheduling - in node e2e tests, this is the single test node
 			testNode = registryNodeNames[0]
 			// PullAlways pull policy will force an ImagePulledRecord to be created
@@ -76,7 +76,7 @@ var _ = SIGDescribe("Ensure Credential Pulled Images", func() {
 			gomega.Expect(origPod.Spec.NodeName).To(gomega.Equal(testNode), "pod should be scheduled on the expected node")
 
 			testImgStatus, err := is.ImageStatus(ctx, &runtimeapi.ImageSpec{Image: testImage}, false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			testImageID = testImgStatus.Image.Id
 		})
 
@@ -111,7 +111,7 @@ var _ = SIGDescribe("Ensure Credential Pulled Images", func() {
 									v1.DockerConfigJsonKey: []byte(`{"auths":{"somerepo.com": {"auth": "aW52YWxpZHVzZXI6aW52YWxpZHBhc3N3b3Jk"}}}`),
 								},
 							}, metav1.CreateOptions{})
-							framework.ExpectNoError(err)
+							framework.ExpectNoError(err, "unexpected error")
 
 							_ = e2ecommonnode.ImagePullTest(ctx, f, testImage, pullPolicy, invalidSecret, testNode, statusOnInvalidCreds, pullingOnInvalidCreds)
 						})
@@ -124,7 +124,7 @@ var _ = SIGDescribe("Ensure Credential Pulled Images", func() {
 							newSecret.ResourceVersion = ""
 							newSecret.GenerateName = f.UniqueName
 							newSecret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, newSecret, metav1.CreateOptions{})
-							framework.ExpectNoError(err)
+							framework.ExpectNoError(err, "unexpected error")
 							_ = e2ecommonnode.ImagePullTest(ctx, f, testImage, pullPolicy, newSecret, testNode, v1.PodRunning, false)
 						})
 

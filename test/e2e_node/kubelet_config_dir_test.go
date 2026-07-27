@@ -39,21 +39,21 @@ var _ = SIGDescribe("Kubelet Config", framework.WithSlow(), framework.WithSerial
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			var err error
 			oldcfg, err = getCurrentKubeletConfig(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		})
 		ginkgo.AfterEach(func(ctx context.Context) {
 			files, err := filepath.Glob(filepath.Join(framework.TestContext.KubeletConfigDropinDir, "*"+".conf"))
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			for _, file := range files {
 				err := os.Remove(file)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}
 			updateKubeletConfig(ctx, f, oldcfg, true)
 		})
 		ginkgo.It("should merge kubelet configs correctly", func(ctx context.Context) {
 			// Get the initial kubelet configuration
 			initialConfig, err := getCurrentKubeletConfig(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Stopping the kubelet")
 			restartKubelet := mustStopKubelet(ctx, f)
@@ -89,7 +89,7 @@ shutdownGracePeriodByPodPriority:
     shutdownGracePeriodSeconds: 30
 featureGates:
   PodAndContainerStatsFromCRI: true`)
-			framework.ExpectNoError(os.WriteFile(filepath.Join(configDir, "10-kubelet.conf"), contents, 0755))
+			framework.ExpectNoError(os.WriteFile(filepath.Join(configDir, "10-kubelet.conf"), contents, 0755), "unexpected error")
 			contents = []byte(`apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 clusterDNS:
@@ -123,12 +123,12 @@ featureGates:
   KubeletServiceAccountTokenForCredentialProviders: true
   PodAndContainerStatsFromCRI: false
   DynamicResourceAllocation: true`)
-			framework.ExpectNoError(os.WriteFile(filepath.Join(configDir, "20-kubelet.conf"), contents, 0755))
+			framework.ExpectNoError(os.WriteFile(filepath.Join(configDir, "20-kubelet.conf"), contents, 0755), "unexpected error")
 			ginkgo.By("Restarting the kubelet")
 			restartKubelet(ctx)
 
 			mergedConfig, err := getCurrentKubeletConfig(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Replace specific fields in the initial configuration with expectedConfig values
 			initialConfig.Port = int32(8080)          // not overridden by second file, should be retained.
@@ -197,7 +197,7 @@ kind: KubeletConfiguration
 eventBurst: 101`)
 
 			dropinConfigPath := filepath.Join(configDir, "10-kubelet.conf")
-			framework.ExpectNoError(os.WriteFile(dropinConfigPath, contents, 0755))
+			framework.ExpectNoError(os.WriteFile(dropinConfigPath, contents, 0755), "unexpected error")
 
 			ginkgo.By("Restarting the kubelet")
 			restartKubelet := mustStopKubelet(ctx, f)

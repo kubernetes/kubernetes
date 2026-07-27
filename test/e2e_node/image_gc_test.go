@@ -47,10 +47,10 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		var err error
 		_, is, err = getCRIClient(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	})
 	ginkgo.AfterEach(func(ctx context.Context) {
-		framework.ExpectNoError(PrePullAllImages(ctx))
+		framework.ExpectNoError(PrePullAllImages(ctx), "unexpected error")
 	})
 	ginkgo.Context("when ImageMaximumGCAge is set", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
@@ -62,10 +62,10 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 			e2epod.NewPodClient(f).CreateBatch(ctx, []*v1.Pod{pod})
 
 			_, err := is.PullImage(context.Background(), &runtimeapi.ImageSpec{Image: agnhostImage}, nil, nil)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			allImages, err := is.ListImages(context.Background(), &runtimeapi.ImageFilter{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			e2epod.NewPodClient(f).DeleteSync(ctx, pod.ObjectMeta.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
@@ -73,7 +73,7 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 			// ImageGCPeriod, which is hardcoded to 5 minutes.
 			gomega.Eventually(ctx, func() int {
 				gcdImageList, err := is.ListImages(context.Background(), &runtimeapi.ImageFilter{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				return len(gcdImageList)
 			}, checkGCUntil, checkGCFreq).Should(gomega.BeNumerically("<", len(allImages)))
 		})
@@ -82,10 +82,10 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 			e2epod.NewPodClient(f).CreateBatch(ctx, []*v1.Pod{pod})
 
 			_, err := is.PullImage(context.Background(), &runtimeapi.ImageSpec{Image: agnhostImage}, nil, nil)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			allImages, err := is.ListImages(context.Background(), &runtimeapi.ImageFilter{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			e2epod.NewPodClient(f).DeleteSync(ctx, pod.ObjectMeta.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
@@ -95,7 +95,7 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 			// GC too early.
 			gomega.Consistently(ctx, func() int {
 				gcdImageList, err := is.ListImages(context.Background(), &runtimeapi.ImageFilter{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				return len(gcdImageList)
 			}, 50*time.Second, 10*time.Second).Should(gomega.Equal(len(allImages)))
 
@@ -103,7 +103,7 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 			// ImageGCPeriod, which is hardcoded to 5 minutes.
 			gomega.Eventually(ctx, func() int {
 				gcdImageList, err := is.ListImages(context.Background(), &runtimeapi.ImageFilter{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				return len(gcdImageList)
 			}, checkGCUntil, checkGCFreq).Should(gomega.BeNumerically("<", len(allImages)))
 		})

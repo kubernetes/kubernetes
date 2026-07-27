@@ -192,7 +192,7 @@ func logAndVerifyResource(ctx context.Context, f *framework.Framework, rc *Resou
 
 	// Obtain memory PerfData
 	usagePerContainer, err := rc.GetLatest()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	framework.Logf("%s", formatResourceUsageStats(usagePerContainer))
 
 	usagePerNode := make(e2ekubelet.ResourceUsagePerNode)

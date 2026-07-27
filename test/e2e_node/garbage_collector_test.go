@@ -149,7 +149,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		var err error
 		runtime, _, err = getCRIClient(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	})
 	for _, pod := range test.testPods {
 		// Initialize the getContainerNames function to use CRI runtime client.

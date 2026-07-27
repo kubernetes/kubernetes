@@ -103,7 +103,7 @@ func testProcMount(ctx context.Context, f *framework.Framework, pmt v1.ProcMount
 	})
 
 	_, err := testutils.PodRunningReady(pod)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	output := e2epod.ExecCommandInContainer(f, pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-ec", "mount | grep /proc")
 	ginkgo.By(output)
@@ -114,7 +114,7 @@ func testProcMount(ctx context.Context, f *framework.Framework, pmt v1.ProcMount
 
 func supportsUserNS(ctx context.Context, f *framework.Framework) bool {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	// Assuming that there is only one node, because this is a node e2e test.
 	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1))
 	node := nodeList.Items[0]
