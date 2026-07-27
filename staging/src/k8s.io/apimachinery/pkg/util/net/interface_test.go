@@ -742,6 +742,9 @@ func TestGetIPFromHostInterfaces(t *testing.T) {
 		{"single-stack ipv6, prefer ipv6", ipv6NetworkInterface{}, preferIPv6, netutils.ParseIPSloppy("2001::200"), ""},
 		{"dual stack", v4v6NetworkInterface{}, preferIPv4, netutils.ParseIPSloppy("10.254.71.145"), ""},
 		{"dual stack, prefer ipv6", v4v6NetworkInterface{}, preferIPv6, netutils.ParseIPSloppy("2001::10"), ""},
+		// BGP-unnumbered: physical interface has only an IPv6 LLA with zone ID.
+		// chooseIPFromHostInterfaces must skip it (no acceptable global address found).
+		{"BGP-unnumbered: IPv6 LLA with zone ID skipped", bgpUnnumberedNetworkInterface{}, preferIPv6, nil, "no acceptable"},
 	}
 
 	for _, tc := range testCases {

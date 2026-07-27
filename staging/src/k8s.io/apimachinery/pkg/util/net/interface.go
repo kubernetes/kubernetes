@@ -347,7 +347,16 @@ func chooseIPFromHostInterfaces(logger klog.Logger, nw networkInterfacer, addres
 				continue
 			}
 			for _, addr := range addrs {
-				ip, _, err := netutils.ParseCIDRSloppy(addr.String())
+				addrStr := addr.String()
+				// IPv6 link-local addresses on physical interfaces include a zone ID
+				// (e.g. "fe80::1%eth0/64"). ParseCIDRSloppy cannot handle the '%' zone
+				// delimiter, so skip these addresses. They are unroutable and will never
+				// be selected as a node IP.
+				if strings.Contains(addrStr, "%") {
+					logger.V(4).Info("Skipping IPv6 link-local address with zone ID", "interface", intf.Name, "address", addrStr)
+					continue
+				}
+				ip, _, err := netutils.ParseCIDRSloppy(addrStr)
 				if err != nil {
 					return nil, fmt.Errorf("unable to parse CIDR for interface %q: %s", intf.Name, err)
 				}
