@@ -909,6 +909,16 @@ func TestReplicaCalcExternalPerPodMetric(t *testing.T) {
 			expectedUsage:     20000,
 		},
 		{
+			name: "statusReplicas zero and metric zero does not underflow",
+			fixture: calcScenario{
+				currentReplicas: 0,
+				metric:          externalPerPodMetric(0),
+			},
+			perPodTargetUsage: 5000,
+			expectedReplicas:  0,
+			expectedUsage:     0,
+		},
+		{
 			name: "scale up",
 			fixture: calcScenario{
 				currentReplicas: 3,
@@ -1227,6 +1237,16 @@ func TestReplicaCalcObjectPerPodMetric(t *testing.T) {
 			perPodTargetUsage: 5000,
 			expectedReplicas:  4,
 			expectedUsage:     20000,
+		},
+		{
+			name: "statusReplicas zero and metric zero does not underflow",
+			fixture: calcScenario{
+				currentReplicas: 0,
+				metric:          perPodMetric(0),
+			},
+			perPodTargetUsage: 5000,
+			expectedReplicas:  0,
+			expectedUsage:     0,
 		},
 	}
 
