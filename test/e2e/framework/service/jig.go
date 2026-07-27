@@ -174,7 +174,7 @@ func ReserveStaticNodePort(port int32) bool {
 //	ginkgo.DeferCleanup(func(ctx context.Context) {
 //		err := cs.CoreV1().Services(ns).Delete(ctx, serviceName, metav1.DeleteOptions{})
 //		if err != nil && !apierrors.IsNotFound(err) {
-//			framework.ExpectNoError(err, "failed to delete service %s in namespace %s", serviceName, ns)
+//			framework.ExpectNoError(err, "failed to cs.CoreV1.Services.Delete", serviceName, ns)
 //		}
 //		e2eservice.ReleaseStaticNodePort(nodePort)
 //	})

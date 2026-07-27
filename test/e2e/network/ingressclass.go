@@ -50,7 +50,7 @@ var _ = common.SIGDescribe("DefaultIngressClass", func() {
 
 	f.It("should set default value on new IngressClass", f.WithSerial(), func(ctx context.Context) {
 		ingressClass1, err := createIngressClass(ctx, cs, "ingressclass1", true, f.UniqueName)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to createIngressClass")
 		ginkgo.DeferCleanup(deleteIngressClass, cs, ingressClass1.Name)
 
 		ctx, cancel := context.WithCancel(ctx)
@@ -87,7 +87,7 @@ var _ = common.SIGDescribe("DefaultIngressClass", func() {
 
 	f.It("should not set default value if no default IngressClass", f.WithSerial(), func(ctx context.Context) {
 		ingressClass1, err := createIngressClass(ctx, cs, "ingressclass1", false, f.UniqueName)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to createIngressClass")
 		ginkgo.DeferCleanup(deleteIngressClass, cs, ingressClass1.Name)
 
 		ctx, cancel := context.WithCancel(ctx)
@@ -121,11 +121,11 @@ var _ = common.SIGDescribe("DefaultIngressClass", func() {
 
 	f.It("should choose the one with the later CreationTimestamp, if equal the one with the lower name when two ingressClasses are marked as default", f.WithSerial(), func(ctx context.Context) {
 		ingressClass1, err := createIngressClass(ctx, cs, "ingressclass1", true, f.UniqueName)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to createIngressClass")
 		ginkgo.DeferCleanup(deleteIngressClass, cs, ingressClass1.Name)
 
 		ingressClass2, err := createIngressClass(ctx, cs, "ingressclass2", true, f.UniqueName)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to createIngressClass")
 		ginkgo.DeferCleanup(deleteIngressClass, cs, ingressClass2.Name)
 
 		expectedName := ingressClass1.Name
@@ -197,7 +197,7 @@ var _ = common.SIGDescribe("IngressClass", func() {
 			},
 		}
 		createdIngressClass, err := cs.NetworkingV1().IngressClasses().Create(ctx, ingressClass, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to cs.NetworkingV1.IngressClasses.Create")
 		ginkgo.DeferCleanup(deleteIngressClass, cs, createdIngressClass.Name)
 
 		if createdIngressClass.Spec.Parameters == nil {
@@ -256,7 +256,7 @@ func createBasicIngress(ctx context.Context, cs clientset.Interface, namespace s
 
 func deleteIngressClass(ctx context.Context, cs clientset.Interface, name string) {
 	err := cs.NetworkingV1().IngressClasses().Delete(ctx, name, metav1.DeleteOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to cs.NetworkingV1.IngressClasses.Delete")
 }
 
 var _ = common.SIGDescribe("IngressClass API", func() {
@@ -285,7 +285,7 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		ginkgo.By("getting /apis")
 		{
 			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.Discovery.ServerGroups")
 			found := false
 			for _, group := range discoveryGroups.Groups {
 				if group.Name == networkingv1.GroupName {
@@ -305,7 +305,7 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		{
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/networking.k8s.io").Do(ctx).Into(group)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.Discovery.RESTClient.Get.AbsPath.Do.Into")
 			found := false
 			for _, version := range group.Versions {
 				if version.Version == icVersion {
@@ -321,7 +321,7 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		ginkgo.By("getting /apis/networking.k8s.io" + icVersion)
 		{
 			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(networkingv1.SchemeGroupVersion.String())
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.Discovery.ServerResourcesForGroupVersion")
 			foundIC := false
 			for _, resource := range resources.APIResources {
 				switch resource.Name {
@@ -337,32 +337,32 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		// IngressClass resource create/read/update/watch verbs
 		ginkgo.By("creating")
 		ingressClass1, err := createIngressClass(ctx, cs, "ingressclass1", false, f.UniqueName)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to createIngressClass")
 		_, err = createIngressClass(ctx, cs, "ingressclass2", false, f.UniqueName)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to createIngressClass")
 		_, err = createIngressClass(ctx, cs, "ingressclass3", false, f.UniqueName)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to createIngressClass")
 
 		ginkgo.By("getting")
 		gottenIC, err := icClient.Get(ctx, ingressClass1.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to icClient.Get")
 		gomega.Expect(gottenIC.UID).To(gomega.Equal(ingressClass1.UID))
 		gomega.Expect(gottenIC.UID).To(gomega.Equal(ingressClass1.UID))
 		gomega.Expect(gottenIC).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		ics, err := icClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=generic"})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to generic"}")
 		gomega.Expect(ics.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
 		icWatch, err := icClient.Watch(ctx, metav1.ListOptions{ResourceVersion: ics.ResourceVersion, LabelSelector: "ingressclass=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to " + f.UniqueName}")
 
 		ginkgo.By("patching")
 		patchedIC, err := icClient.Patch(ctx, ingressClass1.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to icClient.Patch")
 		gomega.Expect(patchedIC.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 		gomega.Expect(resourceversion.CompareResourceVersion(ingressClass1.ResourceVersion, patchedIC.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
@@ -370,7 +370,7 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		icToUpdate := patchedIC.DeepCopy()
 		icToUpdate.Annotations["updated"] = "true"
 		updatedIC, err := icClient.Update(ctx, icToUpdate, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to icClient.Update")
 		gomega.Expect(updatedIC.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 
 		framework.Logf("waiting for watch events with expected annotations")
@@ -400,20 +400,20 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		// IngressClass resource delete operations
 		ginkgo.By("deleting")
 		err = icClient.Delete(ctx, ingressClass1.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to icClient.Delete")
 		_, err = icClient.Get(ctx, ingressClass1.Name, metav1.GetOptions{})
 		if !apierrors.IsNotFound(err) {
 			framework.Failf("expected 404, got %#v", err)
 		}
 		ics, err = icClient.List(ctx, metav1.ListOptions{LabelSelector: "ingressclass=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to " + f.UniqueName}")
 		gomega.Expect(ics.Items).To(gomega.HaveLen(2), "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
 		err = icClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "ingressclass=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to " + f.UniqueName}")
 		ics, err = icClient.List(ctx, metav1.ListOptions{LabelSelector: "ingressclass=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to " + f.UniqueName}")
 		gomega.Expect(ics.Items).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
 

@@ -217,7 +217,7 @@ func (t *volumeGroupSnapshottableStressTestSuite) DefineTests(driver storagefram
 
 		var err error
 		stressTest.statefulSet, err = cs.AppsV1().StatefulSets(f.Namespace.Name).Create(ctx, statefulSet, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create StatefulSet")
+		framework.ExpectNoError(err, "failed to cs.AppsV1.StatefulSets.Create")
 
 		// Wait for StatefulSet to be ready
 		framework.Logf("Waiting for StatefulSet %s to be ready with %d replicas", statefulSetName, replicas)

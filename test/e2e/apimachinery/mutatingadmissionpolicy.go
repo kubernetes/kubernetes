@@ -331,7 +331,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 			mapUpdated, err = client.Update(ctx, mapToUpdate, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err, "failed to update mutatingadmissionpolicy %q", mapCreated.Name)
+		framework.ExpectNoError(err, "failed to client.Update", mapCreated.Name)
 		gomega.Expect(mapUpdated.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 		gomega.Expect(mapUpdated.Spec.ReinvocationPolicy).To(gomega.Equal(admissionregistrationv1.NeverReinvocationPolicy), "updated object should have the applied spec")
 
@@ -531,7 +531,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 			mapbUpdated, err = client.Update(ctx, mapbToUpdate, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err, "failed to update mutatingadmissionpolicybinding %q", mapbCreated.Name)
+		framework.ExpectNoError(err, "failed to client.Update", mapbCreated.Name)
 		gomega.Expect(mapbUpdated.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 		gomega.Expect(mapbUpdated.Spec.PolicyName).To(gomega.Equal("replicalimit-policy.example.com"), "updated object should have the applied spec")
 

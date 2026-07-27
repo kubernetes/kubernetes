@@ -193,7 +193,7 @@ kind: Preference
 			output := e2ekubectl.RunKubectlOrDie(ns, "kuberc", "view", fmt.Sprintf("--kuberc=%s", kubercFile))
 			var pref v1beta1.Preference
 			err := yaml.Unmarshal([]byte(output), &pref)
-			framework.ExpectNoError(err, "failed to unmarshal kuberc view output")
+			framework.ExpectNoError(err, "failed to yaml.Unmarshal")
 
 			ginkgo.By("verifying structure")
 			if pref.APIVersion != "kubectl.config.k8s.io/v1beta1" {

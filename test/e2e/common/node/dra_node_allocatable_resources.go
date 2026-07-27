@@ -681,7 +681,7 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 
 			ginkgo.By("deleting pods")
 			delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
-			framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+			framework.ExpectNoError(delErr, "failed to delErr", delErr)
 		})
 	}
 }
@@ -917,7 +917,7 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 
 			ginkgo.By("deleting pods")
 			delErr := e2epod.DeletePodWithWait(ctx, f.ClientSet, resizedPod)
-			framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
+			framework.ExpectNoError(delErr, "failed to delErr", delErr)
 		})
 	}
 }

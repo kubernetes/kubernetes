@@ -73,7 +73,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 
 	ginkgo.It("should set TCP CLOSE_WAIT timeout [Privileged]", func(ctx context.Context) {
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, fr.ClientSet, 2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetBoundedReadySchedulableNodes")
 		if len(nodes.Items) < 2 {
 			e2eskipper.Skipf(
 				"Test requires >= 2 Ready nodes, but there are only %v nodes",
@@ -282,7 +282,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		ns := fr.Namespace.Name
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 1)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetBoundedReadySchedulableNodes")
 		if len(nodes.Items) < 1 {
 			e2eskipper.Skipf(
 				"Test requires >= 1 Ready nodes, but there are only %v nodes",
@@ -292,7 +292,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 
 		metricName := "kubeproxy_iptables_localhost_nodeports_accepted_packets_total"
 		metricsGrabber, err := e2emetrics.NewMetricsGrabber(ctx, fr.ClientSet, nil, fr.ClientConfig(), false, false, false, false, false, false)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2emetrics.NewMetricsGrabber")
 
 		// create a pod with host-network for execing
 		hostExecPodName := "host-exec-pod"
@@ -310,7 +310,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 
 		// get value of route_localnet
 		stdout, err = e2epodoutput.RunHostCmd(fr.Namespace.Name, hostExecPodName, "cat /proc/sys/net/ipv4/conf/all/route_localnet")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epodoutput.RunHostCmd")
 		routeLocalnet := strings.TrimSpace(stdout)
 
 		if !(proxyMode == string(config.ProxyModeIPTables) && routeLocalnet == "1") {
@@ -319,9 +319,9 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 
 		// get value of target metric before accessing localhost nodeports
 		metrics, err := metricsGrabber.GrabFromKubeProxy(ctx, nodeName)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to metricsGrabber.GrabFromKubeProxy")
 		targetMetricBefore, err := metrics.GetCounterMetricValue(metricName)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to metrics.GetCounterMetricValue")
 
 		// create pod
 		ginkgo.By("creating test pod")
@@ -357,12 +357,12 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 			},
 		}
 		svc, err = fr.ClientSet.CoreV1().Services(fr.Namespace.Name).Create(ctx, svc, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to fr.ClientSet.CoreV1.Services.Create")
 
 		// wait for endpoints update
 		ginkgo.By("waiting for endpoints to be updated")
 		err = e2eendpointslice.WaitForEndpointCount(ctx, fr.ClientSet, ns, svc.Name, 1)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2eendpointslice.WaitForEndpointCount")
 
 		ginkgo.By("accessing endpoint via localhost nodeports 10 times")
 		for range 10 {
@@ -373,7 +373,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 				}
 				return true, nil
 			}); err != nil {
-				framework.ExpectNoError(err, "failed to access nodeport service on localhost")
+				framework.ExpectNoError(err, "failed to e2epodoutput.RunHostCmd")
 			}
 		}
 
@@ -392,7 +392,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 			if wait.Interrupted(err) {
 				framework.Failf("expected %s metric to be updated after accessing endpoints via localhost nodeports", metricName)
 			}
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to metrics.GetCounterMetricValue")
 		}
 	})
 })

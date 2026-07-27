@@ -56,14 +56,14 @@ var _ = SIGDescribe("Pod Allocated Endpoint", framework.WithFeatureGate(features
 			Suffix("allocatedPods").
 			Do(ctx)
 
-		framework.ExpectNoError(result.Error(), "failed to query allocated endpoint list")
+		framework.ExpectNoError(result.Error(), "failed to result.Error")
 
 		statusCode := 0
 		result.StatusCode(&statusCode)
 		gomega.Expect(statusCode).To(gomega.Equal(http.StatusOK))
 
 		var allocatedPodList v1.PodList
-		framework.ExpectNoError(result.Into(&allocatedPodList), "failed to decode response into pod list")
+		framework.ExpectNoError(result.Into(&allocatedPodList), "failed to result.Into")
 
 		var foundPod *v1.Pod
 		for _, p := range allocatedPodList.Items {
@@ -89,14 +89,14 @@ var _ = SIGDescribe("Pod Allocated Endpoint", framework.WithFeatureGate(features
 			Suffix("allocatedPods").
 			Do(ctx)
 
-		framework.ExpectNoError(result.Error(), "failed to query allocated endpoint list after deletion")
+		framework.ExpectNoError(result.Error(), "failed to result.Error")
 
 		statusCode = 0
 		result.StatusCode(&statusCode)
 		gomega.Expect(statusCode).To(gomega.Equal(http.StatusOK))
 
 		var allocatedPodListAfterDelete v1.PodList
-		framework.ExpectNoError(result.Into(&allocatedPodListAfterDelete), "failed to decode response into pod list after deletion")
+		framework.ExpectNoError(result.Into(&allocatedPodListAfterDelete), "failed to result.Into")
 
 		for _, p := range allocatedPodListAfterDelete.Items {
 			if p.Name == pod.Name && p.Namespace == pod.Namespace {
@@ -134,7 +134,7 @@ var _ = SIGDescribe("Pod Allocated Endpoint", framework.WithFeatureGate(features
 
 		ginkgo.By("getting node allocatable CPU")
 		node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get node")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Nodes.Get")
 		nodeAllocatableCPU := node.Status.Allocatable[v1.ResourceCPU]
 		framework.Logf("Node %s allocatable CPU: %v", node.Name, nodeAllocatableCPU.String())
 
@@ -160,7 +160,7 @@ var _ = SIGDescribe("Pod Allocated Endpoint", framework.WithFeatureGate(features
 			Do(ctx).
 			Into(&updatedPod)
 
-		framework.ExpectNoError(err, "failed to update pod for resize")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.RESTClient.Put.")
 
 		ginkgo.By("waiting for pod resize status to show deferred")
 		framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "display pod resize status as deferred", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
@@ -184,10 +184,10 @@ func getAllocatedPod(ctx context.Context, f *framework.Framework, nodeName, name
 		SubResource("proxy").
 		Suffix("allocatedPods", namespace, name).
 		Do(ctx)
-	framework.ExpectNoError(result.Error(), "failed to query allocated endpoint")
+	framework.ExpectNoError(result.Error(), "failed to result.Error")
 
 	allocatedPod := &v1.Pod{}
-	framework.ExpectNoError(result.Into(allocatedPod), "failed to decode response into pod")
+	framework.ExpectNoError(result.Into(allocatedPod), "failed to result.Into")
 
 	gomega.Expect(allocatedPod.Name).To(gomega.Equal(name))
 	gomega.Expect(allocatedPod.Namespace).To(gomega.Equal(namespace))

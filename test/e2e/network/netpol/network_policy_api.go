@@ -76,7 +76,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		ginkgo.By("getting /apis")
 		{
 			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.Discovery.ServerGroups")
 			found := false
 			for _, group := range discoveryGroups.Groups {
 				if group.Name == networkingv1.GroupName {
@@ -96,7 +96,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		{
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/networking.k8s.io").Do(ctx).Into(group)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.Discovery.RESTClient.Get.AbsPath.Do.Into")
 			found := false
 			for _, version := range group.Versions {
 				if version.Version == npVersion {
@@ -111,7 +111,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		ginkgo.By("getting /apis/networking.k8s.io" + npVersion)
 		{
 			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(networkingv1.SchemeGroupVersion.String())
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.Discovery.ServerResourcesForGroupVersion")
 			foundNetPol := false
 			for _, resource := range resources.APIResources {
 				switch resource.Name {
@@ -126,48 +126,48 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		// NetPol resource create/read/update/watch verbs
 		ginkgo.By("creating")
 		_, err := npClient.Create(ctx, npTemplate, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to npClient.Create")
 		_, err = npClient.Create(ctx, npTemplate, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to npClient.Create")
 		createdNetPol, err := npClient.Create(ctx, npTemplate, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to npClient.Create")
 
 		ginkgo.By("getting")
 		gottenNetPol, err := npClient.Get(ctx, createdNetPol.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to npClient.Get")
 		gomega.Expect(gottenNetPol.UID).To(gomega.Equal(createdNetPol.UID))
 
 		ginkgo.By("listing")
 		nps, err := npClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to " + f.UniqueName}")
 		gomega.Expect(nps.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
 		npWatch, err := npClient.Watch(ctx, metav1.ListOptions{ResourceVersion: nps.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to " + f.UniqueName}")
 		// Test cluster-wide list and watch
 		clusterNPClient := f.ClientSet.NetworkingV1().NetworkPolicies("")
 		ginkgo.By("cluster-wide listing")
 		clusterNPs, err := clusterNPClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to " + f.UniqueName}")
 		gomega.Expect(clusterNPs.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("cluster-wide watching")
 		framework.Logf("starting watch")
 		_, err = clusterNPClient.Watch(ctx, metav1.ListOptions{ResourceVersion: nps.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to " + f.UniqueName}")
 
 		ginkgo.By("patching")
 		patchedNetPols, err := npClient.Patch(ctx, createdNetPol.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to npClient.Patch")
 		gomega.Expect(patchedNetPols.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		npToUpdate := patchedNetPols.DeepCopy()
 		npToUpdate.Annotations["updated"] = "true"
 		updatedNetPols, err := npClient.Update(ctx, npToUpdate, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to npClient.Update")
 		gomega.Expect(updatedNetPols.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 
 		framework.Logf("waiting for watch events with expected annotations")
@@ -196,7 +196,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		// NetPol resource delete operations
 		ginkgo.By("deleting")
 		err = npClient.Delete(ctx, createdNetPol.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to npClient.Delete")
 		err = wait.PollUntilContextTimeout(ctx, 2*time.Second, 1*time.Minute, false, func(ctx context.Context) (done bool, err error) {
 			_, err = npClient.Get(ctx, createdNetPol.Name, metav1.GetOptions{})
 			if !apierrors.IsNotFound(err) {
@@ -209,12 +209,12 @@ var _ = common.SIGDescribe("Netpol API", func() {
 			framework.Failf("unexpected error deleting existing network policy: %v", err)
 		}
 		nps, err = npClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to " + f.UniqueName}")
 		gomega.Expect(nps.Items).To(gomega.HaveLen(2), "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
 		err = npClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to " + f.UniqueName}")
 		err = wait.PollUntilContextTimeout(ctx, 2*time.Second, 1*time.Minute, false, func(ctx context.Context) (done bool, err error) {
 			nps, err = npClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 			if err != nil {
@@ -284,7 +284,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 
 		ginkgo.By("deleting all test collection")
 		err = npClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to " + f.UniqueName}")
 		err = wait.PollUntilContextTimeout(ctx, 2*time.Second, 1*time.Minute, false, func(ctx context.Context) (done bool, err error) {
 			nps, err := npClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 			if err != nil {

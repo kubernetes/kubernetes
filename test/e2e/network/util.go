@@ -137,7 +137,7 @@ func execSourceIPTest(sourcePod v1.Pod, targetAddr string) (string, string) {
 		break
 	}
 
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2eoutput.RunHostCmd")
 
 	// The stdout return from RunHostCmd is in this format: x.x.x.x:port or [xx:xx:xx::x]:port
 	host, _, err := net.SplitHostPort(stdout)
@@ -179,7 +179,7 @@ func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
 	targetHostname = strings.Split(targetHostname, ".")[0]
 	hostname := strings.TrimSpace(strings.Split(stdout, ".")[0])
 
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2eoutput.RunHostCmd")
 	gomega.Expect(hostname).To(gomega.Equal(targetHostname))
 }
 
@@ -236,7 +236,7 @@ func createSecondNodePortService(ctx context.Context, f *framework.Framework, co
 	createdService := config.CreateService(ctx, svc)
 
 	err := e2eendpointslice.WaitForEndpointCount(ctx, f.ClientSet, config.Namespace, secondNodePortSvcName, len(config.EndpointPods))
-	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", secondNodePortSvcName, config.Namespace)
+	framework.ExpectNoError(err, "failed to e2eendpointslice.WaitForEndpointCount", secondNodePortSvcName, config.Namespace)
 
 	var httpPort int
 	for _, p := range createdService.Spec.Ports {

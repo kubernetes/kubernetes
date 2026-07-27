@@ -239,7 +239,7 @@ var _ = SIGDescribe("CRDValidationRatcheting [Privileged:ClusterAdmin]", framewo
 		ginkgo.By("creating test resource with correlatable fields")
 		framework.ExpectNoError(applyPatch(testCRDGVR, "test-resource", instance.Object), "failed creating test resource")
 		ginkgo.By("updating CRD schema with constraints on correlatable fields to make instance invalid")
-		framework.ExpectNoError(updateCRDSchema(testCRDGVR, *sch), "failed to update schema")
+		framework.ExpectNoError(updateCRDSchema(testCRDGVR, *sch), "failed to updateCRDSchema")
 
 		// Make an update to a label. The unchanged fields should be allowed
 		// to pass through.
@@ -282,7 +282,7 @@ var _ = SIGDescribe("CRDValidationRatcheting [Privileged:ClusterAdmin]", framewo
 						enum: ["notfoo", "notbar", "notbaz"]
 		`)
 		framework.ExpectNoError(err, "parsing schema")
-		framework.ExpectNoError(updateCRDSchema(testCRDGVR, *sch), "failed to update schema")
+		framework.ExpectNoError(updateCRDSchema(testCRDGVR, *sch), "failed to updateCRDSchema")
 
 		ginkgo.By("updating label on now-invalid test resource")
 		instance, err = parseUnstructured(`
@@ -355,7 +355,7 @@ var _ = SIGDescribe("CRDValidationRatcheting [Privileged:ClusterAdmin]", framewo
 		`)
 
 		framework.ExpectNoError(err, "parsing schema")
-		framework.ExpectNoError(updateCRDSchema(testCRDGVR, *sch), "failed to update schema")
+		framework.ExpectNoError(updateCRDSchema(testCRDGVR, *sch), "failed to updateCRDSchema")
 
 		ginkgo.By("changing every field to invalid value")
 		modifiedInstance, err := parseUnstructured(`
@@ -457,7 +457,7 @@ var _ = SIGDescribe("CRDValidationRatcheting [Privileged:ClusterAdmin]", framewo
 		`)
 
 		framework.ExpectNoError(err, "parsing schema")
-		framework.ExpectNoError(updateCRDSchema(testCRDGVR, *sch), "failed to update schema")
+		framework.ExpectNoError(updateCRDSchema(testCRDGVR, *sch), "failed to updateCRDSchema")
 
 		ginkgo.By("introducing new values, but leaving invalid old correlatable values untouched")
 		modifiedInstance, err := parseUnstructured(`
@@ -522,7 +522,7 @@ var _ = SIGDescribe("CRDValidationRatcheting [Privileged:ClusterAdmin]", framewo
 						- rule: self != "foo"
 		`)
 		framework.ExpectNoError(err, "parsing schema")
-		framework.ExpectNoError(updateCRDSchema(testCRDGVR, *sch), "failed to update schema")
+		framework.ExpectNoError(updateCRDSchema(testCRDGVR, *sch), "failed to updateCRDSchema")
 
 		ginkgo.By("updating label and adding valid elements to invalid lists")
 		instance, err = parseUnstructured(`
@@ -609,7 +609,7 @@ var _ = SIGDescribe("CRDValidationRatcheting [Privileged:ClusterAdmin]", framewo
 		`)
 
 		framework.ExpectNoError(err, "parsing schema")
-		framework.ExpectNoError(updateCRDSchema(testCRDGVR, *sch), "failed to update schema")
+		framework.ExpectNoError(updateCRDSchema(testCRDGVR, *sch), "failed to updateCRDSchema")
 
 		ginkgo.By("changing every field to invalid value")
 		modifiedInstance, err := parseUnstructured(`
@@ -708,7 +708,7 @@ var _ = SIGDescribe("CRDValidationRatcheting [Privileged:ClusterAdmin]", framewo
 		`)
 
 		framework.ExpectNoError(err, "parsing schema")
-		framework.ExpectNoError(updateCRDSchema(testCRDGVR, *sch), "failed to update schema")
+		framework.ExpectNoError(updateCRDSchema(testCRDGVR, *sch), "failed to updateCRDSchema")
 
 		ginkgo.By("updating a label on the test resource")
 		instance.SetLabels(map[string]string{
@@ -778,7 +778,7 @@ var _ = SIGDescribe("CRDValidationRatcheting [Privileged:ClusterAdmin]", framewo
 								  optionalOldSelf: true
 		`)
 		framework.ExpectNoError(err, "parsing schema")
-		framework.ExpectNoError(updateCRDSchema(testCRDGVR, *sch), "failed to update schema")
+		framework.ExpectNoError(updateCRDSchema(testCRDGVR, *sch), "failed to updateCRDSchema")
 
 		ginkgo.By("creating an object")
 		instance, err := parseUnstructured(`

@@ -57,7 +57,7 @@ var _ = common.SIGDescribe("Service CIDRs", func() {
 		ns = fr.Namespace.Name
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetBoundedReadySchedulableNodes")
 		if len(nodes.Items) < 2 {
 			e2eskipper.Skipf(
 				"Test requires >= 2 Ready nodes, but there are only %v nodes",
@@ -125,13 +125,13 @@ var _ = common.SIGDescribe("Service CIDRs", func() {
 
 		ginkgo.DeferCleanup(func(ctx context.Context) {
 			err := cs.CoreV1().Services(ns).Delete(ctx, serviceName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
+			framework.ExpectNoError(err, "failed to cs.CoreV1.Services.Delete", serviceName, ns)
 		})
 		err = jig.CreateServicePods(ctx, 2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to jig.CreateServicePods")
 		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod", nil)
 		err = jig.CheckServiceReachability(ctx, nodePortService, execPod)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to jig.CheckServiceReachability")
 	})
 
 })

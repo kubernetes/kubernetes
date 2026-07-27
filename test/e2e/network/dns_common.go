@@ -77,7 +77,7 @@ func (t *dnsTestCommon) init(ctx context.Context) {
 
 	namespace := "kube-system"
 	pods, err := t.f.ClientSet.CoreV1().Pods(namespace).List(ctx, options)
-	framework.ExpectNoError(err, "failed to list pods in namespace: %s", namespace)
+	framework.ExpectNoError(err, "failed to t.f.ClientSet.CoreV1.Pods.List", namespace)
 	gomega.Expect(pods.Items).ToNot(gomega.BeEmpty())
 
 	t.dnsPod = &pods.Items[0]
@@ -161,23 +161,23 @@ func (t *dnsTestCommon) setConfigMap(ctx context.Context, cm *v1.ConfigMap) {
 		}.AsSelector().String(),
 	}
 	cmList, err := t.c.CoreV1().ConfigMaps(t.ns).List(ctx, options)
-	framework.ExpectNoError(err, "failed to list ConfigMaps in namespace: %s", t.ns)
+	framework.ExpectNoError(err, "failed to t.c.CoreV1.ConfigMaps.List", t.ns)
 
 	if len(cmList.Items) == 0 {
 		ginkgo.By(fmt.Sprintf("Creating the ConfigMap (%s:%s) %+v", t.ns, t.name, *cm))
 		_, err := t.c.CoreV1().ConfigMaps(t.ns).Create(ctx, cm, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create ConfigMap (%s:%s) %+v", t.ns, t.name, *cm)
+		framework.ExpectNoError(err, "failed to t.c.CoreV1.ConfigMaps.Create", t.ns, t.name, *cm)
 	} else {
 		ginkgo.By(fmt.Sprintf("Updating the ConfigMap (%s:%s) to %+v", t.ns, t.name, *cm))
 		_, err := t.c.CoreV1().ConfigMaps(t.ns).Update(ctx, cm, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "failed to update ConfigMap (%s:%s) to %+v", t.ns, t.name, *cm)
+		framework.ExpectNoError(err, "failed to t.c.CoreV1.ConfigMaps.Update", t.ns, t.name, *cm)
 	}
 }
 
 func (t *dnsTestCommon) fetchDNSConfigMapData(ctx context.Context) map[string]string {
 	if t.name == "coredns" {
 		pcm, err := t.c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(ctx, t.name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get DNS ConfigMap: %s", t.name)
+		framework.ExpectNoError(err, "failed to t.c.CoreV1.ConfigMaps.Get", t.name)
 		return pcm.Data
 	}
 	return nil
@@ -204,7 +204,7 @@ func (t *dnsTestCommon) createUtilPodLabel(ctx context.Context, baseName string)
 
 	var err error
 	t.utilPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(ctx, t.utilPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create pod: %v", t.utilPod)
+	framework.ExpectNoError(err, "failed to t.c.CoreV1.Pods.Create", t.utilPod)
 	framework.Logf("Created pod %v", t.utilPod)
 	err = e2epod.WaitForPodNameRunningInNamespace(ctx, t.f.ClientSet, t.utilPod.Name, t.f.Namespace.Name)
 	framework.ExpectNoError(err, "pod failed to start running: %v", t.utilPod)
@@ -230,7 +230,7 @@ func (t *dnsTestCommon) createUtilPodLabel(ctx context.Context, baseName string)
 	}
 
 	t.utilService, err = t.c.CoreV1().Services(t.f.Namespace.Name).Create(ctx, t.utilService, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create service: %s/%s", t.f.Namespace.Name, t.utilService.ObjectMeta.Name)
+	framework.ExpectNoError(err, "failed to t.c.CoreV1.Services.Create", t.f.Namespace.Name, t.utilService.ObjectMeta.Name)
 	framework.Logf("Created service %v", t.utilService)
 }
 
@@ -249,12 +249,12 @@ func (t *dnsTestCommon) deleteCoreDNSPods(ctx context.Context) {
 	options := metav1.ListOptions{LabelSelector: label.String()}
 
 	pods, err := t.f.ClientSet.CoreV1().Pods("kube-system").List(ctx, options)
-	framework.ExpectNoError(err, "failed to list pods of kube-system with label %q", label.String())
+	framework.ExpectNoError(err, "failed to t.f.ClientSet.CoreV1.Pods.List", label.String())
 	podClient := t.c.CoreV1().Pods(metav1.NamespaceSystem)
 
 	for _, pod := range pods.Items {
 		err = podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
-		framework.ExpectNoError(err, "failed to delete pod: %s", pod.Name)
+		framework.ExpectNoError(err, "failed to podClient.Delete", pod.Name)
 	}
 }
 
@@ -314,13 +314,13 @@ func (t *dnsTestCommon) createDNSPodFromObj(ctx context.Context, pod *v1.Pod) {
 
 	var err error
 	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(ctx, t.dnsServerPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create pod: %v", t.dnsServerPod)
+	framework.ExpectNoError(err, "failed to t.c.CoreV1.Pods.Create", t.dnsServerPod)
 	framework.Logf("Created pod %v", t.dnsServerPod)
 	err = e2epod.WaitForPodNameRunningInNamespace(ctx, t.f.ClientSet, t.dnsServerPod.Name, t.f.Namespace.Name)
 	framework.ExpectNoError(err, "pod failed to start running: %v", t.dnsServerPod)
 
 	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Get(ctx, t.dnsServerPod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "failed to get pod: %s", t.dnsServerPod.Name)
+	framework.ExpectNoError(err, "failed to t.c.CoreV1.Pods.Get", t.dnsServerPod.Name)
 }
 
 func (t *dnsTestCommon) createDNSServer(ctx context.Context, namespace string, aRecords map[string]string) {
@@ -515,7 +515,7 @@ func assertFilesContain(ctx context.Context, fileNames []string, fileDir string,
 		}
 
 		return false, nil
-	}))
+	}), "failed to e2epod.GetPodLogs(ctx, client, pod.Namespace, pod.Name, c...")
 	gomega.Expect(failed).To(gomega.BeEmpty())
 }
 
@@ -526,7 +526,7 @@ func validateDNSResults(ctx context.Context, f *framework.Framework, pod *v1.Pod
 		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "failed to e2epod.WaitForPodRunningInNamespaceSlow")
 
 	ginkgo.By("retrieving the pod")
 	pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
@@ -549,7 +549,7 @@ func validateTargetedProbeOutput(ctx context.Context, f *framework.Framework, po
 		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "failed to e2epod.WaitForPodRunningInNamespaceSlow")
 
 	ginkgo.By("retrieving the pod")
 	pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
