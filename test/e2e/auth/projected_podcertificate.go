@@ -69,7 +69,7 @@ var _ = SIGDescribe("Projected PodCertificate",
 				framework.Failf("failed to generate CA for signer: %v", err)
 			}
 
-			signer := hermeticpodcertificatesigner.New(clock.RealClock{}, spiffeSignerName, caKeys, caCerts, f.ClientSet)
+			signer := hermeticpodcertificatesigner.New(clock.RealClock{}, spiffeSignerName, framework.TestContext.ClusterDNSDomain, caKeys, caCerts, f.ClientSet)
 			go signer.Run(signerCtx)
 		})
 
@@ -440,7 +440,9 @@ func createServerObjects(namespace string, spiffeSignerName string, securityCont
 func createClientObjects(namespace string, spiffeSignerName string, securityContext *v1.SecurityContext) *appsv1.Deployment {
 	replicas := int32(1)
 	clientLabels := map[string]string{"app": "client"}
-	fetchURL := "https://server." + namespace + ".svc/spiffe-echo"
+	// Make sure to always include the cluster DNS domain so that
+	// Windows pods are able to resolve the hostname.
+	fetchURL := fmt.Sprintf("https://server.%s.svc.%s/spiffe-echo", namespace, framework.TestContext.ClusterDNSDomain)
 	signerNameVar := spiffeSignerName
 
 	return &appsv1.Deployment{

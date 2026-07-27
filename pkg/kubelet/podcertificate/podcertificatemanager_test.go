@@ -366,7 +366,7 @@ func TestFullFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error generating CA hierarchy: %v", err)
 	}
-	pcrSigner := hermeticpodcertificatesigner.New(clock, signerName, caKeys, caCerts, kc)
+	pcrSigner := hermeticpodcertificatesigner.New(clock, signerName, "", caKeys, caCerts, kc)
 	go pcrSigner.Run(ctx)
 	//
 	// Configure and boot up enough Kubelet subsystems to run an IssuingManager.
