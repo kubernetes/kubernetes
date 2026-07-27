@@ -234,8 +234,15 @@ func (b *OpportunisticBatch) refreshHintCandidates(ctx context.Context, pod *v1.
 		return false
 	}
 
-	if status := b.handle.RunFilterPlugins(ctx, state, pod, lastChosenNode); !status.IsRejected() {
+	status := b.handle.RunFilterPlugins(ctx, state, pod, lastChosenNode)
+	if status.IsSuccess() {
+		// The last chosen node is still feasible — rescore it so it can compete
+		// against the cached candidates for the next hint.
 		return b.rescoreHintedNode(ctx, pod, state, cycleCount, lastChosenNode)
+	}
+	if !status.IsRejected() {
+		b.logUnusableState(logger, cycleCount, metrics.BatchFlushFilterError)
+		return false
 	}
 	return true
 }
@@ -248,30 +255,62 @@ func (b *OpportunisticBatch) rescoreHintedNode(ctx context.Context, pod *v1.Pod,
 	defer metrics.BatchRescoreDuration.ObserveSince(time.Now(), b.handle.ProfileName())()
 	metrics.BatchRescoreAttempts.WithLabelValues(b.handle.ProfileName()).Inc()
 
-	status := b.handle.RunPreScorePlugins(ctx, state, pod, []fwk.NodeInfo{lastChosenNodeInfo})
+	nodeInfos, filteredScores, ok := b.resolveCachedCandidates()
+	if !ok {
+		b.logUnusableState(logger, cycleCount, metrics.BatchFlushNodeMissing)
+		return false
+	}
+	// PreScore must be called with full candidate set, including the node being rescored.
+	nodeInfos = append(nodeInfos, lastChosenNodeInfo)
+	// Clone the live CycleState so writes from the rescore path don't leak back.
+	rescoreState := state.Clone()
+	status := b.handle.RunPreScorePlugins(ctx, rescoreState, pod, nodeInfos)
 	if !status.IsSuccess() {
 		b.logUnusableState(logger, cycleCount, metrics.BatchFlushPreScoreError)
 		return false
 	}
 
-	freshScores, status := b.handle.RunRawScorePlugins(ctx, state, pod, lastChosenNodeInfo)
+	freshScores, status := b.handle.RunRawScorePlugins(ctx, rescoreState, pod, lastChosenNodeInfo)
 	if !status.IsSuccess() {
 		b.logUnusableState(logger, cycleCount, metrics.BatchFlushRescoreError)
 		return false
 	}
 
-	// Add the last chosen node (with fresh scores) to the cached candidates and
-	// re-normalize across all of them so it competes fairly for the next hint.
-	allNodes := b.state.sortedNodes.UnorderedList()
-	allNodes = append(allNodes, fwk.NodePluginScores{Name: lastChosenNodeInfo.Node().Name, RawScores: freshScores})
+	// Add the last chosen node and its fresh scores so filteredScores
+	// stays in sync with nodeInfos, and re-normalize across all candidates.
+	filteredScores = append(filteredScores,
+		fwk.NodePluginScores{
+			Name:      lastChosenNodeInfo.Node().Name,
+			RawScores: freshScores,
+		},
+	)
 
-	if status := b.handle.NormalizeScores(ctx, state, pod, allNodes); !status.IsSuccess() {
+	if status := b.handle.NormalizeScores(ctx, rescoreState, pod, filteredScores); !status.IsSuccess() {
 		b.logUnusableState(logger, cycleCount, metrics.BatchFlushNormalizeError)
 		return false
 	}
 
-	b.state.sortedNodes = framework.NewSortedScoredNodes(allNodes)
+	b.state.sortedNodes = framework.NewSortedScoredNodes(filteredScores)
 	return true
+}
+
+// resolveCachedCandidates resolves the cached sorted nodes to NodeInfos paired
+// with their NodePluginScores. Returns false if any cached node is no longer
+// present in the snapshot.
+func (b *OpportunisticBatch) resolveCachedCandidates() ([]fwk.NodeInfo, []fwk.NodePluginScores, bool) {
+	cached := b.state.sortedNodes.UnorderedList()
+	nodeInfos := make([]fwk.NodeInfo, 0, len(cached)+1)
+	scores := make([]fwk.NodePluginScores, 0, len(cached)+1)
+	lister := b.handle.SnapshotSharedLister().NodeInfos()
+	for _, ns := range cached {
+		ni, err := lister.Get(ns.Name)
+		if err != nil || ni == nil {
+			return nil, nil, false
+		}
+		nodeInfos = append(nodeInfos, ni)
+		scores = append(scores, ns)
+	}
+	return nodeInfos, scores, true
 }
 
 // Irritatingly we can end up with a variety of different configurations that are all "empty".

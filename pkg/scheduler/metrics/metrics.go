@@ -126,6 +126,7 @@ const (
 	BatchFlushExpired         = "expired"
 	BatchFlushPodIncompatible = "pod_incompatible"
 	BatchFlushPodNotBatchable = "pod_not_batchable"
+	BatchFlushFilterError     = "filter_error"
 	BatchFlushPreScoreError   = "prescore_error"
 	BatchFlushRescoreError    = "rescore_error"
 	BatchFlushNormalizeError  = "normalize_error"
