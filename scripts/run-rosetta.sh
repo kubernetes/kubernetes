@@ -65,6 +65,7 @@ if [[ "${jsii_pkgs_file}" = "" ]]; then
 fi
 
 mkdir -p $HOME/.s3buildcache
+batch_size=100
 rosetta_cache_file=$HOME/.s3buildcache/rosetta-cache.tabl.json
 extract_opts=""
 if $infuse; then
@@ -81,6 +82,7 @@ export DEBUG_TYPE_FINGERPRINTS=$HOME/.s3buildcache/type-fingerprints.txt
 
 echo "💎 Extracting code samples" >&2
 time $ROSETTA extract \
+    --batch $batch_size \
     --compile \
     --verbose \
     --compress-tablet \
@@ -94,6 +96,7 @@ if $infuse; then
         $(cat $jsii_pkgs_file)
 
     time $ROSETTA extract \
+        --batch $batch_size \
         --compile \
         --verbose \
         --compress-tablet \
