@@ -2857,9 +2857,11 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 		unresolvable           bool
 		scenarios              []scenario
 		genericWorkloadEnabled bool
+		testFPVariants         bool // true for only tests that use default topologyKey=kubernetes.io/hostname
 	}{
 		{
-			name:       "preemption is performed to satisfy anti-affinity",
+			name: "preemption is performed to satisfy anti-affinity",
+			// testFPVariants: false (default)
 			initTokens: maxTokens,
 			scenarios: []scenario{
 				{
@@ -2916,7 +2918,8 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 			},
 		},
 		{
-			name:       "preemption is not performed when anti-affinity is not satisfied",
+			name: "preemption is not performed when anti-affinity is not satisfied",
+			// testFPVariants: false (default)
 			initTokens: maxTokens,
 			scenarios: []scenario{
 				{
@@ -2969,8 +2972,9 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 			},
 		},
 		{
-			name:       "basic pod preemption with hostname anti-affinity (fast path)",
-			initTokens: maxTokens,
+			name:           "basic pod preemption with hostname anti-affinity (fast path)",
+			testFPVariants: true,
+			initTokens:     maxTokens,
 			scenarios: []scenario{
 				{
 					name: "create pod-0",
@@ -3046,6 +3050,11 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 			for _, asyncPreemptionEnabled := range []bool{true, false} {
 				for _, fpEnabled := range []bool{true, false} {
 					for _, test := range tests {
+						// Skip fpEnabled=true for tests that don't use hostname topologyKey,
+						// since InterPodAffinityHostnameFastPath has no effect on them.
+						if fpEnabled && !test.testFPVariants {
+							continue
+						}
 						nameSuffix := fmt.Sprintf("Async preemption enabled: %v, ClearingNominatedNodeNameAfterBinding: %v, fpEnabled: %v, genericWorkloadEnabled: %v, cpgEnabled: %v", asyncPreemptionEnabled, clearingNominatedNodeNameAfterBinding, fpEnabled, genericWorkloadEnabled, cpgEnabled)
 						t.Run(fmt.Sprintf("%s (%s)", test.name, nameSuffix), func(t *testing.T) {
 							// Feature gates map to test combinations.
