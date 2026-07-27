@@ -186,7 +186,7 @@ func resourceClaimDeviceStatus(tCtx ktesting.TContext, b *drautils.Builder) upgr
 	var buffer bytes.Buffer
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetIndent("   ", "   ")
-	tCtx.ExpectNoError(encoder.Encode(claim))
+	tCtx.ExpectNoError(encoder.Encode(claim), "unexpected error")
 	tCtx.Logf("Final ResourceClaim:\n%s", buffer.String())
 
 	return func(tCtx ktesting.TContext) downgradedTestFunc {
@@ -208,7 +208,7 @@ func resourceClaimDeviceStatus(tCtx ktesting.TContext, b *drautils.Builder) upgr
 		var deviceStatusV1 []resourceapi.AllocatedDeviceStatus
 		for _, status := range deviceStatus {
 			var statusV1 resourceapi.AllocatedDeviceStatus
-			tCtx.ExpectNoError(draapiv1beta2.Convert_v1beta2_AllocatedDeviceStatus_To_v1_AllocatedDeviceStatus(&status, &statusV1, nil))
+			tCtx.ExpectNoError(draapiv1beta2.Convert_v1beta2_AllocatedDeviceStatus_To_v1_AllocatedDeviceStatus(&status, &statusV1, nil), "unexpected error")
 			deviceStatusV1 = append(deviceStatusV1, statusV1)
 		}
 		require.Equal(tCtx, deviceStatusV1, claim.Status.Devices, "after updating device status two")

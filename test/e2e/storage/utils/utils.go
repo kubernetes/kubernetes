@@ -68,7 +68,7 @@ const (
 func VerifyFSGroupInPod(ctx context.Context, f *framework.Framework, filePath, expectedFSGroup string, pod *v1.Pod) {
 	cmd := fmt.Sprintf("ls -l %s", filePath)
 	stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	framework.Logf("pod %s/%s exec for cmd %s, stdout: %s, stderr: %s", pod.Namespace, pod.Name, cmd, stdout, stderr)
 	fsGroupResult := strings.Fields(stdout)[3]
 	gomega.Expect(expectedFSGroup).To(gomega.Equal(fsGroupResult), "Expected fsGroup of %s, got %s", expectedFSGroup, fsGroupResult)
@@ -132,7 +132,7 @@ func TestKubeletRestartsAndRestoresMap(ctx context.Context, c clientset.Interfac
 // If secondPod is set, it is started when kubelet is down to check that the volume is usable while the old pod is being deleted and the new pod is starting.
 func TestVolumeUnmountsFromDeletedPodWithForceOption(ctx context.Context, c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool, checkSubpath bool, secondPod *v1.Pod, volumePath string) {
 	nodeIP, err := getHostAddress(ctx, c, clientPod)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	nodeIP = nodeIP + ":22"
 
 	ginkgo.By("Expecting the volume mount to be found.")
@@ -171,7 +171,7 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(ctx context.Context, c clie
 	} else {
 		err = c.CoreV1().Pods(clientPod.Namespace).Delete(ctx, clientPod.Name, metav1.DeleteOptions{})
 	}
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By("Starting the kubelet and waiting for pod to delete.")
 	KubeletCommand(ctx, KStart, c, clientPod)
@@ -359,7 +359,7 @@ func RunInPodWithVolume(ctx context.Context, c clientset.Interface, t *framework
 	pod, err := c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 	ginkgo.DeferCleanup(e2epod.DeletePodOrFail, c, ns, pod.Name)
-	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, c, pod.Name, pod.Namespace, t.PodStartSlow))
+	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, c, pod.Name, pod.Namespace, t.PodStartSlow), "unexpected error")
 }
 
 // StartExternalProvisioner create external provisioner pod
@@ -427,7 +427,7 @@ func StartExternalProvisioner(ctx context.Context, c clientset.Interface, ns str
 	provisionerPod, err := podClient.Create(ctx, provisionerPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create %s pod: %v", provisionerPod.Name, err)
 
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, c, provisionerPod))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, c, provisionerPod), "unexpected error")
 
 	ginkgo.By("locating the provisioner pod")
 	pod, err := podClient.Get(ctx, provisionerPod.Name, metav1.GetOptions{})
@@ -596,12 +596,12 @@ func CreateDriverNamespace(ctx context.Context, f *framework.Framework) *v1.Name
 		"e2e-framework":      f.BaseName,
 		"e2e-test-namespace": f.Namespace.Name,
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	if framework.TestContext.VerifyServiceAccount {
 		ginkgo.By("Waiting for a default service account to be provisioned in namespace")
 		err = framework.WaitForDefaultServiceAccountInNamespace(ctx, f.ClientSet, namespace.Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	} else {
 		framework.Logf("Skipping waiting for service account")
 	}
@@ -800,7 +800,7 @@ func WaitForGVRFinalizer(ctx context.Context, c dynamic.Interface, gvr schema.Gr
 func VerifyFilePathGIDInPod(ctx context.Context, f *framework.Framework, filePath, expectedGID string, pod *v1.Pod) {
 	cmd := fmt.Sprintf("ls -l %s", filePath)
 	stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	framework.Logf("pod %s/%s exec for cmd %s, stdout: %s, stderr: %s", pod.Namespace, pod.Name, cmd, stdout, stderr)
 	ll := strings.Fields(stdout)
 	framework.Logf("stdout split: %v, expected gid: %v", ll, expectedGID)
@@ -811,7 +811,7 @@ func VerifyFilePathGIDInPod(ctx context.Context, f *framework.Framework, filePat
 func ChangeFilePathGIDInPod(ctx context.Context, f *framework.Framework, filePath, targetGID string, pod *v1.Pod) {
 	cmd := fmt.Sprintf("chgrp %s %s", targetGID, filePath)
 	_, _, err := e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	VerifyFilePathGIDInPod(ctx, f, filePath, targetGID, pod)
 }
 

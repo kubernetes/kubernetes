@@ -109,7 +109,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 
 				ginkgo.By(fmt.Sprintf("Wait for finalizer to be added to claim %s/%s", claim.Namespace, claim.Name))
 				err = e2epv.WaitForPVCFinalizer(ctx, m.cs, claim.Name, claim.Namespace, pvcAsSourceProtectionFinalizer, 1*time.Millisecond, 1*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Wait for PVC to be Bound")
 				_, err = e2epv.WaitForPVClaimBoundPhase(ctx, m.cs, []*v1.PersistentVolumeClaim{claim}, 1*time.Minute)
@@ -136,7 +136,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 
 				ginkgo.By(fmt.Sprintf("Verify VolumeSnapshotContent %s contains finalizer %s", snapshot.GetName(), volumeSnapshotContentFinalizer))
 				err = utils.WaitForGVRFinalizer(ctx, m.config.Framework.DynamicClient, utils.SnapshotContentGVR, volumeSnapshotContentName, "", volumeSnapshotContentFinalizer, 1*time.Millisecond, 1*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By(fmt.Sprintf("Delete VolumeSnapshotContent %s", snapshotContent.GetName()))
 				err = m.config.Framework.DynamicClient.Resource(utils.SnapshotContentGVR).Delete(ctx, snapshotContent.GetName(), metav1.DeleteOptions{})
@@ -144,7 +144,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 
 				ginkgo.By("Get VolumeSnapshotContent from API server and verify deletion timestamp is set")
 				snapshotContent, err = m.config.Framework.DynamicClient.Resource(utils.SnapshotContentGVR).Get(context.TODO(), snapshotContent.GetName(), metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				if snapshotContent.GetDeletionTimestamp() == nil {
 					framework.Failf("Expected deletion timestamp to be set on snapshotcontent")
@@ -161,7 +161,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 
 				ginkgo.By(fmt.Sprintf("Verify VolumeSnapshot %s contains finalizer %s", snapshot.GetName(), volumeSnapshotBoundFinalizer))
 				err = utils.WaitForGVRFinalizer(ctx, m.config.Framework.DynamicClient, utils.SnapshotGVR, volumeSnapshotName, f.Namespace.Name, volumeSnapshotBoundFinalizer, 1*time.Millisecond, 1*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				ginkgo.By("Delete VolumeSnapshot")
 				err = utils.DeleteAndWaitSnapshot(ctx, m.config.Framework.DynamicClient, f.Namespace.Name, volumeSnapshotName, framework.Poll, framework.SnapshotDeleteTimeout)
@@ -425,7 +425,7 @@ func deleteSnapshot(cs clientset.Interface, config *storageframework.PerTestConf
 	// delete the given snapshot
 	dc := config.Framework.DynamicClient
 	err := dc.Resource(utils.SnapshotGVR).Namespace(snapshot.GetNamespace()).Delete(context.TODO(), snapshot.GetName(), metav1.DeleteOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	// check if the snapshot is deleted
 	_, err = dc.Resource(utils.SnapshotGVR).Get(context.TODO(), snapshot.GetName(), metav1.GetOptions{})

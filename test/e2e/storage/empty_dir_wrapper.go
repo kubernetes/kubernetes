@@ -291,7 +291,7 @@ func createConfigmapsForRace(ctx context.Context, f *framework.Framework) (confi
 			},
 		}
 		_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configMap, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	}
 	return
 }
@@ -339,7 +339,7 @@ func testNoWrappedVolumeRace(ctx context.Context, f *framework.Framework, volume
 		"name": rcName,
 	}
 	targetNode, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By("Creating RC which spawns configmap-volume pods")
 	affinity := &v1.Affinity{

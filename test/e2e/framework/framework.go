@@ -323,7 +323,7 @@ func (f *Framework) BeforeEach(ctx context.Context) {
 
 	ginkgo.By("Creating a kubernetes client")
 	config, err := LoadConfig()
-	ExpectNoError(err)
+	ExpectNoError(err, "unexpected error")
 
 	config.QPS = f.Options.ClientQPS
 	config.Burst = f.Options.ClientBurst
@@ -335,13 +335,13 @@ func (f *Framework) BeforeEach(ctx context.Context) {
 	}
 	f.clientConfig = rest.CopyConfig(config)
 	clientSet, err := clientset.NewForConfig(config)
-	ExpectNoError(err)
+	ExpectNoError(err, "unexpected error")
 	f.ClientSet = fClient{
 		Interface: clientSet,
 		f:         f,
 	}
 	f.DynamicClient, err = dynamic.NewForConfig(config)
-	ExpectNoError(err)
+	ExpectNoError(err, "unexpected error")
 
 	// create scales getter, set GroupVersion and NegotiatedSerializer to default values
 	// as they are required when creating a REST client.
@@ -352,9 +352,9 @@ func (f *Framework) BeforeEach(ctx context.Context) {
 		config.NegotiatedSerializer = scheme.Codecs
 	}
 	restClient, err := rest.RESTClientFor(config)
-	ExpectNoError(err)
+	ExpectNoError(err, "unexpected error")
 	discoClient, err := discovery.NewDiscoveryClientForConfig(config)
-	ExpectNoError(err)
+	ExpectNoError(err, "unexpected error")
 	cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
 	restMapper.Reset()
@@ -369,17 +369,17 @@ func (f *Framework) BeforeEach(ctx context.Context) {
 		namespace, err := f.CreateNamespace(ctx, f.BaseName, map[string]string{
 			"e2e-framework": f.BaseName,
 		})
-		ExpectNoError(err)
+		ExpectNoError(err, "unexpected error")
 
 		f.Namespace = namespace
 
 		if TestContext.VerifyServiceAccount {
 			ginkgo.By("Waiting for a default service account to be provisioned in namespace")
 			err = WaitForDefaultServiceAccountInNamespace(ctx, f.ClientSet, namespace.Name)
-			ExpectNoError(err)
+			ExpectNoError(err, "unexpected error")
 			ginkgo.By("Waiting for kube-root-ca.crt to be provisioned in namespace")
 			err = WaitForKubeRootCAInNamespace(ctx, f.ClientSet, namespace.Name)
-			ExpectNoError(err)
+			ExpectNoError(err, "unexpected error")
 		} else {
 			Logf("Skipping waiting for service account")
 		}

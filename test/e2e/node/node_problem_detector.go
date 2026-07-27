@@ -61,7 +61,7 @@ var _ = SIGDescribe("NodeProblemDetector", feature.NodeProblemDetector, framewor
 	ginkgo.It("should run without error", func(ctx context.Context) {
 		ginkgo.By("Getting all nodes and their SSH-able IP addresses")
 		readyNodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		nodes := []v1.Node{}
 		hosts := []string{}
@@ -119,14 +119,14 @@ var _ = SIGDescribe("NodeProblemDetector", feature.NodeProblemDetector, framewor
 				// match regular expression "[n]ode-problem-detector".
 				psCmd := "ps aux | grep [n]ode-problem-detector"
 				result, err = e2essh.SSH(ctx, psCmd, host, framework.TestContext.Provider)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				gomega.Expect(result.Code).To(gomega.Equal(0))
 				gomega.Expect(result.Stdout).To(gomega.ContainSubstring("node-problem-detector"))
 
 				ginkgo.By(fmt.Sprintf("Check node-problem-detector is running fine on node %q", host))
 				journalctlCmd := "sudo journalctl -r -u node-problem-detector"
 				result, err = e2essh.SSH(ctx, journalctlCmd, host, framework.TestContext.Provider)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				gomega.Expect(result.Code).To(gomega.Equal(0))
 				gomega.Expect(result.Stdout).NotTo(gomega.ContainSubstring("node-problem-detector.service: Failed"))
 
@@ -134,7 +134,7 @@ var _ = SIGDescribe("NodeProblemDetector", feature.NodeProblemDetector, framewor
 				ginkgo.By(fmt.Sprintf("Check when node-problem-detector started on node %q", host))
 				npdStartTimeCommand := "sudo systemctl show --timestamp=utc node-problem-detector -P ActiveEnterTimestamp"
 				result, err = e2essh.SSH(ctx, npdStartTimeCommand, host, framework.TestContext.Provider)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				gomega.Expect(result.Code).To(gomega.Equal(0))
 
 				// The time format matches the systemd format.
@@ -155,7 +155,7 @@ var _ = SIGDescribe("NodeProblemDetector", feature.NodeProblemDetector, framewor
 			log := "INFO: task docker:12345 blocked for more than 120 seconds."
 			injectLogCmd := "sudo sh -c \"echo 'kernel: " + log + "' >> /dev/kmsg\""
 			result, err = e2essh.SSH(ctx, injectLogCmd, host, framework.TestContext.Provider)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(result.Code).To(gomega.Equal(0))
 		}
 
@@ -296,12 +296,12 @@ func getMemoryStat(ctx context.Context, f *framework.Framework, host string) (rs
 	}
 
 	result, err := e2essh.SSH(ctx, memCmd, host, framework.TestContext.Provider)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	gomega.Expect(result.Code).To(gomega.Equal(0))
 	lines := strings.Split(result.Stdout, "\n")
 
 	memoryUsage, err := strconv.ParseFloat(lines[0], 64)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	var rssToken, inactiveFileToken string
 	if isCgroupV2 {
@@ -320,11 +320,11 @@ func getMemoryStat(ctx context.Context, f *framework.Framework, host string) (rs
 
 		if tokens[0] == rssToken {
 			rss, err = strconv.ParseFloat(tokens[1], 64)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 		if tokens[0] == inactiveFileToken {
 			totalInactiveFile, err = strconv.ParseFloat(tokens[1], 64)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 	}
 
@@ -350,7 +350,7 @@ func getCPUStat(ctx context.Context, f *framework.Framework, host string) (usage
 	}
 
 	result, err := e2essh.SSH(ctx, cpuCmd, host, framework.TestContext.Provider)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	gomega.Expect(result.Code).To(gomega.Equal(0))
 	lines := strings.Split(result.Stdout, "\n")
 
@@ -366,7 +366,7 @@ func getCPUStat(ctx context.Context, f *framework.Framework, host string) (usage
 
 func isHostRunningCgroupV2(ctx context.Context, f *framework.Framework, host string) bool {
 	result, err := e2essh.SSH(ctx, "stat -fc %T /sys/fs/cgroup/", host, framework.TestContext.Provider)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	gomega.Expect(result.Code).To(gomega.Equal(0))
 
 	// 0x63677270 == CGROUP2_SUPER_MAGIC
@@ -376,7 +376,7 @@ func isHostRunningCgroupV2(ctx context.Context, f *framework.Framework, host str
 
 func getNpdPodStat(ctx context.Context, f *framework.Framework, nodeName string) (cpuUsage, rss, workingSet float64) {
 	summary, err := e2ekubelet.GetStatsSummary(ctx, f.ClientSet, nodeName)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	hasNpdPod := false
 	for _, pod := range summary.Pods {

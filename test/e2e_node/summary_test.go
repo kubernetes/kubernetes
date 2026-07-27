@@ -388,26 +388,26 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
 
 			ginkgo.By("Waiting for the pod to start")
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "unexpected error")
 
 			ginkgo.By("Validating that CPU PSI metrics reflect pressure")
 			gomega.Eventually(ctx, func(g gomega.Gomega) {
 				summary, err := getNodeSummary(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				g.Expect(summary.Pods).To(gstruct.MatchElements(summaryObjectID, gstruct.IgnoreExtras, gstruct.Elements{
 					fmt.Sprintf("%s::%s", f.Namespace.Name, podName): gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 						"CPU": pressureDetected("some", 0.1),
 					}),
 				}))
 			}, 2*time.Minute, 15*time.Second).Should(gomega.Succeed())
-			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{}), "unexpected error")
 		})
 
 		ginkgo.It("should report Memory pressure in PSI metrics", func(ctx context.Context) {
 			runtime, _, err := getCRIClient(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			resp, err := runtime.Version(ctx, "")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			if resp.GetRuntimeName() == "cri-o" {
 				// Skip this test for CRI-O (used on Fedora CoreOS in test CI) until automatic
@@ -442,19 +442,19 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
 
 			ginkgo.By("Waiting for the pod to start")
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "unexpected error")
 
 			ginkgo.By("Validating that Memory PSI metrics reflect pressure")
 			gomega.Eventually(ctx, func(g gomega.Gomega) {
 				summary, err := getNodeSummary(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				g.Expect(summary.Pods).To(gstruct.MatchElements(summaryObjectID, gstruct.IgnoreExtras, gstruct.Elements{
 					fmt.Sprintf("%s::%s", f.Namespace.Name, podName): gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 						"Memory": pressureDetected("full", 0.1),
 					}),
 				}))
 			}, 2*time.Minute, 15*time.Second).Should(gomega.Succeed())
-			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{}), "unexpected error")
 		})
 
 		ginkgo.It("should report I/O pressure in PSI metrics", func(ctx context.Context) {
@@ -474,19 +474,19 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
 
 			ginkgo.By("Waiting for the pod to start")
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "unexpected error")
 
 			ginkgo.By("Validating that I/O PSI metrics reflect pressure")
 			gomega.Eventually(ctx, func(g gomega.Gomega) {
 				summary, err := getNodeSummary(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				g.Expect(summary.Pods).To(gstruct.MatchElements(summaryObjectID, gstruct.IgnoreExtras, gstruct.Elements{
 					fmt.Sprintf("%s::%s", f.Namespace.Name, podName): gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 						"IO": pressureDetected("some", 0.1),
 					}),
 				}))
 			}, 2*time.Minute, 15*time.Second).Should(gomega.Succeed())
-			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{}), "unexpected error")
 		})
 	})
 })

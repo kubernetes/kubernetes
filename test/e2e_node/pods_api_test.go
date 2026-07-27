@@ -662,7 +662,7 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 			// 2. Restart Kubelet
 			ginkgo.By("restarting Kubelet")
 			oldCfg, err := getCurrentKubeletConfig(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			newCfg := oldCfg.DeepCopy()
 			newCfg.FileCheckFrequency = metav1.Duration{Duration: 22 * time.Second}
 			updateKubeletConfig(ctx, f, newCfg, true)
@@ -672,9 +672,9 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 
 			// Reconnect to the API
 			endpoint, err := util.LocalEndpoint("/var/lib/kubelet/pods-api", pods.Socket)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			conn, err = grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			defer func() { _ = conn.Close() }()
 			client = podsv1alpha1.NewPodsClient(conn)
 
@@ -721,14 +721,14 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 		ginkgo.It("should increment metrics on API calls", func(ctx context.Context) {
 			ginkgo.By("grabbing initial metrics")
 			initialMetrics, err := e2emetrics.GetKubeletMetrics(ctx, f.ClientSet, framework.TestContext.NodeName)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			initialTotal := getMetricValue(initialMetrics, "pod_requests_total", map[string]string{"server_api_version": "v1alpha1", "status_code": "OK"})
 			initialList := getMetricValue(initialMetrics, "pod_requests_list_total", map[string]string{"server_api_version": "v1alpha1", "status_code": "OK"})
 
 			ginkgo.By("performing API calls")
 			_, err = client.ListPods(ctx, &podsv1alpha1.ListPodsRequest{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("verifying metrics incremented")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -761,10 +761,10 @@ var _ = SIGDescribe("Kubelet Pods API", framework.WithSerial(), func() {
 
 		ginkgo.It("should not serve requests when feature gate is disabled", func(ctx context.Context) {
 			endpoint, err := util.LocalEndpoint("/var/lib/kubelet/pods-api", pods.Socket)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			conn, err := grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			defer func() { _ = conn.Close() }()
 			client := podsv1alpha1.NewPodsClient(conn)
 

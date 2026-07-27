@@ -48,11 +48,11 @@ var _ = common.SIGDescribe(feature.PerformanceDNS, framework.WithSerial(), func(
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, f.Timeouts.NodeSchedulable))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, f.Timeouts.NodeSchedulable), "unexpected error")
 		e2enode.WaitForTotalHealthy(ctx, f.ClientSet, time.Minute)
 
 		err := framework.CheckTestingNSDeletedExcept(ctx, f.ClientSet, f.Namespace.Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	})
 
 	// answers dns for service - creates the maximum number of services, and then check dns record for one
@@ -70,7 +70,7 @@ var _ = common.SIGDescribe(feature.PerformanceDNS, framework.WithSerial(), func(
 		services := generateServicesInNamespaces(namespaces, maxServicesPerCluster)
 		createService := func(i int) {
 			defer ginkgo.GinkgoRecover()
-			framework.ExpectNoError(testutils.CreateServiceWithRetries(f.ClientSet, services[i].Namespace, services[i]))
+			framework.ExpectNoError(testutils.CreateServiceWithRetries(f.ClientSet, services[i].Namespace, services[i]), "unexpected error")
 		}
 		framework.Logf("Creating %v test services", maxServicesPerCluster)
 		workqueue.ParallelizeUntil(ctx, parallelCreateServiceWorkers, len(services), createService)
@@ -88,7 +88,7 @@ var _ = common.SIGDescribe(feature.PerformanceDNS, framework.WithSerial(), func(
 			}
 			s := services[i]
 			svc, err := f.ClientSet.CoreV1().Services(s.Namespace).Get(ctx, s.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			qname := fmt.Sprintf("%v.%v.svc.%v", s.Name, s.Namespace, framework.TestContext.ClusterDNSDomain)
 			framework.Logf("Querying %v expecting %v", qname, svc.Spec.ClusterIP)
 			dnsTest.checkDNSRecordFrom(

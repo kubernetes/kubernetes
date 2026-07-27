@@ -313,7 +313,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 			ImageID:      e2epod.GetDefaultTestImageID(),
 		}
 		pod, err := e2epod.MakeSecPod(&podConfig)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		// Change volumeMounts to volumeDevices and the other way around
 		pod = swapVolumeMode(pod)
@@ -370,7 +370,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 			ImageID:      e2epod.GetDefaultTestImageID(),
 		}
 		pod, err := e2epod.MakeSecPod(&podConfig)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		for i := range pod.Spec.Containers {
 			pod.Spec.Containers[i].VolumeDevices = nil
@@ -379,26 +379,26 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 
 		// Run the pod
 		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(ctx, pod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		defer func() {
-			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, l.cs, pod))
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, l.cs, pod), "unexpected error")
 		}()
 
 		err = e2epod.WaitForPodNameRunningInNamespace(ctx, l.cs, pod.Name, pod.Namespace)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		// Reload the pod to get its node
 		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(pod.Spec.NodeName).ToNot(gomega.BeEmpty(), "pod should be scheduled to a node")
 		node, err := l.cs.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Listing mounted volumes in the pod")
 		hostExec := storageutils.NewHostExec(f)
 		ginkgo.DeferCleanup(hostExec.Cleanup)
 		volumePaths, devicePaths, err := listPodVolumePluginDirectory(ctx, hostExec, pod, node)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		driverInfo := driver.GetDriverInfo()
 		volumePlugin := driverInfo.InTreePluginName

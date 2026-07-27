@@ -59,7 +59,7 @@ var _ = SIGWindowsDescribe(feature.Windows, feature.StandaloneMode, func() {
 			staticPodName = "static-pod-" + string(uuid.NewUUID())
 			podPath = kubeletCfg.StaticPodPath
 			err := createWindowsBasicStaticPod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				pod, err := getPodFromStandaloneKubelet(ctx, ns, staticPodName)
@@ -81,7 +81,7 @@ var _ = SIGWindowsDescribe(feature.Windows, feature.StandaloneMode, func() {
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By(fmt.Sprintf("delete the static pod (%v/%v)", ns, staticPodName))
 			err := deleteStaticPod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By(fmt.Sprintf("wait for pod to disappear (%v/%v)", ns, staticPodName))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -171,7 +171,7 @@ func getPodFromStandaloneKubelet(ctx context.Context, podNamespace string, podNa
 	}
 	client := &http.Client{Transport: tr}
 	req, err := http.NewRequest("GET", endpoint, nil)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))
 	req.Header.Add("Accept", "application/json")
 

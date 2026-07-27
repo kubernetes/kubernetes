@@ -469,7 +469,7 @@ func (c *Cluster) runComponentWithRetry(tCtx ktesting.TContext, component Cluste
 			continue
 		}
 		// Re-raise the failure.
-		tCtx.ExpectNoError(err)
+		tCtx.ExpectNoError(err, "unexpected error")
 	}
 	tCtx.Logf("started %s with pid %d", cmd.Name, cmd.cmd.Process.Pid)
 	dumpProcesses(tCtx)

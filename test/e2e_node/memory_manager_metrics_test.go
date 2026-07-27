@@ -54,7 +54,7 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 			var err error
 			if oldCfg == nil {
 				oldCfg, err = getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}
 
 			newCfg := oldCfg.DeepCopy()
@@ -177,7 +177,7 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 			)
 
 			_, err := printAllPodsOnNode(ctx, f.ClientSet, framework.TestContext.NodeName)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// we updated the kubelet config in BeforeEach, so we can assume we start fresh.
 			// being [Serial], we can also assume noone else but us is running pods.
@@ -285,7 +285,7 @@ var _ = SIGDescribe("Memory Manager Metrics Pod Level Resources", ginkgo.Ordered
 		var err error
 		if oldCfg == nil {
 			oldCfg, err = getCurrentKubeletConfig(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 	})
 
@@ -314,21 +314,21 @@ var _ = SIGDescribe("Memory Manager Metrics Pod Level Resources", ginkgo.Ordered
 
 		ginkgo.By("Getting baseline metrics")
 		baselineMetrics, err := getKubeletMetrics(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		baseAllocations, err := getCounterMetricValue(baselineMetrics, "kubelet_resource_manager_allocations_total", map[string]string{"resource_name": "memory", "source": "pod"})
 		if !errors.Is(err, ErrMetricNotFound) {
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 
 		baseExclusiveAssignments, err := getCounterMetricValue(baselineMetrics, "kubelet_resource_manager_container_assignments_total", map[string]string{"resource_name": "memory", "assignment_type": "pod_exclusive"})
 		if !errors.Is(err, ErrMetricNotFound) {
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 
 		baseSharedAssignments, err := getCounterMetricValue(baselineMetrics, "kubelet_resource_manager_container_assignments_total", map[string]string{"resource_name": "memory", "assignment_type": "pod_shared"})
 		if !errors.Is(err, ErrMetricNotFound) {
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 
 		ginkgo.By("Creating a Guaranteed pod with pod-level resources and a mix of guaranteed and non-guaranteed containers")
@@ -431,16 +431,16 @@ var _ = SIGDescribe("Memory Manager Metrics Pod Level Resources", ginkgo.Ordered
 
 		ginkgo.By("Getting baseline metrics")
 		baselineMetrics, err := getKubeletMetrics(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		baseAllocations, err := getCounterMetricValue(baselineMetrics, "kubelet_resource_manager_allocations_total", map[string]string{"resource_name": "memory", "source": "node"})
 		if !errors.Is(err, ErrMetricNotFound) {
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 
 		baseExclusiveAssignments, err := getCounterMetricValue(baselineMetrics, "kubelet_resource_manager_container_assignments_total", map[string]string{"resource_name": "memory", "assignment_type": "node_exclusive"})
 		if !errors.Is(err, ErrMetricNotFound) {
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 
 		ginkgo.By("Creating a Guaranteed pod with pod-level resources and a mix of guaranteed and non-guaranteed containers")

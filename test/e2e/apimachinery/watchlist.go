@@ -86,17 +86,17 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 
 		ginkgo.By("Modifying a secret and checking if the update was picked up by the secret informer")
 		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(ctx, "secret-1", metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		secret.StringData = map[string]string{"foo": "bar"}
 		secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(ctx, secret, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		expectedSecrets[0] = secret
 		verifyStoreFor(ctx, verifyStoreForMetaObject(expectedSecrets, secretInformer.GetStore()))
 	})
 	ginkgo.It("should be requested by metadatainformer when WatchListClient is enabled", func(ctx context.Context) {
 		metadataClient, err := metadata.NewForConfig(f.ClientConfig())
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		secretMetaInformer := metadatainformer.NewFilteredMetadataInformer(
 			metadataClient,
 			v1.SchemeGroupVersion.WithResource("secrets"),
@@ -110,7 +110,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 
 		_ = addWellKnownSecrets(ctx, f)
 		expectedSecrets, err := metadataClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "watchlist=true"})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Starting the secret meta informer")
 		stopCh := make(chan struct{})
@@ -128,13 +128,13 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 
 		ginkgo.By("Modifying a secret and checking if the update was picked up by the secret meta informer")
 		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(ctx, "secret-1", metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		secret.StringData = map[string]string{"foo": "bar"}
 		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(ctx, secret, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		expectedSecrets, err = metadataClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "watchlist=true"})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		verifyStoreFor(ctx, verifyPartialObjectMetadataStore(toPointerSlice(expectedSecrets.Items), secretMetaInformer.Informer().GetStore()))
 	})
 	ginkgo.It("should NOT be requested by client-go's List method when WatchListClient is enabled", func(ctx context.Context) {
@@ -142,11 +142,11 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 
 		rt, clientConfig := clientConfigWithRoundTripper(f)
 		wrappedKubeClient, err := kubernetes.NewForConfig(clientConfig)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Getting secrets from the server")
 		secretList, err := wrappedKubeClient.CoreV1().Secrets(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "watchlist=true"})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Verifying retrieved secrets")
 		actualSecrets := secretList.Items
@@ -162,11 +162,11 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 
 		rt, clientConfig := clientConfigWithRoundTripper(f)
 		wrappedDynamicClient, err := dynamic.NewForConfig(clientConfig)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Getting secrets from the server")
 		secretList, err := wrappedDynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "watchlist=true"})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("verifying retrieved secrets")
 		actualSecrets := secretList.Items
@@ -179,21 +179,21 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 	})
 	ginkgo.It("should NOT be requested by metadata client's List method when WatchListClient is enabled", func(ctx context.Context) {
 		metaClient, err := metadata.NewForConfig(f.ClientConfig())
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		expectedMetaSecrets := []metav1.PartialObjectMetadata{}
 		for _, addedSecret := range addWellKnownSecrets(ctx, f) {
 			addedSecretMeta, err := metaClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Get(ctx, addedSecret.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			expectedMetaSecrets = append(expectedMetaSecrets, *addedSecretMeta)
 		}
 
 		rt, clientConfig := clientConfigWithRoundTripper(f)
 		wrappedMetaClient, err := metadata.NewForConfig(clientConfig)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Getting secrets metadata from the server")
 		secretMetaList, err := wrappedMetaClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "watchlist=true"})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("verifying retrieved secrets")
 		actualMetaSecrets := secretMetaList.Items
@@ -211,11 +211,11 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		}, ",")
 		modifiedClientConfig.GroupVersion = &v1.SchemeGroupVersion
 		restClient, err := rest.RESTClientFor(modifiedClientConfig)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		dynamicClient := dynamic.New(restClient)
 
 		opts, hasPreparedOptions, err := watchlist.PrepareWatchListOptionsFromListOptions(metav1.ListOptions{LabelSelector: "watchlist=true"})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(hasPreparedOptions).To(gomega.BeTrueBecause("it should be possible to prepare watchlist opts from an empty ListOptions"))
 
 		ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))
@@ -225,7 +225,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		expectedSecrets := []*unstructured.Unstructured{}
 		for i, wellKnownSecret := range wellKnownSecrets {
 			actualSecret, err := dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Get(ctx, wellKnownSecret.GetName(), metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			if i != 0 {
 				// only the first obj has
 				// the column definition
@@ -236,7 +236,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 
 		ginkgo.By("Verifying if the secrets can be streamed in table format")
 		w, err := dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Watch(ctx, opts)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		defer w.Stop()
 
 		var ageColIndex int
@@ -323,7 +323,7 @@ func setupDynamicTableClient(f *framework.Framework) dynamic.Interface {
 	}, ",")
 	modifiedClientConfig.GroupVersion = &v1.SchemeGroupVersion
 	restClient, err := rest.RESTClientFor(modifiedClientConfig)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return dynamic.New(restClient)
 }
 
@@ -357,15 +357,15 @@ func verifyStoreFor(ctx context.Context, verifier func() bool) {
 
 		return verifier(), nil
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 func verifyStoreForMetaObject[T any](expectedSecrets []*T, store cache.Store) func() bool {
 	return func() bool {
 		expectedSecretsAsMetaObject, err := toMetaObjectSlice(expectedSecrets)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		actualSecretsAsMetaObject, err := toMetaObjectSlice(store.List())
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		sort.Sort(byName(expectedSecretsAsMetaObject))
 		sort.Sort(byName(actualSecretsAsMetaObject))
@@ -377,7 +377,7 @@ func verifyStoreForMetaObject[T any](expectedSecrets []*T, store cache.Store) fu
 func verifyPartialObjectMetadataStore(expected []*metav1.PartialObjectMetadata, store cache.Store) func() bool {
 	return func() bool {
 		actual, err := toPartialObjectMetadata(store.List())
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		sort.Sort(byPartialObjectMetadataName(expected))
 		sort.Sort(byPartialObjectMetadataName(actual))
@@ -397,7 +397,7 @@ func addWellKnownSecrets(ctx context.Context, f *framework.Framework) []*v1.Secr
 	var secrets []*v1.Secret
 	for i := 1; i <= 5; i++ {
 		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, newSecret(fmt.Sprintf("secret-%d", i)), metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		secrets = append(secrets, secret)
 	}
 	return secrets
@@ -409,9 +409,9 @@ func addWellKnownUnstructuredSecrets(ctx context.Context, f *framework.Framework
 	var secrets []*unstructured.Unstructured
 	for i := 1; i <= 5; i++ {
 		unstructuredSecret, err := runtime.DefaultUnstructuredConverter.ToUnstructured(newSecret(fmt.Sprintf("secret-%d", i)))
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		secret, err := f.DynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Create(ctx, &unstructured.Unstructured{Object: unstructuredSecret}, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		secrets = append(secrets, secret)
 	}
 	return secrets
@@ -489,7 +489,7 @@ func retrieveObjFromEventOfType(watch watch.Interface, expectedType watch.EventT
 
 func hasTableObjectInitialEventsAnnotationInBookmarkObj(rawObject runtime.Object) bool {
 	table, err := decodeIntoTable(rawObject)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	if len(table.Rows) == 0 {
 		framework.Failf("table has no rows")
 	}
@@ -498,7 +498,7 @@ func hasTableObjectInitialEventsAnnotationInBookmarkObj(rawObject runtime.Object
 	}
 
 	internalObjMeta, err := extractMetadataFromTableRowObject(table.Rows[0])
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return internalObjMeta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true"
 }
 
@@ -525,7 +525,7 @@ func extractMetadataFromTableRowObject(row metav1.TableRow) (metav1.Object, erro
 	}
 
 	internalObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, row.Object.Raw)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return meta.Accessor(internalObj)
 }
 
@@ -541,23 +541,23 @@ func decodeIntoTable(rawObject runtime.Object) (*metav1.Table, error) {
 
 	var table metav1.Table
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.Object, &table)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return &table, nil
 }
 
 func removeColumnDefinitionsFromTable(rawObject *unstructured.Unstructured) *unstructured.Unstructured {
 	table, err := decodeIntoTable(rawObject)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	table.ColumnDefinitions = nil
 
 	rawTable, err := runtime.DefaultUnstructuredConverter.ToUnstructured(table)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return &unstructured.Unstructured{Object: rawTable}
 }
 
 func getAgeColumnIndex(rawObj runtime.Object) int {
 	table, err := decodeIntoTable(rawObj)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	for i, col := range table.ColumnDefinitions {
 		if col.Name == "Age" {
@@ -573,7 +573,7 @@ func removeAgeColumnValueAtIndex(rawObj runtime.Object, ageColIndex int) runtime
 	}
 
 	table, err := decodeIntoTable(rawObj)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	for i := range table.Rows {
 		cells := table.Rows[i].Cells

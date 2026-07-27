@@ -89,6 +89,6 @@ var _ = SIGDescribe("Terminate Pods", framework.WithNodeConformance(), func() {
 			return apierrors.IsNotFound(err)
 		}, 10*time.Second, time.Second).Should(gomega.BeTrueBecause("expected pod to disappear from API server within 10 seconds"))
 
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	})
 })

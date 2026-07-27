@@ -258,7 +258,7 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 
 	// The hostpath CSI driver only works when everything runs on the same node.
 	node, err := e2enode.GetRandomReadySchedulableNode(ctx, cs)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	config := &storageframework.PerTestConfig{
 		Driver:              h,
 		Prefix:              "hostpath",
@@ -665,7 +665,7 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 
 	// pods should be scheduled on the node
 	node, err := e2enode.GetRandomReadySchedulableNode(ctx, cs)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	embeddedCleanup := func() {}
 	containerArgs := []string{}

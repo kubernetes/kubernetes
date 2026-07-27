@@ -50,7 +50,7 @@ func CreateSnapshot(ctx context.Context, sDriver SnapshottableTestDriver, config
 	var err error
 	if pattern.SnapshotType != DynamicCreatedSnapshot && pattern.SnapshotType != PreprovisionedCreatedSnapshot {
 		err = fmt.Errorf("SnapshotType must be set to either DynamicCreatedSnapshot or PreprovisionedCreatedSnapshot")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	}
 	dc := config.Framework.DynamicClient
 
@@ -62,17 +62,17 @@ func CreateSnapshot(ctx context.Context, sDriver SnapshottableTestDriver, config
 	sclass.Object["deletionPolicy"] = pattern.SnapshotDeletionPolicy.String()
 
 	sclass, err = dc.Resource(utils.SnapshotClassGVR).Create(ctx, sclass, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	sclass, err = dc.Resource(utils.SnapshotClassGVR).Get(ctx, sclass.GetName(), metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By("creating a dynamic VolumeSnapshot")
 	// prepare a dynamically provisioned volume snapshot with certain data
 	snapshot := getSnapshot(pvcName, pvcNamespace, sclass.GetName())
 
 	snapshot, err = dc.Resource(utils.SnapshotGVR).Namespace(snapshot.GetNamespace()).Create(ctx, snapshot, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	return sclass, snapshot
 }
@@ -102,7 +102,7 @@ func CreateSnapshotResource(ctx context.Context, sDriver SnapshottableTestDriver
 		r.Vscontent.Object["spec"].(map[string]interface{})["deletionPolicy"] = "Retain"
 
 		r.Vscontent, err = dc.Resource(utils.SnapshotContentGVR).Update(ctx, r.Vscontent, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("recording properties of the preprovisioned snapshot")
 		snapshotHandle := r.Vscontent.Object["status"].(map[string]interface{})["snapshotHandle"].(string)
@@ -122,21 +122,21 @@ func CreateSnapshotResource(ctx context.Context, sDriver SnapshottableTestDriver
 		if apierrors.IsNotFound(err) {
 			err = nil
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("checking the Snapshot has been deleted")
 		err = utils.WaitForNamespacedGVRDeletion(ctx, dc, utils.SnapshotGVR, r.Vs.GetNamespace(), r.Vs.GetName(), framework.Poll, timeouts.SnapshotDelete)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		err = dc.Resource(utils.SnapshotContentGVR).Delete(ctx, r.Vscontent.GetName(), metav1.DeleteOptions{})
 		if apierrors.IsNotFound(err) {
 			err = nil
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("checking the Snapshot content has been deleted")
 		err = utils.WaitForGVRDeletion(ctx, dc, utils.SnapshotContentGVR, r.Vscontent.GetName(), framework.Poll, timeouts.SnapshotDelete)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("creating a snapshot content with the snapshot handle")
 		uuid := uuid.NewUUID()
@@ -146,22 +146,22 @@ func CreateSnapshotResource(ctx context.Context, sDriver SnapshottableTestDriver
 
 		r.Vscontent = getPreProvisionedSnapshotContent(snapcontentName, snapshotClassName, snapshotContentAnnotations, snapName, pvcNamespace, snapshotHandle, pattern.SnapshotDeletionPolicy.String(), csiDriverName)
 		r.Vscontent, err = dc.Resource(utils.SnapshotContentGVR).Create(ctx, r.Vscontent, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("creating a snapshot with that snapshot content")
 		r.Vs = getPreProvisionedSnapshot(snapName, pvcNamespace, snapcontentName)
 		r.Vs, err = dc.Resource(utils.SnapshotGVR).Namespace(r.Vs.GetNamespace()).Create(ctx, r.Vs, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		err = utils.WaitForSnapshotReady(ctx, dc, r.Vs.GetNamespace(), r.Vs.GetName(), framework.Poll, timeouts.SnapshotCreate)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("getting the snapshot and snapshot content")
 		r.Vs, err = dc.Resource(utils.SnapshotGVR).Namespace(r.Vs.GetNamespace()).Get(ctx, r.Vs.GetName(), metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		r.Vscontent, err = dc.Resource(utils.SnapshotContentGVR).Get(ctx, r.Vscontent.GetName(), metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	}
 	return &r
 }
@@ -193,16 +193,16 @@ func (sr *SnapshotResource) CleanupResource(ctx context.Context, timeouts *frame
 					// or else the physical snapshot content will be leaked.
 					boundVsContent.Object["spec"].(map[string]interface{})["deletionPolicy"] = "Delete"
 					boundVsContent, err = dc.Resource(utils.SnapshotContentGVR).Update(ctx, boundVsContent, metav1.UpdateOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				}
 				err = dc.Resource(utils.SnapshotGVR).Namespace(sr.Vs.GetNamespace()).Delete(ctx, sr.Vs.GetName(), metav1.DeleteOptions{})
 				if apierrors.IsNotFound(err) {
 					err = nil
 				}
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				err = utils.WaitForGVRDeletion(ctx, dc, utils.SnapshotContentGVR, boundVsContent.GetName(), framework.Poll, timeouts.SnapshotDelete)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 			case apierrors.IsNotFound(err):
 				// the volume snapshot is not bound to snapshot content yet
@@ -210,10 +210,10 @@ func (sr *SnapshotResource) CleanupResource(ctx context.Context, timeouts *frame
 				if apierrors.IsNotFound(err) {
 					err = nil
 				}
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				err = utils.WaitForNamespacedGVRDeletion(ctx, dc, utils.SnapshotGVR, sr.Vs.GetNamespace(), sr.Vs.GetName(), framework.Poll, timeouts.SnapshotDelete)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			default:
 				cleanupErrs = append(cleanupErrs, err)
 			}
@@ -235,16 +235,16 @@ func (sr *SnapshotResource) CleanupResource(ctx context.Context, timeouts *frame
 				// or else the physical snapshot content will be leaked.
 				sr.Vscontent.Object["spec"].(map[string]interface{})["deletionPolicy"] = "Delete"
 				sr.Vscontent, err = dc.Resource(utils.SnapshotContentGVR).Update(ctx, sr.Vscontent, metav1.UpdateOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}
 			err = dc.Resource(utils.SnapshotContentGVR).Delete(ctx, sr.Vscontent.GetName(), metav1.DeleteOptions{})
 			if apierrors.IsNotFound(err) {
 				err = nil
 			}
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			err = utils.WaitForGVRDeletion(ctx, dc, utils.SnapshotContentGVR, sr.Vscontent.GetName(), framework.Poll, timeouts.SnapshotDelete)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		case apierrors.IsNotFound(err):
 			// Hope the underlying physical snapshot resource has been deleted already
 		default:
@@ -259,7 +259,7 @@ func (sr *SnapshotResource) CleanupResource(ctx context.Context, timeouts *frame
 			framework.Failf("Error deleting snapshot class %q. Error: %v", sr.Vsclass.GetName(), err)
 		}
 		err = utils.WaitForGVRDeletion(ctx, dc, utils.SnapshotClassGVR, sr.Vsclass.GetName(), framework.Poll, timeouts.SnapshotDelete)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	}
 	return utilerrors.NewAggregate(cleanupErrs)
 }

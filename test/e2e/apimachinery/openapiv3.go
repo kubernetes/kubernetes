@@ -56,7 +56,7 @@ var _ = SIGDescribe("OpenAPIV3", func() {
 	ginkgo.It("should round trip OpenAPI V3 for all built-in group versions", func(ctx context.Context) {
 		c := openapi3.NewRoot(f.ClientSet.Discovery().OpenAPIV3())
 		gvs, err := c.GroupVersions()
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		// List of built in types that do not contain the k8s.io suffix
 		builtinGVs := map[string]bool{
 			"apps":        true,
@@ -72,9 +72,9 @@ var _ = SIGDescribe("OpenAPIV3", func() {
 				continue
 			}
 			spec1, err := c.GVSpec(gv)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			specMarshalled, err := json.Marshal(spec1)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			var spec2 spec3.OpenAPI
 			json.Unmarshal(specMarshalled, &spec2)
 
@@ -92,11 +92,11 @@ var _ = SIGDescribe("OpenAPIV3", func() {
 	*/
 	ginkgo.It("should publish OpenAPI V3 for CustomResourceDefinition", func(ctx context.Context) {
 		config, err := framework.LoadConfig()
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		apiExtensionClient, err := apiextensionclientset.NewForConfig(config)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		dynamicClient, err := dynamic.NewForConfig(config)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		resourceName := "testcrd"
 		// Generate a CRD with random group name to avoid group conflict with other tests that run in parallel.
 		groupName := fmt.Sprintf("%s.example.com", names.SimpleNameGenerator.GenerateName("group"))
@@ -127,7 +127,7 @@ var _ = SIGDescribe("OpenAPIV3", func() {
 			_ = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
 		}()
 
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		c := openapi3.NewRoot(f.ClientSet.Discovery().OpenAPIV3())
 		var openAPISpec *spec3.OpenAPI
 		// Poll for the OpenAPI to be updated with the new CRD
@@ -141,7 +141,7 @@ var _ = SIGDescribe("OpenAPIV3", func() {
 		framework.ExpectNoError(err, "timed out getting new CustomResourceDefinition")
 
 		specMarshalled, err := json.Marshal(openAPISpec)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		var spec2 spec3.OpenAPI
 		json.Unmarshal(specMarshalled, &spec2)
 
@@ -174,9 +174,9 @@ var _ = SIGDescribe("OpenAPIV3", func() {
 	*/
 	f.It("should contain OpenAPI V3 for Aggregated APIServer", f.WithSerial(), func(ctx context.Context) {
 		config, err := framework.LoadConfig()
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		aggrclient, err := aggregatorclient.NewForConfig(config)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		names := generateSampleAPIServerObjectNames(f.Namespace.Name)
 		SetUpSampleAPIServer(ctx, f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer), names, samplev1beta1.GroupName, "v1beta1")
 		defer cleanupSampleAPIServer(ctx, f.ClientSet, aggrclient, names, "v1beta1.wardle.example.com")
@@ -194,7 +194,7 @@ var _ = SIGDescribe("OpenAPIV3", func() {
 		})
 
 		specMarshalled, err := json.Marshal(openAPISpec)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		var spec2 spec3.OpenAPI
 		json.Unmarshal(specMarshalled, &spec2)
 

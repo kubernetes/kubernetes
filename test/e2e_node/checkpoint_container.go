@@ -159,20 +159,20 @@ var _ = SIGDescribe("Checkpoint Container", feature.CheckpointContainer, func() 
 			metav1.GetOptions{},
 		)
 
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		isReady, err := testutils.PodRunningReady(p)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if !isReady {
 			framework.Failf("pod %q should be ready", p.Name)
 		}
 
 		// No checkpoint operation should have been logged
 		checkpointContainerMetric, err := getCheckpointContainerMetric(ctx, f, pod)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(checkpointContainerMetric).To(gomega.Equal(0))
 		// No error should have been logged
 		checkpointContainerErrorMetric, err := getCheckpointContainerErrorMetric(ctx, f, pod)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(checkpointContainerErrorMetric).To(gomega.Equal(0))
 
 		framework.Logf(
@@ -193,7 +193,7 @@ var _ = SIGDescribe("Checkpoint Container", feature.CheckpointContainer, func() 
 			framework.KubeletPort,
 		)
 
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		err = result.Error()
 		if err != nil {
@@ -277,21 +277,21 @@ var _ = SIGDescribe("Checkpoint Container", feature.CheckpointContainer, func() 
 			)
 		}
 
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		// Checkpointing actually worked. Verify that the checkpoint exists and that
 		// it is a checkpoint.
 
 		raw, err := result.Raw()
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		answer := checkpointResult{}
 		err = json.Unmarshal(raw, &answer)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		for _, item := range answer.Items {
 			// Check that the file exists
 			_, err := os.Stat(item)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			// Check the content of the tar file
 			// At least looking for the following files
 			//  * spec.dump
@@ -305,7 +305,7 @@ var _ = SIGDescribe("Checkpoint Container", feature.CheckpointContainer, func() 
 				"checkpoint/inventory.img": false,
 			}
 			fileReader, err := os.Open(item)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			tr := tar.NewReader(fileReader)
 			for {
 				hdr, err := tr.Next()
@@ -313,7 +313,7 @@ var _ = SIGDescribe("Checkpoint Container", feature.CheckpointContainer, func() 
 					// End of archive
 					break
 				}
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				if _, key := checkForFiles[hdr.Name]; key {
 					checkForFiles[hdr.Name] = true
 				}
@@ -328,11 +328,11 @@ var _ = SIGDescribe("Checkpoint Container", feature.CheckpointContainer, func() 
 		}
 		// Exactly one checkpoint operation should have happened
 		checkpointContainerMetric, err = getCheckpointContainerMetric(ctx, f, pod)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(checkpointContainerMetric).To(gomega.Equal(1))
 		// No error should have been logged
 		checkpointContainerErrorMetric, err = getCheckpointContainerErrorMetric(ctx, f, pod)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(checkpointContainerErrorMetric).To(gomega.Equal(0))
 	})
 })

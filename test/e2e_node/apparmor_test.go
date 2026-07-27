@@ -182,7 +182,7 @@ func runAppArmorTest(ctx context.Context, f *framework.Framework, shouldRun bool
 	if shouldRun {
 		// The pod needs to start before it stops, so wait for the longer start timeout.
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx,
-			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
+			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout), "unexpected error")
 	} else {
 		// Pod should remain in the pending state. Wait for the Reason to be set to "AppArmor".
 		fieldSelector := fields.OneTermEqualSelector("metadata.name", pod.Name).String()
@@ -228,10 +228,10 @@ func runAppArmorTest(ctx context.Context, f *framework.Framework, shouldRun bool
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	}
 	p, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return p.Status
 }
 

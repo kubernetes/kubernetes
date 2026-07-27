@@ -42,9 +42,9 @@ func coreDRA(tCtx ktesting.TContext, b *drautils.Builder) upgradedTestFunc {
 
 	return func(tCtx ktesting.TContext) downgradedTestFunc {
 		// Remove pod prepared in step 1.
-		tCtx.ExpectNoError(tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{}))
-		tCtx.ExpectNoError(tCtx.Client().CoreV1().Pods(namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{}))
-		tCtx.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(tCtx, tCtx.Client(), pod.Name, namespace, 3*time.Minute))
+		tCtx.ExpectNoError(tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{}), "unexpected error")
+		tCtx.ExpectNoError(tCtx.Client().CoreV1().Pods(namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{}), "unexpected error")
+		tCtx.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(tCtx, tCtx.Client(), pod.Name, namespace, 3*time.Minute), "unexpected error")
 
 		// Create another claim and pod, this time using the latest Kubernetes.
 		claim = b.ExternalClaim()

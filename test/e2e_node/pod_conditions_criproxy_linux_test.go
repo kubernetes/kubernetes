@@ -112,7 +112,7 @@ func runPodReadyToStartContainersTimingTest(f *framework.Framework, hasInitConta
 			}
 			return nil
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Creating test pod with ImagePullPolicy: Always")
 		var testPod *v1.Pod
@@ -136,20 +136,20 @@ func runPodReadyToStartContainersTimingTest(f *framework.Framework, hasInitConta
 
 		ginkgo.By("Verifying condition timing, it should be set quickly before image pull delay")
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, testPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		conditionTime, err := getTransitionTimeForPodConditionWithStatus(pod, v1.PodReadyToStartContainers, true)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Waiting for pod to eventually become Running after image pull")
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, testPod))
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, testPod), "unexpected error")
 
 		ginkgo.By("Verifying condition was set before image pull completed")
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, testPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		podReadyTime, err := getTransitionTimeForPodConditionWithStatus(pod, v1.PodReady, true)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		gomega.Expect(conditionTime.Before(podReadyTime)).To(gomega.BeTrueBecause(
 			"PodReadyToStartContainers was set at %v but PodReady was set at %v - condition should be set before image pull completes",

@@ -146,7 +146,7 @@ var _ = common.SIGDescribe("Networking IPerf2", feature.NetworkingPerformance, f
 
 	ginkgo.It("should run iperf2", func(ctx context.Context) {
 		readySchedulableNodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		familyStr := ""
 		if framework.TestContext.ClusterIsIPv6() {
@@ -209,7 +209,7 @@ var _ = common.SIGDescribe("Networking IPerf2", feature.NetworkingPerformance, f
 
 		// Get a reference to the server pod for later
 		serverPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, serverPodsListOptions)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if len(serverPodList.Items) != 1 {
 			framework.Failf("expected 1 server pod, found %d", len(serverPodList.Items))
 		}

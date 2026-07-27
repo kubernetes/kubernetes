@@ -129,7 +129,7 @@ func createBackupClientResources(ctx context.Context, f *framework.Framework) {
 	err := storageutils.CreateFromManifests(ctx, f, f.Namespace,
 		func(item interface{}) error { return nil },
 		backupClientManifests...)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 func runSyncInPod(pod *v1.Pod) {
@@ -438,7 +438,7 @@ func (s *snapshotMetadataTestSuite) DefineTests(driver storageframework.TestDriv
 		}, f.Namespace.Name)
 
 		targetDevicePvc, err := e2epv.CreatePVC(ctx, f.ClientSet, f.Namespace.Name, targetPvcClaim)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		// create backup client
 		backupClientPod = createBackupClientPod(ctx, sourceDevicePvc, targetDevicePvc)

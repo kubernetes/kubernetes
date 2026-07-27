@@ -239,9 +239,9 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 
 			vr1, vr2, pod := createPVCsWithPod(ctx)
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
-				framework.ExpectNoError(vr1.CleanupResource(ctx))
-				framework.ExpectNoError(vr2.CleanupResource(ctx))
+				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod), "unexpected error")
+				framework.ExpectNoError(vr1.CleanupResource(ctx), "unexpected error")
+				framework.ExpectNoError(vr2.CleanupResource(ctx), "unexpected error")
 			})
 
 			ginkgo.By("creating a VolumeGroupSnapshotClass with the default annotation")
@@ -260,7 +260,7 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 			})
 
 			ginkgo.By("verifying the VolumeGroupSnapshot becomes ready using the default class")
-			framework.ExpectNoError(utils.WaitForVolumeGroupSnapshotReady(ctx, f.DynamicClient, f.Namespace.Name, vgs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate))
+			framework.ExpectNoError(utils.WaitForVolumeGroupSnapshotReady(ctx, f.DynamicClient, f.Namespace.Name, vgs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate), "unexpected error")
 
 			ginkgo.By("verifying the default VolumeGroupSnapshotClass name was written back to the VolumeGroupSnapshot spec")
 			expectedClassName := vgsclass.GetName()
@@ -272,16 +272,16 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 
 			vr1, vr2, pod := createPVCsWithPod(ctx)
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
-				framework.ExpectNoError(vr1.CleanupResource(ctx))
-				framework.ExpectNoError(vr2.CleanupResource(ctx))
+				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod), "unexpected error")
+				framework.ExpectNoError(vr1.CleanupResource(ctx), "unexpected error")
+				framework.ExpectNoError(vr2.CleanupResource(ctx), "unexpected error")
 			})
 
 			ginkgo.By("creating a VolumeGroupSnapshot without className and without any default VolumeGroupSnapshotClass")
 			vgs := createVGSWithoutClassName(ctx)
 
 			ginkgo.By("verifying the VolumeGroupSnapshot enters an error state")
-			framework.ExpectNoError(waitForVolumeGroupSnapshotError(ctx, f.DynamicClient, f.Namespace.Name, vgs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate, errNoDefaultVGSClass))
+			framework.ExpectNoError(waitForVolumeGroupSnapshotError(ctx, f.DynamicClient, f.Namespace.Name, vgs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate, errNoDefaultVGSClass), "unexpected error")
 
 			ginkgo.By("verifying spec.volumeGroupSnapshotClassName was not set by the controller")
 			expectVolumeGroupSnapshotClassName(ctx, vgs.GetName(), nil)
@@ -292,9 +292,9 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 
 			vr1, vr2, pod := createPVCsWithPod(ctx)
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
-				framework.ExpectNoError(vr1.CleanupResource(ctx))
-				framework.ExpectNoError(vr2.CleanupResource(ctx))
+				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod), "unexpected error")
+				framework.ExpectNoError(vr1.CleanupResource(ctx), "unexpected error")
+				framework.ExpectNoError(vr2.CleanupResource(ctx), "unexpected error")
 			})
 
 			ginkgo.By("creating two VolumeGroupSnapshotClasses both with the default annotation")
@@ -305,7 +305,7 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 			vgs := createVGSWithoutClassName(ctx)
 
 			ginkgo.By("verifying the VolumeGroupSnapshot enters an error state due to multiple default classes")
-			framework.ExpectNoError(waitForVolumeGroupSnapshotError(ctx, f.DynamicClient, f.Namespace.Name, vgs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate, errMultipleDefaultVGSClasses))
+			framework.ExpectNoError(waitForVolumeGroupSnapshotError(ctx, f.DynamicClient, f.Namespace.Name, vgs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate, errMultipleDefaultVGSClasses), "unexpected error")
 
 			ginkgo.By("verifying spec.volumeGroupSnapshotClassName was not set by the controller")
 			expectVolumeGroupSnapshotClassName(ctx, vgs.GetName(), nil)

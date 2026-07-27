@@ -111,10 +111,10 @@ func newCPUBurnPods(numPods int, image imageutils.Config, cpuLimit string, memor
 	var pods []*v1.Pod
 
 	memLimitQuantity, err := resource.ParseQuantity(memoryLimit)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	cpuLimitQuantity, err := resource.ParseQuantity(cpuLimit)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	for range numPods {
 

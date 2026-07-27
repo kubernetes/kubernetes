@@ -75,7 +75,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		client = f.ClientSet
 		nameSpace = f.Namespace.Name
-		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, client, f.Timeouts.NodeSchedulable))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, client, f.Timeouts.NodeSchedulable), "unexpected error")
 
 		ginkgo.By("Creating a PVC")
 		prefix := "pvc-protection"

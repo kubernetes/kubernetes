@@ -230,17 +230,17 @@ func updateKubeletConfigWithMemoryManagerParams(initialCfg *kubeletconfig.Kubele
 
 func getAllNUMANodes() []int {
 	outData, err := exec.Command("/bin/sh", "-c", "lscpu").Output()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	numaNodeRegex, err := regexp.Compile(`NUMA node(\d+) CPU\(s\):`)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	matches := numaNodeRegex.FindAllSubmatch(outData, -1)
 
 	var numaNodes []int
 	for _, m := range matches {
 		n, err := strconv.Atoi(string(m[1]))
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		numaNodes = append(numaNodes, n)
 	}
@@ -254,10 +254,10 @@ func verifyMemoryPinning(f *framework.Framework, ctx context.Context, pod *v1.Po
 	ginkgo.By("Verifying the NUMA pinning")
 
 	output, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	currentNUMANodeIDs, err := cpuset.Parse(strings.Trim(output, "\n"))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	gomega.Expect(numaNodeIDs).To(gomega.Equal(currentNUMANodeIDs.List()))
 }
@@ -266,10 +266,10 @@ func verifyMemoryManagerAllocations(ctx context.Context, pod *v1.Pod, expectedGu
 	ginkgo.GinkgoHelper()
 	ginkgo.By("Verifying memory manager allocations via pod resource API")
 	endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	defer conn.Close() //nolint:errcheck
 
 	gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -277,7 +277,7 @@ func verifyMemoryManagerAllocations(ctx context.Context, pod *v1.Pod, expectedGu
 		return err
 	}).WithTimeout(time.Minute).WithPolling(5 * time.Second).Should(gomega.Succeed())
 	resp, err := cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	expectedGuaranteedSet := sets.NewString(expectedGuaranteedContainers...)
 
@@ -457,18 +457,18 @@ var _ = SIGDescribe("Memory Manager", "[LinuxOnly]", framework.WithDisruptive(),
 		// TODO: move the test to pod resource API test suite, see - https://github.com/kubernetes/kubernetes/issues/101945
 		ginkgo.It("should report memory data during request to pod resources GetAllocatableResources", func(ctx context.Context) {
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			defer conn.Close() //nolint:errcheck
 
 			resp, err := cli.GetAllocatableResources(ctx, &kubeletpodresourcesv1.AllocatableResourcesRequest{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(resp.Memory).ToNot(gomega.BeEmpty())
 
 			stateData, err := getMemoryManagerState()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			stateAllocatableMemory := getAllocatableMemoryFromStateFile(stateData)
 			gomega.Expect(resp.Memory).To(gomega.HaveLen(len(stateAllocatableMemory)))
@@ -597,14 +597,14 @@ var _ = SIGDescribe("Memory Manager", "[LinuxOnly]", framework.WithDisruptive(),
 				testPod2 = e2epod.NewPodClient(f).CreateSync(ctx, testPod2)
 
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				defer conn.Close() //nolint:errcheck
 
 				resp, err := cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				for _, pod := range []*v1.Pod{testPod, testPod2} {
 					for _, podResource := range resp.PodResources {
@@ -661,7 +661,7 @@ var _ = SIGDescribe("Memory Manager", "[LinuxOnly]", framework.WithDisruptive(),
 
 			ginkgo.JustBeforeEach(func(ctx context.Context) {
 				stateData, err := getMemoryManagerState()
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				for _, memoryState := range stateData.MachineState {
 					// consume all memory except of 256Mi on each NUMA node via workload pods
@@ -688,7 +688,7 @@ var _ = SIGDescribe("Memory Manager", "[LinuxOnly]", framework.WithDisruptive(),
 				ginkgo.By("Checking that pod failed to start because of admission error")
 				gomega.Eventually(ctx, func() bool {
 					tmpPod, err := e2epod.NewPodClient(f).Get(ctx, testPod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					if tmpPod.Status.Phase != v1.PodFailed {
 						return false
@@ -742,14 +742,14 @@ var _ = SIGDescribe("Memory Manager", "[LinuxOnly]", framework.WithDisruptive(),
 			// TODO: move the test to pod resource API test suite, see - https://github.com/kubernetes/kubernetes/issues/101945
 			ginkgo.It("should not report any memory data during request to pod resources GetAllocatableResources", func(ctx context.Context) {
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				defer conn.Close() //nolint:errcheck
 
 				resp, err := cli.GetAllocatableResources(ctx, &kubeletpodresourcesv1.AllocatableResourcesRequest{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				gomega.Expect(resp.Memory).To(gomega.BeEmpty())
 			})
@@ -759,14 +759,14 @@ var _ = SIGDescribe("Memory Manager", "[LinuxOnly]", framework.WithDisruptive(),
 				testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
 
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				defer conn.Close() //nolint:errcheck
 
 				resp, err := cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				for _, podResource := range resp.PodResources {
 					if podResource.Name != testPod.Name {
@@ -853,7 +853,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 	ginkgo.BeforeAll(func(ctx context.Context) {
 		var err error
 		oldCfg, err = getCurrentKubeletConfig(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		if isMultiNUMASupported == nil {
 			isMultiNUMASupported = ptr.To(isMultiNUMA())
@@ -894,7 +894,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 		ginkgo.Context("when the topology manager scope is 'pod'", func() {
 			ginkgo.It("should allocate exclusive memory to a guaranteed pod with pod-level resources and guaranteed container, PodLevelResourceManagers enabled", ginkgo.Label("pod-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -938,7 +938,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 			ginkgo.It("should allocate exclusive memory to a guaranteed pod with pod-level resources and non-guaranteed containers, PodLevelResourceManagers enabled", ginkgo.Label("pod-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -995,7 +995,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 			ginkgo.It("should allocate exclusive memory to a guaranteed pod with pod-level resources and mix of guaranteed and non-guaranteed containers, PodLevelResourceManagers enabled", ginkgo.Label("pod-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -1050,7 +1050,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 			ginkgo.It("should allocate exclusive memory to a guaranteed pod with pod-level resources and mix of guaranteed and non-guaranteed standard and init containers, PodLevelResourceManagers enabled", ginkgo.Label("pod-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -1112,7 +1112,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 			ginkgo.It("should not allocate exclusive memory to a non-guaranteed pod with pod-level resources and guaranteed containers, PodLevelResourceManagers enabled", ginkgo.Label("pod-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -1154,7 +1154,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 			ginkgo.It("should not allocate exclusive memory to a non-guaranteed pod with pod-level resources and non-guaranteed containers, PodLevelResourceManagers enabled", ginkgo.Label("pod-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -1211,7 +1211,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 			ginkgo.It("should reject a pod that would result in an empty pod shared pool, topologymanager.PolicyBestEffort, PodLevelResourceManagers enabled", ginkgo.Label("pod-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyBestEffort,
@@ -1264,7 +1264,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 				ginkgo.By("Checking that pod failed to start because of admission error")
 				gomega.Eventually(ctx, func(g gomega.Gomega) {
 					tmpPod, err := e2epod.NewPodClient(f).Get(ctx, testPod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					g.Expect(tmpPod.Status.Phase).To(gomega.Equal(v1.PodFailed))
 					g.Expect(tmpPod.Status.Message).To(gomega.ContainSubstring("sum of exclusive container memory requests equals pod budget"))
@@ -1273,7 +1273,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 			ginkgo.It("should reject a pod that would result in an empty pod shared pool, topologymanager.PolicyRestricted, PodLevelResourceManagers enabled", ginkgo.Label("pod-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -1326,7 +1326,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 				ginkgo.By("Checking that pod failed to start because of admission error")
 				gomega.Eventually(ctx, func(g gomega.Gomega) {
 					tmpPod, err := e2epod.NewPodClient(f).Get(ctx, testPod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					g.Expect(tmpPod.Status.Phase).To(gomega.Equal(v1.PodFailed))
 					g.Expect(tmpPod.Status.Message).To(gomega.ContainSubstring("pod with pod-level resources failed admission under pod-scope topology manager"))
@@ -1339,7 +1339,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 			// proving that the memory manager freed the resources after the first pod completed.
 			ginkgo.It("should release and re-allocate memory correctly for sequential guaranteed pods with guaranteed containers and empty shared pool", ginkgo.Label("pod-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -1349,7 +1349,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 				}))
 
 				stateData, err := getMemoryManagerState()
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				// Find the first NUMA node with enough allocatable memory to run the test.
 				var memRequest string
@@ -1447,7 +1447,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 			// the remove container logic cleans resources properly using the state.
 			ginkgo.It("should release resources from the pod shared pool when no containers used it", ginkgo.Label("pod-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -1457,7 +1457,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 				}))
 
 				stateData, err := getMemoryManagerState()
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				// Find the first NUMA node with enough allocatable memory to run the test.
 				var memRequest string
@@ -1555,7 +1555,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 			// allows one to terminate, and then ensures that the memory remains reserved in the state.
 			ginkgo.It("should not release pod shared pool memory while at least one container is using it", ginkgo.Label("pod-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -1565,7 +1565,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 				}))
 
 				stateData, err := getMemoryManagerState()
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				// Find a NUMA node with sufficient memory.
 				var memRequestString string
@@ -1612,10 +1612,10 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 				podA = createPodSync(ctx, podA)
 
 				ginkgo.By("waiting for long-container to be running")
-				framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, podA.Namespace, podA.Name, "long-container", 2*time.Minute))
+				framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, podA.Namespace, podA.Name, "long-container", 2*time.Minute), "unexpected error")
 
 				ginkgo.By("waiting for short-container to terminate")
-				framework.ExpectNoError(e2epod.WaitForContainerTerminated(ctx, f.ClientSet, podA.Namespace, podA.Name, "short-container", 2*time.Minute))
+				framework.ExpectNoError(e2epod.WaitForContainerTerminated(ctx, f.ClientSet, podA.Namespace, podA.Name, "short-container", 2*time.Minute), "unexpected error")
 
 				// Identify the NUMA node used by Pod A
 				logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, podA.Namespace, podA.Name, "long-container")
@@ -1626,7 +1626,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 				ginkgo.By("verifying memory is still reserved in Memory Manager state")
 				stateAfterExit, err := getMemoryManagerState()
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				for _, nodeID := range numaNodes.List() {
 					nodeState := stateAfterExit.MachineState[nodeID]
@@ -1643,7 +1643,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 			// The test ensures both pods are admitted and run concurrently.
 			ginkgo.It("should admit multiple pods with pod-level resources and many non-guaranteed containers", ginkgo.Label("pod-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -1653,7 +1653,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 				}))
 
 				node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				allocatableMem := node.Status.Allocatable.Memory().Value()
 				memRequestPerPodVal := allocatableMem / 2
 				framework.Logf("Node has %d allocatable memory. Requesting %d for each of the 2 pods.", allocatableMem, memRequestPerPodVal)
@@ -1712,7 +1712,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 		ginkgo.Context("when the topology manager scope is 'container'", func() {
 			ginkgo.It("should allocate exclusive memory to a guaranteed pod with pod-level resources and guaranteed container, PodLevelResourceManagers enabled", ginkgo.Label("container-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -1754,7 +1754,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 			ginkgo.It("should not allocate exclusive memory to a guaranteed pod with pod-level resources and non-guaranteed containers, PodLevelResourceManagers enabled", ginkgo.Label("container-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -1811,7 +1811,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 			ginkgo.It("should allocate exclusive memory to a guaranteed pod with pod-level resources and mix of guaranteed and non-guaranteed containers, PodLevelResourceManagers enabled", ginkgo.Label("container-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -1866,7 +1866,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 			ginkgo.It("should allocate exclusive memory to a guaranteed pod with pod-level resources and mix of guaranteed and non-guaranteed standard and init containers, PodLevelResourceManagers enabled", ginkgo.Label("container-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -1928,7 +1928,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 			ginkgo.It("should not allocate exclusive memory to a non-guaranteed pod with pod-level resources and guaranteed containers, PodLevelResourceManagers enabled", ginkgo.Label("container-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -1968,7 +1968,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 			ginkgo.It("should not allocate exclusive memory to a non-guaranteed pod with pod-level resources and non-guaranteed containers, PodLevelResourceManagers enabled", ginkgo.Label("container-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -2025,7 +2025,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 			ginkgo.It("should not reject a pod that would result in an empty pod shared pool, no pod shared pool in container scope, PodLevelResourceManagers enabled", ginkgo.Label("container-scope"), func(ctx context.Context) {
 				currentCfg, err := getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 					policyName:                     string(staticPolicy),
 					topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -2084,7 +2084,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 		ginkgo.It("should not report any memory data during request and run on the shared memory pool for a pod with pod-level resources when PodLevelResourceManagers is disabled", ginkgo.Label("container-scope"), func(ctx context.Context) {
 			currentCfg, err := getCurrentKubeletConfig(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 				policyName:                     string(staticPolicy),
 				topologyManagerPolicy:          topologymanager.PolicyRestricted,
@@ -2114,7 +2114,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 			testPod = createPodSync(ctx, testPod)
 
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			var resp *kubeletpodresourcesv1.ListPodResourcesResponse
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -2140,7 +2140,7 @@ var _ = SIGDescribe("Memory Manager Pod Level Resources", ginkgo.Ordered, ginkgo
 
 		ginkgo.It("should run on the shared memory pool for a pod with pod-level resources when PodLevelResourceManagers is disabled", ginkgo.Label("container-scope"), func(ctx context.Context) {
 			currentCfg, err := getCurrentKubeletConfig(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			updateKubeletConfigIfNeeded(ctx, f, configureMemoryManagerInKubelet(currentCfg, &memoryManagerKubeletArguments{
 				policyName:                     string(staticPolicy),
 				topologyManagerPolicy:          topologymanager.PolicyRestricted,

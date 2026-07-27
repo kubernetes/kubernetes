@@ -137,7 +137,7 @@ func execSourceIPTest(sourcePod v1.Pod, targetAddr string) (string, string) {
 		break
 	}
 
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	// The stdout return from RunHostCmd is in this format: x.x.x.x:port or [xx:xx:xx::x]:port
 	host, _, err := net.SplitHostPort(stdout)
@@ -179,7 +179,7 @@ func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
 	targetHostname = strings.Split(targetHostname, ".")[0]
 	hostname := strings.TrimSpace(strings.Split(stdout, ".")[0])
 
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	gomega.Expect(hostname).To(gomega.Equal(targetHostname))
 }
 

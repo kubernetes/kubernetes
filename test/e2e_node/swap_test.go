@@ -173,7 +173,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 				}
 
 				err := podClient.Delete(context.Background(), sleepingPod.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				stressMemAllocSize = multiplyQuantity(divideQuantity(nodeTotalMemory, 1000), 4)
 
@@ -236,7 +236,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 
 					// Better to delete the stress pod ASAP to avoid node failures
 					err := podClient.Delete(context.Background(), stressPod.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 
 				ginkgo.It("should be able to use more memory than memory limits", func() {
@@ -286,7 +286,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 
 					// Better to delete the stress pod ASAP to avoid node failures
 					err := podClient.Delete(context.Background(), stressPod.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 
 				ginkgo.It("ensure summary API properly reports swap", func() {
@@ -431,7 +431,7 @@ func getStressPod(f *framework.Framework, stressSize, memAllocSize *resource.Qua
 func getUpdatedPod(f *framework.Framework, pod *v1.Pod) *v1.Pod {
 	podClient := e2epod.NewPodClient(f)
 	pod, err := podClient.Get(context.Background(), pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	return pod
 }
@@ -444,7 +444,7 @@ func runPodAndWaitUntilScheduled(f *framework.Framework, pod *v1.Pod) *v1.Pod {
 	pod = getUpdatedPod(f, pod)
 
 	isReady, err := testutils.PodRunningReady(pod)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	gomega.ExpectWithOffset(1, isReady).To(gomega.BeTrueBecause("pod %+v was expected to be ready", pod))
 
 	return pod
@@ -475,7 +475,7 @@ func expectNoSwap(f *framework.Framework, pod *v1.Pod) {
 func expectLimitedSwap(f *framework.Framework, pod *v1.Pod, expectedSwapLimit int64) {
 	ginkgo.By("expecting limited swap")
 	swapLimitStr, err := readCgroupFile(f, pod, cgroupV2SwapLimitFile)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	swapLimit, err := strconv.Atoi(swapLimitStr)
 	framework.ExpectNoError(err, "cannot convert swap limit to int")

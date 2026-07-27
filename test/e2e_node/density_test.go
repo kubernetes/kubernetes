@@ -549,7 +549,7 @@ func createBatchPodSequential(ctx context.Context, f *framework.Framework, pods 
 		create := metav1.Now()
 		createTimes[pod.Name] = create
 		p := e2epod.NewPodClient(f).Create(ctx, pod)
-		framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, 2*time.Second, framework.PodStartTimeout, true, podWatchedRunning(watchTimes, p.Name)))
+		framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, 2*time.Second, framework.PodStartTimeout, true, podWatchedRunning(watchTimes, p.Name)), "unexpected error")
 		e2eLags = append(e2eLags,
 			e2emetrics.PodLatencyData{Name: pod.Name, Latency: watchTimes[pod.Name].Time.Sub(create.Time)})
 	}
@@ -632,7 +632,7 @@ func logAndVerifyLatency(ctx context.Context, batchLag time.Duration, e2eLags []
 
 	if isVerify {
 		// check whether e2e pod startup time is acceptable.
-		framework.ExpectNoError(verifyLatencyWithinThreshold(podStartupLimits, podStartupLatency, "pod startup"))
+		framework.ExpectNoError(verifyLatencyWithinThreshold(podStartupLimits, podStartupLatency, "pod startup"), "unexpected error")
 
 		// check bactch pod creation latency
 		if podBatchStartupLimit > 0 {

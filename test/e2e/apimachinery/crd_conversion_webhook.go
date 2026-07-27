@@ -396,7 +396,7 @@ func testCustomResourceConversionWebhook(ctx context.Context, f *framework.Frame
 		},
 	}
 	_, err := customResourceClients["v1"].Create(ctx, crInstance, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	ginkgo.By("v2 custom resource should be converted")
 	v2crd, err := customResourceClients["v2"].Get(ctx, name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Getting v2 of custom resource %s", name)
@@ -421,13 +421,13 @@ func testCRListConversion(ctx context.Context, f *framework.Framework, testCrd *
 		},
 	}
 	_, err := customResourceClients["v1"].Create(ctx, crInstance, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	// Now cr-instance-1 is stored as v1. lets change storage version
 	crd, err = integration.UpdateV1CustomResourceDefinitionWithRetry(testCrd.APIExtensionClient, crd.Name, func(c *apiextensionsv1.CustomResourceDefinition) {
 		c.Spec.Versions = alternativeAPIVersions
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	ginkgo.By("Create a v2 custom resource")
 	crInstance = &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -452,13 +452,13 @@ func testCRListConversion(ctx context.Context, f *framework.Framework, testCrd *
 			break
 		}
 	}
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	// Now that we have a v1 and v2 object, both list operation in v1 and v2 should work as expected.
 
 	ginkgo.By("List CRs in v1")
 	list, err := customResourceClients["v1"].List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	gomega.Expect(list.Items).To(gomega.HaveLen(2))
 	if !((list.Items[0].GetName() == name1 && list.Items[1].GetName() == name2) ||
 		(list.Items[0].GetName() == name2 && list.Items[1].GetName() == name1)) {
@@ -469,7 +469,7 @@ func testCRListConversion(ctx context.Context, f *framework.Framework, testCrd *
 
 	ginkgo.By("List CRs in v2")
 	list, err = customResourceClients["v2"].List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	gomega.Expect(list.Items).To(gomega.HaveLen(2))
 	if !((list.Items[0].GetName() == name1 && list.Items[1].GetName() == name2) ||
 		(list.Items[0].GetName() == name2 && list.Items[1].GetName() == name1)) {
@@ -502,5 +502,5 @@ func waitWebhookConversionReady(ctx context.Context, f *framework.Framework, crd
 
 		framework.ExpectNoError(customResourceClients[version].Delete(ctx, crInstance.GetName(), metav1.DeleteOptions{}), "cleaning up stub object")
 		return true, nil
-	}))
+	}), "unexpected error")
 }

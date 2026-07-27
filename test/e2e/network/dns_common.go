@@ -515,7 +515,7 @@ func assertFilesContain(ctx context.Context, fileNames []string, fileDir string,
 		}
 
 		return false, nil
-	}))
+	}), "unexpected error")
 	gomega.Expect(failed).To(gomega.BeEmpty())
 }
 
@@ -526,7 +526,7 @@ func validateDNSResults(ctx context.Context, f *framework.Framework, pod *v1.Pod
 		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "unexpected error")
 
 	ginkgo.By("retrieving the pod")
 	pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
@@ -549,7 +549,7 @@ func validateTargetedProbeOutput(ctx context.Context, f *framework.Framework, po
 		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
 
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "unexpected error")
 
 	ginkgo.By("retrieving the pod")
 	pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})

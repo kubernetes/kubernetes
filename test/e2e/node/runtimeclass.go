@@ -118,11 +118,11 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		}
 		pod = e2epod.NewPodClient(f).Create(ctx, pod)
 
-		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, f.Namespace.Name, pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, f.Namespace.Name, pod.Name), "unexpected error")
 
 		// check that pod got scheduled on specified node.
 		scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(nodeName).To(gomega.Equal(scheduledPod.Spec.NodeName))
 		gomega.Expect(nodeSelector).To(gomega.Equal(pod.Spec.NodeSelector))
 		gomega.Expect(pod.Spec.Tolerations).To(gomega.ContainElement(tolerations[0]))
@@ -164,11 +164,11 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		}
 		pod = e2epod.NewPodClient(f).Create(ctx, pod)
 
-		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, f.Namespace.Name, pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, f.Namespace.Name, pod.Name), "unexpected error")
 
 		// check that pod got scheduled on specified node.
 		scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(nodeName).To(gomega.Equal(scheduledPod.Spec.NodeName))
 		gomega.Expect(nodeSelector).To(gomega.Equal(pod.Spec.NodeSelector))
 	})

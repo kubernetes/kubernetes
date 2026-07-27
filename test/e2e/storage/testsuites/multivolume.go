@@ -361,7 +361,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		pvc2.Spec.DataSourceRef = dataSourceRef
 
 		pvc2, err := l.cs.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Create(ctx, pvc2, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		pvcs = append(pvcs, pvc2)
 		ginkgo.DeferCleanup(framework.IgnoreNotFound(l.cs.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Delete), pvc2.Name, metav1.DeleteOptions{})
 
@@ -403,7 +403,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		pvc2.Spec.DataSourceRef = dataSourceRef
 
 		pvc2, err := l.cs.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Create(ctx, pvc2, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		pvcs = append(pvcs, pvc2)
 		ginkgo.DeferCleanup(framework.IgnoreNotFound(l.cs.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Delete), pvc2.Name, metav1.DeleteOptions{})
 
@@ -499,9 +499,9 @@ func testAccessMultipleVolumes(ctx context.Context, f *framework.Framework, cs c
 	}
 	pod, err := e2epod.CreateSecPodWithNodeSelection(ctx, cs, &podConfig, f.Timeouts.PodStart)
 	defer func() {
-		framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
+		framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod), "unexpected error")
 	}()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	byteLen := 64
 	for i, pvc := range pvcs {
@@ -510,7 +510,7 @@ func testAccessMultipleVolumes(ctx context.Context, f *framework.Framework, cs c
 		path := fmt.Sprintf("/mnt/volume%d", index)
 		ginkgo.By(fmt.Sprintf("Checking if the volume%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
 		err = e2evolume.CheckVolumeModeOfPath(ctx, f, pod, *pvc.Spec.VolumeMode, path)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		if readSeedBase > 0 {
 			ginkgo.By(fmt.Sprintf("Checking if read from the volume%d works properly", index))
@@ -579,12 +579,12 @@ func TestConcurrentAccessToSingleVolume(ctx context.Context, f *framework.Framew
 			ImageID:       e2epod.GetTestImageID(imageutils.GlibcDnsTesting),
 		}
 		pod, err := e2epod.CreateSecPodWithNodeSelection(ctx, cs, &podConfig, f.Timeouts.PodStart)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		// The pod must get deleted before this function returns because the caller may try to
 		// delete volumes as part of the tests. Keeping the pod running would block that.
 		// If the test times out, then the namespace deletion will take care of it.
 		defer func() {
-			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod), "unexpected error")
 		}()
 		pod, err = cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 		pods = append(pods, pod)
@@ -619,7 +619,7 @@ func TestConcurrentAccessToSingleVolume(ctx context.Context, f *framework.Framew
 		index := i + 1
 		ginkgo.By(fmt.Sprintf("Checking if the volume in pod%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
 		err := e2evolume.CheckVolumeModeOfPath(ctx, f, pod, *pvc.Spec.VolumeMode, path)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		if readOnly {
 			ginkgo.By("Skipping volume content checks, volume is read-only")
@@ -647,7 +647,7 @@ func TestConcurrentAccessToSingleVolume(ctx context.Context, f *framework.Framew
 	}
 	// Delete the last pod and remove from slice of pods
 	lastPod := pods[len(pods)-1]
-	framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, lastPod))
+	framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, lastPod), "unexpected error")
 	pods = pods[:len(pods)-1]
 
 	// Recheck if pv can be accessed from each pod after the last pod deletion
@@ -656,7 +656,7 @@ func TestConcurrentAccessToSingleVolume(ctx context.Context, f *framework.Framew
 		// index of pod and index of pvc match, because pods are created above way
 		ginkgo.By(fmt.Sprintf("Rechecking if the volume in pod%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
 		err := e2evolume.CheckVolumeModeOfPath(ctx, f, pod, *pvc.Spec.VolumeMode, "/mnt/volume1")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		if readOnly {
 			ginkgo.By("Skipping volume content checks, volume is read-only")
@@ -704,9 +704,9 @@ func TestConcurrentAccessToRelatedVolumes(ctx context.Context, f *framework.Fram
 		}
 		pod, err := e2epod.CreateSecPodWithNodeSelection(ctx, cs, &podConfig, f.Timeouts.PodStart)
 		defer func() {
-			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod), "unexpected error")
 		}()
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		pods = append(pods, pod)
 		actualNodeName := pod.Spec.NodeName
 
@@ -773,7 +773,7 @@ func getCurrentTopologiesNumber(cs clientset.Interface, nodes *v1.NodeList, keys
 // sets nodeSelection affinity according to given topology keys for drivers that provide them.
 func ensureTopologyRequirements(ctx context.Context, nodeSelection *e2epod.NodeSelection, cs clientset.Interface, driverInfo *storageframework.DriverInfo, minCount int) error {
 	nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	if len(nodes.Items) < minCount {
 		e2eskipper.Skipf("Number of available nodes is less than %d - skipping", minCount)
 	}
@@ -821,7 +821,7 @@ func initializeVolume(ctx context.Context, cs clientset.Interface, t *framework.
 	}
 	pod, err := e2epod.CreateSecPod(ctx, cs, &podConfig, t.PodStart)
 	defer func() {
-		framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
+		framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod), "unexpected error")
 	}()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }

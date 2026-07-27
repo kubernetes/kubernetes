@@ -59,7 +59,7 @@ var _ = SIGDescribe("Unknown Pods", framework.WithSerial(), framework.WithDisrup
 
 			framework.Logf("create the static pod %v", staticPodName)
 			err := createStaticPodWithGracePeriod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			framework.Logf("wait for the mirror pod %v to be running", mirrorPodName)
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -72,13 +72,13 @@ var _ = SIGDescribe("Unknown Pods", framework.WithSerial(), framework.WithDisrup
 			restartKubelet := mustStopKubelet(ctx, f)
 
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			framework.Logf("Delete the static pod manifest while the kubelet is not running")
 			file := staticPodPath(podPath, staticPodName, ns)
 			framework.Logf("deleting static pod manifest %q", file)
 			err = os.Remove(file)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			framework.Logf("Restarting the kubelet")
 			restartKubelet(ctx)
@@ -95,7 +95,7 @@ var _ = SIGDescribe("Unknown Pods", framework.WithSerial(), framework.WithDisrup
 			framework.Logf("deleting the static pod %v", staticPodName)
 			err := deleteStaticPod(podPath, staticPodName, ns)
 			if !os.IsNotExist(err) {
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}
 
 			framework.Logf("wait for the mirror pod to disappear")
@@ -133,7 +133,7 @@ var _ = SIGDescribe("Unknown Pods", framework.WithSerial(), framework.WithDisrup
 			restartKubelet := mustStopKubelet(ctx, f)
 
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			framework.Logf("Delete the pod while the kubelet is not running")
 			// Delete pod sync by name will force delete the pod, removing it from kubelet's config

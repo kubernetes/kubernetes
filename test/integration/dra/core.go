@@ -250,7 +250,7 @@ profiles:
 `)
 		// Without a timeout, the allocator runs to completion on both nodes.
 		// worker-0 has enough devices and succeeds, so the pod gets scheduled.
-		tCtx.ExpectNoError(e2epod.WaitForPodScheduled(tCtx, tCtx.Client(), namespace, pod.Name))
+		tCtx.ExpectNoError(e2epod.WaitForPodScheduled(tCtx, tCtx.Client(), namespace, pod.Name), "unexpected error")
 	})
 
 	runSubTest(tCtx, "enabled", func(tCtx ktesting.TContext) {
@@ -274,7 +274,7 @@ profiles:
 		})
 		_, err := tCtx.Client().ResourceV1().ResourceSlices().Update(tCtx, createdOtherSlice, metav1.UpdateOptions{})
 		tCtx.ExpectNoError(err, "update worker-1's ResourceSlice")
-		tCtx.ExpectNoError(e2epod.WaitForPodScheduled(tCtx, tCtx.Client(), namespace, pod.Name))
+		tCtx.ExpectNoError(e2epod.WaitForPodScheduled(tCtx, tCtx.Client(), namespace, pod.Name), "unexpected error")
 	})
 }
 

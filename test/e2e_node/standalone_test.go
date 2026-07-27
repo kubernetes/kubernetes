@@ -124,7 +124,7 @@ var _ = SIGDescribe(feature.StandaloneMode, framework.WithFeatureGate(features.E
 			}
 
 			err := scheduleStaticPod(podPath, staticPodName, ns, podSpec)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				pod, err := getPodFromStandaloneKubelet(ctx, ns, staticPodName)
@@ -145,7 +145,7 @@ var _ = SIGDescribe(feature.StandaloneMode, framework.WithFeatureGate(features.E
 			}, f.Timeouts.PodStart, time.Second*5).Should(gomega.Succeed())
 
 			logs, err := getPodLogsFromStandaloneKubelet(ctx, ns, staticPodName, "use-envfile")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			gomega.Expect(logs).To(gomega.ContainSubstring("CONFIG_1=value1"))
 			gomega.Expect(logs).To(gomega.ContainSubstring("CONFIG_2=value2"))
@@ -154,7 +154,7 @@ var _ = SIGDescribe(feature.StandaloneMode, framework.WithFeatureGate(features.E
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By(fmt.Sprintf("delete the static pod (%v/%v)", ns, staticPodName))
 			err := deleteStaticPod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By(fmt.Sprintf("wait for pod to disappear (%v/%v)", ns, staticPodName))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -181,7 +181,7 @@ var _ = SIGDescribe(feature.StandaloneMode, func() {
 			podPath = kubeletCfg.StaticPodPath
 
 			err := scheduleStaticPod(podPath, staticPodName, ns, createBasicStaticPodSpec(staticPodName, ns))
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				pod, err := getPodFromStandaloneKubelet(ctx, ns, staticPodName)
@@ -215,7 +215,7 @@ var _ = SIGDescribe(feature.StandaloneMode, func() {
 				},
 			}
 			err := scheduleStaticPod(podPath, staticPodName, ns, podSpec)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				pod, err := getPodFromStandaloneKubelet(ctx, ns, staticPodName)
@@ -236,7 +236,7 @@ var _ = SIGDescribe(feature.StandaloneMode, func() {
 			// Upgrade the pod
 			podSpec.Spec.Containers[0].Name = "upgraded"
 			err = scheduleStaticPod(podPath, staticPodName, ns, podSpec)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				pod, err := getPodFromStandaloneKubelet(ctx, ns, staticPodName)
@@ -275,7 +275,7 @@ var _ = SIGDescribe(feature.StandaloneMode, func() {
 		// 		},
 		// 	}
 		// 	err := scheduleStaticPod(podPath, staticPodName, ns, podSpec)
-		// 	framework.ExpectNoError(err)
+		// 	framework.ExpectNoError(err, "unexpected error")
 
 		// 	gomega.Eventually(ctx, func(ctx context.Context) error {
 		// 		pod, err := getPodFromStandaloneKubelet(ctx, ns, staticPodName)
@@ -299,7 +299,7 @@ var _ = SIGDescribe(feature.StandaloneMode, func() {
 
 		// 	// use old namespace as it uses ns in a file name
 		// 	err = scheduleStaticPod(podPath, staticPodName, ns, podSpec)
-		// 	framework.ExpectNoError(err)
+		// 	framework.ExpectNoError(err, "unexpected error")
 
 		// 	gomega.Eventually(ctx, func(ctx context.Context) error {
 		// 		pod, err := getPodFromStandaloneKubelet(ctx, upgradedNs, staticPodName)
@@ -321,7 +321,7 @@ var _ = SIGDescribe(feature.StandaloneMode, func() {
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By(fmt.Sprintf("delete the static pod (%v/%v)", ns, staticPodName))
 			err := deleteStaticPod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By(fmt.Sprintf("wait for pod to disappear (%v/%v)", ns, staticPodName))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -366,7 +366,7 @@ var _ = SIGDescribe(feature.StandaloneMode, func() {
 				podPath = kubeletCfg.StaticPodPath
 				ns = staticPod.Namespace
 				err := scheduleStaticPod(podPath, staticPod.Name, ns, staticPod)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				var initCtrID string
 				var startTime *metav1.Time
@@ -476,7 +476,7 @@ var _ = SIGDescribe("Pod Extended (RestartAllContainers)",
 			}
 
 			err := scheduleStaticPod(podPath, staticPodName, ns, pod)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				pod, err := getPodFromStandaloneKubelet(ctx, ns, staticPodName)
@@ -580,7 +580,7 @@ func getPodFromStandaloneKubelet(ctx context.Context, podNamespace string, podNa
 	}
 	client := &http.Client{Transport: tr}
 	req, err := http.NewRequest("GET", endpoint, nil)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))
 	req.Header.Add("Accept", "application/json")
 
@@ -675,7 +675,7 @@ var _ = SIGDescribe(feature.StandaloneMode, framework.WithSerial(), func() {
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By(fmt.Sprintf("delete the static pod (%v/%v)", ns, staticPodName))
 			err := deleteStaticPod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By(fmt.Sprintf("wait for pod to disappear (%v/%v)", ns, staticPodName))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -690,7 +690,7 @@ var _ = SIGDescribe(feature.StandaloneMode, framework.WithSerial(), func() {
 
 		ginkgo.It("the pod should be running and kubelet not panic", func(ctx context.Context) {
 			err := scheduleStaticPod(podPath, staticPodName, ns, createBasicStaticPodSpec(staticPodName, ns))
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Waiting for the pod to be running")
 			gomega.Eventually(ctx, func(ctx context.Context) error {

@@ -70,7 +70,7 @@ var _ = common.SIGDescribe("HostPort", func() {
 		}
 		// Get a node where to schedule the pods
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 1)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if len(nodes.Items) == 0 {
 			framework.Failf("No nodes available")
 

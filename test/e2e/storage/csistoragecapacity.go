@@ -79,7 +79,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		ginkgo.By("getting /apis")
 		{
 			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			found := false
 			for _, group := range discoveryGroups.Groups {
 				if group.Name == storagev1.GroupName {
@@ -100,7 +100,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		{
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/storage.k8s.io").Do(ctx).Into(group)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			found := false
 			for _, version := range group.Versions {
 				if version.Version == cscVersion {
@@ -116,7 +116,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		ginkgo.By("getting /apis/storage.k8s.io/" + cscVersion)
 		{
 			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(storagev1.SchemeGroupVersion.String())
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			found := false
 			for _, resource := range resources.APIResources {
 				switch resource.Name {
@@ -133,44 +133,44 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 
 		ginkgo.By("creating")
 		createdCSC, err := cscClient.Create(ctx, csc, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		_, err = cscClient.Create(ctx, csc, metav1.CreateOptions{})
 		if !apierrors.IsAlreadyExists(err) {
 			framework.Failf("expected 409, got %#v", err)
 		}
 		_, err = cscClient.Create(ctx, csc2, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
 		cscWatch, err := cscClient.Watch(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		cscWatchNoNamespace, err := cscClientNoNamespace.Watch(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		// added for a watch
 		_, err = cscClient.Create(ctx, csc3, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("getting")
 		gottenCSC, err := cscClient.Get(ctx, csc.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(gottenCSC.UID).To(gomega.Equal(createdCSC.UID))
 		gomega.Expect(gottenCSC).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing in namespace")
 		cscs, err := cscClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(cscs.Items).To(gomega.HaveLen(3), "filtered list should have 3 items, got: %s", cscs)
 
 		ginkgo.By("listing across namespaces")
 		cscs, err = cscClientNoNamespace.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(cscs.Items).To(gomega.HaveLen(3), "filtered list should have 3 items, got: %s", cscs)
 
 		ginkgo.By("patching")
 		patchedCSC, err := cscClient.Patch(ctx, createdCSC.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(patchedCSC.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 		gomega.Expect(resourceversion.CompareResourceVersion(createdCSC.ResourceVersion, patchedCSC.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
@@ -178,7 +178,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		csrToUpdate := patchedCSC.DeepCopy()
 		csrToUpdate.Annotations["updated"] = "true"
 		updatedCSC, err := cscClient.Update(ctx, csrToUpdate, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(updatedCSC.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 
 		expectWatchResult := func(kind string, w watch.Interface) {
@@ -224,7 +224,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 
 		ginkgo.By("deleting")
 		err = cscClient.Delete(ctx, createdCSC.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		csc, err = cscClient.Get(ctx, createdCSC.Name, metav1.GetOptions{})
 		min := 2
 		max := min
@@ -242,7 +242,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 			framework.Failf("CSIStorageCapacitity should have been deleted or have DeletionTimestamp and Finalizers, but instead got: %s", csc)
 		}
 		cscs, err = cscClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		actualLen := len(cscs.Items)
 		if actualLen < min || actualLen > max {
 			framework.Failf("expected <= %d and >= %d remaining CSIStorageCapacity objects, got %d: %v", max, min, actualLen, cscs.Items)
@@ -250,9 +250,9 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 
 		ginkgo.By("deleting a collection")
 		err = cscClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		cscs, err = cscClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		for _, csc := range cscs.Items {
 			// Any remaining objects should be marked for deletion
 			// and only held back by a Finalizer.

@@ -130,7 +130,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 					},
 				},
 			}, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Make a deployment with a single pod. 'agnhost porter' is
 			// a simple server which serves the values of the
@@ -209,21 +209,21 @@ var _ = common.SIGDescribe("Proxy", func() {
 			deployment, err := f.ClientSet.AppsV1().Deployments(f.Namespace.Name).Create(ctx,
 				deploymentConfig,
 				metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.DeferCleanup(func(ctx context.Context, name string) error {
 				return f.ClientSet.AppsV1().Deployments(f.Namespace.Name).Delete(ctx, name, metav1.DeleteOptions{})
 			}, deployment.Name)
 
 			err = e2edeployment.WaitForDeploymentComplete(f.ClientSet, deployment)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			podList, err := e2edeployment.GetPodsForDeployment(ctx, f.ClientSet, deployment)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			pods := podList.Items
 
 			err = e2eendpointslice.WaitForEndpointCount(ctx, f.ClientSet, f.Namespace.Name, service.Name, 1)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// table constructors
 			// Try proxying through the service and directly to through the pod.
@@ -626,7 +626,7 @@ func truncate(b []byte, maxLen int) []byte {
 func nodeProxyTest(ctx context.Context, f *framework.Framework, prefix, nodeDest string) {
 	// TODO: investigate why it doesn't work on master Node.
 	node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	// TODO: Change it to test whether all requests succeeded when requests
 	// not reaching Kubelet issue is debugged.
@@ -638,7 +638,7 @@ func nodeProxyTest(ctx context.Context, f *framework.Framework, prefix, nodeDest
 			time.Sleep(time.Second)
 			serviceUnavailableErrors++
 		} else {
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(status).To(gomega.Equal(http.StatusOK))
 			gomega.Expect(d).To(gomega.BeNumerically("<", proxyHTTPCallTimeout))
 		}

@@ -53,9 +53,9 @@ func (t *ServiceUpgradeTest) Setup(ctx context.Context, f *framework.Framework) 
 	_, err := jig.CreateTCPService(ctx, func(s *v1.Service) {
 		s.Spec.Type = v1.ServiceTypeLoadBalancer
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	tcpService, err := jig.WaitForLoadBalancer(ctx, e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	// Get info to hit it with
 	tcpIngressIP := e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
@@ -63,11 +63,11 @@ func (t *ServiceUpgradeTest) Setup(ctx context.Context, f *framework.Framework) 
 
 	ginkgo.By("creating pod to be part of service " + serviceName)
 	deployment, err := jig.Run(ctx, jig.AddDeploymentAntiAffinity)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By("creating a PodDisruptionBudget to cover the Deployment")
 	_, err = jig.CreatePDB(ctx, deployment)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	// Hit it once before considering ourselves ready
 	ginkgo.By("hitting the pod through the service's LoadBalancer")

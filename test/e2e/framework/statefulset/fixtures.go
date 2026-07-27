@@ -158,7 +158,7 @@ func PauseNewPods(ss *appsv1.StatefulSet) {
 // This is a no-op if there are no paused pods.
 func ResumeNextPod(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet) {
 	podList, err := GetPodList(ctx, c, ss)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	resumedPod := ""
 	for _, pod := range podList.Items {
@@ -172,7 +172,7 @@ func ResumeNextPod(ctx context.Context, c clientset.Interface, ss *appsv1.Statef
 			framework.Failf("Found multiple paused stateful pods: %v and %v", pod.Name, resumedPod)
 		}
 		_, err := e2epodoutput.RunHostCmdWithRetries(pod.Namespace, pod.Name, "dd if=/dev/zero of=/data/statefulset-continue bs=1 count=1 conv=fsync", StatefulSetPoll, StatefulPodTimeout)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		framework.Logf("Resumed pod %v", pod.Name)
 		resumedPod = pod.Name
 	}

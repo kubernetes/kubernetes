@@ -45,7 +45,7 @@ var _ = sigDescribe(feature.Windows, "DNS", skipUnlessWindows(func() {
 		ginkgo.By("Getting the IP address of the internal Kubernetes service")
 
 		svc, err := f.ClientSet.CoreV1().Services("kube-system").Get(ctx, "kube-dns", metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Preparing a test DNS service with injected DNS names...")
 		// the default service IP will vary from cluster to cluster, but will always be present and is a good DNS test target
@@ -63,7 +63,7 @@ var _ = sigDescribe(feature.Windows, "DNS", skipUnlessWindows(func() {
 			"kubernetes.io/os": "windows",
 		}
 		testPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, testPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("confirming that the pod has a windows label")
 		gomega.Expect(testPod.Spec.NodeSelector).To(gomega.HaveKeyWithValue("kubernetes.io/os", "windows"), "pod.spec.nodeSelector")
@@ -88,7 +88,7 @@ var _ = sigDescribe(feature.Windows, "DNS", skipUnlessWindows(func() {
 			CaptureStdout: true,
 			CaptureStderr: true,
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		framework.Logf("ipconfig /all:\n%s", stdout)
 
 		if !strings.Contains(stdout, "1.1.1.1") {
@@ -132,7 +132,7 @@ var _ = sigDescribe(feature.Windows, "DNS", skipUnlessWindows(func() {
 
 		// curl returns an error if the host isn't resolved, otherwise, it will return a passing result.
 		if err != nil {
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 
 		// TODO: Add more test cases for other DNSPolicies.

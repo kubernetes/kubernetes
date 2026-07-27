@@ -152,11 +152,11 @@ func (t *pvcDeletionPerformanceTestSuite) DefineTests(driver storageframework.Te
 					}
 					deletingStats.mutex.Unlock()
 					err := e2epv.DeletePersistentVolumeClaim(ctx, l.cs, pvc.Name, pvc.Namespace)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					startDeletingPVTime := time.Now()
 					err = e2epv.WaitForPersistentVolumeDeleted(ctx, l.cs, pvc.Spec.VolumeName, 1*time.Second, 100*time.Minute)
 					framework.Logf("Deleted PV %v, PVC %v in %v", pvc.Spec.VolumeName, pvc.GetName(), time.Since(startDeletingPVTime))
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				}(pvc)
 			}
 			wg.Wait()
@@ -167,7 +167,7 @@ func (t *pvcDeletionPerformanceTestSuite) DefineTests(driver storageframework.Te
 
 			ginkgo.By(fmt.Sprintf("Deleting Storage Class %s", l.scName))
 			err := l.cs.StorageV1().StorageClasses().Delete(ctx, l.scName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 		} else {
 			ginkgo.By("Local l setup is nil")
@@ -189,7 +189,7 @@ func (t *pvcDeletionPerformanceTestSuite) DefineTests(driver storageframework.Te
 		}
 		ginkgo.By(fmt.Sprintf("Creating Storage Class %s", sc.Name))
 		sc, err := l.cs.StorageV1().StorageClasses().Create(ctx, sc, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		l.scName = sc.Name
 
 		// Stats for volume provisioning operation; we only need this because imported function newPVCWatch from volumeperf.go requires this as an argument
@@ -214,7 +214,7 @@ func (t *pvcDeletionPerformanceTestSuite) DefineTests(driver storageframework.Te
 				StorageClassName: &sc.Name,
 			}, l.ns.Name)
 			pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(ctx, pvc, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			// Store create time for each PVC
 			provisioningStats.mutex.Lock()
 			provisioningStats.perObjectInterval[pvc.Name] = &interval{
@@ -231,7 +231,7 @@ func (t *pvcDeletionPerformanceTestSuite) DefineTests(driver storageframework.Te
 			if err != nil {
 				framework.Failf("Failed to create pod [%+v]. Error: %v", pod, err)
 			}
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			l.pods = append(l.pods, pod)
 		}

@@ -168,7 +168,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod", framework.WithSerial(), 
 		e2enode.WaitForTotalHealthy(ctx, cs, time.Minute)
 
 		err := framework.CheckTestingNSDeletedExcept(ctx, cs, ns)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	})
 
 	// 1. Run a pod
@@ -182,7 +182,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod", framework.WithSerial(), 
 
 		ginkgo.By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(ctx, cs, pod, 2*time.Minute)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
 
 		ginkgo.By("Trying to apply a taint on the Node")
@@ -213,7 +213,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod", framework.WithSerial(), 
 
 		ginkgo.By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(ctx, cs, pod, 2*time.Minute)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
 
 		ginkgo.By("Trying to apply a taint on the Node")
@@ -245,7 +245,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod", framework.WithSerial(), 
 
 		ginkgo.By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(ctx, cs, pod, 2*time.Minute)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
 
 		ginkgo.By("Trying to apply a taint on the Node")
@@ -290,7 +290,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod", framework.WithSerial(), 
 		// 1. Run a pod with short toleration
 		ginkgo.By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(ctx, cs, pod, 2*time.Minute)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
 
 		// 2. Taint the node running this pod with a no-execute taint
@@ -343,7 +343,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod", framework.WithSerial(), 
 
 		ginkgo.By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(ctx, cs, pod, 2*time.Minute)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
 
 		ginkgo.DeferCleanup(e2epod.NewPodClient(f).RemoveFinalizer, pod.Name, testFinalizer)
@@ -357,7 +357,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod", framework.WithSerial(), 
 		ginkgo.By("Waiting for Pod to be terminating")
 		timeout := time.Duration(kubeletPodDeletionDelaySeconds+3*additionalWaitPerDeleteSeconds) * time.Second
 		err = e2epod.WaitForPodTerminatingInNamespaceTimeout(ctx, f.ClientSet, pod.Name, pod.Namespace, timeout)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Verifying the pod has the pod disruption condition")
 		e2epod.VerifyPodHasConditionWithType(ctx, f, pod, v1.DisruptionTarget)
@@ -377,7 +377,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods", framework.WithSerial(
 		e2enode.WaitForTotalHealthy(ctx, cs, time.Minute)
 
 		err := framework.CheckTestingNSDeletedExcept(ctx, cs, ns)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	})
 
 	// 1. Run two pods; one with toleration, one without toleration
@@ -393,10 +393,10 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods", framework.WithSerial(
 
 		ginkgo.By("Starting pods...")
 		nodeName1, err := testutils.RunPodAndGetNodeName(ctx, cs, pod1, 2*time.Minute)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		framework.Logf("Pod1 is running on %v. Tainting Node", nodeName1)
 		nodeName2, err := testutils.RunPodAndGetNodeName(ctx, cs, pod2, 2*time.Minute)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		framework.Logf("Pod2 is running on %v. Tainting Node", nodeName2)
 
 		ginkgo.By("Trying to apply a taint on the Nodes")
@@ -452,22 +452,22 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods", framework.WithSerial(
 
 		ginkgo.By("Starting pods...")
 		nodeName, err := testutils.RunPodAndGetNodeName(ctx, cs, pod1, 2*time.Minute)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		node, err := cs.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		nodeHostNameLabel, ok := node.GetObjectMeta().GetLabels()["kubernetes.io/hostname"]
 		if !ok {
 			framework.Failf("error getting kubernetes.io/hostname label on node %s", nodeName)
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		framework.Logf("Pod1 is running on %v. Tainting Node", nodeName)
 		// ensure pod2 lands on the same node as pod1
 		pod2.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": nodeHostNameLabel}
 		_, err = testutils.RunPodAndGetNodeName(ctx, cs, pod2, 2*time.Minute)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		// Wait for pods to be running state before eviction happens
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, pod1))
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, pod2))
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, pod1), "unexpected error")
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, pod2), "unexpected error")
 		framework.Logf("Pod2 is running on %v. Tainting Node", nodeName)
 
 		// 2. Taint the nodes running those pods with a no-execute taint

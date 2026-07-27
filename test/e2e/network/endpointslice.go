@@ -292,7 +292,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("getting /apis")
 		{
 			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			found := false
 			for _, group := range discoveryGroups.Groups {
 				if group.Name == discoveryv1.GroupName {
@@ -313,7 +313,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		{
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/discovery.k8s.io").Do(ctx).Into(group)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			found := false
 			for _, version := range group.Versions {
 				if version.Version == epsVersion {
@@ -329,7 +329,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("getting /apis/discovery.k8s.io" + epsVersion)
 		{
 			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(discoveryv1.SchemeGroupVersion.String())
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			foundEPS := false
 			for _, resource := range resources.APIResources {
 				switch resource.Name {
@@ -345,43 +345,43 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		// EndpointSlice resource create/read/update/watch verbs
 		ginkgo.By("creating")
 		_, err := epsClient.Create(ctx, epsTemplate, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		_, err = epsClient.Create(ctx, epsTemplate, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		createdEPS, err := epsClient.Create(ctx, epsTemplate, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("getting")
 		queriedEPS, err := epsClient.Get(ctx, createdEPS.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(queriedEPS.UID).To(gomega.Equal(createdEPS.UID))
 		gomega.Expect(queriedEPS).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		epsList, err := epsClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(epsList.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
 		epsWatch, err := epsClient.Watch(ctx, metav1.ListOptions{ResourceVersion: epsList.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		// Test cluster-wide list and watch
 		clusterEPSClient := f.ClientSet.DiscoveryV1().EndpointSlices("")
 		ginkgo.By("cluster-wide listing")
 		clusterEPSList, err := clusterEPSClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(clusterEPSList.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("cluster-wide watching")
 		framework.Logf("starting watch")
 		_, err = clusterEPSClient.Watch(ctx, metav1.ListOptions{ResourceVersion: epsList.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("patching")
 		patchedEPS, err := epsClient.Patch(ctx, createdEPS.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(patchedEPS.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 		gomega.Expect(resourceversion.CompareResourceVersion(createdEPS.ResourceVersion, patchedEPS.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
@@ -396,7 +396,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			updatedEPS, err = epsClient.Update(ctx, epsToUpdate, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(updatedEPS.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 
 		framework.Logf("waiting for watch events with expected annotations")
@@ -426,13 +426,13 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("deleting")
 
 		err = epsClient.Delete(ctx, createdEPS.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		_, err = epsClient.Get(ctx, createdEPS.Name, metav1.GetOptions{})
 		if !apierrors.IsNotFound(err) {
 			framework.Failf("expected 404, got %v", err)
 		}
 		epsList, err = epsClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(epsList.Items).To(gomega.HaveLen(2), "filtered list should have 2 items")
 		for _, eps := range epsList.Items {
 			if eps.Namespace == createdEPS.Namespace && eps.Name == createdEPS.Name {
@@ -442,9 +442,9 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 
 		ginkgo.By("deleting a collection")
 		err = epsClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		epsList, err = epsClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(epsList.Items).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
 
@@ -537,7 +537,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		}}
 
 		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(ctx, eps1, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		eps2 := epsTemplate.DeepCopy()
 		eps2.Ports = []discoveryv1.EndpointPort{{
 			Name:     ptr.To("port81"),
@@ -546,7 +546,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		}}
 
 		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(ctx, eps2, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		// connect to the service must work
 		ginkgo.By("Creating a pause pods that will try to connect to the webserver")
@@ -651,7 +651,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		}}
 
 		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(context.TODO(), eps1, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		eps2 := epsTemplate.DeepCopy()
 		eps2.Endpoints = []discoveryv1.Endpoint{
 			{
@@ -665,7 +665,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			Protocol: &tcpProtocol,
 		}}
 		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(context.TODO(), eps2, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		// connect to the service must work
 		ginkgo.By("Creating a pause pods that will try to connect to the webserver")

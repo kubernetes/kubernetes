@@ -569,10 +569,10 @@ func AfterReadingAllFlags(t *TestContextType) {
 
 		if TestContext.ReportCompleteGinkgo {
 			ginkgo.ReportAfterSuite("Ginkgo JSON report", func(report ginkgo.Report) {
-				ExpectNoError(reporters.GenerateJSONReport(report, path.Join(ginkgoDir, "report.json")))
+				ExpectNoError(reporters.GenerateJSONReport(report, path.Join(ginkgoDir, "report.json")), "unexpected error")
 			})
 			ginkgo.ReportAfterSuite("JUnit XML report", func(report ginkgo.Report) {
-				ExpectNoError(reporters.GenerateJUnitReport(report, path.Join(ginkgoDir, "report.xml")))
+				ExpectNoError(reporters.GenerateJUnitReport(report, path.Join(ginkgoDir, "report.xml")), "unexpected error")
 			})
 		}
 
@@ -590,7 +590,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 			// needed because the full report can become too large
 			// for tools like Spyglass
 			// (https://github.com/kubernetes/kubernetes/issues/111510).
-			ExpectNoError(junit.WriteJUnitReport(report, junitReport))
+			ExpectNoError(junit.WriteJUnitReport(report, junitReport), "unexpected error")
 		})
 	}
 }

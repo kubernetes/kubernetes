@@ -778,7 +778,7 @@ func (config *NetworkingTestConfig) createTestPods(ctx context.Context) {
 		config.createPod(ctx, hostTestContainerPod)
 	}
 
-	framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, config.f.ClientSet, testContainerPod.Name, config.f.Namespace.Name))
+	framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, config.f.ClientSet, testContainerPod.Name, config.f.Namespace.Name), "unexpected error")
 
 	var err error
 	config.TestContainerPod, err = config.getPodClient().Get(ctx, testContainerPod.Name, metav1.GetOptions{})
@@ -787,7 +787,7 @@ func (config *NetworkingTestConfig) createTestPods(ctx context.Context) {
 	}
 
 	if config.HostNetwork {
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, config.f.ClientSet, hostTestContainerPod.Name, config.f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, config.f.ClientSet, hostTestContainerPod.Name, config.f.Namespace.Name), "unexpected error")
 		config.HostTestContainerPod, err = config.getPodClient().Get(ctx, hostTestContainerPod.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to retrieve %s pod: %v", hostTestContainerPod.Name, err)
@@ -832,9 +832,9 @@ func (config *NetworkingTestConfig) setup(ctx context.Context, selector map[stri
 	config.setupCore(ctx, selector)
 
 	ginkgo.By("Getting node addresses")
-	framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, config.f.ClientSet, 10*time.Minute))
+	framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, config.f.ClientSet, 10*time.Minute), "unexpected error")
 	nodeList, err := e2enode.GetReadySchedulableNodes(ctx, config.f.ClientSet)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 	config.Nodes = nodeList.Items
@@ -896,9 +896,9 @@ func (config *NetworkingTestConfig) setup(ctx context.Context, selector map[stri
 }
 
 func (config *NetworkingTestConfig) createNetProxyPods(ctx context.Context, podName string, selector map[string]string) []*v1.Pod {
-	framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, config.f.ClientSet, 10*time.Minute))
+	framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, config.f.ClientSet, 10*time.Minute), "unexpected error")
 	nodeList, err := e2enode.GetBoundedReadySchedulableNodes(ctx, config.f.ClientSet, maxNetProxyPodsCount)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	nodes := nodeList.Items
 
 	// create pods, one for each node
@@ -921,9 +921,9 @@ func (config *NetworkingTestConfig) createNetProxyPods(ctx context.Context, podN
 	// wait that all of them are up
 	runningPods := make([]*v1.Pod, 0, len(nodes))
 	for _, p := range createdPods {
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, config.f.ClientSet, p.Name, config.f.Namespace.Name, framework.PodStartTimeout))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, config.f.ClientSet, p.Name, config.f.Namespace.Name, framework.PodStartTimeout), "unexpected error")
 		rp, err := config.getPodClient().Get(ctx, p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		runningPods = append(runningPods, rp)
 	}
 
@@ -933,7 +933,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(ctx context.Context, podN
 // DeleteNetProxyPod deletes the first endpoint pod and waits for it being removed.
 func (config *NetworkingTestConfig) DeleteNetProxyPod(ctx context.Context) {
 	pod := config.EndpointPods[0]
-	framework.ExpectNoError(config.getPodClient().Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+	framework.ExpectNoError(config.getPodClient().Delete(ctx, pod.Name, metav1.DeleteOptions{}), "unexpected error")
 	config.EndpointPods = config.EndpointPods[1:]
 	// wait for pod being deleted.
 	err := e2epod.WaitForPodNotFoundInNamespace(ctx, config.f.ClientSet, pod.Name, config.Namespace, config.f.Timeouts.PodDelete)

@@ -70,7 +70,7 @@ func runKubeletAuthzTest(ctx context.Context, f *framework.Framework, endpoint, 
 			Namespace: ns,
 		},
 	}, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By(fmt.Sprintf("Creating ClusterRole with prefix %s with for %s/%s", authzSubresource, resource, authzSubresource))
 
@@ -86,10 +86,10 @@ func runKubeletAuthzTest(ctx context.Context, f *framework.Framework, endpoint, 
 			},
 		},
 	}, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	defer func() {
 		ginkgo.By(fmt.Sprintf("Destroying ClusterRoles %q for this suite.", clusterRole.Name))
-		framework.ExpectNoError(f.ClientSet.RbacV1().ClusterRoles().Delete(ctx, clusterRole.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.RbacV1().ClusterRoles().Delete(ctx, clusterRole.Name, metav1.DeleteOptions{}), "unexpected error")
 	}()
 
 	subject := rbacv1.Subject{
@@ -101,7 +101,7 @@ func runKubeletAuthzTest(ctx context.Context, f *framework.Framework, endpoint, 
 	ginkgo.By(fmt.Sprintf("Creating ClusterRoleBinding with ClusterRole %s with subject %s/%s", clusterRole.Name, ns, saName))
 
 	cleanupFunc, err := e2eauth.BindClusterRole(ctx, f.ClientSet.RbacV1(), clusterRole.Name, ns, subject)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	defer cleanupFunc(ctx)
 
 	ginkgo.By("Waiting for Authorization Update.")
@@ -117,7 +117,7 @@ func runKubeletAuthzTest(ctx context.Context, f *framework.Framework, endpoint, 
 		},
 		true,
 	)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	pod := e2epod.NewAgnhostPod(ns, fmt.Sprintf("agnhost-pod-%s", authzSubresource), nil, nil, nil)
 	pod.Spec.ServiceAccountName = saName

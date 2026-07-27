@@ -210,14 +210,14 @@ var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 	if framework.TestContext.CriProxyEnabled {
 		framework.Logf("Start cri proxy")
 		rs, is, err := getCRIClient(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		e2eCriProxy = criproxy.NewRemoteRuntimeProxy(rs, is)
 		endpoint, err := criproxy.GenerateEndpoint()
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		err = e2eCriProxy.Start(endpoint)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		framework.TestContext.ContainerRuntimeEndpoint = endpoint
 		framework.TestContext.ImageServiceEndpoint = endpoint
@@ -254,7 +254,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 	// must: 1) run in serial; 2) restore kubelet configuration after test.
 	var err error
 	kubeletCfg, err = getCurrentKubeletConfig(ctx)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 })
 
 // Tear down the kubelet on the node

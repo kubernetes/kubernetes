@@ -122,7 +122,7 @@ var _ = SIGDescribe("Cgroup reconciliation", framework.WithSerial(), func() {
 
 			// 1. Read and log initial value (stabilized by Kubelet)
 			initialValueBytes, err := os.ReadFile(filePath)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			defaultValue := strings.TrimSpace(string(initialValueBytes))
 			framework.Logf("Initial (stabilized) value of %s: %s (%s)", filePath, defaultValue, p.comment)
 
@@ -149,7 +149,7 @@ var _ = SIGDescribe("Cgroup reconciliation", framework.WithSerial(), func() {
 			// 3. Set manual value
 			ginkgo.By(fmt.Sprintf("Setting manual value %s for %s", effectiveManual, filePath))
 			err = os.WriteFile(filePath, []byte(effectiveManual), 0644)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 
 		if len(states) == 0 {

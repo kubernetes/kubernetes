@@ -63,7 +63,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 			ginkgo.By("create the static pod")
 			err := createStaticPod(podPath, staticPodName, ns,
 				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to be running")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -78,13 +78,13 @@ var _ = SIGDescribe("MirrorPod", func() {
 		f.It("should be updated when static pod updated", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			uid := pod.UID
 
 			ginkgo.By("update the static pod container image")
 			image := imageutils.GetPauseImageName()
 			err = createStaticPod(podPath, staticPodName, ns, image, v1.RestartPolicyAlways)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -93,7 +93,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 
 			ginkgo.By("check the mirror pod container image is updated")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod.Spec.Containers).To(gomega.HaveLen(1))
 			gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(image))
 		})
@@ -105,12 +105,12 @@ var _ = SIGDescribe("MirrorPod", func() {
 		f.It("should be recreated when mirror pod gracefully deleted", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			uid := pod.UID
 
 			ginkgo.By("delete the mirror pod with grace period 30s")
 			err = f.ClientSet.CoreV1().Pods(ns).Delete(ctx, mirrorPodName, *metav1.NewDeleteOptions(30))
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to be recreated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -125,12 +125,12 @@ var _ = SIGDescribe("MirrorPod", func() {
 		f.It("should be recreated when mirror pod forcibly deleted", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			uid := pod.UID
 
 			ginkgo.By("delete the mirror pod with grace period 0s")
 			err = f.ClientSet.CoreV1().Pods(ns).Delete(ctx, mirrorPodName, *metav1.NewDeleteOptions(0))
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to be recreated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -140,7 +140,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("delete the static pod")
 			err := deleteStaticPod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to disappear")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -166,7 +166,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 			ginkgo.By("create the static pod")
 			err := createStaticPod(podPath, staticPodName, ns,
 				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to be running")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -175,12 +175,12 @@ var _ = SIGDescribe("MirrorPod", func() {
 
 			ginkgo.By("delete the pod manifest from disk")
 			err = deleteStaticPod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("recreate the file")
 			err = createStaticPod(podPath, staticPodName, ns,
 				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("mirror pod should restart with count 1")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -194,7 +194,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 
 			ginkgo.By("delete the static pod")
 			err = deleteStaticPod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to disappear")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -221,14 +221,14 @@ var _ = SIGDescribe("MirrorPod", func() {
 			ginkgo.By(fmt.Sprintf("Creating nfs test pod: %s", staticPodName))
 
 			err := createStaticPodUsingNfs(nfsServerHost, node, "sleep 999999", podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			ginkgo.By(fmt.Sprintf("Wating for nfs test pod: %s to start running...", staticPodName))
 			gomega.Eventually(func() error {
 				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
 			mirrorPod, err := c.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			hash, ok := mirrorPod.Annotations[kubetypes.ConfigHashAnnotationKey]
 			if !ok || hash == "" {
@@ -240,7 +240,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 
 			ginkgo.By(fmt.Sprintf("Deleting the static nfs test pod: %s", staticPodName))
 			err = deleteStaticPod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Wait 5 mins for syncTerminatedPod to fail. We expect that the pod volume should not be cleaned up because the NFS server is down.
 			gomega.Consistently(func() bool {
@@ -257,7 +257,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 
 			// Create the static pod again with the same config and expect it to start running
 			err = createStaticPodUsingNfs(nfsServerHost, node, "sleep 999999", podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			ginkgo.By(fmt.Sprintf("Wating for nfs test pod: %s to start running (after being recreated)", staticPodName))
 			gomega.Eventually(func() error {
 				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
@@ -267,7 +267,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("delete the static pod")
 			err := deleteStaticPod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to disappear")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -295,7 +295,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			ginkgo.By("create the static pod")
 			err := createStaticPod(podPath, staticPodName, ns,
 				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to be running")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -306,11 +306,11 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 		f.It("mirror pod: update activeDeadlineSeconds", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			uid := pod.UID
 
 			ginkgo.By("updating ActiveDeadlineSeconds")
-			framework.ExpectNoError(createStaticPodWithActiveDeadlineSeconds(podPath, staticPodName, ns, imageutils.GetPauseImageName(), v1.RestartPolicyAlways, 3000))
+			framework.ExpectNoError(createStaticPodWithActiveDeadlineSeconds(podPath, staticPodName, ns, imageutils.GetPauseImageName(), v1.RestartPolicyAlways, 3000), "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -319,7 +319,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 
 			ginkgo.By("check mirror pod generation remains at 1")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(int64(1)))
 
 			ginkgo.By("check mirror pod observedGeneration is always empty")
@@ -329,11 +329,11 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 		f.It("mirror pod: update container image", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			uid := pod.UID
 
 			ginkgo.By("updating container image")
-			framework.ExpectNoError(createStaticPod(podPath, staticPodName, ns, imageutils.GetPauseImageName(), v1.RestartPolicyAlways))
+			framework.ExpectNoError(createStaticPod(podPath, staticPodName, ns, imageutils.GetPauseImageName(), v1.RestartPolicyAlways), "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -342,7 +342,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 
 			ginkgo.By("check mirror pod generation remains at 1")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(int64(1)))
 
 			ginkgo.By("check mirror pod observedGeneration is always empty")
@@ -352,11 +352,11 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 		f.It("mirror pod: update initContainer image", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			uid := pod.UID
 
 			ginkgo.By("updating initContainer image")
-			framework.ExpectNoError(createStaticPodWithInitContainer(podPath, staticPodName, ns, imageutils.GetPauseImageName(), imageutils.GetPauseImageName(), v1.RestartPolicyAlways))
+			framework.ExpectNoError(createStaticPodWithInitContainer(podPath, staticPodName, ns, imageutils.GetPauseImageName(), imageutils.GetPauseImageName(), v1.RestartPolicyAlways), "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -365,7 +365,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 
 			ginkgo.By("check mirror pod generation remains at 1")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(int64(1)))
 
 			ginkgo.By("check mirror pod observedGeneration is always empty")
@@ -375,7 +375,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("delete the static pod")
 			err := deleteStaticPod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to disappear")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -401,7 +401,7 @@ var _ = SIGDescribe("MirrorPod with EnvFiles", framework.WithNodeConformance(), 
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("delete the static pod")
 			err := deleteStaticPod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to disappear")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -466,15 +466,15 @@ var _ = SIGDescribe("MirrorPod with EnvFiles", framework.WithNodeConformance(), 
 
 			ginkgo.By("create the static pod with envfiles")
 			err := createStaticPodWithSpec(podPath, staticPodName, ns, podSpec)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to succeed")
 			err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, mirrorPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("checking the logs of the mirror pod")
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, ns, mirrorPodName, "use-envfile")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			gomega.Expect(logs).To(gomega.ContainSubstring("CONFIG_1=value1"))
 			gomega.Expect(logs).To(gomega.ContainSubstring("CONFIG_2=value2"))
@@ -813,7 +813,7 @@ var _ = SIGDescribe("MirrorPod", framework.WithSerial(), func() {
 			}
 
 			err := createStaticPodWithSpec(podPath, staticPodName, ns, podSpec)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to be running")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -824,7 +824,7 @@ var _ = SIGDescribe("MirrorPod", framework.WithSerial(), func() {
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("delete the static pod")
 			err := deleteStaticPod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to disappear")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -846,10 +846,10 @@ var _ = SIGDescribe("MirrorPod", framework.WithSerial(), func() {
 					}
 					return false, nil
 				})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Double check the initial state before starting the concurrent check")
 			gomega.Expect(pod.Status.ContainerStatuses).ToNot(gomega.BeEmpty())

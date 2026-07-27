@@ -90,11 +90,11 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes", framework.WithDisruptive(), fr
 		if clientNode == nil {
 			framework.Logf("Designating test node")
 			nodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			for _, node := range nodes.Items {
 				if node.Name != nfsServerPod.Spec.NodeName {
 					clientNode = &node
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					break
 				}
 			}
@@ -161,13 +161,13 @@ func initTestCase(ctx context.Context, f *framework.Framework, c clientset.Inter
 			ginkgo.DeferCleanup(e2epv.DeletePersistentVolume, c, pv.Name)
 		}
 	}()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, f.NamespacePodSecurityLevel, "")
 	pod.Spec.NodeName = nodeName
 	framework.Logf("Creating NFS client pod.")
 	pod, err = c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 	framework.Logf("NFS client Pod %q created on Node %q", pod.Name, nodeName)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	defer func() {
 		if err != nil {
 			ginkgo.DeferCleanup(e2epod.DeletePodWithWait, c, pod)
@@ -177,11 +177,11 @@ func initTestCase(ctx context.Context, f *framework.Framework, c clientset.Inter
 	framework.ExpectNoError(err, fmt.Sprintf("Pod %q timed out waiting for phase: Running", pod.Name))
 	// Return created api objects
 	pod, err = c.CoreV1().Pods(ns).Get(ctx, pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, pvc.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	pv, err = c.CoreV1().PersistentVolumes().Get(ctx, pv.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return pod, pv, pvc
 }
 

@@ -68,7 +68,7 @@ func DeletePodsWithWait(ctx context.Context, c clientset.Interface, pods []*v1.P
 	}
 	framework.ExpectNoError(errors.NewAggregate(delErrs), "while deleting pods")
 	for _, testPod := range pods {
-		framework.ExpectNoError(WaitForPodNotFoundInNamespace(ctx, c, testPod.Name, testPod.Namespace, PodDeleteTimeout))
+		framework.ExpectNoError(WaitForPodNotFoundInNamespace(ctx, c, testPod.Name, testPod.Namespace, PodDeleteTimeout), "unexpected error")
 	}
 }
 

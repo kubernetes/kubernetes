@@ -115,7 +115,7 @@ func runPodPidsLimitTests(f *framework.Framework) {
 		verifyPod := makePodToVerifyPids("pod"+podUID, resource.MustParse("1024"))
 		e2epod.NewPodClient(f).Create(ctx, verifyPod)
 		err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, verifyPod.Name, f.Namespace.Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	})
 }
 

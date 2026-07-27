@@ -57,7 +57,7 @@ var _ = common.SIGDescribe("Service CIDRs", func() {
 		ns = fr.Namespace.Name
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if len(nodes.Items) < 2 {
 			e2eskipper.Skipf(
 				"Test requires >= 2 Ready nodes, but there are only %v nodes",
@@ -128,10 +128,10 @@ var _ = common.SIGDescribe("Service CIDRs", func() {
 			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 		})
 		err = jig.CreateServicePods(ctx, 2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod", nil)
 		err = jig.CheckServiceReachability(ctx, nodePortService, execPod)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	})
 
 })

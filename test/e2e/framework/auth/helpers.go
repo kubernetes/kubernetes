@@ -129,7 +129,7 @@ func BindClusterRole(ctx context.Context, c bindingsGetter, clusterRole, ns stri
 
 	cleanupFunc := func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Destroying ClusterRoleBindings %q for this suite.", clusterRoleBinding.Name))
-		framework.ExpectNoError(c.ClusterRoleBindings().Delete(ctx, clusterRoleBinding.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(c.ClusterRoleBindings().Delete(ctx, clusterRoleBinding.Name, metav1.DeleteOptions{}), "unexpected error")
 	}
 
 	return cleanupFunc, nil

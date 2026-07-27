@@ -88,7 +88,7 @@ var _ = SIGDescribe("ContainerLogRotation", framework.WithSlow(), framework.With
 			r, _, err := getCRIClient(ctx)
 			framework.ExpectNoError(err, "should connect to CRI and obtain runtime service clients and image service client")
 			resp, err := r.ContainerStatus(context.Background(), id, false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			logPath := resp.GetStatus().GetLogPath()
 			ginkgo.By("wait for container log being rotated to max file limit")
 			gomega.Eventually(ctx, func() (int, error) {
@@ -160,7 +160,7 @@ var _ = SIGDescribe("ContainerLogRotationWithMultipleWorkers", framework.WithSlo
 				r, _, err := getCRIClient(ctx)
 				framework.ExpectNoError(err, "should connect to CRI and obtain runtime service clients and image service client")
 				resp, err := r.ContainerStatus(ctx, id, false)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				logPaths = append(logPaths, resp.GetStatus().GetLogPath())
 			}
 

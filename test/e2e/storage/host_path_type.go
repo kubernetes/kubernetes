@@ -458,7 +458,7 @@ func verifyPodHostPathTypeFailure(ctx context.Context, f *framework.Framework, n
 	pod := newHostPathTypeTestPod(nodeSelector, hostDir, "/mnt/test", hostPathType)
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By("Checking for HostPathType error event")
 	eventSelector := fields.Set{
@@ -486,8 +486,8 @@ func verifyPodHostPathTypeFailure(ctx context.Context, f *framework.Framework, n
 func verifyPodHostPathType(ctx context.Context, f *framework.Framework, nodeSelector map[string]string, hostDir string, hostPathType *v1.HostPathType) {
 	newPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx,
 		newHostPathTypeTestPod(nodeSelector, hostDir, "/mnt/test", hostPathType), metav1.CreateOptions{})
-	framework.ExpectNoError(err)
-	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, newPod.Name, newPod.Namespace, f.Timeouts.PodStart))
+	framework.ExpectNoError(err, "unexpected error")
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, newPod.Name, newPod.Namespace, f.Timeouts.PodStart), "unexpected error")
 
 	f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, newPod.Name, *metav1.NewDeleteOptions(0))
 }

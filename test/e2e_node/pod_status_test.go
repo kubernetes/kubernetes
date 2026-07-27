@@ -80,15 +80,15 @@ var _ = SIGDescribe(framework.WithSerial(), "Pods status phase", func() {
 
 		ginkgo.By("Waiting for the pod's status to become Running")
 		err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Getting the current pod sandbox ID")
 		rs, _, err := getCRIClient(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{
 			LabelSelector: podLabels,
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(sandboxes).To(gomega.HaveLen(1))
 		podSandboxID := sandboxes[0].Id
 
@@ -103,17 +103,17 @@ var _ = SIGDescribe(framework.WithSerial(), "Pods status phase", func() {
 
 		ginkgo.By("Stopping the pod sandbox")
 		err = rs.StopPodSandbox(ctx, podSandboxID)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Starting the kubelet")
 		startKubelet(ctx)
 
 		ginkgo.By("Waiting for the regular init container to be started after the node reboot")
 		err = e2epod.WaitForPodInitContainerStarted(ctx, f.ClientSet, pod.Namespace, pod.Name, 0, f.Timeouts.PodStart)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(pod.Status.Phase == v1.PodPending).To(gomega.BeTrueBecause("pod should be pending during the execution of the init container after the node reboot"))
 
 		ginkgo.By("Parse the logs of the pod after the kubelet restart")
@@ -123,6 +123,6 @@ var _ = SIGDescribe(framework.WithSerial(), "Pods status phase", func() {
 
 		ginkgo.By("Verifying that the pod fully starts")
 		err = e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	})
 })

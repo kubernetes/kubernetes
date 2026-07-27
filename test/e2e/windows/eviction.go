@@ -68,7 +68,7 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 		nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{
 			LabelSelector: selector.String(),
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		var node *v1.Node
 		var nodeMem nodeMemory
@@ -139,10 +139,10 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 			},
 		}
 		pod1, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod1, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod1)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Scheduling another pod will consume the rest of the node's memory")
 		chunks := int((nodeMem.capacity.Value()-nodeMem.hardEviction.Value())/(300*1024*1024) + 3)
@@ -176,11 +176,11 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 			},
 		}
 		pod2, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod2, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By(fmt.Sprintf("Waiting for pod2 running on node %q, in namespace %q", node.Name, f.Namespace.Name))
 		err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		framework.Logf("Waiting for pod2 to be evicted")
 
@@ -234,7 +234,7 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 		time.Sleep(waitForNodeMemoryPressureTaintDelayDuration)
 		// wait for node.kubernetes.io/memory-pressure=NoSchedule to be removed so other tests can run
 		err = e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 10*time.Minute)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	})
 })
 

@@ -194,7 +194,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 		ginkgo.By("getting /apis")
 		{
 			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			found := false
 			for _, group := range discoveryGroups.Groups {
 				if group.Name == admissionregistrationv1.GroupName {
@@ -215,7 +215,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 		{
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/admissionregistration.k8s.io").Do(ctx).Into(group)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			found := false
 			for _, version := range group.Versions {
 				if version.Version == mapVersion {
@@ -231,7 +231,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 		ginkgo.By("getting /apis/admissionregistration.k8s.io/" + mapVersion)
 		{
 			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(admissionregistrationv1.SchemeGroupVersion.String())
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			foundMAP := false
 			for _, resource := range resources.APIResources {
 				switch resource.Name {
@@ -284,36 +284,36 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 
 		ginkgo.DeferCleanup(func(ctx context.Context) {
 			err := client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: label})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		})
 
 		ginkgo.By("creating")
 		_, err := client.Create(ctx, template, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		_, err = client.Create(ctx, template, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		mapCreated, err := client.Create(ctx, template, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("getting")
 		mapRead, err := client.Get(ctx, mapCreated.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(mapRead.UID).To(gomega.Equal(mapCreated.UID))
 		gomega.Expect(mapRead).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: label})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
 		mapWatch, err := client.Watch(ctx, metav1.ListOptions{ResourceVersion: list.ResourceVersion, LabelSelector: label})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("patching")
 		patchBytes := []byte(`{"metadata":{"annotations":{"patched":"true"}},"spec":{"reinvocationPolicy":"IfNeeded"}}`)
 		mapPatched, err := client.Patch(ctx, mapCreated.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(mapPatched.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 		gomega.Expect(mapPatched.Spec.ReinvocationPolicy).To(gomega.Equal(admissionregistrationv1.IfNeededReinvocationPolicy), "patched object should have the applied spec")
 		gomega.Expect(resourceversion.CompareResourceVersion(mapRead.ResourceVersion, mapPatched.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
@@ -322,7 +322,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 		var mapUpdated *admissionregistrationv1.MutatingAdmissionPolicy
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			mp, err := client.Get(ctx, mapCreated.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			mapToUpdate := mp.DeepCopy()
 			mapToUpdate.Annotations["updated"] = "true"
@@ -360,7 +360,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 
 		ginkgo.By("deleting")
 		err = client.Delete(ctx, mapCreated.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		mapTmp, err := client.Get(ctx, mapCreated.Name, metav1.GetOptions{})
 		switch {
 		case err == nil && mapTmp.GetDeletionTimestamp() != nil && len(mapTmp.GetFinalizers()) > 0:
@@ -380,12 +380,12 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 				itemsWithoutFinalizer = append(itemsWithoutFinalizer, item)
 			}
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(itemsWithoutFinalizer).To(gomega.HaveLen(2), "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
 		err = client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: label})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		list, err = client.List(ctx, metav1.ListOptions{LabelSelector: label})
 		var itemsColWithoutFinalizer []admissionregistrationv1.MutatingAdmissionPolicy
@@ -394,7 +394,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 				itemsColWithoutFinalizer = append(itemsColWithoutFinalizer, item)
 			}
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(itemsColWithoutFinalizer).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
 
@@ -416,7 +416,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 		ginkgo.By("getting /apis")
 		{
 			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			found := false
 			for _, group := range discoveryGroups.Groups {
 				if group.Name == admissionregistrationv1.GroupName {
@@ -437,7 +437,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 		{
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/admissionregistration.k8s.io").Do(ctx).Into(group)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			found := false
 			for _, version := range group.Versions {
 				if version.Version == mapbVersion {
@@ -453,7 +453,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 		ginkgo.By("getting /apis/admissionregistration.k8s.io/" + mapbVersion)
 		{
 			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(admissionregistrationv1.SchemeGroupVersion.String())
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			foundMAPB := false
 			for _, resource := range resources.APIResources {
 				switch resource.Name {
@@ -484,36 +484,36 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 
 		ginkgo.DeferCleanup(func(ctx context.Context) {
 			err := client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: label})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		})
 
 		ginkgo.By("creating")
 		_, err := client.Create(ctx, template, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		_, err = client.Create(ctx, template, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		mapbCreated, err := client.Create(ctx, template, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("getting")
 		mapbRead, err := client.Get(ctx, mapbCreated.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(mapbRead.UID).To(gomega.Equal(mapbCreated.UID))
 		gomega.Expect(mapbRead).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: label})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
 		mapbWatch, err := client.Watch(ctx, metav1.ListOptions{ResourceVersion: list.ResourceVersion, LabelSelector: label})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("patching")
 		patchBytes := []byte(`{"metadata":{"annotations":{"patched":"true"}},"spec":{"policyName":"new-policy.example.com"}}`)
 		mapbPatched, err := client.Patch(ctx, mapbCreated.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(mapbPatched.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 		gomega.Expect(mapbPatched.Spec.PolicyName).To(gomega.Equal("new-policy.example.com"), "patched object should have the applied spec")
 		gomega.Expect(resourceversion.CompareResourceVersion(mapbRead.ResourceVersion, mapbPatched.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
@@ -522,7 +522,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 		var mapbUpdated *admissionregistrationv1.MutatingAdmissionPolicyBinding
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			mp, err := client.Get(ctx, mapbCreated.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			mapbToUpdate := mp.DeepCopy()
 			mapbToUpdate.Annotations["updated"] = "true"
@@ -559,7 +559,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 		}
 		ginkgo.By("deleting")
 		err = client.Delete(ctx, mapbCreated.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		mapbTmp, err := client.Get(ctx, mapbCreated.Name, metav1.GetOptions{})
 		switch {
 		case err == nil && mapbTmp.GetDeletionTimestamp() != nil && len(mapbTmp.GetFinalizers()) > 0:
@@ -579,12 +579,12 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 				itemsWithoutFinalizer = append(itemsWithoutFinalizer, item)
 			}
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(itemsWithoutFinalizer).To(gomega.HaveLen(2), "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
 		err = client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: label})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		list, err = client.List(ctx, metav1.ListOptions{LabelSelector: label})
 		var itemsColWithoutFinalizer []admissionregistrationv1.MutatingAdmissionPolicyBinding
@@ -593,7 +593,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", func() 
 				itemsColWithoutFinalizer = append(itemsColWithoutFinalizer, item)
 			}
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(itemsColWithoutFinalizer).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
 })

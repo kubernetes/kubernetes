@@ -252,19 +252,19 @@ func testPodSELinuxLabeling(ctx context.Context, f *framework.Framework, hostIPC
 	pod, err := client.Create(ctx, pod, metav1.CreateOptions{})
 
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "unexpected error")
 
 	testContent := "hello"
 	testFilePath := mountPath + "/TEST"
 	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
 	err = tk.WriteFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, testFilePath, testContent)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	content, err := tk.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, testFilePath)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	gomega.Expect(content).To(gomega.ContainSubstring(testContent))
 
 	foundPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	// Confirm that the file can be accessed from a second
 	// pod using host_path with the same MCS label

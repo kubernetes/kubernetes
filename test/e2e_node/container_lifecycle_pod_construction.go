@@ -354,7 +354,7 @@ func parseOutput(ctx context.Context, f *framework.Framework, pod *v1.Pod) conta
 
 		fields := strings.Fields(log)
 		if len(fields) < 3 {
-			framework.ExpectNoError(fmt.Errorf("%v should have at least length 3", fields))
+			framework.ExpectNoError(fmt.Errorf("%v should have at least length 3", fields), "unexpected error")
 		}
 		timestamp, err := time.Parse(time.RFC3339, fields[0])
 		framework.ExpectNoError(err, "Failed to parse the timestamp, log: %q", log)

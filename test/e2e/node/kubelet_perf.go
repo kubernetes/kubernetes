@@ -81,7 +81,7 @@ func runResourceTrackingTest(ctx context.Context, f *framework.Framework, podsPe
 		Image:     imageutils.GetPauseImageName(),
 		Replicas:  totalPods,
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	// Log once and flush the stats.
 	rm.LogLatest()
@@ -108,7 +108,7 @@ func runResourceTrackingTest(ctx context.Context, f *framework.Framework, podsPe
 	ginkgo.By("Reporting overall resource usage")
 	logPodsOnNodes(ctx, f.ClientSet, nodeNames.List())
 	usageSummary, err := rm.GetLatest()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	// TODO(random-liu): Remove the original log when we migrate to new perfdash
 	framework.Logf("%s", rm.FormatResourceUsage(usageSummary))
 	// Log perf result
@@ -205,7 +205,7 @@ var _ = SIGDescribe("Kubelet", framework.WithSerial(), framework.WithSlow(), fun
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)

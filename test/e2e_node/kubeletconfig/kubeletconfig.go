@@ -128,7 +128,7 @@ func pollConfigz(ctx context.Context, timeout time.Duration, pollInterval time.D
 		tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
 		cmd := tk.KubectlCmd("proxy", "-p", "0")
 		stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		defer stdout.Close()
 		defer stderr.Close()
 		defer framework.TryKill(cmd)
@@ -136,13 +136,13 @@ func pollConfigz(ctx context.Context, timeout time.Duration, pollInterval time.D
 		buf := make([]byte, 128)
 		var n int
 		n, err = stdout.Read(buf)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		output := string(buf[:n])
 		proxyRegexp := regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
 		match := proxyRegexp.FindStringSubmatch(output)
 		gomega.Expect(match).To(gomega.HaveLen(2))
 		port, err := strconv.Atoi(match[1])
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		framework.Logf("http requesting node kubelet /configz")
 		endpoint = fmt.Sprintf("http://127.0.0.1:%d/api/v1/nodes/%s/proxy/configz", port, nodeName)
 	} else if !standaloneMode {
@@ -155,7 +155,7 @@ func pollConfigz(ctx context.Context, timeout time.Duration, pollInterval time.D
 	}
 	client := &http.Client{Transport: tr}
 	req, err := http.NewRequest("GET", endpoint, nil)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	if !useProxy {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))
 	}

@@ -120,7 +120,7 @@ var _ = common.SIGDescribe("Connectivity Pod Lifecycle", func() {
 				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
 			}
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Creating 2 webserver pod (green and blue) able to serve traffic during the grace period of 30 seconds")
 		gracePeriod := int64(30)

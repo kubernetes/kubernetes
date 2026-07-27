@@ -117,10 +117,10 @@ var _ = SIGDescribe("user namespaces kubeconfig tests", "[LinuxOnly]", feature.U
 			})
 
 			err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, createdPod.Name, f.Namespace.Name, f.Timeouts.PodStart)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, createdPod.Name, "container")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			expected := strconv.FormatInt(customIDsPerPod, 10)
 			gomega.Expect(logs).To(gomega.ContainSubstring(expected))
 

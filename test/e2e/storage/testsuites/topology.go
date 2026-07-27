@@ -171,14 +171,14 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		t.createResources(ctx, cs, l, nil)
 
 		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, cs, l.pod.Name, l.pod.Namespace, f.Timeouts.PodStart)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Verifying pod scheduled to correct node")
 		pod, err := cs.CoreV1().Pods(l.pod.Namespace).Get(ctx, l.pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		node, err := cs.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		t.verifyNodeTopology(node, allowedTopologies)
 	})
@@ -221,7 +221,7 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		// With delayed binding, the scheduler errors before provisioning
 		// With immediate binding, the volume gets provisioned but cannot be scheduled
 		err = e2epod.WaitForPodNameUnschedulableInNamespace(ctx, cs, l.pod.Name, l.pod.Namespace)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	})
 }
 
@@ -317,11 +317,11 @@ func (t *topologyTestSuite) createResources(ctx context.Context, cs clientset.In
 
 	ginkgo.By("Creating sc")
 	l.resource.Sc, err = cs.StorageV1().StorageClasses().Create(ctx, l.resource.Sc, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By("Creating pvc")
 	l.resource.Pvc, err = cs.CoreV1().PersistentVolumeClaims(l.resource.Pvc.Namespace).Create(ctx, l.resource.Pvc, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By("Creating pod")
 	podConfig := e2epod.Config{
@@ -332,9 +332,9 @@ func (t *topologyTestSuite) createResources(ctx context.Context, cs clientset.In
 		ImageID:       e2epod.GetDefaultTestImageID(),
 	}
 	l.pod, err = e2epod.MakeSecPod(&podConfig)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	l.pod, err = cs.CoreV1().Pods(l.pod.Namespace).Create(ctx, l.pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 func (t *topologyTestSuite) CleanupResources(ctx context.Context, cs clientset.Interface, l *topologyTest) {

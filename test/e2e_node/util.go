@@ -170,7 +170,7 @@ func addAfterEachForCleaningUpPods(f *framework.Framework) {
 	ginkgo.AfterEach(func(ctx context.Context) {
 		ginkgo.By("Deleting any Pods created by the test in namespace: " + f.Namespace.Name)
 		l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		for _, p := range l.Items {
 			if p.Namespace != f.Namespace.Name {
 				continue
@@ -185,7 +185,7 @@ func addBeforeEachForCleaningUpPods(f *framework.Framework) {
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		ginkgo.By("Deleting any Pods created by previous test(s) in all namespaces")
 		l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		for _, p := range l.Items {
 			framework.Logf("Deleting pod: %s in %s", p.Name, p.Namespace)
 			e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
@@ -232,18 +232,18 @@ func listNamespaceEvents(ctx context.Context, c clientset.Interface, ns string) 
 func logPodEvents(ctx context.Context, f *framework.Framework) {
 	framework.Logf("Summary of pod events during the test:")
 	err := listNamespaceEvents(ctx, f.ClientSet, f.Namespace.Name)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 func logNodeEvents(ctx context.Context, f *framework.Framework) {
 	framework.Logf("Summary of node events during the test:")
 	err := listNamespaceEvents(ctx, f.ClientSet, "")
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 func getLocalNode(ctx context.Context, f *framework.Framework) *v1.Node {
 	nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	gomega.Expect(nodeList.Items).Should(gomega.HaveLen(1), "Unexpected number of node objects for node e2e. Expects only one node.")
 	return &nodeList.Items[0]
 }
@@ -255,7 +255,7 @@ func getLocalNode(ctx context.Context, f *framework.Framework) *v1.Node {
 func getLocalTestNode(ctx context.Context, f *framework.Framework) (*v1.Node, bool) {
 	logger := klog.FromContext(ctx)
 	node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	ready := e2enode.IsNodeReady(logger, node)
 	schedulable := e2enode.IsNodeSchedulable(logger, node)
 	framework.Logf("node %q ready=%v schedulable=%v", node.Name, ready, schedulable)
@@ -335,7 +335,7 @@ func findKubeletServiceName(running bool) string {
 		cmdLine = append(cmdLine, "--state=running")
 	}
 	stdout, err := exec.Command("sudo", cmdLine...).CombinedOutput()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	regex := regexp.MustCompile("(kubelet-\\w+)")
 	matches := regex.FindStringSubmatch(string(stdout))
 	gomega.Expect(matches).ToNot(gomega.BeEmpty(), "Found more than one kubelet service running: %q", stdout)
@@ -467,7 +467,7 @@ func reduceAllocatableMemoryUsageIfCgroupv1() {
 	if !IsCgroup2UnifiedMode() {
 		cmd := fmt.Sprintf("echo 0 > /sys/fs/cgroup/memory/%s/memory.force_empty", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)))
 		_, err := exec.Command("sudo", "sh", "-c", cmd).CombinedOutput()
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	}
 }
 
@@ -490,7 +490,7 @@ func withFeatureGate(feature featuregate.Feature, desired bool) func() {
 // Worth noting, however, that this makes the test runtime much bigger.
 func waitForAllContainerRemoval(ctx context.Context, podName, podNS string) {
 	rs, _, err := getCRIClient(ctx)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	gomega.Eventually(ctx, func(ctx context.Context) error {
 		containers, err := rs.ListContainers(ctx, &runtimeapi.ContainerFilter{
 			LabelSelector: map[string]string{
@@ -613,7 +613,7 @@ func deletePods(ctx context.Context, f *framework.Framework, podNames []string) 
 
 func waitForContainerRemoval(ctx context.Context, containerName, podName, podNS string) {
 	rs, _, err := getCRIClient(ctx)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	gomega.Eventually(ctx, func(ctx context.Context) bool {
 		containers, err := rs.ListContainers(ctx, &runtimeapi.ContainerFilter{
 			LabelSelector: map[string]string{

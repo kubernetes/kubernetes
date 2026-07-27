@@ -55,7 +55,7 @@ var _ = SIGDescribe("Pod InPlace Resize Memory-Backed Volume with CRI Proxy", fr
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if framework.NodeOSDistroIs("windows") {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
@@ -136,7 +136,7 @@ var _ = SIGDescribe("Pod InPlace Resize Memory-Backed Volume with CRI Proxy", fr
 				}
 				return nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Patching pod: downsize vol-1, upsize vol-2, and upsize container")
 			patchBytes := []byte(`{
@@ -192,7 +192,7 @@ var _ = SIGDescribe("Pod InPlace Resize Memory-Backed Volume with CRI Proxy", fr
 
 			// Verify that vol-2 remains at 100Mi during the CRI block
 			stdout, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, newPod.Name, "c1", "df", "-m", "/cache2")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(stdout).To(gomega.ContainSubstring("100"))
 
 			ginkgo.By("Waiting for the entire actuation to complete after CRI unblocks")
@@ -203,11 +203,11 @@ var _ = SIGDescribe("Pod InPlace Resize Memory-Backed Volume with CRI Proxy", fr
 			ginkgo.By("Verifying both volume resizes are eventually complete")
 
 			stdout, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, gotPod.Name, "c1", "df", "-m", "/cache1")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(stdout).To(gomega.ContainSubstring("50"))
 
 			stdout, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, gotPod.Name, "c1", "df", "-m", "/cache2")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(stdout).To(gomega.ContainSubstring("250"))
 
 			ginkgo.By("deleting pod")

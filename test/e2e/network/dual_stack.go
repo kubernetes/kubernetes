@@ -63,7 +63,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 	// cases).
 	ginkgo.It("should have at least one dual-stack node", func(ctx context.Context) {
 		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, cs)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		var found bool
 		for _, node := range nodeList.Items {
@@ -174,7 +174,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		// get all schedulable nodes to determine the number of replicas for pods
 		// this is to ensure connectivity from all nodes on cluster
 		nodeList, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 3)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		replicas := int32(len(nodeList.Items))
 
@@ -235,21 +235,21 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		}
 
 		serverDeployment, err := cs.AppsV1().Deployments(f.Namespace.Name).Create(ctx, serverDeploymentSpec, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		clientDeployment, err := cs.AppsV1().Deployments(f.Namespace.Name).Create(ctx, clientDeploymentSpec, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		err = e2edeployment.WaitForDeploymentComplete(cs, serverDeployment)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		err = e2edeployment.WaitForDeploymentComplete(cs, clientDeployment)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		serverPods, err := e2edeployment.GetPodsForDeployment(ctx, cs, serverDeployment)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		clientPods, err := e2edeployment.GetPodsForDeployment(ctx, cs, clientDeployment)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		assertNetworkConnectivity(ctx, f, *serverPods, *clientPods, "dualstack-test-client", "80")
 	})
@@ -272,7 +272,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 
 		jig.Labels = t.Labels
 		err := jig.CreateServicePods(ctx, 2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		svc, err := t.CreateService(service)
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
@@ -314,7 +314,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 
 		jig.Labels = t.Labels
 		err := jig.CreateServicePods(ctx, 2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		svc, err := t.CreateService(service)
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
@@ -349,7 +349,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 
 		jig.Labels = t.Labels
 		err := jig.CreateServicePods(ctx, 2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		svc, err := t.CreateService(service)
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
@@ -385,7 +385,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 
 		jig.Labels = t.Labels
 		err := jig.CreateServicePods(ctx, 2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		svc, err := t.CreateService(service)
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
@@ -421,7 +421,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 
 		jig.Labels = t.Labels
 		err := jig.CreateServicePods(ctx, 2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		svc, err := t.CreateService(service)
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 

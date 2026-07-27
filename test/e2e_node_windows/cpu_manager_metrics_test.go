@@ -58,7 +58,7 @@ var _ = SIGWindowsDescribe(feature.CPUManager, feature.Windows, framework.WithSe
 			var err error
 			if oldCfg == nil {
 				oldCfg, err = getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}
 
 			newCfg := buildWindowsCPUManagerKubeletConfig(oldCfg, true)

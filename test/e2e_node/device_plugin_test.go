@@ -139,7 +139,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			ginkgo.By("Wait for node to be ready")
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				return nodes == 1
 			}, time.Minute, time.Second).Should(gomega.BeTrueBecause("expected node to be ready"))
 
@@ -204,7 +204,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Deleting any Pods created by the test")
 			l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			for _, p := range l.Items {
 				if p.Namespace != f.Namespace.Name {
 					continue
@@ -234,10 +234,10 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")), "pod1 requested a device but started successfully without")
 
 			v1alphaPodResources, err = getV1alpha1NodeDevices(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			v1PodResources, err = getV1NodeDevices(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			framework.Logf("v1alphaPodResources.PodResources:%+v\n", v1alphaPodResources.PodResources)
 			framework.Logf("v1PodResources.PodResources:%+v\n", v1PodResources.PodResources)
@@ -292,7 +292,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			podObj := makeBusyboxPod(e2enode.SampleDeviceResourceName, "[ $(ls /tmp/CDI-Dev-[1,2] | wc -l) -eq 1 -a -b /tmp/$CDI_DEVICE ]")
 			podObj.Spec.RestartPolicy = v1.RestartPolicyNever
 			pod := e2epod.NewPodClient(f).Create(ctx, podObj)
-			framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace))
+			framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace), "unexpected error")
 		})
 
 		// simulate container restart, while all other involved components (kubelet, device plugin) stay stable. To do so, in the container
@@ -307,7 +307,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")), "pod1 requested a device but started successfully without")
 
 			pod1, err = e2epod.NewPodClient(f).Get(ctx, pod1.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Waiting for container to restart")
 			ensurePodContainerRestart(ctx, f, pod1.Name, pod1.Name)
@@ -331,7 +331,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			ginkgo.By("Creating another pod")
 			pod2 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(e2enode.SampleDeviceResourceName, podRECMD))
 			err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod2.Name, f.Namespace.Name, 1*time.Minute)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Checking that pod got a fake device")
 			devID2, err := parseLog(ctx, f, pod2.Name, pod2.Name, deviceIDRE)
@@ -363,14 +363,14 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")), "pod1 requested a device but started successfully without")
 
 			pod1, err = e2epod.NewPodClient(f).Get(ctx, pod1.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			framework.Logf("testing pod: pre-restart  UID=%s namespace=%s name=%s ready=%v", pod1.UID, pod1.Namespace, pod1.Name, podutils.IsPodReady(pod1))
 
 			ginkgo.By("Restarting Kubelet")
 			restartKubelet(ctx, true)
 
 			ginkgo.By("Wait for node to be ready again")
-			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute))
+			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute), "unexpected error")
 
 			ginkgo.By("Waiting for resource to become available on the local node after restart")
 			gomega.Eventually(ctx, func() bool {
@@ -388,7 +388,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 					"the same pod instance not running across kubelet restarts, workload should not be perturbed by kubelet restarts")
 
 			pod2, err := e2epod.NewPodClient(f).Get(ctx, pod1.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			framework.Logf("testing pod: post-restart UID=%s namespace=%s name=%s ready=%v", pod2.UID, pod2.Namespace, pod2.Name, podutils.IsPodReady(pod2))
 
 			// crosscheck from the device assignment is preserved and stable from perspective of the kubelet.
@@ -418,10 +418,10 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")), "pod1 requested a device but started successfully without")
 
 			pod1, err = e2epod.NewPodClient(f).Get(ctx, pod1.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Wait for node to be ready again")
-			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute))
+			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute), "unexpected error")
 
 			ginkgo.By("Waiting for container to restart")
 			ensurePodContainerRestart(ctx, f, pod1.Name, pod1.Name)
@@ -435,7 +435,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			restartKubelet(ctx, true)
 
 			ginkgo.By("Wait for node to be ready again")
-			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute))
+			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute), "unexpected error")
 
 			ginkgo.By("Checking an instance of the pod is running")
 			gomega.Eventually(ctx, getPodByName).
@@ -486,7 +486,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")), "pod requested a device but started successfully without")
 
 			pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Wait for node to be ready")
 			gomega.Expect(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)).To(gomega.Succeed())
@@ -532,10 +532,10 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")), "pod1 requested a device but started successfully without")
 
 			pod1, err = e2epod.NewPodClient(f).Get(ctx, pod1.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Wait for node to be ready again")
-			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute))
+			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute), "unexpected error")
 
 			ginkgo.By("Re-Register resources and delete the plugin pod")
 			gp := int64(0)
@@ -548,7 +548,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			ginkgo.By("Recreating the plugin pod")
 			devicePluginPod = e2epod.NewPodClient(f).CreateSync(ctx, dptemplate)
 			err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, devicePluginPod.Name, devicePluginPod.Namespace, 1*time.Minute)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Waiting for resource to become available on the local node after re-registration")
 			gomega.Eventually(ctx, func() bool {
@@ -586,13 +586,13 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(devID1).To(gomega.Not(gomega.BeEmpty()), "pod1 requested a device but started successfully without")
 
 			pod1, err = e2epod.NewPodClient(f).Get(ctx, pod1.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Restarting Kubelet")
 			restartKubelet(ctx, true)
 
 			ginkgo.By("Wait for node to be ready again")
-			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute))
+			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute), "unexpected error")
 
 			ginkgo.By("Checking the same instance of the pod is still running after kubelet restart")
 			gomega.Eventually(ctx, getPodByName).
@@ -651,7 +651,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(devID).To(gomega.Not(gomega.BeEmpty()), "pod1 requested a device but started successfully without")
 
 			pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("stopping the kubelet")
 			restartKubelet := mustStopKubelet(ctx, f)
@@ -751,7 +751,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(devID3).NotTo(gomega.Equal(devID2), "pod1's restartable init container and regular container should not share the same device")
 
 			podResources, err := getV1NodeDevices(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			framework.Logf("PodResources.PodResources:%+v\n", podResources.PodResources)
 			framework.Logf("len(PodResources.PodResources):%+v", len(podResources.PodResources))
@@ -906,7 +906,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 				defer ginkgo.GinkgoRecover()
 				framework.Logf("Deleting the control file: %q to trigger registration", triggerPathFile)
 				err := os.Remove(triggerPathFile)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}()
 
 			ginkgo.By("Waiting for devices to become available on the local node")
@@ -940,7 +940,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Deleting any Pods created by the test")
 			l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			for _, p := range l.Items {
 				if p.Namespace != f.Namespace.Name {
 					continue
@@ -954,7 +954,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			}
 
 			err = os.Remove(triggerPathDir)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("Waiting for devices to become unavailable on the local node")
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
@@ -984,22 +984,22 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")))
 
 			pod1, err = e2epod.NewPodClient(f).Get(ctx, pod1.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("stopping the kubelet")
 			restartKubelet := mustStopKubelet(ctx, f)
 
 			ginkgo.By("stopping all the local containers - using CRI")
 			rs, _, err := getCRIClient(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			for _, sandbox := range sandboxes {
 				gomega.Expect(sandbox.Metadata).ToNot(gomega.BeNil())
 				ginkgo.By(fmt.Sprintf("deleting pod using CRI: %s/%s -> %s", sandbox.Metadata.Namespace, sandbox.Metadata.Name, sandbox.Id))
 
 				err := rs.RemovePodSandbox(ctx, sandbox.Id)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				waitForAllContainerRemoval(ctx, sandbox.Metadata.Name, sandbox.Metadata.Namespace)
 			}
 
@@ -1007,7 +1007,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			restartKubelet(ctx)
 
 			ginkgo.By("Wait for node to be ready again")
-			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute))
+			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute), "unexpected error")
 
 			ginkgo.By("Waiting for the pod to fail with admission error as device plugin hasn't re-registered yet")
 			gomega.Eventually(ctx, getPod).

@@ -68,7 +68,7 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Sanity tes
 
 		ginkgo.By("Getting logs from the pod")
 		log, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Checking output from nvidia-smi")
 		gomega.Expect(log).To(gomega.ContainSubstring("NVIDIA-SMI"))
@@ -96,7 +96,7 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using
 
 		ginkgo.By("Getting logs from the pod")
 		log, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Checking output from nvidia-smi")
 		framework.Logf("Got container logs for %s:\n%v", pod.Spec.Containers[0].Name, log)
@@ -121,20 +121,20 @@ var _ = SIGDescribe(feature.GPUDevicePlugin, framework.WithSerial(), "Test using
 		StartJob(ctx, f, completions)
 
 		job, err := e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, "cuda-add")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		// make sure job is running by waiting for its first pod to start running
 		err = e2ejob.WaitForJobPodsRunningWithTimeout(ctx, f.ClientSet, f.Namespace.Name, job.Name, 1, e2ejob.JobTimeout*2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		numNodes, err := e2enode.TotalRegistered(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		_, err = e2enode.CheckReady(ctx, f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("Waiting for gpu job to finish")
 		err = e2ejob.WaitForJobFinishWithTimeout(ctx, f.ClientSet, f.Namespace.Name, job.Name, e2ejob.JobTimeout*2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		ginkgo.By("Done with gpu job")
 
 		gomega.Expect(job.Status.Failed).To(gomega.BeZero(), "Job pods failed during node recreation: %v", job.Status.Failed)
@@ -155,13 +155,13 @@ func createAndValidatePod(ctx context.Context, f *framework.Framework, podClient
 			return false, nil
 		}
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By("Waiting for pod completion")
 	err = e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout*6)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By("Checking that the pod succeeded")
 	gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
@@ -306,7 +306,7 @@ func SetupEnvironmentAndSkipIfNeeded(ctx context.Context, f *framework.Framework
 	}
 
 	nodes, err := e2enode.GetReadySchedulableNodes(ctx, clientSet)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	capacity := 0
 	allocatable := 0
 	for _, node := range nodes.Items {
@@ -512,7 +512,7 @@ print(f"Test PASSED")
 	}
 	ns := f.Namespace.Name
 	_, err := e2ejob.CreateJob(ctx, f.ClientSet, ns, testJob)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	framework.Logf("Created job %v", testJob)
 }
 
@@ -528,7 +528,7 @@ func podNames(pods []v1.Pod) []string {
 func VerifyJobNCompletions(ctx context.Context, f *framework.Framework, completions int32) {
 	ns := f.Namespace.Name
 	pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, "cuda-add")
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	createdPods := pods.Items
 	createdPodNames := podNames(createdPods)
 	framework.Logf("Got the following pods for job cuda-add: %v", createdPodNames)

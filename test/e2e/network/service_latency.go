@@ -139,10 +139,10 @@ func runServiceLatencies(ctx context.Context, f *framework.Framework, inParallel
 	name := "svc-latency-rc"
 	deploymentConf := e2edeployment.NewDeployment(name, 1, map[string]string{"name": name}, name, imageutils.GetPauseImageName(), appsv1.RecreateDeploymentStrategyType)
 	deployment, err := f.ClientSet.AppsV1().Deployments(f.Namespace.Name).Create(ctx, deploymentConf, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	err = e2edeployment.WaitForDeploymentComplete(f.ClientSet, deployment)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	// Run a single watcher, to reduce the number of API calls we have to
 	// make; this is to minimize the timing error. It's how kube-proxy
 	// consumes the endpoint data, so it seems like the right thing to
@@ -154,7 +154,7 @@ func runServiceLatencies(ctx context.Context, f *framework.Framework, inParallel
 	// run one test and throw it away-- this is to make sure that the pod's
 	// ready status has propagated.
 	_, err = singleServiceLatency(ctx, f, name, endpointQueries)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	// These channels are never closed, and each attempt sends on exactly
 	// one of these channels, so the sum of the things sent over them will

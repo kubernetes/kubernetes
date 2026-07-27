@@ -316,7 +316,7 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 			// Wait for the Kubelet to be ready.
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				return nodes == 1
 			}, time.Minute, f.Timeouts.Poll).Should(gomega.BeTrueBecause("expected kubelet to be in ready state"))
 
@@ -428,7 +428,7 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 			// Wait for the Kubelet to be ready.
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				return nodes == 1
 			}, time.Minute, f.Timeouts.Poll).Should(gomega.BeTrueBecause("expected kubelet to be in ready state"))
 

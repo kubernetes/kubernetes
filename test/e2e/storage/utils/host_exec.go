@@ -112,9 +112,9 @@ func (h *hostExecutor) launchNodeExecPod(ctx context.Context, node string) *v1.P
 		}(true),
 	}
 	pod, err := cs.CoreV1().Pods(ns.Name).Create(ctx, hostExecPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, cs, pod.Name, pod.Namespace, f.Timeouts.PodStart)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return pod
 }
 

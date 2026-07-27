@@ -88,7 +88,7 @@ func installFlex(ctx context.Context, c clientset.Interface, node *v1.Node, vend
 		host = net.JoinHostPort(hostName, e2essh.SSHPort)
 	}
 
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	cmd := fmt.Sprintf("sudo mkdir -p %s", flexDir)
 	sshAndLog(ctx, cmd, host, true /*failOnError*/)
@@ -140,7 +140,7 @@ func getFlexDir(c clientset.Interface, node *v1.Node, vendor, driver string) str
 func sshAndLog(ctx context.Context, cmd, host string, failOnError bool) {
 	result, err := e2essh.SSH(ctx, cmd, host, framework.TestContext.Provider)
 	e2essh.LogResult(result)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	if result.Code != 0 && failOnError {
 		framework.Failf("%s returned non-zero, stderr: %s", cmd, result.Stderr)
 	}
@@ -178,7 +178,7 @@ var _ = utils.SIGDescribe("Flexvolumes", framework.WithProvider("gce", "local"),
 		ns = f.Namespace
 		var err error
 		node, err = e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		config = e2evolume.TestConfig{
 			Namespace:           ns.Name,
 			Prefix:              "flex",

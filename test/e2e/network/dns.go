@@ -223,7 +223,7 @@ var _ = common.SIGDescribe("DNS", func() {
 			}},
 		}
 		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(f.Namespace.Name).Create(ctx, slice1, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		slice2 := &discoveryv1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
@@ -245,7 +245,7 @@ var _ = common.SIGDescribe("DNS", func() {
 			}},
 		}
 		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(f.Namespace.Name).Create(ctx, slice2, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		namesToResolve := []string{
 			fmt.Sprintf("%s.%s.svc.%s", service.Name, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
@@ -787,7 +787,7 @@ var _ = common.SIGDescribe("DNS HostNetwork", func() {
 		testAgnhostPod.Spec.Hostname = dnsTestPodHostName
 		testAgnhostPod.Spec.HostNetwork = true
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		nodeSelection := e2epod.NodeSelection{}
 		e2epod.SetAffinity(&nodeSelection, node.Name)
 		e2epod.SetNodeSelection(&testAgnhostPod.Spec, nodeSelection)

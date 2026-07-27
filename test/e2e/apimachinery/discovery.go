@@ -56,25 +56,25 @@ var _ = SIGDescribe("Discovery", func() {
 	ginkgo.It("should accurately determine present and missing resources", func(ctx context.Context) {
 		// checks that legacy api group resources function
 		ok, err := clientdiscovery.IsResourceEnabled(f.ClientSet.Discovery(), schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if !ok {
 			framework.Failf("namespace.v1 should always be present")
 		}
 		// checks that non-legacy api group resources function
 		ok, err = clientdiscovery.IsResourceEnabled(f.ClientSet.Discovery(), schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if !ok {
 			framework.Failf("deployments.v1.apps should always be present")
 		}
 		// checks that nonsense resources in existing api groups function
 		ok, err = clientdiscovery.IsResourceEnabled(f.ClientSet.Discovery(), schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "please-dont-ever-create-this"})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if ok {
 			framework.Failf("please-dont-ever-create-this.v1.apps should never be present")
 		}
 		// checks that resources resources in nonsense api groups function
 		ok, err = clientdiscovery.IsResourceEnabled(f.ClientSet.Discovery(), schema.GroupVersionResource{Group: "not-these-apps", Version: "v1", Resource: "deployments"})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if ok {
 			framework.Failf("deployments.v1.not-these-apps should never be present")
 		}

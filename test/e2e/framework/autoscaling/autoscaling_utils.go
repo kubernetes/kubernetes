@@ -340,11 +340,11 @@ func NewResourceConsumer(ctx context.Context, name, nsName string, kind schema.G
 	}
 
 	config, err := framework.LoadConfig()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	apiExtensionClient, err := crdclientset.NewForConfig(config)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	dynamicClient, err := dynamic.NewForConfig(config)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	resourceClient := dynamicClient.Resource(schema.GroupVersionResource{Group: crdGroup, Version: crdVersion, Resource: crdNamePlural}).Namespace(nsName)
 
 	runServiceAndWorkloadForResourceConsumer(ctx, clientset, resourceClient, apiExtensionClient, nsName, name, kind, replicas, cpuLimit, memLimit, podAnnotations, serviceAnnotations, additionalContainers, podResources)
@@ -528,7 +528,7 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(ctx context.Context, millicore
 		return
 	}
 
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 // sendConsumeMemRequest sends POST request for memory consumption
@@ -559,7 +559,7 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(ctx context.Context, megabytes
 		return
 	}
 
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 // sendConsumeCustomMetric sends POST request for custom metric consumption
@@ -591,7 +591,7 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(ctx context.Context, delta i
 		return
 	}
 
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 /*
@@ -658,7 +658,7 @@ func (rc *ResourceConsumer) sendConsumeCPUPerPodRequest(ctx context.Context, mil
 		}
 		return nil
 	}).WithTimeout(serviceInitializationTimeout).WithPolling(serviceInitializationInterval).Should(gomega.Succeed())
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	perPodMillicores := millicoresTotal / len(readyPods)
 	if perPodMillicores == 0 {
@@ -780,7 +780,7 @@ func (rc *ResourceConsumer) EnsureDesiredReplicasInRange(ctx context.Context, mi
 	} else {
 		framework.Logf("HPA status: %+v", as.Status)
 	}
-	framework.ExpectNoError(desiredReplicasErr)
+	framework.ExpectNoError(desiredReplicasErr, "unexpected error")
 }
 
 // Pause stops background goroutines responsible for consuming resources.
@@ -815,19 +815,19 @@ func (rc *ResourceConsumer) CleanUp(ctx context.Context) {
 	kind := rc.kind.GroupKind()
 	if kind.Kind == crdKind {
 		gvr := schema.GroupVersionResource{Group: crdGroup, Version: crdVersion, Resource: crdNamePlural}
-		framework.ExpectNoError(e2eresource.DeleteCustomResourceAndWaitForGC(ctx, rc.clientSet, rc.dynamicClient, rc.scaleClient, gvr, rc.nsName, rc.name))
+		framework.ExpectNoError(e2eresource.DeleteCustomResourceAndWaitForGC(ctx, rc.clientSet, rc.dynamicClient, rc.scaleClient, gvr, rc.nsName, rc.name), "unexpected error")
 
 	} else {
-		framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(ctx, rc.clientSet, kind, rc.nsName, rc.name))
+		framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(ctx, rc.clientSet, kind, rc.nsName, rc.name), "unexpected error")
 	}
 
-	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(ctx, rc.name, metav1.DeleteOptions{}))
-	framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(ctx, rc.clientSet, schema.GroupKind{Group: "apps", Kind: "ReplicaSet"}, rc.nsName, rc.controllerName))
-	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(ctx, rc.name+"-ctrl", metav1.DeleteOptions{}))
+	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(ctx, rc.name, metav1.DeleteOptions{}), "unexpected error")
+	framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(ctx, rc.clientSet, schema.GroupKind{Group: "apps", Kind: "ReplicaSet"}, rc.nsName, rc.controllerName), "unexpected error")
+	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(ctx, rc.name+"-ctrl", metav1.DeleteOptions{}), "unexpected error")
 	// Cleanup sidecar related resources
 	if rc.sidecarStatus == Enable && rc.sidecarType == Busy {
-		framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(ctx, rc.name+"-sidecar", metav1.DeleteOptions{}))
-		framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(ctx, rc.name+"-sidecar-ctrl", metav1.DeleteOptions{}))
+		framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(ctx, rc.name+"-sidecar", metav1.DeleteOptions{}), "unexpected error")
+		framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(ctx, rc.name+"-sidecar-ctrl", metav1.DeleteOptions{}), "unexpected error")
 	}
 }
 
@@ -886,11 +886,11 @@ func runServiceAndApiregistrationForExternalMetricsServer(ctx context.Context, c
 	}
 	ginkgo.By("Creating a service")
 	service, err := createService(ctx, c, name, ns, serviceAnnotations, serviceSelectors, externalMetricsServicePort, externalMetricsServerPort)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By("Creating an APIService")
 	_, err = createAPIService(ctx, externalMetricsServicePort, service)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	dnsClusterFirst := v1.DNSClusterFirst
 	config := testutils.RCConfig{
@@ -906,7 +906,7 @@ func runServiceAndApiregistrationForExternalMetricsServer(ctx context.Context, c
 	extenalMetricsDeploymentConfig := testutils.DeploymentConfig{
 		RCConfig: config,
 	}
-	framework.ExpectNoError(testutils.RunDeployment(ctx, extenalMetricsDeploymentConfig))
+	framework.ExpectNoError(testutils.RunDeployment(ctx, extenalMetricsDeploymentConfig), "unexpected error")
 }
 
 // runServiceAndSidecarForResourceConsumer creates service and runs resource consumer for sidecar container
@@ -918,12 +918,12 @@ func runServiceAndSidecarForResourceConsumer(ctx context.Context, c clientset.In
 		"name": name,
 	}
 	_, err := createService(ctx, c, sidecarName, ns, serviceAnnotations, serviceSelectors, port, sidecarTargetPort)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By("Running controller for sidecar")
 	controllerName := sidecarName + "-ctrl"
 	_, err = createService(ctx, c, controllerName, ns, map[string]string{}, map[string]string{"name": controllerName}, port, targetPort)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	dnsClusterFirst := v1.DNSClusterFirst
 	controllerRsConfig := testutils.ReplicaSetConfig{
@@ -939,16 +939,16 @@ func runServiceAndSidecarForResourceConsumer(ctx context.Context, c clientset.In
 		},
 	}
 
-	framework.ExpectNoError(runReplicaSet(ctx, controllerRsConfig))
+	framework.ExpectNoError(runReplicaSet(ctx, controllerRsConfig), "unexpected error")
 	// Wait for endpoints to propagate for the controller service.
 	framework.ExpectNoError(e2eendpointslice.WaitForEndpointCount(
-		ctx, c, ns, controllerName, 1))
+		ctx, c, ns, controllerName, 1), "unexpected error")
 }
 
 func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.Interface, resourceClient dynamic.ResourceInterface, apiExtensionClient crdclientset.Interface, ns, name string, kind schema.GroupVersionKind, replicas int, cpuLimitMillis, memLimitMb int64, podAnnotations, serviceAnnotations map[string]string, additionalContainers []v1.Container, podResources *v1.ResourceRequirements) {
 	ginkgo.By(fmt.Sprintf("Running consuming RC %s via %s with %v replicas", name, kind, replicas))
 	_, err := createService(ctx, c, name, ns, serviceAnnotations, map[string]string{"name": name}, port, targetPort)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	rcConfig := testutils.RCConfig{
 		Client:               c,
@@ -977,23 +977,23 @@ func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.I
 	switch kind {
 	case KindDeployment:
 		ginkgo.By(fmt.Sprintf("Creating deployment %s in namespace %s", dpConfig.Name, dpConfig.Namespace))
-		framework.ExpectNoError(testutils.RunDeployment(ctx, dpConfig))
+		framework.ExpectNoError(testutils.RunDeployment(ctx, dpConfig), "unexpected error")
 	case KindReplicaSet:
 		rsConfig := testutils.ReplicaSetConfig{
 			RCConfig: rcConfig,
 		}
 		ginkgo.By(fmt.Sprintf("Creating replicaset %s in namespace %s", rsConfig.Name, rsConfig.Namespace))
-		framework.ExpectNoError(runReplicaSet(ctx, rsConfig))
+		framework.ExpectNoError(runReplicaSet(ctx, rsConfig), "unexpected error")
 	case KindCRD:
 		crd := CreateCustomResourceDefinition(ctx, apiExtensionClient)
 		crdInstance, err := CreateCustomSubresourceInstance(ctx, ns, name, resourceClient, crd)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By(fmt.Sprintf("Creating deployment %s backing CRD in namespace %s", dpConfig.Name, dpConfig.Namespace))
-		framework.ExpectNoError(testutils.RunDeployment(ctx, dpConfig))
+		framework.ExpectNoError(testutils.RunDeployment(ctx, dpConfig), "unexpected error")
 
 		deployment, err := c.AppsV1().Deployments(dpConfig.Namespace).Get(ctx, dpConfig.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		deployment.SetOwnerReferences([]metav1.OwnerReference{{
 			APIVersion: kind.GroupVersion().String(),
 			Kind:       crdKind,
@@ -1001,7 +1001,7 @@ func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.I
 			UID:        crdInstance.GetUID(),
 		}})
 		_, err = c.AppsV1().Deployments(dpConfig.Namespace).Update(ctx, deployment, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	default:
 		framework.Failf(invalidKind)
 	}
@@ -1009,7 +1009,7 @@ func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.I
 	ginkgo.By("Running controller")
 	controllerName := name + "-ctrl"
 	_, err = createService(ctx, c, controllerName, ns, map[string]string{}, map[string]string{"name": controllerName}, port, targetPort)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	dnsClusterFirst := v1.DNSClusterFirst
 	controllerRsConfig := testutils.ReplicaSetConfig{
@@ -1025,10 +1025,10 @@ func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.I
 		},
 	}
 
-	framework.ExpectNoError(runReplicaSet(ctx, controllerRsConfig))
+	framework.ExpectNoError(runReplicaSet(ctx, controllerRsConfig), "unexpected error")
 	// Wait for endpoints to propagate for the controller service.
 	framework.ExpectNoError(e2eendpointslice.WaitForEndpointCount(
-		ctx, c, ns, controllerName, 1))
+		ctx, c, ns, controllerName, 1), "unexpected error")
 }
 
 func CreateHorizontalPodAutoscaler(ctx context.Context, rc *ResourceConsumer, targetRef autoscalingv2.CrossVersionObjectReference, namespace string, metrics []autoscalingv2.MetricSpec, resourceType v1.ResourceName, metricTargetType autoscalingv2.MetricTargetType, metricTargetValue, minReplicas, maxReplicas int32) *autoscalingv2.HorizontalPodAutoscaler {
@@ -1045,7 +1045,7 @@ func CreateHorizontalPodAutoscaler(ctx context.Context, rc *ResourceConsumer, ta
 		},
 	}
 	hpa, errHPA := rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(namespace).Create(ctx, hpa, metav1.CreateOptions{})
-	framework.ExpectNoError(errHPA)
+	framework.ExpectNoError(errHPA, "unexpected error")
 	return hpa
 }
 
@@ -1073,7 +1073,7 @@ func CreateCPUResourceHorizontalPodAutoscaler(ctx context.Context, rc *ResourceC
 
 // DeleteHorizontalPodAutoscaler delete the horizontalPodAutoscaler for consuming resources.
 func DeleteHorizontalPodAutoscaler(ctx context.Context, rc *ResourceConsumer, autoscalerName string) {
-	framework.ExpectNoError(rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Delete(ctx, autoscalerName, metav1.DeleteOptions{}))
+	framework.ExpectNoError(rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Delete(ctx, autoscalerName, metav1.DeleteOptions{}), "unexpected error")
 }
 
 // runReplicaSet launches (and verifies correctness) of a replicaset.
@@ -1105,7 +1105,7 @@ func CreateContainerResourceHorizontalPodAutoscaler(ctx context.Context, rc *Res
 
 // DeleteContainerResourceHPA delete the horizontalPodAutoscaler for consuming resources.
 func DeleteContainerResourceHPA(ctx context.Context, rc *ResourceConsumer, autoscalerName string) {
-	framework.ExpectNoError(rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Delete(ctx, autoscalerName, metav1.DeleteOptions{}))
+	framework.ExpectNoError(rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Delete(ctx, autoscalerName, metav1.DeleteOptions{}), "unexpected error")
 }
 
 func CreateMetricTargetWithType(resourceType v1.ResourceName, targetType autoscalingv2.MetricTargetType, targetValue int32) autoscalingv2.MetricTarget {
@@ -1160,7 +1160,7 @@ func CreateCPUHorizontalPodAutoscalerWithBehavior(ctx context.Context, rc *Resou
 		},
 	}
 	hpa, errHPA := rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Create(ctx, hpa, metav1.CreateOptions{})
-	framework.ExpectNoError(errHPA)
+	framework.ExpectNoError(errHPA, "unexpected error")
 	return hpa
 }
 
@@ -1186,7 +1186,7 @@ func CreateMultiMetricHorizontalPodAutoscaler(ctx context.Context, rc *ResourceC
 	}
 
 	hpa, err := rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Create(ctx, hpa, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return hpa
 }
 
@@ -1217,7 +1217,7 @@ func CreateExternalHorizontalPodAutoscalerWithBehavior(ctx context.Context, rc *
 	}
 
 	hpa, err := rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Create(ctx, hpa, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return hpa
 }
 
@@ -1348,7 +1348,7 @@ func HPABehaviorWithScaleLimitedByPercentage(scalingDirection ScalingDirection, 
 }
 
 func DeleteHPAWithBehavior(ctx context.Context, rc *ResourceConsumer, autoscalerName string) {
-	framework.ExpectNoError(rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Delete(ctx, autoscalerName, metav1.DeleteOptions{}))
+	framework.ExpectNoError(rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Delete(ctx, autoscalerName, metav1.DeleteOptions{}), "unexpected error")
 }
 
 // SidecarStatusType type for sidecar status
@@ -1399,7 +1399,7 @@ func CreateCustomResourceDefinition(ctx context.Context, c crdclientset.Interfac
 	crd, err := c.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crdSchema.Name, metav1.GetOptions{})
 	if err != nil {
 		crd, err = c.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crdSchema, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		// Wait until just created CRD appears in discovery.
 		err = framework.Gomega().Eventually(ctx, framework.RetryNotFound(framework.HandleRetry(func(ctx context.Context) (*metav1.APIResourceList, error) {
 			return c.Discovery().ServerResourcesForGroupVersion(crd.Spec.Group + "/" + "v1")
@@ -1413,7 +1413,7 @@ func CreateCustomResourceDefinition(ctx context.Context, c crdclientset.Interfac
 				return fmt.Sprintf("CRD %s not found in discovery", crd.Spec.Names.Plural)
 			}, nil
 		}))
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		ginkgo.By(fmt.Sprintf("Successfully created Custom Resource Definition: %v", crd))
 	}
 	return crd

@@ -292,7 +292,7 @@ func runHugePagesTests(f *framework.Framework, ctx context.Context, testpod *v1.
 		ginkgo.By("checking if the expected hugetlb settings were applied")
 		e2epod.NewPodClient(f).Create(ctx, verifyPod)
 		err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, verifyPod.Name, f.Namespace.Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	}
 }
 

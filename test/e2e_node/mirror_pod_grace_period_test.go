@@ -53,7 +53,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 
 			ginkgo.By("create the static pod")
 			err := createStaticPodWithGracePeriod(podPath, staticPodName, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to be running")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -64,14 +64,14 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 		f.It("mirror pod termination should satisfy grace period when static pod is deleted", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			uid := pod.UID
 
 			ginkgo.By("delete the static pod")
 			file := staticPodPath(podPath, staticPodName, ns)
 			framework.Logf("deleting static pod manifest %q", file)
 			err = os.Remove(file)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to be running for grace period")
 			gomega.Consistently(ctx, func(ctx context.Context) error {
@@ -82,13 +82,13 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 		f.It("mirror pod termination should satisfy grace period when static pod is updated", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			uid := pod.UID
 
 			ginkgo.By("update the static pod container image")
 			image := imageutils.GetPauseImageName()
 			err = createStaticPod(podPath, staticPodName, ns, image, v1.RestartPolicyAlways)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to be running for grace period")
 			gomega.Consistently(ctx, func(ctx context.Context) error {
@@ -102,7 +102,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 
 			ginkgo.By("check the mirror pod container image is updated")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod.Spec.Containers).To(gomega.HaveLen(1))
 			gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(image))
 		})
@@ -110,19 +110,19 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 		f.It("should update a static pod when the static pod is updated multiple times during the graceful termination period", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			uid := pod.UID
 
 			ginkgo.By("update the pod manifest multiple times during the graceful termination period")
 			for i := range 300 {
 				err = createStaticPod(podPath, staticPodName, ns,
 					fmt.Sprintf("image-%d", i), v1.RestartPolicyAlways)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				time.Sleep(100 * time.Millisecond)
 			}
 			image := imageutils.GetPauseImageName()
 			err = createStaticPod(podPath, staticPodName, ns, image, v1.RestartPolicyAlways)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -131,7 +131,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 
 			ginkgo.By("check the mirror pod container image is updated")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod.Spec.Containers).To(gomega.HaveLen(1))
 			gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(image))
 		})
@@ -196,7 +196,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 
 				ginkgo.By("delete the static pod")
 				err := deleteStaticPod(podPath, staticPodName, ns)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				// Note it is important we have a small delay here as we would like to reproduce https://issues.k8s.io/113091 which requires a failure in syncTerminatingPod()
 				// This requires waiting a small period between the static pod being deleted so that syncTerminatingPod() will attempt to run
@@ -331,7 +331,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			ginkgo.By("delete the static pod")
 			err := deleteStaticPod(podPath, staticPodName, ns)
 			if !os.IsNotExist(err) {
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}
 
 			ginkgo.By("wait for the mirror pod to disappear")

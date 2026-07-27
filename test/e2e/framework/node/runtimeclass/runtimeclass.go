@@ -59,7 +59,7 @@ func NewRuntimeClassPod(runtimeClassName string) *v1.Pod {
 // If no error is returned, the container runtime is assumed to support the test-handler, otherwise an error will be returned.
 func NodeSupportsPreconfiguredRuntimeClassHandler(ctx context.Context, f *framework.Framework) error {
 	node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	hostExec := storageutils.NewHostExec(f)
 	ginkgo.DeferCleanup(hostExec.Cleanup)
 

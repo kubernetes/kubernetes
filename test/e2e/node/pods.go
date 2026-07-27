@@ -97,7 +97,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 
 			// We need to wait for the pod to be running, otherwise the deletion
 			// may be carried out immediately rather than gracefully.
-			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "unexpected error")
 			// save the running pod
 			pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to GET scheduled pod")
@@ -270,7 +270,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			})
 
-			framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+			framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "unexpected error")
 
 			var eventList *v1.EventList
 			var err error
@@ -291,7 +291,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 					return true, nil
 				}
 				return false, nil
-			}))
+			}), "unexpected error")
 
 			ginkgo.By("Checking events about the pod")
 			for _, event := range eventList.Items {
@@ -528,7 +528,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 					expectedPodGeneration++
 				}
 				gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(expectedPodGeneration))
-				framework.ExpectNoError(e2epod.WaitForPodObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, expectedPodGeneration, 20*time.Second))
+				framework.ExpectNoError(e2epod.WaitForPodObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, expectedPodGeneration, 20*time.Second), "unexpected error")
 			}
 		})
 
@@ -556,7 +556,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 			ginkgo.By("issue a graceful delete to trigger generation bump")
 			// We need to wait for the pod to be running, otherwise the deletion
 			// may be carried out immediately rather than gracefully.
-			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "unexpected error")
 			pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to GET scheduled pod")
 
@@ -603,7 +603,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 
 			// Verify pod observedGeneration converges to the expected generation.
 			expectedPodGeneration := int64(500)
-			framework.ExpectNoError(e2epod.WaitForPodObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, expectedPodGeneration, framework.PodStartTimeout))
+			framework.ExpectNoError(e2epod.WaitForPodObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, expectedPodGeneration, framework.PodStartTimeout), "unexpected error")
 
 			// Verify pod generation converges to the expected generation.
 			pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
@@ -622,7 +622,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 
 			ginkgo.By("submitting the pod to kubernetes")
 			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			ginkgo.DeferCleanup(func(ctx context.Context) error {
 				ginkgo.By("deleting the pod")
 				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
@@ -639,7 +639,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 			ginkgo.By("verifying the pod conditions have observedGeneration values")
 			expectedObservedGeneration := int64(1)
 			for _, condition := range expectedPodConditions {
-				framework.ExpectNoError(e2epod.WaitForPodConditionObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, condition, expectedObservedGeneration, framework.PodStartTimeout))
+				framework.ExpectNoError(e2epod.WaitForPodConditionObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, condition, expectedObservedGeneration, framework.PodStartTimeout), "unexpected error")
 			}
 
 			ginkgo.By("waiting for the container to fail to pull the image")
@@ -654,7 +654,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 					}
 				}
 				return false, nil
-			}))
+			}), "unexpected error")
 
 			ginkgo.By("updating pod to have a valid image")
 			podClient.Update(ctx, pod.Name, func(pod *v1.Pod) {
@@ -664,7 +664,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 
 			ginkgo.By("verifying the pod conditions have updated observedGeneration values")
 			for _, condition := range expectedPodConditions {
-				framework.ExpectNoError(e2epod.WaitForPodConditionObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, condition, expectedObservedGeneration, framework.PodStartTimeout))
+				framework.ExpectNoError(e2epod.WaitForPodConditionObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, condition, expectedObservedGeneration, framework.PodStartTimeout), "unexpected error")
 			}
 		})
 	})

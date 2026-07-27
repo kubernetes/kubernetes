@@ -98,7 +98,7 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 	// nodes each. If there are not suitable nodes/zones, the test is skipped.
 	getNodesForMultiNode := func(ctx context.Context) ([]*v1.Node, []*v1.Node, []*v1.Node) {
 		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		nodesForZone := make(map[string][]*v1.Node)
 		for _, node := range nodeList.Items {
 			zone := node.Labels[v1.LabelTopologyZone]
@@ -141,7 +141,7 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 	allocateClientsAndServers := func(ctx context.Context) ([]*clientPod, []*serverPod) {
 		ginkgo.By("finding 3 zones with schedulable nodes")
 		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		nodeForZone := make(map[string]*v1.Node)
 		for _, node := range nodeList.Items {
 			zone := node.Labels[v1.LabelTopologyZone]
@@ -280,7 +280,7 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 
 		ginkgo.By("waiting for EndpointSlices to be created")
 		err := e2eendpointslice.WaitForEndpointCount(ctx, c, svc.Namespace, svc.Name, len(serverPods))
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		slices := endpointSlicesForService(svc.Name)
 		framework.Logf("got slices:\n%v", format.Object(slices, 1))
 
@@ -430,7 +430,7 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 	framework.It("should route traffic to an endpoint on the same node when using PreferSameNode and fall back when the endpoint becomes unavailable", func(ctx context.Context) {
 		ginkgo.By("finding a set of nodes for the test")
 		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if len(nodeList.Items) < 2 {
 			e2eskipper.Skipf("have %d schedulable nodes, need at least 2", len(nodeList.Items))
 		}
@@ -460,9 +460,9 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 
 		ginkgo.By("killing the server pod on the first node and waiting for the EndpointSlices to be updated")
 		err = c.CoreV1().Pods(f.Namespace.Name).Delete(ctx, serverPods[0].pod.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		err = e2eendpointslice.WaitForEndpointCount(ctx, c, svc.Namespace, svc.Name, 1)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("ensuring that both clients talk to the remaining endpoint when only one endpoint exists")
 		serverPods[0].pod = nil
@@ -479,7 +479,7 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		pod.Labels = svc.Spec.Selector
 		serverPods[0].pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
 		err = e2eendpointslice.WaitForEndpointCount(ctx, c, svc.Namespace, svc.Name, 2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("ensuring that each client talks only to its same-node endpoint again")
 		clientPods[0].endpoints = []*serverPod{serverPods[0]}

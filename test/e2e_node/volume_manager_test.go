@@ -75,7 +75,7 @@ var _ = SIGDescribe("Kubelet Volume Manager", func() {
 						},
 					})
 					err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, memoryBackedPod.Name, f.Namespace.Name)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 				ginkgo.By("Verifying the memory backed volume was removed from node", func() {
 					volumePath := fmt.Sprintf("/tmp/%s/volumes/kubernetes.io~empty-dir/%s", string(memoryBackedPod.UID), volumeName)
@@ -121,7 +121,7 @@ var _ = SIGDescribe("Kubelet Volume Manager", func() {
 						}
 						<-time.After(10 * time.Second)
 					}
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				})
 			})
 		})

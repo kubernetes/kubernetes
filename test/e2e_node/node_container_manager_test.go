@@ -75,7 +75,7 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 	f.Describe("Validate Node Allocatable", feature.NodeAllocatable, func() {
 		ginkgo.It("sets up the node and runs the test", func(ctx context.Context) {
 			ginkgo.Skip("currently broken")
-			framework.ExpectNoError(runTest(ctx, f))
+			framework.ExpectNoError(runTest(ctx, f), "unexpected error")
 		})
 	})
 	f.Describe("Validate CGroup management", func() {
@@ -97,12 +97,12 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 			var oldCfg *kubeletconfig.KubeletConfiguration
 			// Get current kubelet configuration
 			oldCfg, err = getCurrentKubeletConfig(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				if oldCfg != nil {
 					// Update the Kubelet configuration.
-					framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
+					framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg), "unexpected error")
 
 					ginkgo.By("Restarting the kubelet")
 					restartKubelet(ctx, true)
@@ -119,7 +119,7 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 			newCfg.FailCgroupV1 = true // extra safety. We want to avoid false negatives though, so we added the skip check earlier
 
 			// Update the Kubelet configuration.
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg), "unexpected error")
 
 			ginkgo.By("Restarting the kubelet")
 			restartKubelet(ctx, true)
@@ -248,7 +248,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 				return e2enode.HealthCheck(kubeletHealthCheckURL)
 			}, time.Minute, time.Second).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
 
-			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
+			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg), "unexpected error")
 
 			ginkgo.By("Restarting the kubelet")
 			restartKubelet(ctx)
@@ -278,7 +278,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 		return fmt.Errorf("Expected Node Allocatable Cgroup %q not to exist", expectedNAPodCgroup)
 	}
 
-	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg), "unexpected error")
 
 	ginkgo.By("Starting the kubelet")
 	restartKubelet(ctx)

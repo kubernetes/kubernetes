@@ -127,7 +127,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		framework.ConformanceIt("resource.k8s.io/v1 DeviceTaintRule", func(ctx context.Context) {
 			lastTransitionTime := metav1.Now()
 			lastTransitionTimeEncoded, err := lastTransitionTime.MarshalJSON()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			e2econformance.TestResource(ctx, f,
 				&e2econformance.ResourceTestcase[*resourceapi.DeviceTaintRule]{
 					GVR:        resourceapi.SchemeGroupVersion.WithResource("devicetaintrules"),
@@ -532,7 +532,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			ginkgo.By("Force-delete claim and pod")
 			forceDelete := metav1.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))}
-			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, forceDelete))
+			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, forceDelete), "unexpected error")
 
 			// Fail NodeUnprepareResources to simulate long grace period
 			unprepareResources := drautils.MethodInstance{NodeName: node, FullMethod: "/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"}
@@ -545,7 +545,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}
 
 			// The claim may take a bit longer because of the allocation and finalizer.
-			framework.ExpectNoError(f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Delete(ctx, claim.Name, forceDelete))
+			framework.ExpectNoError(f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Delete(ctx, claim.Name, forceDelete), "unexpected error")
 			gomega.Eventually(ctx, func(ctx context.Context) (*resourceapi.ResourceClaim, error) {
 				claim, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
 				if apierrors.IsNotFound(err) {
@@ -577,7 +577,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				pod.Namespace,
 				expectedEvent,
 				fmt.Sprintf("old ResourceClaim with same name %s and different UID %s still exists", oldClaim.Name, oldClaim.UID),
-				framework.PodStartTimeout*2))
+				framework.PodStartTimeout*2), "unexpected error")
 
 			driver.Fail(unprepareResources, false)
 
@@ -593,7 +593,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			_, err := f.ClientSet.CoreV1().Namespaces().Apply(ctx,
 				applyv1.Namespace(f.Namespace.Name).WithLabels(map[string]string{"resource.kubernetes.io/admin-access": "true"}),
 				metav1.ApplyOptions{FieldManager: f.UniqueName})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			pod, template := b.PodInline()
 			template.Spec.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
@@ -628,7 +628,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			gomega.Eventually(ctx, func(ctx context.Context) (bool, error) {
 				return e2edaemonset.CheckDaemonPodOnNodes(f, ds, []string{nodeName})(ctx)
 			}).WithTimeout(f.Timeouts.PodStart).Should(gomega.BeTrueBecause("DaemonSet pod should be running on node %s but isn't", nodeName))
-			framework.ExpectNoError(e2edaemonset.CheckDaemonStatus(ctx, f, daemonSet.Name))
+			framework.ExpectNoError(e2edaemonset.CheckDaemonStatus(ctx, f, daemonSet.Name), "unexpected error")
 		})
 	})
 
@@ -647,7 +647,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-counts-"},
 					Spec:       resourcealphaapi.ResourcePoolStatusRequestSpec{Driver: driver.Name},
 				}, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				defer func() { _ = client.Delete(ctx, request.Name, metav1.DeleteOptions{}) }()
 
 				// Wait for controller to set status and validate.
@@ -696,7 +696,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-allocated-"},
 					Spec:       resourcealphaapi.ResourcePoolStatusRequestSpec{Driver: driver.Name},
 				}, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				defer func() { _ = client.Delete(ctx, request.Name, metav1.DeleteOptions{}) }()
 
 				// Wait for controller to set status and validate.
@@ -743,7 +743,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-views-"},
 					Spec:       resourcealphaapi.ResourcePoolStatusRequestSpec{Driver: driverName},
 				}, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				defer func() { _ = client.Delete(ctx, request.Name, metav1.DeleteOptions{}) }()
 
 				g.Eventually(ctx, framework.GetObject(client.Get, request.Name, metav1.GetOptions{})).
@@ -1256,7 +1256,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.Create(tCtx, claim, pod)
 
 			// Cannot run pod, no devices.
-			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace))
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace), "unexpected error")
 
 			// Set up driver, which makes devices available.
 			driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, drautils.DriverResourcesNow(nodes, 1))
@@ -1266,8 +1266,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			// We need to clean up explicitly because the normal
 			// cleanup doesn't work (driver shuts down first).
-			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
-			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
+			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}), "unexpected error")
+			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete), "unexpected error")
 		})
 
 		// Seamless upgrade support was added in Kubernetes 1.33.
@@ -1307,8 +1307,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			// We need to clean up explicitly because the normal
 			// cleanup doesn't work (driver shuts down first).
-			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
-			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
+			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}), "unexpected error")
+			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete), "unexpected error")
 		})
 
 		// Regression test for https://github.com/kubernetes/kubernetes/issues/139166:
@@ -1345,8 +1345,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			finalSlices := getSlices(tCtx)
 			gomega.Expect(finalSlices.Items).Should(gomega.Equal(initialSlices.Items))
 
-			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
-			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
+			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}), "unexpected error")
+			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete), "unexpected error")
 		})
 
 		// Seamless upgrade support was added in Kubernetes 1.33.
@@ -1388,8 +1388,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			// We need to clean up explicitly because the normal
 			// cleanup doesn't work (driver shuts down first).
-			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
-			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
+			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}), "unexpected error")
+			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete), "unexpected error")
 		})
 
 		// Seamless upgrade support was added in Kubernetes 1.33.
@@ -1442,8 +1442,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			// We need to clean up explicitly because the normal
 			// cleanup doesn't work (driver shuts down first).
-			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
-			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
+			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}), "unexpected error")
+			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete), "unexpected error")
 
 			// Now shut down for good and wait for the kubelet to react.
 			// This takes time...
@@ -1502,7 +1502,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					b.TestPod(tCtx, pod, expectedEnv...)
 					err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 					framework.ExpectNoError(err, "delete pod")
-					framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, time.Duration(numPods)*f.Timeouts.PodStartSlow))
+					framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, time.Duration(numPods)*f.Timeouts.PodStartSlow), "unexpected error")
 				}()
 			}
 			wg.Wait()
@@ -1543,13 +1543,13 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			pod, template := b.PodInline()
 			deviceClassName := template.Spec.Spec.Devices.Requests[0].Exactly.DeviceClassName
 			class, err := f.ClientSet.ResourceV1().DeviceClasses().Get(ctx, deviceClassName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			deviceClassName += "-b"
 			template.Spec.Spec.Devices.Requests[0].Exactly.DeviceClassName = deviceClassName
 			objects = append(objects, template, pod)
 			b.Create(tCtx, objects...)
 
-			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace))
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace), "unexpected error")
 
 			class.UID = ""
 			class.ResourceVersion = ""
@@ -1567,7 +1567,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			// First modify the class so that it matches no nodes (for classic DRA) and no devices (structured parameters).
 			deviceClassName := template.Spec.Spec.Devices.Requests[0].Exactly.DeviceClassName
 			class, err := f.ClientSet.ResourceV1().DeviceClasses().Get(ctx, deviceClassName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			originalClass := class.DeepCopy()
 			class.Spec.Selectors = []resourceapi.DeviceSelector{{
 				CEL: &resourceapi.CELDeviceSelector{
@@ -1575,18 +1575,18 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				},
 			}}
 			class, err = f.ClientSet.ResourceV1().DeviceClasses().Update(ctx, class, metav1.UpdateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Now create the pod.
 			objects = append(objects, template, pod)
 			b.Create(tCtx, objects...)
 
-			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace))
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace), "unexpected error")
 
 			// Unblock the pod.
 			class.Spec.Selectors = originalClass.Spec.Selectors
 			_, err = f.ClientSet.ResourceV1().DeviceClasses().Update(ctx, class, metav1.UpdateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			b.TestPod(tCtx, pod, expectedEnv...)
 		})
@@ -1606,8 +1606,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				{Name: pod.Spec.ResourceClaims[0].Name, ResourceClaimName: nil},
 			}
 			_, err := f.ClientSet.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
-			framework.ExpectNoError(err)
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+			framework.ExpectNoError(err, "unexpected error")
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "unexpected error")
 		})
 
 		ginkgo.It("supports simple pod referencing inline resource claim", func(ctx context.Context) {
@@ -1683,7 +1683,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.TestPod(tCtx, pod)
 
 			ginkgo.By(fmt.Sprintf("deleting pod %s", klog.KObj(pod)))
-			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{}), "unexpected error")
 
 			ginkgo.By("waiting for claim to get deallocated")
 			gomega.Eventually(ctx, func(ctx context.Context) (*resourceapi.ResourceClaim, error) {
@@ -2882,7 +2882,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			tCtx := f.TContext(ctx)
 			pod, template := b.PodInline()
 			b.Create(tCtx, pod, template)
-			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "unexpected error")
 		})
 
 		f.It("NoSchedule can be tolerated", func(ctx context.Context) {
@@ -2947,7 +2947,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			createdTaint := b.Create(tCtx, taint)
 			taint = createdTaint[0].(*resourceapi.DeviceTaintRule)
 			gomega.Expect(*taint).Should(gomega.HaveField("Spec.Taint.TimeAdded.Time", gomega.BeTemporally("~", time.Now(), time.Minute /* allow for some clock drift and delays */)))
-			framework.ExpectNoError(e2epod.WaitForPodTerminatingInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart))
+			framework.ExpectNoError(e2epod.WaitForPodTerminatingInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart), "unexpected error")
 			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "get pod")
 			gomega.Expect(pod).Should(gomega.HaveField("Status.Conditions", gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
@@ -2966,7 +2966,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				podGroup := b.PodGroup(workload, workload.Spec.PodGroupTemplates[0])
 				pod := b.GroupedPodWithClaims(podGroup)
 				b.Create(tCtx, workload, podGroup, pod, template)
-				framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+				framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "unexpected error")
 			})
 
 			f.It("NoSchedule can be tolerated for PodGroup claims", func(ctx context.Context) {
@@ -3036,7 +3036,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				createdTaint := b.Create(tCtx, taint)
 				taint = createdTaint[0].(*resourceapi.DeviceTaintRule)
 				gomega.Expect(*taint).Should(gomega.HaveField("Spec.Taint.TimeAdded.Time", gomega.BeTemporally("~", time.Now(), time.Minute /* allow for some clock drift and delays */)))
-				framework.ExpectNoError(e2epod.WaitForPodTerminatingInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart))
+				framework.ExpectNoError(e2epod.WaitForPodTerminatingInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart), "unexpected error")
 				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err, "get pod")
 				gomega.Expect(pod).Should(gomega.HaveField("Status.Conditions", gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
@@ -3063,7 +3063,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			tCtx := f.TContext(ctx)
 			pod, template := b.PodInline()
 			b.Create(tCtx, pod, template)
-			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "unexpected error")
 		})
 
 		f.It("NoExecute can be tolerated", func(ctx context.Context) {
@@ -3287,7 +3287,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 						Used: usedResources,
 					})})))
 
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		})
 
 		ginkgo.It("must run a pod with both implicit and explicit extended resource with one container two resources", f.WithKubeletMinVersion("1.35"), func(ctx context.Context) {
@@ -3481,7 +3481,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			ginkgo.By("Check that pod is processed by the DRA driver")
 			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod.Status.ExtendedResourceClaimStatus).NotTo(gomega.BeNil(),
 				"after device plugin uninstall, DRA must serve the resource and create a special claim")
 			containerEnv := []string{
@@ -3518,7 +3518,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			pod2.Spec.Containers[0].Resources.Limits = res
 			b.Create(tCtx, pod2)
 
-			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod2.Name, f.Namespace.Name))
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod2.Name, f.Namespace.Name), "unexpected error")
 
 			// After deleting pod1, pod2 should be schedulable and run successfully
 			b.DeletePodAndWaitForNotFound(tCtx, pod1)
@@ -3567,7 +3567,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			// Verify status
 			updatedPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			gomega.Expect(updatedPod.Status.ExtendedResourceClaimStatus).ShouldNot(gomega.BeNil())
 			gomega.Expect(updatedPod.Status.ExtendedResourceClaimStatus.ResourceClaimName).ShouldNot(gomega.BeEmpty())
@@ -3603,7 +3603,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			ginkgo.By("Check that pod is not processed by the DRA driver")
 			updatedPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(updatedPod.Status.ExtendedResourceClaimStatus).Should(gomega.BeNil())
 		})
 
@@ -3648,7 +3648,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "start pod")
 
 			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			// Device plugin wins: no special claim created.
 			gomega.Expect(pod.Status.ExtendedResourceClaimStatus).To(gomega.BeNil(),
 				"when both DP and DRA advertise the same resource on a node, DP must win and no special claim should be created")
@@ -3696,11 +3696,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			scheduledPod1, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod1.Name, metav1.GetOptions{})
 			gomega.Expect(scheduledPod1).ToNot(gomega.BeNil())
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			scheduledPod2, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod2.Name, metav1.GetOptions{})
 			gomega.Expect(scheduledPod2).ToNot(gomega.BeNil())
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			draPod := scheduledPod1
 			devicePluginPod := scheduledPod2
@@ -3765,7 +3765,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			_, err := f.ClientSet.CoreV1().Namespaces().Apply(ctx,
 				applyv1.Namespace(f.Namespace.Name).WithLabels(map[string]string{"resource.kubernetes.io/admin-access": "true"}),
 				metav1.ApplyOptions{FieldManager: f.UniqueName})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				_, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
 				return err
@@ -3851,13 +3851,13 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.TestPod(tCtx, pod)
 
 			allocatedResourceClaim, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(allocatedResourceClaim).ToNot(gomega.BeNil())
 			gomega.Expect(allocatedResourceClaim.Status.Allocation).ToNot(gomega.BeNil())
 			gomega.Expect(allocatedResourceClaim.Status.Allocation.Devices.Results).To(gomega.HaveLen(1))
 
 			scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(scheduledPod).ToNot(gomega.BeNil())
 
 			shareID := (*string)(allocatedResourceClaim.Status.Allocation.Devices.Results[0].ShareID)
@@ -3906,7 +3906,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				ObjectMeta: metav1.ObjectMeta{Name: saName, Namespace: f.Namespace.Name},
 			}
 			_, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(ctx, sa, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Create ClusterRole with 'update' permission on 'resourceclaims/status'
 			role := &rbacv1.ClusterRole{
@@ -3926,11 +3926,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				},
 			}
 			_, err = f.ClientSet.RbacV1().ClusterRoles().Create(ctx, role, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				err := f.ClientSet.RbacV1().ClusterRoles().Delete(ctx, roleName, metav1.DeleteOptions{})
 				if !apierrors.IsNotFound(err) {
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				}
 			})
 			// Create ClusterRoleBinding
@@ -3950,11 +3950,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				},
 			}
 			_, err = f.ClientSet.RbacV1().ClusterRoleBindings().Create(ctx, binding, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				err := f.ClientSet.RbacV1().ClusterRoleBindings().Delete(ctx, bindingName, metav1.DeleteOptions{})
 				if !apierrors.IsNotFound(err) {
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				}
 			})
 			// Create a new clientset impersonating the ServiceAccount
@@ -3963,11 +3963,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				UserName: fmt.Sprintf("system:serviceaccount:%s:%s", f.Namespace.Name, saName),
 			}
 			saClient, err := kubernetes.NewForConfig(saClientConfig)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Get the allocated claim using the admin client
 			allocatedResourceClaim, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(allocatedResourceClaim).ToNot(gomega.BeNil())
 			gomega.Expect(allocatedResourceClaim.Status.Allocation).ToNot(gomega.BeNil())
 			gomega.Expect(allocatedResourceClaim.Status.Allocation.Devices.Results).To(gomega.HaveLen(1))
@@ -4013,7 +4013,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				ResourceNames: []string{b.DriverName()}, // allow for the specific drivers
 			})
 			_, err = f.ClientSet.RbacV1().ClusterRoles().Update(ctx, newRole, metav1.UpdateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Use Eventually to wait for RBAC propagation
 			var updatedResourceClaim *resourceapi.ResourceClaim
@@ -4034,7 +4034,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				Verbs:     []string{"arbitrary-node:update", "arbitrary-node:patch"},
 			})
 			_, err = f.ClientSet.RbacV1().ClusterRoles().Update(ctx, newRole, metav1.UpdateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			updatedResourceClaim.Status.Devices[0] = resourceapi.AllocatedDeviceStatus{
 				Driver:     allocatedResourceClaim.Status.Allocation.Devices.Results[0].Driver,
@@ -4060,7 +4060,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			ginkgo.By("Verifying the final status with admin client")
 			getResourceClaim, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(getResourceClaim).ToNot(gomega.BeNil())
 			gomega.Expect(getResourceClaim.Status.Devices).To(gomega.Equal(updatedResourceClaim.Status.Devices))
 		})
@@ -4112,7 +4112,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				err := f.ClientSet.ResourceV1().ResourceSlices().Delete(ctx, fictionalNodeSlice.Name, metav1.DeleteOptions{})
 				if !apierrors.IsNotFound(err) {
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				}
 			})
 
@@ -4196,7 +4196,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				err := f.ClientSet.ResourceV1().ResourceSlices().Delete(ctx, clusterSlice.Name, metav1.DeleteOptions{})
 				if !apierrors.IsNotFound(err) {
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				}
 			})
 
@@ -4226,13 +4226,13 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.TestPod(tCtx, pod)
 
 			allocatedResourceClaim, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(allocatedResourceClaim).ToNot(gomega.BeNil())
 			gomega.Expect(allocatedResourceClaim.Status.Allocation).ToNot(gomega.BeNil())
 			gomega.Expect(allocatedResourceClaim.Status.Allocation.Devices.Results).To(gomega.HaveLen(1))
 
 			scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(scheduledPod).ToNot(gomega.BeNil())
 
 			shareID := (*string)(allocatedResourceClaim.Status.Allocation.Devices.Results[0].ShareID)
@@ -4259,7 +4259,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				framework.Failf("pod got scheduled to node %s without a plugin", scheduledPod.Spec.NodeName)
 			}
 			updatedResourceClaim, err := plugin.UpdateStatus(ctx, allocatedResourceClaim)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(updatedResourceClaim).ToNot(gomega.BeNil())
 			gomega.Expect(updatedResourceClaim.Status.Devices).To(gomega.Equal(allocatedResourceClaim.Status.Devices))
 
@@ -4279,12 +4279,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}
 
 			updatedResourceClaim2, err := plugin.UpdateStatus(ctx, updatedResourceClaim)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(updatedResourceClaim2).ToNot(gomega.BeNil())
 			gomega.Expect(updatedResourceClaim2.Status.Devices).To(gomega.Equal(updatedResourceClaim.Status.Devices))
 
 			getResourceClaim, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(getResourceClaim).ToNot(gomega.BeNil())
 			gomega.Expect(getResourceClaim.Status.Devices).To(gomega.Equal(updatedResourceClaim.Status.Devices))
 		})
@@ -4363,7 +4363,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			// Get the pool name and device name from the allocated claim
 			allocatedClaim, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(allocatedClaim.Status.Allocation).ToNot(gomega.BeNil())
 			gomega.Expect(allocatedClaim.Status.Allocation.Devices.Results).To(gomega.HaveLen(1))
 
@@ -4372,7 +4372,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 			// Get the plugin for the node where the pod is scheduled
 			scheduledPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			plugin, ok := driver.Nodes[scheduledPod.Spec.NodeName]
 			if !ok {
 				framework.Failf("pod got scheduled to node %s without a plugin", scheduledPod.Spec.NodeName)
@@ -4545,7 +4545,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 						ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-basic-"},
 						Spec:       resourcealphaapi.ResourcePoolStatusRequestSpec{Driver: driver.Name},
 					}, metav1.CreateOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					defer func() { _ = client.Delete(ctx, request.Name, metav1.DeleteOptions{}) }()
 
 					g.Eventually(ctx, framework.GetObject(client.Get, request.Name, metav1.GetOptions{})).
@@ -4575,7 +4575,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 						ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-filter-all-"},
 						Spec:       resourcealphaapi.ResourcePoolStatusRequestSpec{Driver: driver.Name},
 					}, metav1.CreateOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					defer func() { _ = client.Delete(ctx, allPoolsRequest.Name, metav1.DeleteOptions{}) }()
 
 					g.Eventually(ctx, framework.GetObject(client.Get, allPoolsRequest.Name, metav1.GetOptions{})).
@@ -4587,7 +4587,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 						})))
 
 					allObj, err := client.Get(ctx, allPoolsRequest.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					poolName := allObj.Status.Pools[0].PoolName
 
 					// Now filter by that pool name.
@@ -4598,7 +4598,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 							PoolName: &poolName,
 						},
 					}, metav1.CreateOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					defer func() { _ = client.Delete(ctx, filtered.Name, metav1.DeleteOptions{}) }()
 
 					g.Eventually(ctx, framework.GetObject(client.Get, filtered.Name, metav1.GetOptions{})).
@@ -4629,7 +4629,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 							Limit:  &limit,
 						},
 					}, metav1.CreateOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					defer func() { _ = client.Delete(ctx, request.Name, metav1.DeleteOptions{}) }()
 
 					g.Eventually(ctx, framework.GetObject(client.Get, request.Name, metav1.GetOptions{})).
@@ -4651,11 +4651,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-unknown-"},
 					Spec:       resourcealphaapi.ResourcePoolStatusRequestSpec{Driver: "nonexistent.driver.example.com"},
 				}, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					err := client.Delete(ctx, request.Name, metav1.DeleteOptions{})
 					if !apierrors.IsNotFound(err) {
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 					}
 				})
 
@@ -4677,11 +4677,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-noreprocess-"},
 					Spec:       resourcealphaapi.ResourcePoolStatusRequestSpec{Driver: driver.Name},
 				}, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					err := client.Delete(ctx, request.Name, metav1.DeleteOptions{})
 					if !apierrors.IsNotFound(err) {
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 					}
 				})
 
@@ -4693,13 +4693,13 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					})))
 
 				obj, err := client.Get(ctx, request.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				initialResourceVersion := obj.ResourceVersion
 
 				// Wait and verify resourceVersion hasn't changed (no reprocessing).
 				time.Sleep(5 * time.Second)
 				obj, err = client.Get(ctx, request.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				gomega.Expect(obj.ResourceVersion).To(gomega.Equal(initialResourceVersion),
 					"resourceVersion should not change — ResourcePoolStatusRequest is a one-time snapshot")
 			})
@@ -4713,7 +4713,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 						ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-nodename-set-"},
 						Spec:       resourcealphaapi.ResourcePoolStatusRequestSpec{Driver: driver.Name},
 					}, metav1.CreateOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					defer func() { _ = client.Delete(ctx, request.Name, metav1.DeleteOptions{}) }()
 
 					// Wait for status to be populated and verify NodeName is set for each pool.
@@ -4780,20 +4780,20 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				}
 
 				_, err := sliceClient.Create(ctx, slice1, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					err := sliceClient.Delete(ctx, slice1.Name, metav1.DeleteOptions{})
 					if !apierrors.IsNotFound(err) {
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 					}
 				})
 
 				_, err = sliceClient.Create(ctx, slice2, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					err := sliceClient.Delete(ctx, slice2.Name, metav1.DeleteOptions{})
 					if !apierrors.IsNotFound(err) {
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 					}
 				})
 
@@ -4806,7 +4806,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 							PoolName: &mixedPoolName,
 						},
 					}, metav1.CreateOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					defer func() { _ = statusClient.Delete(ctx, request.Name, metav1.DeleteOptions{}) }()
 
 					g.Eventually(ctx, framework.GetObject(statusClient.Get, request.Name, metav1.GetOptions{})).

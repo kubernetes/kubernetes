@@ -63,7 +63,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			var err error
 			if oldCfg == nil {
 				oldCfg, err = getCurrentKubeletConfig(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}
 
 			fullCPUsOnlyOpt := fmt.Sprintf("option=%s", cpumanager.FullPCPUsOnlyOption)
@@ -228,7 +228,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 			framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
 			defer func() {
-				framework.ExpectNoError(conn.Close())
+				framework.ExpectNoError(conn.Close(), "unexpected error")
 			}()
 
 			ginkgo.By("Checking the pool allocatable resources from the kubelet")
@@ -259,7 +259,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 			framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
 			defer func() {
-				framework.ExpectNoError(conn.Close())
+				framework.ExpectNoError(conn.Close(), "unexpected error")
 			}()
 
 			ginkgo.By("Checking the pool allocatable resources from the kubelet")
@@ -461,7 +461,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 			framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
 			defer func() {
-				framework.ExpectNoError(conn.Close())
+				framework.ExpectNoError(conn.Close(), "unexpected error")
 			}()
 
 			ginkgo.By("Checking the pool allocatable resources from the kubelet")
@@ -560,7 +560,7 @@ var _ = SIGDescribe("CPU Manager Metrics Pod Level Resources", ginkgo.Ordered, g
 		var err error
 		if oldCfg == nil {
 			oldCfg, err = getCurrentKubeletConfig(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 		_, cpuAlloc, _ := getLocalNodeCPUDetails(ctx, f)
 		if cpuAlloc < 3 {
@@ -591,21 +591,21 @@ var _ = SIGDescribe("CPU Manager Metrics Pod Level Resources", ginkgo.Ordered, g
 
 		ginkgo.By("Getting baseline metrics")
 		baselineMetrics, err := getKubeletMetrics(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		baseAllocations, err := getCounterMetricValue(baselineMetrics, "kubelet_resource_manager_allocations_total", map[string]string{"resource_name": "cpu", "source": "pod"})
 		if !errors.Is(err, ErrMetricNotFound) {
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 
 		baseExclusiveAssignments, err := getCounterMetricValue(baselineMetrics, "kubelet_resource_manager_container_assignments_total", map[string]string{"resource_name": "cpu", "assignment_type": "pod_exclusive"})
 		if !errors.Is(err, ErrMetricNotFound) {
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 
 		baseSharedAssignments, err := getCounterMetricValue(baselineMetrics, "kubelet_resource_manager_container_assignments_total", map[string]string{"resource_name": "cpu", "assignment_type": "pod_shared"})
 		if !errors.Is(err, ErrMetricNotFound) {
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 
 		ginkgo.By("Creating a Guaranteed pod with pod-level resources and a mix of guaranteed and non-guaranteed containers")
@@ -706,16 +706,16 @@ var _ = SIGDescribe("CPU Manager Metrics Pod Level Resources", ginkgo.Ordered, g
 
 		ginkgo.By("Getting baseline metrics")
 		baselineMetrics, err := getKubeletMetrics(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		baseAllocations, err := getCounterMetricValue(baselineMetrics, "kubelet_resource_manager_allocations_total", map[string]string{"resource_name": "cpu", "source": "node"})
 		if !errors.Is(err, ErrMetricNotFound) {
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 
 		baseExclusiveAssignments, err := getCounterMetricValue(baselineMetrics, "kubelet_resource_manager_container_assignments_total", map[string]string{"resource_name": "cpu", "assignment_type": "node_exclusive"})
 		if !errors.Is(err, ErrMetricNotFound) {
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 
 		ginkgo.By("Creating a Guaranteed pod with pod-level resources and a mix of guaranteed and non-guaranteed containers")

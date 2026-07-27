@@ -88,7 +88,7 @@ var _ = common.SIGDescribe("Networking", func() {
 	f.It("should provide Internet connection for containers", feature.NetworkingIPv4, func(ctx context.Context) {
 		ginkgo.By("Running container which tries to connect to 8.8.8.8")
 		framework.ExpectNoError(
-			checkConnectivityToHost(ctx, f, "", "connectivity-test", "8.8.8.8", 53, 30))
+			checkConnectivityToHost(ctx, f, "", "connectivity-test", "8.8.8.8", 53, 30), "unexpected error")
 	})
 
 	f.It("should provide Internet connection for containers", feature.NetworkingIPv6, "[Experimental][LinuxOnly]", func(ctx context.Context) {
@@ -96,13 +96,13 @@ var _ = common.SIGDescribe("Networking", func() {
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		ginkgo.By("Running container which tries to connect to 2001:4860:4860::8888")
 		framework.ExpectNoError(
-			checkConnectivityToHost(ctx, f, "", "connectivity-test", "2001:4860:4860::8888", 53, 30))
+			checkConnectivityToHost(ctx, f, "", "connectivity-test", "2001:4860:4860::8888", 53, 30), "unexpected error")
 	})
 
 	f.It("should provider Internet connection for containers using DNS", feature.NetworkingDNS, func(ctx context.Context) {
 		ginkgo.By("Running container which tries to connect to google.com")
 		framework.ExpectNoError(
-			checkConnectivityToHost(ctx, f, "", "connectivity-test", "google.com", 80, 30))
+			checkConnectivityToHost(ctx, f, "", "connectivity-test", "google.com", 80, 30), "unexpected error")
 	})
 
 	// First test because it has no dependencies on variables created later on.
@@ -608,7 +608,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		}
 
 		ginkgo.By("verifying that kube-proxy rules are eventually recreated")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, f.ClientSet, ns, podNames, svcIP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, f.ClientSet, ns, podNames, svcIP, servicePort), "unexpected error")
 
 		ginkgo.By("verifying that kubelet rules are eventually recreated")
 		err = utilwait.PollImmediate(framework.Poll, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
@@ -633,7 +633,7 @@ var _ = common.SIGDescribe("Networking", func() {
 	// [Feature:SCTPConnectivity] tests, since they may cause sctp.ko to be loaded.
 	f.It("should allow creating a Pod with an SCTP HostPort [LinuxOnly]", f.WithSerial(), func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		hostExec := utils.NewHostExec(f)
 		ginkgo.DeferCleanup(hostExec.Cleanup)
 

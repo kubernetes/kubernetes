@@ -104,7 +104,7 @@ func (l *ltrMgr) setupLocalVolumeTmpfs(ctx context.Context, node *v1.Node, param
 	hostDir := l.getTestDir()
 	ginkgo.By(fmt.Sprintf("Creating tmpfs mount point on node %q at path %q", node.Name, hostDir))
 	err := l.hostExec.IssueCommand(ctx, fmt.Sprintf("mkdir -p %q && mount -t tmpfs -o size=10m tmpfs-%q %q", hostDir, hostDir, hostDir), node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return &LocalTestResource{
 		Node: node,
 		Path: hostDir,
@@ -114,11 +114,11 @@ func (l *ltrMgr) setupLocalVolumeTmpfs(ctx context.Context, node *v1.Node, param
 func (l *ltrMgr) cleanupLocalVolumeTmpfs(ctx context.Context, ltr *LocalTestResource) {
 	ginkgo.By(fmt.Sprintf("Unmount tmpfs mount point on node %q at path %q", ltr.Node.Name, ltr.Path))
 	err := l.hostExec.IssueCommand(ctx, fmt.Sprintf("umount %q", ltr.Path), ltr.Node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By("Removing the test directory")
 	err = l.hostExec.IssueCommand(ctx, fmt.Sprintf("rm -r %s", ltr.Path), ltr.Node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 // createAndSetupLoopDevice creates an empty file and associates a loop devie with it.
@@ -133,14 +133,14 @@ func (l *ltrMgr) createAndSetupLoopDevice(ctx context.Context, dir string, node 
 	ddCmd := fmt.Sprintf("dd if=/dev/zero of=%s/file bs=4096 count=%d", dir, count)
 	losetupCmd := fmt.Sprintf("losetup -f %s/file", dir)
 	err := l.hostExec.IssueCommand(ctx, fmt.Sprintf("%s && %s && %s", mkdirCmd, ddCmd, losetupCmd), node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 // findLoopDevice finds loop device path by its associated storage directory.
 func (l *ltrMgr) findLoopDevice(ctx context.Context, dir string, node *v1.Node) string {
 	cmd := fmt.Sprintf("E2E_LOOP_DEV=$(losetup | grep %s/file | awk '{ print $1 }') 2>&1 > /dev/null && echo ${E2E_LOOP_DEV}", dir)
 	loopDevResult, err := l.hostExec.IssueCommandWithResult(ctx, cmd, node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return strings.TrimSpace(loopDevResult)
 }
 
@@ -161,7 +161,7 @@ func (l *ltrMgr) teardownLoopDevice(ctx context.Context, dir string, node *v1.No
 	ginkgo.By(fmt.Sprintf("Tear down block device %q on node %q at path %s/file", loopDev, node.Name, dir))
 	losetupDeleteCmd := fmt.Sprintf("losetup -d %s", loopDev)
 	err := l.hostExec.IssueCommand(ctx, losetupDeleteCmd, node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return
 }
 
@@ -170,7 +170,7 @@ func (l *ltrMgr) cleanupLocalVolumeBlock(ctx context.Context, ltr *LocalTestReso
 	ginkgo.By(fmt.Sprintf("Removing the test directory %s", ltr.loopDir))
 	removeCmd := fmt.Sprintf("rm -r %s", ltr.loopDir)
 	err := l.hostExec.IssueCommand(ctx, removeCmd, ltr.Node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 func (l *ltrMgr) setupLocalVolumeBlockFS(ctx context.Context, node *v1.Node, parameters map[string]string) *LocalTestResource {
@@ -180,7 +180,7 @@ func (l *ltrMgr) setupLocalVolumeBlockFS(ctx context.Context, node *v1.Node, par
 	// Format and mount at loopDir and give others rwx for read/write testing
 	cmd := fmt.Sprintf("mkfs -t ext4 %s && mount -t ext4 %s %s && chmod o+rwx %s", loopDev, loopDev, loopDir, loopDir)
 	err := l.hostExec.IssueCommand(ctx, cmd, node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return &LocalTestResource{
 		Node:    node,
 		Path:    loopDir,
@@ -191,7 +191,7 @@ func (l *ltrMgr) setupLocalVolumeBlockFS(ctx context.Context, node *v1.Node, par
 func (l *ltrMgr) cleanupLocalVolumeBlockFS(ctx context.Context, ltr *LocalTestResource) {
 	umountCmd := fmt.Sprintf("umount %s", ltr.Path)
 	err := l.hostExec.IssueCommand(ctx, umountCmd, ltr.Node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	l.cleanupLocalVolumeBlock(ctx, ltr)
 }
 
@@ -199,7 +199,7 @@ func (l *ltrMgr) setupLocalVolumeDirectory(ctx context.Context, node *v1.Node, p
 	hostDir := l.getTestDir()
 	mkdirCmd := fmt.Sprintf("mkdir -p %s", hostDir)
 	err := l.hostExec.IssueCommand(ctx, mkdirCmd, node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return &LocalTestResource{
 		Node: node,
 		Path: hostDir,
@@ -210,7 +210,7 @@ func (l *ltrMgr) cleanupLocalVolumeDirectory(ctx context.Context, ltr *LocalTest
 	ginkgo.By("Removing the test directory")
 	removeCmd := fmt.Sprintf("rm -r %s", ltr.Path)
 	err := l.hostExec.IssueCommand(ctx, removeCmd, ltr.Node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 func (l *ltrMgr) setupLocalVolumeDirectoryLink(ctx context.Context, node *v1.Node, parameters map[string]string) *LocalTestResource {
@@ -218,7 +218,7 @@ func (l *ltrMgr) setupLocalVolumeDirectoryLink(ctx context.Context, node *v1.Nod
 	hostDirBackend := hostDir + "-backend"
 	cmd := fmt.Sprintf("mkdir -p %s && ln -s %s %s", hostDirBackend, hostDirBackend, hostDir)
 	err := l.hostExec.IssueCommand(ctx, cmd, node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return &LocalTestResource{
 		Node: node,
 		Path: hostDir,
@@ -231,14 +231,14 @@ func (l *ltrMgr) cleanupLocalVolumeDirectoryLink(ctx context.Context, ltr *Local
 	hostDirBackend := hostDir + "-backend"
 	removeCmd := fmt.Sprintf("rm -r %s && rm -r %s", hostDir, hostDirBackend)
 	err := l.hostExec.IssueCommand(ctx, removeCmd, ltr.Node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 func (l *ltrMgr) setupLocalVolumeDirectoryBindMounted(ctx context.Context, node *v1.Node, parameters map[string]string) *LocalTestResource {
 	hostDir := l.getTestDir()
 	cmd := fmt.Sprintf("mkdir -p %s && mount --bind %s %s", hostDir, hostDir, hostDir)
 	err := l.hostExec.IssueCommand(ctx, cmd, node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return &LocalTestResource{
 		Node: node,
 		Path: hostDir,
@@ -250,7 +250,7 @@ func (l *ltrMgr) cleanupLocalVolumeDirectoryBindMounted(ctx context.Context, ltr
 	hostDir := ltr.Path
 	removeCmd := fmt.Sprintf("umount %s && rm -r %s", hostDir, hostDir)
 	err := l.hostExec.IssueCommand(ctx, removeCmd, ltr.Node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 func (l *ltrMgr) setupLocalVolumeDirectoryLinkBindMounted(ctx context.Context, node *v1.Node, parameters map[string]string) *LocalTestResource {
@@ -258,7 +258,7 @@ func (l *ltrMgr) setupLocalVolumeDirectoryLinkBindMounted(ctx context.Context, n
 	hostDirBackend := hostDir + "-backend"
 	cmd := fmt.Sprintf("mkdir -p %s && mount --bind %s %s && ln -s %s %s", hostDirBackend, hostDirBackend, hostDirBackend, hostDirBackend, hostDir)
 	err := l.hostExec.IssueCommand(ctx, cmd, node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return &LocalTestResource{
 		Node: node,
 		Path: hostDir,
@@ -271,12 +271,12 @@ func (l *ltrMgr) cleanupLocalVolumeDirectoryLinkBindMounted(ctx context.Context,
 	hostDirBackend := hostDir + "-backend"
 	removeCmd := fmt.Sprintf("rm %s && umount %s && rm -r %s", hostDir, hostDirBackend, hostDirBackend)
 	err := l.hostExec.IssueCommand(ctx, removeCmd, ltr.Node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 func (l *ltrMgr) setupLocalVolumeGCELocalSSD(ctx context.Context, node *v1.Node, parameters map[string]string) *LocalTestResource {
 	res, err := l.hostExec.IssueCommandWithResult(ctx, "ls /mnt/disks/by-uuid/google-local-ssds-scsi-fs/", node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	dirName := strings.Fields(res)[0]
 	hostDir := "/mnt/disks/by-uuid/google-local-ssds-scsi-fs/" + dirName
 	return &LocalTestResource{
@@ -289,7 +289,7 @@ func (l *ltrMgr) cleanupLocalVolumeGCELocalSSD(ctx context.Context, ltr *LocalTe
 	// This filesystem is attached in cluster initialization, we clean all files to make it reusable.
 	removeCmd := fmt.Sprintf("find '%s' -mindepth 1 -maxdepth 1 -print0 | xargs -r -0 rm -rf", ltr.Path)
 	err := l.hostExec.IssueCommand(ctx, removeCmd, ltr.Node)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 func (l *ltrMgr) expandLocalVolumeBlockFS(ctx context.Context, ltr *LocalTestResource, mbToAdd int) error {

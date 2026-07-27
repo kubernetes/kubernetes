@@ -94,7 +94,7 @@ func (b KubectlBuilder) ExecOrDie(namespace string) string {
 		framework.Logf("stdout: %q", retryStr)
 		framework.Logf("err: %v", retryErr)
 	}
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return str
 }
 

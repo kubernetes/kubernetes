@@ -95,7 +95,7 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 				}
 				return nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			for _, testpod := range testpods {
 				pod := e2epod.NewPodClient(f).Create(ctx, testpod)
@@ -103,7 +103,7 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 			}
 
 			imagePulled, podStartTime, podEndTime, err := getPodImagePullDurations(ctx, f, testpods)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			checkPodPullingOverlap(podStartTime, podEndTime, testpods)
 
@@ -177,7 +177,7 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 				}
 				return nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			var pods []*v1.Pod
 			for _, testpod := range testpods {
@@ -192,11 +192,11 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 					}
 					return false, nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}
 
 			imagePulled, podStartTime, podEndTime, err := getPodImagePullDurations(ctx, f, testpods)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(len(testpods)).To(gomega.BeComparableTo(len(imagePulled)))
 
 			checkPodPullingOverlap(podStartTime, podEndTime, testpods)
@@ -231,7 +231,7 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 			}
 			return nil
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		pod := e2epod.NewPodClient(f).Create(ctx, newPullImageAlwaysPod())
 		podErr := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "ImagePullBackOff", 1*time.Minute, func(pod *v1.Pod) (bool, error) {
@@ -243,7 +243,7 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 		gomega.Expect(podErr).To(gomega.HaveOccurred())
 
 		eventMsg, err := getFailedToPullImageMsg(ctx, f, pod.Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		isExpectedErrMsg := strings.Contains(eventMsg, expectedErr.Error())
 		gomega.Expect(isExpectedErrMsg).To(gomega.BeTrueBecause("we injected an exception into the PullImage interface of the cri proxy"))
 
@@ -251,7 +251,7 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 		time.Sleep(30 * time.Second)
 
 		e, err := getImagePullAttempts(ctx, f, pod.Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		// 3 would take 10s best case.
 		gomega.Expect(e.Count).Should(gomega.BeNumerically(">=", 3))
 		// 7 would take 310s best case, if the infra went slow.

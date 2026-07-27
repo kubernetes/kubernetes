@@ -57,9 +57,9 @@ var _ = SIGDescribe("ImageID", feature.ImageID, func() {
 		pod := e2epod.NewPodClient(f).Create(ctx, podDesc)
 
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx,
-			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
+			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout), "unexpected error")
 		runningPod, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		status := runningPod.Status
 		gomega.Expect(status.ContainerStatuses).To(gomega.HaveLen(1), dump.Pretty(status))

@@ -136,7 +136,7 @@ func DumpNodeDebugInfo(ctx context.Context, c clientset.Interface, nodeNames []s
 			}
 		}
 		_, err = e2emetrics.HighLatencyKubeletOperations(ctx, c, 10*time.Second, n, logFunc)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		// TODO: Log node resource info
 	}
 }

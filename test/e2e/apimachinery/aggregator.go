@@ -660,7 +660,7 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 		updatedApiService, err = apiServiceClient.Update(ctx, currentApiService, metav1.UpdateOptions{})
 		return err
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	gomega.Expect(updatedApiService.Labels).To(gomega.HaveKeyWithValue(apiServiceName, "updated"), "should have the updated label but have %q", updatedApiService.Labels[apiServiceName])
 	framework.Logf("Found updated apiService label for %q", apiServiceName)
 

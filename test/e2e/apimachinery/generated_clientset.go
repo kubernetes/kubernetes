@@ -149,7 +149,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 
 		// We need to wait for the pod to be scheduled, otherwise the deletion
 		// will be carried out immediately rather than gracefully.
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "unexpected error")
 
 		ginkgo.By("deleting the pod gracefully")
 		gracePeriod := int64(31)

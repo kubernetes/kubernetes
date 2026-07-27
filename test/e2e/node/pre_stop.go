@@ -180,7 +180,7 @@ var _ = SIGDescribe("PreStop", func() {
 		podClient.Create(ctx, pod)
 
 		ginkgo.By("waiting for pod running")
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "unexpected error")
 
 		var err error
 		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})

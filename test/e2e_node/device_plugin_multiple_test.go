@@ -59,7 +59,7 @@ func testDevicePluginMultiple(f *framework.Framework, pluginSockDir string) {
 			ginkgo.By("Wait for node to be ready")
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				return nodes == 1
 			}, time.Minute, time.Second).Should(gomega.BeTrueBecause("expected node to be ready"))
 
@@ -120,7 +120,7 @@ func testDevicePluginMultiple(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Deleting any Pods created by the test")
 			l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			for _, p := range l.Items {
 				if p.Namespace != f.Namespace.Name {
 					continue
@@ -147,7 +147,7 @@ func testDevicePluginMultiple(f *framework.Framework, pluginSockDir string) {
 			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalForever)
 			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(e2enode.SampleDeviceResourceName, podRECMD))
 			pod1, err := e2epod.NewPodClient(f).Get(ctx, pod1.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod1.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
 			ginkgo.By("Creating DP2")
@@ -162,7 +162,7 @@ func testDevicePluginMultiple(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Verifying DP2 is running")
 			dp2Pod, err := e2epod.NewPodClient(f).Get(ctx, devicePluginPod2.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(dp2Pod.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
 			ginkgo.By("Scheduling Pod2 while both are running")
@@ -170,7 +170,7 @@ func testDevicePluginMultiple(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Verifying Pod2 is running")
 			pod2, err = e2epod.NewPodClient(f).Get(ctx, pod2.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod2.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
 			ginkgo.By("Deleting DP1")
@@ -191,7 +191,7 @@ func testDevicePluginMultiple(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Verifying Pod3 is running")
 			pod3, err = e2epod.NewPodClient(f).Get(ctx, pod3.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod3.Status.Phase).To(gomega.Equal(v1.PodRunning))
 		})
 
@@ -202,7 +202,7 @@ func testDevicePluginMultiple(f *framework.Framework, pluginSockDir string) {
 			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalForever)
 			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(e2enode.SampleDeviceResourceName, podRECMD))
 			pod1, err = e2epod.NewPodClient(f).Get(ctx, pod1.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod1.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
 			ginkgo.By("Creating DP2 but struggle to register for 30s")
@@ -224,7 +224,7 @@ func testDevicePluginMultiple(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Verifying Pod2 is running")
 			pod2, err = e2epod.NewPodClient(f).Get(ctx, pod2.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod2.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
 			// Device Plugin's 'take over' implementation will create a new endpoint on every registration attempt.
@@ -241,7 +241,7 @@ func testDevicePluginMultiple(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Verifying DP3 is running")
 			dp2Pod, err := e2epod.NewPodClient(f).Get(ctx, devicePluginPod2.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(dp2Pod.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
 			ginkgo.By("Deleting DP1")
@@ -262,7 +262,7 @@ func testDevicePluginMultiple(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Verifying Pod3 is running")
 			pod3, err = e2epod.NewPodClient(f).Get(ctx, pod3.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod3.Status.Phase).To(gomega.Equal(v1.PodRunning))
 		})
 
@@ -274,7 +274,7 @@ func testDevicePluginMultiple(f *framework.Framework, pluginSockDir string) {
 			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalForever)
 			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(e2enode.SampleDeviceResourceName, podRECMD))
 			pod1, err = e2epod.NewPodClient(f).Get(ctx, pod1.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod1.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
 			ginkgo.By("Scheduling DP2")
@@ -289,7 +289,7 @@ func testDevicePluginMultiple(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Verifying DP2 is running")
 			dp2Pod, err := e2epod.NewPodClient(f).Get(ctx, devicePluginPod2.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(dp2Pod.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
 			ginkgo.By("Scheduling Pod2 while both are running")
@@ -297,7 +297,7 @@ func testDevicePluginMultiple(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Verifying Pod2 is running")
 			pod2, err = e2epod.NewPodClient(f).Get(ctx, pod2.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod2.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
 			ginkgo.By("Deleting DP2")
@@ -318,7 +318,7 @@ func testDevicePluginMultiple(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Verifying Pod3 is running")
 			pod3, err = e2epod.NewPodClient(f).Get(ctx, pod3.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(pod3.Status.Phase).To(gomega.Equal(v1.PodRunning))
 		})
 	})

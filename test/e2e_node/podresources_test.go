@@ -1159,7 +1159,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 
 					cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 					framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
-					defer framework.ExpectNoError(conn.Close())
+					defer framework.ExpectNoError(conn.Close(), "unexpected error")
 
 					waitForSRIOVResources(ctx, f, sd)
 
@@ -1189,7 +1189,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 				cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 				framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
 				defer func() {
-					framework.ExpectNoError(conn.Close())
+					framework.ExpectNoError(conn.Close(), "unexpected error")
 				}()
 
 				waitForSRIOVResources(ctx, f, sd)
@@ -1240,7 +1240,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					pod = e2epod.NewPodClient(f).Create(ctx, pod)
 					defer e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 					err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Ready", 2*time.Minute, testutils.PodRunningReady)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 
 					// Kubelet restarts when applying CPUManager static policy;
 					// podresources socket may not be immediately ready.
@@ -1298,7 +1298,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 					framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
 					defer func() {
-						framework.ExpectNoError(conn.Close())
+						framework.ExpectNoError(conn.Close(), "unexpected error")
 					}()
 
 					podresourcesListTests(ctx, f, cli, nil, false)
@@ -1318,7 +1318,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 					framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
 					defer func() {
-						framework.ExpectNoError(conn.Close())
+						framework.ExpectNoError(conn.Close(), "unexpected error")
 					}()
 
 					podresourcesListTests(ctx, f, cli, nil, true)
@@ -1339,7 +1339,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 				cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 				framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
 				defer func() {
-					framework.ExpectNoError(conn.Close())
+					framework.ExpectNoError(conn.Close(), "unexpected error")
 				}()
 
 				// intentionally passing empty cpuset instead of onlineCPUs because with none policy
@@ -1361,7 +1361,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 
 		ginkgo.AfterEach(func(ctx context.Context) {
 			if podresConn != nil {
-				framework.ExpectNoError(podresConn.Close())
+				framework.ExpectNoError(podresConn.Close(), "unexpected error")
 			}
 			deletePodsAsync(ctx, f, podMap)
 		})
@@ -1487,19 +1487,19 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					} else {
 						pod = e2epod.NewPodClient(f).Create(ctx, pod)
 						pod, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 						podMap[string(pod.UID)] = pod
 						err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Pod Succeeded", time.Minute*2, testutils.PodSucceeded)
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 					}
 				}
 
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				var cli kubeletpodresourcesv1.PodResourcesListerClient
 				cli, podresConn, err = podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				gomega.Consistently(func(ctx context.Context) error {
 					found, err := getPodResourcesValues(ctx, cli)
@@ -1580,19 +1580,19 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					} else {
 						pod = e2epod.NewPodClient(f).Create(ctx, pod)
 						pod, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 						podMap[string(pod.UID)] = pod
 						err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Pod Succeeded", time.Minute*2, testutils.PodSucceeded)
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 					}
 				}
 
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				var cli kubeletpodresourcesv1.PodResourcesListerClient
 				cli, podresConn, err = podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				gomega.Consistently(func(ctx context.Context) error {
 					found, err := getPodResourcesValues(ctx, cli)
@@ -1623,17 +1623,17 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					pod := makePodResourcesTestPod(pd)
 					pod = e2epod.NewPodClient(f).Create(ctx, pod)
 					pod, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					podMap[string(pod.UID)] = pod
 					err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Pod Succeeded", time.Minute*2, testutils.PodSucceeded)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				}
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				var cli kubeletpodresourcesv1.PodResourcesListerClient
 				cli, podresConn, err = podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				gomega.Eventually(func(ctx context.Context) error {
 					found, err := getPodResourcesValues(ctx, cli)
@@ -1754,19 +1754,19 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					} else {
 						pod = e2epod.NewPodClient(f).Create(ctx, pod)
 						pod, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 						podMap[string(pod.UID)] = pod
 						err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Pod Succeeded", time.Minute*2, testutils.PodSucceeded)
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 					}
 				}
 
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				var cli kubeletpodresourcesv1.PodResourcesListerClient
 				cli, podresConn, err = podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				gomega.Consistently(func(ctx context.Context) error {
 					found, err := getPodResourcesValues(ctx, cli)
@@ -1828,19 +1828,19 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					} else {
 						pod = e2epod.NewPodClient(f).Create(ctx, pod)
 						pod, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 						podMap[string(pod.UID)] = pod
 						err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Pod Succeeded", time.Minute*2, testutils.PodSucceeded)
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "unexpected error")
 					}
 				}
 
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				var cli kubeletpodresourcesv1.PodResourcesListerClient
 				cli, podresConn, err = podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				gomega.Consistently(func(ctx context.Context) error {
 					found, err := getPodResourcesValues(ctx, cli)
@@ -1876,17 +1876,17 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					pod := makePodResourcesTestPod(pd)
 					pod = e2epod.NewPodClient(f).Create(ctx, pod)
 					pod, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					podMap[string(pod.UID)] = pod
 					err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Pod Succeeded", time.Minute*2, testutils.PodSucceeded)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 				}
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				var cli kubeletpodresourcesv1.PodResourcesListerClient
 				cli, podresConn, err = podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				// After all pods terminate, PodResources should eventually stop reporting them.
 				// gomega.Consistently was used here, but CI showed transient failures like:
@@ -1957,7 +1957,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 					framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
 					defer func() {
-						framework.ExpectNoError(conn.Close())
+						framework.ExpectNoError(conn.Close(), "unexpected error")
 					}()
 
 					ginkgo.By("checking List and resources topology unaware resource should be without topology")
@@ -2009,7 +2009,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 			cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 			framework.ExpectNoError(err, "GetV1Client() failed err %v", err)
 			defer func() {
-				framework.ExpectNoError(conn.Close())
+				framework.ExpectNoError(conn.Close(), "unexpected error")
 			}()
 
 			_, err = cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
@@ -2076,7 +2076,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 			cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 			framework.ExpectNoError(err, "GetV1Client() failed err %v", err)
 			defer func() {
-				framework.ExpectNoError(conn.Close())
+				framework.ExpectNoError(conn.Close(), "unexpected error")
 			}()
 
 			tries := podresources.DefaultQPS * 2 // This should also be greater than DefaultBurstTokens
@@ -2477,10 +2477,10 @@ var _ = SIGDescribe("Pod Resources API Pod Level Resources", framework.WithSeria
 				defer e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, 2*time.Minute)
 
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err)
-				defer func() { framework.ExpectNoError(conn.Close()) }()
+				framework.ExpectNoError(err, "unexpected error")
+				defer func() { framework.ExpectNoError(conn.Close(), "unexpected error") }()
 
 				// Fetch and match
 				gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -2557,10 +2557,10 @@ var _ = SIGDescribe("Pod Resources API Pod Level Resources", framework.WithSeria
 				defer e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, 2*time.Minute)
 
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-				framework.ExpectNoError(err)
-				defer func() { framework.ExpectNoError(conn.Close()) }()
+				framework.ExpectNoError(err, "unexpected error")
+				defer func() { framework.ExpectNoError(conn.Close(), "unexpected error") }()
 
 				// Fetch and match
 				gomega.Eventually(ctx, func(ctx context.Context) error {

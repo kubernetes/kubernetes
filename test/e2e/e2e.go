@@ -208,12 +208,12 @@ func setupSuite(ctx context.Context) {
 	// In large clusters we may get to this point but still have a bunch
 	// of nodes without Routes created. Since this would make a node
 	// unschedulable, we need to wait until all of them are schedulable.
-	framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, c, timeouts.NodeSchedulable))
+	framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, c, timeouts.NodeSchedulable), "unexpected error")
 
 	// If NumNodes is not specified then auto-detect how many are scheduleable and not tainted
 	if framework.TestContext.CloudConfig.NumNodes == framework.DefaultNumNodes {
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		framework.TestContext.CloudConfig.NumNodes = len(nodes.Items)
 	}
 
@@ -382,7 +382,7 @@ func prepullImages(ctx context.Context, c clientset.Interface) {
 	namespace, err := framework.CreateTestingNS(ctx, "img-puller", c, map[string]string{
 		"e2e-framework": "img-puller",
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	ns := namespace.Name
 	ginkgo.DeferCleanup(c.CoreV1().Namespaces().Delete, ns, metav1.DeleteOptions{})
 
@@ -398,7 +398,7 @@ func prepullImages(ctx context.Context, c clientset.Interface) {
 
 		dsSpec := daemonset.NewDaemonSet(dsName, img, label, nil, nil, nil)
 		ds, err := c.AppsV1().DaemonSets(ns).Create(ctx, dsSpec, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		imgPullers = append(imgPullers, ds)
 	}
 

@@ -57,7 +57,7 @@ var _ = SIGDescribe("SelfSubjectReview", func() {
 			ginkgo.By("getting /apis")
 			{
 				discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				found := false
 				for _, group := range discoveryGroups.Groups {
 					if group.Name == authenticationv1alpha1.GroupName {
@@ -78,7 +78,7 @@ var _ = SIGDescribe("SelfSubjectReview", func() {
 			{
 				group := &metav1.APIGroup{}
 				err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/authentication.k8s.io").Do(ctx).Into(group)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				found := false
 				for _, version := range group.Versions {
 					if version.Version == apiVersion {
@@ -94,7 +94,7 @@ var _ = SIGDescribe("SelfSubjectReview", func() {
 			ginkgo.By("getting /apis/authentication.k8s.io/" + apiVersion)
 			{
 				resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(gv)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				found := false
 				for _, resource := range resources.APIResources {
 					switch resource.Name {
@@ -125,7 +125,7 @@ var _ = SIGDescribe("SelfSubjectReview", func() {
 				return // Alpha API is disabled
 			}
 
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(config.Impersonate.UserName).To(gomega.Equal(res.Status.UserInfo.Username))
 			gomega.Expect(config.Impersonate.UID).To(gomega.Equal(res.Status.UserInfo.UID))
 			gomega.Expect(config.Impersonate.Groups).To(gomega.Equal(res.Status.UserInfo.Groups))
@@ -148,7 +148,7 @@ var _ = SIGDescribe("SelfSubjectReview", func() {
 				return // Beta API is disabled
 			}
 
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(config.Impersonate.UserName).To(gomega.Equal(res.Status.UserInfo.Username))
 			gomega.Expect(config.Impersonate.UID).To(gomega.Equal(res.Status.UserInfo.UID))
 			gomega.Expect(config.Impersonate.Groups).To(gomega.Equal(res.Status.UserInfo.Groups))
@@ -167,7 +167,7 @@ var _ = SIGDescribe("SelfSubjectReview", func() {
 
 			ssrClient := kubernetes.NewForConfigOrDie(config).AuthenticationV1().SelfSubjectReviews()
 			res, err := ssrClient.Create(ctx, &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			gomega.Expect(config.Impersonate.UserName).To(gomega.Equal(res.Status.UserInfo.Username))
 			gomega.Expect(config.Impersonate.UID).To(gomega.Equal(res.Status.UserInfo.UID))

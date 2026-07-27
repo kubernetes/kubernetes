@@ -62,16 +62,16 @@ var _ = SIGDescribe("PodRejectionStatus", func() {
 			}
 
 			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Wait for the scheduler to update the pod status
 			err = e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Fetch the pod to verify that the scheduler has set the PodScheduled condition
 			// with observedGeneration.
 			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(len(pod.Status.Conditions)).To(gomega.BeEquivalentTo(1))
 			gomega.Expect(pod.Status.Conditions[0].Type).To(gomega.BeEquivalentTo(v1.PodScheduled))
 			gomega.Expect(pod.Status.Conditions[0].ObservedGeneration).To(gomega.BeEquivalentTo(1))
@@ -79,7 +79,7 @@ var _ = SIGDescribe("PodRejectionStatus", func() {
 			// Fetch the pod to get the latest status which should be last one observed by the scheduler
 			// before it rejected the pod
 			pod, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// force assign the Pod to a node in order to get rejection status later
 			binding := &v1.Binding{
@@ -94,15 +94,15 @@ var _ = SIGDescribe("PodRejectionStatus", func() {
 				},
 			}
 			err = f.ClientSet.CoreV1().Pods(pod.Namespace).Bind(ctx, binding, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// kubelet has rejected the pod
 			err = e2epod.WaitForPodFailedReason(ctx, f.ClientSet, pod, "OutOfcpu", f.Timeouts.PodStartShort)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// fetch the reject Pod and compare the status
 			gotPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Fetch the rejected Pod and verify the generation and observedGeneration.
 			gomega.Expect(gotPod.Generation).To(gomega.BeEquivalentTo(1))

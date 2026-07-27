@@ -122,14 +122,14 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 						return pErr
 					}).
 					WithTimeout(f.Timeouts.PodStart).
-					Should(gomega.MatchError(gomega.ContainSubstring(wantError))))
+					Should(gomega.MatchError(gomega.ContainSubstring(wantError))), "unexpected error")
 
 				expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, expectedContainers)
 				ginkgo.By("verifying pod patched for resize with error remains unchanged")
 				patchedPod, pErrEx2 := podClient.Get(ctx, newPods[0].Name, metav1.GetOptions{})
 				framework.ExpectNoError(pErrEx2, "failed to get pod post failed resize")
 				podresize.VerifyPodResources(patchedPod, expected, nil)
-				framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPod, expected))
+				framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPod, expected), "unexpected error")
 			}
 		},
 
@@ -260,7 +260,7 @@ func doPodResizeLimitRangerTests(f *framework.Framework) {
 
 		ginkgo.By("Fetching the LimitRange to ensure it has proper values")
 		gotLr, lrErr := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Get(ctx, lr.Name, metav1.GetOptions{})
-		framework.ExpectNoError(lrErr)
+		framework.ExpectNoError(lrErr, "unexpected error")
 
 		if !apiequality.Semantic.DeepEqual(lr.Spec.Limits, gotLr.Spec.Limits) {
 			framework.Failf("retrieved LimitRange does not match created one: got %v; expected %v", gotLr.Spec.Limits, lr.Spec.Limits)
@@ -317,14 +317,14 @@ func doPodResizeLimitRangerTests(f *framework.Framework) {
 						return pErr
 					}).
 					WithTimeout(f.Timeouts.PodStart).
-					Should(gomega.MatchError(gomega.And(errMatchers...))))
+					Should(gomega.MatchError(gomega.And(errMatchers...))), "unexpected error")
 
 				expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, expectedContainers)
 				ginkgo.By("verifying pod patched for resize with error remains unchanged")
 				patchedPod, pErrEx2 := podClient.Get(ctx, newPods[0].Name, metav1.GetOptions{})
 				framework.ExpectNoError(pErrEx2, "failed to get pod post failed resize")
 				podresize.VerifyPodResources(patchedPod, expected, nil)
-				framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPod, expected))
+				framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPod, expected), "unexpected error")
 			}
 		},
 
@@ -559,7 +559,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		ginkgo.By(fmt.Sprintf("TEST1: Create pod '%s' that won't fit node '%s' with pod '%s' on it", testPod2.Name, node.Name, testPod1.Name))
 		testPod2 = podClient.Create(ctx, testPod2)
 		err = e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, testPod2.Name, testPod2.Namespace)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(testPod2.Status.Phase).To(gomega.Equal(v1.PodPending))
 		gomega.Expect(testPod2.Generation).To(gomega.BeEquivalentTo(1))
 
@@ -570,7 +570,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		gomega.Expect(testPod2.Generation).To(gomega.BeEquivalentTo(2))
 
 		ginkgo.By(fmt.Sprintf("TEST1: Verify that pod '%s' is running after resize", testPod2.Name))
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, testPod2))
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, testPod2), "unexpected error")
 
 		// Scheduler focused pod resize E2E test case #2
 		//     1. With pod1 + pod2 running on node above, create pod3 that requests more CPU than available, verify pending.
@@ -624,7 +624,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		framework.Logf("TEST2: Pod '%s' CPU requests '%dm'", testPod1.Name, testPod1.Spec.Containers[0].Resources.Requests.Cpu().MilliValue())
 		framework.Logf("TEST2: Pod '%s' CPU requests '%dm'", testPod2.Name, testPod2.Spec.Containers[0].Resources.Requests.Cpu().MilliValue())
 		framework.Logf("TEST2: Pod '%s' CPU requests '%dm'", testPod3.Name, testPod3.Spec.Containers[0].Resources.Requests.Cpu().MilliValue())
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, testPod3))
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, testPod3), "unexpected error")
 
 		// Scheduler focused pod resize E2E test case #3
 		//     1. With pod1 + pod2 + pod3 running on node above, attempt to scale up pod1 to requests more CPU than available, verify deferred.
@@ -884,9 +884,9 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 			},
 			Value: 1000,
 		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		defer func() {
-			framework.ExpectNoError(f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, pc.Name, metav1.DeleteOptions{}))
+			framework.ExpectNoError(f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, pc.Name, metav1.DeleteOptions{}), "unexpected error")
 		}()
 
 		testPod2.Spec.PriorityClassName = pc.Name
@@ -1231,7 +1231,7 @@ func doPodResizeDeferredPreemptionTests(f *framework.Framework) {
 			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("preemptor-priority-%s", f.Namespace.Name)},
 			Value:      1000,
 		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		defer func() {
 			_ = f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, pcPreemptor.Name, metav1.DeleteOptions{})
 		}()
@@ -1240,7 +1240,7 @@ func doPodResizeDeferredPreemptionTests(f *framework.Framework) {
 			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("midpri-priority-%s", f.Namespace.Name)},
 			Value:      500,
 		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		defer func() {
 			_ = f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, pcMid.Name, metav1.DeleteOptions{})
 		}()
@@ -1249,7 +1249,7 @@ func doPodResizeDeferredPreemptionTests(f *framework.Framework) {
 			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("victim-priority-%s", f.Namespace.Name)},
 			Value:      100,
 		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		defer func() {
 			_ = f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, pcVictim.Name, metav1.DeleteOptions{})
 		}()
@@ -1353,7 +1353,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (sched
 	f := framework.NewDefaultFramework("pod-resize-scheduler-tests")
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
@@ -1365,7 +1365,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (defer
 	f := framework.NewDefaultFramework("pod-resize-deferred-resize-tests")
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
@@ -1378,7 +1378,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container (resource-quota)", framework.W
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
@@ -1391,7 +1391,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container (limit-ranger)", framework.Wit
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
@@ -1406,7 +1406,7 @@ var _ = SIGDescribe(framework.WithSerial(), framework.WithSlow(), "Pod InPlace R
 		f := framework.NewDefaultFramework("pod-resize-deferred-preemption-tests")
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
 				e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 			}
@@ -1428,7 +1428,7 @@ func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaN
 func waitForPodDeferred(ctx context.Context, f *framework.Framework, testPod *v1.Pod) {
 	framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, testPod.Namespace, testPod.Name, "display pod resize status as deferred", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
 		return helpers.IsPodResizeDeferred(pod), nil
-	}))
+	}), "unexpected error")
 }
 
 func doPodResizeMemoryVolumeDeferredTests(f *framework.Framework) {
@@ -1541,7 +1541,7 @@ func doPodResizeMemoryVolumeDeferredTests(f *framework.Framework) {
 		gomega.Expect(stdout).ToNot(gomega.ContainSubstring(strconv.FormatInt(qty128Mi.Value()/(1024*1024), 10)))
 
 		gotPod, getErr := podClient.Get(ctx, patchedPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(getErr)
+		framework.ExpectNoError(getErr, "unexpected error")
 		gomega.Expect(gotPod.Status.ContainerStatuses[0].RestartCount).To(gomega.Equal(initialRestarts))
 
 		ginkgo.By("deleting pods")
@@ -1553,7 +1553,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Memory-Backed Vo
 	f := framework.NewDefaultFramework("pod-resize-memory-vol-deferred-tests")
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}

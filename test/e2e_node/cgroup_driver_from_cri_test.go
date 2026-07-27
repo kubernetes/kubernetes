@@ -57,12 +57,12 @@ var _ = SIGDescribe("Cgroup Driver From CRI", feature.CriProxy, framework.WithSe
 				}
 				return nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			restartKubelet(context.Background(), true)
 			time.Sleep(time.Second * 1)
 
 			m, err := e2emetrics.GrabKubeletMetricsWithoutProxy(context.Background(), nodeNameOrIP()+":10255", "/metrics")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			samples := m[kubeletmetrics.KubeletSubsystem+"_"+kubeletmetrics.CRILosingSupportKey]
 
 			gomega.Expect(samples).NotTo(gomega.BeEmpty())
@@ -73,7 +73,7 @@ var _ = SIGDescribe("Cgroup Driver From CRI", feature.CriProxy, framework.WithSe
 			time.Sleep(time.Second * 1)
 
 			m, err := e2emetrics.GrabKubeletMetricsWithoutProxy(context.Background(), nodeNameOrIP()+":10255", "/metrics")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			samples := m[kubeletmetrics.KubeletSubsystem+"_"+kubeletmetrics.CRILosingSupportKey]
 
 			gomega.Expect(samples).To(gomega.BeEmpty())

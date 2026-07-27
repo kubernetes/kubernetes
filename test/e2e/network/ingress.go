@@ -115,7 +115,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		ginkgo.By("getting /apis")
 		{
 			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			found := false
 			for _, group := range discoveryGroups.Groups {
 				if group.Name == networkingv1.GroupName {
@@ -136,7 +136,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		{
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/networking.k8s.io").Do(ctx).Into(group)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			found := false
 			for _, version := range group.Versions {
 				if version.Version == ingVersion {
@@ -152,7 +152,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		ginkgo.By("getting /apis/networking.k8s.io" + ingVersion)
 		{
 			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(networkingv1.SchemeGroupVersion.String())
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			foundIngress := false
 			for _, resource := range resources.APIResources {
 				switch resource.Name {
@@ -168,43 +168,43 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		// Ingress resource create/read/update/watch verbs
 		ginkgo.By("creating")
 		_, err := ingClient.Create(ctx, ingress1, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		_, err = ingClient.Create(ctx, ingress2, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		createdIngress, err := ingClient.Create(ctx, ingress3, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("getting")
 		gottenIngress, err := ingClient.Get(ctx, createdIngress.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(gottenIngress.UID).To(gomega.Equal(createdIngress.UID))
 		gomega.Expect(gottenIngress).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		ings, err := ingClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(ings.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
 		ingWatch, err := ingClient.Watch(ctx, metav1.ListOptions{ResourceVersion: ings.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		// Test cluster-wide list and watch
 		clusterIngClient := f.ClientSet.NetworkingV1().Ingresses("")
 		ginkgo.By("cluster-wide listing")
 		clusterIngs, err := clusterIngClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(clusterIngs.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("cluster-wide watching")
 		framework.Logf("starting watch")
 		_, err = clusterIngClient.Watch(ctx, metav1.ListOptions{ResourceVersion: ings.ResourceVersion, LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("patching")
 		patchedIngress, err := ingClient.Patch(ctx, createdIngress.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(resourceversion.CompareResourceVersion(createdIngress.ResourceVersion, patchedIngress.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 		gomega.Expect(patchedIngress.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 
@@ -219,7 +219,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			updatedIngress, err = ingClient.Update(ctx, ingToUpdate, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(updatedIngress.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 
 		framework.Logf("waiting for watch events with expected annotations")
@@ -252,11 +252,11 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			Ingress: []networkingv1.IngressLoadBalancerIngress{{IP: "169.1.1.1"}},
 		}
 		lbStatusJSON, err := json.Marshal(lbStatus)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		patchedStatus, err := ingClient.Patch(ctx, createdIngress.Name, types.MergePatchType,
 			[]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},"status":{"loadBalancer":`+string(lbStatusJSON)+`}}`),
 			metav1.PatchOptions{}, "status")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(patchedStatus.Status.LoadBalancer).To(gomega.Equal(lbStatus), "patched object should have the applied loadBalancer status")
 		gomega.Expect(patchedStatus.Annotations).To(gomega.HaveKeyWithValue("patchedstatus", "true"), "patched object should have the applied annotation")
 
@@ -273,15 +273,15 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			updatedStatus, err = ingClient.UpdateStatus(ctx, statusToUpdate, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(updatedStatus.Status.LoadBalancer).To(gomega.Equal(statusToUpdate.Status.LoadBalancer), "updated object expected to have updated loadbalancer status %#v, got %#v", statusToUpdate.Status.LoadBalancer, updatedStatus.Status.LoadBalancer)
 
 		ginkgo.By("get /status")
 		ingResource := schema.GroupVersionResource{Group: "networking.k8s.io", Version: ingVersion, Resource: "ingresses"}
 		gottenStatus, err := f.DynamicClient.Resource(ingResource).Namespace(ns).Get(ctx, createdIngress.Name, metav1.GetOptions{}, "status")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		statusUID, _, err := unstructured.NestedFieldCopy(gottenStatus.Object, "metadata", "uid")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(string(createdIngress.UID)).To(gomega.Equal(statusUID), "createdIngress.UID: %v expected to match statusUID: %v ", createdIngress.UID, statusUID)
 
 		// Ingress resource delete operations
@@ -295,7 +295,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		}
 
 		err = ingClient.Delete(ctx, createdIngress.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		ing, err := ingClient.Get(ctx, createdIngress.Name, metav1.GetOptions{})
 		// If ingress controller does not support finalizers, we expect a 404.  Otherwise we validate finalizer behavior.
 		if err == nil {
@@ -306,7 +306,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			}
 		}
 		ings, err = ingClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		// Should have <= 3 items since some ingresses might not have been deleted yet due to finalizers
 		if len(ings.Items) > 3 {
 			framework.Fail("filtered list should have <= 3 items")
@@ -320,9 +320,9 @@ var _ = common.SIGDescribe("Ingress API", func() {
 
 		ginkgo.By("deleting a collection")
 		err = ingClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		ings, err = ingClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		// Should have <= 3 items since some ingresses might not have been deleted yet due to finalizers
 		if len(ings.Items) > 3 {
 			framework.Fail("filtered list should have <= 3 items")

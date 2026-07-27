@@ -199,7 +199,7 @@ func testWorkloadResourceClaims(tCtx ktesting.TContext, workloadAPIEnabled, work
 		// to remove it.
 		patch := []byte(`{"metadata": {"finalizers": null}}`)
 		podGroup, err = tCtx.Client().SchedulingV1beta1().PodGroups(namespace).Patch(tCtx, podGroup.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
-		tCtx.ExpectNoError(err)
+		tCtx.ExpectNoError(err, "unexpected error")
 		deleteAndWait(tCtx, tCtx.Client().SchedulingV1beta1().PodGroups(namespace).Delete, tCtx.Client().SchedulingV1beta1().PodGroups(namespace).Get, podGroup.Name)
 
 		waitForClaim(tCtx, namespace, podGroupResourceClaim.Name, controllerTimeout,

@@ -70,7 +70,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 					}
 
 					registryAddress, podNodes, err = e2eregistry.SetupRegistry(ctx, f, true)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					// we need to wait for the registry to be removed and so we need to delete the whole NS ourselves
 					ginkgo.DeferCleanup(func(ctx context.Context) {
 						f.DeleteNamespace(ctx, f.Namespace.Name)
@@ -100,14 +100,14 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 					restartKubelet(context.Background(), true)
 
 					err := os.WriteFile(configFile, []byte(auth), 0644)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "unexpected error")
 					ginkgo.DeferCleanup(func(ctx context.Context) {
 						imageManagerDir := filepath.Join(services.KubeletRootDirectory, "image_manager")
 
 						// restart the kubelet
 						withStoppedKubelet(ctx, f, false, func() {
-							framework.ExpectNoError(os.Remove(configFile))
-							framework.ExpectNoError(os.RemoveAll(imageManagerDir))
+							framework.ExpectNoError(os.Remove(configFile), "unexpected error")
+							framework.ExpectNoError(os.RemoveAll(imageManagerDir), "unexpected error")
 						})
 						framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, 5*time.Second, 2*time.Minute, true, func(_ context.Context) (bool, error) {
 							if _, err := os.Stat(imageManagerDir); err != nil {

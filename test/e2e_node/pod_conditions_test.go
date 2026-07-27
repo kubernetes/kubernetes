@@ -133,39 +133,39 @@ func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, chec
 			"involvedObject.namespace": f.Namespace.Name,
 			"reason":                   events.FailedMountVolume,
 		}.AsSelector().String()
-		framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(ctx, f.ClientSet, f.Namespace.Name, eventSelector, "MountVolume.SetUp failed for volume", framework.PodEventTimeout))
+		framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(ctx, f.ClientSet, f.Namespace.Name, eventSelector, "MountVolume.SetUp failed for volume", framework.PodEventTimeout), "unexpected error")
 
 		p, err := e2epod.NewPodClient(f).Get(ctx, p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("checking pod condition for a pod whose sandbox creation is blocked")
 
 		scheduledTime, err := getTransitionTimeForPodConditionWithStatus(p, v1.PodScheduled, true)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		// Verify PodReadyToStartContainers is not set (since sandboxcreation is blocked)
 		if checkPodReadyToStart {
 			_, err := getTransitionTimeForPodConditionWithStatus(p, v1.PodReadyToStartContainers, false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 
 		if hasInitContainers {
 			// Verify PodInitialized is not set if init containers are present (since sandboxcreation is blocked)
 			_, err := getTransitionTimeForPodConditionWithStatus(p, v1.PodInitialized, false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		} else {
 			// Verify PodInitialized is set if init containers are not present (since without init containers, it gets set very early)
 			initializedTime, err := getTransitionTimeForPodConditionWithStatus(p, v1.PodInitialized, true)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			gomega.Expect(initializedTime.Before(scheduledTime)).NotTo(gomega.BeTrueBecause("pod without init containers is initialized at: %v which is before pod scheduled at: %v", initializedTime, scheduledTime))
 		}
 
 		// Verify ContainersReady is not set (since sandboxcreation is blocked)
 		_, err = getTransitionTimeForPodConditionWithStatus(p, v1.ContainersReady, false)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		// Verify PodReady is not set (since sandboxcreation is blocked)
 		_, err = getTransitionTimeForPodConditionWithStatus(p, v1.PodReady, false)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		// this testcase is creating the missing volume that unblock the pod above,
 		// and check PodReadyToStartContainer is setting correctly.
@@ -185,7 +185,7 @@ func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, chec
 				},
 			}
 			_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, &configmap, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			defer func() {
 				err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(ctx, "cm-that-unblock-pod-condition", metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "unable to delete configmap")
@@ -200,7 +200,7 @@ func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, chec
 				},
 			}
 			_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, &secret, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			defer func() {
 				err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(ctx, "secret-that-unblock-pod-condition", metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "unable to delete secret")
@@ -208,21 +208,21 @@ func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, chec
 		}
 
 		ginkgo.By("waiting for the pod to become ready after the volume source is created")
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, p.Namespace, framework.PodStartTimeout))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, p.Namespace, framework.PodStartTimeout), "unexpected error")
 
 		p, err = e2epod.NewPodClient(f).Get(ctx, p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		_, err = getTransitionTimeForPodConditionWithStatus(p, v1.PodScheduled, true)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		_, err = getTransitionTimeForPodConditionWithStatus(p, v1.PodInitialized, true)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		// Verify PodReadyToStartContainers is set (since sandboxcreation is unblocked)
 		if checkPodReadyToStart {
 			_, err = getTransitionTimeForPodConditionWithStatus(p, v1.PodReadyToStartContainers, true)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 	}
 }
@@ -232,12 +232,12 @@ func runPodReadyConditionsTest(f *framework.Framework, hasInitContainers, checkP
 		ginkgo.By("creating a pod that successfully comes up in a ready/running state")
 
 		p := e2epod.NewPodClient(f).Create(ctx, webserverPodSpec("pod-"+string(uuid.NewUUID()), "web1", "init1", hasInitContainers))
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout), "unexpected error")
 
 		p, err := e2epod.NewPodClient(f).Get(ctx, p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		isReady, err := testutils.PodRunningReady(p)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if !isReady {
 			framework.Failf("pod %q should be ready", p.Name)
 		}
@@ -245,15 +245,15 @@ func runPodReadyConditionsTest(f *framework.Framework, hasInitContainers, checkP
 		ginkgo.By("checking order of pod condition transitions for a pod with no container/sandbox restarts")
 
 		scheduledTime, err := getTransitionTimeForPodConditionWithStatus(p, v1.PodScheduled, true)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		initializedTime, err := getTransitionTimeForPodConditionWithStatus(p, v1.PodInitialized, true)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		condBeforeContainersReadyTransitionTime := initializedTime
 		errSubstrIfContainersReadyTooEarly := "is initialized"
 		if checkPodReadyToStart {
 			readyToStartContainersTime, err := getTransitionTimeForPodConditionWithStatus(p, v1.PodReadyToStartContainers, true)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			if hasInitContainers {
 				// With init containers, verify the sequence of conditions is: Scheduled => PodReadyToStartContainers => Initialized
@@ -272,12 +272,12 @@ func runPodReadyConditionsTest(f *framework.Framework, hasInitContainers, checkP
 		}
 		// Verify the next condition to get set is ContainersReady
 		containersReadyTime, err := getTransitionTimeForPodConditionWithStatus(p, v1.ContainersReady, true)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(containersReadyTime.Before(condBeforeContainersReadyTransitionTime)).NotTo(gomega.BeTrueBecause("containers ready at: %v which is before pod %s: %v", containersReadyTime, errSubstrIfContainersReadyTooEarly, initializedTime))
 
 		// Verify ContainersReady => PodReady
 		podReadyTime, err := getTransitionTimeForPodConditionWithStatus(p, v1.PodReady, true)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(podReadyTime.Before(containersReadyTime)).NotTo(gomega.BeTrueBecause("pod ready at: %v which is before pod containers ready at: %v", podReadyTime, containersReadyTime))
 	}
 }

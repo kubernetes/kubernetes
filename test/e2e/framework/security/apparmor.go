@@ -129,13 +129,13 @@ func RunAppArmorTestPod(ctx context.Context, pod *v1.Pod, clientset clientset.In
 	if runOnce {
 		pod = podClient.Create(ctx, pod)
 		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx,
-			clientset, pod.Name, pod.Namespace))
+			clientset, pod.Name, pod.Namespace), "unexpected error")
 		var err error
 		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	} else {
 		pod = podClient.CreateSync(ctx, pod)
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, clientset, pod.Name, pod.Namespace, framework.PodStartTimeout))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, clientset, pod.Name, pod.Namespace, framework.PodStartTimeout), "unexpected error")
 	}
 
 	// Verify Pod affinity colocated the Pods.

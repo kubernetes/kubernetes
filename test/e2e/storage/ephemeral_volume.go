@@ -57,12 +57,12 @@ var _ = utils.SIGDescribe("Ephemeralstorage", func() {
 			ginkgo.It(fmt.Sprintf("should allow deletion of pod with invalid volume : %s", testSource.volumeType), func(ctx context.Context) {
 				pod := testEphemeralVolumePod(f, testSource.volumeType, testSource.source)
 				pod, err := c.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 
 				// Allow it to sleep for 30 seconds
 				time.Sleep(30 * time.Second)
 				framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
-				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, c, pod))
+				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, c, pod), "unexpected error")
 			})
 		}
 	})

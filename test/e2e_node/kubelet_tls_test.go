@@ -76,13 +76,13 @@ var _ = SIGDescribe("KubletTLS", framework.WithSerial(), framework.WithNodeConfo
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			tempDir = t.TempDir()
 			cfg, err := getCurrentKubeletConfig(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			ginkgo.DeferCleanup(func(ctx context.Context, cfg *kubeletconfig.KubeletConfiguration) {
 				updateKubeletConfig(ctx, f, cfg, true)
 			}, cfg.DeepCopy())
 
 			certPath, keyPath, err := createCertAndKeyFiles(tempDir)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			cfg.TLSCertFile = certPath
 			cfg.TLSPrivateKeyFile = keyPath
@@ -92,10 +92,10 @@ var _ = SIGDescribe("KubletTLS", framework.WithSerial(), framework.WithNodeConfo
 		ginkgo.It("should reload certificates from disk", func(ctx context.Context) {
 			addr := fmt.Sprintf("127.0.0.1:%d", ports.KubeletPort)
 			oldCert, err := getCert(addr)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			_, _, err = createCertAndKeyFiles(tempDir)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			gomega.Eventually(ctx, func(ctx context.Context) (bool, error) {
 				newCert, err := getCert(addr)

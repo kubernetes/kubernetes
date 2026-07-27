@@ -70,7 +70,7 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 
 		ginkgo.By("creating a test pod on each Node")
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 3)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(nodes.Items).ToNot(gomega.BeEmpty(), "no Nodes in the cluster")
 
 		for _, node := range nodes.Items {
@@ -78,12 +78,12 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 			nodeSelection := e2epod.NodeSelection{Name: node.Name}
 			e2epod.SetNodeSelection(&testPod.Spec, nodeSelection)
 			_, err = pc.Create(ctx, &testPod, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		}
 
 		ginkgo.By("waiting for all of the no-snat-test pods to be scheduled and running")
 		pods, err := e2epod.WaitForPodsWithLabelRunningReady(ctx, cs, f.Namespace.Name, labels.Set{noSNATTestName: ""}.AsSelector(), len(nodes.Items), framework.PodStartTimeout)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("sending traffic from each pod to the others and checking that SNAT does not occur")
 		// hit the /clientip endpoint on every other Pods to check if source ip is preserved

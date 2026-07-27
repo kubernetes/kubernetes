@@ -104,7 +104,7 @@ func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, 
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	// Subtract any per-pod overhead the cluster's admission chain injects
 	// (Pod Overhead, KEP-688) so limit+overhead fits Allocatable.Memory.
@@ -147,7 +147,7 @@ func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, 
 			},
 		}
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	}
 	framework.Logf("Schedule additional pod which should not get scheduled")
 	podName := "mem-failure-pod"
@@ -174,7 +174,7 @@ func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, 
 	}
 	framework.Logf("Ensuring that pod %s fails to schedule", podName)
 	failurePod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, failurePod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	gomega.Eventually(ctx, func() error {
 		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
@@ -195,9 +195,9 @@ func getNodeMemory(ctx context.Context, f *framework.Framework, node v1.Node) no
 	framework.Logf("Getting memory details for node %s", node.ObjectMeta.Name)
 	request := f.ClientSet.CoreV1().RESTClient().Get().Resource("nodes").Name(node.ObjectMeta.Name).SubResource("proxy").Suffix("configz")
 	rawbytes, err := request.DoRaw(ctx)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	kubeletConfig, err := decodeConfigz(rawbytes)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	systemReserve, err := resource.ParseQuantity(kubeletConfig.SystemReserved["memory"])
 	if err != nil {
@@ -235,7 +235,7 @@ func getFirstNodeMemory(ctx context.Context, f *framework.Framework) nodeMemory 
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	// Assuming that agent nodes have the same config
 	// Make sure there is >0 agent nodes, then use the first one for info

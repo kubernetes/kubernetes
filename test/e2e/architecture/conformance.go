@@ -38,9 +38,9 @@ var _ = SIGDescribe("Conformance Tests", func() {
 	*/
 	framework.ConformanceIt("should have at least two untainted nodes", func(ctx context.Context) {
 		ginkgo.By("Getting node addresses")
-		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 10*time.Minute))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 10*time.Minute), "unexpected error")
 		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if len(nodeList.Items) < 2 {
 			framework.Failf("Conformance requires at least two nodes")
 		}

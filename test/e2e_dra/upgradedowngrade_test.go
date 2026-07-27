@@ -175,7 +175,7 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 			tCtx.Logf("stable doesn't exist, get latest release %d.%d", major, previousMinor)
 			previousURL, previousVersion, err = serverDownloadURL(tCtx, "latest", major, previousMinor)
 		}
-		tCtx.ExpectNoError(err)
+		tCtx.ExpectNoError(err, "unexpected error")
 		tCtx.Logf("got previous release version: %s, URL: %s", previousVersion, previousURL)
 	})
 

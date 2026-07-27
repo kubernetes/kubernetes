@@ -184,7 +184,7 @@ func NewNFSServerWithNodeName(ctx context.Context, cs clientset.Interface, names
 func RestartNFSServer(ctx context.Context, f *framework.Framework, serverPod *v1.Pod) {
 	const startcmd = "rpc.nfsd 1"
 	_, _, err := e2epod.ExecShellInPodWithFullOutput(ctx, f, serverPod.Name, startcmd)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 // Stop the passed-in nfs-server by issuing a `rpc.nfsd 0` command in the
@@ -193,7 +193,7 @@ func RestartNFSServer(ctx context.Context, f *framework.Framework, serverPod *v1
 func StopNFSServer(ctx context.Context, f *framework.Framework, serverPod *v1.Pod) {
 	const stopcmd = "rpc.nfsd 0 && for i in $(seq 200); do rpcinfo -p | grep -q nfs || break; sleep 1; done"
 	_, _, err := e2epod.ExecShellInPodWithFullOutput(ctx, f, serverPod.Name, stopcmd)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 // CreateStorageServer is a wrapper for startVolumeServer(). A storage server config is passed in, and a pod pointer
@@ -395,10 +395,10 @@ func startVolumeServer(ctx context.Context, client clientset.Interface, config T
 		}
 	}
 	if config.WaitForCompletion {
-		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx, client, serverPod.Name, serverPod.Namespace))
-		framework.ExpectNoError(podClient.Delete(ctx, serverPod.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx, client, serverPod.Name, serverPod.Namespace), "unexpected error")
+		framework.ExpectNoError(podClient.Delete(ctx, serverPod.Name, metav1.DeleteOptions{}), "unexpected error")
 	} else {
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, client, serverPod))
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, client, serverPod), "unexpected error")
 		if pod == nil {
 			ginkgo.By(fmt.Sprintf("locating the %q server pod", serverPodName))
 			pod, err = podClient.Get(ctx, serverPodName, metav1.GetOptions{})
@@ -595,7 +595,7 @@ func testVolumeClient(ctx context.Context, f *framework.Framework, config TestCo
 		// testVolumeClient might get used more than once per test, therefore
 		// we have to clean up before returning.
 		e2epod.DeletePodOrFail(ctx, f.ClientSet, clientPod.Namespace, clientPod.Name)
-		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, clientPod.Name, clientPod.Namespace, timeouts.PodDelete))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, clientPod.Name, clientPod.Namespace, timeouts.PodDelete), "unexpected error")
 	}()
 
 	testVolumeContent(ctx, f, clientPod, "", fsGroup, fsType, tests)
@@ -630,7 +630,7 @@ func InjectContent(ctx context.Context, f *framework.Framework, config TestConfi
 		// This pod must get deleted before the function returns becaue the test relies on
 		// the volume not being in use.
 		e2epod.DeletePodOrFail(ctx, f.ClientSet, injectorPod.Namespace, injectorPod.Name)
-		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, injectorPod.Name, injectorPod.Namespace, timeouts.PodDelete))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, injectorPod.Name, injectorPod.Namespace, timeouts.PodDelete), "unexpected error")
 	}()
 
 	ginkgo.By("Writing text file contents in the container.")

@@ -150,7 +150,7 @@ func doTest(ctx context.Context, f *framework.Framework, targetRestarts int, con
 	gomega.Expect(podErr).ShouldNot(gomega.HaveOccurred(), "Expected container to repeatedly back off container failures")
 
 	r, err := extractObservedBackoff(ctx, f, pod.Name, containerName)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	gomega.Expect(r).Should(gomega.BeNumerically("<=", maxRestarts))
 }

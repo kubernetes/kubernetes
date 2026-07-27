@@ -73,7 +73,7 @@ func SetupRegistry(ctx context.Context, f *framework.Framework, podOnly bool) (s
 	if podOnly {
 		podClient := e2epod.NewPodClient(f)
 		pod = podClient.Create(ctx, pod)
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "unexpected error")
 	} else {
 		labels := map[string]string{"kube-e2e": podTestLabel}
 		daemonset := e2edaemonset.NewDaemonSet("", "", labels, nil, nil, nil)

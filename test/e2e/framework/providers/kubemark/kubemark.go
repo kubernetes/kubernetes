@@ -63,9 +63,9 @@ func (p *Provider) FrameworkBeforeEach(f *framework.Framework) {
 		externalConfig, err := clientcmd.BuildConfigFromFlags("", *kubemarkExternalKubeConfig)
 		externalConfig.QPS = f.Options.ClientQPS
 		externalConfig.Burst = f.Options.ClientBurst
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		externalClient, err := clientset.NewForConfig(externalConfig)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		f.KubemarkExternalClusterClientSet = externalClient
 		p.closeChannel = make(chan struct{})
 		externalInformerFactory := informers.NewSharedInformerFactory(externalClient, 0)
@@ -73,7 +73,7 @@ func (p *Provider) FrameworkBeforeEach(f *framework.Framework) {
 		kubemarkNodeInformer := kubemarkInformerFactory.Core().V1().Nodes()
 		go kubemarkNodeInformer.Informer().Run(p.closeChannel)
 		p.controller, err = kubemark.NewKubemarkController(externalClient, externalInformerFactory, f.ClientSet, kubemarkNodeInformer)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		externalInformerFactory.Start(p.closeChannel)
 		if !p.controller.WaitForCacheSync(p.closeChannel) {
 			framework.Failf("Unable to sync caches for %v", p.controller)

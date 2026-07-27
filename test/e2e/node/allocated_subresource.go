@@ -165,7 +165,7 @@ var _ = SIGDescribe("Pod Allocated Endpoint", framework.WithFeatureGate(features
 		ginkgo.By("waiting for pod resize status to show deferred")
 		framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "display pod resize status as deferred", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
 			return helpers.IsPodResizeDeferred(pod), nil
-		}))
+		}), "unexpected error")
 
 		ginkgo.By("verifying the allocated pod is unchanged")
 		currentAllocatedPod := getAllocatedPod(ctx, f, pod.Spec.NodeName, pod.Namespace, pod.Name)

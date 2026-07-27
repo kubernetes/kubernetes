@@ -62,10 +62,10 @@ var _ = utils.SIGDescribe(feature.Flexvolumes, "Mounted flexvolume expand", fram
 		e2eskipper.SkipUnlessSSHKeyPresent()
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, c, f.Timeouts.NodeSchedulable))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, c, f.Timeouts.NodeSchedulable), "unexpected error")
 
 		node, err = e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		nodeName = node.Name
 
 		nodeKey = "mounted_flexvolume_expand_" + ns

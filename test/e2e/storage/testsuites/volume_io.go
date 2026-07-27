@@ -155,7 +155,7 @@ func (t *volumeIOTestSuite) DefineTests(driver storageframework.TestDriver, patt
 			FSGroup: fsGroup,
 		}
 		err := testVolumeIO(ctx, f, cs, storageframework.ConvertTestConfig(l.config), *l.resource.VolSource, &podSec, testFile, fileSizes)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 	})
 }
 

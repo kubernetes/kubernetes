@@ -168,7 +168,7 @@ var _ = common.SIGDescribe("Topology Hints", func() {
 		}
 
 		podList, err := c.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		podsByZone := map[string]string{}
 		for _, pod := range podList.Items {
 			if zone, ok := nodesByZone[pod.Spec.NodeName]; ok {
@@ -194,7 +194,7 @@ var _ = common.SIGDescribe("Topology Hints", func() {
 			if pollErr := wait.PollUntilContextTimeout(ctx, 5*time.Second, e2eservice.KubeProxyLagTimeout, false, func(ctx context.Context) (bool, error) {
 				var err error
 				logs, err = e2epod.GetPodLogs(ctx, c, f.Namespace.Name, clientPod.Name, clientPod.Name)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				framework.Logf("Pod client logs: %s", logs)
 
 				logLines := strings.Split(logs, "\n")

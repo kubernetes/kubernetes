@@ -46,7 +46,7 @@ var _ = common.SIGDescribe("LocalhostNodePorts", func() {
 		ns := fr.Namespace.Name
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if len(nodes.Items) < 2 {
 			e2eskipper.Skipf("Test requires >= 2 Ready nodes, but there are only %v nodes", len(nodes.Items))
 		}
@@ -87,10 +87,10 @@ var _ = common.SIGDescribe("LocalhostNodePorts", func() {
 			},
 		}
 		svc, err = cs.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("waiting for endpoints")
-		framework.ExpectNoError(e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, svc.Name, 2))
+		framework.ExpectNoError(e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, svc.Name, 2), "unexpected error")
 
 		ginkgo.By("curling the localhost NodePort and confirming traffic spreads across both backends")
 		loopbackIP := "127.0.0.1"
@@ -109,7 +109,7 @@ var _ = common.SIGDescribe("LocalhostNodePorts", func() {
 		ns := fr.Namespace.Name
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 1)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if len(nodes.Items) < 1 {
 			e2eskipper.Skipf("Test requires >= 1 Ready nodes, but there are only %v nodes", len(nodes.Items))
 		}
@@ -149,10 +149,10 @@ var _ = common.SIGDescribe("LocalhostNodePorts", func() {
 			},
 		}
 		svc, err = cs.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("waiting for all 3 endpoints to be ready")
-		framework.ExpectNoError(e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, svc.Name, 3))
+		framework.ExpectNoError(e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, svc.Name, 3), "unexpected error")
 
 		ginkgo.By("curling the localhost NodePort and confirming all requests hit the same pod")
 		loopbackIP := "127.0.0.1"
@@ -171,7 +171,7 @@ var _ = common.SIGDescribe("LocalhostNodePorts", func() {
 		ns := fr.Namespace.Name
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		if len(nodes.Items) < 2 {
 			e2eskipper.Skipf("Test requires >= 2 Ready nodes, but there are only %v nodes", len(nodes.Items))
 		}
@@ -199,10 +199,10 @@ var _ = common.SIGDescribe("LocalhostNodePorts", func() {
 			},
 		}
 		svc, err = cs.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("waiting for the registry endpoint")
-		framework.ExpectNoError(e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, svc.Name, 1))
+		framework.ExpectNoError(e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, svc.Name, 1), "unexpected error")
 
 		nodePort := svc.Spec.Ports[0].NodePort
 		registryAddress := fmt.Sprintf("localhost:%d", nodePort)
@@ -211,7 +211,7 @@ var _ = common.SIGDescribe("LocalhostNodePorts", func() {
 		secret := e2eregistry.User1DockerSecret(registryAddress)
 		secret.Name = "localhost-nodeport-registry-creds-" + string(uuid.NewUUID())
 		_, err = cs.CoreV1().Secrets(ns).Create(ctx, secret, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("pulling an image through the localhost NodePort and running it")
 		pullPod := &v1.Pod{
@@ -228,6 +228,6 @@ var _ = common.SIGDescribe("LocalhostNodePorts", func() {
 		}
 		e2epod.SetNodeSelection(&pullPod.Spec, e2epod.NodeSelection{Name: clientNodeName})
 		pullPod = e2epod.NewPodClient(fr).Create(ctx, pullPod)
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, pullPod))
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, pullPod), "unexpected error")
 	})
 })

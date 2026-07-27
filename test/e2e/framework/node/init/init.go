@@ -32,7 +32,7 @@ func init() {
 		func(f *framework.Framework) {
 			ginkgo.BeforeEach(func() {
 				ginkgo.DeferCleanup(func(ctx context.Context) {
-					framework.ExpectNoError(e2enode.AllNodesReady(ctx, f.ClientSet, 7*time.Minute))
+					framework.ExpectNoError(e2enode.AllNodesReady(ctx, f.ClientSet, 7*time.Minute), "unexpected error")
 				})
 			})
 		},

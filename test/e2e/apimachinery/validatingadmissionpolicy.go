@@ -415,7 +415,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		ginkgo.By("getting /apis")
 		{
 			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			found := false
 			for _, group := range discoveryGroups.Groups {
 				if group.Name == admissionregistrationv1.GroupName {
@@ -436,7 +436,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		{
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/admissionregistration.k8s.io").Do(ctx).Into(group)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			found := false
 			for _, version := range group.Versions {
 				if version.Version == vapVersion {
@@ -452,7 +452,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		ginkgo.By("getting /apis/admissionregistration.k8s.io/" + vapVersion)
 		{
 			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(admissionregistrationv1.SchemeGroupVersion.String())
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			foundVAP, foundVAPStatus := false, false
 			for _, resource := range resources.APIResources {
 				switch resource.Name {
@@ -506,36 +506,36 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 
 		ginkgo.DeferCleanup(func(ctx context.Context) {
 			err := client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: label})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		})
 
 		ginkgo.By("creating")
 		_, err := client.Create(ctx, template, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		_, err = client.Create(ctx, template, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		vapCreated, err := client.Create(ctx, template, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("getting")
 		vapRead, err := client.Get(ctx, vapCreated.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(vapRead.UID).To(gomega.Equal(vapCreated.UID))
 		gomega.Expect(vapRead).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: label})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
 		vapWatch, err := client.Watch(ctx, metav1.ListOptions{ResourceVersion: list.ResourceVersion, LabelSelector: label})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("patching")
 		patchBytes := []byte(`{"metadata":{"annotations":{"patched":"true"}},"spec":{"failurePolicy":"Ignore"}}`)
 		vapPatched, err := client.Patch(ctx, vapCreated.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(vapPatched.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 		gomega.Expect(vapPatched.Spec.FailurePolicy).To(gomega.HaveValue(gomega.Equal(admissionregistrationv1.Ignore)), "patched object should have the applied spec")
 		gomega.Expect(resourceversion.CompareResourceVersion(vapRead.ResourceVersion, vapPatched.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
@@ -544,7 +544,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		var vapUpdated *admissionregistrationv1.ValidatingAdmissionPolicy
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			vap, err := client.Get(ctx, vapCreated.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			vapToUpdate := vap.DeepCopy()
 			vapToUpdate.Annotations["updated"] = "true"
@@ -584,14 +584,14 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		ginkgo.By("getting /status")
 		resource := admissionregistrationv1.SchemeGroupVersion.WithResource("validatingadmissionpolicies")
 		vapStatusRead, err := f.DynamicClient.Resource(resource).Get(ctx, vapCreated.Name, metav1.GetOptions{}, "status")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(vapStatusRead.GetObjectKind().GroupVersionKind()).To(gomega.Equal(admissionregistrationv1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicy")))
 		gomega.Expect(vapStatusRead.GetUID()).To(gomega.Equal(vapCreated.UID))
 
 		ginkgo.By("patching /status")
 		patchBytes = []byte(`{"status":{"conditions":[{"type":"PatchStatusFailed","status":"False","reason":"e2e","message":"Set from an e2e test","lastTransitionTime":"2024-01-01T00:00:00Z"}]}}`)
 		vapStatusPatched, err := client.Patch(ctx, vapCreated.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		hasCondition := false
 		for i := range vapStatusPatched.Status.Conditions {
 			if vapStatusPatched.Status.Conditions[i].Type == "PatchStatusFailed" {
@@ -604,7 +604,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		var vapStatusUpdated *admissionregistrationv1.ValidatingAdmissionPolicy
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			vap, err := client.Get(ctx, vapCreated.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			vapStatusToUpdate := vap.DeepCopy()
 			vapStatusToUpdate.Status.Conditions = append(vapStatusToUpdate.Status.Conditions, metav1.Condition{
@@ -628,7 +628,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 
 		ginkgo.By("deleting")
 		err = client.Delete(ctx, vapCreated.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		vapTmp, err := client.Get(ctx, vapCreated.Name, metav1.GetOptions{})
 		switch {
 		case err == nil && vapTmp.GetDeletionTimestamp() != nil && len(vapTmp.GetFinalizers()) > 0:
@@ -648,12 +648,12 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 				itemsWithoutFinalizer = append(itemsWithoutFinalizer, item)
 			}
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(itemsWithoutFinalizer).To(gomega.HaveLen(2), "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
 		err = client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: label})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		list, err = client.List(ctx, metav1.ListOptions{LabelSelector: label})
 		var itemsColWithoutFinalizer []admissionregistrationv1.ValidatingAdmissionPolicy
@@ -662,7 +662,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 				itemsColWithoutFinalizer = append(itemsColWithoutFinalizer, item)
 			}
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(itemsColWithoutFinalizer).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
 
@@ -684,7 +684,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		ginkgo.By("getting /apis")
 		{
 			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			found := false
 			for _, group := range discoveryGroups.Groups {
 				if group.Name == admissionregistrationv1.GroupName {
@@ -705,7 +705,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		{
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/admissionregistration.k8s.io").Do(ctx).Into(group)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			found := false
 			for _, version := range group.Versions {
 				if version.Version == vapbVersion {
@@ -721,7 +721,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		ginkgo.By("getting /apis/admissionregistration.k8s.io/" + vapbVersion)
 		{
 			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(admissionregistrationv1.SchemeGroupVersion.String())
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			foundVAPB := false
 			for _, resource := range resources.APIResources {
 				switch resource.Name {
@@ -753,36 +753,36 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 
 		ginkgo.DeferCleanup(func(ctx context.Context) {
 			err := client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: label})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		})
 
 		ginkgo.By("creating")
 		_, err := client.Create(ctx, template, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		_, err = client.Create(ctx, template, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		vapbCreated, err := client.Create(ctx, template, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("getting")
 		vapbRead, err := client.Get(ctx, vapbCreated.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(vapbRead.UID).To(gomega.Equal(vapbCreated.UID))
 		gomega.Expect(vapbRead).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: label})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
 		vapbWatch, err := client.Watch(ctx, metav1.ListOptions{ResourceVersion: list.ResourceVersion, LabelSelector: label})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		ginkgo.By("patching")
 		patchBytes := []byte(`{"metadata":{"annotations":{"patched":"true"}},"spec":{"validationActions":["Warn"]}}`)
 		vapbPatched, err := client.Patch(ctx, vapbCreated.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(vapbPatched.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 		gomega.Expect(vapbPatched.Spec.ValidationActions).To(gomega.Equal([]admissionregistrationv1.ValidationAction{admissionregistrationv1.Warn}), "patched object should have the applied spec")
 		gomega.Expect(resourceversion.CompareResourceVersion(vapbRead.ResourceVersion, vapbPatched.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
@@ -791,7 +791,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		var vapbUpdated *admissionregistrationv1.ValidatingAdmissionPolicyBinding
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			vap, err := client.Get(ctx, vapbCreated.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			vapbToUpdate := vap.DeepCopy()
 			vapbToUpdate.Annotations["updated"] = "true"
@@ -828,7 +828,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 		}
 		ginkgo.By("deleting")
 		err = client.Delete(ctx, vapbCreated.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		vapbTmp, err := client.Get(ctx, vapbCreated.Name, metav1.GetOptions{})
 		switch {
 		case err == nil && vapbTmp.GetDeletionTimestamp() != nil && len(vapbTmp.GetFinalizers()) > 0:
@@ -848,12 +848,12 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 				itemsWithoutFinalizer = append(itemsWithoutFinalizer, item)
 			}
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(itemsWithoutFinalizer).To(gomega.HaveLen(2), "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
 		err = client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: label})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 
 		list, err = client.List(ctx, metav1.ListOptions{LabelSelector: label})
 		var itemsColWithoutFinalizer []admissionregistrationv1.ValidatingAdmissionPolicyBinding
@@ -862,7 +862,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 				itemsColWithoutFinalizer = append(itemsColWithoutFinalizer, item)
 			}
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(itemsColWithoutFinalizer).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
 })

@@ -139,13 +139,13 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 			ginkgo.By("Deleting all PVCs")
 			for _, pvc := range l.pvcs {
 				err := e2epv.DeletePersistentVolumeClaim(ctx, l.cs, pvc.Name, pvc.Namespace)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 				err = e2epv.WaitForPersistentVolumeDeleted(ctx, l.cs, pvc.Spec.VolumeName, 1*time.Second, 5*time.Minute)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			}
 			ginkgo.By(fmt.Sprintf("Deleting Storage Class %s", l.scName))
 			err := l.cs.StorageV1().StorageClasses().Delete(ctx, l.scName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 		} else {
 			ginkgo.By("Local l setup is nil")
 		}
@@ -174,7 +174,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		}
 		ginkgo.By(fmt.Sprintf("Creating Storage Class %s", sc.Name))
 		sc, err := l.cs.StorageV1().StorageClasses().Create(ctx, sc, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		l.scName = sc.Name
 
 		// Create a controller to watch on PVCs
@@ -192,7 +192,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 				StorageClassName: &sc.Name,
 			}, l.ns.Name)
 			pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(ctx, pvc, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			// Store create time for each PVC
 			provisioningStats.mutex.Lock()
 			provisioningStats.perObjectInterval[pvc.Name] = &interval{

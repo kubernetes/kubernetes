@@ -41,20 +41,20 @@ func IsCgroup2UnifiedMode() bool {
 
 func isHTEnabled() bool {
 	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Thread(s) per core:\" | cut -d \":\" -f 2").Output()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	threadsPerCore, err := strconv.Atoi(strings.TrimSpace(string(outData)))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	return threadsPerCore > 1
 }
 
 func isMultiNUMA() bool {
 	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"NUMA node(s):\" | cut -d \":\" -f 2").Output()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	numaNodes, err := strconv.Atoi(strings.TrimSpace(string(outData)))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	return numaNodes > 1
 }
@@ -65,22 +65,22 @@ func getUncoreCPUGroupSize() int {
 	if errors.Is(err, fs.ErrNotExist) {
 		return 0 // no Uncore/LLC cache detected, nothing to do
 	}
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	// how many cores share a same Uncore/LLC block?
 	cpus, err := cpuset.Parse(strings.TrimSpace(string(out)))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return cpus.Size()
 }
 
 func getCPUSiblingList(cpuRes int64) string {
 	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/cpu/cpu%d/topology/thread_siblings_list | tr -d \"\n\r\"", cpuRes)).Output()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return string(out)
 }
 
 func getCoreSiblingList(cpuRes int64) string {
 	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/cpu/cpu%d/topology/core_siblings_list | tr -d \"\n\r\"", cpuRes)).Output()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	return string(out)
 }
 

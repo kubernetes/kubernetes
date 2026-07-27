@@ -50,7 +50,7 @@ const (
 func must[R, P, O any](tCtx ktesting.TContext, call func(context.Context, P, O) (*R, error), p P, o O) *R {
 	tCtx.Helper()
 	r, err := call(tCtx, p, o)
-	tCtx.ExpectNoError(err)
+	tCtx.ExpectNoError(err, "unexpected error")
 	return r
 }
 
@@ -91,7 +91,7 @@ func createTestNamespace(tCtx ktesting.TContext, labels map[string]string) strin
 	ns, err := tCtx.Client().CoreV1().Namespaces().Create(tCtx, ns, metav1.CreateOptions{})
 	tCtx.ExpectNoError(err, "create test namespace")
 	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-		tCtx.ExpectNoError(tCtx.Client().CoreV1().Namespaces().Delete(tCtx, ns.Name, metav1.DeleteOptions{}))
+		tCtx.ExpectNoError(tCtx.Client().CoreV1().Namespaces().Delete(tCtx, ns.Name, metav1.DeleteOptions{}), "unexpected error")
 		// *Not* waiting here. Deleting namespaces is slow.
 	})
 	return ns.Name

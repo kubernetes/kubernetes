@@ -112,7 +112,7 @@ var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func()
 		podInvalid := e2epod.NewPodClient(f).Create(ctx, p)
 
 		framework.Logf("Waiting for pod %s to enter the error state.", podInvalid.Name)
-		framework.ExpectNoError(e2epod.WaitForPodTerminatedInNamespace(ctx, f.ClientSet, podInvalid.Name, "", f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodTerminatedInNamespace(ctx, f.ClientSet, podInvalid.Name, "", f.Namespace.Name), "unexpected error")
 
 		podInvalid, _ = e2epod.NewPodClient(f).Get(ctx, podInvalid.Name, metav1.GetOptions{})
 		podTerminatedReason := testutils.TerminatedContainers(podInvalid)[runAsUserNameContainerName]
@@ -154,7 +154,7 @@ var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func()
 		windowsPodWithSELinux.Spec.Tolerations = []v1.Toleration{{Key: "os", Value: "Windows"}}
 		windowsPodWithSELinux, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx,
 			windowsPodWithSELinux, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		framework.Logf("Created pod %v", windowsPodWithSELinux)
 		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, windowsPodWithSELinux.Name,
 			f.Namespace.Name), "failed to wait for pod %s to be running", windowsPodWithSELinux.Name)
@@ -171,7 +171,7 @@ var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func()
 
 		ginkgo.By("Waiting for pod to finish")
 		event, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, podInvalid)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(event).ToNot(gomega.BeNil(), "event should not be empty")
 		framework.Logf("Got event: %v", event)
 		expectedEventError := "container's runAsUserName (ContainerAdministrator) which will be regarded as root identity and will break non-root policy"
@@ -189,7 +189,7 @@ var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func()
 
 		ginkgo.By("Waiting for pod to finish")
 		event, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, podInvalid)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(event).ToNot(gomega.BeNil(), "event should not be empty")
 		framework.Logf("Got event: %v", event)
 		expectedEventError := "container's runAsUserName (CONTAINERADMINISTRATOR) which will be regarded as root identity and will break non-root policy"
@@ -254,7 +254,7 @@ var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func()
 			framework.Logf("Pod events: \n%v", format.Object(events, 1))
 		}
 
-		framework.ExpectNoError(podErr)
+		framework.ExpectNoError(podErr, "unexpected error")
 	})
 }))
 

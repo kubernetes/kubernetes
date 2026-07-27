@@ -59,7 +59,7 @@ func (t *PersistentVolumeUpgradeTest) Setup(ctx context.Context, f *framework.Fr
 	}
 	t.pvc = e2epv.MakePersistentVolumeClaim(pvcConfig, ns)
 	t.pvc, err = e2epv.CreatePVC(ctx, f.ClientSet, ns, t.pvc)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By("Consuming the PV before upgrade")
 	t.testPod(ctx, f, pvWriteCmd+";"+pvReadCmd)

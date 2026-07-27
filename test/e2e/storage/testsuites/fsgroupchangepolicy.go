@@ -261,13 +261,13 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			}
 
 			ginkgo.By(fmt.Sprintf("Deleting Pod %s/%s", pod.Namespace, pod.Name))
-			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, pod))
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, pod), "unexpected error")
 
 			// Create a second pod with existing volume and verify the contents ownership.
 			podConfig.FsGroup = ptr.To[int64](int64(test.secondPodFsGroup))
 			pod = createPodAndVerifyContentGid(ctx, l.config.Framework, &podConfig, false /* createInitialFiles */, strconv.Itoa(test.finalExpectedRootDirFileOwnership), strconv.Itoa(test.finalExpectedSubDirFileOwnership))
 			ginkgo.By(fmt.Sprintf("Deleting Pod %s/%s", pod.Namespace, pod.Name))
-			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, pod))
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, pod), "unexpected error")
 		})
 	}
 }
@@ -276,7 +276,7 @@ func createPodAndVerifyContentGid(ctx context.Context, f *framework.Framework, p
 	podFsGroup := strconv.FormatInt(*podConfig.FsGroup, 10)
 	ginkgo.By(fmt.Sprintf("Creating Pod in namespace %s with fsgroup %s", podConfig.NS, podFsGroup))
 	pod, err := e2epod.CreateSecPodWithNodeSelection(ctx, f.ClientSet, podConfig, f.Timeouts.PodStart)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	framework.Logf("Pod %s/%s started successfully", pod.Namespace, pod.Name)
 
 	if createInitialFiles {
@@ -284,15 +284,15 @@ func createPodAndVerifyContentGid(ctx context.Context, f *framework.Framework, p
 		cmd := fmt.Sprintf("touch %s", rootDirFilePath)
 		var err error
 		_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		storageutils.VerifyFilePathGIDInPod(ctx, f, rootDirFilePath, podFsGroup, pod)
 
 		cmd = fmt.Sprintf("mkdir %s", subdir)
 		_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		cmd = fmt.Sprintf("touch %s", subDirFilePath)
 		_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		storageutils.VerifyFilePathGIDInPod(ctx, f, subDirFilePath, podFsGroup, pod)
 		return pod
 	}

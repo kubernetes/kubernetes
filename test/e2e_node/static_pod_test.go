@@ -67,11 +67,11 @@ var _ = SIGDescribe("StaticPod", framework.WithSerial(), func() {
 				},
 			}
 			staticPodPath, err := createStaticPodFromPod(kubeletCfg.StaticPodPath, staticPod)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			ginkgo.DeferCleanup(func() {
 				ginkgo.By("delete static pod")
 				err = os.Remove(staticPodPath)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			})
 
 			var initCtrID string
@@ -140,11 +140,11 @@ var _ = SIGDescribe("StaticPod", framework.WithSerial(), func() {
 				},
 			}
 			staticPodPath, err := createStaticPodFromPod(kubeletCfg.StaticPodPath, staticPod)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 			ginkgo.DeferCleanup(func() {
 				ginkgo.By("delete static pod")
 				err = os.Remove(staticPodPath)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "unexpected error")
 			})
 
 			var sidecarCtrID string
@@ -203,12 +203,12 @@ func createStaticPodFromPod(dir string, pod *v1.Pod) (string, error) {
 
 func removeInitContainer(ctx context.Context, ctrID string) {
 	cricli, _, err := getCRIClient(ctx)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	splitID := strings.Split(ctrID, "://")
 	gomega.Expect(splitID).To(gomega.HaveLen(2))
 	ctrID = splitID[1]
 	// Make sure the container is stopped before removing it. This may fail.
 	_ = cricli.StopContainer(ctx, ctrID, 0)
 	err = cricli.RemoveContainer(ctx, ctrID)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }

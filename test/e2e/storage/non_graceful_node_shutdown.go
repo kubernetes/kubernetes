@@ -117,7 +117,7 @@ var _ = utils.SIGDescribe(framework.WithDisruptive(), framework.WithProvider("gc
 				FieldSelector: fields.OneTermNotEqualSelector("spec.nodeName", oldNodeName).String(),
 			}
 			_, err = e2epod.WaitForPods(ctx, c, ns, podListOpts, e2epod.Range{MinMatching: 1}, framework.PodStartTimeout, "be running and ready", e2epod.RunningReady)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			// Bring the node back online and remove the taint
 			utils.KubeletCommand(ctx, utils.KStart, c, pod)
@@ -153,7 +153,7 @@ func createAndVerifyStatefulDeployment(ctx context.Context, scName *string, name
 	ginkgo.By(fmt.Sprintf("Ensuring that the pod of deployment %s is running and ready", dep.Name))
 	labelSelector := labels.SelectorFromSet(labels.Set(podLabels))
 	podList, err := e2epod.WaitForPodsWithLabelRunningReady(ctx, c, ns, labelSelector, 1, framework.PodStartTimeout)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 	pod := &podList.Items[0]
 	return pod
 }

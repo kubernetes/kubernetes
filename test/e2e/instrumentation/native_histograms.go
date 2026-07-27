@@ -54,7 +54,7 @@ var _ = common.SIGDescribe("NativeHistograms", framework.WithFeatureGate(metrics
 			RequestURI("/metrics").
 			SetHeader("Accept", "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited").
 			DoRaw(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "unexpected error")
 		gomega.Expect(body).NotTo(gomega.BeEmpty())
 
 		ginkgo.By("Parsing Protobuf payload and asserting native histogram schema")
@@ -69,7 +69,7 @@ var _ = common.SIGDescribe("NativeHistograms", framework.WithFeatureGate(metrics
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "unexpected error")
 
 			if mf.GetName() == "apiserver_request_duration_seconds" {
 				targetMetricFamily = &mf

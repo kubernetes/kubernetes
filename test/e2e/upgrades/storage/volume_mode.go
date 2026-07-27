@@ -84,16 +84,16 @@ func (t *VolumeModeDowngradeTest) Setup(ctx context.Context, f *framework.Framew
 	}
 	t.pvc = e2epv.MakePersistentVolumeClaim(pvcConfig, ns)
 	t.pvc, err = e2epv.CreatePVC(ctx, cs, ns, t.pvc)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	err = e2epv.WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, cs, ns, t.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	t.pvc, err = cs.CoreV1().PersistentVolumeClaims(t.pvc.Namespace).Get(ctx, t.pvc.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	t.pv, err = cs.CoreV1().PersistentVolumes().Get(ctx, t.pvc.Spec.VolumeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By("Consuming the PVC before downgrade")
 	podConfig := e2epod.Config{
@@ -102,11 +102,11 @@ func (t *VolumeModeDowngradeTest) Setup(ctx context.Context, f *framework.Framew
 		SeLinuxLabel: e2epv.SELinuxLabel,
 	}
 	t.pod, err = e2epod.CreateSecPod(ctx, cs, &podConfig, framework.PodStartTimeout)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By("Checking if PV exists as expected volume mode")
 	err = e2evolume.CheckVolumeModeOfPath(ctx, f, t.pod, block, devicePath)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 
 	ginkgo.By("Checking if read/write to PV works properly")
 	storageutils.CheckReadWriteToPath(ctx, f, t.pod, block, devicePath)
@@ -120,17 +120,17 @@ func (t *VolumeModeDowngradeTest) Test(ctx context.Context, f *framework.Framewo
 
 	ginkgo.By("Verifying that nothing exists at the device path in the pod")
 	err := e2epod.VerifyExecInPodFail(ctx, f, t.pod, fmt.Sprintf("test -e %s", devicePath), 1)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "unexpected error")
 }
 
 // Teardown cleans up any remaining resources.
 func (t *VolumeModeDowngradeTest) Teardown(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Deleting the pod")
-	framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, t.pod))
+	framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, t.pod), "unexpected error")
 
 	ginkgo.By("Deleting the PVC")
-	framework.ExpectNoError(f.ClientSet.CoreV1().PersistentVolumeClaims(t.pvc.Namespace).Delete(ctx, t.pvc.Name, metav1.DeleteOptions{}))
+	framework.ExpectNoError(f.ClientSet.CoreV1().PersistentVolumeClaims(t.pvc.Namespace).Delete(ctx, t.pvc.Name, metav1.DeleteOptions{}), "unexpected error")
 
 	ginkgo.By("Waiting for the PV to be deleted")
-	framework.ExpectNoError(e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, t.pv.Name, 5*time.Second, 20*time.Minute))
+	framework.ExpectNoError(e2epv.WaitForPersistentVolumeDeleted(ctx, f.ClientSet, t.pv.Name, 5*time.Second, 20*time.Minute), "unexpected error")
 }
