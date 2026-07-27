@@ -567,13 +567,13 @@ func (_ networkInterfaceWithInvalidAddr) Interfaces() ([]net.Interface, error) {
 // can fall through to getIPFromLoopbackInterface and return the loopback IPv4 address.
 type bgpUnnumberedNetworkInterface struct{}
 
-func (_ bgpUnnumberedNetworkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
+func (bgpUnnumberedNetworkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
 	if intfName == LoopbackInterfaceName {
 		return &loopbackIntf, nil
 	}
 	return &upIntf, nil
 }
-func (_ bgpUnnumberedNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
+func (bgpUnnumberedNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
 	if intf.Name == LoopbackInterfaceName {
 		// Stable node IPv4 identity + standard loopback addresses.
 		return []net.Addr{
@@ -585,7 +585,7 @@ func (_ bgpUnnumberedNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, e
 	// Physical interface: only an IPv6 LLA with a zone ID used as BGP nexthop.
 	return []net.Addr{addrStruct{val: "fe80::1%eth3/64"}}, nil
 }
-func (_ bgpUnnumberedNetworkInterface) Interfaces() ([]net.Interface, error) {
+func (bgpUnnumberedNetworkInterface) Interfaces() ([]net.Interface, error) {
 	return []net.Interface{upIntf, loopbackIntf}, nil
 }
 
