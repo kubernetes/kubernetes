@@ -158,12 +158,12 @@ var _ = common.SIGDescribe("DNS", func() {
 		}
 		headlessService := e2eservice.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, headlessService, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create headless service: %s", dnsTestServiceName)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Services.Create", dnsTestServiceName)
 
 		regularServiceName := "test-service-2"
 		regularService := e2eservice.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
 		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, regularService, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create regular service: %s", regularServiceName)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Services.Create", regularServiceName)
 
 		// All the names we need to be able to resolve.
 		// TODO: Create more endpoints and ensure that multiple A records are returned
@@ -194,7 +194,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		ginkgo.By("Creating a test headless, selectorless service")
 		service := e2eservice.CreateServiceSpec(dnsTestServiceName, "", true, nil)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, service, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create headless service: %s", dnsTestServiceName)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Services.Create", dnsTestServiceName)
 
 		ginkgo.By("Manually creating two EndpointSlices for the service")
 		addressType := discoveryv1.AddressTypeIPv4
@@ -281,12 +281,12 @@ var _ = common.SIGDescribe("DNS", func() {
 		}
 		headlessService := e2eservice.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, headlessService, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create headless service: %s", dnsTestServiceName)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Services.Create", dnsTestServiceName)
 
 		regularServiceName := "test-service-2"
 		regularService := e2eservice.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
 		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, regularService, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create regular service: %s", regularServiceName)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Services.Create", regularServiceName)
 
 		// All the names we need to be able to resolve.
 		// for headless service.
@@ -330,7 +330,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		podHostname := "dns-querier-2"
 		headlessService := e2eservice.CreateServiceSpec(serviceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, headlessService, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create headless service: %s", serviceName)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Services.Create", serviceName)
 
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", podHostname, serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		hostNames := []string{hostFQDN, podHostname}
@@ -368,7 +368,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		podHostname := "dns-querier-2"
 		headlessService := e2eservice.CreateServiceSpec(serviceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, headlessService, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create headless service: %s", serviceName)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Services.Create", serviceName)
 
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", podHostname, serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		subdomain := fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
@@ -403,7 +403,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		serviceName := "dns-test-service-3"
 		externalNameService := e2eservice.CreateServiceSpec(serviceName, "foo.example.com", false, nil)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, externalNameService, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create ExternalName service: %s", serviceName)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Services.Create", serviceName)
 
 		hostFQDN := fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		muslProbeCmd, muslFileName := createTargetedProbeCommand(hostFQDN, "CNAME", "musl")
@@ -424,7 +424,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		_, err = e2eservice.UpdateService(ctx, f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
 			s.Spec.ExternalName = "bar.example.com"
 		})
-		framework.ExpectNoError(err, "failed to change externalName of service: %s", serviceName)
+		framework.ExpectNoError(err, "failed to e2eservice.UpdateService", serviceName)
 		muslProbeCmd, muslFileName = createTargetedProbeCommand(hostFQDN, "CNAME", "musl")
 		muslProber = dnsQuerier{name: "musl", image: imageutils.Agnhost, cmd: muslProbeCmd}
 		glibcProbeCmd, glibcFileName = createTargetedProbeCommand(hostFQDN, "CNAME", "glibc")
@@ -446,7 +446,7 @@ var _ = common.SIGDescribe("DNS", func() {
 				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
 			}
 		})
-		framework.ExpectNoError(err, "failed to change service type to ClusterIP for service: %s", serviceName)
+		framework.ExpectNoError(err, "failed to e2eservice.UpdateService", serviceName)
 		targetRecord := "A"
 		if framework.TestContext.ClusterIsIPv6() {
 			targetRecord = "AAAA"
@@ -465,7 +465,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		pod3 := createDNSPod(f.Namespace.Name, []dnsQuerier{muslProber, glibcProber}, dnsTestPodHostName, dnsTestServiceName)
 
 		svc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Get(ctx, externalNameService.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get service: %s", externalNameService.Name)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Services.Get", externalNameService.Name)
 
 		validateTargetedProbeOutput(ctx, f, pod3, []string{muslFileName, glibcFileName}, svc.Spec.ClusterIP)
 	})
@@ -487,10 +487,10 @@ var _ = common.SIGDescribe("DNS", func() {
 			Searches:    []string{testSearchPath},
 		}
 		testAgnhostPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, testAgnhostPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pod: %s", testAgnhostPod.Name)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Create", testAgnhostPod.Name)
 		framework.Logf("Created pod %v", testAgnhostPod)
 		err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, testAgnhostPod.Name, f.Namespace.Name, framework.PodStartTimeout)
-		framework.ExpectNoError(err, "failed to wait for pod %s to be running", testAgnhostPod.Name)
+		framework.ExpectNoError(err, "failed to e2epod.WaitTimeoutForPodReadyInNamespace", testAgnhostPod.Name)
 
 		runCommand := func(arg string) string {
 			cmd := []string{"/agnhost", arg}
@@ -502,7 +502,7 @@ var _ = common.SIGDescribe("DNS", func() {
 				CaptureStdout: true,
 				CaptureStderr: true,
 			})
-			framework.ExpectNoError(err, "failed to run command '/agnhost %s' on pod, stdout: %v, stderr: %v, err: %v", arg, stdout, stderr, err)
+			framework.ExpectNoError(err, "failed to e2epod.Exec", arg, stdout, stderr, err)
 			return stdout
 		}
 
@@ -534,14 +534,14 @@ var _ = common.SIGDescribe("DNS", func() {
 
 		testServerPod := generateCoreDNSServerPod(corednsConfig)
 		testServerPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, testServerPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pod: %s", testServerPod.Name)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Create", testServerPod.Name)
 		framework.Logf("Created pod %v", testServerPod)
 		err = e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, testServerPod.Name, f.Namespace.Name)
-		framework.ExpectNoError(err, "failed to wait for pod %s to be running", testServerPod.Name)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodNameRunningInNamespace", testServerPod.Name)
 
 		// Retrieve server pod IP.
 		testServerPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, testServerPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get pod %v", testServerPod.Name)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Get", testServerPod.Name)
 		testServerIP := testServerPod.Status.PodIP
 		framework.Logf("testServerIP is %s", testServerIP)
 
@@ -560,10 +560,10 @@ var _ = common.SIGDescribe("DNS", func() {
 			},
 		}
 		testUtilsPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, testUtilsPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pod: %s", testUtilsPod.Name)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Create", testUtilsPod.Name)
 		framework.Logf("Created pod %v", testUtilsPod)
 		err = e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, testUtilsPod.Name, f.Namespace.Name)
-		framework.ExpectNoError(err, "failed to wait for pod %s to be running", testUtilsPod.Name)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodNameRunningInNamespace", testUtilsPod.Name)
 
 		ginkgo.By("Verifying customized DNS option is configured on pod...")
 		// TODO: Figure out a better way other than checking the actual resolv,conf file.
@@ -576,7 +576,7 @@ var _ = common.SIGDescribe("DNS", func() {
 			CaptureStdout: true,
 			CaptureStderr: true,
 		})
-		framework.ExpectNoError(err, "failed to examine resolv,conf file on pod, stdout: %v, stderr: %v, err: %v", stdout, stderr, err)
+		framework.ExpectNoError(err, "failed to e2epod.Exec", stdout, stderr, err)
 		if !strings.Contains(stdout, "ndots:2") {
 			framework.Failf("customized DNS options not found in resolv.conf, got: %s", stdout)
 		}
@@ -608,7 +608,7 @@ var _ = common.SIGDescribe("DNS", func() {
 			return true, nil
 		}
 		err = wait.PollImmediate(5*time.Second, 3*time.Minute, digFunc)
-		framework.ExpectNoError(err, "failed to verify customized name server and search path")
+		framework.ExpectNoError(err, "failed to wait.PollImmediate")
 
 		// TODO: Add more test cases for other DNSPolicies.
 	})
@@ -725,12 +725,12 @@ var _ = common.SIGDescribe("DNS HostNetwork", func() {
 		}
 		headlessService := e2eservice.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, headlessService, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create headless service: %s", dnsTestServiceName)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Services.Create", dnsTestServiceName)
 
 		regularServiceName := "test-service-2"
 		regularService := e2eservice.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
 		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, regularService, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create regular service: %s", regularServiceName)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Services.Create", regularServiceName)
 
 		// All the names we need to be able to resolve.
 		// for headless service.
@@ -766,13 +766,13 @@ var _ = common.SIGDescribe("DNS HostNetwork", func() {
 		testAgnhostPod := e2epod.NewAgnhostPod(f.Namespace.Name, "test-dns-hostname", nil, nil, nil)
 		testAgnhostPod.Spec.Hostname = dnsTestPodHostName
 		testAgnhostPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, testAgnhostPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to created pod: %s", testAgnhostPod.Name)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Create", testAgnhostPod.Name)
 
 		err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, testAgnhostPod.Name, f.Namespace.Name, framework.PodStartTimeout)
-		framework.ExpectNoError(err, "failed to wait for pod %s to be running", testAgnhostPod.Name)
+		framework.ExpectNoError(err, "failed to e2epod.WaitTimeoutForPodReadyInNamespace", testAgnhostPod.Name)
 
 		stdout, err := e2eoutput.RunHostCmd(testAgnhostPod.Namespace, testAgnhostPod.Name, "hostname")
-		framework.ExpectNoError(err, "failed to run command hostname: %s", stdout)
+		framework.ExpectNoError(err, "failed to e2eoutput.RunHostCmd", stdout)
 		hostname := strings.TrimSpace(stdout)
 		if testAgnhostPod.Spec.Hostname != hostname {
 			framework.Failf("expected hostname: %s, got: %s", testAgnhostPod.Spec.Hostname, hostname)
@@ -793,13 +793,13 @@ var _ = common.SIGDescribe("DNS HostNetwork", func() {
 		e2epod.SetNodeSelection(&testAgnhostPod.Spec, nodeSelection)
 
 		testAgnhostPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, testAgnhostPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to created pod: %s", testAgnhostPod.Name)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Create", testAgnhostPod.Name)
 
 		err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, testAgnhostPod.Name, f.Namespace.Name, framework.PodStartTimeout)
-		framework.ExpectNoError(err, "failed to wait for pod %s to be running", testAgnhostPod.Name)
+		framework.ExpectNoError(err, "failed to e2epod.WaitTimeoutForPodReadyInNamespace", testAgnhostPod.Name)
 
 		stdout, err := e2eoutput.RunHostCmd(testAgnhostPod.Namespace, testAgnhostPod.Name, "hostname")
-		framework.ExpectNoError(err, "failed to run command hostname: %s", stdout)
+		framework.ExpectNoError(err, "failed to e2eoutput.RunHostCmd", stdout)
 		hostname := strings.TrimSpace(stdout)
 		if dnsTestPodHostName == hostname {
 			framework.Failf("https://issues.k8s.io/67019 expected spec.Hostname %s to be ignored", hostname)

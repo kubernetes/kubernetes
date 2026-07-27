@@ -193,7 +193,7 @@ func (n *nfsDriver) PrepareTest(ctx context.Context, f *framework.Framework) *st
 	// is not enough. We should create new clusterrole for testing.
 	cleanupFunc, err := e2eauth.BindClusterRole(ctx, cs.RbacV1(), "cluster-admin", ns.Name,
 		rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: ns.Name, Name: "default"})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2eauth.BindClusterRole")
 	ginkgo.DeferCleanup(cleanupFunc)
 
 	err = e2eauth.WaitForAuthorizationUpdate(ctx, cs.AuthorizationV1(),
@@ -469,7 +469,7 @@ func (h *hostPathDriver) CreateVolume(ctx context.Context, config *storageframew
 
 	// pods should be scheduled on the node
 	node, err := e2enode.GetRandomReadySchedulableNode(ctx, cs)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 	config.ClientNodeSelection = e2epod.NodeSelection{Name: node.Name}
 
 	cmd := fmt.Sprintf("mkdir %v -m 777", targetPath)
@@ -627,7 +627,7 @@ func (h *hostPathSymlinkDriver) CreateVolume(ctx context.Context, config *storag
 
 	// pods should be scheduled on the node
 	node, err := e2enode.GetRandomReadySchedulableNode(ctx, cs)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 	config.ClientNodeSelection = e2epod.NodeSelection{Name: node.Name}
 
 	cmd := fmt.Sprintf("mkdir %v -m 777 && ln -s %v %v", sourcePath, sourcePath, targetPath)
@@ -1319,7 +1319,7 @@ func (l *localDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) 
 func (l *localDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	var err error
 	l.node, err = e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 
 	l.hostExec = utils.NewHostExec(f)
 	l.ltrMgr = utils.NewLocalResourceManager("local-driver", l.hostExec, "/tmp")
@@ -1330,9 +1330,9 @@ func (l *localDriver) PrepareTest(ctx context.Context, f *framework.Framework) *
 		filesystemType := "fs"
 		ssdCmd := fmt.Sprintf("ls -1 /mnt/disks/by-uuid/google-local-ssds-%s-%s/ | wc -l", ssdInterface, filesystemType)
 		res, err := l.hostExec.IssueCommandWithResult(ctx, ssdCmd, l.node)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to l.hostExec.IssueCommandWithResult")
 		num, err := strconv.Atoi(strings.TrimSpace(res))
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to strconv.Atoi")
 		if num < 1 {
 			e2eskipper.Skipf("Requires at least 1 %s %s localSSD ", ssdInterface, filesystemType)
 		}

@@ -274,7 +274,7 @@ var _ = SIGDescribe("Kubectl logs", func() {
 				ginkgo.By("creating the Deployment")
 				var err error
 				deploy, err = deployClient.Create(ctx, deploy, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "failed to create deployment")
+				framework.ExpectNoError(err, "failed to deployClient.Create")
 
 				framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deploy),
 					"failed to wait for deployment to complete")
@@ -290,7 +290,7 @@ var _ = SIGDescribe("Kubectl logs", func() {
 				ginkgo.By("Waiting for Deployment pods to be running.")
 
 				pods, err := e2edeployment.GetPodsForDeployment(ctx, c, deploy)
-				framework.ExpectNoError(err, "failed to get pods for deployment")
+				framework.ExpectNoError(err, "failed to e2edeployment.GetPodsForDeployment")
 
 				podOne := pods.Items[0].GetName()
 				podTwo := pods.Items[1].GetName()
@@ -317,7 +317,7 @@ var _ = SIGDescribe("Kubectl logs", func() {
 				ginkgo.By("Waiting for Deployment pods to be running.")
 
 				pods, err := e2edeployment.GetPodsForDeployment(ctx, c, deploy)
-				framework.ExpectNoError(err, "failed to get pods for deployment")
+				framework.ExpectNoError(err, "failed to e2edeployment.GetPodsForDeployment")
 
 				podOne := pods.Items[0].GetName()
 				podTwo := pods.Items[1].GetName()

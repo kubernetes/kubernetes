@@ -83,7 +83,7 @@ func WaitForSnapshotReady(ctx context.Context, c dynamic.Interface, ns string, s
 func GetSnapshotContentFromSnapshot(ctx context.Context, dc dynamic.Interface, snapshot *unstructured.Unstructured, timeout time.Duration) *unstructured.Unstructured {
 	defer ginkgo.GinkgoRecover()
 	err := WaitForSnapshotReady(ctx, dc, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, timeout)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to WaitForSnapshotReady")
 
 	vs, err := dc.Resource(SnapshotGVR).Namespace(snapshot.GetNamespace()).Get(ctx, snapshot.GetName(), metav1.GetOptions{})
 
@@ -91,10 +91,10 @@ func GetSnapshotContentFromSnapshot(ctx context.Context, dc dynamic.Interface, s
 	snapshotContentName := snapshotStatus["boundVolumeSnapshotContentName"].(string)
 	framework.Logf("received snapshotStatus %v", snapshotStatus)
 	framework.Logf("snapshotContentName %s", snapshotContentName)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to dc.Resource.Namespace.Get")
 
 	vscontent, err := dc.Resource(SnapshotContentGVR).Get(ctx, snapshotContentName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to dc.Resource.Get")
 
 	return vscontent
 

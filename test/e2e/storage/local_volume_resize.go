@@ -57,7 +57,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion", func() {
 		testMode := immediateMode
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, maxNodes)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2enode.GetBoundedReadySchedulableNodes")
 
 			scName = fmt.Sprintf("%v-%v", testSCPrefix, f.Namespace.Name)
 			// Choose a random node
@@ -93,7 +93,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion", func() {
 			)
 			ginkgo.By("Creating pod1")
 			pod1, pod1Err = createLocalPod(ctx, config, testVol, nil)
-			framework.ExpectNoError(pod1Err)
+			framework.ExpectNoError(pod1Err, "failed to pod1Err")
 			verifyLocalPod(ctx, config, testVol, pod1, config.randomNode.Name)
 
 			// We expand the PVC while l.pod is using it for online expansion.
@@ -217,5 +217,5 @@ func setupExpandableLocalStorageClass(ctx context.Context, config *localTestConf
 	}
 
 	_, err := config.client.StorageV1().StorageClasses().Create(ctx, sc, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to config.client.StorageV1.StorageClasses.Create")
 }

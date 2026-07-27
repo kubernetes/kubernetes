@@ -107,7 +107,7 @@ func StartPodLogs(ctx context.Context, f *framework.Framework, driverNamespace *
 // Allowed kubeletOps are `KStart`, `KStop`, and `KRestart`
 func KubeletCommand(ctx context.Context, kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	nodeIP, err := getHostAddress(ctx, c, pod)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to getHostAddress")
 	nodeIP = nodeIP + ":22"
 
 	commandTemplate := "systemctl %s kubelet"
@@ -139,7 +139,7 @@ func KubeletCommand(ctx context.Context, kOp KubeletOpt, c clientset.Interface, 
 	}
 
 	node, err := c.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.CoreV1.Nodes.Get")
 	heartbeatTime := e2enode.GetNodeHeartbeatTime(node)
 
 	runCmd("start")

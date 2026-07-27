@@ -114,7 +114,7 @@ func masterExec(ctx context.Context, f *framework.Framework, cmd string) {
 
 	host := ips[0] + ":22"
 	result, err := e2essh.SSH(ctx, cmd, host, framework.TestContext.Provider)
-	framework.ExpectNoError(err, "failed to SSH to host %s on provider %s and run command: %q", host, framework.TestContext.Provider, cmd)
+	framework.ExpectNoError(err, "failed to e2essh.SSH", host, framework.TestContext.Provider, cmd)
 	if result.Code != 0 {
 		e2essh.LogResult(result)
 		framework.Failf("master exec command returned non-zero")
@@ -139,7 +139,7 @@ func checkExistingRCRecovers(ctx context.Context, f *framework.Framework) {
 		}
 		for _, pod := range pods.Items {
 			err = podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
-			framework.ExpectNoError(err, "failed to delete pod %s in namespace: %s", pod.Name, f.Namespace.Name)
+			framework.ExpectNoError(err, "failed to podClient.Delete", pod.Name, f.Namespace.Name)
 		}
 		framework.Logf("apiserver has recovered")
 		return true, nil
@@ -149,7 +149,7 @@ func checkExistingRCRecovers(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, time.Millisecond*500, time.Second*60, false, func(ctx context.Context) (bool, error) {
 		options := metav1.ListOptions{LabelSelector: rcSelector.String()}
 		pods, err := podClient.List(ctx, options)
-		framework.ExpectNoError(err, "failed to list pods in namespace: %s, that match label selector: %s", f.Namespace.Name, rcSelector.String())
+		framework.ExpectNoError(err, "failed to podClient.List", f.Namespace.Name, rcSelector.String())
 		for _, pod := range pods.Items {
 			if pod.DeletionTimestamp == nil && podutil.IsPodReady(&pod) {
 				return true, nil

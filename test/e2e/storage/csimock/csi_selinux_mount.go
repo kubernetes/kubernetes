@@ -918,7 +918,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics and SELinuxWarningC
 
 func grabNodeMetrics(ctx context.Context, grabber *e2emetrics.Grabber, nodeName string, metricNames sets.Set[string], volumePluginLabel string) (map[string]float64, error) {
 	response, err := grabber.GrabFromKubelet(ctx, nodeName)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to grabber.GrabFromKubelet")
 
 	metrics := map[string]float64{}
 	for _, samples := range response {

@@ -114,7 +114,7 @@ func runSnapshotMetadataVerifier(pod *v1.Pod, toolCommand string) {
 		pod.Namespace,
 		strings.Split(toolCommand, " ")...,
 	)
-	framework.ExpectNoError(err, "failed to run snapshot-metadata-verifier tool")
+	framework.ExpectNoError(err, "failed to e2ekubectl.RunKubectlWithFullOutput")
 	if stderr != "" {
 		framework.Failf("failed to run snapshot-metadata-verifier tool:\nstdout:%s\nstderr:%s\n", stdout, stderr)
 	}
@@ -129,7 +129,7 @@ func createBackupClientResources(ctx context.Context, f *framework.Framework) {
 	err := storageutils.CreateFromManifests(ctx, f, f.Namespace,
 		func(item interface{}) error { return nil },
 		backupClientManifests...)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to storageutils.CreateFromManifests")
 }
 
 func runSyncInPod(pod *v1.Pod) {
@@ -438,7 +438,7 @@ func (s *snapshotMetadataTestSuite) DefineTests(driver storageframework.TestDriv
 		}, f.Namespace.Name)
 
 		targetDevicePvc, err := e2epv.CreatePVC(ctx, f.ClientSet, f.Namespace.Name, targetPvcClaim)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epv.CreatePVC")
 
 		// create backup client
 		backupClientPod = createBackupClientPod(ctx, sourceDevicePvc, targetDevicePvc)

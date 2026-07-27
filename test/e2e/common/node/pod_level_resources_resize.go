@@ -554,7 +554,7 @@ func doPodLevelResourcesMemoryLimitDecreaseTest(f *framework.Framework) {
 		patch := podresize.MakeResizePatch(containers, containers, originalPLR, viableLoweredLimitPLR)
 		testPod, pErr := f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx, testPod.Name,
 			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(pErr, "failed to patch pod for viable lowered limit")
+		framework.ExpectNoError(pErr, "failed to pErr")
 
 		ginkgo.By("verifying pod patched for viable lowered limit")
 		podresize.VerifyPodResources(testPod, containers, viableLoweredLimitPLR)
@@ -585,7 +585,7 @@ func doPodLevelResourcesMemoryLimitDecreaseTest(f *framework.Framework) {
 		patch = podresize.MakeResizePatch(containers, containers, viableLoweredLimitPLR, nonViableLoweredLimitPLR)
 		testPod, pErr = f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx, testPod.Name,
 			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(pErr, "failed to patch pod for viable lowered limit")
+		framework.ExpectNoError(pErr, "failed to pErr")
 
 		framework.ExpectNoError(framework.Gomega().
 			Eventually(ctx, framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(testPod.Namespace).Get, testPod.Name, metav1.GetOptions{}))).
@@ -632,7 +632,7 @@ func doPodLevelResourcesMemoryLimitDecreaseTest(f *framework.Framework) {
 		patch = podresize.MakeResizePatch(containers, containers, viableLoweredLimitPLR, originalPLR)
 		testPod, pErr = f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx, testPod.Name,
 			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(pErr, "failed to patch pod back to original values")
+		framework.ExpectNoError(pErr, "failed to pErr")
 
 		ginkgo.By("verifying pod patched for original values")
 		podresize.VerifyPodResources(testPod, containers, originalPLR)
@@ -669,7 +669,7 @@ func doInitialCreationNoResizeEventTest(f *framework.Framework) {
 
 		ginkgo.By("verifying no ResizeCompleted event was emitted")
 		events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).SearchWithContext(ctx, scheme.Scheme, testPod)
-		framework.ExpectNoError(err, "failed to list events")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Events.SearchWithContext")
 
 		for _, event := range events.Items {
 			if event.Reason == kubeletevents.ResizeCompleted {

@@ -373,7 +373,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 				}
 				return true, nil
 			}); err != nil {
-				framework.ExpectNoError(err, "failed to access nodeport service on localhost")
+				framework.ExpectNoError(err, "failed to e2epodoutput.RunHostCmd")
 			}
 		}
 

@@ -119,7 +119,7 @@ func ExecShellInContainer(f *framework.Framework, podName, containerName string,
 // ExecShellInPod executes the specified command on the pod.
 func ExecShellInPod(ctx context.Context, f *framework.Framework, podName string, cmd string) string {
 	pod, err := NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
-	framework.ExpectNoError(err, "failed to get pod %v", podName)
+	framework.ExpectNoError(err, "failed to NewPodClient.Get", podName)
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
 	return ExecCommandInContainer(f, podName, pod.Spec.Containers[0].Name, "/bin/sh", "-c", cmd)
 }
@@ -127,7 +127,7 @@ func ExecShellInPod(ctx context.Context, f *framework.Framework, podName string,
 // ExecShellInPodWithFullOutput executes the specified command on the Pod and returns stdout, stderr and error.
 func ExecShellInPodWithFullOutput(ctx context.Context, f *framework.Framework, podName string, cmd string) (string, string, error) {
 	pod, err := NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
-	framework.ExpectNoError(err, "failed to get pod %v", podName)
+	framework.ExpectNoError(err, "failed to NewPodClient.Get", podName)
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
 	return ExecCommandInContainerWithFullOutput(f, podName, pod.Spec.Containers[0].Name, "/bin/sh", "-c", cmd)
 }

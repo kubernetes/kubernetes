@@ -96,13 +96,13 @@ var _ = utils.SIGDescribe("MutableCSINodeAllocatableCount", framework.WithFeatur
 			updateCSIDriverWithNodeAllocatableUpdatePeriodSeconds(ctx, clientSet, driverName, updatePeriodSeconds)
 
 			err := drivers.WaitForCSIDriverRegistrationOnNode(ctx, nodeName, driverName, clientSet)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to drivers.WaitForCSIDriverRegistrationOnNode")
 		})
 
 		f.It("should observe dynamic changes in CSINode allocatable count", func(ctx context.Context) {
 			framework.Logf("Testing dynamic changes in CSINode allocatable count")
 			initVal, err := readCSINodeLimit(ctx, clientSet, nodeName, driverName)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to readCSINodeLimit")
 			framework.Logf("Initial MaxVolumesPerNode limit: %d", initVal)
 
 			err = wait.PollUntilContextTimeout(ctx, time.Duration(updatePeriodSeconds), timeout, true, func(ctx context.Context) (bool, error) {
@@ -160,7 +160,7 @@ var _ = utils.SIGDescribe("MutableCSINodeAllocatableCount", framework.WithFeatur
 			updateCSIDriverWithNodeAllocatableUpdatePeriodSeconds(ctx, clientSet, driverName, updatePeriodSeconds)
 
 			err := drivers.WaitForCSIDriverRegistrationOnNode(ctx, nodeName, driverName, clientSet)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to drivers.WaitForCSIDriverRegistrationOnNode")
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {

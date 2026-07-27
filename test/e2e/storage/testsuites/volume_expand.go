@@ -182,7 +182,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			// Waiting for pod to run
 			ginkgo.By("Waiting for pod to run")
 			err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, l.pod.Name, l.pod.Namespace, f.Timeouts.PodStart)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2epod.WaitTimeoutForPodRunningInNamespace")
 
 			gomega.Expect(l.resource.Sc.AllowVolumeExpansion).NotTo(gomega.BeNil())
 			allowVolumeExpansion := *l.resource.Sc.AllowVolumeExpansion

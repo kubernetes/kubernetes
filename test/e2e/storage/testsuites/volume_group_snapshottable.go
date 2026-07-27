@@ -204,7 +204,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 
 				var err error
 				groupTest.statefulSet, err = cs.AppsV1().StatefulSets(f.Namespace.Name).Create(ctx, statefulSet, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "failed to create StatefulSet")
+				framework.ExpectNoError(err, "failed to cs.AppsV1.StatefulSets.Create")
 
 				// Wait for StatefulSet to be ready
 				e2estatefulset.WaitForRunningAndReady(ctx, cs, replicas, groupTest.statefulSet)
@@ -213,7 +213,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 				for i := 0; i < groupTest.numReplicas; i++ {
 					podName := fmt.Sprintf("%s-%d", statefulSetName, i)
 					pod, err := cs.CoreV1().Pods(f.Namespace.Name).Get(ctx, podName, metav1.GetOptions{})
-					framework.ExpectNoError(err, "failed to get StatefulSet pod %s", podName)
+					framework.ExpectNoError(err, "failed to cs.CoreV1.Pods.Get", podName)
 					groupTest.pods = append(groupTest.pods, pod)
 				}
 			}
@@ -230,7 +230,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 					testData := fmt.Sprintf("HelloFromStatefulSetPVC%d", i)
 					originalMntTestData[pvcName] = testData
 					err := tk.WriteFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, writePath, testData)
-					framework.ExpectNoError(err, "failed to write test data to StatefulSet pod %s", pod.Name)
+					framework.ExpectNoError(err, "failed to tk.WriteFileViaContainer", pod.Name)
 				}
 				return originalMntTestData
 			}
@@ -260,7 +260,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 						framework.Logf("deleted VolumeGroupSnapshotResource %s/%s", vgsNamespace, vgsName)
 					}
 				}
-				framework.ExpectNoError(utilerrors.NewAggregate(cleanupVGSErrs), "failed to delete VGS resources")
+				framework.ExpectNoError(utilerrors.NewAggregate(cleanupVGSErrs), "failed to utilerrors.NewAggregate")
 
 				var cleanupVolumeErrs []error
 				for _, volumeResource := range groupTest.volumeResources {
@@ -277,7 +277,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 						framework.Logf("deleted volume resource %s/%s", ns, name)
 					}
 				}
-				framework.ExpectNoError(utilerrors.NewAggregate(cleanupVolumeErrs), "failed to delete volume resources")
+				framework.ExpectNoError(utilerrors.NewAggregate(cleanupVolumeErrs), "failed to utilerrors.NewAggregate")
 			}
 
 			ginkgo.It("should create snapshots for StatefulSet volumes and verify data consistency after restore", func(ctx context.Context) {
@@ -316,10 +316,10 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 					for i := 0; i < groupTest.numReplicas; i++ {
 						pvcName := fmt.Sprintf("data-%s-%d", groupTest.statefulSet.Name, i)
 						pvc, err := cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Get(ctx, pvcName, metav1.GetOptions{})
-						framework.ExpectNoError(err, "failed to get PVC %s", pvcName)
+						framework.ExpectNoError(err, "failed to cs.CoreV1.PersistentVolumeClaims.Get", pvcName)
 
 						pv, err := cs.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
-						framework.ExpectNoError(err, "failed to get PV for PVC %s", pvcName)
+						framework.ExpectNoError(err, "failed to cs.CoreV1.PersistentVolumes.Get", pvcName)
 						volumeHandle := pv.Spec.CSI.VolumeHandle
 						volumeHandleToPVCName[volumeHandle] = pvcName
 					}
@@ -355,7 +355,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 						}
 
 						pvc, err := cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(ctx, pvc, metav1.CreateOptions{})
-						framework.ExpectNoError(err, "failed to create PVC from snapshot")
+						framework.ExpectNoError(err, "failed to cs.CoreV1.PersistentVolumeClaims.Create")
 						restoredPVCs = append(restoredPVCs, pvc)
 					}
 				} else {
@@ -365,7 +365,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 
 					// List VolumeSnapshots owned by this VGS
 					vss, err := dc.Resource(utils.SnapshotGVR).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-					framework.ExpectNoError(err, "failed to list VolumeSnapshots")
+					framework.ExpectNoError(err, "failed to dc.Resource.Namespace.List")
 
 					// Map VolumeSnapshot name to its source PVC name
 					type snapshotInfo struct {
@@ -386,7 +386,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 						vscName := source["volumeSnapshotContentName"].(string)
 
 						vsc, err := dc.Resource(utils.SnapshotContentGVR).Get(ctx, vscName, metav1.GetOptions{})
-						framework.ExpectNoError(err, "failed to get VolumeSnapshotContent %s for pre-provisioned VolumeSnapshot %s", vscName, vs.GetName())
+						framework.ExpectNoError(err, "failed to dc.Resource.Get", vscName, vs.GetName())
 
 						vscStatus := vsc.Object["status"].(map[string]interface{})
 						snapshotHandle := vscStatus["snapshotHandle"].(string)
@@ -421,7 +421,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 						}
 
 						pvc, err := cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(ctx, pvc, metav1.CreateOptions{})
-						framework.ExpectNoError(err, "failed to create PVC from snapshot")
+						framework.ExpectNoError(err, "failed to cs.CoreV1.PersistentVolumeClaims.Create")
 						restoredPVCs = append(restoredPVCs, pvc)
 					}
 				}
@@ -430,7 +430,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 					for _, pvc := range restoredPVCs {
 						framework.Logf("Deleting restored PVC %s", pvc.Name)
 						err := cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Delete(ctx, pvc.Name, metav1.DeleteOptions{})
-						framework.ExpectNoError(err, "failed to delete restored PVC %s", pvc.Name)
+						framework.ExpectNoError(err, "failed to cs.CoreV1.PersistentVolumeClaims.Delete", pvc.Name)
 					}
 				})
 
@@ -441,10 +441,10 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 					SeLinuxLabel: e2epv.SELinuxLabel,
 				}
 				restoredPod, err := e2epod.MakeSecPod(&restoredPodConfig)
-				framework.ExpectNoError(err, "failed to create restored pod config")
+				framework.ExpectNoError(err, "failed to e2epod.MakeSecPod")
 
 				restoredPod, err = cs.CoreV1().Pods(f.Namespace.Name).Create(ctx, restoredPod, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "failed to create restored pod")
+				framework.ExpectNoError(err, "failed to cs.CoreV1.Pods.Create")
 				ginkgo.DeferCleanup(e2epod.DeletePodWithWait, cs, restoredPod)
 				framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, cs, restoredPod.Name, restoredPod.Namespace, f.Timeouts.PodStartSlow), "Restored pod did not start in expected time")
 

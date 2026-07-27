@@ -125,7 +125,7 @@ var _ = common.SIGDescribe("Service CIDRs", func() {
 
 		ginkgo.DeferCleanup(func(ctx context.Context) {
 			err := cs.CoreV1().Services(ns).Delete(ctx, serviceName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
+			framework.ExpectNoError(err, "failed to cs.CoreV1.Services.Delete", serviceName, ns)
 		})
 		err = jig.CreateServicePods(ctx, 2)
 		framework.ExpectNoError(err)

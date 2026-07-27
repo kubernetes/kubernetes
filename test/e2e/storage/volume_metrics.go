@@ -51,18 +51,18 @@ import (
 func createPod(ctx context.Context, c clientset.Interface, pod *v1.Pod) *v1.Pod {
 	ns := pod.Namespace
 	pod, err := c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.CoreV1.Pods.Create")
 
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
-		framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, c, pod))
+		framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, c, pod), "failed to e2epod.DeletePodWithWait")
 	})
 	return pod
 }
 
 func createPVC(ctx context.Context, c clientset.Interface, pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
 	pvc, err := c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.CoreV1.PersistentVolumeClaims.Create")
 	gomega.Expect(pvc).ToNot(gomega.BeNil())
 
 	ginkgo.DeferCleanup(func(ctx context.Context) {
@@ -70,7 +70,7 @@ func createPVC(ctx context.Context, c clientset.Interface, pvc *v1.PersistentVol
 		if err != nil {
 			framework.Failf("Failed to get pvc %s/%s: %v", pvc.Namespace, pvc.Name, err)
 		} else {
-			framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(ctx, c, newPvc.Name, newPvc.Namespace))
+			framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(ctx, c, newPvc.Name, newPvc.Namespace), "failed to e2epv.DeletePersistentVolumeClaim")
 			if newPvc.Spec.VolumeName != "" {
 				err = e2epv.WaitForPersistentVolumeDeleted(ctx, c, newPvc.Spec.VolumeName, 5*time.Second, 5*time.Minute)
 				framework.ExpectNoError(err, "Persistent Volume %v not deleted by dynamic provisioner", newPvc.Spec.VolumeName)
@@ -150,12 +150,12 @@ var _ = utils.SIGDescribe("Volume metrics", func() {
 
 		pod := makePod(f, pvc, ephemeral)
 		pod, err = c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to c.CoreV1.Pods.Create")
 
 		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, c, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "Error starting pod %s", pod.Name)
 
-		framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, c, pod))
+		framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, c, pod), "failed to e2epod.DeletePodWithWait")
 
 		updatedStorageMetrics := waitForDetachAndGrabMetrics(ctx, storageOpMetrics, metricsGrabber, pluginName)
 
@@ -181,7 +181,7 @@ var _ = utils.SIGDescribe("Volume metrics", func() {
 		framework.ExpectNoError(err, "Error starting pod %s", pod.Name)
 
 		pod, err = c.CoreV1().Pods(ns).Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to c.CoreV1.Pods.Get")
 
 		pvcName := pvc.Name
 		if isEphemeral {
@@ -245,7 +245,7 @@ var _ = utils.SIGDescribe("Volume metrics", func() {
 		framework.ExpectNoError(err, "Error starting pod %s", pod.Name)
 
 		pod, err = c.CoreV1().Pods(ns).Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to c.CoreV1.Pods.Get")
 
 		// Verify volume stat metrics were collected for the referenced PVC
 		volumeStatKeys := []string{
@@ -323,10 +323,10 @@ var _ = utils.SIGDescribe("Volume metrics", func() {
 		framework.ExpectNoError(err, "Error starting pod %s", pod.Name)
 
 		pod, err = c.CoreV1().Pods(ns).Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to c.CoreV1.Pods.Get")
 
 		kubeMetrics, err := metricsGrabber.GrabFromKubelet(ctx, pod.Spec.NodeName)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to metricsGrabber.GrabFromKubelet")
 
 		// Metrics should have dimensions plugin_name and state available
 		totalVolumesKey := "volume_manager_total_volumes"

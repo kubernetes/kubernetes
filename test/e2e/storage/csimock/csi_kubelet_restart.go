@@ -56,13 +56,13 @@ var _ = utils.SIGDescribe("CSI Mock when kubelet restart", framework.WithSerial(
 
 		ginkgo.By("Waiting for the Pod to be running")
 		err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-		framework.ExpectNoError(err, "failed to wait for pod %s to be running", pod.Name)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodRunningInNamespace", pod.Name)
 		pod, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get pod %s", pod.Name)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Get", pod.Name)
 
 		ginkgo.By("Deleting the PVC")
 		err = f.ClientSet.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "failed to delete PVC %s", pvc.Name)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.PersistentVolumeClaims.Delete", pvc.Name)
 
 		ginkgo.By("Restarting kubelet")
 		utils.KubeletCommand(ctx, utils.KRestart, f.ClientSet, pod)
@@ -70,7 +70,7 @@ var _ = utils.SIGDescribe("CSI Mock when kubelet restart", framework.WithSerial(
 
 		ginkgo.By("Verifying the PVC is terminating during kubelet restart")
 		pvc, err = f.ClientSet.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get PVC %s", pvc.Name)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.PersistentVolumeClaims.Get", pvc.Name)
 		gomega.Expect(pvc.DeletionTimestamp).NotTo(gomega.BeNil(), "PVC %s should have deletion timestamp", pvc.Name)
 
 		ginkgo.By(fmt.Sprintf("Verifying that the driver didn't receive NodeUnpublishVolume call for PVC %s", pvc.Name))
@@ -93,6 +93,6 @@ var _ = utils.SIGDescribe("CSI Mock when kubelet restart", framework.WithSerial(
 
 		ginkgo.By("Verifying the Pod is still running")
 		err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-		framework.ExpectNoError(err, "failed to wait for pod %s to be running", pod.Name)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodRunningInNamespace", pod.Name)
 	})
 })

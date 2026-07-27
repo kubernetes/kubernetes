@@ -63,7 +63,7 @@ var _ = utils.SIGDescribe(feature.Flexvolumes, "Detaching volumes", framework.Wi
 		ns = f.Namespace
 		var err error
 		node, err = e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 		suffix = ns.Name
 	})
 
@@ -86,7 +86,7 @@ var _ = utils.SIGDescribe(feature.Flexvolumes, "Detaching volumes", framework.Wi
 		clientPod := getFlexVolumePod(volumeSource, node.Name)
 		ginkgo.By("Creating pod that uses slow format volume")
 		pod, err := cs.CoreV1().Pods(ns.Name).Create(ctx, clientPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to cs.CoreV1.Pods.Create")
 
 		uniqueVolumeName := getUniqueVolumeName(pod, driverInstallAs)
 

@@ -141,7 +141,7 @@ func waitUntilPodInfoInLog(ctx context.Context, m *mockDriverSetup, expectPodInf
 			if expectPodInfo {
 				ginkgo.By("checking for CSIInlineVolumes feature")
 				csiInlineVolumesEnabled, err = testsuites.CSIInlineVolumesEnabled(ctx, m.cs, m.f.Timeouts, m.f.Namespace.Name)
-				framework.ExpectNoError(err, "failed to test for CSIInlineVolumes")
+				framework.ExpectNoError(err, "failed to testsuites.CSIInlineVolumesEnabled")
 			}
 
 			ginkgo.By("Deleting the previously created pod")
@@ -150,7 +150,7 @@ func waitUntilPodInfoInLog(ctx context.Context, m *mockDriverSetup, expectPodInf
 
 			ginkgo.By("Checking CSI driver logs")
 			err = checkNodePublishVolume(ctx, m.driver.GetCalls, pod, expectPodInfo, expectEphemeral, csiInlineVolumesEnabled, false, false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to checkNodePublishVolume")
 		})
 
 		return err == nil

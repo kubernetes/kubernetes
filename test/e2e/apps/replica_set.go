@@ -488,7 +488,7 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 		},
 	}
 	rsList, err := f.ClientSet.AppsV1().ReplicaSets("").List(ctx, metav1.ListOptions{LabelSelector: label})
-	framework.ExpectNoError(err, "failed to list rsList")
+	framework.ExpectNoError(err, "failed to f.ClientSet.AppsV1.ReplicaSets.List")
 	// Create a ReplicaSet
 	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
 	createdRS, err := c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
@@ -526,9 +526,9 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 			},
 		},
 	})
-	framework.ExpectNoError(err, "failed to Marshal ReplicaSet JSON patch")
+	framework.ExpectNoError(err, "failed to json.Marshal")
 	patchedRS, err := f.ClientSet.AppsV1().ReplicaSets(ns).Patch(ctx, rsName, types.StrategicMergePatchType, []byte(rsPatch), metav1.PatchOptions{})
-	framework.ExpectNoError(err, "failed to patch ReplicaSet")
+	framework.ExpectNoError(err, "failed to f.ClientSet.AppsV1.ReplicaSets.Patch")
 	gomega.Expect(resourceversion.CompareResourceVersion(createdRS.ResourceVersion, patchedRS.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 	ctxUntil, cancel := context.WithTimeout(ctx, f.Timeouts.PodStart)
@@ -554,7 +554,7 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 		return false, nil
 	})
 
-	framework.ExpectNoError(err, "failed to see replicas of %v in namespace %v scale to requested amount of %v", rs.Name, ns, rsPatchReplicas)
+	framework.ExpectNoError(err, "failed to watchtools.Until", rs.Name, ns, rsPatchReplicas)
 }
 
 // List and DeleteCollection operations
@@ -585,21 +585,21 @@ func listRSDeleteCollection(ctx context.Context, f *framework.Framework) {
 	err = e2epod.VerifyPodsRunning(ctx, c, ns, podName, labels.SelectorFromSet(map[string]string{"name": podName}), false, replicas)
 	framework.ExpectNoError(err, "Failed to create pods: %s", err)
 	r, err := rsClient.Get(ctx, rsName, metav1.GetOptions{})
-	framework.ExpectNoError(err, "failed to get ReplicaSets")
+	framework.ExpectNoError(err, "failed to rsClient.Get")
 	framework.Logf("Replica Status: %+v", r.Status)
 
 	ginkgo.By("Listing all ReplicaSets")
 	rsList, err := c.AppsV1().ReplicaSets("").List(ctx, metav1.ListOptions{LabelSelector: "e2e=" + e2eValue})
-	framework.ExpectNoError(err, "failed to list ReplicaSets")
+	framework.ExpectNoError(err, "failed to " + e2eValue}")
 	gomega.Expect(rsList.Items).To(gomega.HaveLen(1), "filtered list wasn't found")
 
 	ginkgo.By("DeleteCollection of the ReplicaSets")
 	err = rsClient.DeleteCollection(ctx, metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{LabelSelector: "e2e=" + e2eValue})
-	framework.ExpectNoError(err, "failed to delete ReplicaSets")
+	framework.ExpectNoError(err, "failed to " + e2eValue}")
 
 	ginkgo.By("After DeleteCollection verify that ReplicaSets have been deleted")
 	rsList, err = c.AppsV1().ReplicaSets("").List(ctx, metav1.ListOptions{LabelSelector: "e2e=" + e2eValue})
-	framework.ExpectNoError(err, "failed to list ReplicaSets")
+	framework.ExpectNoError(err, "failed to " + e2eValue}")
 	gomega.Expect(rsList.Items).To(gomega.BeEmpty(), "filtered list should have no replicas")
 }
 
@@ -626,7 +626,7 @@ func testRSStatus(ctx context.Context, f *framework.Framework) {
 		},
 	}
 	rsList, err := c.AppsV1().ReplicaSets("").List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
-	framework.ExpectNoError(err, "failed to list Replicasets")
+	framework.ExpectNoError(err, "failed to c.AppsV1.ReplicaSets.List")
 
 	ginkgo.By("Create a Replicaset")
 	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
@@ -696,7 +696,7 @@ func testRSStatus(ctx context.Context, f *framework.Framework) {
 		framework.Logf("Observed %v event: %+v", object, event.Type)
 		return false, nil
 	})
-	framework.ExpectNoError(err, "failed to locate replicaset %v in namespace %v", testReplicaSet.ObjectMeta.Name, ns)
+	framework.ExpectNoError(err, "failed to watchtools.Until", testReplicaSet.ObjectMeta.Name, ns)
 	framework.Logf("Replicaset %s has an updated status", rsName)
 
 	ginkgo.By("patching the Replicaset Status")
@@ -732,6 +732,6 @@ func testRSStatus(ctx context.Context, f *framework.Framework) {
 		framework.Logf("Observed %v event: %+v", object, event.Type)
 		return false, nil
 	})
-	framework.ExpectNoError(err, "failed to locate replicaset %v in namespace %v", testReplicaSet.ObjectMeta.Name, ns)
+	framework.ExpectNoError(err, "failed to watchtools.Until", testReplicaSet.ObjectMeta.Name, ns)
 	framework.Logf("Replicaset %s has a patched status", rsName)
 }

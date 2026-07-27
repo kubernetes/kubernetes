@@ -277,7 +277,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}
 
 			cleanupFunc, err := e2eauth.BindClusterRole(ctx, c.RbacV1(), "system:persistent-volume-provisioner", ns, subject)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2eauth.BindClusterRole")
 			defer cleanupFunc(ctx)
 
 			roleName := "leader-locking-nfs-provisioner"
@@ -294,7 +294,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.ExpectNoError(err, "Failed to create leader-locking role")
 
 			err = e2eauth.BindRoleInNamespace(ctx, c.RbacV1(), roleName, ns, subject)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2eauth.BindRoleInNamespace")
 
 			err = e2eauth.WaitForAuthorizationUpdate(ctx, c.AuthorizationV1(),
 				serviceaccount.MakeUsername(ns, serviceAccountName),
@@ -358,7 +358,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 
 			scName, scErr := e2epv.GetDefaultStorageClassName(ctx, c)
-			framework.ExpectNoError(scErr)
+			framework.ExpectNoError(scErr, "failed to scErr")
 
 			test := testsuites.StorageClassTest{
 				Name:      "default",
@@ -377,7 +377,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				VolumeMode: &test.VolumeMode,
 			}, ns)
 			claim, err := c.CoreV1().PersistentVolumeClaims(ns).Create(ctx, claim, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1.PersistentVolumeClaims.Create")
 			ginkgo.DeferCleanup(e2epv.DeletePersistentVolumeClaim, c, claim.Name, ns)
 
 			// The claim should timeout phase:Pending
@@ -385,7 +385,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("not all in phase Bound")))
 			framework.Logf("%s", err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claim.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1.PersistentVolumeClaims.Get")
 			gomega.Expect(claim.Status.Phase).To(gomega.Equal(v1.ClaimPending))
 		})
 
@@ -394,7 +394,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 
 			scName, scErr := e2epv.GetDefaultStorageClassName(ctx, c)
-			framework.ExpectNoError(scErr)
+			framework.ExpectNoError(scErr, "failed to scErr")
 
 			test := testsuites.StorageClassTest{
 				Name:      "default",
@@ -413,9 +413,9 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				VolumeMode: &test.VolumeMode,
 			}, ns)
 			claim, err := c.CoreV1().PersistentVolumeClaims(ns).Create(ctx, claim, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1.PersistentVolumeClaims.Create")
 			defer func() {
-				framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(ctx, c, claim.Name, ns))
+				framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(ctx, c, claim.Name, ns), "failed to e2epv.DeletePersistentVolumeClaim")
 			}()
 
 			// The claim should timeout phase:Pending
@@ -423,7 +423,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("not all in phase Bound")))
 			framework.Logf("%s", err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claim.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1.PersistentVolumeClaims.Get")
 			gomega.Expect(claim.Status.Phase).To(gomega.Equal(v1.ClaimPending))
 		})
 	})
@@ -449,7 +449,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				VolumeMode:       &test.VolumeMode,
 			}, ns)
 			claim, err := c.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1.PersistentVolumeClaims.Create")
 			defer func() {
 				framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
 				err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
@@ -495,13 +495,13 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 func verifyDefaultStorageClass(ctx context.Context, c clientset.Interface, scName string, expectedDefault bool) {
 	sc, err := c.StorageV1().StorageClasses().Get(ctx, scName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.StorageV1.StorageClasses.Get")
 	gomega.Expect(storageutil.IsDefaultAnnotation(sc.ObjectMeta)).To(gomega.Equal(expectedDefault))
 }
 
 func updateDefaultStorageClass(ctx context.Context, c clientset.Interface, scName string, defaultStr string) {
 	sc, err := c.StorageV1().StorageClasses().Get(ctx, scName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.StorageV1.StorageClasses.Get")
 
 	if defaultStr == "" {
 		delete(sc.Annotations, storageutil.BetaIsDefaultStorageClassAnnotation)
@@ -515,7 +515,7 @@ func updateDefaultStorageClass(ctx context.Context, c clientset.Interface, scNam
 	}
 
 	_, err = c.StorageV1().StorageClasses().Update(ctx, sc, metav1.UpdateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.StorageV1.StorageClasses.Update")
 
 	expectedDefault := false
 	if defaultStr == "true" {
@@ -528,14 +528,14 @@ func updateDefaultStorageClass(ctx context.Context, c clientset.Interface, scNam
 func deleteStorageClass(ctx context.Context, c clientset.Interface, className string) {
 	err := c.StorageV1().StorageClasses().Delete(ctx, className, metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to c.StorageV1.StorageClasses.Delete")
 	}
 }
 
 func getRandomClusterZone(ctx context.Context, c clientset.Interface) string {
 	zones, err := e2enode.GetClusterZones(ctx, c)
 	zone := ""
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2enode.GetClusterZones")
 	if len(zones) != 0 {
 		zonesList := zones.UnsortedList()
 		zone = zonesList[rand.Intn(zones.Len())]

@@ -136,7 +136,7 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 				SeLinuxLabel: e2epv.SELinuxLabel,
 			}
 			pod, err := e2epod.MakeSecPod(&podConfig)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2epod.MakeSecPod")
 
 			l.pods = append(l.pods, pod)
 		}

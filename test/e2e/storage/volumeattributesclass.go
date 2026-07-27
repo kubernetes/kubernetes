@@ -68,21 +68,21 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", framework.WithFeatureGate(fea
 
 		ginkgo.By("Creating a VolumeAttributesClass")
 		createdVolumeAttributesClass, err := vacClient.Create(ctx, initialVAC, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create the requested VolumeAttributesClass")
+		framework.ExpectNoError(err, "failed to vacClient.Create")
 
 		ginkgo.By(fmt.Sprintf("Get VolumeAttributesClass %q", createdVolumeAttributesClass.Name))
 		retrievedVolumeAttributesClass, err := vacClient.Get(ctx, createdVolumeAttributesClass.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get VolumeAttributesClass %q", createdVolumeAttributesClass.Name)
+		framework.ExpectNoError(err, "failed to vacClient.Get", createdVolumeAttributesClass.Name)
 
 		ginkgo.By(fmt.Sprintf("Patching the VolumeAttributesClass %q", retrievedVolumeAttributesClass.Name))
 		payload := "{\"metadata\":{\"labels\":{\"" + retrievedVolumeAttributesClass.Name + "\":\"patched\"}}}"
 		patchedVolumeAttributesClass, err := vacClient.Patch(ctx, retrievedVolumeAttributesClass.Name, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch VolumeAttributesClass %q", retrievedVolumeAttributesClass.Name)
+		framework.ExpectNoError(err, "failed to vacClient.Patch", retrievedVolumeAttributesClass.Name)
 		gomega.Expect(patchedVolumeAttributesClass.Labels).To(gomega.HaveKeyWithValue(patchedVolumeAttributesClass.Name, "patched"), "checking that patched label has been applied")
 
 		ginkgo.By(fmt.Sprintf("Delete VolumeAttributesClass %q", patchedVolumeAttributesClass.Name))
 		err = vacClient.Delete(ctx, patchedVolumeAttributesClass.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "failed to delete VolumeAttributesClass %q", patchedVolumeAttributesClass.Name)
+		framework.ExpectNoError(err, "failed to vacClient.Delete", patchedVolumeAttributesClass.Name)
 
 		ginkgo.By(fmt.Sprintf("Confirm deletion of VolumeAttributesClass %q", patchedVolumeAttributesClass.Name))
 
@@ -125,7 +125,7 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", framework.WithFeatureGate(fea
 		}
 
 		replacementVolumeAttributesClass, err := vacClient.Create(ctx, replacementVAC, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create replacement VolumeAttributesClass")
+		framework.ExpectNoError(err, "failed to vacClient.Create")
 
 		ginkgo.By(fmt.Sprintf("Updating VolumeAttributesClass %q", replacementVolumeAttributesClass.Name))
 		var updatedVolumeAttributesClass *storagev1.VolumeAttributesClass
@@ -137,18 +137,18 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", framework.WithFeatureGate(fea
 			updatedVolumeAttributesClass, err = vacClient.Update(ctx, vac, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err, "failed to update VolumeAttributesClass %q", replacementVolumeAttributesClass.Name)
+		framework.ExpectNoError(err, "failed to vacClient.Update", replacementVolumeAttributesClass.Name)
 		gomega.Expect(updatedVolumeAttributesClass.Labels).To(gomega.HaveKeyWithValue(replacementVolumeAttributesClass.Name, "updated"), "checking that updated label has been applied")
 
 		vacSelector = labels.Set{replacementVolumeAttributesClass.Name: "updated"}.AsSelector().String()
 		ginkgo.By(fmt.Sprintf("Listing all VolumeAttributesClasses with the labelSelector: %q", vacSelector))
 		vacList, err := vacClient.List(ctx, metav1.ListOptions{LabelSelector: vacSelector})
-		framework.ExpectNoError(err, "failed to list VolumeAttributesClasses with the labelSelector: %q", vacSelector)
+		framework.ExpectNoError(err, "failed to vacClient.List", vacSelector)
 		gomega.Expect(vacList.Items).To(gomega.HaveLen(1))
 
 		ginkgo.By(fmt.Sprintf("Deleting VolumeAttributesClass %q via DeleteCollection", updatedVolumeAttributesClass.Name))
 		err = vacClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: vacSelector})
-		framework.ExpectNoError(err, "failed to delete VolumeAttributesClass %q", updatedVolumeAttributesClass.Name)
+		framework.ExpectNoError(err, "failed to vacClient.DeleteCollection", updatedVolumeAttributesClass.Name)
 
 		ginkgo.By(fmt.Sprintf("Confirm deletion of VolumeAttributesClass %q", updatedVolumeAttributesClass.Name))
 

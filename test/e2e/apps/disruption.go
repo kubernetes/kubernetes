@@ -130,7 +130,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 					"minAvailable": "3%",
 				},
 			})
-			framework.ExpectNoError(err, "failed to marshal JSON for new data")
+			framework.ExpectNoError(err, "failed to json.Marshal")
 			return newBytes, nil
 		})
 		gomega.Expect(patchedPDB.Spec.MinAvailable.String()).To(gomega.Equal("3%"))
@@ -189,10 +189,10 @@ var _ = SIGDescribe("DisruptionController", func() {
 		ginkgo.By("Patching PodDisruptionBudget status")
 		patched := patchPDBOrDie(ctx, cs, dc, ns, defaultName, func(old *policyv1.PodDisruptionBudget) (bytes []byte, err error) {
 			oldBytes, err := json.Marshal(old)
-			framework.ExpectNoError(err, "failed to marshal JSON for old data")
+			framework.ExpectNoError(err, "failed to json.Marshal")
 			old.Status.DisruptedPods = make(map[string]metav1.Time)
 			newBytes, err := json.Marshal(old)
-			framework.ExpectNoError(err, "failed to marshal JSON for new data")
+			framework.ExpectNoError(err, "failed to json.Marshal")
 			return jsonpatch.CreateMergePatch(oldBytes, newBytes)
 		}, "status")
 		gomega.Expect(patched.Status.DisruptedPods).To(gomega.BeEmpty(), "Expecting the PodDisruptionBudget's be empty")
@@ -389,12 +389,12 @@ var _ = SIGDescribe("DisruptionController", func() {
 		ginkgo.By("Patching the pdb to disallow a pod to be evicted")
 		patchPDBOrDie(ctx, cs, dc, ns, defaultName, func(old *policyv1.PodDisruptionBudget) (bytes []byte, err error) {
 			oldData, err := json.Marshal(old)
-			framework.ExpectNoError(err, "failed to marshal JSON for old data")
+			framework.ExpectNoError(err, "failed to json.Marshal")
 			old.Spec.MinAvailable = nil
 			maxUnavailable := intstr.FromInt32(0)
 			old.Spec.MaxUnavailable = &maxUnavailable
 			newData, err := json.Marshal(old)
-			framework.ExpectNoError(err, "failed to marshal JSON for new data")
+			framework.ExpectNoError(err, "failed to json.Marshal")
 			return jsonpatch.CreateMergePatch(oldData, newData)
 		})
 

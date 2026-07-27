@@ -402,7 +402,7 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 	)
 
 	resizedPod, err := framework.GetObject(podClient.Get, pod.Name, metav1.GetOptions{})(ctx)
-	framework.ExpectNoError(err, "failed to get resized pod")
+	framework.ExpectNoError(err, "failed to framework.GetObject")
 	return resizedPod
 }
 

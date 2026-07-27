@@ -100,7 +100,7 @@ var _ = utils.SIGDescribe("CSI Mock volume service account token", func() {
 					serviceAccountTokenInSecrets = *test.serviceAccountTokenInSecrets
 				}
 				err = checkNodePublishVolume(ctx, m.driver.GetCalls, pod, false, false, false, test.deployCSIDriverObject && csiServiceAccountTokenEnabled, serviceAccountTokenInSecrets)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to checkNodePublishVolume")
 			})
 		}
 	})

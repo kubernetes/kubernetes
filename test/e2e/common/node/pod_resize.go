@@ -605,7 +605,7 @@ func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
 		patch := podresize.MakeResizePatch(original, viableLoweredLimit, nil, nil)
 		testPod, pErr := f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx, testPod.Name,
 			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(pErr, "failed to patch pod for viable lowered limit")
+		framework.ExpectNoError(pErr, "failed to pErr")
 
 		ginkgo.By("verifying pod patched for viable lowered limit")
 		podresize.VerifyPodResources(testPod, viableLoweredLimit, nil)
@@ -631,7 +631,7 @@ func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
 		patch = podresize.MakeResizePatch(viableLoweredLimit, nonViableLoweredLimit, nil, nil)
 		testPod, pErr = f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx, testPod.Name,
 			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(pErr, "failed to patch pod for viable lowered limit")
+		framework.ExpectNoError(pErr, "failed to pErr")
 
 		framework.ExpectNoError(framework.Gomega().
 			Eventually(ctx, framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(testPod.Namespace).Get, testPod.Name, metav1.GetOptions{}))).
@@ -678,7 +678,7 @@ func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
 		patch = podresize.MakeResizePatch(nonViableLoweredLimit, original, nil, nil)
 		testPod, pErr = f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx, testPod.Name,
 			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(pErr, "failed to patch pod back to original values")
+		framework.ExpectNoError(pErr, "failed to pErr")
 
 		ginkgo.By("verifying pod patched for original values")
 		podresize.VerifyPodResources(testPod, original, nil)
@@ -756,7 +756,7 @@ func doPodResizeInitContainerResizeTest(f *framework.Framework) {
 		patch := podresize.MakeResizePatch(originalContainers, resizedContainers, nil, nil)
 		patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
 			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(pErr, "failed to patch pod for resize")
+		framework.ExpectNoError(pErr, "failed to pErr")
 		verifyInitContainerResources(ctx, f, patchedPod, resizedContainers, resizedInitCtr)
 
 		// Resize has been actuated, test the reverse operation.
@@ -764,7 +764,7 @@ func doPodResizeInitContainerResizeTest(f *framework.Framework) {
 		patch = podresize.MakeResizePatch(resizedContainers, originalContainers, nil, nil)
 		patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
 			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(pErr, "failed to patch pod for resize")
+		framework.ExpectNoError(pErr, "failed to pErr")
 		verifyInitContainerResources(ctx, f, patchedPod, originalContainers, originalInitCtr)
 
 		ginkgo.By("deleting pod")
@@ -800,16 +800,16 @@ func doPodResizeReadAndReplaceTests(f *framework.Framework) {
 		gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(1))
 
 		podToUpdate, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get pod")
+		framework.ExpectNoError(err, "failed to podClient.Get")
 		podToUpdate.Spec.Containers[0].Resources = desired
 
 		ginkgo.By("updating the pod resources")
 		_, err = podClient.UpdateResize(ctx, pod.Name, podToUpdate, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "failed to resize pod")
+		framework.ExpectNoError(err, "failed to podClient.UpdateResize")
 
 		ginkgo.By("fetching updated pod")
 		updatedPod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get pod")
+		framework.ExpectNoError(err, "failed to podClient.Get")
 
 		ginkgo.By("verifying pod resources")
 		podresize.VerifyPodResources(updatedPod, desiredContainers, nil)
@@ -911,7 +911,7 @@ func doPodResizeMemoryVolumeTests(f *framework.Framework) {
 
 			ginkgo.By("verifying initial volume mount size via df inside the container")
 			stdout, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, newPod.Name, "c1", "df", "-m", "/cache")
-			framework.ExpectNoError(err, "failed to run df inside container")
+			framework.ExpectNoError(err, "failed to e2epod.ExecCommandInContainerWithFullOutput")
 			origMB := origQty.Value() / (1024 * 1024)
 			gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(origMB, 10)))
 
@@ -919,7 +919,7 @@ func doPodResizeMemoryVolumeTests(f *framework.Framework) {
 			containerPatchBytes := podresize.MakeResizePatch(originalContainers, desiredContainers, nil, nil)
 			var patchMap map[string]interface{}
 			err = json.Unmarshal(containerPatchBytes, &patchMap)
-			framework.ExpectNoError(err, "failed to unmarshal container patch")
+			framework.ExpectNoError(err, "failed to json.Unmarshal")
 
 			if patchMap == nil {
 				patchMap = make(map[string]interface{})
@@ -939,11 +939,11 @@ func doPodResizeMemoryVolumeTests(f *framework.Framework) {
 			}
 
 			patchBytes, err := json.Marshal(patchMap)
-			framework.ExpectNoError(err, "failed to marshal combined patch")
+			framework.ExpectNoError(err, "failed to json.Marshal")
 
 			patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
 				types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "resize")
-			framework.ExpectNoError(pErr, "failed to patch pod spec")
+			framework.ExpectNoError(pErr, "failed to pErr")
 
 			ginkgo.By("waiting for resize actuation to complete")
 			expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, desiredContainers)
@@ -954,7 +954,7 @@ func doPodResizeMemoryVolumeTests(f *framework.Framework) {
 
 			ginkgo.By("verifying new volume mount size via df inside the container")
 			stdout, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, resizedPod.Name, "c1", "df", "-m", "/cache")
-			framework.ExpectNoError(err, "failed to run df inside container after resize")
+			framework.ExpectNoError(err, "failed to e2epod.ExecCommandInContainerWithFullOutput")
 			desiredMB := desiredQty.Value() / (1024 * 1024)
 			gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(desiredMB, 10)))
 
@@ -962,7 +962,7 @@ func doPodResizeMemoryVolumeTests(f *framework.Framework) {
 			rollbackContainerPatchBytes := podresize.MakeResizePatch(desiredContainers, originalContainers, nil, nil)
 			var rollbackPatchMap map[string]interface{}
 			err = json.Unmarshal(rollbackContainerPatchBytes, &rollbackPatchMap)
-			framework.ExpectNoError(err, "failed to unmarshal rollback container patch")
+			framework.ExpectNoError(err, "failed to json.Unmarshal")
 
 			if rollbackPatchMap == nil {
 				rollbackPatchMap = make(map[string]interface{})
@@ -982,18 +982,18 @@ func doPodResizeMemoryVolumeTests(f *framework.Framework) {
 			}
 
 			rollbackPatchBytes, err := json.Marshal(rollbackPatchMap)
-			framework.ExpectNoError(err, "failed to marshal rollback patch")
+			framework.ExpectNoError(err, "failed to json.Marshal")
 
 			rolledBackPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
 				types.StrategicMergePatchType, rollbackPatchBytes, metav1.PatchOptions{}, "resize")
-			framework.ExpectNoError(pErr, "failed to patch pod for rollback")
+			framework.ExpectNoError(pErr, "failed to pErr")
 
 			expectedRollback := podresize.UpdateExpectedContainerRestarts(ctx, rolledBackPod, originalContainers)
 			finalPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, rolledBackPod, expectedRollback)
 			podresize.ExpectPodResized(ctx, f, finalPod, expectedRollback)
 
 			stdout, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, finalPod.Name, "c1", "df", "-m", "/cache")
-			framework.ExpectNoError(err, "failed to run df after rollback")
+			framework.ExpectNoError(err, "failed to e2epod.ExecCommandInContainerWithFullOutput")
 			gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(origMB, 10)))
 
 			ginkgo.By("deleting pod")
@@ -1055,12 +1055,12 @@ func doPodResizeMemoryVolumeSizeLimitDecreaseTest(f *framework.Framework) {
 
 		ginkgo.By("verifying new volume mount size via df inside the container")
 		stdout, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, newPod.Name, "c1", "df", "-m", "/cache")
-		framework.ExpectNoError(err, "failed to run df inside container")
+		framework.ExpectNoError(err, "failed to e2epod.ExecCommandInContainerWithFullOutput")
 		gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(qty128Mi.Value()/(1024*1024), 10)))
 
 		ginkgo.By(fmt.Sprintf("writing a %s file to the volume to ensure active usage", qty100Mi.String()))
 		_, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, newPod.Name, "c1", "dd", "if=/dev/zero", "of=/cache/largefile", "bs=1M", fmt.Sprintf("count=%d", qty100Mi.Value()/(1024*1024)))
-		framework.ExpectNoError(err, "failed to write large file inside container")
+		framework.ExpectNoError(err, "failed to /dev/zero", "of=/cache/largefile", "bs=1M", fmt.Sprintf")
 
 		ginkgo.By(fmt.Sprintf("patching pod spec's emptyDir sizeLimit down to %s", qty50Mi.String()))
 		patchBytes := fmt.Appendf(nil, `{
@@ -1077,7 +1077,7 @@ func doPodResizeMemoryVolumeSizeLimitDecreaseTest(f *framework.Framework) {
 		}`, qty50Mi.String())
 		patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
 			types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(pErr, "failed to patch emptyDir sizeLimit")
+		framework.ExpectNoError(pErr, "failed to pErr")
 
 		ginkgo.By("waiting for resize actuation to fail and report error in condition")
 		framework.ExpectNoError(framework.Gomega().
@@ -1108,7 +1108,7 @@ func doPodResizeMemoryVolumeSizeLimitDecreaseTest(f *framework.Framework) {
 
 		ginkgo.By("verifying the volume still holds the original size and c1 didn't restart")
 		stdout, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, newPod.Name, "c1", "df", "-m", "/cache")
-		framework.ExpectNoError(err, "failed to run df inside container")
+		framework.ExpectNoError(err, "failed to e2epod.ExecCommandInContainerWithFullOutput")
 		gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(qty128Mi.Value()/(1024*1024), 10)))
 
 		gotPod, getErr := podClient.Get(ctx, newPod.Name, metav1.GetOptions{})

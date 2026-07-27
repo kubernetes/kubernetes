@@ -199,14 +199,14 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		nodeName := l.config.ClientNodeSelection.Name
 		if nodeName == "" {
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 			nodeName = node.Name
 		}
 		framework.Logf("Selected node %s", nodeName)
 
 		ginkgo.By("Checking node limits")
 		limit, err := getNodeLimits(ctx, l.cs, l.config, nodeName, dDriver)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to getNodeLimits")
 
 		framework.Logf("Node %s can handle %d volumes of driver %s", nodeName, limit, driverInfo.Name)
 		// Create a storage class and generate a PVC. Do not instantiate the PVC yet, keep it for the last pod.
@@ -239,7 +239,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 					StorageClassName: &l.resource.Sc.Name,
 				}, l.ns.Name)
 				pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(ctx, pvc, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to l.cs.CoreV1.PersistentVolumeClaims.Create")
 				l.pvcNames = append(l.pvcNames, pvc.Name)
 				pvcs = append(pvcs, pvc)
 			}
@@ -252,9 +252,9 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 				NodeSelection: selection,
 			}
 			pod, err := e2epod.MakeSecPod(&podConfig)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2epod.MakeSecPod")
 			pod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(ctx, pod, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to l.cs.CoreV1.Pods.Create")
 			l.podNames = append(l.podNames, pod.Name)
 		}
 
@@ -264,7 +264,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		ginkgo.By("Waiting for the pod(s) running")
 		for _, podName := range l.podNames {
 			err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, l.cs, podName, l.ns.Name, testSlowMultiplier*f.Timeouts.PodStart)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2epod.WaitTimeoutForPodRunningInNamespace")
 		}
 
 		ginkgo.By("Creating an extra pod with one volume to exceed the limit")
@@ -290,7 +290,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to regexp.Compile")
 	})
 
 	ginkgo.It("should verify that all csinodes have volume limits", func(ctx context.Context) {
@@ -311,7 +311,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 			nodeNames = append(nodeNames, l.config.ClientNodeSelection.Name)
 		} else {
 			nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2enode.GetReadySchedulableNodes")
 			for _, node := range nodeList.Items {
 				nodeNames = append(nodeNames, node.Name)
 			}

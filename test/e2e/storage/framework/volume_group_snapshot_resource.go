@@ -121,7 +121,7 @@ func CreateVolumeGroupSnapshot(ctx context.Context, sDriver VolumeGroupSnapshott
 	err = framework.Gomega().Expect(vgscName).NotTo(gomega.BeNil())
 	framework.ExpectNoError(err, "Failed to get content name of volume group snapshot")
 	vgsc, err := dc.Resource(utils.VolumeGroupSnapshotContentGVR).Get(ctx, vgscName, metav1.GetOptions{})
-	framework.ExpectNoError(err, "failed to get content of group snapshot")
+	framework.ExpectNoError(err, "failed to dc.Resource.Get")
 	return gsclass, volumeGroupSnapshot, vgsc
 }
 
@@ -454,7 +454,7 @@ func (r *VolumeGroupSnapshotResource) convertToPreprovisioned(ctx context.Contex
 	if r.Pattern.SnapshotDeletionPolicy == DeleteSnapshot {
 		ginkgo.By("updating VGSC and VSC deletion policies to Retain")
 		vgsc, err = r.patchVGSAndVSCsDeletionPolicy(ctx, dc, vgsc, pvcNamespace, vgsUID, "Retain")
-		framework.ExpectNoError(err, "failed to update VGSC and VSC deletion policies to Retain")
+		framework.ExpectNoError(err, "failed to r.patchVGSAndVSCsDeletionPolicy")
 	}
 
 	ginkgo.By("recording properties of the pre-provisioned group snapshot")
@@ -477,13 +477,13 @@ func (r *VolumeGroupSnapshotResource) convertToPreprovisioned(ctx context.Contex
 
 	// Get all VolumeSnapshotContent names owned by this VGS before deletion
 	contentNamesSet, err := r.getVolumeSnapshotContentNames(ctx, dc, pvcNamespace, vgsUID)
-	framework.ExpectNoError(err, "failed to get VolumeSnapshotContent names owned by VGS %s", vgsUID)
+	framework.ExpectNoError(err, "failed to r.getVolumeSnapshotContentNames", vgsUID)
 
 	// Capture the mapping of snapshot handle to source PVC name before deleting dynamic snapshots
 	// This is needed because pre-provisioned snapshots don't have spec.source.persistentVolumeClaimName
 	ginkgo.By("capturing source PVC names from dynamic VolumeSnapshots")
 	vsList, err := dc.Resource(utils.SnapshotGVR).Namespace(pvcNamespace).List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err, "failed to list VolumeSnapshots")
+	framework.ExpectNoError(err, "failed to dc.Resource.Namespace.List")
 
 	// Filter to VolumeSnapshots owned by this VGS
 	ownedSnapshots := utils.FilterResourcesByOwner(vsList.Items, "VolumeGroupSnapshot", vgsUID)
@@ -503,7 +503,7 @@ func (r *VolumeGroupSnapshotResource) convertToPreprovisioned(ctx context.Contex
 
 		// Get the VSC to find the snapshot handle (should exist since VS is bound)
 		vsc, err := dc.Resource(utils.SnapshotContentGVR).Get(ctx, vscName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get VolumeSnapshotContent %s for bound VolumeSnapshot %s", vscName, vs.GetName())
+		framework.ExpectNoError(err, "failed to dc.Resource.Get", vscName, vs.GetName())
 
 		vscStatus := vsc.Object["status"].(map[string]interface{})
 		snapshotHandle := vscStatus["snapshotHandle"].(string)
@@ -517,7 +517,7 @@ func (r *VolumeGroupSnapshotResource) convertToPreprovisioned(ctx context.Contex
 	// We exploit this to create a group snapshot resource from which we can create a preprovisioned snapshot
 	ginkgo.By("deleting the group snapshot")
 	err = dc.Resource(utils.VolumeGroupSnapshotGVR).Namespace(snapshot.GetNamespace()).Delete(ctx, snapshot.GetName(), metav1.DeleteOptions{})
-	framework.ExpectNoError(err, "failed to delete VolumeGroupSnapshot %s/%s", snapshot.GetNamespace(), snapshot.GetName())
+	framework.ExpectNoError(err, "failed to dc.Resource.Namespace.Delete", snapshot.GetNamespace(), snapshot.GetName())
 
 	ginkgo.By("checking the VolumeGroupSnapshot has been deleted")
 	err = utils.WaitForNamespacedGVRDeletion(ctx, dc, utils.VolumeGroupSnapshotGVR, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, timeouts.SnapshotDelete)
@@ -533,7 +533,7 @@ func (r *VolumeGroupSnapshotResource) convertToPreprovisioned(ctx context.Contex
 	for _, contentName := range contentNamesSet.UnsortedList() {
 		err := dc.Resource(utils.SnapshotContentGVR).Delete(ctx, contentName, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			framework.ExpectNoError(err, "failed to delete VolumeSnapshotContent %s", contentName)
+			framework.ExpectNoError(err, "failed to dc.Resource.Delete", contentName)
 		}
 	}
 
@@ -545,7 +545,7 @@ func (r *VolumeGroupSnapshotResource) convertToPreprovisioned(ctx context.Contex
 
 	// Delete the VolumeGroupSnapshotContent (with Retain policy, so physical group snapshot remains)
 	err = dc.Resource(utils.VolumeGroupSnapshotContentGVR).Delete(ctx, vgsc.GetName(), metav1.DeleteOptions{})
-	framework.ExpectNoError(err, "failed to delete VolumeGroupSnapshotContent %s", vgsc.GetName())
+	framework.ExpectNoError(err, "failed to dc.Resource.Delete", vgsc.GetName())
 
 	ginkgo.By("checking the VolumeGroupSnapshotContent has been deleted")
 	err = utils.WaitForGVRDeletion(ctx, dc, utils.VolumeGroupSnapshotContentGVR, vgsc.GetName(), framework.Poll, timeouts.SnapshotDelete)
@@ -560,19 +560,19 @@ func (r *VolumeGroupSnapshotResource) convertToPreprovisioned(ctx context.Contex
 
 	r.VGSContent = getPreProvisionedVolumeGroupSnapshotContent(vgscName, vgsName, pvcNamespace, groupSnapshotHandle, volumeSnapshotHandles, r.Pattern.SnapshotDeletionPolicy.String(), csiDriverName)
 	r.VGSContent, err = dc.Resource(utils.VolumeGroupSnapshotContentGVR).Create(ctx, r.VGSContent, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create pre-provisioned VolumeGroupSnapshotContent %s", vgscName)
+	framework.ExpectNoError(err, "failed to dc.Resource.Create", vgscName)
 
 	ginkgo.By("creating a pre-provisioned VGS with that VGSContent")
 	r.VGS = getPreProvisionedVolumeGroupSnapshot(vgsName, pvcNamespace, vgscName)
 	r.VGS, err = dc.Resource(utils.VolumeGroupSnapshotGVR).Namespace(r.VGS.GetNamespace()).Create(ctx, r.VGS, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create pre-provisioned VolumeGroupSnapshot %s/%s", pvcNamespace, vgsName)
+	framework.ExpectNoError(err, "failed to dc.Resource.Namespace.Create", pvcNamespace, vgsName)
 
 	err = utils.WaitForVolumeGroupSnapshotReady(ctx, dc, r.VGS.GetNamespace(), r.VGS.GetName(), framework.Poll, timeouts.SnapshotCreate*10)
 	framework.ExpectNoError(err, "pre-provisioned VolumeGroupSnapshot %s/%s did not become ready within timeout", r.VGS.GetNamespace(), r.VGS.GetName())
 
 	// Get the new VGS UID for owner references
 	r.VGS, err = dc.Resource(utils.VolumeGroupSnapshotGVR).Namespace(r.VGS.GetNamespace()).Get(ctx, r.VGS.GetName(), metav1.GetOptions{})
-	framework.ExpectNoError(err, "failed to get VolumeGroupSnapshot %s/%s for UID", r.VGS.GetNamespace(), r.VGS.GetName())
+	framework.ExpectNoError(err, "failed to dc.Resource.Namespace.Get", r.VGS.GetNamespace(), r.VGS.GetName())
 	newVgsUID := r.VGS.GetUID()
 	vgsAPIVersion := r.VGS.GetAPIVersion()
 	vgsKind := r.VGS.GetKind()
@@ -591,7 +591,7 @@ func (r *VolumeGroupSnapshotResource) convertToPreprovisioned(ctx context.Contex
 		// Note: volumeSnapshotClassName is not required for pre-provisioned VolumeSnapshotContent
 		vsc := getPreProvisionedVolumeSnapshotContent(snapContentName, snapName, pvcNamespace, snapshotHandle, r.Pattern.SnapshotDeletionPolicy.String(), csiDriverName)
 		_, err := dc.Resource(utils.SnapshotContentGVR).Create(ctx, vsc, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pre-provisioned VolumeSnapshotContent %s", snapContentName)
+		framework.ExpectNoError(err, "failed to dc.Resource.Create", snapContentName)
 
 		// Get the source PVC name mapping for this snapshot handle
 		sourcePVCName := r.SnapshotHandleToPVCName[snapshotHandle]
@@ -624,7 +624,7 @@ func (r *VolumeGroupSnapshotResource) convertToPreprovisioned(ctx context.Contex
 		}
 
 		_, err = dc.Resource(utils.SnapshotGVR).Namespace(pvcNamespace).Create(ctx, preProvisionedVS, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pre-provisioned VolumeSnapshot %s/%s", pvcNamespace, snapName)
+		framework.ExpectNoError(err, "failed to dc.Resource.Namespace.Create", pvcNamespace, snapName)
 
 		// Wait for the VolumeSnapshot to be ready
 		err = utils.WaitForSnapshotReady(ctx, dc, pvcNamespace, snapName, framework.Poll, timeouts.SnapshotCreate)
@@ -635,10 +635,10 @@ func (r *VolumeGroupSnapshotResource) convertToPreprovisioned(ctx context.Contex
 
 	ginkgo.By("getting the group snapshot and group snapshot content")
 	r.VGS, err = dc.Resource(utils.VolumeGroupSnapshotGVR).Namespace(r.VGS.GetNamespace()).Get(ctx, r.VGS.GetName(), metav1.GetOptions{})
-	framework.ExpectNoError(err, "failed to get final VolumeGroupSnapshot %s/%s", r.VGS.GetNamespace(), r.VGS.GetName())
+	framework.ExpectNoError(err, "failed to dc.Resource.Namespace.Get", r.VGS.GetNamespace(), r.VGS.GetName())
 
 	r.VGSContent, err = dc.Resource(utils.VolumeGroupSnapshotContentGVR).Get(ctx, r.VGSContent.GetName(), metav1.GetOptions{})
-	framework.ExpectNoError(err, "failed to get final VolumeGroupSnapshotContent %s", r.VGSContent.GetName())
+	framework.ExpectNoError(err, "failed to dc.Resource.Get", r.VGSContent.GetName())
 }
 
 func getPreProvisionedVolumeGroupSnapshot(vgsName, ns, vgscName string) *unstructured.Unstructured {

@@ -152,7 +152,7 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestD
 				SeLinuxLabel: e2epv.SELinuxLabel,
 			}
 			pod, err := e2epod.MakeSecPod(&podConfig)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2epod.MakeSecPod")
 			stressTest.pods = append(stressTest.pods, pod)
 
 		}

@@ -122,7 +122,7 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 			for _, vr := range []*storageframework.VolumeResource{vr1, vr2} {
 				patchData := fmt.Appendf(nil, `{"metadata":{"labels":{"%s":"%s"}}}`, labelKey, labelValue)
 				updatedPVC, err := cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Patch(ctx, vr.Pvc.Name, types.MergePatchType, patchData, metav1.PatchOptions{})
-				framework.ExpectNoError(err, "failed to add label to PVC %s", vr.Pvc.Name)
+				framework.ExpectNoError(err, "failed to cs.CoreV1.PersistentVolumeClaims.Patch", vr.Pvc.Name)
 				vr.Pvc = updatedPVC
 			}
 
@@ -133,9 +133,9 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 				SeLinuxLabel: e2epv.SELinuxLabel,
 			}
 			pod, err := e2epod.MakeSecPod(&podConfig)
-			framework.ExpectNoError(err, "failed to make pod config")
+			framework.ExpectNoError(err, "failed to e2epod.MakeSecPod")
 			pod, err = cs.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create pod")
+			framework.ExpectNoError(err, "failed to cs.CoreV1.Pods.Create")
 			framework.ExpectNoError(
 				e2epod.WaitTimeoutForPodRunningInNamespace(ctx, cs, pod.Name, pod.Namespace, f.Timeouts.PodStartSlow),
 				"pod did not become running in time",
@@ -154,11 +154,11 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 			annotations[defaultVGSClassAnnotationKey] = "true"
 			vgsclassSpec.SetAnnotations(annotations)
 			vgsclass, err := f.DynamicClient.Resource(utils.VolumeGroupSnapshotClassGVR).Create(ctx, vgsclassSpec, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create VolumeGroupSnapshotClass")
+			framework.ExpectNoError(err, "failed to f.DynamicClient.Resource.Create")
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				err := f.DynamicClient.Resource(utils.VolumeGroupSnapshotClassGVR).Delete(ctx, vgsclass.GetName(), metav1.DeleteOptions{})
 				if err != nil && !apierrors.IsNotFound(err) {
-					framework.ExpectNoError(err, "failed to delete VolumeGroupSnapshotClass %s", vgsclass.GetName())
+					framework.ExpectNoError(err, "failed to f.DynamicClient.Resource.Delete", vgsclass.GetName())
 				}
 			})
 			return vgsclass
@@ -170,11 +170,11 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 			vgs, err := f.DynamicClient.Resource(utils.VolumeGroupSnapshotGVR).Namespace(f.Namespace.Name).Create(ctx,
 				storageframework.GetVolumeGroupSnapshot(f.Namespace.Name, map[string]interface{}{labelKey: labelValue}, ""),
 				metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create VolumeGroupSnapshot")
+			framework.ExpectNoError(err, "failed to f.DynamicClient.Resource.Namespace.Create")
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				err := f.DynamicClient.Resource(utils.VolumeGroupSnapshotGVR).Namespace(f.Namespace.Name).Delete(ctx, vgs.GetName(), metav1.DeleteOptions{})
 				if err != nil && !apierrors.IsNotFound(err) {
-					framework.ExpectNoError(err, "failed to delete VolumeGroupSnapshot %s", vgs.GetName())
+					framework.ExpectNoError(err, "failed to f.DynamicClient.Resource.Namespace.Delete", vgs.GetName())
 				}
 			})
 			return vgs
@@ -187,7 +187,7 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 		removeAndRestoreDefaultVGSClasses := func(ctx context.Context) {
 			driverName := driver.GetDriverInfo().Name
 			list, err := f.DynamicClient.Resource(utils.VolumeGroupSnapshotClassGVR).List(ctx, metav1.ListOptions{})
-			framework.ExpectNoError(err, "failed to list VolumeGroupSnapshotClasses")
+			framework.ExpectNoError(err, "failed to f.DynamicClient.Resource.List")
 
 			for _, item := range list.Items {
 				classDriver, _, _ := unstructured.NestedString(item.Object, "driver")
@@ -201,12 +201,12 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 				framework.Logf("removing default annotation from VolumeGroupSnapshotClass %s for test isolation", name)
 				removePatch := []byte(`{"metadata":{"annotations":{"groupsnapshot.storage.kubernetes.io/is-default-class":null}}}`)
 				_, err := f.DynamicClient.Resource(utils.VolumeGroupSnapshotClassGVR).Patch(ctx, name, types.MergePatchType, removePatch, metav1.PatchOptions{})
-				framework.ExpectNoError(err, "failed to remove default annotation from VolumeGroupSnapshotClass %s", name)
+				framework.ExpectNoError(err, "failed to f.DynamicClient.Resource.Patch", name)
 				ginkgo.DeferCleanup(func(ctx context.Context) {
 					framework.Logf("restoring default annotation on VolumeGroupSnapshotClass %s", name)
 					restorePatch := []byte(`{"metadata":{"annotations":{"groupsnapshot.storage.kubernetes.io/is-default-class":"true"}}}`)
 					_, err := f.DynamicClient.Resource(utils.VolumeGroupSnapshotClassGVR).Patch(ctx, name, types.MergePatchType, restorePatch, metav1.PatchOptions{})
-					framework.ExpectNoError(err, "failed to restore default annotation on VolumeGroupSnapshotClass %s", name)
+					framework.ExpectNoError(err, "failed to f.DynamicClient.Resource.Patch", name)
 				})
 			}
 		}
@@ -220,7 +220,7 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 		expectVolumeGroupSnapshotClassName := func(ctx context.Context, vgsName string, expectedClassName *string) {
 			ginkgo.GinkgoHelper()
 			vgs, err := f.DynamicClient.Resource(utils.VolumeGroupSnapshotGVR).Namespace(f.Namespace.Name).Get(ctx, vgsName, metav1.GetOptions{})
-			framework.ExpectNoError(err, "failed to get VolumeGroupSnapshot %s", vgsName)
+			framework.ExpectNoError(err, "failed to f.DynamicClient.Resource.Namespace.Get", vgsName)
 			spec, ok := vgs.Object["spec"].(map[string]interface{})
 			if !ok {
 				ginkgo.Fail("failed to get VolumeGroupSnapshot spec: spec field is not a map[string]interface{}")
@@ -239,9 +239,9 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 
 			vr1, vr2, pod := createPVCsWithPod(ctx)
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
-				framework.ExpectNoError(vr1.CleanupResource(ctx))
-				framework.ExpectNoError(vr2.CleanupResource(ctx))
+				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod), "failed to e2epod.DeletePodWithWait")
+				framework.ExpectNoError(vr1.CleanupResource(ctx), "failed to vr1.CleanupResource")
+				framework.ExpectNoError(vr2.CleanupResource(ctx), "failed to vr2.CleanupResource")
 			})
 
 			ginkgo.By("creating a VolumeGroupSnapshotClass with the default annotation")
@@ -256,11 +256,11 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 					Pattern: storageframework.VolumeGroupSnapshotDelete,
 					VGS:     vgs,
 				}
-				framework.ExpectNoError(sr.CleanupResource(ctx, f.Timeouts), "failed to clean up VolumeGroupSnapshot resources")
+				framework.ExpectNoError(sr.CleanupResource(ctx, f.Timeouts), "failed to sr.CleanupResource")
 			})
 
 			ginkgo.By("verifying the VolumeGroupSnapshot becomes ready using the default class")
-			framework.ExpectNoError(utils.WaitForVolumeGroupSnapshotReady(ctx, f.DynamicClient, f.Namespace.Name, vgs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate))
+			framework.ExpectNoError(utils.WaitForVolumeGroupSnapshotReady(ctx, f.DynamicClient, f.Namespace.Name, vgs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate), "failed to utils.WaitForVolumeGroupSnapshotReady")
 
 			ginkgo.By("verifying the default VolumeGroupSnapshotClass name was written back to the VolumeGroupSnapshot spec")
 			expectedClassName := vgsclass.GetName()
@@ -272,16 +272,16 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 
 			vr1, vr2, pod := createPVCsWithPod(ctx)
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
-				framework.ExpectNoError(vr1.CleanupResource(ctx))
-				framework.ExpectNoError(vr2.CleanupResource(ctx))
+				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod), "failed to e2epod.DeletePodWithWait")
+				framework.ExpectNoError(vr1.CleanupResource(ctx), "failed to vr1.CleanupResource")
+				framework.ExpectNoError(vr2.CleanupResource(ctx), "failed to vr2.CleanupResource")
 			})
 
 			ginkgo.By("creating a VolumeGroupSnapshot without className and without any default VolumeGroupSnapshotClass")
 			vgs := createVGSWithoutClassName(ctx)
 
 			ginkgo.By("verifying the VolumeGroupSnapshot enters an error state")
-			framework.ExpectNoError(waitForVolumeGroupSnapshotError(ctx, f.DynamicClient, f.Namespace.Name, vgs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate, errNoDefaultVGSClass))
+			framework.ExpectNoError(waitForVolumeGroupSnapshotError(ctx, f.DynamicClient, f.Namespace.Name, vgs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate, errNoDefaultVGSClass), "failed to waitForVolumeGroupSnapshotError")
 
 			ginkgo.By("verifying spec.volumeGroupSnapshotClassName was not set by the controller")
 			expectVolumeGroupSnapshotClassName(ctx, vgs.GetName(), nil)
@@ -292,9 +292,9 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 
 			vr1, vr2, pod := createPVCsWithPod(ctx)
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
-				framework.ExpectNoError(vr1.CleanupResource(ctx))
-				framework.ExpectNoError(vr2.CleanupResource(ctx))
+				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod), "failed to e2epod.DeletePodWithWait")
+				framework.ExpectNoError(vr1.CleanupResource(ctx), "failed to vr1.CleanupResource")
+				framework.ExpectNoError(vr2.CleanupResource(ctx), "failed to vr2.CleanupResource")
 			})
 
 			ginkgo.By("creating two VolumeGroupSnapshotClasses both with the default annotation")
@@ -305,7 +305,7 @@ func (s *VolumeGroupSnapshotClassTestSuite) DefineTests(driver storageframework.
 			vgs := createVGSWithoutClassName(ctx)
 
 			ginkgo.By("verifying the VolumeGroupSnapshot enters an error state due to multiple default classes")
-			framework.ExpectNoError(waitForVolumeGroupSnapshotError(ctx, f.DynamicClient, f.Namespace.Name, vgs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate, errMultipleDefaultVGSClasses))
+			framework.ExpectNoError(waitForVolumeGroupSnapshotError(ctx, f.DynamicClient, f.Namespace.Name, vgs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate, errMultipleDefaultVGSClasses), "failed to waitForVolumeGroupSnapshotError")
 
 			ginkgo.By("verifying spec.volumeGroupSnapshotClassName was not set by the controller")
 			expectVolumeGroupSnapshotClassName(ctx, vgs.GetName(), nil)

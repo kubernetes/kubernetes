@@ -252,7 +252,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 				},
 			}
 			_, err = cs.NodeV1().RuntimeClasses().Create(ctx, rc, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+			framework.ExpectNoError(err, "failed to cs.NodeV1.RuntimeClasses.Create")
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {

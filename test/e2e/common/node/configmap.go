@@ -152,17 +152,17 @@ var _ = SIGDescribe("ConfigMap", func() {
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating ConfigMap %v/%v", f.Namespace.Name, configMap.Name))
 		_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configMap, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create ConfigMap")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.ConfigMaps.Create")
 
 		configMap.Data = map[string]string{
 			"data": "value",
 		}
 		ginkgo.By(fmt.Sprintf("Updating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(ctx, configMap, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "failed to update ConfigMap")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.ConfigMaps.Update")
 
 		configMapFromUpdate, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(ctx, name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get ConfigMap")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.ConfigMaps.Get")
 		ginkgo.By(fmt.Sprintf("Verifying update of ConfigMap %v/%v", f.Namespace.Name, configMap.Name))
 		gomega.Expect(configMapFromUpdate.Data).To(gomega.Equal(configMap.Data))
 	})
@@ -191,11 +191,11 @@ var _ = SIGDescribe("ConfigMap", func() {
 
 		ginkgo.By("creating a ConfigMap")
 		_, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Create(ctx, &testConfigMap, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create ConfigMap")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.ConfigMaps.Create")
 
 		ginkgo.By("fetching the ConfigMap")
 		configMap, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Get(ctx, testConfigMapName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get ConfigMap")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.ConfigMaps.Get")
 		gomega.Expect(configMap.Data["valueName"]).To(gomega.Equal(testConfigMap.Data["valueName"]))
 		gomega.Expect(configMap.Labels["test-configmap-static"]).To(gomega.Equal(testConfigMap.Labels["test-configmap-static"]))
 		gomega.Expect(configMap).To(apimachineryutils.HaveValidResourceVersion())
@@ -210,18 +210,18 @@ var _ = SIGDescribe("ConfigMap", func() {
 				"valueName": "value1",
 			},
 		})
-		framework.ExpectNoError(err, "failed to marshal patch data")
+		framework.ExpectNoError(err, "failed to json.Marshal")
 
 		ginkgo.By("patching the ConfigMap")
 		patchedConfigMap, err := f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).Patch(ctx, testConfigMapName, types.StrategicMergePatchType, []byte(configMapPatchPayload), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch ConfigMap")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.ConfigMaps.Patch")
 		gomega.Expect(resourceversion.CompareResourceVersion(configMap.ResourceVersion, patchedConfigMap.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		ginkgo.By("listing all ConfigMaps in all namespaces with a label selector")
 		configMapList, err := f.ClientSet.CoreV1().ConfigMaps("").List(ctx, metav1.ListOptions{
 			LabelSelector: "test-configmap=patched",
 		})
-		framework.ExpectNoError(err, "failed to list ConfigMaps with LabelSelector")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.ConfigMaps.List")
 		testConfigMapFound := false
 		for _, cm := range configMapList.Items {
 			if cm.ObjectMeta.Name == testConfigMap.ObjectMeta.Name &&
@@ -241,13 +241,13 @@ var _ = SIGDescribe("ConfigMap", func() {
 		err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "test-configmap-static=true",
 		})
-		framework.ExpectNoError(err, "failed to delete ConfigMap collection with LabelSelector")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.ConfigMaps.DeleteCollection")
 
 		ginkgo.By("listing all ConfigMaps in test namespace")
 		configMapList, err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).List(ctx, metav1.ListOptions{
 			LabelSelector: "test-configmap-static=true",
 		})
-		framework.ExpectNoError(err, "failed to list ConfigMap by LabelSelector")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.ConfigMaps.List")
 		gomega.Expect(configMapList.Items).To(gomega.BeEmpty(), "ConfigMap is still present after being deleted by collection")
 	})
 

@@ -143,7 +143,7 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 
 		ginkgo.By(fmt.Sprintf("Confirm DaemonSet %q successfully created with %q label", dsName, dsLabelSelector))
 		dsList, err := csAppsV1.DaemonSets("").List(ctx, metav1.ListOptions{LabelSelector: dsLabelSelector})
-		framework.ExpectNoError(err, "failed to list Daemon Sets")
+		framework.ExpectNoError(err, "failed to csAppsV1.DaemonSets.List")
 		gomega.Expect(dsList.Items).To(gomega.HaveLen(1), "filtered list wasn't found")
 
 		ds, err := c.AppsV1().DaemonSets(ns).Get(ctx, dsName, metav1.GetOptions{})
@@ -163,7 +163,7 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 		if oref.Kind == "DaemonSet" && oref.UID == ds.UID {
 			framework.Logf("Located ControllerRevision: %q", rev.Name)
 			initialRevision, err = csAppsV1.ControllerRevisions(ns).Get(ctx, rev.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "failed to lookup ControllerRevision: %v", err)
+			framework.ExpectNoError(err, "failed to csAppsV1.ControllerRevisions.Get", err)
 			gomega.Expect(initialRevision).NotTo(gomega.BeNil(), "failed to lookup ControllerRevision: %v", initialRevision)
 		}
 		gomega.Expect(&rev).To(apimachineryutils.HaveValidResourceVersion())
@@ -171,7 +171,7 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 		ginkgo.By(fmt.Sprintf("Patching ControllerRevision %q", initialRevision.Name))
 		payload := "{\"metadata\":{\"labels\":{\"" + initialRevision.Name + "\":\"patched\"}}}"
 		patchedControllerRevision, err := csAppsV1.ControllerRevisions(ns).Patch(ctx, initialRevision.Name, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch ControllerRevision %s in namespace %s", initialRevision.Name, ns)
+		framework.ExpectNoError(err, "failed to csAppsV1.ControllerRevisions.Patch", initialRevision.Name, ns)
 		gomega.Expect(patchedControllerRevision.Labels).To(gomega.HaveKeyWithValue(initialRevision.Name, "patched"), "Did not find 'patched' label for this ControllerRevision. Current labels: %v", patchedControllerRevision.Labels)
 		gomega.Expect(resourceversion.CompareResourceVersion(rev.ResourceVersion, patchedControllerRevision.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 		framework.Logf("%s has been patched", patchedControllerRevision.Name)
@@ -196,7 +196,7 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 
 		ginkgo.By("Confirm that there are two ControllerRevisions")
 		err = wait.PollUntilContextTimeout(ctx, controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, true, checkControllerRevisionListQuantity(f, dsLabelSelector, 2))
-		framework.ExpectNoError(err, "failed to count required ControllerRevisions")
+		framework.ExpectNoError(err, "failed to wait.PollUntilContextTimeout")
 
 		ginkgo.By(fmt.Sprintf("Deleting ControllerRevision %q", initialRevision.Name))
 		err = csAppsV1.ControllerRevisions(ns).Delete(ctx, initialRevision.Name, metav1.DeleteOptions{})
@@ -204,7 +204,7 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 
 		ginkgo.By("Confirm that there is only one ControllerRevision")
 		err = wait.PollUntilContextTimeout(ctx, controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, true, checkControllerRevisionListQuantity(f, dsLabelSelector, 1))
-		framework.ExpectNoError(err, "failed to count required ControllerRevisions")
+		framework.ExpectNoError(err, "failed to wait.PollUntilContextTimeout")
 
 		listControllerRevisions, err := csAppsV1.ControllerRevisions(ns).List(ctx, metav1.ListOptions{})
 		currentControllerRevision := listControllerRevisions.Items[0]
@@ -219,7 +219,7 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 			updatedControllerRevision, err = csAppsV1.ControllerRevisions(ns).Update(ctx, updatedControllerRevision, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err, "failed to update ControllerRevision in namespace: %s", ns)
+		framework.ExpectNoError(err, "failed to csAppsV1.ControllerRevisions.Update", ns)
 		gomega.Expect(updatedControllerRevision.Labels).To(gomega.HaveKeyWithValue(currentControllerRevision.Name, "updated"), "Did not find 'updated' label for this ControllerRevision. Current labels: %v", updatedControllerRevision.Labels)
 		framework.Logf("%s has been updated", updatedControllerRevision.Name)
 
@@ -231,7 +231,7 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 
 		ginkgo.By("Confirm that there are two ControllerRevisions")
 		err = wait.PollUntilContextTimeout(ctx, controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, true, checkControllerRevisionListQuantity(f, dsLabelSelector, 2))
-		framework.ExpectNoError(err, "failed to count required ControllerRevisions")
+		framework.ExpectNoError(err, "failed to wait.PollUntilContextTimeout")
 
 		updatedLabel := map[string]string{updatedControllerRevision.Name: "updated"}
 		updatedLabelSelector := labels.SelectorFromSet(updatedLabel).String()
@@ -242,10 +242,10 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 
 		ginkgo.By("Confirm that there is only one ControllerRevision")
 		err = wait.PollUntilContextTimeout(ctx, controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, true, checkControllerRevisionListQuantity(f, dsLabelSelector, 1))
-		framework.ExpectNoError(err, "failed to count required ControllerRevisions")
+		framework.ExpectNoError(err, "failed to wait.PollUntilContextTimeout")
 
 		list, err := csAppsV1.ControllerRevisions(ns).List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err, "failed to list ControllerRevision")
+		framework.ExpectNoError(err, "failed to csAppsV1.ControllerRevisions.List")
 		gomega.Expect(list.Items[0].Revision).To(gomega.Equal(int64(3)), "failed to find the expected revision for the Controller")
 		framework.Logf("ControllerRevision %q has revision %d", list.Items[0].Name, list.Items[0].Revision)
 	})

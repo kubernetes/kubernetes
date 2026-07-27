@@ -110,7 +110,7 @@ func CreateVolumeResourceWithAccessModes(ctx context.Context, driver TestDriver,
 			ginkgo.By("creating a StorageClass " + r.Sc.Name)
 
 			r.Sc, err = cs.StorageV1().StorageClasses().Create(ctx, r.Sc, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to cs.StorageV1.StorageClasses.Create")
 
 			switch pattern.VolType {
 			case DynamicPV:
@@ -314,20 +314,20 @@ func createPVCPVFromDynamicProvisionSC(
 
 	var err error
 	pvc, err = e2epv.CreatePVC(ctx, cs, ns, pvc)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2epv.CreatePVC")
 
 	if !isDelayedBinding(sc) {
 		err = e2epv.WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, f.Timeouts.ClaimProvision)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epv.WaitForPersistentVolumeClaimPhase")
 	}
 
 	pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to cs.CoreV1.PersistentVolumeClaims.Get")
 
 	var pv *v1.PersistentVolume
 	if !isDelayedBinding(sc) {
 		pv, err = cs.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to cs.CoreV1.PersistentVolumes.Get")
 	}
 
 	return pv, pvc

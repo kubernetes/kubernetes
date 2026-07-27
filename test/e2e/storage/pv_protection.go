@@ -54,7 +54,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		client = f.ClientSet
 		nameSpace = f.Namespace.Name
-		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, client, f.Timeouts.NodeSchedulable))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, client, f.Timeouts.NodeSchedulable), "failed to e2enode.WaitForAllNodesSchedulable")
 
 		// Enforce binding only within test space via selector labels
 		volLabel = labels.Set{e2epv.VolumeSelectorKey: nameSpace}
@@ -84,7 +84,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		framework.ExpectNoError(err, "Error creating PV")
 
 		ginkgo.By("Waiting for PV to enter phase Available")
-		framework.ExpectNoError(e2epv.WaitForPersistentVolumePhase(ctx, v1.VolumeAvailable, client, pv.Name, 1*time.Second, 30*time.Second))
+		framework.ExpectNoError(e2epv.WaitForPersistentVolumePhase(ctx, v1.VolumeAvailable, client, pv.Name, 1*time.Second, 30*time.Second), "failed to e2epv.WaitForPersistentVolumePhase")
 
 		ginkgo.By("Checking that PV Protection finalizer is set")
 		pv, err = client.CoreV1().PersistentVolumes().Get(ctx, pv.Name, metav1.GetOptions{})
