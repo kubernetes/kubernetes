@@ -59,10 +59,10 @@ var _ = sigDescribe("Services", skipUnlessWindows(func() {
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to jig.CreateTCPService")
 
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, jig.Client)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode")
 		ips := e2enode.GetAddressesByTypeAndFamily(node, v1.NodeInternalIP, svc.Spec.IPFamilies[0])
 		gomega.Expect(ips).NotTo(gomega.BeEmpty())
 		nodeIP := ips[0]
@@ -76,7 +76,7 @@ var _ = sigDescribe("Services", skipUnlessWindows(func() {
 			}
 		}
 		_, err = jig.Run(ctx, windowsNodeSelectorTweak)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to jig.Run")
 
 		//using hybrid_network methods
 		ginkgo.By("creating Windows testing Pod")

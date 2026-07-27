@@ -184,7 +184,7 @@ func testResourceClaimDeviceStatus(tCtx ktesting.TContext, enabled bool) {
 	var buffer bytes.Buffer
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetIndent("   ", "   ")
-	tCtx.ExpectNoError(encoder.Encode(claim))
+	tCtx.ExpectNoError(encoder.Encode(claim), "unexpected error")
 	tCtx.Logf("Final ResourceClaim:\n%s", buffer.String())
 
 	// Update one entry, remove the other.

@@ -82,7 +82,7 @@ var _ = sigDescribe(feature.Windows, "GracefulNodeShutdown", framework.WithSeria
 		list, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{
 			FieldSelector: nodeSelector,
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.NewPodClient.List")
 		gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
 
 		ctx, cancel := context.WithCancel(context.Background())

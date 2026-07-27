@@ -363,7 +363,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 				}}
 			_, err := f.ClientSet.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create pod")
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Create")
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "Pod didn't start within time out period")
 
 			framework.Logf("Creating service...")
@@ -457,7 +457,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 				}}
 			_, err := f.ClientSet.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create pod")
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Create")
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "Pod didn't start within time out period")
 
 			framework.Logf("Creating service...")

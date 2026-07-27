@@ -95,7 +95,7 @@ func testExtendedResource(tCtx ktesting.TContext, b *drautils.Builder, resourceT
 			// Clean up pods
 			tCtx.Logf("Cleaning up %s resource pods after downgrade", resourceType)
 			for _, pod := range pods {
-				tCtx.ExpectNoError(e2epod.DeletePodWithWaitByName(tCtx, tCtx.Client(), pod.Name, namespace))
+				tCtx.ExpectNoError(e2epod.DeletePodWithWaitByName(tCtx, tCtx.Client(), pod.Name, namespace), "unexpected error")
 			}
 			tCtx.Logf("Successfully cleaned up %s resource pods", resourceType)
 
@@ -128,8 +128,8 @@ func extendedResourceGateCycle(tCtx ktesting.TContext, b *drautils.Builder) gate
 
 	return func(tCtx ktesting.TContext) gateOnAgainFunc {
 		tCtx.Run("survivor-pods-still-running", func(tCtx ktesting.TContext) {
-			tCtx.ExpectNoError(e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), podSurvivor))
-			tCtx.ExpectNoError(e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), podToDelete))
+			tCtx.ExpectNoError(e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), podSurvivor), "unexpected error")
+			tCtx.ExpectNoError(e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), podToDelete), "unexpected error")
 		})
 
 		// Verify that each pod's special ResourceClaim still exists and is allocated.
@@ -157,14 +157,14 @@ func extendedResourceGateCycle(tCtx ktesting.TContext, b *drautils.Builder) gate
 			tCtx.WithStep("probe pod stays Pending").
 				Consistently(func(tCtx ktesting.TContext) v1.PodPhase {
 					p, err := tCtx.Client().CoreV1().Pods(probePod.Namespace).Get(tCtx, probePod.Name, metav1.GetOptions{})
-					tCtx.ExpectNoError(err)
+					tCtx.ExpectNoError(err, "unexpected error")
 					tCtx.Expect(p.Status.ExtendedResourceClaimStatus).To(gomega.BeNil(),
 						"probe pod must not get a special claim when gate is off")
 					return p.Status.Phase
 				}).WithTimeout(30 * time.Second).Should(gomega.Equal(v1.PodPending))
 
 			// Cleanup probe pod.
-			tCtx.ExpectNoError(e2epod.DeletePodWithWaitByName(tCtx, tCtx.Client(), probePod.Name, probePod.Namespace))
+			tCtx.ExpectNoError(e2epod.DeletePodWithWaitByName(tCtx, tCtx.Client(), probePod.Name, probePod.Namespace), "unexpected error")
 		})
 
 		var toDeleteClaimName string
@@ -173,9 +173,9 @@ func extendedResourceGateCycle(tCtx ktesting.TContext, b *drautils.Builder) gate
 			// the apiserver) remove the claim, and node accounting must release
 			// the device.
 			toDeleteClaimName = claimNameFromPod(tCtx, podToDelete)
-			tCtx.ExpectNoError(e2epod.DeletePodWithWaitByName(tCtx, tCtx.Client(), podToDelete.Name, podToDelete.Namespace))
+			tCtx.ExpectNoError(e2epod.DeletePodWithWaitByName(tCtx, tCtx.Client(), podToDelete.Name, podToDelete.Namespace), "unexpected error")
 			eventuallyClaimsGone(tCtx, []string{toDeleteClaimName}, 3*time.Minute)
-			tCtx.ExpectNoError(e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), podSurvivor))
+			tCtx.ExpectNoError(e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), podSurvivor), "unexpected error")
 		})
 
 		return func(tCtx ktesting.TContext) {
@@ -209,8 +209,8 @@ func extendedResourceGateCycle(tCtx ktesting.TContext, b *drautils.Builder) gate
 			}
 
 			tCtx.Run("cleanup-pods", func(tCtx ktesting.TContext) {
-				tCtx.ExpectNoError(e2epod.DeletePodWithWaitByName(tCtx, tCtx.Client(), podSurvivor.Name, podSurvivor.Namespace))
-				tCtx.ExpectNoError(e2epod.DeletePodWithWaitByName(tCtx, tCtx.Client(), freshPod.Name, freshPod.Namespace))
+				tCtx.ExpectNoError(e2epod.DeletePodWithWaitByName(tCtx, tCtx.Client(), podSurvivor.Name, podSurvivor.Namespace), "unexpected error")
+				tCtx.ExpectNoError(e2epod.DeletePodWithWaitByName(tCtx, tCtx.Client(), freshPod.Name, freshPod.Namespace), "unexpected error")
 			})
 
 			tCtx.Run("claims-GC", func(tCtx ktesting.TContext) {

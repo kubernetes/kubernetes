@@ -554,7 +554,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 			vapUpdated, err = client.Update(ctx, vapToUpdate, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err, "failed to update validatingadmissionpolicy %q", vapCreated.Name)
+		framework.ExpectNoError(err, "failed to client.Update", vapCreated.Name)
 		gomega.Expect(vapUpdated.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 		gomega.Expect(vapUpdated.Spec.FailurePolicy).To(gomega.HaveValue(gomega.Equal(admissionregistrationv1.Fail)), "updated object should have the applied spec")
 
@@ -617,7 +617,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 			vapStatusUpdated, err = client.UpdateStatus(ctx, vapStatusToUpdate, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err, "failed to update status of validatingadmissionpolicy %q", vapCreated.Name)
+		framework.ExpectNoError(err, "failed to client.UpdateStatus", vapCreated.Name)
 		hasCondition = false
 		for i := range vapStatusUpdated.Status.Conditions {
 			if vapStatusUpdated.Status.Conditions[i].Type == "StatusUpdateFailed" {
@@ -800,7 +800,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 			vapbUpdated, err = client.Update(ctx, vapbToUpdate, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err, "failed to update validatingadmissionpolicybinding %q", vapbCreated.Name)
+		framework.ExpectNoError(err, "failed to client.Update", vapbCreated.Name)
 		gomega.Expect(vapbUpdated.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 		gomega.Expect(vapbUpdated.Spec.ValidationActions).To(gomega.Equal([]admissionregistrationv1.ValidationAction{admissionregistrationv1.Deny}), "updated object should have the applied spec")
 

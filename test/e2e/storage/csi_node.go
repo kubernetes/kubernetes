@@ -65,7 +65,7 @@ var _ = utils.SIGDescribe("CSINodes", func() {
 
 			ginkgo.By(fmt.Sprintf("Creating initial csiNode %q", initialCSINode.Name))
 			csiNode, err := csiNodeClient.Create(ctx, &initialCSINode, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create csiNode %q", initialCSINode.Name)
+			framework.ExpectNoError(err, "failed to csiNodeClient.Create", initialCSINode.Name)
 			gomega.Expect(csiNode).To(apimachineryutils.HaveValidResourceVersion())
 
 			ginkgo.By(fmt.Sprintf("Getting initial csiNode %q", initialCSINode.Name))
@@ -83,12 +83,12 @@ var _ = utils.SIGDescribe("CSINodes", func() {
 			patchedSelector := labels.Set{csiNode.Name: "patched"}.AsSelector().String()
 			ginkgo.By(fmt.Sprintf("Listing csiNodes with LabelSelector %q", patchedSelector))
 			csiNodeList, err := csiNodeClient.List(ctx, metav1.ListOptions{LabelSelector: patchedSelector})
-			framework.ExpectNoError(err, "failed to list csiNodes")
+			framework.ExpectNoError(err, "failed to csiNodeClient.List")
 			gomega.Expect(csiNodeList.Items).To(gomega.HaveLen(1))
 
 			ginkgo.By(fmt.Sprintf("Delete initial csiNode: %q", initialCSINode.Name))
 			err = csiNodeClient.Delete(ctx, csiNode.Name, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "failed to delete csiNode %q", initialCSINode.Name)
+			framework.ExpectNoError(err, "failed to csiNodeClient.Delete", initialCSINode.Name)
 
 			ginkgo.By(fmt.Sprintf("Confirm deletion of csiNode %q", initialCSINode.Name))
 
@@ -122,7 +122,7 @@ var _ = utils.SIGDescribe("CSINodes", func() {
 
 			ginkgo.By(fmt.Sprintf("Creating replacement csiNode %q", replacementCSINode.Name))
 			secondCSINode, err := csiNodeClient.Create(ctx, &replacementCSINode, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create csiNode %q", replacementCSINode.Name)
+			framework.ExpectNoError(err, "failed to csiNodeClient.Create", replacementCSINode.Name)
 
 			ginkgo.By(fmt.Sprintf("Getting replacement csiNode %q", replacementCSINode.Name))
 			retrievedCSINode, err = csiNodeClient.Get(ctx, secondCSINode.Name, metav1.GetOptions{})
@@ -140,13 +140,13 @@ var _ = utils.SIGDescribe("CSINodes", func() {
 
 				return err
 			})
-			framework.ExpectNoError(err, "failed to update %q", replacementCSINode.Name)
+			framework.ExpectNoError(err, "failed to csiNodeClient.Update", replacementCSINode.Name)
 			gomega.Expect(updatedCSINode.Labels).To(gomega.HaveKeyWithValue(secondCSINode.Name, "updated"), "Checking that updated label has been applied")
 
 			updatedSelector := labels.Set{retrievedCSINode.Name: "updated"}.AsSelector().String()
 			ginkgo.By(fmt.Sprintf("DeleteCollection of CSINodes with %q label", updatedSelector))
 			err = csiNodeClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: updatedSelector})
-			framework.ExpectNoError(err, "failed to delete csiNode Colllection")
+			framework.ExpectNoError(err, "failed to csiNodeClient.DeleteCollection")
 
 			ginkgo.By(fmt.Sprintf("Confirm deletion of replacement csiNode with LabelSelector %q", updatedSelector))
 

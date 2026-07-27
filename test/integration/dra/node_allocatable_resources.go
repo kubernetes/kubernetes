@@ -102,7 +102,7 @@ func expectPodUnschedulable(tCtx ktesting.TContext, pod *v1.Pod, reason string) 
 	tCtx.Helper()
 	tCtx.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(tCtx, tCtx.Client(), pod.Name, pod.Namespace), fmt.Sprintf("expected pod to be unschedulable because %q", reason))
 	pod, err := tCtx.Client().CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-	tCtx.ExpectNoError(err)
+	tCtx.ExpectNoError(err, "unexpected error")
 	gomega.NewWithT(tCtx).Expect(pod).To(gomega.HaveField("Status.Conditions", gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 		"Type":    gomega.Equal(v1.PodScheduled),
 		"Status":  gomega.Equal(v1.ConditionFalse),
@@ -609,7 +609,7 @@ func testNodeAllocatableResourcesWithClaimTemplate(tCtx ktesting.TContext) {
 		},
 	}
 	_, err := tCtx.Client().ResourceV1().ResourceClaimTemplates(env.namespace).Create(tCtx, claimTemplate, metav1.CreateOptions{})
-	tCtx.ExpectNoError(err)
+	tCtx.ExpectNoError(err, "unexpected error")
 
 	claimTemplateRef := v1.PodResourceClaim{
 		Name:                      podClaimName,

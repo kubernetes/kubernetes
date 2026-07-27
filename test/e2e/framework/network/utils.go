@@ -889,10 +889,10 @@ func (config *NetworkingTestConfig) setup(ctx context.Context, selector map[stri
 		numEndpoints = 2 * len(config.EndpointPods)
 	}
 	err = e2eendpointslice.WaitForEndpointCount(ctx, config.f.ClientSet, config.Namespace, nodePortServiceName, numEndpoints)
-	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", nodePortServiceName, config.Namespace)
+	framework.ExpectNoError(err, "failed to e2eendpointslice.WaitForEndpointCount", nodePortServiceName, config.Namespace)
 	ginkgo.By("Waiting for Session Affinity service to expose endpoint")
 	err = e2eendpointslice.WaitForEndpointCount(ctx, config.f.ClientSet, config.Namespace, sessionAffinityServiceName, numEndpoints)
-	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", sessionAffinityServiceName, config.Namespace)
+	framework.ExpectNoError(err, "failed to e2eendpointslice.WaitForEndpointCount", sessionAffinityServiceName, config.Namespace)
 }
 
 func (config *NetworkingTestConfig) createNetProxyPods(ctx context.Context, podName string, selector map[string]string) []*v1.Pod {

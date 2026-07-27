@@ -172,7 +172,7 @@ var _ = SIGDescribe("Secrets", func() {
 			},
 			Type: "Opaque",
 		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create secret")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Secrets.Create")
 		gomega.Expect(createdSecret).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing secrets in all namespaces to ensure that there are more than zero")
@@ -180,7 +180,7 @@ var _ = SIGDescribe("Secrets", func() {
 		secretsList, err := f.ClientSet.CoreV1().Secrets("").List(ctx, metav1.ListOptions{
 			LabelSelector: "testsecret-constant=true",
 		})
-		framework.ExpectNoError(err, "failed to list secrets")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Secrets.List")
 		gomega.Expect(secretsList.Items).ToNot(gomega.BeEmpty(), "no secrets found")
 
 		foundCreatedSecret := false
@@ -205,16 +205,16 @@ var _ = SIGDescribe("Secrets", func() {
 			},
 			"data": map[string][]byte{"key": []byte(secretPatchNewData)},
 		})
-		framework.ExpectNoError(err, "failed to marshal JSON")
+		framework.ExpectNoError(err, "failed to json.Marshal")
 		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Patch(ctx, secretCreatedName, types.StrategicMergePatchType, []byte(secretPatch), metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch secret")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Secrets.Patch")
 
 		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(ctx, secretCreatedName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get secret")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Secrets.Get")
 		gomega.Expect(resourceversion.CompareResourceVersion(createdSecret.ResourceVersion, secret.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
 		secretDecodedstring, err := base64.StdEncoding.DecodeString(string(secret.Data["key"]))
-		framework.ExpectNoError(err, "failed to decode secret from Base64")
+		framework.ExpectNoError(err, "failed to base64.StdEncoding.DecodeString")
 
 		gomega.Expect(string(secretDecodedstring)).To(gomega.Equal("value1"), "found secret, but the data wasn't updated from the patch")
 
@@ -222,14 +222,14 @@ var _ = SIGDescribe("Secrets", func() {
 		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "testsecret=true",
 		})
-		framework.ExpectNoError(err, "failed to delete patched secret")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Secrets.DeleteCollection")
 
 		ginkgo.By("listing secrets in all namespaces, searching for label name and value in patch")
 		// list all secrets in all namespaces
 		secretsList, err = f.ClientSet.CoreV1().Secrets("").List(ctx, metav1.ListOptions{
 			LabelSelector: "testsecret-constant=true",
 		})
-		framework.ExpectNoError(err, "failed to list secrets")
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Secrets.List")
 
 		foundCreatedSecret = false
 		for _, val := range secretsList.Items {

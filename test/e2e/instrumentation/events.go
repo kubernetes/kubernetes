@@ -66,7 +66,7 @@ func eventExistsInList(ctx context.Context, client typedeventsv1.EventInterface,
 	eventsList, err := client.List(ctx, metav1.ListOptions{
 		LabelSelector: "testevent-constant=true",
 	})
-	framework.ExpectNoError(err, "failed to list events")
+	framework.ExpectNoError(err, "failed to client.List")
 
 	for _, val := range eventsList.Items {
 		if val.ObjectMeta.Name == name && val.ObjectMeta.Namespace == namespace {
@@ -102,7 +102,7 @@ var _ = common.SIGDescribe("Events API", func() {
 
 		ginkgo.By("creating a test event")
 		createdEvent, err := client.Create(ctx, newTestEvent(f.Namespace.Name, eventName, "testevent-constant"), metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create test event")
+		framework.ExpectNoError(err, "failed to client.Create")
 		gomega.Expect(createdEvent).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing events in all namespaces")
@@ -119,25 +119,25 @@ var _ = common.SIGDescribe("Events API", func() {
 
 		ginkgo.By("listing events with field selection filtering on source")
 		filteredCoreV1List, err := coreClient.List(ctx, metav1.ListOptions{FieldSelector: "source=test-controller"})
-		framework.ExpectNoError(err, "failed to get filtered list")
+		framework.ExpectNoError(err, "failed to test-controller"}")
 		if len(filteredCoreV1List.Items) != 1 || filteredCoreV1List.Items[0].Name != eventName {
 			framework.Failf("expected single event, got %#v", filteredCoreV1List.Items)
 		}
 
 		ginkgo.By("listing events with field selection filtering on reportingController")
 		filteredEventsV1List, err := client.List(ctx, metav1.ListOptions{FieldSelector: "reportingController=test-controller"})
-		framework.ExpectNoError(err, "failed to get filtered list")
+		framework.ExpectNoError(err, "failed to test-controller"}")
 		if len(filteredEventsV1List.Items) != 1 || filteredEventsV1List.Items[0].Name != eventName {
 			framework.Failf("expected single event, got %#v", filteredEventsV1List.Items)
 		}
 
 		ginkgo.By("getting the test event")
 		testEvent, err := client.Get(ctx, eventName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get test event")
+		framework.ExpectNoError(err, "failed to client.Get")
 
 		ginkgo.By("patching the test event")
 		oldData, err := json.Marshal(testEvent)
-		framework.ExpectNoError(err, "failed to marshal event")
+		framework.ExpectNoError(err, "failed to json.Marshal")
 		newEvent := testEvent.DeepCopy()
 		eventSeries := &eventsv1.EventSeries{
 			Count:            2,
@@ -145,16 +145,16 @@ var _ = common.SIGDescribe("Events API", func() {
 		}
 		newEvent.Series = eventSeries
 		newData, err := json.Marshal(newEvent)
-		framework.ExpectNoError(err, "failed to marshal new event")
+		framework.ExpectNoError(err, "failed to json.Marshal")
 		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, eventsv1.Event{})
-		framework.ExpectNoError(err, "failed to create two-way merge patch")
+		framework.ExpectNoError(err, "failed to strategicpatch.CreateTwoWayMergePatch")
 
 		_, err = client.Patch(ctx, eventName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
-		framework.ExpectNoError(err, "failed to patch the test event")
+		framework.ExpectNoError(err, "failed to client.Patch")
 
 		ginkgo.By("getting the test event")
 		event, err := client.Get(ctx, eventName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get test event")
+		framework.ExpectNoError(err, "failed to client.Get")
 		gomega.Expect(resourceversion.CompareResourceVersion(createdEvent.ResourceVersion, event.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 		// clear ResourceVersion and ManagedFields which are set by control-plane
 		event.ObjectMeta.ResourceVersion = ""
@@ -173,11 +173,11 @@ var _ = common.SIGDescribe("Events API", func() {
 			LastObservedTime: metav1.MicroTime{Time: time.Unix(1505828956, 0)},
 		}
 		_, err = client.Update(ctx, testEvent, metav1.UpdateOptions{})
-		framework.ExpectNoError(err, "failed to update the test event")
+		framework.ExpectNoError(err, "failed to client.Update")
 
 		ginkgo.By("getting the test event")
 		event, err = client.Get(ctx, eventName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get test event")
+		framework.ExpectNoError(err, "failed to client.Get")
 		// clear ResourceVersion and ManagedFields which are set by control-plane
 		event.ObjectMeta.ResourceVersion = ""
 		event.ObjectMeta.ManagedFields = nil
@@ -187,7 +187,7 @@ var _ = common.SIGDescribe("Events API", func() {
 
 		ginkgo.By("deleting the test event")
 		err = client.Delete(ctx, eventName, metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "failed to delete the test event")
+		framework.ExpectNoError(err, "failed to client.Delete")
 
 		ginkgo.By("listing events in all namespaces")
 		foundCreatedEvent = eventExistsInList(ctx, clientAllNamespaces, f.Namespace.Name, eventName)
@@ -214,14 +214,14 @@ var _ = common.SIGDescribe("Events API", func() {
 		ginkgo.By("Create set of events")
 		for _, eventName := range eventNames {
 			_, err := client.Create(ctx, newTestEvent(f.Namespace.Name, eventName, "testevent-set"), metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create event")
+			framework.ExpectNoError(err, "failed to client.Create")
 		}
 
 		ginkgo.By("get a list of Events with a label in the current namespace")
 		eventList, err := client.List(ctx, metav1.ListOptions{
 			LabelSelector: "testevent-set=true",
 		})
-		framework.ExpectNoError(err, "failed to get a list of events")
+		framework.ExpectNoError(err, "failed to client.List")
 		gomega.Expect(eventList.Items).To(gomega.HaveLen(len(eventNames)), "unexpected event list: %#v", eventList)
 
 		ginkgo.By("delete a list of events")
@@ -229,13 +229,13 @@ var _ = common.SIGDescribe("Events API", func() {
 		err = client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "testevent-set=true",
 		})
-		framework.ExpectNoError(err, "failed to delete the test event")
+		framework.ExpectNoError(err, "failed to client.DeleteCollection")
 
 		ginkgo.By("check that the list of events matches the requested quantity")
 		eventList, err = client.List(ctx, metav1.ListOptions{
 			LabelSelector: "testevent-set=true",
 		})
-		framework.ExpectNoError(err, "failed to get a list of events")
+		framework.ExpectNoError(err, "failed to client.List")
 		gomega.Expect(eventList.Items).To(gomega.BeEmpty(), "unexpected event list: %#v", eventList)
 	})
 })

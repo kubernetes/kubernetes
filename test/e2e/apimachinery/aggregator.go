@@ -590,9 +590,9 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 			"labels": apiServiceLabel,
 		},
 	})
-	framework.ExpectNoError(err, "failed to Marshal APIService JSON patch")
+	framework.ExpectNoError(err, "failed to json.Marshal")
 	_, err = apiServiceClient.Patch(ctx, apiServiceName, types.StrategicMergePatchType, []byte(apiServicePatch), metav1.PatchOptions{})
-	framework.ExpectNoError(err, "failed to patch APIService")
+	framework.ExpectNoError(err, "failed to apiServiceClient.Patch")
 
 	patchedApiService, err := apiServiceClient.Get(ctx, apiServiceName, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Unable to retrieve api service %s", apiServiceName)
@@ -758,7 +758,7 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 
 	ginkgo.By("Confirm that the generated APIService has been deleted")
 	err = wait.PollImmediate(apiServiceRetryPeriod, apiServiceRetryTimeout, checkApiServiceListQuantity(ctx, aggrclient, apiServiceLabelSelector, 0))
-	framework.ExpectNoError(err, "failed to count the required APIServices")
+	framework.ExpectNoError(err, "failed to wait.PollImmediate")
 	framework.Logf("APIService %s has been deleted.", apiServiceName)
 
 	cleanupSampleAPIServer(ctx, client, aggrclient, n, apiServiceName)

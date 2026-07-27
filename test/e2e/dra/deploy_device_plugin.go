@@ -72,7 +72,7 @@ func deployDevicePlugin(tCtx ktesting.TContext, f *framework.Framework, nodeName
 	for _, nodeName := range nodeNames {
 		gomega.Eventually(tCtx, func() int64 {
 			node, err := f.ClientSet.CoreV1().Nodes().Get(tCtx, nodeName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Nodes.Get")
 			return e2enode.CountSampleDeviceAllocatable(node)
 		}).WithTimeout(f.Timeouts.PodStart).Should(gomega.BeNumerically("==", e2enode.SampleDevsAmount), "expected %d %q to be allocatable on node %q", e2enode.SampleDevsAmount, e2enode.SampleDeviceResourceName, nodeName)
 	}
@@ -94,7 +94,7 @@ func undeployDevicePlugin(tCtx ktesting.TContext, f *framework.Framework, nodeNa
 	for _, nodeName := range nodeNames {
 		gomega.Eventually(tCtx, func() int64 {
 			node, err := f.ClientSet.CoreV1().Nodes().Get(tCtx, nodeName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Nodes.Get")
 			return e2enode.CountSampleDeviceAllocatable(node)
 		}).WithTimeout(f.Timeouts.PodStart).Should(gomega.BeZero(), "expected 0 %q to be allocatable on node %q after device plugin undeploy", e2enode.SampleDeviceResourceName, nodeName)
 	}

@@ -41,7 +41,7 @@ type EventsLister func(opts metav1.ListOptions, ns string) (*v1.EventList, error
 func dumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 	ginkgo.By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
 	events, err := eventsLister(metav1.ListOptions{}, namespace)
-	framework.ExpectNoError(err, "failed to list events in namespace %q", namespace)
+	framework.ExpectNoError(err, "failed to eventsLister", namespace)
 
 	ginkgo.By(fmt.Sprintf("Found %d events.", len(events.Items)))
 	// Sort events by their first timestamp

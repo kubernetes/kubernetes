@@ -296,13 +296,13 @@ func TestAssert(t *testing.T) {
 		},
 		"expect-no-error-success": {
 			cb: func(tCtx TContext) {
-				tCtx.ExpectNoError(nil)
+				tCtx.ExpectNoError(nil, "unexpected error")
 			},
 		},
 		"expect-no-error-normal-error": {
 
 			cb: func(tCtx TContext) {
-				tCtx.ExpectNoError(errors.New("fake error"))
+				tCtx.ExpectNoError(errors.New("fake error"), "unexpected error")
 			},
 			expectTrace: `(LOG) <klog header>: Unexpected error:
 	<*errors.errorString | 0xXXXX>: 
@@ -315,7 +315,7 @@ func TestAssert(t *testing.T) {
 		},
 		"expect-no-error-failure": {
 			cb: func(tCtx TContext) {
-				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error"}))
+				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error"}), "unexpected error")
 				tCtx.Log("not reached")
 			},
 			expectTrace: `(FATAL) FATAL ERROR: <klog header>:
@@ -358,7 +358,7 @@ func TestAssert(t *testing.T) {
 		},
 		"expect-no-error-backtrace": {
 			cb: func(tCtx TContext) {
-				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error", FullStackTrace: "abc\nxyz"}))
+				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error", FullStackTrace: "abc\nxyz"}), "unexpected error")
 			},
 			expectTrace: `(LOG) <klog header>: Failed at:
 	abc

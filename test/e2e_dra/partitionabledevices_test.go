@@ -174,8 +174,8 @@ func partitionableDevices(tCtx ktesting.TContext, b *drautils.Builder) upgradedT
 	pod4g, claim4g := partitionableCreatePodWithClaim(tCtx, b, driverName, "4Gi")
 
 	// Wait for pods to be running so that the third pod won't be scheduled before they are scheduled.
-	tCtx.ExpectNoError(e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), pod2g))
-	tCtx.ExpectNoError(e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), pod4g))
+	tCtx.ExpectNoError(e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), pod2g), "unexpected error")
+	tCtx.ExpectNoError(e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), pod4g), "unexpected error")
 
 	// A second 4Gi pod should be unschedulable because the shared counter
 	// pool only has 2Gi remaining (8Gi total - 2Gi - 4Gi = 2Gi).
@@ -197,9 +197,9 @@ func partitionableDevices(tCtx ktesting.TContext, b *drautils.Builder) upgradedT
 			b.DeletePodAndWaitForNotFound(tCtx, pod4g)
 			b.DeletePodAndWaitForNotFound(tCtx, pod4g2)
 
-			tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceClaims(namespace).Delete(tCtx, claim2g.Name, metav1.DeleteOptions{}))
-			tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceClaims(namespace).Delete(tCtx, claim4g.Name, metav1.DeleteOptions{}))
-			tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceClaims(namespace).Delete(tCtx, claim4g2.Name, metav1.DeleteOptions{}))
+			tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceClaims(namespace).Delete(tCtx, claim2g.Name, metav1.DeleteOptions{}), "unexpected error")
+			tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceClaims(namespace).Delete(tCtx, claim4g.Name, metav1.DeleteOptions{}), "unexpected error")
+			tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceClaims(namespace).Delete(tCtx, claim4g2.Name, metav1.DeleteOptions{}), "unexpected error")
 		}
 	}
 }
@@ -222,13 +222,13 @@ func partitionableDoTest(tCtx ktesting.TContext, b *drautils.Builder, driverName
 	pod4g, claim4g := partitionableCreatePodWithClaim(tCtx, b, driverName, "4Gi")
 	tCtx.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(tCtx, tCtx.Client(), pod4g.Name, namespace), "Pod with a claim over the counter should be unschedulable")
 	b.DeletePodAndWaitForNotFound(tCtx, pod4g)
-	tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceClaims(namespace).Delete(tCtx, claim4g.Name, metav1.DeleteOptions{}))
+	tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceClaims(namespace).Delete(tCtx, claim4g.Name, metav1.DeleteOptions{}), "unexpected error")
 
 	// A new 2Gi pod should be schedulable because 2Gi is still available.
 	pod2g, claim2g := partitionableCreatePodWithClaim(tCtx, b, driverName, "2Gi")
 	b.TestPod(tCtx, pod2g)
 	b.DeletePodAndWaitForNotFound(tCtx, pod2g)
-	tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceClaims(namespace).Delete(tCtx, claim2g.Name, metav1.DeleteOptions{}))
+	tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceClaims(namespace).Delete(tCtx, claim2g.Name, metav1.DeleteOptions{}), "unexpected error")
 }
 
 func partitionableCreatePodWithClaim(tCtx ktesting.TContext, b *drautils.Builder, driverName, value string) (*v1.Pod, *resourceapi.ResourceClaim) {

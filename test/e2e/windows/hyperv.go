@@ -96,7 +96,7 @@ var _ = sigDescribe(feature.WindowsHyperVContainers, "HyperV containers", skipUn
 		ginkgo.By("waiting for the pod to be running")
 		timeout := 3 * time.Minute
 		err = e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, timeout)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodsRunningReady")
 
 		ginkgo.By("creating a host process container in another pod to verify the pod is running hyperv isolated containers")
 

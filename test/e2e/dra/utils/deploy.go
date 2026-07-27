@@ -535,7 +535,7 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 					},
 				}
 				_, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, resourceSlice, metav1.CreateOptions{})
-				tCtx.ExpectNoError(err)
+				tCtx.ExpectNoError(err, "failed to tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, resourceSlice, metav...")
 			}
 		}
 	}

@@ -93,7 +93,7 @@ func compatibilityGroupsCreatePod(tCtx ktesting.TContext, b *drautils.Builder, c
 }
 
 func verifyCompatibilityGroupsPodAllocated(tCtx ktesting.TContext, pod *v1.Pod, claimName string) {
-	tCtx.ExpectNoError(e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), pod))
+	tCtx.ExpectNoError(e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), pod), "unexpected error")
 	claim, err := tCtx.Client().ResourceV1().ResourceClaims(pod.Namespace).Get(tCtx, claimName, metav1.GetOptions{})
 	tCtx.ExpectNoError(err, "get ResourceClaim %s", claimName)
 	tCtx.Expect(claim.Status.Allocation).ToNot(gomega.BeNil(), "claim %s must be allocated", claimName)

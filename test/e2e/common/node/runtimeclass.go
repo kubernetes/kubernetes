@@ -368,7 +368,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 
 func deleteRuntimeClass(ctx context.Context, f *framework.Framework, name string) {
 	err := f.ClientSet.NodeV1().RuntimeClasses().Delete(ctx, name, metav1.DeleteOptions{})
-	framework.ExpectNoError(err, "failed to delete RuntimeClass resource")
+	framework.ExpectNoError(err, "failed to f.ClientSet.NodeV1.RuntimeClasses.Delete")
 }
 
 // createRuntimeClass generates a RuntimeClass with the desired handler and a "namespaced" name,
@@ -378,7 +378,7 @@ func createRuntimeClass(ctx context.Context, f *framework.Framework, name, handl
 	rc := runtimeclasstest.NewRuntimeClass(uniqueName, handler)
 	rc.Overhead = overhead
 	rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(ctx, rc, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+	framework.ExpectNoError(err, "failed to f.ClientSet.NodeV1.RuntimeClasses.Create")
 	return rc.GetName()
 }
 

@@ -45,7 +45,7 @@ var _ = sigDescribe(feature.Windows, "DNS", skipUnlessWindows(func() {
 		ginkgo.By("Getting the IP address of the internal Kubernetes service")
 
 		svc, err := f.ClientSet.CoreV1().Services("kube-system").Get(ctx, "kube-dns", metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Services.Get")
 
 		ginkgo.By("Preparing a test DNS service with injected DNS names...")
 		// the default service IP will vary from cluster to cluster, but will always be present and is a good DNS test target
@@ -63,7 +63,7 @@ var _ = sigDescribe(feature.Windows, "DNS", skipUnlessWindows(func() {
 			"kubernetes.io/os": "windows",
 		}
 		testPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, testPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Create")
 
 		ginkgo.By("confirming that the pod has a windows label")
 		gomega.Expect(testPod.Spec.NodeSelector).To(gomega.HaveKeyWithValue("kubernetes.io/os", "windows"), "pod.spec.nodeSelector")
@@ -75,7 +75,7 @@ var _ = sigDescribe(feature.Windows, "DNS", skipUnlessWindows(func() {
 				framework.Failf("Failed to delete pod %s: %v", testPod.Name, err)
 			}
 		}()
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, testPod.Name, f.Namespace.Name), "failed to wait for pod %s to be running", testPod.Name)
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, testPod.Name, f.Namespace.Name), "failed to e2epod.WaitForPodNameRunningInNamespace", testPod.Name)
 
 		// This isn't the best 'test' but it is a great diagnostic, see later test for the 'real' test.
 		ginkgo.By("Calling ipconfig to get debugging info for this pod's DNS and confirm that a dns server 1.1.1.1 can be injected, along with ")
@@ -88,7 +88,7 @@ var _ = sigDescribe(feature.Windows, "DNS", skipUnlessWindows(func() {
 			CaptureStdout: true,
 			CaptureStderr: true,
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.Exec")
 		framework.Logf("ipconfig /all:\n%s", stdout)
 
 		if !strings.Contains(stdout, "1.1.1.1") {
@@ -132,7 +132,7 @@ var _ = sigDescribe(feature.Windows, "DNS", skipUnlessWindows(func() {
 
 		// curl returns an error if the host isn't resolved, otherwise, it will return a passing result.
 		if err != nil {
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2epod.Exec")
 		}
 
 		// TODO: Add more test cases for other DNSPolicies.

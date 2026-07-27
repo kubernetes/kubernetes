@@ -159,7 +159,7 @@ func waitUtilFSGroupInPod(ctx context.Context, m *mockDriverSetup, modified bool
 			fileName := dirName + "/" + m.f.UniqueName
 
 			err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
-			framework.ExpectNoError(err, "failed to start pod")
+			framework.ExpectNoError(err, "failed to e2epod.WaitForPodNameRunningInNamespace")
 
 			// Create the subdirectory to ensure that fsGroup propagates
 			createDirectory := fmt.Sprintf("mkdir %s", dirName)

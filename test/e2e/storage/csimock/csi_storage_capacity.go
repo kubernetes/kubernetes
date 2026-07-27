@@ -198,11 +198,11 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 				gomega.Expect(*sc.VolumeBindingMode).To(gomega.Equal(bindingMode), "volume binding mode")
 
 				err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "failed to start pod")
+				framework.ExpectNoError(err, "failed to e2epod.WaitForPodNameRunningInNamespace")
 				err = e2epod.DeletePodWithWait(ctx, m.cs, pod)
-				framework.ExpectNoError(err, "failed to delete pod")
+				framework.ExpectNoError(err, "failed to e2epod.DeletePodWithWait")
 				err = m.cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err, "failed to delete claim")
+				framework.ExpectNoError(err, "failed to m.cs.CoreV1.PersistentVolumeClaims.Delete")
 
 				normal := []csiCall{}
 				for _, method := range deterministicCalls {
@@ -386,7 +386,7 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 						framework.Failf("unexpected error while waiting for pod: %v", err)
 					}
 				} else {
-					framework.ExpectNoError(err, "failed to start pod")
+					framework.ExpectNoError(err, "failed to wait.PollImmediateUntil")
 				}
 
 				ginkgo.By("Deleting the previously created pod")

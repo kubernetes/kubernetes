@@ -274,10 +274,10 @@ func deletePodsSync(ctx context.Context, f *framework.Framework, pods []*v1.Pod)
 			defer wg.Done()
 
 			err := e2epod.NewPodClient(f).Delete(ctx, pod.ObjectMeta.Name, *metav1.NewDeleteOptions(30))
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2epod.NewPodClient.Delete")
 
 			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.ObjectMeta.Name, f.Namespace.Name, 10*time.Minute)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2epod.WaitForPodNotFoundInNamespace")
 		}(pod)
 	}
 	wg.Wait()

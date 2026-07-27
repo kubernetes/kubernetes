@@ -419,7 +419,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 			fsUpdated, err = client.Update(ctx, fsToUpdate, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err, "failed to update flowschema %q", fsCreated.Name)
+		framework.ExpectNoError(err, "failed to client.Update", fsCreated.Name)
 		gomega.Expect(fsUpdated.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 		gomega.Expect(fsUpdated.Spec.MatchingPrecedence).To(gomega.Equal(int32(9000)), "updated object should have the applied spec")
 
@@ -476,7 +476,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 			fsStatusUpdated, err = client.UpdateStatus(ctx, fsStatusToUpdate, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err, "failed to update status of flowschema %q", fsCreated.Name)
+		framework.ExpectNoError(err, "failed to client.UpdateStatus", fsCreated.Name)
 		condition = apihelpers.GetFlowSchemaConditionByType(fsStatusUpdated, flowcontrol.FlowSchemaConditionType("StatusUpdateFailed"))
 		gomega.Expect(condition).NotTo(gomega.BeNil())
 
@@ -647,7 +647,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 			plUpdated, err = client.Update(ctx, plToUpdate, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err, "failed to update prioritylevelconfiguration %q", plCreated.Name)
+		framework.ExpectNoError(err, "failed to client.Update", plCreated.Name)
 		gomega.Expect(plUpdated.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 		gomega.Expect(plUpdated.Spec.Limited.NominalConcurrencyShares).To(gomega.Equal(ptr.To(int32(6))), "updated object should have the applied spec")
 
@@ -704,7 +704,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 			plStatusUpdated, err = client.UpdateStatus(ctx, plStatusToUpdate, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err, "failed to update status of prioritylevelconfiguration %q", plCreated.Name)
+		framework.ExpectNoError(err, "failed to client.UpdateStatus", plCreated.Name)
 		condition = apihelpers.GetPriorityLevelConfigurationConditionByType(plStatusUpdated, flowcontrol.PriorityLevelConfigurationConditionType("StatusUpdateFailed"))
 		gomega.Expect(condition).NotTo(gomega.BeNil())
 

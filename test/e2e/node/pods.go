@@ -82,7 +82,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options := metav1.ListOptions{LabelSelector: selector.String()}
 			pods, err := podClient.List(ctx, options)
-			framework.ExpectNoError(err, "failed to query for pod")
+			framework.ExpectNoError(err, "failed to podClient.List")
 			gomega.Expect(pods.Items).To(gomega.BeEmpty())
 
 			ginkgo.By("submitting the pod to kubernetes")
@@ -92,7 +92,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options = metav1.ListOptions{LabelSelector: selector.String()}
 			pods, err = podClient.List(ctx, options)
-			framework.ExpectNoError(err, "failed to query for pod")
+			framework.ExpectNoError(err, "failed to podClient.List")
 			gomega.Expect(pods.Items).To(gomega.HaveLen(1))
 
 			// We need to wait for the pod to be running, otherwise the deletion
@@ -100,13 +100,13 @@ var _ = SIGDescribe("Pods Extended", func() {
 			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
 			// save the running pod
 			pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "failed to GET scheduled pod")
+			framework.ExpectNoError(err, "failed to podClient.Get")
 
 			ginkgo.By("deleting the pod gracefully")
 			var lastPod v1.Pod
 			var statusCode int
 			err = f.ClientSet.CoreV1().RESTClient().Delete().AbsPath("/api/v1/namespaces", pod.Namespace, "pods", pod.Name).Param("gracePeriodSeconds", "30").Do(ctx).StatusCode(&statusCode).Into(&lastPod)
-			framework.ExpectNoError(err, "failed to use http client to send delete")
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.RESTClient.Delete.AbsPath.Param.Do.StatusCode.Into")
 			gomega.Expect(statusCode).To(gomega.Equal(http.StatusOK), "failed to delete gracefully by client request")
 
 			ginkgo.By("verifying the kubelet observed the termination notice")
@@ -144,7 +144,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options = metav1.ListOptions{LabelSelector: selector.String()}
 			pods, err = podClient.List(ctx, options)
-			framework.ExpectNoError(err, "failed to query for pods")
+			framework.ExpectNoError(err, "failed to podClient.List")
 			gomega.Expect(pods.Items).To(gomega.BeEmpty())
 		})
 	})
@@ -196,7 +196,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 
 			ginkgo.By("verifying QOS class is set on the pod")
 			pod, err := podClient.Get(ctx, name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "failed to query for pod")
+			framework.ExpectNoError(err, "failed to podClient.Get")
 			gomega.Expect(pod.Status.QOSClass).To(gomega.Equal(v1.PodQOSGuaranteed))
 		})
 	})
@@ -376,7 +376,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			podClient.Create(ctx, pod)
 
 			pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "failed to query for pod")
+			framework.ExpectNoError(err, "failed to podClient.Get")
 
 			if pod.Spec.TerminationGracePeriodSeconds == nil {
 				framework.Failf("pod spec TerminationGracePeriodSeconds is nil")
@@ -390,16 +390,16 @@ var _ = SIGDescribe("Pods Extended", func() {
 			// see more in https://github.com/kubernetes/kubernetes/pull/115606
 			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 				pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err, "failed to query for pod")
+				framework.ExpectNoError(err, "failed to podClient.Get")
 				ginkgo.By("updating the pod to have a negative TerminationGracePeriodSeconds")
 				pod.Spec.TerminationGracePeriodSeconds = ptr.To[int64](-1)
 				_, err = podClient.PodInterface.Update(ctx, pod, metav1.UpdateOptions{})
 				return err
 			})
-			framework.ExpectNoError(err, "failed to update pod")
+			framework.ExpectNoError(err, "failed to podClient.PodInterface.Update")
 
 			pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "failed to query for pod")
+			framework.ExpectNoError(err, "failed to podClient.Get")
 
 			if pod.Spec.TerminationGracePeriodSeconds == nil {
 				framework.Failf("pod spec TerminationGracePeriodSeconds is nil")
@@ -523,7 +523,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 				ginkgo.By(test.name)
 				podClient.Update(ctx, podName, test.updateFn)
 				pod, err := podClient.Get(ctx, podName, metav1.GetOptions{})
-				framework.ExpectNoError(err, "failed to query for pod")
+				framework.ExpectNoError(err, "failed to podClient.Get")
 				if test.expectGenerationBump {
 					expectedPodGeneration++
 				}
@@ -558,18 +558,18 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 			// may be carried out immediately rather than gracefully.
 			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
 			pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "failed to GET scheduled pod")
+			framework.ExpectNoError(err, "failed to podClient.Get")
 
 			var lastPod v1.Pod
 			var statusCode int
 			// Set gracePeriodSeconds to 60 to give us time to verify the generation bump.
 			err = f.ClientSet.CoreV1().RESTClient().Delete().AbsPath("/api/v1/namespaces", pod.Namespace, "pods", pod.Name).Param("gracePeriodSeconds", "60").Do(ctx).StatusCode(&statusCode).Into(&lastPod)
-			framework.ExpectNoError(err, "failed to use http client to send delete")
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.RESTClient.Delete.AbsPath.Param.Do.StatusCode.Into")
 			gomega.Expect(statusCode).To(gomega.Equal(http.StatusOK), "failed to delete gracefully by client request")
 
 			ginkgo.By("verifying the pod generation was bumped")
 			pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "failed to query for pod")
+			framework.ExpectNoError(err, "failed to podClient.Get")
 			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(2))
 		})
 
@@ -607,7 +607,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 
 			// Verify pod generation converges to the expected generation.
 			pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "failed to query for pod")
+			framework.ExpectNoError(err, "failed to podClient.Get")
 			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(expectedPodGeneration))
 		})
 		ginkgo.It("pod observedGeneration field set in pod conditions", func(ctx context.Context) {
@@ -701,7 +701,7 @@ func createAndTestPodRepeatedly(ctx context.Context, workers, iterations int, sc
 				// create the pod, capture the change events, then delete the pod
 				start := time.Now()
 				created, err := podClient.Create(ctx, pod, metav1.CreateOptions{})
-				framework.ExpectNoError(err, "failed to create pod")
+				framework.ExpectNoError(err, "failed to podClient.Create")
 
 				ch := make(chan []watch.Event)
 				waitForWatch := make(chan struct{})
@@ -740,7 +740,7 @@ func createAndTestPodRepeatedly(ctx context.Context, workers, iterations int, sc
 				}
 
 				verifier, scenario, err := scenario.Action(ctx, pod)
-				framework.ExpectNoError(err, "failed to take action")
+				framework.ExpectNoError(err, "failed to scenario.Action")
 
 				var (
 					events []watch.Event

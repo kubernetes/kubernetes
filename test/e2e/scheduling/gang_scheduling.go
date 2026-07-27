@@ -41,7 +41,7 @@ var _ = SIGDescribe("GangScheduling", framework.WithFeatureGate(features.Generic
 		ns := f.Namespace.Name
 		ginkgo.By("Deleting PodGroup")
 		err := cs.SchedulingV1beta1().PodGroups(ns).Delete(ctx, pgName, metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "failed to delete PodGroup")
+		framework.ExpectNoError(err, "failed to cs.SchedulingV1beta1.PodGroups.Delete")
 	}
 
 	f.It("should schedule pods only when quorum is reached", func(ctx context.Context) {
@@ -64,7 +64,7 @@ var _ = SIGDescribe("GangScheduling", framework.WithFeatureGate(features.Generic
 			},
 		}
 		_, err := cs.SchedulingV1beta1().PodGroups(ns).Create(ctx, pg, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create PodGroup")
+		framework.ExpectNoError(err, "failed to cs.SchedulingV1beta1.PodGroups.Create")
 		defer removePodGroup(ctx, pgName)
 
 		ginkgo.By("Creating first pod in the gang")
@@ -73,7 +73,7 @@ var _ = SIGDescribe("GangScheduling", framework.WithFeatureGate(features.Generic
 			PodGroupName: &pgName,
 		}
 		p1, err = cs.CoreV1().Pods(ns).Create(ctx, p1, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pod p1")
+		framework.ExpectNoError(err, "failed to cs.CoreV1.Pods.Create")
 
 		ginkgo.By("Verifying pod p1 remains Pending")
 		gomega.Consistently(ctx, func() v1.PodPhase {
@@ -90,7 +90,7 @@ var _ = SIGDescribe("GangScheduling", framework.WithFeatureGate(features.Generic
 			PodGroupName: &pgName,
 		}
 		p2, err = cs.CoreV1().Pods(ns).Create(ctx, p2, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pod p2")
+		framework.ExpectNoError(err, "failed to cs.CoreV1.Pods.Create")
 
 		ginkgo.By("Verifying both pods are scheduled")
 		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, cs, p1.Name, ns), "pod p1 failed to run")
@@ -115,7 +115,7 @@ var _ = SIGDescribe("GangScheduling", framework.WithFeatureGate(features.Generic
 			},
 		}
 		_, err := cs.SchedulingV1beta1().PodGroups(ns).Create(ctx, pg, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create PodGroup")
+		framework.ExpectNoError(err, "failed to cs.SchedulingV1beta1.PodGroups.Create")
 
 		ginkgo.By("Creating first pod in the group")
 		p1 := e2epod.MakePod(ns, nil, nil, admissionapi.LevelPrivileged, "")
@@ -123,7 +123,7 @@ var _ = SIGDescribe("GangScheduling", framework.WithFeatureGate(features.Generic
 			PodGroupName: &pgName,
 		}
 		p1, err = cs.CoreV1().Pods(ns).Create(ctx, p1, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pod p1")
+		framework.ExpectNoError(err, "failed to cs.CoreV1.Pods.Create")
 
 		ginkgo.By("Verifying first pod is scheduled immediately")
 		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, cs, p1.Name, ns), "pod p1 failed to run")
@@ -134,7 +134,7 @@ var _ = SIGDescribe("GangScheduling", framework.WithFeatureGate(features.Generic
 			PodGroupName: &pgName,
 		}
 		p2, err = cs.CoreV1().Pods(ns).Create(ctx, p2, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pod p2")
+		framework.ExpectNoError(err, "failed to cs.CoreV1.Pods.Create")
 
 		ginkgo.By("Verifying second pod is scheduled immediately")
 		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, cs, p2.Name, ns), "pod p2 failed to run")

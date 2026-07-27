@@ -121,7 +121,7 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 
 			var nodes *drautils.Nodes
 			tCtx.Step("wait for node", func(tCtx ktesting.TContext) {
-				tCtx.ExpectNoError(e2enode.WaitForAllNodesSchedulable(tCtx, tCtx.Client(), 5*time.Minute))
+				tCtx.ExpectNoError(e2enode.WaitForAllNodesSchedulable(tCtx, tCtx.Client(), 5*time.Minute), "unexpected error")
 				nodes = drautils.NewNodesNow(tCtx, 1, 1)
 			})
 

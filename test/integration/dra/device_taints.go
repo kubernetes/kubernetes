@@ -112,7 +112,7 @@ func testEvictCluster(tCtx ktesting.TContext, useRule useRuleMode) {
 		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
 			err := tCtx.Client().CoreV1().Pods(namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))})
 			if !apierrors.IsNotFound(err) {
-				tCtx.ExpectNoError(err)
+				tCtx.ExpectNoError(err, "unexpected error")
 			}
 		})
 
@@ -233,7 +233,7 @@ func testEvictCluster(tCtx ktesting.TContext, useRule useRuleMode) {
 			if apierrors.IsNotFound(err) {
 				return
 			}
-			tCtx.ExpectNoError(err)
+			tCtx.ExpectNoError(err, "unexpected error")
 		})
 		tCtx.Expect(rule).To(gomega.HaveField("ObjectMeta.Generation", gomega.Equal(int64(1))))
 
@@ -313,7 +313,7 @@ func testEvictCluster(tCtx ktesting.TContext, useRule useRuleMode) {
 			if apierrors.IsNotFound(err) {
 				return
 			}
-			tCtx.ExpectNoError(err)
+			tCtx.ExpectNoError(err, "unexpected error")
 		})
 		tCtx.Expect(rule).To(gomega.HaveField("ObjectMeta.Generation", gomega.Equal(int64(1))))
 
@@ -393,7 +393,7 @@ func testEvictCluster(tCtx ktesting.TContext, useRule useRuleMode) {
 			if apierrors.IsNotFound(err) {
 				return
 			}
-			tCtx.ExpectNoError(err)
+			tCtx.ExpectNoError(err, "unexpected error")
 		})
 		tCtx.Expect(rule).To(gomega.HaveField("ObjectMeta.Generation", gomega.Equal(int64(1))))
 
@@ -521,7 +521,7 @@ func testNoScheduleRule(tCtx ktesting.TContext, useRule useRuleMode) {
 			if apierrors.IsNotFound(err) {
 				return
 			}
-			tCtx.ExpectNoError(err)
+			tCtx.ExpectNoError(err, "unexpected error")
 		})
 	case useV1beta2Rule:
 		rule := &resourcebeta.DeviceTaintRule{
@@ -544,7 +544,7 @@ func testNoScheduleRule(tCtx ktesting.TContext, useRule useRuleMode) {
 			if apierrors.IsNotFound(err) {
 				return
 			}
-			tCtx.ExpectNoError(err)
+			tCtx.ExpectNoError(err, "unexpected error")
 		})
 	case useV1Rule:
 		rule := &resourceapi.DeviceTaintRule{
@@ -567,7 +567,7 @@ func testNoScheduleRule(tCtx ktesting.TContext, useRule useRuleMode) {
 			if apierrors.IsNotFound(err) {
 				return
 			}
-			tCtx.ExpectNoError(err)
+			tCtx.ExpectNoError(err, "unexpected error")
 		})
 	case useNoRule:
 		slice.Spec.Devices[0].Taints = []resourceapi.DeviceTaint{

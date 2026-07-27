@@ -89,7 +89,7 @@ var _ = utils.SIGDescribe(framework.WithDisruptive(), framework.WithProvider("gc
 			ginkgo.By("Creating a gce-pd storage class")
 			sc := dDriver.GetDynamicProvisionStorageClass(ctx, config, "")
 			_, err := c.StorageV1().StorageClasses().Create(ctx, sc, metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create a storageclass")
+			framework.ExpectNoError(err, "failed to c.StorageV1.StorageClasses.Create")
 			scName := &sc.Name
 
 			deploymentName := "sts-pod-gcepd"
@@ -143,12 +143,12 @@ func createAndVerifyStatefulDeployment(ctx context.Context, scName *string, name
 		StorageClassName: scName,
 	}, ns)
 	gotPVC, err := c.CoreV1().PersistentVolumeClaims(ns).Create(ctx, pvc, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create a persistent volume claim")
+	framework.ExpectNoError(err, "failed to c.CoreV1.PersistentVolumeClaims.Create")
 
 	ginkgo.By("Creating a deployment using the pvc " + pvc.Name)
 	dep := makeDeployment(ns, name, gotPVC.Name, podLabels)
 	_, err = c.AppsV1().Deployments(ns).Create(ctx, dep, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to created the deployment")
+	framework.ExpectNoError(err, "failed to c.AppsV1.Deployments.Create")
 
 	ginkgo.By(fmt.Sprintf("Ensuring that the pod of deployment %s is running and ready", dep.Name))
 	labelSelector := labels.SelectorFromSet(labels.Set(podLabels))

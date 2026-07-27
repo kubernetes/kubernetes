@@ -125,7 +125,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 
 		ginkgo.By("deleting the pod")
 		err := podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(30))
-		framework.ExpectNoError(err, "failed to delete pod")
+		framework.ExpectNoError(err, "failed to podClient.Delete")
 	})
 
 	f.It("should create pod, add ipv6 and ipv4 ip to host ips", func(ctx context.Context) {
@@ -163,7 +163,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 
 		ginkgo.By("deleting the pod")
 		err := podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(30))
-		framework.ExpectNoError(err, "failed to delete pod")
+		framework.ExpectNoError(err, "failed to podClient.Delete")
 	})
 
 	// takes close to 140s to complete, so doesn't need to be marked [SLOW]
@@ -274,7 +274,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		err := jig.CreateServicePods(ctx, 2)
 		framework.ExpectNoError(err)
 		svc, err := t.CreateService(service)
-		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
+		framework.ExpectNoError(err, "failed to t.CreateService", serviceName, ns)
 
 		validateNumOfServicePorts(svc, 2)
 
@@ -316,7 +316,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		err := jig.CreateServicePods(ctx, 2)
 		framework.ExpectNoError(err)
 		svc, err := t.CreateService(service)
-		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
+		framework.ExpectNoError(err, "failed to t.CreateService", serviceName, ns)
 
 		validateNumOfServicePorts(svc, 2)
 
@@ -351,7 +351,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		err := jig.CreateServicePods(ctx, 2)
 		framework.ExpectNoError(err)
 		svc, err := t.CreateService(service)
-		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
+		framework.ExpectNoError(err, "failed to t.CreateService", serviceName, ns)
 
 		validateNumOfServicePorts(svc, 2)
 
@@ -387,7 +387,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		err := jig.CreateServicePods(ctx, 2)
 		framework.ExpectNoError(err)
 		svc, err := t.CreateService(service)
-		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
+		framework.ExpectNoError(err, "failed to t.CreateService", serviceName, ns)
 
 		validateNumOfServicePorts(svc, 2)
 
@@ -423,7 +423,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		err := jig.CreateServicePods(ctx, 2)
 		framework.ExpectNoError(err)
 		svc, err := t.CreateService(service)
-		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
+		framework.ExpectNoError(err, "failed to t.CreateService", serviceName, ns)
 
 		validateNumOfServicePorts(svc, 2)
 

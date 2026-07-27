@@ -71,7 +71,7 @@ func deviceTaints(tCtx ktesting.TContext, b *drautils.Builder) upgradedTestFunc 
 		},
 	}
 	_, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
-	tCtx.ExpectNoError(err)
+	tCtx.ExpectNoError(err, "unexpected error")
 
 	tCtx.Log("The pod wants exactly the tainted device -> not schedulable.")
 	claim := b.ExternalClaim()
@@ -82,7 +82,7 @@ func deviceTaints(tCtx ktesting.TContext, b *drautils.Builder) upgradedTestFunc 
 		},
 	}}
 	b.Create(tCtx, claim, pod)
-	tCtx.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(tCtx, tCtx.Client(), pod.Name, namespace))
+	tCtx.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(tCtx, tCtx.Client(), pod.Name, namespace), "unexpected error")
 
 	tCtx.Log("Adding a toleration makes the pod schedulable.")
 	claim.Spec.Devices.Requests[0].Exactly.Tolerations = []resourceapi.DeviceToleration{{
@@ -90,9 +90,9 @@ func deviceTaints(tCtx ktesting.TContext, b *drautils.Builder) upgradedTestFunc 
 		Value:  taintValueFromSlice,
 		Effect: resourceapi.DeviceTaintEffectNoSchedule,
 	}}
-	tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceClaims(namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{}))
+	tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceClaims(namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{}), "unexpected error")
 	_, err = tCtx.Client().ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
-	tCtx.ExpectNoError(err)
+	tCtx.ExpectNoError(err, "unexpected error")
 	b.TestPod(tCtx, pod)
 
 	return func(tCtx ktesting.TContext) downgradedTestFunc {
@@ -120,19 +120,19 @@ func deviceTaints(tCtx ktesting.TContext, b *drautils.Builder) upgradedTestFunc 
 			},
 		}
 		_, err := tCtx.Client().ResourceV1alpha3().DeviceTaintRules().Create(tCtx, rule, metav1.CreateOptions{})
-		tCtx.ExpectNoError(err)
-		tCtx.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(tCtx, tCtx.Client(), pod.Name, namespace, 5*time.Minute))
+		tCtx.ExpectNoError(err, "unexpected error")
+		tCtx.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(tCtx, tCtx.Client(), pod.Name, namespace, 5*time.Minute), "unexpected error")
 
 		return func(tCtx ktesting.TContext) {
 			tCtx.Log("DeviceTaintRule still in effect.")
 			b.Create(tCtx, pod)
-			tCtx.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(tCtx, tCtx.Client(), pod.Name, namespace))
+			tCtx.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(tCtx, tCtx.Client(), pod.Name, namespace), "unexpected error")
 
 			// We must clean up manually, otherwise the code which checks for ResourceSlice deletion after
 			// driver removal gets stuck waiting for the removal of special ResourceSlice.
 			// This cannot be scheduled via tCtx.Cleanup after creating it because then it would be removed
 			// after the first sub-test.
-			tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceSlices().Delete(tCtx, slice.Name, metav1.DeleteOptions{}))
+			tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceSlices().Delete(tCtx, slice.Name, metav1.DeleteOptions{}), "unexpected error")
 		}
 	}
 }

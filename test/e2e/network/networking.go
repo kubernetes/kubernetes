@@ -549,7 +549,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		hosts, err := e2essh.NodeSSHHosts(ctx, f.ClientSet)
-		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
+		framework.ExpectNoError(err, "failed to e2essh.NodeSSHHosts")
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
 		}
@@ -561,7 +561,7 @@ var _ = common.SIGDescribe("Networking", func() {
 
 		ginkgo.DeferCleanup(StopServeHostnameService, f.ClientSet, ns, svc)
 		podNames, svcIP, err := StartServeHostnameService(ctx, f.ClientSet, getServeHostnameService(svc), ns, numPods)
-		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc, ns)
+		framework.ExpectNoError(err, "failed to StartServeHostnameService", svc, ns)
 
 		// Ideally we want to reload the system firewall, but we don't necessarily
 		// know how to do that on this system ("firewall-cmd --reload"? "systemctl
@@ -653,7 +653,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		e2epod.NewPodClient(f).CreateSync(ctx, podSpec)
 		ginkgo.DeferCleanup(func(ctx context.Context) {
 			err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, podName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", podName, f.Namespace.Name)
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1.Pods.Delete", podName, f.Namespace.Name)
 		})
 		ginkgo.By("validating sctp module is still not loaded")
 		sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(ctx, f, nodes)

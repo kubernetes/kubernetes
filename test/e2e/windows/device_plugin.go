@@ -96,7 +96,7 @@ var _ = sigDescribe(feature.GPUDevicePlugin, "Device Plugin", skipUnlessWindows(
 
 		sysNs := "kube-system"
 		_, err := cs.AppsV1().DaemonSets(sysNs).Create(ctx, ds, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to cs.AppsV1.DaemonSets.Create")
 
 		// Windows device plugin tests require the *full* windows image (not nanoserver or servercore)
 		// because those images do not contain the necessary DirectX components.
@@ -109,10 +109,10 @@ var _ = sigDescribe(feature.GPUDevicePlugin, "Device Plugin", skipUnlessWindows(
 			"microsoft.com/directx": resource.MustParse("1"),
 		}
 		windowsPod, err = cs.CoreV1().Pods(f.Namespace.Name).Create(ctx, windowsPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to cs.CoreV1.Pods.Create")
 		ginkgo.By("Waiting for the pod Running")
 		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, cs, windowsPod.Name, f.Namespace.Name, testSlowMultiplier*framework.PodStartTimeout)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitTimeoutForPodRunningInNamespace")
 
 		ginkgo.By("verifying device access in Windows testing Pod")
 		dxdiagCommand := []string{"cmd.exe", "/c", "dxdiag", "/t", "dxdiag_output.txt", "&", "type", "dxdiag_output.txt"}
