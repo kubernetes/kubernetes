@@ -12944,9 +12944,9 @@ tar-stream@~2.2.0:
     readable-stream "^3.1.1"
 
 tar@6.2.1, tar@^6.1.11, tar@^6.2.1, tar@^7.5.20, tar@^7.5.7:
-  version "7.5.20"
-  resolved "https://registry.npmjs.org/tar/-/tar-7.5.20.tgz#37a65aa911cbd69864002e14bf8a926a5551e240"
-  integrity sha512-9FcyK4PA6+WbzlTM9WhQm6vB5W7cP7dUiPsv1g7YDwEQnQ1CGpK3MGlKk/ITVWMk05kHZuBhmVhiv8LZoy/PFQ==
+  version "7.5.21"
+  resolved "https://registry.npmjs.org/tar/-/tar-7.5.21.tgz#b3405af2eb493523ce4379f531e9ebda0601bc59"
+  integrity sha512-XdhtCvlMywwxpCW8YEq3lOXBJpUPTR2OHHcwLPO3HwsJqOHa2Ok/oJ7ruGzp+JrKoRPVCzJwAdEjqLW/vNRPHA==
   dependencies:
     "@isaacs/fs-minipass" "^4.0.0"
     chownr "^3.0.0"
