@@ -92,7 +92,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		if err == nil && *(rc.Spec.Replicas) != 0 {
 			ginkgo.By("Cleaning up the replication controller")
 			err := e2erc.DeleteRCAndWaitForGC(ctx, f.ClientSet, ns, RCName)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2erc.DeleteRCAndWaitForGC(ctx, f.ClientSet, ns, RCName)")
 		}
 	})
 
@@ -114,7 +114,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		}
 
 		err = framework.CheckTestingNSDeletedExcept(ctx, cs, ns)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to framework.CheckTestingNSDeletedExcept(ctx, cs, ns)")
 
 		for _, node := range nodeList.Items {
 			framework.Logf("\nLogging pods the apiserver thinks is on node %v before test", node.Name)
@@ -146,7 +146,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		WaitForStableCluster(cs, workerNodes)
 
 		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to cs.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})")
 		for _, pod := range pods.Items {
 			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
 			if found && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
@@ -183,7 +183,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 							v1.ResourceEphemeralStorage: *resource.NewQuantity(ephemeralStoragePerPod, "DecimalSI"),
 						},
 					},
-				}), true, framework.Logf))
+				}), true, framework.Logf), "failed to cs.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.Li...")
 		}
 		podName := "additional-pod"
 		conf := pausePodConfig{
@@ -292,7 +292,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 			})
 
 			// Wait for filler pod to schedule.
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, fillerPod))
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, fillerPod), "failed to e2epod.WaitForPodRunningInNamespace(ctx, cs, fillerPod)")
 
 			ginkgo.By("Creating another pod that requires unavailable amount of resources.")
 			// Create another pod that requires 20% of available beard-seconds, but utilizes the RuntimeClass
@@ -366,7 +366,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		}()
 
 		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to cs.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})")
 		for _, pod := range pods.Items {
 			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
 			if found && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
@@ -412,7 +412,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		}
 		// Wait for filler pods to schedule.
 		for _, pod := range fillerPods {
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, pod))
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, pod), "failed to e2epod.WaitForPodRunningInNamespace(ctx, cs, pod)")
 		}
 		ginkgo.By("Creating another pod that requires unavailable amount of CPU.")
 		// Create another pod that requires 50% of the largest node CPU resources.
@@ -489,9 +489,9 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, cs, ns, labelPodName))
+		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, cs, ns, labelPodName), "failed to e2epod.WaitForPodNotPending(ctx, cs, ns, labelPodName)")
 		labelPod, err := cs.CoreV1().Pods(ns).Get(ctx, labelPodName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to cs.CoreV1().Pods(ns).Get(ctx, labelPodName, metav1.GetOptions{})")
 		gomega.Expect(labelPod.Spec.NodeName).To(gomega.Equal(nodeName))
 	})
 
@@ -576,9 +576,9 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, cs, ns, labelPodName))
+		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, cs, ns, labelPodName), "failed to e2epod.WaitForPodNotPending(ctx, cs, ns, labelPodName)")
 		labelPod, err := cs.CoreV1().Pods(ns).Get(ctx, labelPodName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to cs.CoreV1().Pods(ns).Get(ctx, labelPodName, metav1.GetOptions{})")
 		gomega.Expect(labelPod.Spec.NodeName).To(gomega.Equal(nodeName))
 	})
 
@@ -619,9 +619,9 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new taint yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, cs, ns, tolerationPodName))
+		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, cs, ns, tolerationPodName), "failed to e2epod.WaitForPodNotPending(ctx, cs, ns, tolerationPodName)")
 		deployedPod, err := cs.CoreV1().Pods(ns).Get(ctx, tolerationPodName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to cs.CoreV1().Pods(ns).Get(ctx, tolerationPodName, metav1.GetOptions{})")
 		gomega.Expect(deployedPod.Spec.NodeName).To(gomega.Equal(nodeName))
 	})
 
@@ -792,7 +792,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 			}
 			runPauseRS(ctx, f, rsConfig)
 			podList, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})")
 			numInNode1, numInNode2 := 0, 0
 			for _, pod := range podList.Items {
 				if pod.Spec.NodeName == nodeNames[0] {
@@ -827,8 +827,8 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 
 		ginkgo.By("Expect all pods stay in pending state")
 		podList, err := e2epod.WaitForNumberOfPods(ctx, cs, ns, replicas, time.Minute)
-		framework.ExpectNoError(err)
-		framework.ExpectNoError(e2epod.WaitForPodsSchedulingGated(ctx, cs, ns, replicas, time.Minute))
+		framework.ExpectNoError(err, "failed to e2epod.WaitForNumberOfPods(ctx, cs, ns, replicas, time.Minute)")
+		framework.ExpectNoError(e2epod.WaitForPodsSchedulingGated(ctx, cs, ns, replicas, time.Minute), "failed to e2epod.WaitForNumberOfPods(ctx, cs, ns, replicas, time.Minute)")
 
 		ginkgo.By("Remove one scheduling gate")
 		want := []v1.PodSchedulingGate{{Name: "bar"}}
@@ -837,24 +837,24 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 			clone := pod.DeepCopy()
 			clone.Spec.SchedulingGates = want
 			live, err := patchPod(cs, &pod, clone)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to patchPod(cs, &pod, clone)")
 			pods = append(pods, live)
 		}
 
 		ginkgo.By("Expect all pods carry one scheduling gate and are still in pending state")
-		framework.ExpectNoError(e2epod.WaitForPodsWithSchedulingGates(ctx, cs, ns, replicas, time.Minute, want))
-		framework.ExpectNoError(e2epod.WaitForPodsSchedulingGated(ctx, cs, ns, replicas, time.Minute))
+		framework.ExpectNoError(e2epod.WaitForPodsWithSchedulingGates(ctx, cs, ns, replicas, time.Minute, want), "failed to e2epod.WaitForPodsWithSchedulingGates(ctx, cs, ns, replicas, time.Minute, want)")
+		framework.ExpectNoError(e2epod.WaitForPodsSchedulingGated(ctx, cs, ns, replicas, time.Minute), "failed to e2epod.WaitForPodsSchedulingGated(ctx, cs, ns, replicas, time.Minute)")
 
 		ginkgo.By("Remove the remaining scheduling gates")
 		for _, pod := range pods {
 			clone := pod.DeepCopy()
 			clone.Spec.SchedulingGates = nil
 			_, err := patchPod(cs, pod, clone)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to patchPod(cs, pod, clone)")
 		}
 
 		ginkgo.By("Expect all pods are scheduled and running")
-		framework.ExpectNoError(e2epod.WaitForPodsRunning(ctx, cs, ns, replicas, time.Minute))
+		framework.ExpectNoError(e2epod.WaitForPodsRunning(ctx, cs, ns, replicas, time.Minute), "failed to e2epod.WaitForPodsRunning(ctx, cs, ns, replicas, time.Minute)")
 	})
 
 	// Regression test for an extended scenario for https://issues.k8s.io/123465
@@ -894,7 +894,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		}, e2epv.PersistentVolumeClaimConfig{
 			Name: pvcName,
 		}, ns, true)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epv.CreatePVPVC(ctx, cs, f.Timeouts, e2epv.PersistentVo...")
 		bindPvPod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: podName,
@@ -925,8 +925,8 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 			},
 		}
 		_, err = f.ClientSet.CoreV1().Pods(ns).Create(ctx, bindPvPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, ns, podName))
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(ns).Create(ctx, bindPvPod, metav1.CreateOptions{})")
+		framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, ns, podName), "failed to f.ClientSet.CoreV1().Pods(ns).Create(ctx, bindPvPod, metav1.CreateOptions{})")
 	})
 })
 
@@ -1032,15 +1032,15 @@ func createPausePod(ctx context.Context, f *framework.Framework, conf pausePodCo
 		namespace = f.Namespace.Name
 	}
 	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(ctx, initPausePod(f, conf), metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(namespace).Create(ctx, initPausePod(f, conf), metav...")
 	return pod
 }
 
 func runPausePod(ctx context.Context, f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	pod := createPausePod(ctx, f, conf)
-	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStartShort))
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStartShort), "failed to e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Na...")
 	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, conf.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, conf.Name, metav1.GetOption...")
 	return pod
 }
 
@@ -1053,7 +1053,7 @@ func runPodAndGetNodeName(ctx context.Context, f *framework.Framework, conf paus
 
 	ginkgo.By("Explicitly delete pod here to free the resource it takes.")
 	err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, *metav1.New...")
 
 	return pod.Spec.NodeName
 }
@@ -1099,7 +1099,7 @@ func WaitForSchedulerAfterAction(ctx context.Context, f *framework.Framework, ac
 		predicate = scheduleSuccessEvent(ns, podName, "" /* any node */)
 	}
 	observed, err := observeEventAfterAction(ctx, f.ClientSet, f.Namespace.Name, predicate, action)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to observeEventAfterAction(ctx, f.ClientSet, f.Namespace.Name, predicate, action)")
 	if expectSuccess && !observed {
 		framework.Failf("Did not observe success event after performing the supplied action for pod %v", podName)
 	}
@@ -1111,7 +1111,7 @@ func WaitForSchedulerAfterAction(ctx context.Context, f *framework.Framework, ac
 // TODO: upgrade calls in PodAffinity tests when we're able to run them
 func verifyResult(ctx context.Context, c clientset.Interface, expectedScheduled int, expectedNotScheduled int, ns string) {
 	allPods, err := c.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})")
 	scheduledPods, notScheduledPods := GetPodsScheduled(workerNodes, allPods)
 
 	gomega.Expect(notScheduledPods).To(gomega.HaveLen(expectedNotScheduled), fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods))
@@ -1167,7 +1167,7 @@ func CreateHostPortPods(ctx context.Context, f *framework.Framework, id string, 
 	}
 	err := e2erc.RunRC(ctx, *config)
 	if expectRunning {
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2erc.RunRC(ctx, *config)")
 	}
 }
 
@@ -1230,11 +1230,11 @@ func createHostPortPodOnNode(ctx context.Context, f *framework.Framework, podNam
 		},
 	}
 	_, err := f.ClientSet.CoreV1().Pods(ns).Create(ctx, hostPortPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(ns).Create(ctx, hostPortPod, metav1.CreateOptions{})")
 
 	err = e2epod.WaitForPodNotPending(ctx, f.ClientSet, ns, podName)
 	if expectScheduled {
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodNotPending(ctx, f.ClientSet, ns, podName)")
 	}
 }
 
@@ -1265,7 +1265,7 @@ func getNodeHostIP(ctx context.Context, f *framework.Framework, nodeName string)
 		family = v1.IPv6Protocol
 	}
 	node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})")
 	ips := e2enode.GetAddressesByTypeAndFamily(node, v1.NodeInternalIP, family)
 	if len(ips) == 0 {
 		ips = e2enode.GetAddressesByTypeAndFamily(node, v1.NodeExternalIP, family)

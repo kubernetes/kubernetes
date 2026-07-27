@@ -87,12 +87,12 @@ func (t *StatefulSetUpgradeTest) Setup(ctx context.Context, f *framework.Framewo
 
 	ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
 	_, err := f.ClientSet.CoreV1().Services(ns).Create(ctx, t.service, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Services(ns).Create(ctx, t.service, metav1.CreateOptions{})")
 
 	ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 	*(t.set.Spec.Replicas) = 3
 	_, err = f.ClientSet.AppsV1().StatefulSets(ns).Create(ctx, t.set, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to f.ClientSet.AppsV1().StatefulSets(ns).Create(ctx, t.set, metav1.CreateOptions{})")
 
 	ginkgo.By("Saturating stateful set " + t.set.Name)
 	e2estatefulset.Saturate(ctx, f.ClientSet, t.set)
@@ -114,17 +114,17 @@ func (t *StatefulSetUpgradeTest) Teardown(ctx context.Context, f *framework.Fram
 
 func (t *StatefulSetUpgradeTest) verify(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Verifying statefulset mounted data directory is usable")
-	framework.ExpectNoError(e2estatefulset.CheckMount(ctx, f.ClientSet, t.set, "/data"))
+	framework.ExpectNoError(e2estatefulset.CheckMount(ctx, f.ClientSet, t.set, "/data"), "failed to e2estatefulset.CheckMount(ctx, f.ClientSet, t.set, '/data')")
 
 	ginkgo.By("Verifying statefulset provides a stable hostname for each pod")
-	framework.ExpectNoError(e2estatefulset.CheckHostname(ctx, f.ClientSet, t.set))
+	framework.ExpectNoError(e2estatefulset.CheckHostname(ctx, f.ClientSet, t.set), "failed to e2estatefulset.CheckHostname(ctx, f.ClientSet, t.set)")
 
 	ginkgo.By("Verifying statefulset set proper service name")
-	framework.ExpectNoError(e2estatefulset.CheckServiceName(t.set, t.set.Spec.ServiceName))
+	framework.ExpectNoError(e2estatefulset.CheckServiceName(t.set, t.set.Spec.ServiceName), "failed to e2estatefulset.CheckServiceName(t.set, t.set.Spec.ServiceName)")
 
 	cmd := "echo $(hostname) > /data/hostname; sync;"
 	ginkgo.By("Running " + cmd + " in all stateful pods")
-	framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(ctx, f.ClientSet, t.set, cmd))
+	framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(ctx, f.ClientSet, t.set, cmd), "failed to e2estatefulset.ExecInStatefulPods(ctx, f.ClientSet, t.set, cmd)")
 }
 
 func (t *StatefulSetUpgradeTest) restart(ctx context.Context, f *framework.Framework) {

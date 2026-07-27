@@ -99,19 +99,19 @@ func (t *EtcdUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 		}
 		return true, nil
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to t.listUsers(); err != nil {")
 	framework.Logf("Service endpoint is up")
 
 	ginkgo.By("Adding 2 dummy users")
 	err = t.addUser("Alice")
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to t.addUser('Alice')")
 	err = t.addUser("Bob")
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to t.addUser('Bob')")
 	t.successfulWrites = 2
 
 	ginkgo.By("Verifying that the users exist")
 	users, err := t.listUsers()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to t.listUsers()")
 	gomega.Expect(users).To(gomega.HaveLen(2))
 }
 
@@ -154,7 +154,7 @@ func (t *EtcdUpgradeTest) addUser(name string) error {
 
 func (t *EtcdUpgradeTest) getServiceIP(ctx context.Context, f *framework.Framework, ns, svcName string) string {
 	svc, err := f.ClientSet.CoreV1().Services(ns).Get(ctx, svcName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Services(ns).Get(ctx, svcName, metav1.GetOptions{})")
 	ingress := svc.Status.LoadBalancer.Ingress
 	if len(ingress) == 0 {
 		return ""
@@ -210,6 +210,6 @@ func (t *EtcdUpgradeTest) Test(ctx context.Context, f *framework.Framework, done
 // Teardown does one final check of the data's availability.
 func (t *EtcdUpgradeTest) Teardown(ctx context.Context, f *framework.Framework) {
 	users, err := t.listUsers()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to t.listUsers()")
 	gomega.Expect(len(users)).To(gomega.BeNumerically(">=", t.successfulWrites), "len(users) is too small")
 }

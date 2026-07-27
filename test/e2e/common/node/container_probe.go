@@ -73,12 +73,12 @@ var _ = SIGDescribe("Probing container", func() {
 	framework.ConformanceIt("with readiness probe should not be ready before initial delay and never restart", f.WithNodeConformance(), func(ctx context.Context) {
 		containerName := "test-webserver"
 		p := podClient.Create(ctx, testWebServerPodSpec(probe.withInitialDelay().build(), nil, containerName, 80))
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout), "failed to e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespac...")
 
 		p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Get(ctx, p.Name, metav1.GetOptions{})")
 		isReady, err := testutils.PodRunningReady(p)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to testutils.PodRunningReady(p)")
 		if !isReady {
 			framework.Failf("pod %s/%s should be ready", f.Namespace.Name, p.Name)
 		}
@@ -86,9 +86,9 @@ var _ = SIGDescribe("Probing container", func() {
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
 		readyTime, err := GetTransitionTimeForReadyCondition(p)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to GetTransitionTimeForReadyCondition(p)")
 		startedTime, err := GetContainerStartedTime(p, containerName)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to GetContainerStartedTime(p, containerName)")
 
 		framework.Logf("Container started at %v, pod became ready at %v", startedTime, readyTime)
 		initialDelay := probeTestInitialDelaySeconds * time.Second
@@ -117,7 +117,7 @@ var _ = SIGDescribe("Probing container", func() {
 		}, 1*time.Minute, 1*time.Second).ShouldNot(gomega.BeTrueBecause("pod should not be ready"))
 
 		p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Get(ctx, p.Name, metav1.GetOptions{})")
 
 		isReady, _ := testutils.PodRunningReady(p)
 		if isReady {
@@ -311,7 +311,7 @@ var _ = SIGDescribe("Probing container", func() {
 			"reason":                   events.ContainerProbeWarning,
 		}.AsSelector().String()
 		framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(
-			ctx, f.ClientSet, f.Namespace.Name, expectedEvent, "Probe terminated redirects, Response body: <a href=\"http://0.0.0.0/\">Found</a>.", framework.PodEventTimeout))
+			ctx, f.ClientSet, f.Namespace.Name, expectedEvent, "Probe terminated redirects, Response body: <a href=\"http://0.0.0.0/\">Found</a>.", framework.PodEventTimeout), "failed to execute test operation")
 	})
 
 	/*
@@ -425,23 +425,23 @@ var _ = SIGDescribe("Probing container", func() {
 		p := podClient.Create(ctx, startupPodSpec(startupProbe, readinessProbe, nil, cmd))
 
 		p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Get(ctx, p.Name, metav1.GetOptions{})")
 
 		err = e2epod.WaitForPodContainerStarted(ctx, f.ClientSet, f.Namespace.Name, p.Name, 0, framework.PodStartTimeout)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodContainerStarted(ctx, f.ClientSet, f.Namespace.Name, p.Name,...")
 		startedTime := time.Now()
 
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
 		err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespac...")
 		readyTime := time.Now()
 
 		p, err = podClient.Get(ctx, p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Get(ctx, p.Name, metav1.GetOptions{})")
 
 		isReady, err := testutils.PodRunningReady(p)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to testutils.PodRunningReady(p)")
 		if !isReady {
 			framework.Failf("pod %s/%s should be ready", f.Namespace.Name, p.Name)
 		}
@@ -826,11 +826,11 @@ done
 
 		// verify pods are running and ready
 		err := e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, f.Timeouts.PodStart)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, f.Timeo...")
 
 		// Shutdown pod. Readiness should change to false
 		err = podClient.Delete(ctx, podName, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Delete(ctx, podName, metav1.DeleteOptions{})")
 
 		err = waitForPodStatusByInformer(ctx, f.ClientSet, f.Namespace.Name, podName, f.Timeouts.PodDelete, func(pod *v1.Pod) (bool, error) {
 			if !podutil.IsPodReady(pod) {
@@ -839,7 +839,7 @@ done
 			framework.Logf("pod %s/%s is still ready, waiting until is not ready", pod.Namespace, pod.Name)
 			return false, nil
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to waitForPodStatusByInformer(ctx, f.ClientSet, f.Namespace....")
 	})
 
 	f.It("should mark readiness on pods to false and disable liveness probes while pod is in progress of terminating", f.WithNodeConformance(), func(ctx context.Context) {
@@ -908,11 +908,11 @@ done
 
 		// verify pods are running and ready
 		err := e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, f.Timeouts.PodStart)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, f.Timeo...")
 
 		// Shutdown pod. Readiness should change to false
 		err = podClient.Delete(ctx, podName, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Delete(ctx, podName, metav1.DeleteOptions{})")
 
 		// Wait for pod to go unready
 		err = waitForPodStatusByInformer(ctx, f.ClientSet, f.Namespace.Name, podName, f.Timeouts.PodDelete, func(pod *v1.Pod) (bool, error) {
@@ -922,13 +922,13 @@ done
 			framework.Logf("pod %s/%s is still ready, waiting until is not ready", pod.Namespace, pod.Name)
 			return false, nil
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to waitForPodStatusByInformer(ctx, f.ClientSet, f.Namespace....")
 
 		// Verify there are zero liveness failures since they are turned off
 		// during pod termination
 		gomega.Consistently(ctx, func(ctx context.Context) (bool, error) {
 			items, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})")
 			for _, event := range items.Items {
 				// Search only for the pod we are interested in
 				if event.InvolvedObject.Name != podName {
@@ -963,12 +963,12 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Probing restartable init c
 	ginkgo.It("with readiness probe should not be ready before initial delay and never restart", func(ctx context.Context) {
 		containerName := "test-webserver"
 		p := podClient.Create(ctx, testWebServerSidecarPodSpec(probe.withInitialDelay().build(), nil, containerName, 80))
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout), "failed to e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespac...")
 
 		p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Get(ctx, p.Name, metav1.GetOptions{})")
 		isReady, err := testutils.PodRunningReady(p)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to testutils.PodRunningReady(p)")
 		if !isReady {
 			framework.Failf("pod %s/%s should be ready", f.Namespace.Name, p.Name)
 		}
@@ -976,9 +976,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Probing restartable init c
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
 		readyTime, err := GetTransitionTimeForReadyCondition(p)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to GetTransitionTimeForReadyCondition(p)")
 		startedTime, err := GetContainerStartedTime(p, containerName)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to GetContainerStartedTime(p, containerName)")
 
 		framework.Logf("Container started at %v, pod became ready at %v", startedTime, readyTime)
 		initialDelay := probeTestInitialDelaySeconds * time.Second
@@ -1008,7 +1008,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Probing restartable init c
 		}, 1*time.Minute, 1*time.Second).ShouldNot(gomega.BeTrueBecause("pod should not be ready"))
 
 		p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Get(ctx, p.Name, metav1.GetOptions{})")
 
 		isReady, _ := testutils.PodRunningReady(p)
 		if isReady {
@@ -1238,7 +1238,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Probing restartable init c
 			"reason":                   events.ContainerProbeWarning,
 		}.AsSelector().String()
 		framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(
-			ctx, f.ClientSet, f.Namespace.Name, expectedEvent, "Probe terminated redirects, Response body: <a href=\"http://0.0.0.0/\">Found</a>.", framework.PodEventTimeout))
+			ctx, f.ClientSet, f.Namespace.Name, expectedEvent, "Probe terminated redirects, Response body: <a href=\"http://0.0.0.0/\">Found</a>.", framework.PodEventTimeout), "failed to execute test operation")
 	})
 
 	/*
@@ -1362,23 +1362,23 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Probing restartable init c
 		p := podClient.Create(ctx, startupSidecarPodSpec(startupProbe, readinessProbe, nil, cmd))
 
 		p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Get(ctx, p.Name, metav1.GetOptions{})")
 
 		err = e2epod.WaitForPodContainerStarted(ctx, f.ClientSet, f.Namespace.Name, p.Name, 0, framework.PodStartTimeout)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodContainerStarted(ctx, f.ClientSet, f.Namespace.Name, p.Name,...")
 		startedTime := time.Now()
 
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
 		err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespac...")
 		readyTime := time.Now()
 
 		p, err = podClient.Get(ctx, p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Get(ctx, p.Name, metav1.GetOptions{})")
 
 		isReady, err := testutils.PodRunningReady(p)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to testutils.PodRunningReady(p)")
 		if !isReady {
 			framework.Failf("pod %s/%s should be ready", f.Namespace.Name, p.Name)
 		}
@@ -1571,11 +1571,11 @@ done
 
 		// verify pods are running and ready
 		err := e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, f.Timeouts.PodStart)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, f.Timeo...")
 
 		// Shutdown pod. Readiness should change to false
 		err = podClient.Delete(ctx, podName, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Delete(ctx, podName, metav1.DeleteOptions{})")
 
 		err = waitForPodStatusByInformer(ctx, f.ClientSet, f.Namespace.Name, podName, f.Timeouts.PodDelete, func(pod *v1.Pod) (bool, error) {
 			if !podutil.IsPodReady(pod) {
@@ -1584,7 +1584,7 @@ done
 			framework.Logf("pod %s/%s is still ready, waiting until is not ready", pod.Namespace, pod.Name)
 			return false, nil
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to waitForPodStatusByInformer(ctx, f.ClientSet, f.Namespace....")
 	})
 
 	ginkgo.It("should mark readiness on pods to false and disable liveness probes while pod is in progress of terminating", func(ctx context.Context) {
@@ -1664,11 +1664,11 @@ done
 
 		// verify pods are running and ready
 		err := e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, f.Timeouts.PodStart)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, f.Timeo...")
 
 		// Shutdown pod. Readiness should change to false
 		err = podClient.Delete(ctx, podName, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Delete(ctx, podName, metav1.DeleteOptions{})")
 
 		// Wait for pod to go unready
 		err = waitForPodStatusByInformer(ctx, f.ClientSet, f.Namespace.Name, podName, f.Timeouts.PodDelete, func(pod *v1.Pod) (bool, error) {
@@ -1678,13 +1678,13 @@ done
 			framework.Logf("pod %s/%s is still ready, waiting until is not ready", pod.Namespace, pod.Name)
 			return false, nil
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to waitForPodStatusByInformer(ctx, f.ClientSet, f.Namespace....")
 
 		// Verify there are zero liveness failures since they are turned off
 		// during pod termination
 		gomega.Consistently(ctx, func(ctx context.Context) (bool, error) {
 			items, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})")
 			for _, event := range items.Items {
 				// Search only for the pod we are interested in
 				if event.InvolvedObject.Name != podName {
@@ -1950,7 +1950,7 @@ func runLivenessTest(ctx context.Context, f *framework.Framework, pod *v1.Pod, e
 			}
 		}
 		return false, nil
-	}))
+	}), "failed to execute test operation")
 
 	// Check the pod's current state and verify that restartCount is present.
 	ginkgo.By("checking the pod's current state and verifying that restartCount is present")

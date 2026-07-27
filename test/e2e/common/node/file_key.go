@@ -365,11 +365,11 @@ var _ = SIGDescribe("FileKeyRef", feature.EnvFiles, framework.WithFeatureGate(fe
 		pod = podClient.Create(ctx, pod)
 		ginkgo.By("Waiting for pod to complete")
 		err := e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Nam...")
 
 		// Check logs for lifecycle hook output
 		rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)")
 		defer func() { _ = rc.Close() }()
 		buf := new(bytes.Buffer)
 		_, _ = buf.ReadFrom(rc)
@@ -445,11 +445,11 @@ var _ = SIGDescribe("FileKeyRef", feature.EnvFiles, framework.WithFeatureGate(fe
 		podClient := e2epod.NewPodClient(f)
 		pod = podClient.CreateSync(ctx, pod)
 		err := podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})")
 
 		gomega.Eventually(ctx, func(g gomega.Gomega) {
 			rc, err := podClient.GetLogs(pod.Name, &v1.PodLogOptions{}).Stream(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to podClient.GetLogs(pod.Name, &v1.PodLogOptions{}).Stream(ctx)")
 			defer func() { _ = rc.Close() }()
 			buf := new(bytes.Buffer)
 			_, _ = buf.ReadFrom(rc)
@@ -659,7 +659,7 @@ var _ = SIGDescribe("FileKeyRef", feature.EnvFiles, framework.WithFeatureGate(fe
 				}
 			}
 			return false, nil
-		}))
+		}), "failed to f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, p...")
 	})
 
 	/*
@@ -786,9 +786,9 @@ var _ = SIGDescribe("FileKeyRef", feature.EnvFiles, framework.WithFeatureGate(fe
 		podClient := e2epod.NewPodClient(f)
 		pod = podClient.Create(ctx, pod)
 		err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.N...")
 		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "use-envfile1")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, 'use-envfile1')")
 		gomega.Expect(logs).To(gomega.ContainSubstring("CONFIG_1=value1"))
 	})
 
@@ -894,9 +894,9 @@ var _ = SIGDescribe("FileKeyRef", feature.EnvFiles, framework.WithFeatureGate(fe
 			},
 		}
 		err := podClient.AddEphemeralContainerSync(ctx, pod, &ec, time.Minute)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.AddEphemeralContainerSync(ctx, pod, &ec, time.Minute)")
 		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "debugger")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, 'debugger')")
 		gomega.Expect(logs).To(gomega.ContainSubstring("CONFIG_EPH_MAIN=ephemeral"))
 	})
 })

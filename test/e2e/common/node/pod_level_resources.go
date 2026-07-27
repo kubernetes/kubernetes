@@ -49,7 +49,7 @@ var _ = SIGDescribe("Pod Level Resources", framework.WithSerial(), feature.PodLe
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)")
 
 		if framework.NodeOSDistroIs("windows") {
 			e2eskipper.Skipf("not supported on windows -- skipping")
@@ -550,7 +550,7 @@ var _ = SIGDescribe("Pod Level Resources Fix Defaulting", framework.WithSerial()
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)")
 
 		if framework.NodeOSDistroIs("windows") {
 			e2eskipper.Skipf("not supported on windows -- skipping")

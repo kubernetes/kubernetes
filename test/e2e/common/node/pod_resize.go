@@ -88,7 +88,7 @@ func doGuaranteedPodResizeTests(f *framework.Framework) {
 
 			// The tests for guaranteed pods include extended resources.
 			nodes, err := e2enode.GetReadySchedulableNodes(context.Background(), f.ClientSet)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2enode.GetReadySchedulableNodes(context.Background(), f.ClientSet)")
 			for _, node := range nodes.Items {
 				e2enode.AddExtendedResource(ctx, f.ClientSet, node.Name, fakeExtendedResource, resource.MustParse("123"))
 			}
@@ -391,14 +391,14 @@ func doPodResizePatchErrorTests(f *framework.Framework) {
 		gomega.Expect(pErr.Error()).To(gomega.ContainSubstring(patchError))
 
 		patchedPod, getErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Get(ctx, newPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(getErr)
+		framework.ExpectNoError(getErr, "failed to getErr")
 
 		ginkgo.By("verifying pod resources after patch")
 		podresize.VerifyPodResources(patchedPod, originalContainers, nil)
 
 		if waitForStart {
 			ginkgo.By("verifying pod status resources after patch")
-			framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPod, originalContainers))
+			framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPod, originalContainers), "failed to podresize.VerifyPodStatusResources(patchedPod, originalContainers)")
 		}
 
 		ginkgo.By("deleting pod")
@@ -668,10 +668,10 @@ func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
 					}, nil
 				}
 				return nil, nil
-			})),
+			})), "failed to execute test operation",
 		)
 		ginkgo.By("verifying pod status resources still match the viable resize")
-		framework.ExpectNoError(podresize.VerifyPodStatusResources(testPod, viableLoweredLimit))
+		framework.ExpectNoError(podresize.VerifyPodStatusResources(testPod, viableLoweredLimit), "failed to podresize.VerifyPodStatusResources(testPod, viableLoweredLimit)")
 
 		// 3. Revert the limit back to the original value - should succeed
 		ginkgo.By("Patching pod to revert to original state")
@@ -850,7 +850,7 @@ func doPodResizeReadAndReplaceTests(f *framework.Framework) {
 				}
 
 				return nil, nil
-			})),
+			})), "failed to unstructuredToPod(unstruct)",
 		)
 	})
 }
@@ -1103,7 +1103,7 @@ func doPodResizeMemoryVolumeSizeLimitDecreaseTest(f *framework.Framework) {
 					return func() string { return "expected a non-empty error message in PodResizeInProgress condition" }, nil
 				}
 				return nil, nil
-			})),
+			})), "failed to e2epod.ExecCommandInContainerWithFullOutput(f, newPod.Nam...",
 		)
 
 		ginkgo.By("verifying the volume still holds the original size and c1 didn't restart")
@@ -1112,7 +1112,7 @@ func doPodResizeMemoryVolumeSizeLimitDecreaseTest(f *framework.Framework) {
 		gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(qty128Mi.Value()/(1024*1024), 10)))
 
 		gotPod, getErr := podClient.Get(ctx, newPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(getErr)
+		framework.ExpectNoError(getErr, "failed to getErr")
 		expected := podresize.UpdateExpectedContainerRestarts(ctx, gotPod, original)
 		gomega.Expect(gotPod.Status.ContainerStatuses[0].RestartCount).To(gomega.Equal(expected[0].RestartCount))
 
@@ -1133,7 +1133,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container", func() {
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)")
 		if framework.NodeOSDistroIs("windows") {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
@@ -1151,7 +1151,7 @@ var _ = SIGDescribe("Pod InPlace Resize Init Container", framework.WithSlow(), f
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)")
 		if framework.NodeOSDistroIs("windows") {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
@@ -1165,7 +1165,7 @@ var _ = SIGDescribe("Pod InPlace Resize Memory-Backed Volume", framework.WithFea
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)")
 		if framework.NodeOSDistroIs("windows") {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
@@ -1230,7 +1230,7 @@ func patchAndVerify(ctx context.Context, f *framework.Framework, podClient *e2ep
 
 	podresize.ExpectPodResized(ctx, f, resizedPod, expected)
 	if expectedPodResources != nil {
-		framework.ExpectNoError(podresize.VerifyPodCgroupValues(ctx, f, resizedPod))
+		framework.ExpectNoError(podresize.VerifyPodCgroupValues(ctx, f, resizedPod), "failed to podresize.VerifyPodCgroupValues(ctx, f, resizedPod)")
 	}
 
 	// Verify CPU weight moved in the right direction
@@ -1290,10 +1290,10 @@ func createAndVerifyPod(ctx context.Context, f *framework.Framework, podClient *
 
 	podresize.VerifyPodResources(newPod, originalContainers, podResources)
 	podresize.VerifyPodResizePolicy(newPod, originalContainers)
-	framework.ExpectNoError(podresize.VerifyPodStatusResources(newPod, originalContainers))
-	framework.ExpectNoError(podresize.VerifyPodContainersCgroupValues(ctx, f, newPod, originalContainers))
+	framework.ExpectNoError(podresize.VerifyPodStatusResources(newPod, originalContainers), "failed to podresize.VerifyPodStatusResources(newPod, originalContainers)")
+	framework.ExpectNoError(podresize.VerifyPodContainersCgroupValues(ctx, f, newPod, originalContainers), "failed to podresize.VerifyPodContainersCgroupValues(ctx, f, newPod, originalContainers)")
 	if podResources != nil {
-		framework.ExpectNoError(podresize.VerifyPodCgroupValues(ctx, f, newPod))
+		framework.ExpectNoError(podresize.VerifyPodCgroupValues(ctx, f, newPod), "failed to podresize.VerifyPodCgroupValues(ctx, f, newPod)")
 	}
 	return newPod
 }
@@ -1397,6 +1397,6 @@ func verifyInitContainerResources(ctx context.Context, f *framework.Framework, p
 				}, nil
 			}
 			return nil, nil
-		})),
+		})), "failed to cgroups.VerifyContainerCgroupValues(ctx, f, pod, &expecte...",
 	)
 }

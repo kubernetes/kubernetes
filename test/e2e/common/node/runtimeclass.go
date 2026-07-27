@@ -176,7 +176,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 					return true, err // stop wait with error
 				}
 				return false, nil
-			}))
+			}), "failed to rcClient.Get(ctx, rcName, metav1.GetOptions{})")
 		})
 
 		gomega.Eventually(ctx, func() error {
@@ -214,7 +214,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		ginkgo.By("getting /apis")
 		{
 			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.Discovery().ServerGroups()")
 			found := false
 			for _, group := range discoveryGroups.Groups {
 				if group.Name == nodev1.GroupName {
@@ -235,7 +235,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		{
 			group := &metav1.APIGroup{}
 			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/node.k8s.io").Do(ctx).Into(group)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.Discovery().RESTClient().Get().AbsPath('/apis/node.k8s.io').Do(ct...")
 			found := false
 			for _, version := range group.Versions {
 				if version.Version == rcVersion {
@@ -251,7 +251,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		ginkgo.By("getting /apis/node.k8s.io/" + rcVersion)
 		{
 			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(nodev1.SchemeGroupVersion.String())
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.Discovery().ServerResourcesForGroupVersion(nodev1.SchemeGroupVers...")
 			found := false
 			for _, resource := range resources.APIResources {
 				switch resource.Name {
@@ -268,37 +268,37 @@ var _ = SIGDescribe("RuntimeClass", func() {
 
 		ginkgo.By("creating")
 		createdRC, err := rcClient.Create(ctx, rc, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to rcClient.Create(ctx, rc, metav1.CreateOptions{})")
 		_, err = rcClient.Create(ctx, rc, metav1.CreateOptions{})
 		if !apierrors.IsAlreadyExists(err) {
 			framework.Failf("expected 409, got %#v", err)
 		}
 		_, err = rcClient.Create(ctx, rc2, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to rcClient.Create(ctx, rc2, metav1.CreateOptions{})")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
 		rcWatch, err := rcClient.Watch(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to rcClient.Watch(ctx, metav1.ListOptions{LabelSelector: 'test=' + f.UniqueName})")
 
 		// added for a watch
 		_, err = rcClient.Create(ctx, rc3, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to rcClient.Create(ctx, rc3, metav1.CreateOptions{})")
 
 		ginkgo.By("getting")
 		gottenRC, err := rcClient.Get(ctx, rc.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to rcClient.Get(ctx, rc.Name, metav1.GetOptions{})")
 		gomega.Expect(gottenRC.UID).To(gomega.Equal(createdRC.UID))
 		gomega.Expect(gottenRC).To(apimachineryutils.HaveValidResourceVersion())
 
 		ginkgo.By("listing")
 		rcs, err := rcClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to rcClient.List(ctx, metav1.ListOptions{LabelSelector: 'test=' + f.UniqueName})")
 		gomega.Expect(rcs.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("patching")
 		patchedRC, err := rcClient.Patch(ctx, createdRC.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to rcClient.Patch(ctx, createdRC.Name, types.MergePatchType, []byte(`{'metadata'...")
 		gomega.Expect(patchedRC.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 		gomega.Expect(resourceversion.CompareResourceVersion(gottenRC.ResourceVersion, patchedRC.ResourceVersion)).To(gomega.BeNumerically("==", -1), "patched object should have a larger resource version")
 
@@ -306,7 +306,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		csrToUpdate := patchedRC.DeepCopy()
 		csrToUpdate.Annotations["updated"] = "true"
 		updatedRC, err := rcClient.Update(ctx, csrToUpdate, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to rcClient.Update(ctx, csrToUpdate, metav1.UpdateOptions{})")
 		gomega.Expect(updatedRC.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 
 		framework.Logf("waiting for watch events with expected annotations")
@@ -348,20 +348,20 @@ var _ = SIGDescribe("RuntimeClass", func() {
 
 		ginkgo.By("deleting")
 		err = rcClient.Delete(ctx, createdRC.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to rcClient.Delete(ctx, createdRC.Name, metav1.DeleteOptions{})")
 		_, err = rcClient.Get(ctx, createdRC.Name, metav1.GetOptions{})
 		if !apierrors.IsNotFound(err) {
 			framework.Failf("expected 404, got %#v", err)
 		}
 		rcs, err = rcClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to rcClient.List(ctx, metav1.ListOptions{LabelSelector: 'test=' + f.UniqueName})")
 		gomega.Expect(rcs.Items).To(gomega.HaveLen(2), "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
 		err = rcClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to rcClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{Lab...")
 		rcs, err = rcClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to rcClient.List(ctx, metav1.ListOptions{LabelSelector: 'test=' + f.UniqueName})")
 		gomega.Expect(rcs.Items).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
 })
@@ -400,5 +400,5 @@ func expectPodRejection(ctx context.Context, f *framework.Framework, rcName stri
 // expectPodSuccess waits for the given pod to terminate successfully.
 func expectPodSuccess(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
 	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(
-		ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+		ctx, f.ClientSet, pod.Name, f.Namespace.Name), "failed to f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, p...")
 }
