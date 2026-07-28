@@ -1150,6 +1150,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 
 		ar := metrics.NewMetricsAsyncRecorder(10, 1*time.Second, ctx.Done())
 		queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar), internalqueue.WithAPIDispatcher(apiDispatcher))
+		schedFramework.SetPodNominator(queue)
 		if features.asyncAPICallsEnabled {
 			schedFramework.SetAPICacher(apicache.New(queue, cache))
 		}
@@ -1161,8 +1162,10 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			SchedulingQueue:                        queue,
 			Profiles:                               profile.Map{testSchedulerName: schedFramework},
 			APIDispatcher:                          apiDispatcher,
+			nodeInfoSnapshot:                       internalcache.NewEmptySnapshot(),
 			nominatedNodeNameForExpectationEnabled: features.nominatedNodeNameForExpectationEnabled,
 		}
+		sched.initAlgorithm()
 		informerFactory.Start(ctx.Done())
 		informerFactory.WaitForCacheSync(ctx.Done())
 
@@ -1192,7 +1195,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		sched.nodeInfoSnapshot = internalcache.NewEmptySnapshot()
 		sched.ScheduleOne(ctx)
 
 		if item.postSchedulingCycle != nil {
@@ -1952,13 +1954,15 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 				}
 
 				sched := &Scheduler{
-					Cache:           cache,
-					client:          client,
-					NextEntity:      queue.Pop,
-					SchedulingQueue: queue,
-					Profiles:        profile.Map{testSchedulerName: schedFramework},
-					APIDispatcher:   apiDispatcher,
+					Cache:            cache,
+					client:           client,
+					NextEntity:       queue.Pop,
+					SchedulingQueue:  queue,
+					Profiles:         profile.Map{testSchedulerName: schedFramework},
+					APIDispatcher:    apiDispatcher,
+					nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
 				}
+				sched.initAlgorithm()
 				queue.Add(ctx, item.sendPod)
 
 				sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
@@ -2049,6 +2053,9 @@ type FakeFramework struct {
 func NewFakeFramework(ctx context.Context, schedQueue internalqueue.SchedulingQueue, fns []tf.RegisterPluginFunc,
 	profileName string, opts ...frameworkruntime.Option) (*FakeFramework, error) {
 	fwk, err := tf.NewFramework(ctx, fns, profileName, opts...)
+	if fwk != nil {
+		fwk.SetPodNominator(schedQueue)
+	}
 	return &FakeFramework{
 			Framework: fwk,
 			queue:     schedQueue},
@@ -2482,7 +2489,7 @@ func TestSchedulerBinding(t *testing.T) {
 					[]tf.RegisterPluginFunc{
 						tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 						tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-					}, "", frameworkruntime.WithClientSet(client), frameworkruntime.WithAPIDispatcher(apiDispatcher), frameworkruntime.WithEventRecorder(&events.FakeRecorder{}))
+					}, "", frameworkruntime.WithClientSet(client), frameworkruntime.WithAPIDispatcher(apiDispatcher), frameworkruntime.WithEventRecorder(&events.FakeRecorder{}), frameworkruntime.WithExtenders(test.extenders))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -2495,11 +2502,9 @@ func TestSchedulerBinding(t *testing.T) {
 				}
 
 				sched := &Scheduler{
-					Extenders:                test.extenders,
-					Cache:                    cache,
-					nodeInfoSnapshot:         nil,
-					percentageOfNodesToScore: 0,
-					APIDispatcher:            apiDispatcher,
+					Cache:            cache,
+					nodeInfoSnapshot: nil,
+					APIDispatcher:    apiDispatcher,
 				}
 				status := sched.bind(ctx, fwk, pod, "node", state)
 				if !status.IsSuccess() {
@@ -3827,27 +3832,27 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				_, _ = cs.CoreV1().PersistentVolumes().Create(ctx, &pv, metav1.CreateOptions{})
 			}
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
+			var extenders []fwk.Extender
+			for ii := range test.extenders {
+				extenders = append(extenders, &test.extenders[ii])
+			}
 			schedFramework, err := tf.NewFramework(
 				ctx,
 				test.registerPlugins, "",
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithExtenders(extenders),
 			)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			var extenders []fwk.Extender
-			for ii := range test.extenders {
-				extenders = append(extenders, &test.extenders[ii])
-			}
 			sched := &Scheduler{
-				Cache:                    cache,
-				nodeInfoSnapshot:         snapshot,
-				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
-				Extenders:                extenders,
+				Cache:            cache,
+				nodeInfoSnapshot: snapshot,
 			}
+			sched.initAlgorithm()
 			sched.applyDefaultHandlers()
 
 			informerFactory.Start(ctx.Done())
@@ -3908,7 +3913,7 @@ func TestFindFitAllError(t *testing.T) {
 	}
 
 	podInfo := queuedPodInfoForPod(&v1.Pod{})
-	_, diagnosis, _, err := scheduler.findNodesThatFitPod(ctx, schedFramework, framework.NewCycleState(), podInfo)
+	_, diagnosis, _, err := scheduler.algorithm.findNodesThatFitPod(ctx, schedFramework, framework.NewCycleState(), podInfo, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3955,7 +3960,7 @@ func TestFindFitSomeError(t *testing.T) {
 
 	pod := st.MakePod().Name("1").UID("1").Obj()
 	podInfo := queuedPodInfoForPod(pod)
-	_, diagnosis, _, err := scheduler.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), podInfo)
+	_, diagnosis, _, err := scheduler.algorithm.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), podInfo, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -4051,7 +4056,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			schedFramework.AddNominatedPod(logger, podinfo, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "1"})
 
 			podInfo := queuedPodInfoForPod(test.pod)
-			_, _, _, err = scheduler.findNodesThatFitPod(ctx, schedFramework, framework.NewCycleState(), podInfo)
+			_, _, _, err = scheduler.algorithm.findNodesThatFitPod(ctx, schedFramework, framework.NewCycleState(), podInfo, false)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -4516,6 +4521,10 @@ func Test_prioritizeNodes(t *testing.T) {
 			if err := cache.UpdateSnapshot(klog.FromContext(ctx), snapshot); err != nil {
 				t.Fatal(err)
 			}
+			var extenders []fwk.Extender
+			for ii := range test.extenders {
+				extenders = append(extenders, &test.extenders[ii])
+			}
 			schedFramework, err := tf.NewFramework(
 				ctx,
 				test.pluginRegistrations, "",
@@ -4523,21 +4532,18 @@ func Test_prioritizeNodes(t *testing.T) {
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithExtenders(extenders),
 			)
 			if err != nil {
 				t.Fatalf("error creating framework: %+v", err)
 			}
 
 			state := framework.NewCycleState()
-			var extenders []fwk.Extender
-			for ii := range test.extenders {
-				extenders = append(extenders, &test.extenders[ii])
-			}
 			nodeInfos, err := snapshot.NodeInfos().List()
 			if err != nil {
 				t.Fatalf("failed to list node from snapshot: %v", err)
 			}
-			nodesscores, err := prioritizeNodes(ctx, extenders, schedFramework, state, test.pod, nodeInfos)
+			nodesscores, err := prioritizeNodes(ctx, schedFramework, state, test.pod, nodeInfos)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -4617,11 +4623,9 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sched := &Scheduler{
-				percentageOfNodesToScore: tt.globalPercentage,
-			}
-			if gotNumNodes := sched.numFeasibleNodesToFind(tt.profilePercentage, tt.numAllNodes); gotNumNodes != tt.wantNumNodes {
-				t.Errorf("Scheduler.numFeasibleNodesToFind() = %v, want %v", gotNumNodes, tt.wantNumNodes)
+			alg := &SchedulingAlgorithm{percentageOfNodesToScore: tt.globalPercentage}
+			if gotNumNodes := alg.numFeasibleNodesToFind(tt.profilePercentage, tt.numAllNodes); gotNumNodes != tt.wantNumNodes {
+				t.Errorf("SchedulingAlgorithm.numFeasibleNodesToFind() = %v, want %v", gotNumNodes, tt.wantNumNodes)
 			}
 		})
 	}
@@ -4656,21 +4660,35 @@ func TestFairEvaluationForNodes(t *testing.T) {
 	}
 
 	// To make numAllNodes % nodesToFind != 0
-	sched.percentageOfNodesToScore = 30
-	nodesToFind := int(sched.numFeasibleNodesToFind(fwk.PercentageOfNodesToScore(), int32(numAllNodes)))
+	sched.algorithm.percentageOfNodesToScore = 30
+	nodesToFind := int(sched.algorithm.numFeasibleNodesToFind(fwk.PercentageOfNodesToScore(), int32(numAllNodes)))
 
 	// Iterating over all nodes more than twice
 	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {
 		podInfo := queuedPodInfoForPod(&v1.Pod{})
-		nodesThatFit, _, _, err := sched.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), podInfo)
+		nodesThatFit, _, _, err := sched.algorithm.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), podInfo, false)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if len(nodesThatFit) != nodesToFind {
 			t.Errorf("got %d nodes filtered, want %d", len(nodesThatFit), nodesToFind)
 		}
-		if sched.nextStartNodeIndex != (i+1)*nodesToFind%numAllNodes {
-			t.Errorf("got %d lastProcessedNodeIndex, want %d", sched.nextStartNodeIndex, (i+1)*nodesToFind%numAllNodes)
+		expectedNextStartNodeIndex := (i + 1) * nodesToFind % numAllNodes
+		if sched.algorithm.nextStartNodeIndex != expectedNextStartNodeIndex {
+			t.Errorf("got %d lastProcessedNodeIndex, want %d", sched.algorithm.nextStartNodeIndex, expectedNextStartNodeIndex)
+		}
+
+		// Interleave a FindAllNodesThatFitPod call between normal cycles and assert nextStartNodeIndex
+		// advances exactly as if the findAll call never happened.
+		allNodesThatFit, _, err := sched.algorithm.FindAllNodesThatFitPod(ctx, framework.NewCycleState(), fwk, podInfo)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if len(allNodesThatFit) != numAllNodes {
+			t.Errorf("got %d nodes filtered, want %d", len(allNodesThatFit), numAllNodes)
+		}
+		if sched.algorithm.nextStartNodeIndex != expectedNextStartNodeIndex {
+			t.Errorf("got %d lastProcessedNodeIndex, want %d", sched.algorithm.nextStartNodeIndex, expectedNextStartNodeIndex)
 		}
 	}
 }
@@ -4740,14 +4758,14 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			}
 
 			sched := &Scheduler{
-				Cache:                    cache,
-				nodeInfoSnapshot:         snapshot,
-				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+				Cache:            cache,
+				nodeInfoSnapshot: snapshot,
 			}
+			sched.initAlgorithm()
 			sched.applyDefaultHandlers()
 
 			podInfo := queuedPodInfoForPod(test.pod)
-			_, _, _, err = sched.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), podInfo)
+			_, _, _, err = sched.algorithm.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), podInfo, false)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -4790,6 +4808,15 @@ func makeNodeList(nodeNames []string) []*v1.Node {
 	return result
 }
 
+// initTestAlgorithm finishes a Scheduler built as a struct literal the way New
+// does: it builds the scheduling algorithm from the fields already set and points
+// SchedulePod at it. Unlike applyDefaultHandlers it leaves FailureHandler alone,
+// so it is safe for tests that install their own.
+func initTestAlgorithm(sched *Scheduler) {
+	sched.initAlgorithm()
+	sched.SchedulePod = sched.algorithm.schedulePod
+}
+
 // makeScheduler makes a simple Scheduler for testing.
 func makeScheduler(ctx context.Context, nodes []*v1.Node) *Scheduler {
 	logger := klog.FromContext(ctx)
@@ -4799,10 +4826,10 @@ func makeScheduler(ctx context.Context, nodes []*v1.Node) *Scheduler {
 	}
 
 	sched := &Scheduler{
-		Cache:                    cache,
-		nodeInfoSnapshot:         emptySnapshot,
-		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+		Cache:            cache,
+		nodeInfoSnapshot: emptySnapshot,
 	}
+	sched.initAlgorithm()
 	sched.applyDefaultHandlers()
 	cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot)
 	return sched
@@ -4910,10 +4937,9 @@ func setupTestScheduler(ctx context.Context, t *testing.T, client clientset.Inte
 
 	errChan := make(chan error, 1)
 	sched := &Scheduler{
-		Cache:                    cache,
-		client:                   client,
-		nodeInfoSnapshot:         snapshot,
-		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+		Cache:            cache,
+		client:           client,
+		nodeInfoSnapshot: snapshot,
 		NextEntity: func(logger klog.Logger) (framework.QueuedEntityInfo, error) {
 			return &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, pop(queuedPodStore).(*v1.Pod))}, nil
 		},
@@ -4922,7 +4948,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, client clientset.Inte
 		Profiles:        profile.Map{testSchedulerName: schedFramework},
 	}
 
-	sched.SchedulePod = sched.schedulePod
+	initTestAlgorithm(sched)
 	sched.FailureHandler = func(ctx context.Context, _ framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
 		err := status.AsError()
 		errChan <- err
@@ -5085,8 +5111,9 @@ func TestEvaluateNominatedNode(t *testing.T) {
 			sched := &Scheduler{
 				nodeInfoSnapshot: snapshot,
 			}
+			sched.initAlgorithm()
 
-			gotNodes, err := sched.evaluateNominatedNode(ctx, tt.pod, fw, framework.NewCycleState(), "", framework.Diagnosis{})
+			gotNodes, err := sched.algorithm.evaluateNominatedNode(ctx, tt.pod, fw, framework.NewCycleState(), "", framework.Diagnosis{})
 
 			if (err != nil) != tt.wantError {
 				t.Errorf("Unexpected error, want error: %v, got: %v", tt.wantError, err)
@@ -5166,6 +5193,7 @@ func TestScheduler_DeferredResizePluginSkipping(t *testing.T) {
 		Cache:            cache,
 		nodeInfoSnapshot: snapshot,
 	}
+	sched.initAlgorithm()
 
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
@@ -5174,7 +5202,7 @@ func TestScheduler_DeferredResizePluginSkipping(t *testing.T) {
 	podInfo := queuedPodInfoForPod(pod)
 
 	// Run schedulePod
-	_, _ = sched.schedulePod(ctx, schedFramework, state, podInfo)
+	_, _ = sched.algorithm.schedulePod(ctx, schedFramework, state, podInfo)
 
 	// Verify the skipped plugins
 	skipped := state.GetSkipFilterPlugins()

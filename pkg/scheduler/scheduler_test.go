@@ -247,16 +247,6 @@ func TestSchedulerCreation(t *testing.T) {
 
 			// Extenders
 			if len(tc.wantExtenders) != 0 {
-				// Scheduler.Extenders
-				extenders := make([]string, 0, len(s.Extenders))
-				for _, e := range s.Extenders {
-					extenders = append(extenders, e.Name())
-				}
-				if diff := cmp.Diff(tc.wantExtenders, extenders); diff != "" {
-					t.Errorf("unexpected extenders (-want, +got):\n%s", diff)
-				}
-
-				// fwk.Handle.Extenders()
 				for _, p := range s.Profiles {
 					extenders := make([]string, 0, len(p.Extenders()))
 					for _, e := range p.Extenders() {
@@ -461,8 +451,8 @@ func TestWithPercentageOfNodesToScore(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create scheduler: %v", err)
 			}
-			if sched.percentageOfNodesToScore != tt.wantedPercentageOfNodesToScore {
-				t.Errorf("scheduler.percercentageOfNodesToScore = %v, want %v", sched.percentageOfNodesToScore, tt.wantedPercentageOfNodesToScore)
+			if sched.algorithm.percentageOfNodesToScore != tt.wantedPercentageOfNodesToScore {
+				t.Errorf("scheduler.percentageOfNodesToScore = %v, want %v", sched.algorithm.percentageOfNodesToScore, tt.wantedPercentageOfNodesToScore)
 			}
 		})
 	}
@@ -529,6 +519,7 @@ func initScheduler(ctx context.Context, cache internalcache.Cache, queue interna
 		Profiles:        profile.Map{testSchedulerName: fwk},
 		logger:          logger,
 	}
+	s.initAlgorithm()
 	s.applyDefaultHandlers()
 
 	return s, fwk, nil
