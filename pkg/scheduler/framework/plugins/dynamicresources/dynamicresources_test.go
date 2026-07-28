@@ -1312,7 +1312,7 @@ func TestPreFilterReusesPendingAllocationWithNilNodeSelector(t *testing.T) {
 		},
 	})
 	cycleState := framework.NewCycleState()
-	cycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+	cycleState.SetPodGroupCycleState(podGroupCycleState)
 	testCtx.state = cycleState
 
 	nodeInfo := framework.NewNodeInfo()
@@ -1372,7 +1372,7 @@ func TestFilterReusesPendingAllocationRequiresDRAOptionalNodeOperations(t *testi
 		},
 	})
 	cycleState := framework.NewCycleState()
-	cycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+	cycleState.SetPodGroupCycleState(podGroupCycleState)
 	testCtx.state = cycleState
 
 	nodeInfo := framework.NewNodeInfo()
@@ -4262,7 +4262,7 @@ func testPlugin(tCtx ktesting.TContext) {
 					})
 				} else {
 					// PodGroup cycle state is cleared before asynchronous binding.
-					testCtx.state.(*framework.CycleState).SetPodGroupSchedulingCycle(nil)
+					testCtx.state.(*framework.CycleState).SetPodGroupCycleState(nil)
 
 					if tc.want.unreserveBeforePreBind != nil {
 						initialObjects = testCtx.listAll(tCtx)
@@ -4708,7 +4708,7 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 	state := framework.NewCycleState()
 	if len(podGroups) > 0 {
 		pgCycleState := framework.NewCycleState()
-		state.SetPodGroupSchedulingCycle(pgCycleState)
+		state.SetPodGroupCycleState(pgCycleState)
 	}
 	tc.state = state
 
