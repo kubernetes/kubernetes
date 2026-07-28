@@ -361,6 +361,8 @@ template:
           - addValue
           drop:
           - dropValue
+        cgroupOptions:
+          mountMode: mountModeValue
         privileged: true
         procMount: procMountValue
         readOnlyRootFilesystem: true
@@ -599,6 +601,8 @@ template:
           - addValue
           drop:
           - dropValue
+        cgroupOptions:
+          mountMode: mountModeValue
         privileged: true
         procMount: procMountValue
         readOnlyRootFilesystem: true
@@ -843,6 +847,8 @@ template:
           - addValue
           drop:
           - dropValue
+        cgroupOptions:
+          mountMode: mountModeValue
         privileged: true
         procMount: procMountValue
         readOnlyRootFilesystem: true
