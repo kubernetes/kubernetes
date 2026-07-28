@@ -1,0 +1,50 @@
+{
+  "/aws-cdk-glue/MyDatabase": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-glue/MyConnection": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-glue/MyTableWithCustomLocation": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-glue/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-glue/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-glue/MyDatabase/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyDatabase1E2517DB"
+    }
+  ],
+  "/aws-cdk-glue/MyConnection/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyConnection5621880D"
+    }
+  ],
+  "/aws-cdk-glue/MyTableWithCustomLocation/Table": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyTableWithCustomLocationTable43A19D42"
+    }
+  ]
+}

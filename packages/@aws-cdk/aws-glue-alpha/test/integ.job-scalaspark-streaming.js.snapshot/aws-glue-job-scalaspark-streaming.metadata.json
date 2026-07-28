@@ -1,0 +1,150 @@
+{
+  "/aws-glue-job-scalaspark-streaming/IAMServiceRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "managedPolicies": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-glue-job-scalaspark-streaming/BasicScalaSparkStreamingJob": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-glue-job-scalaspark-streaming/OverrideScalaSparkStreamingJob": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-glue-job-scalaspark-streaming/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-glue-job-scalaspark-streaming/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-glue-job-scalaspark-streaming/IAMServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "IAMServiceRole61C662C4"
+    }
+  ],
+  "/aws-glue-job-scalaspark-streaming/IAMServiceRole/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-glue-job-scalaspark-streaming/BasicScalaSparkStreamingJob/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BasicScalaSparkStreamingJob03E183FE"
+    }
+  ],
+  "/aws-glue-job-scalaspark-streaming/OverrideScalaSparkStreamingJob/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "OverrideScalaSparkStreamingJob598931ED"
+    }
+  ],
+  "/aws-glue-job-scalaspark-streaming/IAMServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "IAMServiceRoleDefaultPolicy379D1A0E"
+    }
+  ],
+  "/aws-glue-job-scalaspark-streaming/BasicScalaSparkStreamingJob/Codeb9c3d0890aee06c3b673670fca714c59/AssetBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ]
+}

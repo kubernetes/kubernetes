@@ -1,5 +1,5 @@
 {
-  "version": "52.0.0",
+  "version": "54.0.0",
   "testCases": {
     "aws-glue-job-python-shell-integ-test/DefaultTest": {
       "stacks": [
@@ -9,5 +9,6 @@
       "assertionStackName": "awsgluejobpythonshellintegtestDefaultTestDeployAssert453D25B7"
     }
   },
-  "minimumCliVersion": "2.1107.0"
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
 }

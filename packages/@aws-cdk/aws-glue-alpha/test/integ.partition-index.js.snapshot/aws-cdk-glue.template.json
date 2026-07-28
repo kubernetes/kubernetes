@@ -40,6 +40,10 @@
       {
        "Name": "month",
        "Type": "bigint"
+      },
+      {
+       "Name": "day",
+       "Type": "bigint"
       }
      ],
      "StorageDescriptor": {
@@ -81,121 +85,97 @@
     }
    }
   },
-  "CSVTablepartitionindexindex16247ABF6": {
-   "Type": "Custom::AWS",
+  "CSVTablepartitionindexindex1295EC599": {
+   "Type": "Custom::GluePartitionIndex",
    "Properties": {
     "ServiceToken": {
      "Fn::GetAtt": [
-      "AWS679f53fac002430cb0da5b7982bd22872D164C4C",
+      "awscdkawsgluealphaPartitionIndexProviderframeworkonEventC84EA1EC",
       "Arn"
      ]
     },
-    "Create": {
-     "Fn::Join": [
-      "",
-      [
-       "{\"service\":\"Glue\",\"action\":\"createPartitionIndex\",\"parameters\":{\"DatabaseName\":\"",
-       {
-        "Ref": "MyDatabase1E2517DB"
-       },
-       "\",\"TableName\":\"",
-       {
-        "Ref": "CSVTableE499CABA"
-       },
-       "\",\"PartitionIndex\":{\"IndexName\":\"index1\",\"Keys\":[\"month\"]}},\"physicalResourceId\":{\"id\":\"index1\"}}"
-      ]
-     ]
+    "DatabaseName": {
+     "Ref": "MyDatabase1E2517DB"
     },
-    "InstallLatestAwsSdk": false
+    "TableName": {
+     "Ref": "CSVTableE499CABA"
+    },
+    "IndexName": "index1",
+    "Keys": [
+     "month"
+    ]
    },
    "DependsOn": [
-    "CSVTablepartitionindexindex1CustomResourcePolicy4983F2A9",
-    "CSVTablepartitionindexindex2CustomResourcePolicy4FF1AF9F",
-    "CSVTablepartitionindexindex29D554319"
+    "awscdkawsgluealphaPartitionIndexProviderHandlerServiceRoleDefaultPolicyBACAF1B6",
+    "awscdkawsgluealphaPartitionIndexProviderHandlerServiceRole303F5F62",
+    "awscdkawsgluealphaPartitionIndexProviderIsCompleteServiceRoleDefaultPolicyF8256777",
+    "awscdkawsgluealphaPartitionIndexProviderIsCompleteServiceRole2FCB8267"
    ],
    "UpdateReplacePolicy": "Delete",
    "DeletionPolicy": "Delete"
   },
-  "CSVTablepartitionindexindex1CustomResourcePolicy4983F2A9": {
-   "Type": "AWS::IAM::Policy",
-   "Properties": {
-    "PolicyDocument": {
-     "Statement": [
-      {
-       "Action": "glue:CreatePartitionIndex",
-       "Effect": "Allow",
-       "Resource": "*"
-      }
-     ],
-     "Version": "2012-10-17"
-    },
-    "PolicyName": "CSVTablepartitionindexindex1CustomResourcePolicy4983F2A9",
-    "Roles": [
-     {
-      "Ref": "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2"
-     }
-    ]
-   },
-   "DependsOn": [
-    "CSVTablepartitionindexindex2CustomResourcePolicy4FF1AF9F",
-    "CSVTablepartitionindexindex29D554319"
-   ]
-  },
-  "CSVTablepartitionindexindex29D554319": {
-   "Type": "Custom::AWS",
+  "CSVTablepartitionindexindex256C55CE5": {
+   "Type": "Custom::GluePartitionIndex",
    "Properties": {
     "ServiceToken": {
      "Fn::GetAtt": [
-      "AWS679f53fac002430cb0da5b7982bd22872D164C4C",
+      "awscdkawsgluealphaPartitionIndexProviderframeworkonEventC84EA1EC",
       "Arn"
      ]
     },
-    "Create": {
-     "Fn::Join": [
-      "",
-      [
-       "{\"service\":\"Glue\",\"action\":\"createPartitionIndex\",\"parameters\":{\"DatabaseName\":\"",
-       {
-        "Ref": "MyDatabase1E2517DB"
-       },
-       "\",\"TableName\":\"",
-       {
-        "Ref": "CSVTableE499CABA"
-       },
-       "\",\"PartitionIndex\":{\"IndexName\":\"index2\",\"Keys\":[\"month\",\"year\"]}},\"physicalResourceId\":{\"id\":\"index2\"}}"
-      ]
-     ]
+    "DatabaseName": {
+     "Ref": "MyDatabase1E2517DB"
     },
-    "InstallLatestAwsSdk": false
+    "TableName": {
+     "Ref": "CSVTableE499CABA"
+    },
+    "IndexName": "index2",
+    "Keys": [
+     "month",
+     "year"
+    ]
    },
    "DependsOn": [
-    "CSVTablepartitionindexindex2CustomResourcePolicy4FF1AF9F"
+    "awscdkawsgluealphaPartitionIndexProviderHandlerServiceRoleDefaultPolicyBACAF1B6",
+    "awscdkawsgluealphaPartitionIndexProviderHandlerServiceRole303F5F62",
+    "awscdkawsgluealphaPartitionIndexProviderIsCompleteServiceRoleDefaultPolicyF8256777",
+    "awscdkawsgluealphaPartitionIndexProviderIsCompleteServiceRole2FCB8267",
+    "CSVTablepartitionindexindex1295EC599"
    ],
    "UpdateReplacePolicy": "Delete",
    "DeletionPolicy": "Delete"
   },
-  "CSVTablepartitionindexindex2CustomResourcePolicy4FF1AF9F": {
-   "Type": "AWS::IAM::Policy",
+  "CSVTablepartitionindexindex3109814A9": {
+   "Type": "Custom::GluePartitionIndex",
    "Properties": {
-    "PolicyDocument": {
-     "Statement": [
-      {
-       "Action": "glue:CreatePartitionIndex",
-       "Effect": "Allow",
-       "Resource": "*"
-      }
-     ],
-     "Version": "2012-10-17"
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "awscdkawsgluealphaPartitionIndexProviderframeworkonEventC84EA1EC",
+      "Arn"
+     ]
     },
-    "PolicyName": "CSVTablepartitionindexindex2CustomResourcePolicy4FF1AF9F",
-    "Roles": [
-     {
-      "Ref": "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2"
-     }
+    "DatabaseName": {
+     "Ref": "MyDatabase1E2517DB"
+    },
+    "TableName": {
+     "Ref": "CSVTableE499CABA"
+    },
+    "IndexName": "index3",
+    "Keys": [
+     "day"
     ]
-   }
+   },
+   "DependsOn": [
+    "awscdkawsgluealphaPartitionIndexProviderHandlerServiceRoleDefaultPolicyBACAF1B6",
+    "awscdkawsgluealphaPartitionIndexProviderHandlerServiceRole303F5F62",
+    "awscdkawsgluealphaPartitionIndexProviderIsCompleteServiceRoleDefaultPolicyF8256777",
+    "awscdkawsgluealphaPartitionIndexProviderIsCompleteServiceRole2FCB8267",
+    "CSVTablepartitionindexindex256C55CE5"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
   },
-  "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2": {
+  "awscdkawsgluealphaPartitionIndexProviderHandlerServiceRole303F5F62": {
    "Type": "AWS::IAM::Role",
    "Properties": {
     "AssumeRolePolicyDocument": {
@@ -226,13 +206,19 @@
     ]
    }
   },
-  "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleDefaultPolicyD28E1A5E": {
+  "awscdkawsgluealphaPartitionIndexProviderHandlerServiceRoleDefaultPolicyBACAF1B6": {
    "Type": "AWS::IAM::Policy",
    "Properties": {
     "PolicyDocument": {
      "Statement": [
       {
-       "Action": "glue:UpdateTable",
+       "Action": [
+        "glue:CreatePartitionIndex",
+        "glue:DeletePartitionIndex",
+        "glue:GetPartitionIndexes",
+        "glue:GetTable",
+        "glue:UpdateTable"
+       ],
        "Effect": "Allow",
        "Resource": [
         {
@@ -337,36 +323,905 @@
      ],
      "Version": "2012-10-17"
     },
-    "PolicyName": "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleDefaultPolicyD28E1A5E",
+    "PolicyName": "awscdkawsgluealphaPartitionIndexProviderHandlerServiceRoleDefaultPolicyBACAF1B6",
     "Roles": [
      {
-      "Ref": "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2"
+      "Ref": "awscdkawsgluealphaPartitionIndexProviderHandlerServiceRole303F5F62"
      }
     ]
    }
   },
-  "AWS679f53fac002430cb0da5b7982bd22872D164C4C": {
+  "awscdkawsgluealphaPartitionIndexProviderHandlerE1740A06": {
    "Type": "AWS::Lambda::Function",
    "Properties": {
     "Code": {
      "S3Bucket": {
       "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
      },
-     "S3Key": "cacbae65717103d06f41c1e2d810143b3469d00294d9bbef4b39a6bce1660214.zip"
+     "S3Key": "2b4fe4c0bc4d25fa1a387eaaa3c87bfb717c0f8f6a6dcfb0cdc0a7b8768f916d.zip"
     },
-    "Handler": "index.handler",
+    "Handler": "index.onEvent",
     "Role": {
      "Fn::GetAtt": [
-      "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2",
+      "awscdkawsgluealphaPartitionIndexProviderHandlerServiceRole303F5F62",
       "Arn"
      ]
     },
     "Runtime": "nodejs24.x",
-    "Timeout": 120
+    "Timeout": 60
    },
    "DependsOn": [
-    "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleDefaultPolicyD28E1A5E",
-    "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2"
+    "awscdkawsgluealphaPartitionIndexProviderHandlerServiceRoleDefaultPolicyBACAF1B6",
+    "awscdkawsgluealphaPartitionIndexProviderHandlerServiceRole303F5F62"
+   ]
+  },
+  "awscdkawsgluealphaPartitionIndexProviderHandlerLogGroup8E433B5B": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "awscdkawsgluealphaPartitionIndexProviderHandlerE1740A06"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 731
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain"
+  },
+  "awscdkawsgluealphaPartitionIndexProviderIsCompleteServiceRole2FCB8267": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  "awscdkawsgluealphaPartitionIndexProviderIsCompleteServiceRoleDefaultPolicyF8256777": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "glue:CreatePartitionIndex",
+        "glue:DeletePartitionIndex",
+        "glue:GetPartitionIndexes",
+        "glue:GetTable",
+        "glue:UpdateTable"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::Join": [
+          "",
+          [
+           "arn:",
+           {
+            "Ref": "AWS::Partition"
+           },
+           ":glue:",
+           {
+            "Ref": "AWS::Region"
+           },
+           ":",
+           {
+            "Ref": "AWS::AccountId"
+           },
+           ":catalog"
+          ]
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           "arn:",
+           {
+            "Ref": "AWS::Partition"
+           },
+           ":glue:",
+           {
+            "Ref": "AWS::Region"
+           },
+           ":",
+           {
+            "Ref": "AWS::AccountId"
+           },
+           ":database/",
+           {
+            "Ref": "MyDatabase1E2517DB"
+           }
+          ]
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           "arn:",
+           {
+            "Ref": "AWS::Partition"
+           },
+           ":glue:",
+           {
+            "Ref": "AWS::Region"
+           },
+           ":",
+           {
+            "Ref": "AWS::AccountId"
+           },
+           ":table/",
+           {
+            "Ref": "MyDatabase1E2517DB"
+           },
+           "/",
+           {
+            "Ref": "CSVTableE499CABA"
+           }
+          ]
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           "arn:",
+           {
+            "Ref": "AWS::Partition"
+           },
+           ":glue:",
+           {
+            "Ref": "AWS::Region"
+           },
+           ":",
+           {
+            "Ref": "AWS::AccountId"
+           },
+           ":table/",
+           {
+            "Ref": "MyDatabase1E2517DB"
+           },
+           "/",
+           {
+            "Ref": "JSONTable00348F1D"
+           }
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "awscdkawsgluealphaPartitionIndexProviderIsCompleteServiceRoleDefaultPolicyF8256777",
+    "Roles": [
+     {
+      "Ref": "awscdkawsgluealphaPartitionIndexProviderIsCompleteServiceRole2FCB8267"
+     }
+    ]
+   }
+  },
+  "awscdkawsgluealphaPartitionIndexProviderIsComplete0893CD8C": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "2b4fe4c0bc4d25fa1a387eaaa3c87bfb717c0f8f6a6dcfb0cdc0a7b8768f916d.zip"
+    },
+    "Handler": "index.isComplete",
+    "Role": {
+     "Fn::GetAtt": [
+      "awscdkawsgluealphaPartitionIndexProviderIsCompleteServiceRole2FCB8267",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs24.x",
+    "Timeout": 60
+   },
+   "DependsOn": [
+    "awscdkawsgluealphaPartitionIndexProviderIsCompleteServiceRoleDefaultPolicyF8256777",
+    "awscdkawsgluealphaPartitionIndexProviderIsCompleteServiceRole2FCB8267"
+   ]
+  },
+  "awscdkawsgluealphaPartitionIndexProviderIsCompleteLogGroup58834B02": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "awscdkawsgluealphaPartitionIndexProviderIsComplete0893CD8C"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 731
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain"
+  },
+  "awscdkawsgluealphaPartitionIndexProviderframeworkonEventServiceRoleB171B2EB": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  "awscdkawsgluealphaPartitionIndexProviderframeworkonEventServiceRoleDefaultPolicy986ACCE7": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "lambda:InvokeFunction",
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "awscdkawsgluealphaPartitionIndexProviderHandlerE1740A06",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::GetAtt": [
+          "awscdkawsgluealphaPartitionIndexProviderIsComplete0893CD8C",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "awscdkawsgluealphaPartitionIndexProviderHandlerE1740A06",
+             "Arn"
+            ]
+           },
+           ":*"
+          ]
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "awscdkawsgluealphaPartitionIndexProviderIsComplete0893CD8C",
+             "Arn"
+            ]
+           },
+           ":*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "lambda:GetFunction",
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "awscdkawsgluealphaPartitionIndexProviderHandlerE1740A06",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::GetAtt": [
+          "awscdkawsgluealphaPartitionIndexProviderIsComplete0893CD8C",
+          "Arn"
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "states:StartExecution",
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "awscdkawsgluealphaPartitionIndexProviderwaiterstatemachineD73BC19E"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "awscdkawsgluealphaPartitionIndexProviderframeworkonEventServiceRoleDefaultPolicy986ACCE7",
+    "Roles": [
+     {
+      "Ref": "awscdkawsgluealphaPartitionIndexProviderframeworkonEventServiceRoleB171B2EB"
+     }
+    ]
+   }
+  },
+  "awscdkawsgluealphaPartitionIndexProviderframeworkonEventC84EA1EC": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "775803ec04ddcc7cbb5479b0d84ac848097d215c16587dc92070925fac5cbf3e.zip"
+    },
+    "Description": "AWS CDK resource provider framework - onEvent (aws-cdk-glue/@aws-cdk--aws-glue-alpha.PartitionIndexProvider/Provider)",
+    "Environment": {
+     "Variables": {
+      "USER_ON_EVENT_FUNCTION_ARN": {
+       "Fn::GetAtt": [
+        "awscdkawsgluealphaPartitionIndexProviderHandlerE1740A06",
+        "Arn"
+       ]
+      },
+      "USER_IS_COMPLETE_FUNCTION_ARN": {
+       "Fn::GetAtt": [
+        "awscdkawsgluealphaPartitionIndexProviderIsComplete0893CD8C",
+        "Arn"
+       ]
+      },
+      "WAITER_STATE_MACHINE_ARN": {
+       "Ref": "awscdkawsgluealphaPartitionIndexProviderwaiterstatemachineD73BC19E"
+      }
+     }
+    },
+    "Handler": "framework.onEvent",
+    "LoggingConfig": {
+     "ApplicationLogLevel": "FATAL",
+     "LogFormat": "JSON"
+    },
+    "Role": {
+     "Fn::GetAtt": [
+      "awscdkawsgluealphaPartitionIndexProviderframeworkonEventServiceRoleB171B2EB",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs24.x",
+    "Timeout": 900
+   },
+   "DependsOn": [
+    "awscdkawsgluealphaPartitionIndexProviderframeworkonEventServiceRoleDefaultPolicy986ACCE7",
+    "awscdkawsgluealphaPartitionIndexProviderframeworkonEventServiceRoleB171B2EB"
+   ]
+  },
+  "awscdkawsgluealphaPartitionIndexProviderframeworkonEventLogGroup32C32150": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "awscdkawsgluealphaPartitionIndexProviderframeworkonEventC84EA1EC"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 731
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain"
+  },
+  "awscdkawsgluealphaPartitionIndexProviderframeworkisCompleteServiceRole6741A4AA": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  "awscdkawsgluealphaPartitionIndexProviderframeworkisCompleteServiceRoleDefaultPolicy15F55D85": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "lambda:InvokeFunction",
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "awscdkawsgluealphaPartitionIndexProviderHandlerE1740A06",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::GetAtt": [
+          "awscdkawsgluealphaPartitionIndexProviderIsComplete0893CD8C",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "awscdkawsgluealphaPartitionIndexProviderHandlerE1740A06",
+             "Arn"
+            ]
+           },
+           ":*"
+          ]
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "awscdkawsgluealphaPartitionIndexProviderIsComplete0893CD8C",
+             "Arn"
+            ]
+           },
+           ":*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "lambda:GetFunction",
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "awscdkawsgluealphaPartitionIndexProviderHandlerE1740A06",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::GetAtt": [
+          "awscdkawsgluealphaPartitionIndexProviderIsComplete0893CD8C",
+          "Arn"
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "awscdkawsgluealphaPartitionIndexProviderframeworkisCompleteServiceRoleDefaultPolicy15F55D85",
+    "Roles": [
+     {
+      "Ref": "awscdkawsgluealphaPartitionIndexProviderframeworkisCompleteServiceRole6741A4AA"
+     }
+    ]
+   }
+  },
+  "awscdkawsgluealphaPartitionIndexProviderframeworkisComplete5725C648": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "775803ec04ddcc7cbb5479b0d84ac848097d215c16587dc92070925fac5cbf3e.zip"
+    },
+    "Description": "AWS CDK resource provider framework - isComplete (aws-cdk-glue/@aws-cdk--aws-glue-alpha.PartitionIndexProvider/Provider)",
+    "Environment": {
+     "Variables": {
+      "USER_ON_EVENT_FUNCTION_ARN": {
+       "Fn::GetAtt": [
+        "awscdkawsgluealphaPartitionIndexProviderHandlerE1740A06",
+        "Arn"
+       ]
+      },
+      "USER_IS_COMPLETE_FUNCTION_ARN": {
+       "Fn::GetAtt": [
+        "awscdkawsgluealphaPartitionIndexProviderIsComplete0893CD8C",
+        "Arn"
+       ]
+      }
+     }
+    },
+    "Handler": "framework.isComplete",
+    "LoggingConfig": {
+     "ApplicationLogLevel": "FATAL",
+     "LogFormat": "JSON"
+    },
+    "Role": {
+     "Fn::GetAtt": [
+      "awscdkawsgluealphaPartitionIndexProviderframeworkisCompleteServiceRole6741A4AA",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs24.x",
+    "Timeout": 900
+   },
+   "DependsOn": [
+    "awscdkawsgluealphaPartitionIndexProviderframeworkisCompleteServiceRoleDefaultPolicy15F55D85",
+    "awscdkawsgluealphaPartitionIndexProviderframeworkisCompleteServiceRole6741A4AA"
+   ]
+  },
+  "awscdkawsgluealphaPartitionIndexProviderframeworkisCompleteLogGroup949CD139": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "awscdkawsgluealphaPartitionIndexProviderframeworkisComplete5725C648"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 731
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain"
+  },
+  "awscdkawsgluealphaPartitionIndexProviderframeworkonTimeoutServiceRoleFA2BF574": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  "awscdkawsgluealphaPartitionIndexProviderframeworkonTimeoutServiceRoleDefaultPolicy2024C86F": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "lambda:InvokeFunction",
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "awscdkawsgluealphaPartitionIndexProviderHandlerE1740A06",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::GetAtt": [
+          "awscdkawsgluealphaPartitionIndexProviderIsComplete0893CD8C",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "awscdkawsgluealphaPartitionIndexProviderHandlerE1740A06",
+             "Arn"
+            ]
+           },
+           ":*"
+          ]
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "awscdkawsgluealphaPartitionIndexProviderIsComplete0893CD8C",
+             "Arn"
+            ]
+           },
+           ":*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "lambda:GetFunction",
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "awscdkawsgluealphaPartitionIndexProviderHandlerE1740A06",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::GetAtt": [
+          "awscdkawsgluealphaPartitionIndexProviderIsComplete0893CD8C",
+          "Arn"
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "awscdkawsgluealphaPartitionIndexProviderframeworkonTimeoutServiceRoleDefaultPolicy2024C86F",
+    "Roles": [
+     {
+      "Ref": "awscdkawsgluealphaPartitionIndexProviderframeworkonTimeoutServiceRoleFA2BF574"
+     }
+    ]
+   }
+  },
+  "awscdkawsgluealphaPartitionIndexProviderframeworkonTimeout776FC8F8": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "775803ec04ddcc7cbb5479b0d84ac848097d215c16587dc92070925fac5cbf3e.zip"
+    },
+    "Description": "AWS CDK resource provider framework - onTimeout (aws-cdk-glue/@aws-cdk--aws-glue-alpha.PartitionIndexProvider/Provider)",
+    "Environment": {
+     "Variables": {
+      "USER_ON_EVENT_FUNCTION_ARN": {
+       "Fn::GetAtt": [
+        "awscdkawsgluealphaPartitionIndexProviderHandlerE1740A06",
+        "Arn"
+       ]
+      },
+      "USER_IS_COMPLETE_FUNCTION_ARN": {
+       "Fn::GetAtt": [
+        "awscdkawsgluealphaPartitionIndexProviderIsComplete0893CD8C",
+        "Arn"
+       ]
+      }
+     }
+    },
+    "Handler": "framework.onTimeout",
+    "LoggingConfig": {
+     "ApplicationLogLevel": "FATAL",
+     "LogFormat": "JSON"
+    },
+    "Role": {
+     "Fn::GetAtt": [
+      "awscdkawsgluealphaPartitionIndexProviderframeworkonTimeoutServiceRoleFA2BF574",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs24.x",
+    "Timeout": 900
+   },
+   "DependsOn": [
+    "awscdkawsgluealphaPartitionIndexProviderframeworkonTimeoutServiceRoleDefaultPolicy2024C86F",
+    "awscdkawsgluealphaPartitionIndexProviderframeworkonTimeoutServiceRoleFA2BF574"
+   ]
+  },
+  "awscdkawsgluealphaPartitionIndexProviderframeworkonTimeoutLogGroup0270A05E": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "awscdkawsgluealphaPartitionIndexProviderframeworkonTimeout776FC8F8"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 731
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain"
+  },
+  "awscdkawsgluealphaPartitionIndexProviderwaiterstatemachineRole655FF907": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "states.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   }
+  },
+  "awscdkawsgluealphaPartitionIndexProviderwaiterstatemachineRoleDefaultPolicyBEBB19B4": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "lambda:InvokeFunction",
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "awscdkawsgluealphaPartitionIndexProviderframeworkisComplete5725C648",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::GetAtt": [
+          "awscdkawsgluealphaPartitionIndexProviderframeworkonTimeout776FC8F8",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "awscdkawsgluealphaPartitionIndexProviderframeworkisComplete5725C648",
+             "Arn"
+            ]
+           },
+           ":*"
+          ]
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "awscdkawsgluealphaPartitionIndexProviderframeworkonTimeout776FC8F8",
+             "Arn"
+            ]
+           },
+           ":*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "awscdkawsgluealphaPartitionIndexProviderwaiterstatemachineRoleDefaultPolicyBEBB19B4",
+    "Roles": [
+     {
+      "Ref": "awscdkawsgluealphaPartitionIndexProviderwaiterstatemachineRole655FF907"
+     }
+    ]
+   }
+  },
+  "awscdkawsgluealphaPartitionIndexProviderwaiterstatemachineD73BC19E": {
+   "Type": "AWS::StepFunctions::StateMachine",
+   "Properties": {
+    "DefinitionString": {
+     "Fn::Join": [
+      "",
+      [
+       "{\"StartAt\":\"framework-isComplete-task\",\"States\":{\"framework-isComplete-task\":{\"End\":true,\"Retry\":[{\"ErrorEquals\":[\"States.ALL\"],\"IntervalSeconds\":10,\"MaxAttempts\":90,\"BackoffRate\":1}],\"Catch\":[{\"ErrorEquals\":[\"States.ALL\"],\"Next\":\"framework-onTimeout-task\"}],\"Type\":\"Task\",\"Resource\":\"",
+       {
+        "Fn::GetAtt": [
+         "awscdkawsgluealphaPartitionIndexProviderframeworkisComplete5725C648",
+         "Arn"
+        ]
+       },
+       "\"},\"framework-onTimeout-task\":{\"End\":true,\"Type\":\"Task\",\"Resource\":\"",
+       {
+        "Fn::GetAtt": [
+         "awscdkawsgluealphaPartitionIndexProviderframeworkonTimeout776FC8F8",
+         "Arn"
+        ]
+       },
+       "\"}}}"
+      ]
+     ]
+    },
+    "RoleArn": {
+     "Fn::GetAtt": [
+      "awscdkawsgluealphaPartitionIndexProviderwaiterstatemachineRole655FF907",
+      "Arn"
+     ]
+    }
+   },
+   "DependsOn": [
+    "awscdkawsgluealphaPartitionIndexProviderwaiterstatemachineRoleDefaultPolicyBEBB19B4",
+    "awscdkawsgluealphaPartitionIndexProviderwaiterstatemachineRole655FF907"
    ]
   },
   "JSONTable00348F1D": {
@@ -392,6 +1247,10 @@
       },
       {
        "Name": "month",
+       "Type": "bigint"
+      },
+      {
+       "Name": "day",
        "Type": "bigint"
       }
      ],
@@ -434,66 +1293,35 @@
     }
    }
   },
-  "JSONTablepartitionindexyearmonthawscdkglueJSONTable937C116B74A5990F": {
-   "Type": "Custom::AWS",
+  "JSONTablepartitionindexyearmonthawscdkglueJSONTable937C116B26F5733E": {
+   "Type": "Custom::GluePartitionIndex",
    "Properties": {
     "ServiceToken": {
      "Fn::GetAtt": [
-      "AWS679f53fac002430cb0da5b7982bd22872D164C4C",
+      "awscdkawsgluealphaPartitionIndexProviderframeworkonEventC84EA1EC",
       "Arn"
      ]
     },
-    "Create": {
-     "Fn::Join": [
-      "",
-      [
-       "{\"service\":\"Glue\",\"action\":\"createPartitionIndex\",\"parameters\":{\"DatabaseName\":\"",
-       {
-        "Ref": "MyDatabase1E2517DB"
-       },
-       "\",\"TableName\":\"",
-       {
-        "Ref": "JSONTable00348F1D"
-       },
-       "\",\"PartitionIndex\":{\"IndexName\":\"year-month-awscdkglueJSONTable937C116B\",\"Keys\":[\"year\",\"month\"]}},\"physicalResourceId\":{\"id\":\"year-month-awscdkglueJSONTable937C116B\"}}"
-      ]
-     ]
+    "DatabaseName": {
+     "Ref": "MyDatabase1E2517DB"
     },
-    "InstallLatestAwsSdk": false
+    "TableName": {
+     "Ref": "JSONTable00348F1D"
+    },
+    "IndexName": "year-month-awscdkglueJSONTable937C116B",
+    "Keys": [
+     "year",
+     "month"
+    ]
    },
    "DependsOn": [
-    "JSONTablepartitionindexyearmonthawscdkglueJSONTable937C116BCustomResourcePolicy92B3C1AE"
+    "awscdkawsgluealphaPartitionIndexProviderHandlerServiceRoleDefaultPolicyBACAF1B6",
+    "awscdkawsgluealphaPartitionIndexProviderHandlerServiceRole303F5F62",
+    "awscdkawsgluealphaPartitionIndexProviderIsCompleteServiceRoleDefaultPolicyF8256777",
+    "awscdkawsgluealphaPartitionIndexProviderIsCompleteServiceRole2FCB8267"
    ],
    "UpdateReplacePolicy": "Delete",
    "DeletionPolicy": "Delete"
-  },
-  "JSONTablepartitionindexyearmonthawscdkglueJSONTable937C116BCustomResourcePolicy92B3C1AE": {
-   "Type": "AWS::IAM::Policy",
-   "Properties": {
-    "PolicyDocument": {
-     "Statement": [
-      {
-       "Action": "glue:CreatePartitionIndex",
-       "Effect": "Allow",
-       "Resource": "*"
-      }
-     ],
-     "Version": "2012-10-17"
-    },
-    "PolicyName": "JSONTablepartitionindexyearmonthawscdkglueJSONTable937C116BCustomResourcePolicy92B3C1AE",
-    "Roles": [
-     {
-      "Ref": "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2"
-     }
-    ]
-   }
-  }
- },
- "Outputs": {
-  "CatalogId": {
-   "Value": {
-    "Ref": "AWS::AccountId"
-   }
   }
  },
  "Parameters": {

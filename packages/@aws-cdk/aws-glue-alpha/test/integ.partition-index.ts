@@ -1,22 +1,10 @@
 #!/usr/bin/env node
+import * as integ from '@aws-cdk/integ-tests-alpha';
 import * as cdk from 'aws-cdk-lib';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as glue from '../lib';
 
-/**
- * Stack verification steps:
- * * aws cloudformation describe-stacks --stack-name aws-cdk-glue --query Stacks[0].Outputs[0].OutputValue
- * * aws glue get-partition-indexes --catalog-id <output-from-above> --database-name database --table-name csv_table
- * returns two indexes named 'index1' and 'index2'
- * * aws glue get-partition-indexes --catalog-id <output-from-above> --database-name database --table-name json_table
- * returns an index with name 'year-month...'
- */
-
-const app = new cdk.App({
-  postCliContext: {
-    '@aws-cdk/aws-lambda:useCdkManagedLogGroup': false,
-  },
-});
+const app = new cdk.App();
 const stack = new cdk.Stack(app, 'aws-cdk-glue');
 const bucket = new s3.Bucket(stack, 'DataBucket');
 const database = new glue.Database(stack, 'MyDatabase', {
@@ -40,6 +28,9 @@ const partitionKeys = [{
 }, {
   name: 'month',
   type: glue.Schema.BIG_INT,
+}, {
+  name: 'day',
+  type: glue.Schema.BIG_INT,
 }];
 
 const csvTable = new glue.S3Table(stack, 'CSVTable', {
@@ -60,6 +51,11 @@ csvTable.addPartitionIndex({
   keyNames: ['month', 'year'],
 });
 
+csvTable.addPartitionIndex({
+  indexName: 'index3',
+  keyNames: ['day'],
+});
+
 const jsonTable = new glue.S3Table(stack, 'JSONTable', {
   database,
   bucket,
@@ -73,9 +69,29 @@ jsonTable.addPartitionIndex({
   keyNames: ['year', 'month'],
 });
 
-// output necessary for stack verification
-new cdk.CfnOutput(stack, 'CatalogId', {
-  value: database.catalogId,
+const integTest = new integ.IntegTest(app, 'glue-partition-index-integ', {
+  testCases: [stack],
 });
+
+// Verify partition indexes were created on csv_table
+const csvIndexes = integTest.assertions.awsApiCall('Glue', 'getPartitionIndexes', {
+  CatalogId: stack.account,
+  DatabaseName: 'database',
+  TableName: 'csv_table',
+});
+
+csvIndexes.provider.addToRolePolicy({
+  Effect: 'Allow',
+  Action: ['glue:GetPartitionIndexes', 'glue:GetTable'],
+  Resource: ['*'],
+});
+
+csvIndexes.expect(integ.ExpectedResult.objectLike({
+  PartitionIndexDescriptorList: [
+    { IndexName: 'index1', IndexStatus: 'ACTIVE' },
+    { IndexName: 'index2', IndexStatus: 'ACTIVE' },
+    { IndexName: 'index3', IndexStatus: 'ACTIVE' },
+  ],
+}));
 
 app.synth();

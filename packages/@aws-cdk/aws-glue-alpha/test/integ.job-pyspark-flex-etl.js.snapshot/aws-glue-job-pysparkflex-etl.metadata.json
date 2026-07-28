@@ -1,0 +1,150 @@
+{
+  "/aws-glue-job-pysparkflex-etl/IAMServiceRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "managedPolicies": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-glue-job-pysparkflex-etl/BasicPySparkFlexEtlJob": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-glue-job-pysparkflex-etl/OverridePySparkFlexEtlJob": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-glue-job-pysparkflex-etl/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-glue-job-pysparkflex-etl/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-glue-job-pysparkflex-etl/IAMServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "IAMServiceRole61C662C4"
+    }
+  ],
+  "/aws-glue-job-pysparkflex-etl/IAMServiceRole/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-glue-job-pysparkflex-etl/BasicPySparkFlexEtlJob/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BasicPySparkFlexEtlJobC50DC250"
+    }
+  ],
+  "/aws-glue-job-pysparkflex-etl/OverridePySparkFlexEtlJob/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "OverridePySparkFlexEtlJob8EE4CFA1"
+    }
+  ],
+  "/aws-glue-job-pysparkflex-etl/IAMServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "IAMServiceRoleDefaultPolicy379D1A0E"
+    }
+  ],
+  "/aws-glue-job-pysparkflex-etl/BasicPySparkFlexEtlJob/Coded194a11e6093124ac8ca0f26b7502843/AssetBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ]
+}

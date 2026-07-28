@@ -1,0 +1,481 @@
+{
+  "/aws-cdk-glue/DataBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "removalPolicy": "destroy"
+      }
+    }
+  ],
+  "/aws-cdk-glue/MyDatabase": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-glue/AVROTable": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-glue/CSVTable": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-glue/JSONTable": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-glue/ParquetTable": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-glue/MyKey": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "removalPolicy": "destroy"
+      }
+    }
+  ],
+  "/aws-cdk-glue/MyEncryptedTable": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-glue/MyPartitionFilteredTable": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-glue/MyTableWithConnection": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-glue/MyTableWithStorageDescriptorParameters": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-glue/MyTableWithParameters": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-glue/MyDeprecatedTable": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-glue/MyUser": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-glue/AnotherUser": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-glue/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-glue/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-glue/DataBucket/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DataBucketE3889A50"
+    }
+  ],
+  "/aws-cdk-glue/MyDatabase/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyDatabase1E2517DB"
+    }
+  ],
+  "/aws-cdk-glue/AVROTable/Table": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AVROTable58646ABF"
+    }
+  ],
+  "/aws-cdk-glue/CSVTable/Table": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CSVTableE499CABA"
+    }
+  ],
+  "/aws-cdk-glue/JSONTable/Table": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "JSONTable00348F1D"
+    }
+  ],
+  "/aws-cdk-glue/ParquetTable/Table": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ParquetTableE84E985F"
+    }
+  ],
+  "/aws-cdk-glue/MyKey/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyKey6AB29FA6"
+    }
+  ],
+  "/aws-cdk-glue/MyEncryptedTable/Bucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "encryption": "KMS",
+        "encryptionKey": "*"
+      }
+    }
+  ],
+  "/aws-cdk-glue/MyEncryptedTable/Table": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyEncryptedTable981A88C6"
+    }
+  ],
+  "/aws-cdk-glue/MyPartitionFilteredTable/Table": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyPartitionFilteredTable324BA27A"
+    }
+  ],
+  "/aws-cdk-glue/MyTableWithConnection/Table": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyTableWithConnectionTable4BCA8495"
+    }
+  ],
+  "/aws-cdk-glue/MyTableWithStorageDescriptorParameters/Table": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyTableWithStorageDescriptorParametersTable1A347345"
+    }
+  ],
+  "/aws-cdk-glue/MyTableWithParameters/Table": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyTableWithParametersTable39568AB8"
+    }
+  ],
+  "/aws-cdk-glue/MyDeprecatedTable/Table": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyDeprecatedTableAA0364FD"
+    }
+  ],
+  "/aws-cdk-glue/MyUser/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyUserDC45028B"
+    }
+  ],
+  "/aws-cdk-glue/MyUser/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToUser": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToUser": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-glue/AnotherUser/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AnotherUser254B09E3"
+    }
+  ],
+  "/aws-cdk-glue/AnotherUser/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToUser": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToUser": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-glue/MyEncryptedTable/Bucket/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyEncryptedTableBucket7B28486D"
+    }
+  ],
+  "/aws-cdk-glue/MyUser/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyUserDefaultPolicy7B897426"
+    }
+  ],
+  "/aws-cdk-glue/AnotherUser/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AnotherUserDefaultPolicyDBDB9923"
+    }
+  ]
+}

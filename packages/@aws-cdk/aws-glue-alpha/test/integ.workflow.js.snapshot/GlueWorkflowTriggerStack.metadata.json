@@ -1,0 +1,175 @@
+{
+  "/GlueWorkflowTriggerStack/Workflow": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/GlueWorkflowTriggerStack/JobRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        }
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/GlueWorkflowTriggerStack/OutboundJob": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/GlueWorkflowTriggerStack/InboundJob": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/GlueWorkflowTriggerStack/WorkflowName": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "WorkflowName"
+    }
+  ],
+  "/GlueWorkflowTriggerStack/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/GlueWorkflowTriggerStack/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/GlueWorkflowTriggerStack/Workflow/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Workflow193EF7C1"
+    }
+  ],
+  "/GlueWorkflowTriggerStack/Workflow/OnDemandTrigger": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "WorkflowOnDemandTriggerEE8E75A1"
+    }
+  ],
+  "/GlueWorkflowTriggerStack/Workflow/ConditionalTrigger": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "WorkflowConditionalTrigger133C0CA8"
+    }
+  ],
+  "/GlueWorkflowTriggerStack/JobRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "JobRole014917C6"
+    }
+  ],
+  "/GlueWorkflowTriggerStack/JobRole/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/GlueWorkflowTriggerStack/OutboundJob/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "OutboundJobB5826414"
+    }
+  ],
+  "/GlueWorkflowTriggerStack/InboundJob/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "InboundJobEDA3CBF4"
+    }
+  ],
+  "/GlueWorkflowTriggerStack/JobRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "JobRoleDefaultPolicy5DE0D8F9"
+    }
+  ],
+  "/GlueWorkflowTriggerStack/OutboundJob/Coded194a11e6093124ac8ca0f26b7502843/AssetBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ]
+}

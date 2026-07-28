@@ -1,13 +1,14 @@
 {
-  "version": "38.0.1",
+  "version": "54.0.0",
   "files": {
     "e305655b966b957f91fcec580e3f8703573eb6b69528c5d52190d72579c91602": {
+      "displayName": "BasicScalaSparkFlexEtlJob/Codeb9c3d0890aee06c3b673670fca714c59",
       "source": {
         "path": "asset.e305655b966b957f91fcec580e3f8703573eb6b69528c5d52190d72579c91602.jar",
         "packaging": "file"
       },
       "destinations": {
-        "current_account-current_region": {
+        "current_account-current_region-52d31c7f": {
           "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
           "objectKey": "e305655b966b957f91fcec580e3f8703573eb6b69528c5d52190d72579c91602.jar",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
@@ -15,12 +16,13 @@
       }
     },
     "7c0d31e02ab980459f90299032315caaa05e6b665bdcd686783bdb95a6ff474f": {
+      "displayName": "aws-glue-job-scalasparkflex-etl Template",
       "source": {
         "path": "aws-glue-job-scalasparkflex-etl.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "current_account-current_region": {
+        "current_account-current_region-827c1793": {
           "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
           "objectKey": "7c0d31e02ab980459f90299032315caaa05e6b665bdcd686783bdb95a6ff474f.json",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
