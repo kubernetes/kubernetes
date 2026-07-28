@@ -21,3 +21,10 @@
   errorType: '*'
   origin: '*'
   reason: Not served by kube-apiserver.
+
+- apiVersion: '*/*'
+  kind: '*'
+  path: '*.ephemeralContainers[*].securityContext.cgroupOptions.mountMode'
+  errorType: 'FieldValueNotSupported'
+  origin: '*'
+  reason: 'cgroupOptions is not allowed in ephemeral containers'

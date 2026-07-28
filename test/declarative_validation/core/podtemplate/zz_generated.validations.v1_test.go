@@ -73,6 +73,9 @@ func init() {
 			"template.spec.containers": {
 				{ErrorType: "FieldValueRequired"},
 			},
+			"template.spec.containers[*].securityContext.cgroupOptions.mountMode": {
+				{ErrorType: "FieldValueNotSupported"},
+			},
 			"template.spec.evictionResponders": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
@@ -87,6 +90,9 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
+			},
+			"template.spec.initContainers[*].securityContext.cgroupOptions.mountMode": {
+				{ErrorType: "FieldValueNotSupported"},
 			},
 			"template.spec.schedulingGroup": {
 				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
