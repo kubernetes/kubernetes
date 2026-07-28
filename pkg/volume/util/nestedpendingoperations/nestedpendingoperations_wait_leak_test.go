@@ -10,18 +10,16 @@ import (
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
-// This test demonstrates the bug described in kubernetes/kubernetes#136075:
-// With exponentialBackOffOnError enabled, an operation that returns an error
-// leaves a non-pending entry in the operations slice. Wait() loops on
-// len(operations) > 0 and therefore blocks indefinitely, even though there is
-// no pending work.
-func TestWaitBlocksOnNonPendingOperationAfterError(t *testing.T) {
+// Demonstrates kubernetes/kubernetes#136075 behavior pre-fix and validates fix:
+// When exponentialBackOffOnError is enabled and an operation errors, the entry
+// remains but is not pending. Wait() must not block in that state.
+func TestWaitReturnsWhenNoPendingOperationsRemainAfterError(t *testing.T) {
 	g := NewNestedPendingOperations(true)
 
 	op := volumetypes.GeneratedOperations{
 		OperationName: "fail-once",
-		Run: func() (eventErr, detailedErr error) {
-			return nil, errors.New("boom")
+		OperationFunc: func() volumetypes.OperationContext {
+			return volumetypes.NewOperationContext(nil, errors.New("boom"), false)
 		},
 	}
 
@@ -29,7 +27,7 @@ func TestWaitBlocksOnNonPendingOperationAfterError(t *testing.T) {
 		t.Fatalf("Run() unexpected error: %v", err)
 	}
 
-	// Wait until the spawned operation goroutine has updated state: entry present and not pending.
+	// Wait until the goroutine marks operation as non-pending but entry remains.
 	deadline := time.Now().Add(3 * time.Second)
 	for {
 		if time.Now().After(deadline) {
@@ -45,8 +43,6 @@ func TestWaitBlocksOnNonPendingOperationAfterError(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	// Now call Wait() in a separate goroutine; it should block because
-	// len(operations) > 0, even though no operation is pending.
 	done := make(chan struct{})
 	go func() {
 		g.Wait()
@@ -55,10 +51,8 @@ func TestWaitBlocksOnNonPendingOperationAfterError(t *testing.T) {
 
 	select {
 	case <-done:
-		// If this returns, behavior has changed; make the test fail to capture it.
-		t.Fatalf("Wait() returned but expected it to block due to retained non-pending operation")
-	case <-time.After(500 * time.Millisecond):
-		// Demonstrates the bug: Wait() is blocked. Fail the test to mark the regression.
-		t.Fatalf("Wait() blocked due to retained non-pending operation; demonstrates kubernetes#136075")
+		// expected: Wait should not block when no pending operations remain
+	case <-time.After(1 * time.Second):
+		t.Fatalf("Wait() blocked while no pending operations remained")
 	}
 }
