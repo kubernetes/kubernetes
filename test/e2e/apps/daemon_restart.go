@@ -242,19 +242,22 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 
 		// The following code continues to run after the BeforeEach and thus
 		// must not use ctx.
-		backgroundCtx, cancel := context.WithCancel(context.Background())
-		ginkgo.DeferCleanup(cancel)
+		stopCh := make(chan struct{})
+		ginkgo.DeferCleanup(func() {
+			close(stopCh)
+			time.Sleep(100 * time.Millisecond)
+		})
 		tracker = newPodTracker()
 		newPods, controller = cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					options.LabelSelector = labelSelector.String()
-					obj, err := f.ClientSet.CoreV1().Pods(ns).List(backgroundCtx, options)
+					obj, err := f.ClientSet.CoreV1().Pods(ns).List(context.Background(), options)
 					return runtime.Object(obj), err
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 					options.LabelSelector = labelSelector.String()
-					return f.ClientSet.CoreV1().Pods(ns).Watch(backgroundCtx, options)
+					return f.ClientSet.CoreV1().Pods(ns).Watch(context.Background(), options)
 				},
 			},
 			&v1.Pod{},
@@ -271,7 +274,7 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 				},
 			},
 		)
-		go controller.Run(backgroundCtx.Done())
+		go controller.Run(stopCh)
 	})
 
 	ginkgo.It("Controller Manager should not create/delete replicas across restart", func(ctx context.Context) {
