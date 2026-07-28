@@ -5217,7 +5217,11 @@ func TestEvaluateNominatedNode(t *testing.T) {
 			sched := &Scheduler{
 				nodeInfoSnapshot: snapshot,
 			}
+<<<<<<< HEAD
 			initTestAlgorithm(sched)
+=======
+			sched.initAlgorithm()
+>>>>>>> 22ab867be53 (scheduler: move in-memory scheduling onto internal SchedulingAlgorithm type)
 
 			gotNodes, err := sched.algorithm.evaluateNominatedNode(ctx, tt.pod, fw, framework.NewCycleState(), "", framework.Diagnosis{})
 
