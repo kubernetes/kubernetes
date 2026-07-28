@@ -42,7 +42,7 @@ type PodGroupTemplateApplyConfiguration struct {
 	// PodGroup's claim exactly. The claim must have the same name and refer to
 	// the same ResourceClaim or ResourceClaimTemplate.
 	//
-	// This is an alpha-level field and requires that the
+	// This is a beta-level field and requires that the
 	// DRAWorkloadResourceClaims feature gate is enabled.
 	//
 	// This field is immutable.
