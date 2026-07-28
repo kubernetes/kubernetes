@@ -24463,6 +24463,7 @@ func TestValidateOSFields(t *testing.T) {
 	osSpecificFields := sets.NewString(
 		"Containers[*].SecurityContext.AppArmorProfile",
 		"Containers[*].SecurityContext.AllowPrivilegeEscalation",
+		"Containers[*].SecurityContext.CgroupOptions",
 		"Containers[*].SecurityContext.Capabilities",
 		"Containers[*].SecurityContext.Privileged",
 		"Containers[*].SecurityContext.ProcMount",
@@ -24474,6 +24475,7 @@ func TestValidateOSFields(t *testing.T) {
 		"Containers[*].SecurityContext.WindowsOptions",
 		"InitContainers[*].SecurityContext.AppArmorProfile",
 		"InitContainers[*].SecurityContext.AllowPrivilegeEscalation",
+		"InitContainers[*].SecurityContext.CgroupOptions",
 		"InitContainers[*].SecurityContext.Capabilities",
 		"InitContainers[*].SecurityContext.Privileged",
 		"InitContainers[*].SecurityContext.ProcMount",
@@ -24485,6 +24487,7 @@ func TestValidateOSFields(t *testing.T) {
 		"InitContainers[*].SecurityContext.WindowsOptions",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AppArmorProfile",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AllowPrivilegeEscalation",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.CgroupOptions",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.Capabilities",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.Privileged",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.ProcMount",

@@ -486,6 +486,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.Capabilities{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_Capabilities(ref),
 		corev1.CephFSPersistentVolumeSource{}.OpenAPIModelName():                                                        schema_k8sio_api_core_v1_CephFSPersistentVolumeSource(ref),
 		corev1.CephFSVolumeSource{}.OpenAPIModelName():                                                                  schema_k8sio_api_core_v1_CephFSVolumeSource(ref),
+		corev1.CgroupOptions{}.OpenAPIModelName():                                                                       schema_k8sio_api_core_v1_CgroupOptions(ref),
 		corev1.CinderPersistentVolumeSource{}.OpenAPIModelName():                                                        schema_k8sio_api_core_v1_CinderPersistentVolumeSource(ref),
 		corev1.CinderVolumeSource{}.OpenAPIModelName():                                                                  schema_k8sio_api_core_v1_CinderVolumeSource(ref),
 		corev1.ClientIPConfig{}.OpenAPIModelName():                                                                      schema_k8sio_api_core_v1_ClientIPConfig(ref),
@@ -20173,6 +20174,27 @@ func schema_k8sio_api_core_v1_CephFSVolumeSource(ref common.ReferenceCallback) c
 	}
 }
 
+func schema_k8sio_api_core_v1_CgroupOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CgroupOptions defines options for cgroup filesystem access.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"mountMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "mountMode controls how the cgroup filesystem is mounted in the container. Valid values are \"ReadOnly\" and \"Writable\". If not specified, the container runtime's default mount mode is used. \"ReadOnly\" cannot be set when the container's privileged field is true.\n\nPossible enum values:\n - `\"ReadOnly\"` mounts the cgroup filesystem read-only.\n - `\"Writable\"` mounts the cgroup filesystem read-write to let the container create its own cgroups.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"ReadOnly", "Writable"},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_core_v1_CinderPersistentVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -28986,7 +29008,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					},
 					"os": {
 						SchemaProps: spec.SchemaProps{
-							Description: "os specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.hostUsers - spec.resources - spec.securityContext.appArmorProfile - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.securityContext.supplementalGroupsPolicy - spec.containers[*].securityContext.appArmorProfile - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup",
+							Description: "os specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.hostUsers - spec.resources - spec.securityContext.appArmorProfile - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.securityContext.supplementalGroupsPolicy - spec.containers[*].securityContext.appArmorProfile - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup - spec.containers[*].securityContext.cgroupOptions",
 							Ref:         ref(corev1.PodOS{}.OpenAPIModelName()),
 						},
 					},
@@ -31644,11 +31666,17 @@ func schema_k8sio_api_core_v1_SecurityContext(ref common.ReferenceCallback) comm
 							Ref:         ref(corev1.AppArmorProfile{}.OpenAPIModelName()),
 						},
 					},
+					"cgroupOptions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "cgroupOptions controls how the cgroup filesystem is mounted in the container. If mountMode is specified, the scheduler only places the pod on a node whose status.declaredFeatures includes CgroupOptions. (Alpha) This field requires the CgroupOptions feature gate to be enabled. This field cannot be set for ephemeral containers or when spec.os.name is windows.",
+							Ref:         ref(corev1.CgroupOptions{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			corev1.AppArmorProfile{}.OpenAPIModelName(), corev1.Capabilities{}.OpenAPIModelName(), corev1.SELinuxOptions{}.OpenAPIModelName(), corev1.SeccompProfile{}.OpenAPIModelName(), corev1.WindowsSecurityContextOptions{}.OpenAPIModelName()},
+			corev1.AppArmorProfile{}.OpenAPIModelName(), corev1.Capabilities{}.OpenAPIModelName(), corev1.CgroupOptions{}.OpenAPIModelName(), corev1.SELinuxOptions{}.OpenAPIModelName(), corev1.SeccompProfile{}.OpenAPIModelName(), corev1.WindowsSecurityContextOptions{}.OpenAPIModelName()},
 	}
 }
 
