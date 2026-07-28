@@ -124,5 +124,47 @@ describe('deps', () => {
       removeDependency(resource1, resource2);
       expect(stack1.dependencies.length).toEqual(0);
     });
+
+    test('node.addDependency on a construct containing nested stacks depends on the nested stack resources, not their contents', () => {
+      // https://github.com/aws/aws-cdk/issues/38406
+      // A dependency on a construct that contains nested stacks must be reified as a
+      // dependency on the AWS::CloudFormation::Stack resources in the parent template,
+      // not flattened into a DependsOn entry for every resource inside the nested stacks.
+      const app = new core.App();
+      // The buggy behavior renders DependsOn entries for logical IDs that don't exist in the
+      // template. Acknowledge that validation finding so synthesis completes and we can
+      // assert on the actual DependsOn contents, which is what the issue is about.
+      core.Validations.of(app).acknowledge({
+        id: 'CloudFormation-Validate::E3005',
+        reason: 'Assert on the rendered DependsOn instead of failing at validation time',
+      });
+      const stack = new core.Stack(app, 'TestStack');
+
+      // An L3-style construct with one direct resource and a nested stack with many resources
+      const api = new Construct(stack, 'Api');
+      const directResource = new core.CfnResource(api, 'Direct', { type: 'Test::Resource::Fake' });
+      const nested = new core.NestedStack(api, 'Nested');
+      const nestedResourceCount = 5;
+      for (let i = 0; i < nestedResourceCount; i++) {
+        new core.CfnResource(nested, `InNested${i}`, { type: 'Test::Resource::Fake' });
+      }
+
+      const fn = new core.CfnResource(stack, 'Fn', { type: 'Test::Resource::Fake' });
+      fn.node.addDependency(api);
+
+      const template = app.synth().getStackByName(stack.stackName).template;
+      const dependsOn: string[] = template.Resources.Fn.DependsOn;
+
+      // The size of DependsOn must not scale with the number of resources inside the
+      // nested stack (in the issue this grew a template past CloudFormation's 1MB limit).
+      expect(dependsOn.length).toBeLessThan(nestedResourceCount);
+
+      // Only the direct resource and the nested stack resource itself; none of the
+      // resources inside the nested stack (their logical IDs don't even exist in this template).
+      expect([...dependsOn].sort()).toEqual([
+        stack.resolve(directResource.logicalId),
+        stack.resolve(nested.nestedStackResource!.logicalId),
+      ].sort());
+    });
   });
 });
