@@ -92,6 +92,11 @@ func (in CephFSVolumeSource) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CgroupOptions) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.CgroupOptions"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CinderPersistentVolumeSource) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.CinderPersistentVolumeSource"
 }
