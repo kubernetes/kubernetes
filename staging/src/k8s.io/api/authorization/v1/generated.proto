@@ -28,6 +28,160 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/authorization/v1";
 
+// AuthorizationOptions contains options for specifying the client's authorization abilities.
+message AuthorizationOptions {
+  // handledDecisionTypes specifies what decision types the client can handle in the context it is in.
+  // Currently valid values are:
+  // - [Allow, Deny, NoOpinion] (for conditions-unaware clients) or
+  // - [Allow, Deny, NoOpinion, ConditionsMap, Union] (for conditions-aware clients)
+  // If the authorizer would like to return conditions, but the client does not opt in to handle those here,
+  //   the authorizer must fail closed to a safe unconditional decision using ConditionsAwareDecision.FailureDecision()
+  //   (Deny if any Deny conditions were present, otherwise NoOpinion).
+  // Order does not matter in this slice; set semantics should be used.
+  // The server should not reject unrecognized decision types (hence the k8s:opaqueType), but focus on whether the client
+  // supports a mode that the server does. All clients must support "classic", conditions-unaware authorization.
+  // +listType=set
+  // +k8s:listType=set
+  // +k8s:required
+  // +required
+  // +k8s:eachVal=+k8s:opaqueType
+  repeated string handledDecisionTypes = 1;
+}
+
+// Condition represents a single authorization condition to be evaluated against
+// data available later in the request chain, e.g. objects available in admission.
+message Condition {
+  // id uniquely identifies this condition within the scope of the authorizer
+  // that authored it and ConditionsMap it is part of. Validated as a Kubernetes label key.
+  // Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.
+  // +k8s:required
+  // +k8s:format=k8s-label-key
+  // +required
+  optional string id = 1;
+
+  // condition returns a string encoding of the condition to be evaluated.
+  // It is a pure, deterministic function from ConditionsData to a boolean (or error).
+  // Might or might not be human-readable.
+  // Optional, if the ID alone is enough for the authorizer to know how to evaluate the condition.
+  // +k8s:beta=+k8s:maxBytes=10240
+  // +k8s:optional
+  // +optional
+  optional string condition = 2;
+
+  // type describes the type of the condition, if there are multiple possibilities.
+  // Should be formatted as a Kubernetes label key.
+  // Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.
+  // Optional. Can be omitted if the authorizer already knows how to evaluate the condition.
+  // +k8s:format=k8s-label-key
+  // +k8s:optional
+  // +optional
+  optional string type = 3;
+
+  // description is an optional human-friendly description that can be shown
+  // as an error message or for debugging. Optional.
+  // +k8s:beta=+k8s:maxBytes=1024
+  // +k8s:optional
+  // +optional
+  optional string description = 4;
+}
+
+// ConditionsAwareDecision represents one authorizer's decision. It is an enum type,
+// with variants described in ConditionsAwareDecisionType, plus a reason and error.
+message ConditionsAwareDecision {
+  // type describes the type of the decision, and acts as an enum discriminator.
+  // +k8s:beta=+k8s:unionDiscriminator
+  // +k8s:required
+  // +required
+  optional string type = 1;
+
+  // deny represents an unconditional Deny decision.
+  // Must be non-null when type == "Deny", otherwise this field must be unset.
+  // +k8s:unionMember
+  // +k8s:optional
+  // +optional
+  optional UnconditionalDecision deny = 2;
+
+  // noOpinion represents an unconditional NoOpinion decision.
+  // Must be non-null when type == "NoOpinion", otherwise this field must be unset.
+  // +k8s:unionMember
+  // +k8s:optional
+  // +optional
+  optional UnconditionalDecision noOpinion = 3;
+
+  // allow represents an unconditional Allow decision.
+  // Must be non-null when type == "Allow", otherwise this field must be unset.
+  // +k8s:unionMember
+  // +k8s:optional
+  // +optional
+  optional UnconditionalDecision allow = 4;
+
+  // conditionsMap represents a conditional decision, modelled as a map of conditions.
+  // Must be non-null when type == "ConditionsMap", otherwise this field must be unset.
+  // +k8s:unionMember
+  // +k8s:optional
+  // +optional
+  optional ConditionsMap conditionsMap = 5;
+
+  // union forms an ordered tree of decisions, where the union decision is represented by
+  // an internal node, and all other decision types are leaf nodes. During evaluation, the
+  // leaf decisions are evaluated in depth-first order, until an Allow or Deny decision is found.
+  // The order of the decisions must match exactly the order of the authorizers in the union authorizer.
+  // At least one of the leaves must be of type ConditionsMap, as otherwise the union could be trivially
+  // reduced to just a single Allow/Deny/NoOpinion.
+  //
+  // Must have at least one element when type == "Union", otherwise this field must be unset.
+  //
+  // +k8s:unionMember
+  // +k8s:optional
+  // +optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=authorizerName
+  // +listType=map
+  // +listMapKey=authorizerName
+  repeated NamedConditionsAwareDecision union = 6;
+}
+
+// ConditionsMap represents a map of conditions, keyed by ID across all conditions, across
+// all effects. The ConditionsMap must have at least one Allow condition or at least one
+// Deny condition. It cannot contain more than 128 conditions in total. The conditions are evaluated
+// against data available later, to determine whether the authorizer that authored the conditions
+// allows or denies the request.
+// If all conditions in the map evaluate to false, the final decision must be NoOpinion.
+message ConditionsMap {
+  // denyConditions contains the conditions with Deny effect. If any such condition evaluates to
+  // true or error, the ConditionsMap as a whole must evaluate to Deny.
+  // +listType=map
+  // +listMapKey=id
+  // +k8s:listType=map
+  // +k8s:listMapKey=id
+  // +k8s:maxItems=128
+  // +k8s:optional
+  // +optional
+  repeated Condition denyConditions = 1;
+
+  // noOpinionConditions contains the conditions with NoOpinion effect. If any such condition evaluates to
+  // true or error, the ConditionsMap as a whole must evaluate to NoOpinion.
+  // +listType=map
+  // +listMapKey=id
+  // +k8s:listType=map
+  // +k8s:listMapKey=id
+  // +k8s:maxItems=128
+  // +k8s:optional
+  // +optional
+  repeated Condition noOpinionConditions = 2;
+
+  // allowConditions contains the conditions with Allow effect. If any such condition evaluates to
+  // true, the ConditionsMap as a whole must evaluate to Allow.
+  // +listType=map
+  // +listMapKey=id
+  // +k8s:listType=map
+  // +k8s:listMapKey=id
+  // +k8s:maxItems=128
+  // +k8s:optional
+  // +optional
+  repeated Condition allowConditions = 3;
+}
+
 // ExtraValue masks the value so protobuf can generate
 // +protobuf.nullable=true
 // +protobuf.options.(gogoproto.goproto_stringer)=false
@@ -109,6 +263,22 @@ message LocalSubjectAccessReview {
   // status is filled in by the server and indicates whether the request is allowed or not
   // +optional
   optional SubjectAccessReviewStatus status = 3;
+}
+
+// NamedConditionsAwareDecision is a named ConditionsAwareDecision, returned by a unioned authorizer.
+message NamedConditionsAwareDecision {
+  // authorizerName details the name of the authorizer that authored the condition, such that
+  // the right Decision can be paired with the right authorizer when evaluating the conditions,
+  // even across API server replicas. The name must be stable over time.
+  // This name must be unique within a given union authorizer, not necessarily globally.
+  // +required
+  // +k8s:required
+  // +k8s:format=k8s-long-name
+  optional string authorizerName = 1;
+
+  // decision carries the inner decision returned from the authorizer.
+  // +required
+  optional ConditionsAwareDecision decision = 2;
 }
 
 // NonResourceAttributes includes the authorization attributes available for non-resource requests to the Authorizer interface
@@ -235,6 +405,14 @@ message SelfSubjectAccessReviewSpec {
   // +k8s:alpha(since: "1.37")=+k8s:optional
   // +k8s:alpha(since: "1.37")=+k8s:unionMember
   optional NonResourceAttributes nonResourceAttributes = 2;
+
+  // authorizationOptions contains options for specifying the client's authorization abilities.
+  // Requires the ConditionalAuthorization feature to be enabled.
+  // +optional
+  // +k8s:optional
+  // +featureGate=ConditionalAuthorization
+  // +k8s:ifDisabled("ConditionalAuthorization")=+k8s:forbidden
+  optional AuthorizationOptions authorizationOptions = 3;
 }
 
 // SelfSubjectRulesReview enumerates the set of actions the current user can perform within a namespace.
@@ -315,17 +493,26 @@ message SubjectAccessReviewSpec {
   // uid information about the requesting user.
   // +optional
   optional string uid = 6;
+
+  // authorizationOptions contains options for specifying the client's authorization abilities.
+  // Requires the ConditionalAuthorization feature to be enabled.
+  // +optional
+  // +k8s:optional
+  // +featureGate=ConditionalAuthorization
+  // +k8s:ifDisabled("ConditionalAuthorization")=+k8s:forbidden
+  optional AuthorizationOptions authorizationOptions = 7;
 }
 
 // SubjectAccessReviewStatus
 message SubjectAccessReviewStatus {
   // allowed is required. True if the action would be allowed, false otherwise.
+  // allowed=true is mutually exclusive with denied=true and conditionalDecision != nil.
   optional bool allowed = 1;
 
-  // denied is optional. True if the action would be denied, otherwise
-  // false. If both allowed is false and denied is false, then the
-  // authorizer has no opinion on whether to authorize the action. Denied
-  // may not be true if Allowed is true.
+  // denied is optional. True if the action would be denied, otherwise false
+  // If allowed is false, denied is false, and conditionalDecision is unset,
+  // then the authorizer has no opinion on whether to authorize the action.
+  // denied=true is mutually exclusive with allowed=true and conditionalDecision != nil.
   // +optional
   optional bool denied = 4;
 
@@ -338,6 +525,19 @@ message SubjectAccessReviewStatus {
   // For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.
   // +optional
   optional string evaluationError = 3;
+
+  // conditionalDecision represents a conditional decision returned by the authorizer.
+  // Mutually exclusive with allowed=true and denied=true.
+  // The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or
+  // ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented
+  // with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone.
+  // May only be set if spec.conditionalAuthorization is non-null.
+  // Requires the ConditionalAuthorization feature to be enabled.
+  // +optional
+  // +k8s:optional
+  // +featureGate=ConditionalAuthorization
+  // +k8s:ifDisabled("ConditionalAuthorization")=+k8s:forbidden
+  optional ConditionsAwareDecision conditionalDecision = 5;
 }
 
 // SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on
@@ -364,5 +564,20 @@ message SubjectRulesReviewStatus {
   // ResourceRules and/or NonResourceRules may be incomplete.
   // +optional
   optional string evaluationError = 4;
+}
+
+// UnconditionalDecision represents the data associated with an unconditional decision.
+message UnconditionalDecision {
+  // reason is optional. It indicates why a request was allowed or denied.
+  // +k8s:optional
+  // +optional
+  optional string reason = 1;
+
+  // evaluationError is an indication that some error occurred during the authorization check.
+  // It is entirely possible to get an error and be able to continue determine authorization status in spite of it.
+  // For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.
+  // +k8s:optional
+  // +optional
+  optional string evaluationError = 2;
 }
 

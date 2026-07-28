@@ -2409,7 +2409,7 @@
     endpoint: /metrics
 - name: authorization_attempts_total
   help: Counter of authorization attempts broken down by result. It can be either
-    'allowed', 'denied', 'no-opinion' or 'error'.
+    'allowed', 'denied', 'no-opinion', 'conditional' or 'error'.
   type: Counter
   stabilityLevel: ALPHA
   labels:

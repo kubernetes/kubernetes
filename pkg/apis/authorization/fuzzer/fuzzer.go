@@ -17,10 +17,34 @@ limitations under the License.
 package fuzzer
 
 import (
+	"sigs.k8s.io/randfill"
+
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/kubernetes/pkg/apis/authorization"
 )
 
 // Funcs returns the fuzzer functions for the authorization api group.
+//
+// The v1beta1 schema dropped Spec.AuthorizationOptions and Status.ConditionalDecision,
+// and the v1 -> v1beta1 conversion functions fail closed on any value the v1beta1
+// schema can't represent (anything but nil AuthorizationOptions with the exact
+// unconditional HandledDecisionTypes, and nil ConditionalDecision). Constrain the
+// fuzzer to only produce values that survive that conversion so cross-version
+// round-trip tests don't spuriously fail. Content-level fuzzing of those fields
+// is exercised by the dedicated declarative-validation tests.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
-	return []interface{}{}
+	return []interface{}{
+		func(s *authorization.SubjectAccessReviewSpec, c randfill.Continue) {
+			c.FillNoCustom(s)
+			s.AuthorizationOptions = nil
+		},
+		func(s *authorization.SelfSubjectAccessReviewSpec, c randfill.Continue) {
+			c.FillNoCustom(s)
+			s.AuthorizationOptions = nil
+		},
+		func(s *authorization.SubjectAccessReviewStatus, c randfill.Continue) {
+			c.FillNoCustom(s)
+			s.ConditionalDecision = nil
+		},
+	}
 }

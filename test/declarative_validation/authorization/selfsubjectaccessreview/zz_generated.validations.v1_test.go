@@ -33,6 +33,86 @@ func init() {
 			"spec": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 			},
+			"spec.authorizationOptions": {
+				{ErrorType: "FieldValueForbidden"},
+			},
+			"spec.authorizationOptions.handledDecisionTypes": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.authorizationOptions.handledDecisionTypes[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.conditionalDecision": {
+				{ErrorType: "FieldValueForbidden"},
+			},
+			"status.conditionalDecision.conditionsMap.allowConditions": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"status.conditionalDecision.conditionsMap.allowConditions[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.conditionalDecision.conditionsMap.allowConditions[*].condition": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
+			"status.conditionalDecision.conditionsMap.allowConditions[*].description": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
+			"status.conditionalDecision.conditionsMap.allowConditions[*].id": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.conditionalDecision.conditionsMap.allowConditions[*].type": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
+			"status.conditionalDecision.conditionsMap.denyConditions": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"status.conditionalDecision.conditionsMap.denyConditions[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.conditionalDecision.conditionsMap.denyConditions[*].condition": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
+			"status.conditionalDecision.conditionsMap.denyConditions[*].description": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
+			"status.conditionalDecision.conditionsMap.denyConditions[*].id": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.conditionalDecision.conditionsMap.denyConditions[*].type": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
+			"status.conditionalDecision.conditionsMap.noOpinionConditions": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"status.conditionalDecision.conditionsMap.noOpinionConditions[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.conditionalDecision.conditionsMap.noOpinionConditions[*].condition": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
+			"status.conditionalDecision.conditionsMap.noOpinionConditions[*].description": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
+			"status.conditionalDecision.conditionsMap.noOpinionConditions[*].id": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.conditionalDecision.conditionsMap.noOpinionConditions[*].type": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
+			"status.conditionalDecision.type": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.conditionalDecision.union[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.conditionalDecision.union[*].authorizerName": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+				{ErrorType: "FieldValueRequired"},
+			},
 		},
 	)
 }

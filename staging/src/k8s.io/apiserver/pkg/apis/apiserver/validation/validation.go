@@ -30,6 +30,7 @@ import (
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 
 	v1 "k8s.io/api/authorization/v1"
+	"k8s.io/api/authorization/v1alpha1"
 	"k8s.io/api/authorization/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/cert"
+	"k8s.io/klog/v2"
 )
 
 // ValidateAuthenticationConfiguration validates a given AuthenticationConfiguration.
@@ -636,6 +638,15 @@ func ValidateAuthorizationConfiguration(compiler authorizationcel.Compiler, fldP
 		}
 		seenAuthorizerNames.Insert(a.Name)
 
+		// Warn for Kubernetes-reserved authorizer names, but don't fail, as someone could technically have configured their Kube API server with such a name already,
+		// and they are forced to change the name first when they would actually like to use Kubernetes' own authorizer.
+		if strings.HasSuffix(a.Name, "kubernetes.io") {
+			klog.Warningf("Authorizer name %q is a subdomain of kubernetes.io, this is not recommended for user-provided authorizers, as Kubernetes might add an authorizer with this name in future versions", a.Name)
+		}
+		if strings.HasSuffix(a.Name, "k8s.io") {
+			klog.Warningf("Authorizer name %q is a subdomain of k8s.io, this is not recommended for user-provided authorizers, as Kubernetes might add an authorizer with this name in future versions", a.Name)
+		}
+
 		switch a.Type {
 		case api.TypeWebhook:
 			if a.Webhook == nil {
@@ -725,8 +736,44 @@ func ValidateWebhookConfiguration(compiler authorizationcel.Compiler, fldPath *f
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("connectionInfo", "type"), c.ConnectionInfo, []string{api.AuthorizationWebhookConnectionInfoTypeInCluster, api.AuthorizationWebhookConnectionInfoTypeKubeConfigFile}))
 	}
 
+	if c.ConditionsReview != nil {
+		allErrs = append(allErrs, ValidateConditionsReviewConfiguration(fldPath.Child("conditionsReview"), fldPath, c.ConditionsReview, c.ConnectionInfo.Type)...)
+	}
+
+	// TODO(luxas): Do not allow matchConditions to operate on the API version when conditions are enabled, to make sure
+	// that the webhook authorizer gets requests for all API versions uniformly.
 	_, errs := compileMatchConditions(compiler, c.MatchConditions, fldPath)
 	allErrs = append(allErrs, errs...)
+
+	return allErrs
+}
+
+// ValidateConditionsReviewConfiguration validates a given non-nil ConditionsReviewConfiguration.
+func ValidateConditionsReviewConfiguration(fldPath, parentFldPath *field.Path, crc *api.ConditionsReviewConfiguration, connectionType string) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ConditionalAuthorization) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "the ConditionalAuthorization feature gate must be on to use this field"))
+	}
+
+	switch connectionType {
+	case api.AuthorizationWebhookConnectionInfoTypeKubeConfigFile:
+		// field kubeConfigContextName is optional in this mode, nothing to validate
+	default:
+		if len(crc.KubeConfigContextName) != 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("kubeConfigContextName"),
+				fmt.Sprintf("may only be specified when %s=%s", parentFldPath.Child("connectionInfo", "type"), api.AuthorizationWebhookConnectionInfoTypeKubeConfigFile)))
+		}
+	}
+
+	switch crc.Version {
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("version"), ""))
+	case "v1alpha1":
+		_ = &v1alpha1.AuthorizationConditionsReview{}
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("version"), crc.Version, []string{"v1alpha1"}))
+	}
 
 	return allErrs
 }

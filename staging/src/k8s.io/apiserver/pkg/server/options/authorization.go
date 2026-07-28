@@ -179,7 +179,7 @@ func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interfac
 
 	if len(s.AlwaysAllowGroups) > 0 {
 		authorizers = append(authorizers, union.NamedAuthorizer{
-			AuthorizerName: "kubernetes.io/always-allow-groups",
+			AuthorizerName: "always-allow-groups.authorizer.kubernetes.io",
 			Authorizer:     authorizerfactory.NewPrivilegedGroups(s.AlwaysAllowGroups...),
 		})
 	}
@@ -190,7 +190,7 @@ func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interfac
 			return nil, err
 		}
 		authorizers = append(authorizers, union.NamedAuthorizer{
-			AuthorizerName: "kubernetes.io/always-allow-paths",
+			AuthorizerName: "always-allow-paths.authorizer.kubernetes.io",
 			Authorizer:     a,
 		})
 	}
@@ -199,17 +199,18 @@ func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interfac
 		klog.Warning("No authorization-kubeconfig provided, so SubjectAccessReview of authorization tokens won't work.")
 	} else {
 		cfg := authorizerfactory.DelegatingAuthorizerConfig{
-			SubjectAccessReviewClient: client.AuthorizationV1(),
-			AllowCacheTTL:             s.AllowCacheTTL,
-			DenyCacheTTL:              s.DenyCacheTTL,
-			WebhookRetryBackoff:       s.WebhookRetryBackoff,
+			SubjectAccessReviewClient:           client.AuthorizationV1(),
+			AllowCacheTTL:                       s.AllowCacheTTL,
+			DenyCacheTTL:                        s.DenyCacheTTL,
+			WebhookRetryBackoff:                 s.WebhookRetryBackoff,
+			AuthorizationConditionsReviewClient: client.AuthorizationV1alpha1(),
 		}
 		delegatedAuthorizer, err := cfg.New()
 		if err != nil {
 			return nil, err
 		}
 		authorizers = append(authorizers, union.NamedAuthorizer{
-			AuthorizerName: "kubernetes.io/webhook",
+			AuthorizerName: "webhook.authorizer.kubernetes.io",
 			Authorizer:     delegatedAuthorizer,
 		})
 	}
