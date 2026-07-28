@@ -1,10 +1,14 @@
 name: Fork targeted tests
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
 on:
   push:
     branches: [tdd/nestedpendingops-wait-leak]
     paths:
       - ".github/workflows/test-fork.yml"
-      - "pkg/util/goroutinemap/nestedpendingoperations/**"
+      - "pkg/volume/util/nestedpendingoperations/**"
   workflow_dispatch:
 jobs:
   test:
@@ -21,16 +25,18 @@ jobs:
         run: |
           set -o pipefail
           go env
-          go test -v -count=1 -timeout=2m ./pkg/util/goroutinemap/nestedpendingoperations 2>&1 | tee test_output.txt
-      - name: Post logs as PR comment on failure
-        if: failure() || steps.gotest.outcome == 'failure'
+          go test -v -count=1 -timeout=2m ./pkg/volume/util/nestedpendingoperations 2>&1 | tee test_output.txt
+      - name: Post logs as PR comment
+        if: always()
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const body = fs.readFileSync('test_output.txt','utf8');
+            let body = 'No test_output.txt produced.';
+            try { body = fs.readFileSync('test_output.txt','utf8'); } catch (e) {}
             const truncated = body.slice(-60000);
-            const md = `Automated log extract (CI failure on ${context.sha})\n\n<details><summary>Logs</summary>\n\n\`\`\`\n${truncated}\n\`\`\`\n</details>`;
+            const md = `Automated log extract (CI on ${context.sha})\n\n<details><summary>Logs</summary>\n\n\`\`\`\n${truncated}\n\`\`\`\n</details>`;
             await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: 1, body: md });
       - name: Fail job if tests failed
         if: steps.gotest.outcome == 'failure'
