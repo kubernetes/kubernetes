@@ -109,11 +109,11 @@ func (c *CycleState) IsPodGroupSchedulingCycle() bool {
 	return c.podGroupCycleState != nil
 }
 
-func (c *CycleState) SetPodGroupSchedulingCycle(podGroupCycleState fwk.PodGroupCycleState) {
+func (c *CycleState) SetPodGroupCycleState(podGroupCycleState fwk.PodGroupCycleState) {
 	c.podGroupCycleState = podGroupCycleState
 }
 
-func (c *CycleState) GetPodGroupSchedulingCycle() fwk.PodGroupCycleState {
+func (c *CycleState) GetPodGroupCycleState() fwk.PodGroupCycleState {
 	return c.podGroupCycleState
 }
 

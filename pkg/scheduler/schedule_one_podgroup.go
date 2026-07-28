@@ -362,9 +362,9 @@ func initPodSchedulingContext(ctx context.Context, pod *v1.Pod, placementCycleSt
 	podsToActivate := framework.NewPodsToActivate()
 	state.Write(framework.PodsToActivateKey, podsToActivate)
 
-	podGroupCycleState := placementCycleState.GetPodGroupSchedulingCycle()
+	podGroupCycleState := placementCycleState.GetPodGroupCycleState()
 	// Marks this cycle as a pod group scheduling cycle.
-	state.SetPodGroupSchedulingCycle(podGroupCycleState)
+	state.SetPodGroupCycleState(podGroupCycleState)
 	// Set the placement cycle state so per-pod plugins can access placement-scoped data.
 	state.SetPlacementCycleState(placementCycleState)
 
@@ -619,7 +619,7 @@ func completePodGroupAlgorithmResult(ctx context.Context, queuedPodInfos []*fram
 	for i := numInResult; i < numInQueue; i++ {
 		pInfo := queuedPodInfos[i]
 		placementCycleState := framework.NewCycleState()
-		placementCycleState.SetPodGroupSchedulingCycle(podGroupState)
+		placementCycleState.SetPodGroupCycleState(podGroupState)
 		newResults[i] = algorithmResult{
 			podInfo: pInfo,
 			podCtx:  initPodSchedulingContext(ctx, pInfo.Pod, placementCycleState),
@@ -758,7 +758,8 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 				switch {
 				case podGroupResult.status.IsSuccess():
 					// Disable pod group scheduling in cycle state before binding.
-					podCtx.state.SetPodGroupSchedulingCycle(nil)
+					podCtx.state.SetPodGroupCycleState(nil)
+					podCtx.state.SetPlacementCycleState(nil)
 					// Schedule result is applied for pod and its binding cycle executes.
 					assumedPodInfo, status := sched.prepareForBindingCycle(ctx, podCtx.state, schedFwk, pInfo, podCtx.podsToActivate, podResult.scheduleResult)
 					if !status.IsSuccess() {
@@ -926,7 +927,7 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 			}, nil
 		}
 		placementCycleState := framework.NewCycleState()
-		placementCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+		placementCycleState.SetPodGroupCycleState(podGroupCycleState)
 		result, placementRevertFns := sched.podGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, podGroupInfo, queuedPodGroupInfo)
 		placementRevertFns.revert()
 
@@ -1030,7 +1031,7 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 			}, nil
 		}
 		placementCycleState := framework.NewCycleState()
-		placementCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+		placementCycleState.SetPodGroupCycleState(podGroupCycleState)
 		subtreeResult := map[fwk.EntityKey]*podGroupAlgorithmResult{}
 		result, placementRevertFns := sched.compositePodGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, root, podGroupInfo, subtreeResult)
 		placementRevertFns.revert()
@@ -1202,7 +1203,7 @@ func (sched *Scheduler) podGroupSchedulingAlgorithm(ctx context.Context, schedFw
 	// still runs in a single implicit placement context so placement-scoped
 	// extension points can use the same state plumbing as TAS.
 	placementCycleState := framework.NewCycleState()
-	placementCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+	placementCycleState.SetPodGroupCycleState(podGroupCycleState)
 	return sched.podGroupSchedulingDefaultAlgorithm(podGroupCycleCtx, schedFwk, placementCycleState, podGroupInfo, queuedPodGroupInfo)
 }
 

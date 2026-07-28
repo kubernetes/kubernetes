@@ -4082,7 +4082,7 @@ func (p *stateSaverPreFilterPlugin) PreFilter(ctx context.Context, state fwk.Cyc
 	if !state.IsPodGroupSchedulingCycle() {
 		return nil, nil
 	}
-	pgState := state.GetPodGroupSchedulingCycle()
+	pgState := state.GetPodGroupCycleState()
 	if pgState == nil {
 		return nil, nil
 	}

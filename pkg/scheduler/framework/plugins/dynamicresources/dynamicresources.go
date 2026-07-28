@@ -897,14 +897,14 @@ func getPodGroupStateDataFromPodGroupCycleState(pgState fwk.PodGroupCycleState) 
 func getPodGroupStateData(cs fwk.CycleState) (*podGroupStateData, error) {
 	// This is nil if the GenericWorkload feature is disabled, the Pod does not
 	// belong to a PodGroup, or the PodGroup is in the asynchronous binding phase.
-	podGroupCycleState := cs.GetPodGroupSchedulingCycle()
+	podGroupCycleState := cs.GetPodGroupCycleState()
 	return getPodGroupStateDataFromPodGroupCycleState(podGroupCycleState)
 }
 
 func getOrCreatePodGroupStateData(cs fwk.CycleState) (*podGroupStateData, error) {
 	podGroupState, err := getPodGroupStateData(cs)
 	if errors.Is(err, fwk.ErrNotFound) {
-		podGroupCycleState := cs.GetPodGroupSchedulingCycle()
+		podGroupCycleState := cs.GetPodGroupCycleState()
 		if podGroupCycleState == nil {
 			// This should never happen since [getPodGroupStateData] only returns
 			// [fwk.ErrNotFound] after [fwk.CycleState.GetPodGroupSchedulingCycle]
