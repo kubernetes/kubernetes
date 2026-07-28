@@ -4730,6 +4730,7 @@ type PodSpec struct {
 	// - spec.containers[*].securityContext.procMount
 	// - spec.containers[*].securityContext.runAsUser
 	// - spec.containers[*].securityContext.runAsGroup
+	// - spec.containers[*].securityContext.cgroupOptions
 	// +optional
 	OS *PodOS `json:"os,omitempty" protobuf:"bytes,36,opt,name=os"`
 
@@ -8822,7 +8823,37 @@ type SecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	AppArmorProfile *AppArmorProfile `json:"appArmorProfile,omitempty" protobuf:"bytes,12,opt,name=appArmorProfile"`
+	// cgroupOptions holds the cgroup options for this container.
+	// If mountMode is specified, the scheduler only places the pod on a node
+	// whose status.declaredFeatures includes CgroupOptions.
+	// (Alpha) This field requires the CgroupOptions feature gate to be enabled.
+	// This field cannot be set for ephemeral containers or when spec.os.name is windows.
+	// +featureGate=CgroupOptions
+	// +optional
+	CgroupOptions *CgroupOptions `json:"cgroupOptions,omitempty" protobuf:"bytes,13,opt,name=cgroupOptions"`
 }
+
+// CgroupOptions defines options for cgroup filesystem access.
+type CgroupOptions struct {
+	// mountMode controls how the cgroup filesystem is mounted in the container.
+	// Valid values are "ReadOnly" and "Writable". If not specified, the
+	// container runtime's default mount mode is used.
+	// "ReadOnly" cannot be set when the container's privileged field is true.
+	// +optional
+	MountMode *CgroupMountMode `json:"mountMode,omitempty" protobuf:"bytes,1,opt,name=mountMode"`
+}
+
+// CgroupMountMode defines how the cgroup filesystem is mounted in a container.
+// +enum
+// +k8s:validation-gen-nolint
+type CgroupMountMode string
+
+const (
+	// CgroupMountModeReadOnly mounts the cgroup filesystem read-only.
+	CgroupMountModeReadOnly CgroupMountMode = "ReadOnly"
+	// CgroupMountModeWritable mounts the cgroup filesystem read-write.
+	CgroupMountModeWritable CgroupMountMode = "Writable"
+)
 
 // +enum
 // +k8s:validation-gen-nolint
