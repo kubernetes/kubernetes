@@ -118,7 +118,9 @@ func (w *patternAllowlist) Admit(_ context.Context, attrs *lifecycle.PodAdmitAtt
 		}
 	}
 
-	hostUsers := pod.Spec.HostUsers != nil && *pod.Spec.HostUsers
+	// The default for hostUsers is true, so a nil HostUsers means the pod
+	// shares the host user namespace.
+	hostUsers := pod.Spec.HostUsers == nil || *pod.Spec.HostUsers
 	for _, s := range pod.Spec.SecurityContext.Sysctls {
 		if err := w.validateSysctl(s.Name, pod.Spec.HostNetwork, pod.Spec.HostIPC, hostUsers); err != nil {
 			return lifecycle.PodAdmitResult{
