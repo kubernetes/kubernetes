@@ -28,12 +28,22 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
+// batchHandle is the subset of framework.Framework that OpportunisticBatch requires.
+type batchHandle interface {
+	ProfileName() string
+	SnapshotSharedLister() fwk.SharedLister
+	RunFilterPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status
+	RunPreScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status
+	RunRawScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) ([]fwk.PluginScore, *fwk.Status)
+	NormalizeScores(ctx context.Context, state fwk.CycleState, pod *v1.Pod, scores []fwk.NodePluginScores) *fwk.Status
+}
+
 // OpportunisticBatching caches results from filtering and scoring when possible to optimize
 // scheduling of common pods.
 type OpportunisticBatch struct {
 	state     *batchState
 	lastCycle schedulingCycle
-	handle    fwk.Handle
+	handle    batchHandle
 
 	// Used primarily for tests, count the total pods we
 	// have successfully batched.
@@ -71,17 +81,20 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, signa
 		hinted := "hint"
 		if hint == "" {
 			hinted = "no_hint"
+			metrics.BatchAttemptStats.WithLabelValues(b.handle.ProfileName(), metrics.BatchAttemptNoHint).Inc()
+			logger.V(4).Info("OpportunisticBatch no node hint available for pod",
+				"profile", b.handle.ProfileName(), "pod", klog.KObj(pod), "cycleCount", cycleCount)
 		}
 		metrics.GetNodeHintDuration.WithLabelValues(hinted, b.handle.ProfileName()).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
-	nodeInfos := b.handle.SnapshotSharedLister().NodeInfos()
-
 	// If we don't have state that we can use, then return an empty hint.
-	if !b.batchStateCompatible(ctx, pod, signature, cycleCount, state, nodeInfos) {
-		metrics.BatchAttemptStats.WithLabelValues(b.handle.ProfileName(), metrics.BatchAttemptNoHint).Inc()
-		logger.V(4).Info("OpportunisticBatch no node hint available for pod",
-			"profile", b.handle.ProfileName(), "pod", klog.KObj(pod), "cycleCount", cycleCount)
+	if !b.batchStateCompatible(ctx, pod, signature, cycleCount) {
+		return ""
+	}
+
+	// Re-check the previously chosen node and re-score it if still feasible.
+	if !b.refreshHintCandidates(ctx, pod, cycleCount, state) {
 		return ""
 	}
 
@@ -160,8 +173,9 @@ func (b *OpportunisticBatch) logUnusableState(logger klog.Logger, cycleCount int
 		"profile", b.handle.ProfileName(), "cycleCount", cycleCount, "reason", reason)
 }
 
-// Update the batch state based on a the arrival of a new pod and the chosen node from the last pod.
-func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.Pod, signature fwk.PodSignature, cycleCount int64, state fwk.CycleState, nodeInfos fwk.NodeInfoLister) bool {
+// batchStateCompatible checks whether the cached batch state is still valid for the new pod.
+func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.Pod, signature fwk.PodSignature,
+	cycleCount int64) bool {
 	// Just return if we don't have any state to use.
 	if b.stateEmpty() {
 		return false
@@ -204,28 +218,99 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.P
 		return false
 	}
 
-	// We can only reuse the previous state if the new pod will not
-	// fit on the node we used for the last pod. If the node we
-	// chose last time can't host this pod, then we know
-	// that the next best should be the next node in the list.
-	// If we *could* put this pod on the node we just used, then we can't
-	// use our cache because we don't know how to rescore the used node; it
-	// could be the best, or it could be somewhere else.
-	// See git.k8s.io/enhancements/keps/sig-scheduling/5598-opportunistic-batching
-	lastChosenNode, err := nodeInfos.Get(b.lastCycle.chosenNode)
+	// Our state matches with our new pod and is useable
+	return true
+}
+
+// refreshHintCandidates checks if the last chosen node is still feasible for the new pod,
+// and if so, rescores it and adds it back into the candidate list so it can compete for the
+// next hint. Returns false if the node is missing or rescoring fails.
+func (b *OpportunisticBatch) refreshHintCandidates(ctx context.Context, pod *v1.Pod, cycleCount int64,
+	state fwk.CycleState) bool {
+	logger := klog.FromContext(ctx)
+	lastChosenNode, err := b.handle.SnapshotSharedLister().NodeInfos().Get(b.lastCycle.chosenNode)
 	if lastChosenNode == nil || err != nil {
 		b.logUnusableState(logger, cycleCount, metrics.BatchFlushNodeMissing)
 		return false
 	}
 
 	status := b.handle.RunFilterPlugins(ctx, state, pod, lastChosenNode)
+	if status.IsSuccess() {
+		// The last chosen node is still feasible — rescore it so it can compete
+		// against the cached candidates for the next hint.
+		return b.rescoreHintedNode(ctx, pod, state, cycleCount, lastChosenNode)
+	}
 	if !status.IsRejected() {
-		b.logUnusableState(logger, cycleCount, metrics.BatchFlushNodeNotFull)
+		b.logUnusableState(logger, cycleCount, metrics.BatchFlushFilterError)
+		return false
+	}
+	return true
+}
+
+// rescoreHintedNode re-runs Score() for the last chosen node. It adds the node back into the candidate
+// list with fresh scores, re-normalizes across all candidates, then rebuilds the sorted list.
+func (b *OpportunisticBatch) rescoreHintedNode(ctx context.Context, pod *v1.Pod, state fwk.CycleState, cycleCount int64,
+	lastChosenNodeInfo fwk.NodeInfo) bool {
+	logger := klog.FromContext(ctx)
+	defer metrics.BatchRescoreDuration.ObserveSince(time.Now(), b.handle.ProfileName())()
+	metrics.BatchRescoreAttempts.WithLabelValues(b.handle.ProfileName()).Inc()
+
+	nodeInfos, filteredScores, ok := b.resolveCachedCandidates()
+	if !ok {
+		b.logUnusableState(logger, cycleCount, metrics.BatchFlushNodeMissing)
+		return false
+	}
+	// PreScore must be called with full candidate set, including the node being rescored.
+	nodeInfos = append(nodeInfos, lastChosenNodeInfo)
+	// Clone the live CycleState so writes from the rescore path don't leak back.
+	rescoreState := state.Clone()
+	status := b.handle.RunPreScorePlugins(ctx, rescoreState, pod, nodeInfos)
+	if !status.IsSuccess() {
+		b.logUnusableState(logger, cycleCount, metrics.BatchFlushPreScoreError)
 		return false
 	}
 
-	// Our state matches with our new pod and is useable
+	freshScores, status := b.handle.RunRawScorePlugins(ctx, rescoreState, pod, lastChosenNodeInfo)
+	if !status.IsSuccess() {
+		b.logUnusableState(logger, cycleCount, metrics.BatchFlushRescoreError)
+		return false
+	}
+
+	// Add the last chosen node and its fresh scores so filteredScores
+	// stays in sync with nodeInfos, and re-normalize across all candidates.
+	filteredScores = append(filteredScores,
+		fwk.NodePluginScores{
+			Name:      lastChosenNodeInfo.Node().Name,
+			RawScores: freshScores,
+		},
+	)
+
+	if status := b.handle.NormalizeScores(ctx, rescoreState, pod, filteredScores); !status.IsSuccess() {
+		b.logUnusableState(logger, cycleCount, metrics.BatchFlushNormalizeError)
+		return false
+	}
+
+	b.state.sortedNodes = framework.NewSortedScoredNodes(filteredScores)
 	return true
+}
+
+// resolveCachedCandidates resolves the cached sorted nodes to NodeInfos paired
+// with their NodePluginScores. Returns false if any cached node is no longer
+// present in the snapshot.
+func (b *OpportunisticBatch) resolveCachedCandidates() ([]fwk.NodeInfo, []fwk.NodePluginScores, bool) {
+	cached := b.state.sortedNodes.UnorderedList()
+	nodeInfos := make([]fwk.NodeInfo, 0, len(cached)+1)
+	scores := make([]fwk.NodePluginScores, 0, len(cached)+1)
+	lister := b.handle.SnapshotSharedLister().NodeInfos()
+	for _, ns := range cached {
+		ni, err := lister.Get(ns.Name)
+		if err != nil || ni == nil {
+			return nil, nil, false
+		}
+		nodeInfos = append(nodeInfos, ni)
+		scores = append(scores, ns)
+	}
+	return nodeInfos, scores, true
 }
 
 // Irritatingly we can end up with a variety of different configurations that are all "empty".
@@ -234,7 +319,7 @@ func (b *OpportunisticBatch) stateEmpty() bool {
 	return b.state == nil || b.state.sortedNodes == nil || b.state.sortedNodes.Len() == 0
 }
 
-func newOpportunisticBatch(h fwk.Handle, genericWorkloadEnabled bool) *OpportunisticBatch {
+func newOpportunisticBatch(h batchHandle, genericWorkloadEnabled bool) *OpportunisticBatch {
 	return &OpportunisticBatch{
 		handle:                 h,
 		genericWorkloadEnabled: genericWorkloadEnabled,
