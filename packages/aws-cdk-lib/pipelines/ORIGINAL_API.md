@@ -17,14 +17,14 @@ Replace `new CdkPipeline` with `new CodePipeline`. Some
 configuration properties have been changed:
 
 | Old API                        | New API                                                                                        |
-|--------------------------------|------------------------------------------------------------------------------------------------|
+| ------------------------------ | ---------------------------------------------------------------------------------------------- |
 | `cloudAssemblyArtifact`        | removed                                                                                        |
 | `sourceAction`                 | removed                                                                                        |
 | `synthAction`                  | `synth`                                                                                        |
 | `crossAccountKeys`             | new default is `false`; specify `crossAccountKeys: true` if you need cross-account deployments |
 | `cdkCliVersion`                | `cliVersion`                                                                                   |
 | `selfMutating`                 | `selfMutation`                                                                                 |
-| `vpc`, `subnetSelection`       | `codeBuildDefaults.vpc`, `codeBuildDefaults.subnetSelection`                                    |
+| `vpc`, `subnetSelection`       | `codeBuildDefaults.vpc`, `codeBuildDefaults.subnetSelection`                                   |
 | `selfMutationBuildSpec`        | `selfMutationCodeBuildDefaults.partialBuildSpec`                                               |
 | `assetBuildSpec`               | `assetPublishingCodeBuildDefaults.partialBuildSpec`                                            |
 | `assetPreinstallCommands`      | use `assetPublishingCodeBuildDefaults.partialBuildSpec` instead                                |
@@ -100,7 +100,7 @@ potentially `addWave().addStage()`. All stages inside a wave are
 deployed in parallel, which was not a capability of the original API.
 
 | Old API                       | New API                                                                                                                       |
-|-------------------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `addApplicationStage()`       | `addStage()`                                                                                                                  |
 | `addStage().addApplication()` | `addStage()`. Adding multiple CDK Stages into a single Pipeline stage is not supported, add multiple Pipeline stages instead. |
 
@@ -448,7 +448,7 @@ of `Stage`. The `Stage` can contain one or more stack which make up your applica
 there are dependencies between the stacks, the stacks will automatically be added to the
 pipeline in the right order. Stacks that don't depend on each other will be deployed in
 parallel. You can add a dependency relationship between stacks by calling
-`stack1.addDependency(stack2)`.
+`stack1.addStackDependency(stack2)`.
 
 Stages take a default `env` argument which the Stacks inside the Stage will fall back to
 if no `env` is defined for them.

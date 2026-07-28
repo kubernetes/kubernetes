@@ -339,7 +339,7 @@ The exact CloudFormation realization depends on the strength and whether the ref
 crosses region or account boundaries:
 
 |                            | Strong (default)                                  | Both                                                                                         | Weak                                                            |
-|----------------------------|---------------------------------------------------|----------------------------------------------------------------------------------------------|-----------------------------------------------------------------|
+| -------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | Same account and region    | Generates a `Fn::ImportValue` reference           | Generates a `Fn::GetStackOutput` reference AND an Export, but not the `Fn::ImportValue`      | Generates a `Fn::GetStackOutput` reference                      |
 | Same account, cross-region | Generates a pair of `ExportWriter`/`ExportReader` | Generates a `Fn::GetStackOutput` reference AND an `ExportWriter`, but not the `ExportReader` | Generates a `Fn::GetStackOutput` reference                      |
 | Cross-account              | Not possible. Falls back to weak.                 | Generates a `Fn::GetStackOutput` reference + cross-account role                              | Generates a `Fn::GetStackOutput` reference + cross-account role |
@@ -695,7 +695,7 @@ happens when an resource from one stack is referenced in another stack. In
 that case, CDK records the cross-stack referencing of resources,
 automatically produces the right CloudFormation primitives, and adds a
 dependency between the two stacks. You can also manually add a dependency
-between two stacks by using the `stackA.addDependency(stackB)` method.
+between two stacks by using the `stackA.addStackDependency(stackB)` method.
 
 A stack dependency has the following implications:
 
@@ -709,7 +709,7 @@ A stack dependency has the following implications:
 
 ### CfnResource Dependencies
 
-To make declaring dependencies between `CfnResource` objects easier, you can declare dependencies from one `CfnResource` object on another by using the `cfnResource1.addDependency(cfnResource2)` method. This method will work for resources both within the same stack and across stacks as it detects the relative location of the two resources and adds the dependency either to the resource or between the relevant stacks, as appropriate. If more complex logic is in needed, you can similarly remove, replace, or view dependencies between `CfnResource` objects with the `CfnResource` `removeDependency`, `replaceDependency`, and `obtainDependencies` methods, respectively.
+To make declaring dependencies between `CfnResource` objects easier, you can declare dependencies from one `CfnResource` object on another by using the `cfnResource1.addResourceDependency(cfnResource2)` method. This method will work for resources both within the same stack and across stacks as it detects the relative location of the two resources and adds the dependency either to the resource or between the relevant stacks, as appropriate. If more complex logic is in needed, you can similarly remove, replace, or view dependencies between `CfnResource` objects with the `CfnResource` `removeResourceDependency`, `replaceDependency`, and `obtainDependencies` methods, respectively.
 
 ## Custom Resources
 
@@ -1159,7 +1159,7 @@ Resource dependencies (the `DependsOn` attribute) is modified using the
 const resourceA = new CfnResource(this, 'ResourceA', resourceProps);
 const resourceB = new CfnResource(this, 'ResourceB', resourceProps);
 
-resourceB.addDependency(resourceA);
+resourceB.addResourceDependency(resourceA);
 ```
 
 [cfn-resource-attributes]: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-product-attribute-reference.html
