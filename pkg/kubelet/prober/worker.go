@@ -19,6 +19,7 @@ package prober
 import (
 	"context"
 	"math/rand"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -42,6 +43,13 @@ type worker struct {
 
 	// Channel for triggering the probe manually.
 	manualTriggerCh chan struct{}
+
+	// cancelMu guards cancel. cancel is set once by run() before the probe
+	// loop starts, and read by stop() to cancel a probe that is currently
+	// in flight; the mutex protects against stop() being called concurrently
+	// with (or before) that initial assignment.
+	cancelMu sync.Mutex
+	cancel   context.CancelFunc
 
 	// The pod containing this probe (read-only)
 	pod *v1.Pod
@@ -157,6 +165,17 @@ func newWorker(
 // run periodically probes the container.
 func (w *worker) run(ctx context.Context) {
 	logger := klog.FromContext(ctx)
+
+	// Derive a cancellable context for this worker's probes, so that stop()
+	// can cancel a probe that is currently in flight instead of only
+	// signalling stopCh, which is only observed between probes (see doProbe
+	// below, and stop()).
+	ctx, cancel := context.WithCancel(ctx)
+	w.cancelMu.Lock()
+	w.cancel = cancel
+	w.cancelMu.Unlock()
+	defer cancel()
+
 	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
 
 	// If kubelet restarted the probes could be started in rapid succession.
@@ -207,6 +226,18 @@ func (w *worker) stop() {
 	select {
 	case w.stopCh <- struct{}{}:
 	default: // Non-blocking.
+	}
+
+	// Cancel a probe that may currently be in flight, so it doesn't keep
+	// running against a container that is being torn down. cancel is nil
+	// if run() hasn't started yet; in that case there's nothing in flight
+	// to cancel, and run() will observe stopCh (or ctx cancellation, once
+	// it derives it) as usual.
+	w.cancelMu.Lock()
+	cancel := w.cancel
+	w.cancelMu.Unlock()
+	if cancel != nil {
+		cancel()
 	}
 }
 

@@ -17,7 +17,9 @@ limitations under the License.
 package prober
 
 import (
+	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -26,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -1109,5 +1112,114 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 				t.Errorf("Expected result %v, but got: %v", tc.expectedResult, result)
 			}
 		})
+	}
+}
+
+// blockingRunner is a kubecontainer.CommandRunner that blocks until its
+// context is cancelled, simulating a long-running (or hung) exec probe
+// command. It reports on startedCh once RunInContainer has actually been
+// entered, so the test can synchronize with it instead of guessing timings.
+type blockingRunner struct {
+	startedOnce sync.Once
+	startedCh   chan struct{}
+}
+
+// RunInContainer blocks until ctx is cancelled. runProbeWithRetries can call
+// this multiple times for a single probe tick (on error, up to
+// maxProbeRetries), so startedCh is only ever closed once, and once ctx is
+// already cancelled, later calls (retries after the first one is cancelled)
+// return immediately instead of blocking again.
+func (r *blockingRunner) RunInContainer(ctx context.Context, _ kubecontainer.ContainerID, _ []string, _ time.Duration) ([]byte, error) {
+	r.startedOnce.Do(func() { close(r.startedCh) })
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+// TestWorkerStopCancelsInFlightExecProbe covers
+// https://github.com/kubernetes/kubernetes/issues/140977: stop() must cancel
+// a probe that is currently executing, instead of only signalling stopCh
+// (which is only observed *between* probes, after the in-flight one already
+// returned). Uses the real exec prober (unlike most tests in this file,
+// which stub prober.exec directly) so that context cancellation is actually
+// exercised end-to-end through prober.probe -> CommandRunner.RunInContainer.
+func TestWorkerStopCancelsInFlightExecProbe(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+
+	runner := &blockingRunner{startedCh: make(chan struct{})}
+	podManager := kubepod.NewBasicPodManager()
+	pod := getTestPod()
+	podManager.AddPod(pod)
+	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
+	m := NewManager(
+		status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker),
+		results.NewManager(),
+		results.NewManager(),
+		results.NewManager(),
+		runner,
+		&record.FakeRecorder{},
+	).(*manager)
+	// Deliberately do NOT stub m.prober.exec here: this test needs the real
+	// exec prober so it actually calls through to runner.RunInContainer with
+	// a context that the worker controls.
+
+	// blockingRunner ignores TimeoutSeconds and just blocks until its ctx is
+	// cancelled, so the probe spec here only needs to avoid run()'s initial
+	// random startup delay (which scales with PeriodSeconds and would
+	// otherwise make this test slow/flaky) - use setTestProbe's small
+	// defaults for that.
+	setTestProbe(pod, readiness, v1.Probe{})
+	w := newWorker(m, readiness, pod, pod.Spec.Containers[0])
+	m.statusManager.SetPodStatus(logger, pod, getTestRunningStatusWithStarted(true))
+
+	runDone := make(chan struct{})
+	go func() {
+		defer close(runDone)
+		w.run(ctx)
+	}()
+
+	select {
+	case <-runner.startedCh:
+		// The probe is now blocked inside RunInContainer, waiting on ctx.
+	case <-time.After(10 * time.Second):
+		t.Fatal("probe never reached RunInContainer")
+	}
+
+	// At this point doProbe has already set the initial placeholder result
+	// (results.Failure for readiness, set the first time the worker sees
+	// this container) but the real probe call is still blocked in
+	// RunInContainer, so it cannot have recorded anything of its own yet.
+	// Capture that now, before stop() triggers run()'s cleanup defer, which
+	// unconditionally removes the result for this container regardless of
+	// how the worker stopped - checking after stop() would conflate "cleanup
+	// ran" with "the cancelled probe didn't record a result", which are two
+	// different things.
+	preStopResult, ok := m.readinessManager.Get(w.containerID)
+	if !ok {
+		t.Fatal("expected the initial placeholder readiness result to have been set before the probe ran")
+	}
+	if preStopResult != results.Failure {
+		t.Fatalf("got initial result %v before the probe ran, want the initial placeholder %v; the probe must not have completed yet at this point in the test", preStopResult, results.Failure)
+	}
+
+	stopStart := time.Now()
+	w.stop()
+
+	select {
+	case <-runDone:
+	case <-time.After(10 * time.Second):
+		t.Fatal("worker did not exit after stop(); an in-flight probe was not cancelled")
+	}
+	// blockingRunner never returns on its own - only ctx cancellation ends
+	// it - so any bounded elapsed time here demonstrates stop() actually
+	// cancelled the in-flight probe rather than waiting for it to finish.
+	if elapsed := time.Since(stopStart); elapsed > 5*time.Second {
+		t.Errorf("worker took %v to stop after stop() was called; expected near-immediate cancellation of the in-flight probe", elapsed)
+	}
+
+	// run()'s cleanup defer removes the result once the worker has fully
+	// stopped; confirm that actually happened (i.e. run() really returned
+	// and ran its cleanup, rather than e.g. panicking past it).
+	if _, ok := m.readinessManager.Get(w.containerID); ok {
+		t.Error("expected the result to have been removed by run()'s cleanup after the worker stopped")
 	}
 }
