@@ -659,6 +659,16 @@
         ],
         "type": "object"
       },
+      "io.k8s.api.core.v1.CgroupOptions": {
+        "description": "CgroupOptions defines options for cgroup filesystem access.",
+        "properties": {
+          "mountMode": {
+            "description": "mountMode controls whether the cgroup filesystem is mounted as writable. Defaults to \"ReadOnly\" if not specified.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.core.v1.CinderPersistentVolumeSource": {
         "description": "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
         "properties": {
@@ -7442,6 +7452,14 @@
               }
             ],
             "description": "The capabilities to add/drop when running containers. Defaults to the default set of capabilities granted by the container runtime. Note that this field cannot be set when spec.os.name is windows."
+          },
+          "cgroupOptions": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.CgroupOptions"
+              }
+            ],
+            "description": "cgroupOptions controls cgroup filesystem access and configuration. This allows unprivileged containers to manage their own cgroup hierarchies on cgroup v2 systems. Only effective on Linux containers with cgroup v2. Note that this field cannot be set when spec.os.name is windows."
           },
           "privileged": {
             "description": "Run container in privileged mode. Processes in privileged containers are essentially equivalent to root on the host. Defaults to false. Note that this field cannot be set when spec.os.name is windows.",

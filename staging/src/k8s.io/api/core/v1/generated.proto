@@ -370,6 +370,14 @@ message CephFSVolumeSource {
   optional bool readOnly = 6;
 }
 
+// CgroupOptions defines options for cgroup filesystem access.
+message CgroupOptions {
+  // mountMode controls whether the cgroup filesystem is mounted as writable.
+  // Defaults to "ReadOnly" if not specified.
+  // +optional
+  optional string mountMode = 1;
+}
+
 // Represents a cinder volume resource in Openstack.
 // A Cinder volume must exist before mounting to a container.
 // The volume must also be in the same region as the kubelet.
@@ -6365,6 +6373,14 @@ message SecurityContext {
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional AppArmorProfile appArmorProfile = 12;
+
+  // cgroupOptions controls cgroup filesystem access and configuration.
+  // This allows unprivileged containers to manage their own cgroup hierarchies on cgroup v2 systems.
+  // Only effective on Linux containers with cgroup v2.
+  // Note that this field cannot be set when spec.os.name is windows.
+  // +featureGate=CgroupOptions
+  // +optional
+  optional CgroupOptions cgroupOptions = 13;
 }
 
 // SerializedReference is a reference to serialized object.

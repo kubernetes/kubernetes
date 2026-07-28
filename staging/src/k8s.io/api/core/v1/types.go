@@ -8694,7 +8694,35 @@ type SecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	AppArmorProfile *AppArmorProfile `json:"appArmorProfile,omitempty" protobuf:"bytes,12,opt,name=appArmorProfile"`
+	// cgroupOptions controls cgroup filesystem access and configuration.
+	// This allows unprivileged containers to manage their own cgroup hierarchies on cgroup v2 systems.
+	// Only effective on Linux containers with cgroup v2.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +featureGate=CgroupOptions
+	// +optional
+	CgroupOptions *CgroupOptions `json:"cgroupOptions,omitempty" protobuf:"bytes,13,opt,name=cgroupOptions"`
 }
+
+// CgroupOptions defines options for cgroup filesystem access.
+type CgroupOptions struct {
+	// mountMode controls whether the cgroup filesystem is mounted as writable.
+	// Defaults to "ReadOnly" if not specified.
+	// +optional
+	MountMode *CgroupMountMode `json:"mountMode,omitempty" protobuf:"bytes,1,opt,name=mountMode"`
+}
+
+// CgroupMountMode defines the mount mode for cgroup filesystem.
+// +enum
+type CgroupMountMode string
+
+const (
+	// CgroupMountModeReadOnly mounts cgroup filesystem as read-only (default)
+	CgroupMountModeReadOnly CgroupMountMode = "ReadOnly"
+
+	// CgroupMountModeWritable mounts cgroup filesystem as writable,
+	// allowing containers to manage their own cgroup subtree
+	CgroupMountModeWritable CgroupMountMode = "Writable"
+)
 
 // +enum
 type ProcMountType string

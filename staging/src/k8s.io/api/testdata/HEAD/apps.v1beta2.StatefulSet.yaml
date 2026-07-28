@@ -380,6 +380,8 @@ spec:
             - addValue
             drop:
             - dropValue
+          cgroupOptions:
+            mountMode: mountModeValue
           privileged: true
           procMount: procMountValue
           readOnlyRootFilesystem: true
@@ -618,6 +620,8 @@ spec:
             - addValue
             drop:
             - dropValue
+          cgroupOptions:
+            mountMode: mountModeValue
           privileged: true
           procMount: procMountValue
           readOnlyRootFilesystem: true
@@ -862,6 +866,8 @@ spec:
             - addValue
             drop:
             - dropValue
+          cgroupOptions:
+            mountMode: mountModeValue
           privileged: true
           procMount: procMountValue
           readOnlyRootFilesystem: true
