@@ -31,6 +31,17 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
+// TestWantsUnconditionalAuthorizer ensures that the authorizer is injected
+// when the WantsUnconditionalAuthorizer interface is implemented by a plugin.
+func TestWantsUnconditionalAuthorizer(t *testing.T) {
+	target := initializer.New(nil, nil, nil, &TestAuthorizer{}, nil, nil, nil, nil)
+	wantUnconditionalAuthorizerAdmission := &WantUnconditionalAuthorizerAdmission{}
+	target.Initialize(wantUnconditionalAuthorizerAdmission)
+	if wantUnconditionalAuthorizerAdmission.auth == nil {
+		t.Errorf("expected unconditional authorizer to be initialized but found nil")
+	}
+}
+
 // TestWantsAuthorizer ensures that the authorizer is injected
 // when the WantsAuthorizer interface is implemented by a plugin.
 func TestWantsAuthorizer(t *testing.T) {
@@ -113,12 +124,29 @@ func (self *WantExternalKubeClientSet) ValidateInitialization() error      { ret
 var _ admission.Interface = &WantExternalKubeClientSet{}
 var _ initializer.WantsExternalKubeClientSet = &WantExternalKubeClientSet{}
 
-// WantAuthorizerAdmission is a test stub that fulfills the WantsAuthorizer interface.
-type WantAuthorizerAdmission struct {
+// WantUnconditionalAuthorizerAdmission is a test stub that fulfills the WantsUnconditionalAuthorizer interface.
+type WantUnconditionalAuthorizerAdmission struct {
 	auth authorizer.UnconditionalAuthorizer
 }
 
-func (self *WantAuthorizerAdmission) SetUnconditionalAuthorizer(a authorizer.UnconditionalAuthorizer) {
+func (self *WantUnconditionalAuthorizerAdmission) SetUnconditionalAuthorizer(a authorizer.UnconditionalAuthorizer) {
+	self.auth = a
+}
+func (self *WantUnconditionalAuthorizerAdmission) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
+	return nil
+}
+func (self *WantUnconditionalAuthorizerAdmission) Handles(o admission.Operation) bool { return false }
+func (self *WantUnconditionalAuthorizerAdmission) ValidateInitialization() error      { return nil }
+
+var _ admission.Interface = &WantUnconditionalAuthorizerAdmission{}
+var _ initializer.WantsUnconditionalAuthorizer = &WantUnconditionalAuthorizerAdmission{}
+
+// WantAuthorizerAdmission is a test stub that fulfills the WantsAuthorizer interface.
+type WantAuthorizerAdmission struct {
+	auth authorizer.Authorizer
+}
+
+func (self *WantAuthorizerAdmission) SetAuthorizer(a authorizer.Authorizer) {
 	self.auth = a
 }
 func (self *WantAuthorizerAdmission) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
@@ -128,7 +156,7 @@ func (self *WantAuthorizerAdmission) Handles(o admission.Operation) bool { retur
 func (self *WantAuthorizerAdmission) ValidateInitialization() error      { return nil }
 
 var _ admission.Interface = &WantAuthorizerAdmission{}
-var _ initializer.WantsUnconditionalAuthorizer = &WantAuthorizerAdmission{}
+var _ initializer.WantsAuthorizer = &WantAuthorizerAdmission{}
 
 // WantDrainedNotification is a test stub that filfills the WantsDrainedNotification interface.
 type WantDrainedNotification struct {
@@ -147,11 +175,21 @@ func (self *WantDrainedNotification) ValidateInitialization() error      { retur
 var _ admission.Interface = &WantDrainedNotification{}
 var _ initializer.WantsDrainedNotification = &WantDrainedNotification{}
 
-// TestAuthorizer is a test stub that fulfills the WantsAuthorizer interface.
+// TestAuthorizer is a test stub that fulfills the full Authorizer interface.
 type TestAuthorizer struct{}
 
 func (t *TestAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	return authorizer.DecisionNoOpinion, "", nil
+}
+
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (t *TestAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(t.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*TestAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
 func TestRESTMapperAdmissionPlugin(t *testing.T) {

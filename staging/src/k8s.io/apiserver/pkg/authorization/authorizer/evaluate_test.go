@@ -43,11 +43,13 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 	}
 
 	// cnd is a shorthand for a labeled authorizer.GenericCondition. Description is optional.
+	// The id and type are auto-prefixed with "example.com/" to satisfy the domain-prefixed-key
+	// validation performed by ConditionsAwareDecisionConditionsMap.
 	cnd := func(effect conditionEffect, id, condition, typ, description string) effectCondition {
 		return effectCondition{
 			effect: effect,
 			cond: authorizer.GenericCondition{
-				ID: id, Condition: condition, Type: typ, Description: description,
+				ID: "example.com/" + id, Condition: condition, Type: "example.com/" + typ, Description: description,
 			},
 		}
 	}
@@ -74,7 +76,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "d")
 			},
-			want: snapDecision{Kind: "Deny", Reason: `condition "d" denied the request with description "very bad"`},
+			want: snapDecision{Kind: "Deny", Reason: `condition "example.com/d" denied the request with description "very bad"`},
 		},
 		{
 			name: "full builtin evaluation of one ConditionsMap => NoOpinion",
@@ -96,7 +98,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "c")
 			},
-			want: snapDecision{Kind: "Allow", Reason: `condition "c" allowed the request with description "all ok"`},
+			want: snapDecision{Kind: "Allow", Reason: `condition "example.com/c" allowed the request with description "all ok"`},
 		},
 		{
 			// The opaque allow condition cannot be evaluated in-process, so the partial result
@@ -107,7 +109,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				cnd(effectDeny, "d", "d", "transparent", "very bad"),
 			),
 			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
-				if condition.GetType() == "transparent" {
+				if condition.GetType() == "example.com/transparent" {
 					return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "c")
 				}
 				return authorizer.ConditionsEvaluationResultUnevaluatable()
@@ -116,7 +118,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				Kind: "ConditionsMap",
 				CM: &snapCM{
 					Allow: []snapCondition{
-						{ID: "c", Condition: "c", Type: "opaque", Description: "all ok"},
+						{ID: "example.com/c", Condition: "c", Type: "example.com/opaque", Description: "all ok"},
 					},
 				},
 			},
@@ -136,7 +138,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "c")
 			},
-			want: snapDecision{Kind: "Allow", Reason: `1.example.com: {condition "c" allowed the request}`},
+			want: snapDecision{Kind: "Allow", Reason: `1.example.com: {condition "example.com/c" allowed the request}`},
 		},
 		{
 			name: "builtin evaluation of union succeeds => Deny",
@@ -153,7 +155,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 				return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "d")
 			},
-			want: snapDecision{Kind: "Deny", Reason: `1.example.com: {condition "d" denied the request}`},
+			want: snapDecision{Kind: "Deny", Reason: `1.example.com: {condition "example.com/d" denied the request}`},
 		},
 		{
 			// First CM has an opaque allow condition that cannot be simplified, so the union
@@ -171,7 +173,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				),
 			),
 			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
-				if condition.GetType() == "transparent" {
+				if condition.GetType() == "example.com/transparent" {
 					return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "c")
 				}
 				return authorizer.ConditionsEvaluationResultUnevaluatable()
@@ -182,14 +184,14 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 					{
 						Kind: "ConditionsMap",
 						CM: &snapCM{
-							Allow: []snapCondition{{ID: "a", Condition: "a", Type: "opaque"}},
+							Allow: []snapCondition{{ID: "example.com/a", Condition: "a", Type: "example.com/opaque"}},
 						},
 					},
 					{
 						Kind: "ConditionsMap",
 						CM: &snapCM{
-							Deny:  []snapCondition{{ID: "d", Condition: "d", Type: "transparent"}},
-							Allow: []snapCondition{{ID: "c", Condition: "c", Type: "transparent"}},
+							Deny:  []snapCondition{{ID: "example.com/d", Condition: "d", Type: "example.com/transparent"}},
+							Allow: []snapCondition{{ID: "example.com/c", Condition: "c", Type: "example.com/transparent"}},
 						},
 					},
 				},
@@ -212,7 +214,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				authorizer.ConditionsAwareDecisionDeny("something later denies", nil),
 			),
 			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
-				if condition.GetType() == "transparent" {
+				if condition.GetType() == "example.com/transparent" {
 					return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "c")
 				}
 				return authorizer.ConditionsEvaluationResultUnevaluatable()
@@ -224,8 +226,8 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 					{
 						Kind: "ConditionsMap",
 						CM: &snapCM{
-							Deny:  []snapCondition{{ID: "d", Condition: "d", Type: "opaque"}},
-							Allow: []snapCondition{{ID: "c", Condition: "c", Type: "transparent"}},
+							Deny:  []snapCondition{{ID: "example.com/d", Condition: "d", Type: "example.com/opaque"}},
+							Allow: []snapCondition{{ID: "example.com/c", Condition: "c", Type: "example.com/transparent"}},
 						},
 					},
 					{Kind: "Deny", Reason: "something later denies"},
@@ -245,7 +247,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				authorizer.ConditionsAwareDecisionDeny("something later denies", nil),
 			),
 			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
-				if condition.GetType() == "transparent" {
+				if condition.GetType() == "example.com/transparent" {
 					return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "allow-true")
 				}
 				return authorizer.ConditionsEvaluationResultUnevaluatable()
@@ -268,7 +270,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				authorizer.ConditionsAwareDecisionAllow("something later allows", nil),
 			),
 			builtinConditionsEvaluator: func(_ context.Context, condition authorizer.Condition, _ authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
-				if condition.GetType() == "transparent" {
+				if condition.GetType() == "example.com/transparent" {
 					return authorizer.ConditionEvaluationResultBoolean(condition.GetCondition() == "deny-true")
 				}
 				return authorizer.ConditionsEvaluationResultUnevaluatable()
@@ -286,7 +288,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 					effectCondition{
 						effect: effectDeny,
 						cond: authorizer.GenericCondition{
-							ID: "foo",
+							ID: "example.com/foo",
 							EvaluateFunc: func(ctx context.Context, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 								return authorizer.ConditionEvaluationResultBoolean(true)
 							},
@@ -300,7 +302,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 				),
 				authorizer.ConditionsAwareDecisionDeny("something later denies", nil),
 			),
-			want: snapDecision{Kind: "Deny", Reason: `0.example.com: {condition "foo" denied the request}`},
+			want: snapDecision{Kind: "Deny", Reason: `0.example.com: {condition "example.com/foo" denied the request}`},
 		},
 		{
 			name: "evaluateConditionFn can be nil, and refinement can still happen",
@@ -310,7 +312,7 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 					effectCondition{
 						effect: effectDeny,
 						cond: authorizer.GenericCondition{
-							ID: "foo",
+							ID: "example.com/foo",
 							EvaluateFunc: func(ctx context.Context, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 								return authorizer.ConditionEvaluationResultBoolean(false)
 							},
@@ -330,14 +332,14 @@ func TestPartiallyEvaluateConditionsAwareDecision(t *testing.T) {
 					{
 						Kind: "ConditionsMap",
 						CM: &snapCM{
-							Allow: []snapCondition{{ID: "c", Condition: "c", Type: "transparent"}},
+							Allow: []snapCondition{{ID: "example.com/c", Condition: "c", Type: "example.com/transparent"}},
 						},
 					},
 					{
 						Kind: "ConditionsMap",
 						CM: &snapCM{
-							Deny:  []snapCondition{{ID: "d", Condition: "d", Type: "opaque"}},
-							Allow: []snapCondition{{ID: "c", Condition: "c", Type: "transparent"}},
+							Deny:  []snapCondition{{ID: "example.com/d", Condition: "d", Type: "example.com/opaque"}},
+							Allow: []snapCondition{{ID: "example.com/c", Condition: "c", Type: "example.com/transparent"}},
 						},
 					},
 					{Kind: "Deny", Reason: "something later denies"},
