@@ -713,11 +713,7 @@ func (r ctxAwareRunner) RunInContainer(ctx context.Context, id kubecontainer.Con
 // must keep executing through termination so a failing probe can mark the pod
 // NotReady. Regression test for https://github.com/kubernetes/kubernetes/issues/140881.
 func TestProbeWorkersSurviveSyncContextCancellation(t *testing.T) {
-	ktesting.Init(t).SyncTest("", testProbeWorkersSurviveSyncContextCancellation)
-}
-
-func testProbeWorkersSurviveSyncContextCancellation(tCtx ktesting.TContext) {
-	t := tCtx.TB()
+	tCtx := ktesting.Init(t)
 	logger := tCtx.Logger()
 	testPod := getTestPod()
 	setTestProbe(testPod, readiness, v1.Probe{})
