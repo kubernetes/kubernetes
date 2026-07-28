@@ -123,9 +123,15 @@ func validate(ctx context.Context, raw string) error {
 	}
 	log.Printf("OK: Constructed OIDC provider for issuer %v", unsafeClaims.Issuer)
 
+	// IMPORTANT: The algorithms listed below must be kept in sync with:
+	// - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
+	// - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
+	// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+	// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
+
 	validTok, err := iss.Verifier(&oidc.Config{
 		ClientID:             audience,
-		SupportedSigningAlgs: []string{oidc.RS256, oidc.ES256},
+		SupportedSigningAlgs: []string{oidc.RS256, oidc.ES256, oidc.ES384, oidc.ES512},
 	}).Verify(ctx, raw)
 	if err != nil {
 		return err
