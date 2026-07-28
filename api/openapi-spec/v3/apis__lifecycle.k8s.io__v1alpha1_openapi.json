@@ -646,8 +646,7 @@
           "type",
           "status",
           "lastTransitionTime",
-          "reason",
-          "message"
+          "reason"
         ],
         "type": "object"
       },

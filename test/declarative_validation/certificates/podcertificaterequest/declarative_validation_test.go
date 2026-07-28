@@ -303,7 +303,7 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 						),
 					},
 					ExpectedErrs: field.ErrorList{
-						field.TooLong(field.NewPath("status", "conditions").Index(0).Child("message"), "", 1024).WithOrigin("maxBytes").MarkAlpha(),
+						field.TooLong(field.NewPath("status", "conditions").Index(0).Child("message"), "", 32769).WithOrigin("maxBytes").MarkAlpha(),
 					},
 				},
 				{

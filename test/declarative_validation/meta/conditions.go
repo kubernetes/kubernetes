@@ -242,21 +242,35 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 			},
 		},
 		{
+			Name: "valid message at max length",
+			Conditions: []metav1.Condition{
+				MkCondition(TweakMessage(strings.Repeat("a", 32768))),
+			},
+			ExpectedErrs: nil,
+		},
+		{
+			Name: "valid non ascii characters message at max length",
+			Conditions: []metav1.Condition{
+				MkCondition(TweakMessage(strings.Repeat("आ", 10922) + "aa")),
+			},
+			ExpectedErrs: nil,
+		},
+		{
 			Name: "invalid message",
 			Conditions: []metav1.Condition{
 				MkCondition(TweakMessage(strings.Repeat("a", 32769))),
 			},
 			ExpectedErrs: field.ErrorList{
-				field.TooLongCharacters(fldPath.Index(0).Child("message"), "", 1024).WithOrigin("maxBytes").MarkAlpha(),
+				field.TooLong(fldPath.Index(0).Child("message"), "", 32768).WithOrigin("maxBytes").MarkAlpha(),
 			},
 		},
 		{
 			Name: "invalid non ascii characters message",
 			Conditions: []metav1.Condition{
-				MkCondition(TweakMessage(strings.Repeat("आ", 32769))),
+				MkCondition(TweakMessage(strings.Repeat("आ", 10923))),
 			},
 			ExpectedErrs: field.ErrorList{
-				field.TooLongCharacters(fldPath.Index(0).Child("message"), "", 1024).WithOrigin("maxBytes").MarkAlpha(),
+				field.TooLong(fldPath.Index(0).Child("message"), "", 32768).WithOrigin("maxBytes").MarkAlpha(),
 			},
 		},
 	}
