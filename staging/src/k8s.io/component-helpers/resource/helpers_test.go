@@ -970,6 +970,7 @@ func TestPodResourceLimits(t *testing.T) {
 		description           string
 		options               PodResourcesOptions
 		overhead              v1.ResourceList
+		podLevelResources     *v1.ResourceRequirements
 		initContainers        []v1.Container
 		initContainerStatuses []v1.ContainerStatus
 		containers            []v1.Container
@@ -1546,6 +1547,86 @@ func TestPodResourceLimits(t *testing.T) {
 				},
 			},
 		},
+		{
+			description: "OmitPartialLimits unset, cpu limit missing on one container",
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			// partial sum is returned.
+			expectedLimits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+		},
+		{
+			description: "OmitPartialLimits set, cpu limit missing on one container",
+			options:     PodResourcesOptions{OmitPartialLimits: true},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			description: "OmitPartialLimits drops only the resource that is missing",
+			options:     PodResourcesOptions{OmitPartialLimits: true},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				}}},
+			},
+			expectedLimits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+		},
+		{
+			description: "OmitPartialLimits, init container missing the limit",
+			options:     PodResourcesOptions{OmitPartialLimits: true},
+			initContainers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}},
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			description: "OmitPartialLimits, ephemeral-storage missing on one container",
+			options:     PodResourcesOptions{OmitPartialLimits: true},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			description: "OmitPartialLimits keeps hugepages, where an unset limit means zero",
+			options:     PodResourcesOptions{OmitPartialLimits: true},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")},
+		},
+		{
+			description: "OmitPartialLimits keeps extended resources, where an unset limit means zero",
+			options:     PodResourcesOptions{OmitPartialLimits: true},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{"example.com/gpu": resource.MustParse("1")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{"example.com/gpu": resource.MustParse("1")},
+		},
+		{
+			description:       "OmitPartialLimits, pod-level limit covers the container that omits one",
+			options:           PodResourcesOptions{OmitPartialLimits: true},
+			podLevelResources: &v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")}},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
@@ -1554,6 +1635,7 @@ func TestPodResourceLimits(t *testing.T) {
 					Containers:     tc.containers,
 					InitContainers: tc.initContainers,
 					Overhead:       tc.overhead,
+					Resources:      tc.podLevelResources,
 				},
 				Status: v1.PodStatus{
 					ContainerStatuses:     tc.containerStatuses,

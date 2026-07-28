@@ -62,6 +62,13 @@ type PodResourcesOptions struct {
 	SkipContainerLevelResources bool
 	// Use node allocatable resource claim information from pod status to compute the effective pod resource request.
 	UseDRANodeAllocatableResourceClaimStatus bool
+	// OmitPartialLimits controls whether PodLimits() drops a limit when it is unset for any
+	// container and also not set at the pod level, instead of counting the unset limits as 0.
+	//
+	// This applies to cpu, memory and ephemeral-storage, where the kubelet treats
+	// container and the pod limits as unlimited when unset in the spec. It does not apply
+	// to hugepages or extended resources, where an unset limit means zero.
+	OmitPartialLimits bool
 }
 
 var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
@@ -396,6 +403,20 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 		applyPodLevelResources(limits, effectiveLims)
 	}
 
+	// When a container does not set a limit for cpu, memory or ephemeral-storage, it is treated
+	// as unlimited and not as zero, for both the container and the pod. Exclude those here
+	// rather than returning a partial sum.
+	if opts.OmitPartialLimits {
+		for name := range limits {
+			switch name {
+			case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage:
+				if !podDeclaresLimit(pod, name, opts) {
+					delete(limits, name)
+				}
+			}
+		}
+	}
+
 	// Add overhead to non-zero limits if requested:
 	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
 		for name, quantity := range pod.Spec.Overhead {
@@ -407,6 +428,31 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	}
 
 	return limits
+}
+
+// podDeclaresLimit reports whether a limit for resourceName is set at the pod level or by
+// every container in the pod, init containers included.
+func podDeclaresLimit(pod *v1.Pod, resourceName v1.ResourceName, opts PodResourcesOptions) bool {
+	// A pod-level limit bounds the whole pod, so it makes the limit well defined even when
+	// individual containers omit their own.
+	if !opts.SkipPodLevelResources && IsPodLevelResourcesSet(pod) {
+		if limit, found := pod.Spec.Resources.Limits[resourceName]; found && !limit.IsZero() {
+			return true
+		}
+	}
+
+	for i := range pod.Spec.InitContainers {
+		if limit, found := pod.Spec.InitContainers[i].Resources.Limits[resourceName]; !found || limit.IsZero() {
+			return false
+		}
+	}
+	for i := range pod.Spec.Containers {
+		if limit, found := pod.Spec.Containers[i].Resources.Limits[resourceName]; !found || limit.IsZero() {
+			return false
+		}
+	}
+
+	return true
 }
 
 // AggregateContainerLimits computes the aggregated resource limits of all the containers
