@@ -26,8 +26,8 @@ async function isCdkTeamMember(githubToken: string, username: string): Promise<b
     `https://api.github.com/orgs/${CDK_ORG}/teams/${CDK_TEAM}/memberships/${username}`,
     {
       headers: {
-        'Authorization': `token ${githubToken}`,
-        'Accept': 'application/vnd.github.v3+json',
+        Authorization: `token ${githubToken}`,
+        Accept: 'application/vnd.github.v3+json',
       },
     },
   );
@@ -78,8 +78,8 @@ export async function shouldRunIntegTests(props: {
   // Fetch reviews to check for CDK team approval
   const reviewsResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/reviews`, {
     headers: {
-      'Authorization': `token ${githubToken}`,
-      'Accept': 'application/vnd.github.v3+json',
+      Authorization: `token ${githubToken}`,
+      Accept: 'application/vnd.github.v3+json',
     },
   });
 

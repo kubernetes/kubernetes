@@ -1,5 +1,5 @@
-import { main } from '../lib/main';
 import * as integRunner from '../lib/integration-test-runner';
+import { main } from '../lib/main';
 import * as preflight from '../lib/preflight';
 
 describe('main function', () => {
