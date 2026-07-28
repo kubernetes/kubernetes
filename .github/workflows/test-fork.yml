@@ -1,0 +1,22 @@
+name: Fork targeted tests
+on:
+  push:
+    branches: [tdd/nestedpendingops-wait-leak]
+    paths:
+      - ".github/workflows/test-fork.yml"
+      - "pkg/util/goroutinemap/nestedpendingoperations/**"
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Run targeted tests (with 2m timeout)
+        run: |
+          set -e
+          go env
+          go test -v -count=1 -timeout=2m ./pkg/util/goroutinemap/nestedpendingoperations
