@@ -53,6 +53,8 @@ type Controller struct {
 	clock      clock.PassiveClock
 	signerName string
 
+	clusterDNSDomain string
+
 	kc          kubernetes.Interface
 	pcrInformer cache.SharedIndexInformer
 	pcrQueue    workqueue.TypedRateLimitingInterface[string]
@@ -62,7 +64,7 @@ type Controller struct {
 }
 
 // New creates a new Controller.
-func New(clock clock.PassiveClock, signerName string, caKeys []crypto.PrivateKey, caCerts [][]byte, kc kubernetes.Interface) *Controller {
+func New(clock clock.PassiveClock, signerName, clusterDNSDomain string, caKeys []crypto.PrivateKey, caCerts [][]byte, kc kubernetes.Interface) *Controller {
 	pcrInformer := certinformersv1.NewFilteredPodCertificateRequestInformer(kc, metav1.NamespaceAll, 24*time.Hour, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		func(opts *metav1.ListOptions) {
 			opts.FieldSelector = fields.OneTermEqualSelector("spec.signerName", signerName).String()
@@ -70,14 +72,15 @@ func New(clock clock.PassiveClock, signerName string, caKeys []crypto.PrivateKey
 	)
 
 	sc := &Controller{
-		clock:       clock,
-		signerName:  signerName,
-		kc:          kc,
-		pcrInformer: pcrInformer,
-		pcrQueue:    workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
-		pcrLister:   certlistersv1.NewPodCertificateRequestLister(pcrInformer.GetIndexer()),
-		caKeys:      caKeys,
-		caCerts:     caCerts,
+		clock:            clock,
+		signerName:       signerName,
+		clusterDNSDomain: clusterDNSDomain,
+		kc:               kc,
+		pcrInformer:      pcrInformer,
+		pcrQueue:         workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+		pcrLister:        certlistersv1.NewPodCertificateRequestLister(pcrInformer.GetIndexer()),
+		caKeys:           caKeys,
+		caCerts:          caCerts,
 	}
 
 	sc.pcrInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -261,6 +264,9 @@ func (c *Controller) handlePCR(ctx context.Context, pcr *certsv1.PodCertificateR
 	// Construct DNS names
 	dnsNames := []string{
 		fmt.Sprintf("server.%s.svc", pcr.ObjectMeta.Namespace),
+	}
+	if c.clusterDNSDomain != "" {
+		dnsNames = append(dnsNames, fmt.Sprintf("server.%s.svc.%s", pcr.ObjectMeta.Namespace, c.clusterDNSDomain))
 	}
 	template := &x509.Certificate{
 		URIs:        []*url.URL{spiffeURI},
