@@ -25,6 +25,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,6 +54,19 @@ const (
 	probeTestInitialDelaySeconds = 15
 
 	defaultObservationTimeout = time.Minute * 4
+
+	// Twice terminationProbeUnreadyTimeout, so the container is still running
+	// when the assertion completes.
+	terminationProbeGracePeriodSeconds = 60
+
+	// Slack over the ~2s the kubelet needs at periodSeconds=1, for slow CI.
+	terminationProbeUnreadyTimeout = 30 * time.Second
+
+	// The 1s default is aggressive on a loaded node, and the kubelet discards
+	// errored (timed out) probe results rather than failing the container.
+	terminationProbeTimeoutSeconds = 5
+
+	terminationProbeContainerName = "probe-target"
 )
 
 var _ = SIGDescribe("Probing container", func() {
@@ -777,69 +791,27 @@ var _ = SIGDescribe("Probing container", func() {
 		})
 
 	f.It("should mark readiness on pods to false while pod is in progress of terminating when a pod has a readiness probe", f.WithNodeConformance(), func(ctx context.Context) {
-		podName := "probe-test-" + string(uuid.NewUUID())
-		podClient := e2epod.NewPodClient(f)
-		terminationGracePeriod := int64(30)
+		// Trapping TERM without exiting keeps the container alive until the
+		// kubelet SIGKILLs it, so the probe still has a live target.
 		script := `
 _term() {
 	rm -f /tmp/ready
-	sleep 30
-	exit 0
 }
-trap _term SIGTERM
+trap _term TERM
 
 touch /tmp/ready
 
+# Short sleeps: the shell runs the handler only once the current foreground
+# command returns.
 while true; do
-  echo \"hello\"
-  sleep 10
+	sleep 1
 done
-			`
+`
+		container := terminationProbeContainer(execHandler([]string{"cat", "/tmp/ready"}))
+		container.Command = []string{"/bin/bash"}
+		container.Args = []string{"-c", script}
 
-		// Create Pod
-		podClient.Create(ctx, &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: podName,
-			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
-						Name:    podName,
-						Command: []string{"/bin/bash"},
-						Args:    []string{"-c", script},
-						ReadinessProbe: &v1.Probe{
-							ProbeHandler: v1.ProbeHandler{
-								Exec: &v1.ExecAction{
-									Command: []string{"cat", "/tmp/ready"},
-								},
-							},
-							FailureThreshold:    1,
-							InitialDelaySeconds: 5,
-							PeriodSeconds:       2,
-						},
-					},
-				},
-				TerminationGracePeriodSeconds: &terminationGracePeriod,
-			},
-		})
-
-		// verify pods are running and ready
-		err := e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, f.Timeouts.PodStart)
-		framework.ExpectNoError(err)
-
-		// Shutdown pod. Readiness should change to false
-		err = podClient.Delete(ctx, podName, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
-
-		err = waitForPodStatusByInformer(ctx, f.ClientSet, f.Namespace.Name, podName, f.Timeouts.PodDelete, func(pod *v1.Pod) (bool, error) {
-			if !podutil.IsPodReady(pod) {
-				return true, nil
-			}
-			framework.Logf("pod %s/%s is still ready, waiting until is not ready", pod.Namespace, pod.Name)
-			return false, nil
-		})
-		framework.ExpectNoError(err)
+		runTerminationReadinessTest(ctx, f, podClient, container)
 	})
 
 	f.It("should mark readiness on pods to false and disable liveness probes while pod is in progress of terminating", f.WithNodeConformance(), func(ctx context.Context) {
@@ -941,7 +913,134 @@ done
 			return false, nil
 		}, 1*time.Minute, framework.Poll).ShouldNot(gomega.BeTrueBecause("should not see liveness probes"))
 	})
+
+	f.It("should mark readiness on pods to false while pod is in progress of terminating when a pod has an http readiness probe", f.WithNodeConformance(), func(ctx context.Context) {
+		// Same behavior expected for httpGet as for exec. netexec answers
+		// /readyz with 503 on SIGTERM; --delay-shutdown keeps it serving.
+		container := terminationProbeContainer(httpGetHandler("/readyz", 8080))
+		container.Args = []string{"netexec", "--http-port=8080",
+			fmt.Sprintf("--delay-shutdown=%d", terminationProbeGracePeriodSeconds)}
+
+		runTerminationReadinessTest(ctx, f, podClient, container)
+	})
+
+	f.It("should mark readiness on pods to false while a preStop hook fails the readiness probe during termination", f.WithNodeConformance(), func(ctx context.Context) {
+		// Only the preStop hook fails readiness here, the documented way to
+		// drain a pod before its containers are signaled. The container itself
+		// never stops passing its probe.
+		script := `
+touch /tmp/ready
+
+while true; do
+	sleep 1
+done
+`
+		container := terminationProbeContainer(execHandler([]string{"cat", "/tmp/ready"}))
+		container.Command = []string{"/bin/bash"}
+		container.Args = []string{"-c", script}
+		container.Lifecycle = &v1.Lifecycle{
+			PreStop: &v1.LifecycleHandler{
+				// Blocking holds off SIGTERM. The kubelet caps this at the
+				// grace period.
+				Exec: &v1.ExecAction{
+					Command: []string{"/bin/bash", "-c", fmt.Sprintf("rm -f /tmp/ready; sleep %d", terminationProbeGracePeriodSeconds)},
+				},
+			},
+		}
+
+		runTerminationReadinessTest(ctx, f, podClient, container)
+	})
 })
+
+// terminationProbeContainer returns an agnhost container with a readiness probe
+// tuned to react within a couple of seconds, so the assertion window can stay
+// short. Callers set Command, Args and Lifecycle.
+func terminationProbeContainer(handler v1.ProbeHandler) v1.Container {
+	container := e2epod.NewAgnhostContainer(terminationProbeContainerName, nil, nil)
+	container.ReadinessProbe = &v1.Probe{
+		ProbeHandler:        handler,
+		FailureThreshold:    1,
+		InitialDelaySeconds: 5,
+		PeriodSeconds:       1,
+		TimeoutSeconds:      terminationProbeTimeoutSeconds,
+	}
+	return container
+}
+
+// runTerminationReadinessTest waits for a single-container pod to be Ready,
+// deletes it, and asserts it goes NotReady while the container is still running.
+func runTerminationReadinessTest(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, container v1.Container) {
+	podName := "probe-test-" + string(uuid.NewUUID())
+	gracePeriod := int64(terminationProbeGracePeriodSeconds)
+
+	podClient.Create(ctx, &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Containers:                    []v1.Container{container},
+			TerminationGracePeriodSeconds: &gracePeriod,
+		},
+	})
+	ginkgo.DeferCleanup(deletePodImmediately, podClient, podName)
+
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, podName, f.Namespace.Name, f.Timeouts.PodStart))
+	framework.ExpectNoError(podClient.Delete(ctx, podName, metav1.DeleteOptions{}))
+
+	waitForTerminatingPodNotReady(ctx, podClient, podName, container.Name, terminationProbeUnreadyTimeout)
+}
+
+// waitForTerminatingPodNotReady waits for the pod to go NotReady while it is
+// still terminating and containerName is still running.
+//
+// Both conditions matter, see https://issue.k8s.io/140978. EndpointSlice
+// membership is no substitute: the deletionTimestamp withdraws the endpoint
+// regardless of readiness. And once the container stops, the pod goes NotReady
+// with or without a working probe.
+func waitForTerminatingPodNotReady(ctx context.Context, podClient *e2epod.PodClient, podName, containerName string, timeout time.Duration) {
+	ginkgo.By(fmt.Sprintf("waiting up to %v for terminating pod %q to report NotReady", timeout, podName))
+	gomega.Eventually(ctx, func(ctx context.Context) error {
+		pod, err := podClient.Get(ctx, podName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return gomega.StopTrying(fmt.Sprintf("pod %q was removed before it was observed NotReady", podName)).Wrap(err)
+		}
+		if err != nil {
+			return err
+		}
+		if pod.DeletionTimestamp == nil {
+			return fmt.Errorf("pod %s/%s is not terminating yet", pod.Namespace, pod.Name)
+		}
+		status, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, containerName)
+		if !ok {
+			return fmt.Errorf("pod %s/%s has no status for container %q yet", pod.Namespace, pod.Name, containerName)
+		}
+		if status.State.Running == nil {
+			return gomega.StopTrying(fmt.Sprintf("container %q stopped first, so this proves nothing about probing", containerName)).
+				Wrap(fmt.Errorf("state: %+v", status.State))
+		}
+		// The prober sets container readiness; the pod condition is derived
+		// from it. Assert both, so a broken derivation is not mistaken for a
+		// broken probe.
+		if status.Ready {
+			return fmt.Errorf("container %q of terminating pod %s/%s is still Ready", containerName, pod.Namespace, pod.Name)
+		}
+		if podutil.IsPodReady(pod) {
+			return fmt.Errorf("terminating pod %s/%s is still Ready", pod.Namespace, pod.Name)
+		}
+		framework.Logf("terminating pod %s/%s is NotReady while container %q is still running", pod.Namespace, pod.Name, containerName)
+		return nil
+	}).WithTimeout(timeout).WithPolling(time.Second).Should(gomega.Succeed())
+}
+
+// deletePodImmediately keeps namespace teardown from blocking on a container
+// that intentionally outlives SIGTERM. NotFound: the spec already deleted it.
+func deletePodImmediately(ctx context.Context, podClient *e2epod.PodClient, podName string) error {
+	err := podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(0))
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
+}
 
 var _ = SIGDescribe(framework.WithNodeConformance(), "Probing restartable init container", func() {
 	f := framework.NewDefaultFramework("container-probe")
