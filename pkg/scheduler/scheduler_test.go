@@ -461,8 +461,8 @@ func TestWithPercentageOfNodesToScore(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create scheduler: %v", err)
 			}
-			if sched.percentageOfNodesToScore != tt.wantedPercentageOfNodesToScore {
-				t.Errorf("scheduler.percercentageOfNodesToScore = %v, want %v", sched.percentageOfNodesToScore, tt.wantedPercentageOfNodesToScore)
+			if sched.alg().percentageOfNodesToScore != tt.wantedPercentageOfNodesToScore {
+				t.Errorf("scheduler.percentageOfNodesToScore = %v, want %v", sched.alg().percentageOfNodesToScore, tt.wantedPercentageOfNodesToScore)
 			}
 		})
 	}

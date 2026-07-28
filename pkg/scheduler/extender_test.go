@@ -29,7 +29,6 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -344,17 +343,17 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				runtime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				runtime.WithLogger(logger),
 				runtime.WithSnapshotSharedLister(emptySnapshot),
+				runtime.WithExtenders(extenders),
 			)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			sched := &Scheduler{
-				Cache:                    cache,
-				nodeInfoSnapshot:         emptySnapshot,
-				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
-				Extenders:                extenders,
-				logger:                   logger,
+				Cache:            cache,
+				nodeInfoSnapshot: emptySnapshot,
+				Extenders:        extenders,
+				logger:           logger,
 			}
 			sched.applyDefaultHandlers()
 
