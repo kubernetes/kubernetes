@@ -1688,9 +1688,7 @@ type Condition struct {
 	Reason string `json:"reason" protobuf:"bytes,5,opt,name=reason"`
 	// message is a human readable message indicating details about the transition.
 	// This may be an empty string.
-	// +required
 	// +default=""
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32768
 	// +k8s:alpha(since: "1.37")=+k8s:optional
 	// +k8s:alpha(since: "1.37")=+k8s:maxBytes=32768
