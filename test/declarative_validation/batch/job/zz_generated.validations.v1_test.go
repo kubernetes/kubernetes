@@ -135,6 +135,9 @@ func init() {
 			"spec.template.spec.containers": {
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.template.spec.containers[*].securityContext.cgroupOptions.mountMode": {
+				{ErrorType: "FieldValueNotSupported"},
+			},
 			"spec.template.spec.containers[*].securityContext.seccompProfile.oci": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 			},
@@ -185,6 +188,9 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.template.spec.initContainers[*].securityContext.cgroupOptions.mountMode": {
+				{ErrorType: "FieldValueNotSupported"},
 			},
 			"spec.template.spec.initContainers[*].securityContext.seccompProfile.oci": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
