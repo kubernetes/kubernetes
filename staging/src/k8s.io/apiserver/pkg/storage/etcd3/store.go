@@ -175,6 +175,9 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 		groupResource: groupResource,
 		versioner:     versioner,
 		transformer:   transformer,
+		// Snapshot the testing-only panic-on-decode-error setting so that watch goroutines
+		// belonging to this store are not affected by later changes to the global.
+		fatalOnDecodeError: fatalOnDecodeError.Load(),
 	}
 	if newFunc == nil {
 		w.objectType = "<unknown>"
