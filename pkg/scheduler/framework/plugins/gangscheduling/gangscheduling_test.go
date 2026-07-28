@@ -1070,7 +1070,7 @@ func TestPlacementFeasible(t *testing.T) {
 					pl.snapshotLister = mockLister
 
 					cycleState := schedulerframework.NewCycleState()
-					cycleState.SetPodGroupSchedulingCycle(cycleState)
+					cycleState.SetPodGroupCycleState(cycleState)
 
 					scheduled := tc.initialScheduledCount
 					for i, code := range tc.podStatuses {
