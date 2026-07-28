@@ -440,7 +440,11 @@ func TestValidateEvictionStatusUpdate(t *testing.T) {
 		},
 		// Full Eviction progression/lifecycle
 		"mark active and started": {
+<<<<<<< HEAD
 			oldInput: mkValidEvictionStatus(0),
+=======
+			oldInput: mkValidEvictionStatus(2, setRespondersStartTime(clockBefore(time.Second), 0, 1)),
+>>>>>>> 852a18aa035 (test: make eviction status timestamps deterministic)
 			input: mkValidEvictionStatus(2,
 				setStateFor(lifecycle.ResponderStateActive, 0),
 				setRespondersStartTime(clock, 0, 1)),
