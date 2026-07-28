@@ -25,7 +25,7 @@ spec:
       # data from a previous execution, that data will always be used.
       initContainers:
       - name: bootstrap
-        image: cockroachdb/cockroach-k8s-init:0.1
+        image: cockroachdb/cockroach-k8s-init:0.2
         imagePullPolicy: IfNotPresent
         args:
         - "-on-start=/on-start.sh"
@@ -52,7 +52,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
       - name: cockroachdb
-        image: cockroachdb/cockroach:v1.0
+        image: cockroachdb/cockroach:latest-v24.1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 26257
