@@ -833,6 +833,9 @@
             "appArmorProfile": {
               "type": "typeValue",
               "localhostProfile": "localhostProfileValue"
+            },
+            "cgroupOptions": {
+              "mountMode": "mountModeValue"
             }
           },
           "stdin": true,
@@ -1165,6 +1168,9 @@
             "appArmorProfile": {
               "type": "typeValue",
               "localhostProfile": "localhostProfileValue"
+            },
+            "cgroupOptions": {
+              "mountMode": "mountModeValue"
             }
           },
           "stdin": true,
@@ -1497,6 +1503,9 @@
             "appArmorProfile": {
               "type": "typeValue",
               "localhostProfile": "localhostProfileValue"
+            },
+            "cgroupOptions": {
+              "mountMode": "mountModeValue"
             }
           },
           "stdin": true,
