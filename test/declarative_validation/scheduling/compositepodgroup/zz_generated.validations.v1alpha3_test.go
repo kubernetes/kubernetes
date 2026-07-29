@@ -94,7 +94,6 @@ func init() {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"spec.schedulingPolicy": {
-				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 			},
 			"spec.schedulingPolicy.basic": {
