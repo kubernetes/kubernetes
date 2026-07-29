@@ -103,6 +103,17 @@ export interface CapacityProviderProps {
   readonly kmsKey?: kms.IKey;
 
   /**
+   * Configuration for tag propagation to managed resources (EC2 instances, ENIs, EBS volumes).
+   *
+   * Use the static factory methods on `PropagateTags` to create:
+   * - `PropagateTags.none()` - Explicitly disable tag propagation
+   * - `PropagateTags.explicit(tags)` - Propagate specified tags
+   *
+   * @default - No tag propagation; tags are not propagated to managed resources.
+   */
+  readonly propagateTags?: PropagateTags;
+
+  /**
    * The CloudWatch log group for capacity provider system logs.
    *
    * @default - Service creates a default log group at /aws/lambda/capacity-provider/<name>
@@ -115,6 +126,47 @@ export interface CapacityProviderProps {
    * @default - Service default applies (INFO)
    */
   readonly systemLogLevel?: SystemLogLevel;
+}
+
+/**
+ * Configuration for propagating tags to managed resources created by a capacity provider.
+ *
+ * Use static factory methods to create instances:
+ * ```
+ * propagateTags: lambda.PropagateTags.explicit({ env: 'prod', team: 'platform' })
+ * ```
+ */
+export class PropagateTags {
+  /**
+   * No tag propagation to managed resources.
+   */
+  public static none(): PropagateTags {
+    return new PropagateTags('None');
+  }
+
+  /**
+   * Propagate the specified tags to all managed resources.
+   *
+   * @param tags A map of tag keys to values to propagate. Maximum 40 tags.
+   */
+  public static explicit(tags: { [key: string]: string }): PropagateTags {
+    return new PropagateTags('Explicit', tags);
+  }
+
+  /**
+   * The propagation mode.
+   */
+  public readonly mode: string;
+
+  /**
+   * The explicit tags to propagate (only for Explicit mode).
+   */
+  public readonly explicitTags?: { [key: string]: string };
+
+  private constructor(mode: string, explicitTags?: { [key: string]: string }) {
+    this.mode = mode;
+    this.explicitTags = explicitTags;
+  }
 }
 
 /**
@@ -471,6 +523,12 @@ export class CapacityProvider extends CapacityProviderBase {
       instanceRequirements,
       capacityProviderScalingConfig,
       kmsKeyArn: props.kmsKey?.keyArn,
+      propagateTags: props.propagateTags ? {
+        mode: props.propagateTags.mode,
+        explicitTags: props.propagateTags.explicitTags
+          ? Object.entries(props.propagateTags.explicitTags).map(([key, value]) => ({ key, value }))
+          : undefined,
+      } : undefined,
       telemetryConfig: props.logGroup || props.systemLogLevel ? {
         loggingConfig: {
           logGroup: props.logGroup?.logGroupRef.logGroupName,
@@ -505,6 +563,16 @@ export class CapacityProvider extends CapacityProviderBase {
 
     if (props.scalingOptions) {
       this.validateScalingPolicies(props.scalingOptions, validationErrorCPName);
+    }
+
+    if (props.propagateTags?.explicitTags && !Token.isUnresolved(props.propagateTags.explicitTags)
+      && Object.keys(props.propagateTags.explicitTags).length > 40) {
+      const tagCount = Object.keys(props.propagateTags.explicitTags).length;
+      throw new ValidationError(
+        lit`PropagateTagsExplicitTagsMaximum`,
+        `propagateTags explicit tags can have at most 40 tags, but ${validationErrorCPName} has ${tagCount}.`,
+        this,
+      );
     }
   }
 

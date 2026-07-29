@@ -1,0 +1,34 @@
+{
+  "version": "54.0.0",
+  "files": {
+    "bea78ce725e22a5e0d82378f6b49028c09ba86499286d6945a0506e820854e92": {
+      "displayName": "CapacityProviderPropagateTagsStack/Custom::VpcRestrictDefaultSGCustomResourceProvider Code",
+      "source": {
+        "path": "asset.bea78ce725e22a5e0d82378f6b49028c09ba86499286d6945a0506e820854e92",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "current_account-current_region-fea3f0e7": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "bea78ce725e22a5e0d82378f6b49028c09ba86499286d6945a0506e820854e92.zip",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    },
+    "3845631f94f1e62b21fbffcea920a0ea8b17a1193adc95154c82770860247387": {
+      "displayName": "CapacityProviderPropagateTagsStack Template",
+      "source": {
+        "path": "CapacityProviderPropagateTagsStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-a139dd8b": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "3845631f94f1e62b21fbffcea920a0ea8b17a1193adc95154c82770860247387.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

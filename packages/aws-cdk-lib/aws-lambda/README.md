@@ -828,6 +828,28 @@ const capacityProvider = new lambda.CapacityProvider(this, 'MyCapacityProvider',
 });
 ```
 
+### Tag Propagation
+
+You can propagate explicit tags to managed resources (EC2 instances, ENIs, EBS volumes) launched by the capacity provider:
+
+```ts
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
+
+const vpc = new ec2.Vpc(this, 'MyVpc');
+const securityGroup = new ec2.SecurityGroup(this, 'SecurityGroup', { vpc });
+
+const capacityProvider = new lambda.CapacityProvider(this, 'MyCapacityProvider', {
+  subnets: vpc.privateSubnets,
+  securityGroups: [securityGroup],
+  propagateTags: lambda.PropagateTags.explicit({
+    CostCenter: 'Engineering',
+    Project: 'MyProject',
+  }),
+});
+```
+
+Use `PropagateTags.none()` to explicitly disable propagation, or omit the prop entirely (defaults to no propagation). Up to 40 tags can be specified with `PropagateTags.explicit()`.
+
 ### Using a Capacity Provider with Lambda Functions
 
 Once you have a capacity provider, you can configure Lambda functions to use it:

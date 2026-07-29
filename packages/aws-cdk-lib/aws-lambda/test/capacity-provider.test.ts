@@ -668,6 +668,78 @@ describe('capacity provider', () => {
     });
   });
 
+  describe('propagateTags', () => {
+    test('renders PropagateTags with Mode Explicit when PropagateTags.explicit() used', () => {
+      // WHEN
+      new lambda.CapacityProvider(stack, 'MyCapacityProvider', {
+        subnets,
+        securityGroups: [securityGroup],
+        propagateTags: lambda.PropagateTags.explicit({
+          env: 'prod',
+          team: 'platform',
+        }),
+      });
+
+      // THEN
+      Template.fromStack(stack).hasResourceProperties('AWS::Lambda::CapacityProvider', {
+        PropagateTags: {
+          Mode: 'Explicit',
+          ExplicitTags: [
+            { Key: 'env', Value: 'prod' },
+            { Key: 'team', Value: 'platform' },
+          ],
+        },
+      });
+    });
+
+    test('renders PropagateTags with Mode None when PropagateTags.none() used', () => {
+      // WHEN
+      new lambda.CapacityProvider(stack, 'MyCapacityProvider', {
+        subnets,
+        securityGroups: [securityGroup],
+        propagateTags: lambda.PropagateTags.none(),
+      });
+
+      // THEN
+      Template.fromStack(stack).hasResourceProperties('AWS::Lambda::CapacityProvider', {
+        PropagateTags: {
+          Mode: 'None',
+        },
+      });
+    });
+
+    test('does not render PropagateTags when prop is omitted', () => {
+      // WHEN
+      new lambda.CapacityProvider(stack, 'MyCapacityProvider', {
+        subnets,
+        securityGroups: [securityGroup],
+      });
+
+      // THEN
+      const template = Template.fromStack(stack);
+      template.hasResourceProperties('AWS::Lambda::CapacityProvider', {
+        PropagateTags: Match.absent(),
+      });
+    });
+
+    test('throws when explicit tags exceed 40', () => {
+      // GIVEN
+      const tooManyTags: { [key: string]: string } = {};
+      for (let i = 0; i < 41; i++) {
+        tooManyTags[`key${i}`] = `value${i}`;
+      }
+
+      // THEN
+      expect(() => {
+        new lambda.CapacityProvider(stack, 'MyCapacityProvider', {
+          subnets,
+          securityGroups: [securityGroup],
+          propagateTags: lambda.PropagateTags.explicit(tooManyTags),
+        });
+      }).toThrow(/propagateTags explicit tags can have at most 40 tags/);
+    });
+  });
+
   describe('telemetry config', () => {
     beforeEach(() => {
       // TelemetryConfig is not yet in the bundled CFN schema — acknowledge the validation warning
