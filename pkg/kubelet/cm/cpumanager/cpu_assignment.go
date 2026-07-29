@@ -117,10 +117,15 @@ func (n *numaFirst) takeFullSecondLevel() {
 // Sort the UncoreCaches within the NUMA nodes.
 func (a *cpuAccumulator) sortAvailableUncoreCaches() []int {
 	var result []int
+	added := cpuset.New()
+
 	for _, numa := range a.sortAvailableNUMANodes() {
-		uncore := a.details.UncoreInNUMANodes(numa).UnsortedList()
-		a.sort(uncore, a.details.CPUsInUncoreCaches)
-		result = append(result, uncore...)
+		uncore := a.details.UncoreInNUMANodes(numa)
+		// UncoreCache can span NUMA nodes, so skip already added
+		uncoreIDs := uncore.Difference(added).UnsortedList()
+		added = added.Union(uncore)
+		a.sort(uncoreIDs, a.details.CPUsInUncoreCaches)
+		result = append(result, uncoreIDs...)
 	}
 	return result
 }
@@ -367,17 +372,6 @@ func (a *cpuAccumulator) freeSockets() []int {
 	return free
 }
 
-// Returns free UncoreCache IDs as a slice sorted by sortAvailableUnCoreCache().
-func (a *cpuAccumulator) freeUncoreCache() []int {
-	free := []int{}
-	for _, uncore := range a.sortAvailableUncoreCaches() {
-		if a.isUncoreCacheFree(uncore) {
-			free = append(free, uncore)
-		}
-	}
-	return free
-}
-
 // Returns free core IDs as a slice sorted by sortAvailableCores().
 func (a *cpuAccumulator) freeCores() []int {
 	free := []int{}
@@ -551,15 +545,16 @@ func (a *cpuAccumulator) takeFullSockets() {
 	}
 }
 
-func (a *cpuAccumulator) takeFullUncore() {
-	for _, uncore := range a.freeUncoreCache() {
-		cpusInUncore := a.topo.CPUDetails.CPUsInUncoreCaches(uncore)
-		if !a.needsAtLeast(cpusInUncore.Size()) {
-			continue
-		}
-		a.logger.V(4).Info("takeFullUncore: claiming uncore", "uncore", uncore)
-		a.take(cpusInUncore)
+func (a *cpuAccumulator) takeFullUncore(uncoreID int) {
+	if !a.isUncoreCacheFree(uncoreID) {
+		return
 	}
+	cpusInUncore := a.topo.CPUDetails.CPUsInUncoreCaches(uncoreID)
+	if !a.needsAtLeast(cpusInUncore.Size()) {
+		return
+	}
+	a.logger.V(4).Info("takeFullUncore: claiming uncore", "uncore", uncoreID)
+	a.take(cpusInUncore)
 }
 
 func (a *cpuAccumulator) takePartialUncore(uncoreID int) {
@@ -606,18 +601,18 @@ func (a *cpuAccumulator) takePartialUncore(uncoreID int) {
 // First try to take full UncoreCache, if available and need is at least the size of the UncoreCache group.
 // Second try to take the partial UncoreCache if available and the request size can fit w/in the UncoreCache.
 func (a *cpuAccumulator) takeUncoreCache() {
-	numCPUsInUncore := a.topo.CPUsPerUncore()
-	for _, uncore := range a.sortAvailableUncoreCaches() {
-		// take full UncoreCache if the CPUs needed is greater than free UncoreCache size
-		if a.needsAtLeast(numCPUsInUncore) {
-			a.takeFullUncore()
-		}
+	uncores := a.sortAvailableUncoreCaches()
 
+	// take full UncoreCache if the CPUs needed is greater than free UncoreCache size
+	for _, uncore := range uncores {
+		a.takeFullUncore(uncore)
 		if a.isSatisfied() {
 			return
 		}
+	}
 
-		// take partial UncoreCache if the CPUs needed is less than free UncoreCache size
+	// take partial UncoreCache if the CPUs needed is less than free UncoreCache size
+	for _, uncore := range uncores {
 		a.takePartialUncore(uncore)
 		if a.isSatisfied() {
 			return
