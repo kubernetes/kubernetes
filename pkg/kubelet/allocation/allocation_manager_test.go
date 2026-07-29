@@ -18,7 +18,10 @@ package allocation
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	goruntime "runtime"
 	"strings"
 	"testing"
@@ -41,6 +44,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
@@ -167,128 +171,196 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 		v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
 	}
 
+	podWithVolumes := pod.DeepCopy()
+	podWithVolumes.Spec.Volumes = []v1.Volume{
+		{
+			Name: "mem-vol",
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{
+					Medium:    v1.StorageMediumMemory,
+					SizeLimit: resource.NewQuantity(128*1024*1024, resource.BinarySI),
+				},
+			},
+		},
+	}
+
+	resizedPodWithVolumes := podWithVolumes.DeepCopy()
+	resizedPodWithVolumes.Spec.Volumes[0].EmptyDir.SizeLimit = resource.NewQuantity(256*1024*1024, resource.BinarySI)
+
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 
 	tests := []struct {
-		name                         string
-		pod                          *v1.Pod
-		allocated                    state.PodResourceInfo
-		expectPod                    *v1.Pod
-		expectUpdate                 bool
-		inPlacePodLevelResizeEnabled bool
-	}{{
-		name: "steady state",
-		pod:  pod,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *pod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *pod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *pod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *pod.Spec.InitContainers[1].Resources.DeepCopy(),
+		name                                                string
+		pod                                                 *v1.Pod
+		allocated                                           state.PodResourceInfo
+		expectPod                                           *v1.Pod
+		expectUpdate                                        bool
+		inPlacePodLevelResizeEnabled                        bool
+		inPlacePodVerticalScalingMemoryBackedVolumesEnabled bool
+	}{
+		{
+			name: "steady state",
+			pod:  pod,
+			allocated: state.PodResourceInfo{
+				PodSpec: &v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1", Resources: *pod.Spec.Containers[0].Resources.DeepCopy()},
+						{Name: "c2", Resources: *pod.Spec.Containers[1].Resources.DeepCopy()},
+					},
+					InitContainers: []v1.Container{
+						{Name: "c1-restartable-init", Resources: *pod.Spec.InitContainers[0].Resources.DeepCopy()},
+						{Name: "c1-init", Resources: *pod.Spec.InitContainers[1].Resources.DeepCopy()},
+					},
+				},
 			},
-		},
-		expectUpdate: false,
-	}, {
-		name:         "no allocations",
-		pod:          pod,
-		allocated:    state.PodResourceInfo{},
-		expectUpdate: false,
-	}, {
-		name: "missing container allocation",
-		pod:  pod,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c2": *pod.Spec.Containers[1].Resources.DeepCopy(),
+			expectUpdate: false,
+		}, {
+			name:         "no allocations",
+			pod:          pod,
+			allocated:    state.PodResourceInfo{},
+			expectUpdate: false,
+		}, {
+			name: "missing container allocation",
+			pod:  pod,
+			allocated: state.PodResourceInfo{
+				PodSpec: &v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c2", Resources: *pod.Spec.Containers[1].Resources.DeepCopy()},
+					},
+				},
 			},
-		},
-		expectUpdate: false,
-	}, {
-		name: "resized container",
-		pod:  pod,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
+			expectUpdate: false,
+		}, {
+			name: "resized container",
+			pod:  pod,
+			allocated: state.PodResourceInfo{
+				PodSpec: &v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1", Resources: *resizedPod.Spec.Containers[0].Resources.DeepCopy()},
+						{Name: "c2", Resources: *resizedPod.Spec.Containers[1].Resources.DeepCopy()},
+					},
+					InitContainers: []v1.Container{
+						{Name: "c1-restartable-init", Resources: *resizedPod.Spec.InitContainers[0].Resources.DeepCopy()},
+						{Name: "c1-init", Resources: *resizedPod.Spec.InitContainers[1].Resources.DeepCopy()},
+					},
+				},
 			},
-		},
-		expectUpdate: true,
-		expectPod:    resizedPod,
-	}, {
-		name: "resized pod-level allocation",
-		pod:  pod,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
+			expectUpdate: true,
+			expectPod:    resizedPod,
+		}, {
+			name: "resized pod-level allocation",
+			pod:  pod,
+			allocated: state.PodResourceInfo{
+				PodSpec: &v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1", Resources: *resizedPod.Spec.Containers[0].Resources.DeepCopy()},
+						{Name: "c2", Resources: *resizedPod.Spec.Containers[1].Resources.DeepCopy()},
+					},
+					InitContainers: []v1.Container{
+						{Name: "c1-restartable-init", Resources: *resizedPod.Spec.InitContainers[0].Resources.DeepCopy()},
+						{Name: "c1-init", Resources: *resizedPod.Spec.InitContainers[1].Resources.DeepCopy()},
+					},
+					Resources: resizedPodWithPodLevelResources.Spec.Resources.DeepCopy(),
+				},
 			},
-			PodLevelResources: resizedPodWithPodLevelResources.Spec.Resources.DeepCopy(),
-		},
-		expectUpdate:                 true,
-		expectPod:                    resizedPodWithPodLevelResources,
-		inPlacePodLevelResizeEnabled: true,
-	}, {
-		name: "resized pod-level resources and allocation",
-		pod:  podWithPodLevelResources,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
+			expectUpdate:                 true,
+			expectPod:                    resizedPodWithPodLevelResources,
+			inPlacePodLevelResizeEnabled: true,
+		}, {
+			name: "resized pod-level resources and allocation",
+			pod:  podWithPodLevelResources,
+			allocated: state.PodResourceInfo{
+				PodSpec: &v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1", Resources: *resizedPod.Spec.Containers[0].Resources.DeepCopy()},
+						{Name: "c2", Resources: *resizedPod.Spec.Containers[1].Resources.DeepCopy()},
+					},
+					InitContainers: []v1.Container{
+						{Name: "c1-restartable-init", Resources: *resizedPod.Spec.InitContainers[0].Resources.DeepCopy()},
+						{Name: "c1-init", Resources: *resizedPod.Spec.InitContainers[1].Resources.DeepCopy()},
+					},
+					Resources: resizedPodWithPodLevelResources.Spec.Resources.DeepCopy(),
+				},
 			},
-			PodLevelResources: resizedPodWithPodLevelResources.Spec.Resources.DeepCopy(),
-		},
-		expectUpdate:                 true,
-		expectPod:                    resizedPodWithPodLevelResources,
-		inPlacePodLevelResizeEnabled: true,
-	}, {
-		name: "resized pod-level resources and no container resources",
-		pod:  podWithoutContainerResources,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
+			expectUpdate:                 true,
+			expectPod:                    resizedPodWithPodLevelResources,
+			inPlacePodLevelResizeEnabled: true,
+		}, {
+			name: "resized pod-level resources and no container resources",
+			pod:  podWithoutContainerResources,
+			allocated: state.PodResourceInfo{
+				PodSpec: &v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1", Resources: *resizedPod.Spec.Containers[0].Resources.DeepCopy()},
+						{Name: "c2", Resources: *resizedPod.Spec.Containers[1].Resources.DeepCopy()},
+					},
+					InitContainers: []v1.Container{
+						{Name: "c1-restartable-init", Resources: *resizedPod.Spec.InitContainers[0].Resources.DeepCopy()},
+						{Name: "c1-init", Resources: *resizedPod.Spec.InitContainers[1].Resources.DeepCopy()},
+					},
+					Resources: resizedPodWithPodLevelResources.Spec.Resources.DeepCopy(),
+				},
 			},
-			PodLevelResources: resizedPodWithPodLevelResources.Spec.Resources.DeepCopy(),
-		},
-		expectUpdate:                 true,
-		expectPod:                    resizedPodWithPodLevelResources,
-		inPlacePodLevelResizeEnabled: true,
-	}, {
-		name: "pod-level resources with overhead, checkpoint matches spec (no overhead stored)",
-		pod:  podWithPodLevelResourcesAndOverhead,
-		allocated: state.PodResourceInfo{
-			PodLevelResources: podWithPodLevelResourcesAndOverhead.Spec.Resources.DeepCopy(),
-		},
-		expectUpdate:                 false,
-		inPlacePodLevelResizeEnabled: true,
-	}, {
-		name: "resized pod-level resources with feature gate disabled",
-		pod:  podWithPodLevelResources,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *pod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *pod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *pod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *pod.Spec.InitContainers[1].Resources.DeepCopy(),
+			expectUpdate:                 true,
+			expectPod:                    resizedPodWithPodLevelResources,
+			inPlacePodLevelResizeEnabled: true,
+		}, {
+			name: "pod-level resources with overhead, checkpoint matches spec (no overhead stored)",
+			pod:  podWithPodLevelResourcesAndOverhead,
+			allocated: state.PodResourceInfo{
+				PodSpec: &v1.PodSpec{
+					Resources: podWithPodLevelResourcesAndOverhead.Spec.Resources.DeepCopy(),
+				},
 			},
-			PodLevelResources: resizedPod.Spec.Resources.DeepCopy(),
+			expectUpdate:                 false,
+			inPlacePodLevelResizeEnabled: true,
+		}, {
+			name: "resized pod-level resources with feature gate disabled",
+			pod:  podWithPodLevelResources,
+			allocated: state.PodResourceInfo{
+				PodSpec: &v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1", Resources: *pod.Spec.Containers[0].Resources.DeepCopy()},
+						{Name: "c2", Resources: *pod.Spec.Containers[1].Resources.DeepCopy()},
+					},
+					InitContainers: []v1.Container{
+						{Name: "c1-restartable-init", Resources: *pod.Spec.InitContainers[0].Resources.DeepCopy()},
+						{Name: "c1-init", Resources: *pod.Spec.InitContainers[1].Resources.DeepCopy()},
+					},
+					Resources: resizedPod.Spec.Resources.DeepCopy(),
+				},
+			},
+			expectUpdate:                 false,
+			expectPod:                    podWithPodLevelResources,
+			inPlacePodLevelResizeEnabled: false,
 		},
-		expectUpdate:                 false,
-		expectPod:                    podWithPodLevelResources,
-		inPlacePodLevelResizeEnabled: false,
-	}}
+		{
+			name: "resized memory-backed volume limit",
+			pod:  podWithVolumes,
+			allocated: state.PodResourceInfo{
+				PodSpec: &resizedPodWithVolumes.Spec,
+			},
+			expectUpdate: true,
+			expectPod:    resizedPodWithVolumes,
+			inPlacePodVerticalScalingMemoryBackedVolumesEnabled: true,
+		},
+		{
+			name: "resized memory-backed volume limit with feature gate disabled",
+			pod:  podWithVolumes,
+			allocated: state.PodResourceInfo{
+				PodSpec: &resizedPodWithVolumes.Spec,
+			},
+			expectUpdate: false,
+			expectPod:    podWithVolumes,
+			inPlacePodVerticalScalingMemoryBackedVolumesEnabled: false,
+		},
+	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inPlacePodLevelResizeEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, test.inPlacePodVerticalScalingMemoryBackedVolumesEnabled)
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, nil, nil)
 			pod := test.pod.DeepCopy()
 			allocationManager.(*manager).allocated.SetPodResourceInfo(logger, pod.UID, test.allocated)
@@ -838,8 +910,9 @@ func TestRetryPendingResizes(t *testing.T) {
 					alloc, found := allocationManager.(*manager).allocated.GetPodResourceInfo(newPod.UID)
 					if tt.expectedAllocatedPodReqs != nil {
 						require.True(t, found, "pod allocation")
-						if alloc.PodLevelResources == nil {
-							assert.Equal(t, tt.expectedAllocatedPodReqs, alloc.PodLevelResources.Requests, "stored pod request allocation")
+						require.NotNil(t, alloc.PodSpec, "allocated pod spec")
+						if alloc.PodSpec.Resources != nil {
+							assert.Equal(t, tt.expectedAllocatedPodReqs, alloc.PodSpec.Resources.Requests, "stored pod request allocation")
 						}
 					} else {
 						require.False(t, found, "pod allocation should not be found")
@@ -2689,7 +2762,8 @@ func TestAllocationManager_EmptyDirVolumeLimits_AddPod(t *testing.T) {
 					},
 				},
 			},
-			expectedAllocated: false,
+			expectedAllocated: true,
+			expectedLimit:     resource.NewQuantity(1024*1024*128, resource.BinarySI),
 		},
 		{
 			name:               "admit volume with medium Default (not Memory) when gate is enabled",
@@ -2725,7 +2799,8 @@ func TestAllocationManager_EmptyDirVolumeLimits_AddPod(t *testing.T) {
 					},
 				},
 			},
-			expectedAllocated: false,
+			expectedAllocated: true,
+			expectedLimit:     resource.NewQuantity(1024*1024*128, resource.BinarySI),
 		},
 		{
 			name:               "admit memory-backed volume with nil size limit when gate is enabled",
@@ -3236,7 +3311,7 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 				},
 			},
 			expectResizeAllocated:    false,
-			expectedAllocatedLimit:   nil,
+			expectedAllocatedLimit:   resource.NewQuantity(1024*1024*128, resource.BinarySI),
 			expectedResizeConditions: nil,
 		},
 		{
@@ -3691,4 +3766,162 @@ func setupNonAllocatedCapacityTest(t *testing.T) (Manager, *v1.Pod, *v1.Pod, klo
 	})
 
 	return allocationManager, runningPod, pendingPod, logger
+}
+
+func TestAllocationManager_Upgrade_CheckpointMigration(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	testDir := t.TempDir()
+
+	// Enable feature gates
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
+
+	// Define the allocated pod (which represents the pod after it has been restored/updated from the checkpoint!)
+	allocatedPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "pod1",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "container1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: resource.MustParse("128Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("200m"),
+							v1.ResourceMemory: resource.MustParse("256Mi"),
+						},
+					},
+				},
+			},
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("200m"),
+					v1.ResourceMemory: resource.MustParse("256Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("400m"),
+					v1.ResourceMemory: resource.MustParse("512Mi"),
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "mem-vol",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: new(resource.MustParse("128Mi")),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Prepare the legacy V1 checkpoint data using values from allocatedPod
+	v1Entries := state.PodResourceInfoMapV1{
+		allocatedPod.UID: state.PodResourceInfoV1{
+			ContainerResources: map[string]v1.ResourceRequirements{
+				allocatedPod.Spec.Containers[0].Name: allocatedPod.Spec.Containers[0].Resources,
+			},
+			PodLevelResources: allocatedPod.Spec.Resources,
+			EmptyDirVolumeLimits: map[string]*resource.Quantity{
+				allocatedPod.Spec.Volumes[0].Name: allocatedPod.Spec.Volumes[0].EmptyDir.SizeLimit,
+			},
+		},
+	}
+
+	// Serialize and wrap in Checkpoint
+	serializedV1, err := json.Marshal(state.PodResourceCheckpointInfoV1{Entries: v1Entries})
+	require.NoError(t, err)
+
+	cp := &state.Checkpoint{
+		Data: string(serializedV1),
+	}
+	cp.Checksum = checksum.New(cp.Data)
+
+	blob, err := cp.MarshalCheckpoint()
+	require.NoError(t, err)
+
+	// Write to the checkpoint file on disk inside the temp directory
+	err = os.WriteFile(filepath.Join(testDir, "allocated_pods_state"), blob, 0644)
+	require.NoError(t, err)
+
+	// Initialize the real Allocation Manager using NewManager (which triggers the startup migration!)
+	statusManager := status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
+	dummySourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+	fakeRecorder := &record.FakeRecorder{}
+
+	allocManager := NewManager(
+		testDir,
+		statusManager,
+		func(_ context.Context, _ *v1.Pod) {},
+		func() []*v1.Pod { return nil },
+		func(_ types.UID) (*v1.Pod, bool) { return nil, false },
+		dummySourcesReady,
+		fakeRecorder,
+		logger,
+	)
+
+	// Define the incoming pod by deep copying allocatedPod and modifying its resources to simulate a resize request
+	incomingPod := allocatedPod.DeepCopy()
+	incomingPod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("500m"),
+			v1.ResourceMemory: resource.MustParse("512Mi"),
+		},
+		Limits: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("1000m"),
+			v1.ResourceMemory: resource.MustParse("1024Mi"),
+		},
+	}
+	incomingPod.Spec.Resources = &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("600m"),
+			v1.ResourceMemory: resource.MustParse("512Mi"),
+		},
+		Limits: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("1200m"),
+			v1.ResourceMemory: resource.MustParse("1024Mi"),
+		},
+	}
+	incomingPod.Spec.Volumes[0].EmptyDir.SizeLimit = new(resource.MustParse("256Mi"))
+
+	// Call UpdatePodFromAllocation to verify that it correctly overwrites the incoming pod's resources with the previous allocated values from the migrated checkpoint!
+	updatedPod, updated := allocManager.UpdatePodFromAllocation(incomingPod)
+	require.True(t, updated, "pod spec should be updated from the migrated checkpoint")
+
+	// Directly compare the updated pod with our allocated pod!
+	assert.Equal(t, allocatedPod, updatedPod)
+
+	// Call AddPod to trigger writing the fully populated V2 checkpoint to disk!
+	ok, reason, msg := allocManager.AddPod(context.TODO(), nil, incomingPod)
+	require.True(t, ok, "AddPod should succeed, reason: %s, msg: %s", reason, msg)
+
+	// Read the updated checkpoint file from disk!
+	updatedBlob, err := os.ReadFile(filepath.Join(testDir, "allocated_pods_state"))
+	require.NoError(t, err)
+
+	// Deserialise checkpoint
+	var checkpointV2 state.Checkpoint
+	err = json.Unmarshal(updatedBlob, &checkpointV2)
+	require.NoError(t, err)
+
+	// Unmarshal the inner Data string which contains PodResourceCheckpointInfo in V2 format!
+	var praInfoV2 state.PodResourceCheckpointInfo
+	err = json.Unmarshal([]byte(checkpointV2.Data), &praInfoV2)
+	require.NoError(t, err)
+
+	// Assert that the checkpoint now contains the complete PodSpec under PodEntries!
+	require.Len(t, praInfoV2.PodEntries, 1)
+	checkpointPodInfo, found := praInfoV2.PodEntries[allocatedPod.UID]
+	require.True(t, found)
+	require.NotNil(t, checkpointPodInfo.PodSpec)
+
+	// Directly assert that the checkpointed PodSpec matches our updated pod spec!
+	assert.Equal(t, &updatedPod.Spec, checkpointPodInfo.PodSpec)
 }

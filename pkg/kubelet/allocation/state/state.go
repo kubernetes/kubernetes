@@ -24,16 +24,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// PodResourceInfo stores resource requirements for containers within a pod.
+// PodResourceInfo stores the entire allocated pod spec.
 type PodResourceInfo struct {
-	// ContainerResources maps container names to their respective ResourceRequirements.
-	ContainerResources map[string]v1.ResourceRequirements
-
-	// PodLevelResources represents resource requirements that apply to the entire pod, if any.
-	PodLevelResources *v1.ResourceRequirements
-
-	// EmptyDirVolumeLimits maps emptyDir volume names to their respective resource limits, if any.
-	EmptyDirVolumeLimits map[string]*resource.Quantity
+	// PodSpec is the entire allocated pod spec.
+	PodSpec *v1.PodSpec `json:"podSpec,omitempty"`
 }
 
 // PodResourceInfoMap maps pod UIDs to their corresponding PodResourceInfo,
@@ -45,22 +39,7 @@ func (pr PodResourceInfoMap) Clone() PodResourceInfoMap {
 	prCopy := make(PodResourceInfoMap)
 	for podUID, podInfo := range pr {
 		newPodInfo := PodResourceInfo{
-			ContainerResources: make(map[string]v1.ResourceRequirements),
-			PodLevelResources:  podInfo.PodLevelResources.DeepCopy(),
-		}
-		for containerName, containerInfo := range podInfo.ContainerResources {
-			newPodInfo.ContainerResources[containerName] = *containerInfo.DeepCopy()
-		}
-		if podInfo.EmptyDirVolumeLimits != nil {
-			newPodInfo.EmptyDirVolumeLimits = make(map[string]*resource.Quantity)
-			for volumeName, volumeLimit := range podInfo.EmptyDirVolumeLimits {
-				if volumeLimit == nil {
-					newPodInfo.EmptyDirVolumeLimits[volumeName] = nil
-				} else {
-					vl := volumeLimit.DeepCopy()
-					newPodInfo.EmptyDirVolumeLimits[volumeName] = &vl
-				}
-			}
+			PodSpec: podInfo.PodSpec.DeepCopy(),
 		}
 		prCopy[podUID] = newPodInfo
 	}

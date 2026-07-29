@@ -55,6 +55,7 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	cmtesting "k8s.io/kubernetes/pkg/kubelet/cm/testing"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -6783,4 +6784,72 @@ func TestSysctlFiltering(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInitializeActuatedPod_HydrateMigratedState(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	// create a pod with full metadata representing a pending unactuated resize
+	allocatedPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "pod-123",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "nginx:latest",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("200m"),
+							v1.ResourceMemory: resource.MustParse("256Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("200m"),
+							v1.ResourceMemory: resource.MustParse("256Mi"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// simulate a migrated legacy V1 checkpoint entry that has an empty container image and older actuated resources
+	migratedSpec := &v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name:  "c1",
+				Image: "", // empty image indicates legacy migrated state
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				},
+			},
+		},
+	}
+	err = m.actuatedState.SetPodResourceInfo(logger, allocatedPod.UID, state.PodResourceInfo{PodSpec: migratedSpec})
+	require.NoError(t, err)
+
+	// execute InitializeActuatedPod, which must hydrate non-resource metadata while preserving actuated resources
+	m.InitializeActuatedPod(logger, allocatedPod)
+
+	actuatedInfo, found := m.actuatedState.GetPodResourceInfo(allocatedPod.UID)
+	require.True(t, found)
+	require.NotNil(t, actuatedInfo.PodSpec)
+
+	// assert non-resource metadata was hydrated from allocatedPod
+	assert.Equal(t, "nginx:latest", actuatedInfo.PodSpec.Containers[0].Image)
+
+	// assert actuated resources were preserved, ignoring allocatedPod's desired resources
+	assert.True(t, actuatedInfo.PodSpec.Containers[0].Resources.Requests[v1.ResourceCPU].Equal(resource.MustParse("100m")), "CPU request should remain at actuated value")
+	assert.True(t, actuatedInfo.PodSpec.Containers[0].Resources.Requests[v1.ResourceMemory].Equal(resource.MustParse("128Mi")), "Memory request should remain at actuated value")
 }

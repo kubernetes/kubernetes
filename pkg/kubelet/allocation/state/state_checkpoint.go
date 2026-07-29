@@ -48,7 +48,7 @@ func NewStateCheckpoint(logger klog.Logger, stateDir, checkpointName string) (St
 		return nil, fmt.Errorf("failed to initialize checkpoint manager for pod resource information tracking: %w", err)
 	}
 
-	pra, checksum, err := restoreState(logger, checkpointManager, checkpointName)
+	pra, checksum, migrated, err := restoreState(logger, checkpointManager, checkpointName)
 	if err != nil {
 		//lint:ignore ST1005 user-facing error message
 		return nil, fmt.Errorf("could not restore state from checkpoint: %w, please drain this node and delete pod resource information checkpoint file %q before restarting Kubelet",
@@ -61,26 +61,47 @@ func NewStateCheckpoint(logger klog.Logger, stateDir, checkpointName string) (St
 		checkpointName:    checkpointName,
 		lastChecksum:      checksum,
 	}
+
+	if migrated {
+		logger.Info("Saving migrated V2 checkpoint to disk")
+		if err := stateCheckpoint.storeState(logger); err != nil {
+			logger.Error(err, "Failed to save migrated V2 checkpoint to disk")
+		}
+	}
+
 	return stateCheckpoint, nil
 }
 
 // restores state from a checkpoint and creates it if it doesn't exist
-func restoreState(logger klog.Logger, checkpointManager checkpointmanager.CheckpointManager, checkpointName string) (PodResourceInfoMap, checksum.Checksum, error) {
+func restoreState(logger klog.Logger, checkpointManager checkpointmanager.CheckpointManager, checkpointName string) (PodResourceInfoMap, checksum.Checksum, bool, error) {
 	checkpoint := &Checkpoint{}
 	if err := checkpointManager.GetCheckpoint(checkpointName, checkpoint); err != nil {
 		if err == errors.ErrCheckpointNotFound {
-			return nil, 0, nil
+			return nil, 0, false, nil
 		}
-		return nil, 0, err
+		return nil, 0, false, err
 	}
 
+	// Try to restore as V2 (new format with "podEntries")
 	praInfo, err := checkpoint.GetPodResourceCheckpointInfo()
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get pod resource information: %w", err)
+	if err == nil && len(praInfo.PodEntries) > 0 {
+		logger.V(2).Info("State checkpoint: restored pod resource state from V2 checkpoint")
+		return praInfo.PodEntries, checkpoint.Checksum, false, nil
 	}
 
-	logger.V(2).Info("State checkpoint: restored pod resource state from checkpoint")
-	return praInfo.Entries, checkpoint.Checksum, nil
+	// Fallback to V1 (legacy format with "entries")
+	logger.Info("Could not load V2 checkpoint, trying V1 fallback", "err", err)
+	praInfoV1, err := checkpoint.GetPodResourceCheckpointInfoV1()
+	if err != nil {
+		return nil, 0, false, fmt.Errorf("failed to get pod resource information from V1 checkpoint: %w", err)
+	}
+
+	// Migrate V1 to V2
+	logger.Info("Migrating allocation checkpoint from V1 to V2")
+	migratedEntries := migrateV1ToV2(praInfoV1.Entries)
+
+	logger.V(2).Info("State checkpoint: restored and migrated pod resource state from V1 checkpoint")
+	return migratedEntries, checkpoint.Checksum, true, nil
 }
 
 // saves state to a checkpoint, caller is responsible for locking
@@ -88,7 +109,7 @@ func (sc *stateCheckpoint) storeState(logger klog.Logger) error {
 	resourceInfo := sc.cache.GetPodResourceInfoMap()
 
 	checkpoint, err := NewCheckpoint(&PodResourceCheckpointInfo{
-		Entries: resourceInfo,
+		PodEntries: resourceInfo,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create checkpoint: %w", err)

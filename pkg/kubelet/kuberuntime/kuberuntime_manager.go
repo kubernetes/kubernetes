@@ -832,7 +832,15 @@ func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, al
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		return
 	}
-	if _, ok := m.actuatedState.GetPodResourceInfo(allocatedPod.UID); ok {
+	if actuatedInfo, ok := m.actuatedState.GetPodResourceInfo(allocatedPod.UID); ok {
+		// Legacy checkpoints migrated from V1 only populated resource requirements, leaving the
+		// rest of the PodSpec empty. Hydrate non-resource PodSpec metadata while preserving actuated resources.
+		if actuatedInfo.PodSpec != nil && len(actuatedInfo.PodSpec.Containers) > 0 && actuatedInfo.PodSpec.Containers[0].Image == "" {
+			hydratedPod, _ := allocation.UpdatePodFromResourceInfo(allocatedPod, actuatedInfo)
+			if err := m.actuatedState.SetPodResourceInfo(logger, allocatedPod.UID, allocation.ResourceInfoForPod(hydratedPod)); err != nil {
+				logger.Error(err, "Failed to hydrate actuated pod resource info checkpoint", "pod", klog.KObj(allocatedPod))
+			}
+		}
 		return
 	}
 	info := allocation.ResourceInfoForPod(allocatedPod)
