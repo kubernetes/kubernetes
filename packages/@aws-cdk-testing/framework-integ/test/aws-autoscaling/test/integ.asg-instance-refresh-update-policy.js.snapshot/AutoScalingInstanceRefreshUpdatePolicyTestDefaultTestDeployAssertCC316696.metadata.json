@@ -1,0 +1,56 @@
+{
+  "/AutoScalingInstanceRefreshUpdatePolicyTest/DefaultTest/DeployAssert": [
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new DeployAssert (/Volumes/workplace/aws-cdk/packages/@aws-cdk/integ-tests-alpha/lib/assertions/private/deploy-assert.js:38:38)",
+        "new IntegTestCase (/Volumes/workplace/aws-cdk/packages/@aws-cdk/integ-tests-alpha/lib/test-case.js:39:24)",
+        "new IntegTest (/Volumes/workplace/aws-cdk/packages/@aws-cdk/integ-tests-alpha/lib/test-case.js:132:33)",
+        "<anonymous> (/Volumes/workplace/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-autoscaling/test/integ.asg-instance-refresh-update-policy.js:27:1)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/AutoScalingInstanceRefreshUpdatePolicyTest/DefaultTest/DeployAssert/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "addBootstrapVersionRule (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:261:19)",
+        "DefaultStackSynthesizer.addBootstrapVersionRule (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:161:9)",
+        "DefaultStackSynthesizer.synthesize (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:302:18)",
+        "/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:433: (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:433:3)",
+        "visit (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:490:9)",
+        "visit (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:487:9)",
+        "visit (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:487:9)",
+        "visit (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:487:9)",
+        "synthesizeTree (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:426:5)",
+        "synthesize (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:54:5)"
+      ]
+    }
+  ],
+  "/AutoScalingInstanceRefreshUpdatePolicyTest/DefaultTest/DeployAssert/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "addBootstrapVersionRule (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:269:5)",
+        "DefaultStackSynthesizer.addBootstrapVersionRule (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:161:9)",
+        "DefaultStackSynthesizer.synthesize (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:302:18)",
+        "/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:433: (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:433:3)",
+        "visit (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:490:9)",
+        "visit (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:487:9)",
+        "visit (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:487:9)",
+        "visit (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:487:9)",
+        "synthesizeTree (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:426:5)",
+        "synthesize (/Volumes/workplace/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:54:5)"
+      ]
+    }
+  ]
+}

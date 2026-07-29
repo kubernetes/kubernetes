@@ -1,0 +1,20 @@
+{
+  "version": "53.0.0",
+  "files": {
+    "3951bfd1ec16ee25b4c02dd49d4008af022314782ff621af624d22876b6743eb": {
+      "displayName": "aws-cdk-autoscaling-instance-refresh-update-policy Template",
+      "source": {
+        "path": "aws-cdk-autoscaling-instance-refresh-update-policy.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-44160582": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "3951bfd1ec16ee25b4c02dd49d4008af022314782ff621af624d22876b6743eb.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}
