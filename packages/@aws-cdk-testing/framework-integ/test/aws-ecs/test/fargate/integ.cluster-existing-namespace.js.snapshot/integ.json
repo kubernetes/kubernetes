@@ -1,0 +1,13 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "ClusterExistingNamespace/DefaultTest": {
+      "stacks": [
+        "aws-ecs-cluster-existing-namespace"
+      ],
+      "assertionStack": "ClusterExistingNamespace/DefaultTest/DeployAssert",
+      "assertionStackName": "ClusterExistingNamespaceDefaultTestDeployAssertC44466B7"
+    }
+  },
+  "minimumCliVersion": "2.1126.0"
+}
