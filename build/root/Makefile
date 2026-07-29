@@ -78,6 +78,11 @@ define ALL_HELP_INFO
 #   GOGCFLAGS: Additional go compile flags passed to 'go' when building.
 #   DBG: If set to "1", build with optimizations disabled for easier
 #     debugging.  Any other value is ignored.
+#   KUBE_FASTBUILD: If set to "true", only build for the host platform
+#     instead of every supported platform (e.g. this cuts client builds like
+#     kubectl from ~10 platforms down to 1). Recommended for local iteration.
+#   KUBE_BUILD_PLATFORMS: Space-separated list of "os/arch" platforms to
+#     build for, overriding the default platform set(s) directly.
 #
 # Example:
 #   make
@@ -87,6 +92,9 @@ define ALL_HELP_INFO
 #     Note: Specify DBG=1 for building unstripped binaries, which allows you to
 #     use code debugging tools like delve. When DBG is unspecified, it defaults
 #     to "-s -w" which strips debug information.
+#   make all KUBE_FASTBUILD=true
+#     Note: builds only for your host platform instead of every supported
+#     platform, which is much faster for local development.
 endef
 .PHONY: all
 ifeq ($(PRINT_HELP),y)
