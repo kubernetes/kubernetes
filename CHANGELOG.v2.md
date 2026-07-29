@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.262.2](https://github.com/aws/aws-cdk/compare/v2.262.1...v2.262.2) (2026-07-29)
+
+
+### Bug Fixes
+
+* revert "fix(core): stack.node.addDependency gets slower as stacks grow ([#38314](https://github.com/aws/aws-cdk/issues/38314))" ([#38417](https://github.com/aws/aws-cdk/issues/38417)) ([d97dd8d](https://github.com/aws/aws-cdk/commit/d97dd8d5aae1bcddee95fc02ba723c1e8157487e)), closes [#38406](https://github.com/aws/aws-cdk/issues/38406) [#38406](https://github.com/aws/aws-cdk/issues/38406)
+
 ## [2.262.1](https://github.com/aws/aws-cdk/compare/v2.262.0...v2.262.1) (2026-07-23)
 
 
