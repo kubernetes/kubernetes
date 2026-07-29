@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: bind
+  labels:
+    service: bind
+spec:
+  selector:
+    matchLabels:
+      service: bind
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
+  template:
+    metadata:
+      labels:
+        service: bind
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                - key: "service"
+                  operator: "In"
+                  values: ["bind"]
+              topologyKey: "kubernetes.io/hostname"
+              namespaces: []
+      containers:
+      - name: kubernetes-pause
+        image: registry.k8s.io/pause:latest
+      - name: app
+        image: registry.k8s.io/nginx:test-cmd

@@ -1,0 +1,34 @@
+#$ Used in:
+#$ - site-src/v1alpha2/guides/tls.md
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: cross-namespace-tls-gateway
+  namespace: gateway-api-example-ns1
+spec:
+  gatewayClassName: acme-lb
+  listeners:
+  - name: https
+    protocol: HTTPS
+    port: 443
+    hostname: "*.example.com"
+    tls:
+      certificateRefs:
+      - kind: Secret
+        group: ""
+        name: wildcard-example-com-cert
+        namespace: gateway-api-example-ns2
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-ns1-gateways-to-ref-secrets
+  namespace: gateway-api-example-ns2
+spec:
+  from:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    namespace: gateway-api-example-ns1
+  to:
+  - group: ""
+    kind: Secret

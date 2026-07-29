@@ -1,0 +1,203 @@
+header:
+  schema-version: "1.0.0"
+  expiration-date: "2026-08-04T00:00:00.000Z"
+  last-updated: "2025-08-04"
+  last-reviewed: "2025-08-04"
+  commit-hash: 69e81088ad40f45a0764597326722dea8f3f00a8
+  project-url: https://github.com/open-telemetry/opentelemetry-go
+  project-release: "v1.37.0"
+  changelog: https://github.com/open-telemetry/opentelemetry-go/blob/69e81088ad40f45a0764597326722dea8f3f00a8/CHANGELOG.md
+  license: https://github.com/open-telemetry/opentelemetry-go/blob/69e81088ad40f45a0764597326722dea8f3f00a8/LICENSE
+
+project-lifecycle:
+  status: active
+  bug-fixes-only: false
+  core-maintainers:
+    - https://github.com/dmathieu
+    - https://github.com/dashpole
+    - https://github.com/pellared
+    - https://github.com/XSAM
+    - https://github.com/MrAlias
+  release-process: |
+    See https://github.com/open-telemetry/opentelemetry-go/blob/69e81088ad40f45a0764597326722dea8f3f00a8/RELEASING.md
+
+contribution-policy:
+  accepts-pull-requests: true
+  accepts-automated-pull-requests: true
+  automated-tools-list:
+    - automated-tool: dependabot
+      action: allowed
+      comment: Automated dependency updates are accepted.
+    - automated-tool: renovatebot
+      action: allowed
+      comment: Automated dependency updates are accepted.
+    - automated-tool: opentelemetrybot
+      action: allowed
+      comment: Automated OpenTelemetry actions are accepted.
+  contributing-policy: https://github.com/open-telemetry/opentelemetry-go/blob/69e81088ad40f45a0764597326722dea8f3f00a8/CONTRIBUTING.md
+  code-of-conduct: https://github.com/open-telemetry/.github/blob/ffa15f76b65ec7bcc41f6a0b277edbb74f832206/CODE_OF_CONDUCT.md
+
+documentation:
+  - https://pkg.go.dev/go.opentelemetry.io/otel
+  - https://opentelemetry.io/docs/instrumentation/go/
+
+distribution-points:
+  - pkg:golang/go.opentelemetry.io/otel
+  - pkg:golang/go.opentelemetry.io/otel/bridge/opencensus
+  - pkg:golang/go.opentelemetry.io/otel/bridge/opencensus/test
+  - pkg:golang/go.opentelemetry.io/otel/bridge/opentracing
+  - pkg:golang/go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc
+  - pkg:golang/go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp
+  - pkg:golang/go.opentelemetry.io/otel/exporters/otlp/otlptrace
+  - pkg:golang/go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc
+  - pkg:golang/go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp
+  - pkg:golang/go.opentelemetry.io/otel/exporters/stdout/stdoutmetric
+  - pkg:golang/go.opentelemetry.io/otel/exporters/stdout/stdouttrace
+  - pkg:golang/go.opentelemetry.io/otel/exporters/zipkin
+  - pkg:golang/go.opentelemetry.io/otel/metric
+  - pkg:golang/go.opentelemetry.io/otel/sdk
+  - pkg:golang/go.opentelemetry.io/otel/sdk/metric
+  - pkg:golang/go.opentelemetry.io/otel/trace
+  - pkg:golang/go.opentelemetry.io/otel/exporters/prometheus
+  - pkg:golang/go.opentelemetry.io/otel/log
+  - pkg:golang/go.opentelemetry.io/otel/log/logtest
+  - pkg:golang/go.opentelemetry.io/otel/sdk/log
+  - pkg:golang/go.opentelemetry.io/otel/sdk/log/logtest
+  - pkg:golang/go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc
+  - pkg:golang/go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp
+  - pkg:golang/go.opentelemetry.io/otel/exporters/stdout/stdoutlog
+  - pkg:golang/go.opentelemetry.io/otel/schema
+
+security-artifacts:
+  threat-model:
+    threat-model-created: false
+    comment: |
+      No formal threat model created yet.
+  self-assessment:
+    self-assessment-created: false
+    comment: |
+      No formal self-assessment yet.
+
+security-testing:
+  - tool-type: sca
+    tool-name: Dependabot
+    tool-version: latest
+    tool-url: https://github.com/dependabot
+    tool-rulesets:
+      - built-in
+    integration:
+      ad-hoc: false
+      ci: true
+      before-release: true
+    comment: |
+      Automated dependency updates.
+  - tool-type: sast
+    tool-name: golangci-lint
+    tool-version: latest
+    tool-url: https://github.com/golangci/golangci-lint
+    tool-rulesets:
+      - built-in
+    integration:
+      ad-hoc: false
+      ci: true
+      before-release: true
+    comment: |
+      Static analysis in CI.
+  - tool-type: fuzzing
+    tool-name: OSS-Fuzz
+    tool-version: latest
+    tool-url: https://github.com/google/oss-fuzz
+    tool-rulesets:
+      - default
+    integration:
+      ad-hoc: false
+      ci: false
+      before-release: false
+    comment: |
+      OpenTelemetry Go is integrated with OSS-Fuzz for continuous fuzz testing. See https://github.com/google/oss-fuzz/tree/f0f9b221190c6063a773bea606d192ebfc3d00cf/projects/opentelemetry-go for more details.
+  - tool-type: sast
+    tool-name: CodeQL
+    tool-version: latest
+    tool-url: https://github.com/github/codeql
+    tool-rulesets:
+      - default
+    integration:
+      ad-hoc: false
+      ci: true
+      before-release: true
+    comment: |
+      CodeQL static analysis is run in CI for all commits and pull requests to detect security vulnerabilities in the Go source code. See https://github.com/open-telemetry/opentelemetry-go/blob/d5b5b059849720144a03ca5c87561bfbdb940119/.github/workflows/codeql-analysis.yml for workflow details.
+  - tool-type: sca
+    tool-name: govulncheck
+    tool-version: latest
+    tool-url: https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck
+    tool-rulesets:
+      - default
+    integration:
+      ad-hoc: false
+      ci: true
+      before-release: true
+    comment: |
+      govulncheck is run in CI to detect known vulnerabilities in Go modules and code paths. See https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/.github/workflows/ci.yml for workflow configuration.
+
+security-assessments:
+  - auditor-name: 7ASecurity
+    auditor-url: https://7asecurity.com
+    auditor-report: https://7asecurity.com/reports/pentest-report-opentelemetry.pdf
+    report-year: 2023
+    comment: |
+      This independent penetration test by 7ASecurity covered OpenTelemetry repositories including opentelemetry-go. The assessment focused on codebase review, threat modeling, and vulnerability identification. See the report for details of findings and recommendations applicable to opentelemetry-go. No critical vulnerabilities were found for this repository.
+
+security-contacts:
+  - type: email
+    value: cncf-opentelemetry-security@lists.cncf.io
+    primary: true
+  - type: website
+    value: https://github.com/open-telemetry/opentelemetry-go/security/policy
+    primary: false
+
+vulnerability-reporting:
+  accepts-vulnerability-reports: true
+  email-contact: cncf-opentelemetry-security@lists.cncf.io
+  security-policy: https://github.com/open-telemetry/opentelemetry-go/security/policy
+  comment: |
+    Security issues should be reported via email or GitHub security policy page.
+
+dependencies:
+  third-party-packages: true
+  dependencies-lists:
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/bridge/opencensus/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/bridge/opencensus/test/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/bridge/opentracing/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/exporters/otlp/otlplog/otlploggrpc/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/exporters/otlp/otlplog/otlploghttp/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/exporters/otlp/otlpmetric/otlpmetricgrpc/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/exporters/otlp/otlpmetric/otlpmetrichttp/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/exporters/otlp/otlptrace/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/exporters/otlp/otlptrace/otlptracegrpc/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/exporters/otlp/otlptrace/otlptracehttp/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/exporters/prometheus/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/exporters/stdout/stdoutlog/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/exporters/stdout/stdoutmetric/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/exporters/stdout/stdouttrace/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/exporters/zipkin/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/internal/tools/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/log/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/log/logtest/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/metric/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/schema/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/sdk/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/sdk/log/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/sdk/log/logtest/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/sdk/metric/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/trace/go.mod
+    - https://github.com/open-telemetry/opentelemetry-go/blob/v1.37.0/trace/internal/telemetry/test/go.mod
+  dependencies-lifecycle:
+    policy-url: https://github.com/open-telemetry/opentelemetry-go/blob/69e81088ad40f45a0764597326722dea8f3f00a8/CONTRIBUTING.md
+    comment: |
+      Dependency lifecycle managed via go.mod and renovatebot.
+  env-dependencies-policy:
+    policy-url: https://github.com/open-telemetry/opentelemetry-go/blob/69e81088ad40f45a0764597326722dea8f3f00a8/CONTRIBUTING.md
+    comment: |
+      See contributing policy for environment usage.

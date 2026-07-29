@@ -1,0 +1,2675 @@
+/*
+Copyright 2015 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package pods
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
+
+	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
+	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	ipprfeature "k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/integration"
+	"k8s.io/kubernetes/test/integration/authutil"
+	"k8s.io/kubernetes/test/integration/framework"
+)
+
+func TestPodTopologyLabels(t *testing.T) {
+	tests := []podTopologyTestCase{
+		{
+			name: "zone and region topology labels copied from assigned Node",
+			targetNodeLabels: map[string]string{
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
+			},
+			expectedPodLabels: map[string]string{
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
+			},
+		},
+		{
+			name: "subdomains of topology.kubernetes.io are not copied",
+			targetNodeLabels: map[string]string{
+				"sub.topology.kubernetes.io/zone": "zone",
+				"topology.kubernetes.io/region":   "region",
+			},
+			expectedPodLabels: map[string]string{
+				"topology.kubernetes.io/region": "region",
+			},
+		},
+		{
+			name: "custom topology.kubernetes.io labels are not copied",
+			targetNodeLabels: map[string]string{
+				"topology.kubernetes.io/custom": "thing",
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
+			},
+			expectedPodLabels: map[string]string{
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
+			},
+		},
+		{
+			name: "labels from Bindings overwriting existing labels on Pod",
+			existingPodLabels: map[string]string{
+				"topology.kubernetes.io/zone":   "bad-zone",
+				"topology.kubernetes.io/region": "bad-region",
+				"topology.kubernetes.io/abc":    "123",
+			},
+			targetNodeLabels: map[string]string{
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
+				"topology.kubernetes.io/abc":    "456", // this label isn't in (zone, region) so isn't copied
+			},
+			expectedPodLabels: map[string]string{
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
+				"topology.kubernetes.io/abc":    "123",
+			},
+		},
+	}
+	// Enable the feature BEFORE starting the test server, as the admission plugin only checks feature gates
+	// on start up and not on each invocation at runtime.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodTopologyLabelsAdmission, true)
+	testPodTopologyLabels(t, tests)
+}
+
+func TestPodTopologyLabels_FeatureDisabled(t *testing.T) {
+	tests := []podTopologyTestCase{
+		{
+			name: "does nothing when the feature is not enabled",
+			targetNodeLabels: map[string]string{
+				"topology.kubernetes.io/zone":     "zone",
+				"topology.kubernetes.io/region":   "region",
+				"topology.kubernetes.io/custom":   "thing",
+				"sub.topology.kubernetes.io/zone": "zone",
+			},
+			expectedPodLabels: map[string]string{},
+		},
+	}
+	// Disable the feature BEFORE starting the test server, as the admission plugin only checks feature gates
+	// on start up and not on each invocation at runtime.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodTopologyLabelsAdmission, false)
+	testPodTopologyLabels(t, tests)
+}
+
+// podTopologyTestCase is defined outside of TestPodTopologyLabels to allow us to re-use the test implementation logic
+// between the feature enabled and feature disabled tests.
+// This will no longer be required once the feature gate graduates to GA/locked to being enabled.
+type podTopologyTestCase struct {
+	name              string
+	targetNodeLabels  map[string]string
+	existingPodLabels map[string]string
+	expectedPodLabels map[string]string
+}
+
+func testPodTopologyLabels(t *testing.T, tests []podTopologyTestCase) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "pod-topology-labels", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	prototypePod := func() *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "pod-topology-test-",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "fake-name",
+						Image: "fakeimage",
+					},
+				},
+			},
+		}
+	}
+	prototypeNode := func() *v1.Node {
+		return &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "podtopology-test-node-",
+			},
+		}
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Create the Node we are going to bind to.
+			node := prototypeNode()
+			// Set the labels on the Node we are going to create.
+			node.Labels = test.targetNodeLabels
+			ctx := context.Background()
+
+			var err error
+			if node, err = client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
+				t.Errorf("Failed to create node: %v", err)
+			}
+
+			pod := prototypePod()
+			pod.Labels = test.existingPodLabels
+			if pod, err = client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
+				t.Errorf("Failed to create pod: %v", err)
+			}
+
+			binding := &v1.Binding{
+				ObjectMeta: metav1.ObjectMeta{Name: pod.Name, Namespace: pod.Namespace},
+				Target: v1.ObjectReference{
+					Kind: "Node",
+					Name: node.Name,
+				},
+			}
+			if err := client.CoreV1().Pods(pod.Namespace).Bind(ctx, binding, metav1.CreateOptions{}); err != nil {
+				t.Errorf("Failed to bind pod to node: %v", err)
+			}
+
+			if pod, err = client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{}); err != nil {
+				t.Errorf("Failed to fetch bound Pod: %v", err)
+			}
+
+			if !apiequality.Semantic.DeepEqual(pod.Labels, test.expectedPodLabels) {
+				t.Errorf("Unexpected label values: %v", cmp.Diff(pod.Labels, test.expectedPodLabels))
+			}
+		})
+	}
+}
+
+func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	ns := framework.CreateNamespaceOrDie(client, "pod-activedeadline-update", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	var (
+		iZero = int64(0)
+		i30   = int64(30)
+		i60   = int64(60)
+		iNeg  = int64(-1)
+	)
+
+	prototypePod := func() *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "xxx",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "fake-name",
+						Image: "fakeimage",
+					},
+				},
+			},
+		}
+	}
+
+	cases := []struct {
+		name     string
+		original *int64
+		update   *int64
+		valid    bool
+	}{
+		{
+			name:     "no change, nil",
+			original: nil,
+			update:   nil,
+			valid:    true,
+		},
+		{
+			name:     "no change, set",
+			original: &i30,
+			update:   &i30,
+			valid:    true,
+		},
+		{
+			name:     "change to positive from nil",
+			original: nil,
+			update:   &i60,
+			valid:    true,
+		},
+		{
+			name:     "change to smaller positive",
+			original: &i60,
+			update:   &i30,
+			valid:    true,
+		},
+		{
+			name:     "change to larger positive",
+			original: &i30,
+			update:   &i60,
+			valid:    false,
+		},
+		{
+			name:     "change to negative from positive",
+			original: &i30,
+			update:   &iNeg,
+			valid:    false,
+		},
+		{
+			name:     "change to negative from nil",
+			original: nil,
+			update:   &iNeg,
+			valid:    false,
+		},
+		// zero is not allowed, must be a positive integer
+		{
+			name:     "change to zero from positive",
+			original: &i30,
+			update:   &iZero,
+			valid:    false,
+		},
+		{
+			name:     "change to nil from positive",
+			original: &i30,
+			update:   nil,
+			valid:    false,
+		},
+	}
+
+	for i, tc := range cases {
+		pod := prototypePod()
+		pod.Spec.ActiveDeadlineSeconds = tc.original
+		pod.ObjectMeta.Name = fmt.Sprintf("activedeadlineseconds-test-%v", i)
+
+		if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
+			t.Errorf("Failed to create pod: %v", err)
+		}
+
+		pod.Spec.ActiveDeadlineSeconds = tc.update
+
+		_, err := client.CoreV1().Pods(ns.Name).Update(context.TODO(), pod, metav1.UpdateOptions{})
+		if tc.valid && err != nil {
+			t.Errorf("%v: failed to update pod: %v", tc.name, err)
+		} else if !tc.valid && err == nil {
+			t.Errorf("%v: unexpected allowed update to pod", tc.name)
+		}
+
+		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+	}
+}
+
+func TestPodReadOnlyFilesystem(t *testing.T) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	isReadOnly := true
+	ns := framework.CreateNamespaceOrDie(client, "pod-readonly-root", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "xxx",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "fake-name",
+					Image: "fakeimage",
+					SecurityContext: &v1.SecurityContext{
+						ReadOnlyRootFilesystem: &isReadOnly,
+					},
+				},
+			},
+		},
+	}
+
+	if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
+		t.Errorf("Failed to create pod: %v", err)
+	}
+
+	integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+}
+
+func TestPodCreateEphemeralContainers(t *testing.T) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	ns := framework.CreateNamespaceOrDie(client, "pod-create-ephemeral-containers", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "xxx",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:                     "fake-name",
+					Image:                    "fakeimage",
+					ImagePullPolicy:          "Always",
+					TerminationMessagePolicy: "File",
+				},
+			},
+			EphemeralContainers: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+		},
+	}
+
+	if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err == nil {
+		t.Errorf("Unexpected allowed creation of pod with ephemeral containers")
+		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+	} else if !strings.HasSuffix(err.Error(), "spec.ephemeralContainers: Forbidden: cannot be set on create") {
+		t.Errorf("Unexpected error when creating pod with ephemeral containers: %v", err)
+	}
+}
+
+// setUpEphemeralContainers creates a pod that has Ephemeral Containers. This is a two step
+// process because Ephemeral Containers are not allowed during pod creation.
+func setUpEphemeralContainers(podsClient typedv1.PodInterface, pod *v1.Pod, containers []v1.EphemeralContainer) (*v1.Pod, error) {
+	result, err := podsClient.Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pod: %v", err)
+	}
+
+	if len(containers) == 0 {
+		return result, nil
+	}
+
+	pod.Spec.EphemeralContainers = containers
+	if _, err := podsClient.Update(context.TODO(), pod, metav1.UpdateOptions{}); err == nil {
+		return nil, fmt.Errorf("unexpected allowed direct update of ephemeral containers during set up: %v", err)
+	}
+
+	result, err = podsClient.UpdateEphemeralContainers(context.TODO(), pod.Name, pod, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to update ephemeral containers for test case set up: %v", err)
+	}
+
+	return result, nil
+}
+
+func TestPodPatchEphemeralContainers(t *testing.T) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	ns := framework.CreateNamespaceOrDie(client, "pod-patch-ephemeral-containers", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	testPod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:                     "fake-name",
+						Image:                    "fakeimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+		}
+	}
+
+	cases := []struct {
+		name      string
+		original  []v1.EphemeralContainer
+		patchType types.PatchType
+		patchBody []byte
+		valid     bool
+	}{
+		{
+			name:      "create single container (strategic)",
+			original:  nil,
+			patchType: types.StrategicMergePatchType,
+			patchBody: []byte(`{
+				"spec": {
+					"ephemeralContainers": [{
+						"name": "debugger1",
+						"image": "debugimage",
+						"imagePullPolicy": "Always",
+						"terminationMessagePolicy": "File"
+					}]
+				}
+			}`),
+			valid: true,
+		},
+		{
+			name:      "create single container (merge)",
+			original:  nil,
+			patchType: types.MergePatchType,
+			patchBody: []byte(`{
+				"spec": {
+					"ephemeralContainers":[{
+						"name": "debugger1",
+						"image": "debugimage",
+						"imagePullPolicy": "Always",
+						"terminationMessagePolicy": "File"
+					}]
+				}
+			}`),
+			valid: true,
+		},
+		{
+			name:      "create single container (JSON)",
+			original:  nil,
+			patchType: types.JSONPatchType,
+			// Because ephemeralContainers is optional, a JSON patch of an empty ephemeralContainers must add the
+			// list rather than simply appending to it.
+			patchBody: []byte(`[{
+				"op":"add",
+				"path":"/spec/ephemeralContainers",
+				"value":[{
+					"name":"debugger1",
+					"image":"debugimage",
+					"imagePullPolicy": "Always",
+					"terminationMessagePolicy": "File"
+				}]
+			}]`),
+			valid: true,
+		},
+		{
+			name: "add single container (strategic)",
+			original: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger1",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			patchType: types.StrategicMergePatchType,
+			patchBody: []byte(`{
+				"spec": {
+					"ephemeralContainers":[{
+						"name": "debugger2",
+						"image": "debugimage",
+						"imagePullPolicy": "Always",
+						"terminationMessagePolicy": "File"
+					}]
+				}
+			}`),
+			valid: true,
+		},
+		{
+			name: "add single container (merge)",
+			original: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger1",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			patchType: types.MergePatchType,
+			patchBody: []byte(`{
+				"spec": {
+					"ephemeralContainers":[{
+						"name": "debugger1",
+						"image": "debugimage",
+						"imagePullPolicy": "Always",
+						"terminationMessagePolicy": "File"
+					},{
+						"name": "debugger2",
+						"image": "debugimage",
+						"imagePullPolicy": "Always",
+						"terminationMessagePolicy": "File"
+					}]
+				} 
+			}`),
+			valid: true,
+		},
+		{
+			name: "add single container (JSON)",
+			original: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger1",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			patchType: types.JSONPatchType,
+			patchBody: []byte(`[{
+				"op":"add",
+				"path":"/spec/ephemeralContainers/-",
+				"value":{
+					"name":"debugger2",
+					"image":"debugimage",
+					"imagePullPolicy": "Always",
+					"terminationMessagePolicy": "File"
+				}
+			}]`),
+			valid: true,
+		},
+		{
+			name: "remove all containers (merge)",
+			original: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger1",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			patchType: types.MergePatchType,
+			patchBody: []byte(`{"spec": {"ephemeralContainers":[]}}`),
+			valid:     false,
+		},
+		{
+			name: "remove the single container (JSON)",
+			original: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger1",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			patchType: types.JSONPatchType,
+			patchBody: []byte(`[{"op":"remove","path":"/spec/ephemeralContainers/0"}]`),
+			valid:     false, // disallowed by policy rather than patch semantics
+		},
+		{
+			name: "remove all containers (JSON)",
+			original: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger1",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			patchType: types.JSONPatchType,
+			patchBody: []byte(`[{"op":"remove","path":"/spec/ephemeralContainers"}]`),
+			valid:     false, // disallowed by policy rather than patch semantics
+		},
+	}
+
+	for i, tc := range cases {
+		pod := testPod(fmt.Sprintf("ephemeral-container-test-%v", i))
+		if _, err := setUpEphemeralContainers(client.CoreV1().Pods(ns.Name), pod, tc.original); err != nil {
+			t.Errorf("%v: %v", tc.name, err)
+		}
+
+		if _, err := client.CoreV1().Pods(ns.Name).Patch(context.TODO(), pod.Name, tc.patchType, tc.patchBody, metav1.PatchOptions{}, "ephemeralcontainers"); tc.valid && err != nil {
+			t.Errorf("%v: failed to update ephemeral containers: %v", tc.name, err)
+		} else if !tc.valid && err == nil {
+			t.Errorf("%v: unexpected allowed update to ephemeral containers", tc.name)
+		}
+
+		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+	}
+}
+
+func TestPodUpdateEphemeralContainers(t *testing.T) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	ns := framework.CreateNamespaceOrDie(client, "pod-update-ephemeral-containers", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	testPod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "fake-name",
+						Image: "fakeimage",
+					},
+				},
+			},
+		}
+	}
+
+	cases := []struct {
+		name     string
+		original []v1.EphemeralContainer
+		update   []v1.EphemeralContainer
+		valid    bool
+	}{
+		{
+			name:     "no change, nil",
+			original: nil,
+			update:   nil,
+			valid:    true,
+		},
+		{
+			name: "no change, set",
+			original: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			update: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			valid: true,
+		},
+		{
+			name:     "add single container",
+			original: nil,
+			update: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			valid: true,
+		},
+		{
+			name: "remove all containers, nil",
+			original: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			update: nil,
+			valid:  false,
+		},
+		{
+			name: "remove all containers, empty",
+			original: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			update: []v1.EphemeralContainer{},
+			valid:  false,
+		},
+		{
+			name: "increase number of containers",
+			original: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger1",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			update: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger1",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger2",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			valid: true,
+		},
+		{
+			name: "decrease number of containers",
+			original: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger1",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger2",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			update: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger1",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			valid: false,
+		},
+	}
+
+	for i, tc := range cases {
+		pod, err := setUpEphemeralContainers(client.CoreV1().Pods(ns.Name), testPod(fmt.Sprintf("ephemeral-container-test-%v", i)), tc.original)
+		if err != nil {
+			t.Errorf("%v: %v", tc.name, err)
+		}
+
+		pod.Spec.EphemeralContainers = tc.update
+		if _, err := client.CoreV1().Pods(ns.Name).UpdateEphemeralContainers(context.TODO(), pod.Name, pod, metav1.UpdateOptions{}); tc.valid && err != nil {
+			t.Errorf("%v: failed to update ephemeral containers: %v", tc.name, err)
+		} else if !tc.valid && err == nil {
+			t.Errorf("%v: unexpected allowed update to ephemeral containers", tc.name)
+		}
+
+		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+	}
+}
+
+func TestPodResizeRBAC(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil,
+		append(framework.DefaultTestServerFlags(), "--authorization-mode=RBAC"), framework.SharedEtcd())
+	defer server.TearDownFn()
+	adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	ns := framework.CreateNamespaceOrDie(adminClient, "pod-resize", t)
+	defer framework.DeleteNamespaceOrDie(adminClient, ns, t)
+
+	testPod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "fake-name",
+						Image: "fakeimage",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("100m"),
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	testcases := []struct {
+		name               string
+		serviceAccountFn   func(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset
+		serviceAccountRBAC rbacv1.PolicyRule
+		allowResize        bool
+		allowUpdate        bool
+	}{
+		{
+			name:               "pod-mutator",
+			serviceAccountFn:   authutil.ServiceAccountClient(ns.Name, "pod-mutator"),
+			serviceAccountRBAC: rbachelper.NewRule("get", "update", "patch").Groups("").Resources("pods").RuleOrDie(),
+			allowResize:        false,
+			allowUpdate:        true,
+		},
+		{
+			name:               "pod-resizer",
+			serviceAccountFn:   authutil.ServiceAccountClient(ns.Name, "pod-resizer"),
+			serviceAccountRBAC: rbachelper.NewRule("get", "update", "patch").Groups("").Resources("pods/resize").RuleOrDie(),
+			allowResize:        true,
+			allowUpdate:        false,
+		},
+	}
+
+	for i, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			// 1. Create a test pod.
+			pod := testPod(fmt.Sprintf("resize-%d", i))
+			resp, err := adminClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Unexpected error when creating pod: %v", err)
+				integration.DeletePodOrErrorf(t, adminClient, ns.Name, pod.Name)
+			}
+
+			// 2. Create a service account and fetch its client.
+			saClient := tc.serviceAccountFn(t, adminClient, server.ClientConfig, []rbacv1.PolicyRule{tc.serviceAccountRBAC})
+
+			// 3. Update pod and check whether it should be allowed.
+			resp.Spec.Containers[0].Image = "updated-image"
+			if _, err := saClient.CoreV1().Pods(ns.Name).Update(context.TODO(), resp, metav1.UpdateOptions{}); err == nil && !tc.allowUpdate {
+				t.Fatalf("Unexpected allowed pod update")
+				integration.DeletePodOrErrorf(t, adminClient, ns.Name, pod.Name)
+			} else if err != nil && tc.allowUpdate {
+				t.Fatalf("Unexpected error when updating pod container resources: %v", err)
+				integration.DeletePodOrErrorf(t, adminClient, ns.Name, pod.Name)
+			}
+
+			// 4. Resize pod container resource and check whether it should be allowed.
+			resp, err = adminClient.CoreV1().Pods(ns.Name).Get(context.TODO(), resp.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Unexpected error when fetching the pod: %v", err)
+				integration.DeletePodOrErrorf(t, adminClient, ns.Name, pod.Name)
+			}
+			resp.Spec.Containers[0].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("200m"),
+				},
+			}
+			_, err = saClient.CoreV1().Pods(ns.Name).UpdateResize(context.TODO(), resp.Name, resp, metav1.UpdateOptions{})
+			if tc.allowResize && err != nil {
+				t.Fatalf("Unexpected pod resize failure: %v", err)
+				integration.DeletePodOrErrorf(t, adminClient, ns.Name, pod.Name)
+			}
+			if !tc.allowResize && err == nil {
+				t.Fatalf("Unexpected pod resize success")
+				integration.DeletePodOrErrorf(t, adminClient, ns.Name, pod.Name)
+			}
+
+			// 5. Delete the test pod.
+			integration.DeletePodOrErrorf(t, adminClient, ns.Name, pod.Name)
+		})
+	}
+}
+
+func TestPodResize(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	ns := framework.CreateNamespaceOrDie(client, "pod-resize", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	testPod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "fake-name",
+						Image: "fakeimage",
+					},
+				},
+			},
+		}
+	}
+
+	resizeCases := []struct {
+		name        string
+		originalRes v1.ResourceRequirements
+		resize      v1.ResourceRequirements
+		valid       bool
+	}{
+		{
+			name: "cpu request change",
+			originalRes: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("10m"),
+				},
+			},
+			resize: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("20m"),
+				},
+			},
+			valid: true,
+		},
+		{
+			name: "memory request change",
+			originalRes: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+			resize: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("2Gi"),
+				},
+			},
+			valid: true,
+		},
+		{
+			name: "storage request change",
+			originalRes: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+			},
+			resize: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+				},
+			},
+			valid: false,
+		},
+	}
+
+	for _, tc := range resizeCases {
+		pod := testPod("resize")
+		pod.Spec.Containers[0].Resources = tc.originalRes
+		resp, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Unexpected error when creating pod: %v", err)
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+
+		// Part 1. Resize
+		resp.Spec.Containers[0].Resources = tc.resize
+		if _, err := client.CoreV1().Pods(ns.Name).Update(context.TODO(), resp, metav1.UpdateOptions{}); err == nil {
+			t.Fatalf("Unexpected allowed pod update")
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		} else if !strings.Contains(err.Error(), "spec: Forbidden: pod updates may not change fields other than") {
+			t.Fatalf("Unexpected error when updating pod container resources: %v", err)
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+
+		resp, err = client.CoreV1().Pods(ns.Name).UpdateResize(context.TODO(), resp.Name, resp, metav1.UpdateOptions{})
+		if tc.valid && err != nil {
+			t.Fatalf("Unexpected pod resize failure: %v", err)
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+		if !tc.valid && err == nil {
+			t.Fatalf("Unexpected pod resize success")
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+
+		// Part 2. Rollback
+		if !tc.valid {
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+			continue
+		}
+		resp.Spec.Containers[0].Resources = tc.originalRes
+		_, err = client.CoreV1().Pods(ns.Name).UpdateResize(context.TODO(), resp.Name, resp, metav1.UpdateOptions{})
+		if tc.valid && err != nil {
+			t.Fatalf("Unexpected pod resize failure: %v", err)
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+		if !tc.valid && err == nil {
+			t.Fatalf("Unexpected pod resize success")
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+
+		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+	}
+
+	patchCases := []struct {
+		name        string
+		originalRes v1.ResourceRequirements
+		patchBody   string
+		patchType   types.PatchType
+		valid       bool
+	}{
+		{
+			name: "cpu request change (strategic)",
+			originalRes: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("10m"),
+				},
+			},
+			patchType: types.StrategicMergePatchType,
+			patchBody: `{
+				"spec":{
+					"containers":[
+						{
+							"name":"fake-name",
+							"resources": {
+								"requests": {
+									"cpu":"20m"
+								}
+							}
+						}
+					]
+				}
+			}`,
+			valid: true,
+		},
+		{
+			name: "cpu request change (merge)",
+			originalRes: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("10m"),
+				},
+			},
+			patchType: types.MergePatchType,
+			patchBody: `{
+				"spec":{
+					"containers":[
+						{
+							"name":"fake-name",
+							"resources": {
+								"requests": {
+									"cpu":"20m"
+								}
+							}
+						}
+					]
+				}
+			}`,
+			valid: true,
+		},
+		{
+			name: "cpu request change (JSON)",
+			originalRes: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("10m"),
+				},
+			},
+			patchType: types.JSONPatchType,
+			patchBody: `[{
+				"op":"add",
+				"path":"/spec/containers",
+				"value":[{
+					"name":"fake-name",
+					"resources": {
+						"requests": {
+							"cpu":"20m"
+						}
+					}
+				}]
+			}]`,
+			valid: true,
+		},
+		{
+			name: "storage request change (merge)",
+			originalRes: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("10m"),
+				},
+			},
+			patchType: types.MergePatchType,
+			patchBody: `{
+				"spec":{
+					"containers":[
+						{
+							"name":"fake-name",
+							"resources": {
+								"requests": {
+									"ephemeral-storage":"20m"
+								}
+							}
+						}
+					]
+				}
+			}`,
+			valid: false,
+		},
+	}
+
+	for _, tc := range patchCases {
+		pod := testPod("resize")
+		pod.Spec.Containers[0].Resources = tc.originalRes
+		if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Unexpected error when creating pod: %v", err)
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+
+		if _, err := client.CoreV1().Pods(ns.Name).Patch(context.TODO(), pod.Name, tc.patchType, []byte(tc.patchBody), metav1.PatchOptions{}, "resize"); tc.valid && err != nil {
+			t.Fatalf("Unexpected pod resize failure: %v", err)
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		} else if !tc.valid && err == nil {
+			t.Fatalf("Unexpected pod resize success")
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		}
+		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+	}
+}
+
+func TestMutablePodSchedulingDirectives(t *testing.T) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	ns := framework.CreateNamespaceOrDie(client, "mutable-pod-scheduling-directives", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	cases := []struct {
+		name   string
+		create *v1.Pod
+		update *v1.Pod
+		err    string
+	}{
+		{
+			name: "adding node selector is allowed for gated pods",
+			create: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "fake-name",
+							Image: "fakeimage",
+						},
+					},
+					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			update: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "fake-name",
+							Image: "fakeimage",
+						},
+					},
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+		},
+		{
+			name: "addition to nodeAffinity is allowed for gated pods",
+			create: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "fake-name",
+							Image: "fakeimage",
+						},
+					},
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			update: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "fake-name",
+							Image: "fakeimage",
+						},
+					},
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								// Add 1 MatchExpression and 1 MatchField.
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+											{
+												Key:      "expr2",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"foo2"},
+											},
+										},
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+		},
+		{
+			name: "addition to nodeAffinity is allowed for gated pods with nil affinity",
+			create: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "fake-name",
+							Image: "fakeimage",
+						},
+					},
+					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			update: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "fake-name",
+							Image: "fakeimage",
+						},
+					},
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								// Add 1 MatchExpression and 1 MatchField.
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "expr",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      "metadata.name",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					SchedulingGates: []v1.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+		},
+	}
+	for _, tc := range cases {
+		if _, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), tc.create, metav1.CreateOptions{}); err != nil {
+			t.Errorf("Failed to create pod: %v", err)
+		}
+
+		_, err := client.CoreV1().Pods(ns.Name).Update(context.TODO(), tc.update, metav1.UpdateOptions{})
+		if (tc.err == "" && err != nil) || (tc.err != "" && err != nil && !strings.Contains(err.Error(), tc.err)) {
+			t.Errorf("Unexpected error: got %q, want %q", err.Error(), err)
+		}
+		integration.DeletePodOrErrorf(t, client, ns.Name, tc.update.Name)
+	}
+}
+
+func TestDNSSearchValidation(t *testing.T) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	ns := framework.CreateNamespaceOrDie(client, "pod-update-dns-search", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	testPod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "fake-name",
+						Image: "fakeimage",
+					},
+				},
+			},
+		}
+	}
+
+	cases := []struct {
+		name     string
+		original *v1.PodDNSConfig
+		valid    bool
+	}{
+		{
+			name:     "leading underscore",
+			original: &v1.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+			valid:    true,
+		},
+		{
+			name:     "single dot",
+			original: &v1.PodDNSConfig{Searches: []string{"."}},
+			valid:    true,
+		},
+		{
+			name:     "without underscore",
+			original: &v1.PodDNSConfig{Searches: []string{"example.com"}},
+			valid:    true,
+		},
+		{
+			name:     "double dot",
+			original: &v1.PodDNSConfig{Searches: []string{".."}},
+			valid:    false,
+		},
+		{
+			name:     "leading unicode",
+			original: &v1.PodDNSConfig{Searches: []string{"☃.example.com"}},
+			valid:    false,
+		},
+	}
+
+	for _, tc := range cases {
+		pod := testPod("dns")
+		pod.Spec.DNSConfig = tc.original
+		_, err := client.CoreV1().Pods(ns.Name).Create(t.Context(), pod, metav1.CreateOptions{})
+		if tc.valid {
+			if err != nil {
+				t.Errorf("%v: %v", tc.name, err)
+			}
+			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		} else if err == nil {
+			t.Errorf("%v: unexpected allowed update to ephemeral containers", tc.name)
+		}
+	}
+}
+
+func TestNodeDeclaredFeatureAdmission(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.NodeDeclaredFeatures:                         true,
+		features.PodLevelResources:                            true,
+		features.InPlacePodLevelResourcesVerticalScaling:      true,
+		features.InPlacePodVerticalScalingMemoryBackedVolumes: true,
+	})
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "pod-resize-feature-admission", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	limit100 := resource.MustParse("100Mi")
+	nodeName := "test-node"
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "test-pod-",
+		},
+		Spec: v1.PodSpec{
+			NodeName: nodeName,
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+			},
+			Containers: []v1.Container{
+				{
+					Name:  "test-container",
+					Image: "fakeimage",
+				},
+			},
+			RestartPolicy: v1.RestartPolicyAlways,
+			Volumes: []v1.Volume{
+				{
+					Name: "vol-memory",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &limit100,
+						},
+					},
+				},
+				{
+					Name: "vol-default",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumDefault,
+							SizeLimit: &limit100,
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+
+	testCases := []struct {
+		name                 string
+		nodeDeclaredFeatures []string
+		nodeVersion          string
+		podUpdateFn          func(pod *v1.Pod)
+		expectError          string
+	}{
+		{
+			name:                 "admission fails when required feature is not declared on node",
+			nodeDeclaredFeatures: []string{"SomeOtherFeature"},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				pod.Spec.Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+				pod.Spec.Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+			},
+			expectError: "pod update requires features InPlacePodLevelResourcesVerticalScaling which are not available on node",
+		},
+
+		{
+			name:                 "admission succeeds when required feature is declared on node",
+			nodeDeclaredFeatures: []string{ipprfeature.PodLevelResourcesResizeFeature.Name()},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				pod.Spec.Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+				pod.Spec.Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+			},
+			expectError: "",
+		},
+
+		{
+			name:                 "admission succeeds when pod update does not require any declared feature",
+			nodeDeclaredFeatures: []string{"SomeOtherFeature"},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				pod.ObjectMeta.Labels = map[string]string{"foo": "bar"}
+			},
+			expectError: "",
+		},
+
+		{
+			name:                 "memory backed volume resize admission fails when required feature is not declared on node",
+			nodeDeclaredFeatures: []string{"SomeOtherFeature"},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				limit200 := resource.MustParse("200Mi")
+				pod.Spec.Volumes[0].EmptyDir.SizeLimit = &limit200
+			},
+			expectError: "pod update requires features InPlacePodVerticalScalingMemoryBackedVolumes which are not available on node",
+		},
+
+		{
+			name:                 "memory backed volume resize admission succeeds when required feature is declared on node",
+			nodeDeclaredFeatures: []string{ipprfeature.MemoryBackedVolumesResizeFeature.Name()},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				limit200 := resource.MustParse("200Mi")
+				pod.Spec.Volumes[0].EmptyDir.SizeLimit = &limit200
+			},
+			expectError: "",
+		},
+
+		{
+			name:                 "non-memory backed volume resize admission passes NDF but fails regular validation",
+			nodeDeclaredFeatures: []string{"SomeOtherFeature"},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				limit200 := resource.MustParse("200Mi")
+				pod.Spec.Volumes[1].EmptyDir.SizeLimit = &limit200
+			},
+			// Regular validation will throw an error for this case, but NDF should not.
+			expectError: "Forbidden: sizeLimit is only mutable for memory-backed emptyDir volumes",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: nodeName,
+				},
+				Status: v1.NodeStatus{
+					NodeInfo:         v1.NodeSystemInfo{KubeletVersion: tc.nodeVersion},
+					DeclaredFeatures: tc.nodeDeclaredFeatures,
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("12"),
+						v1.ResourceMemory: resource.MustParse("8Gi"),
+					},
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("12"),
+						v1.ResourceMemory: resource.MustParse("8Gi"),
+					},
+				},
+			}
+			_, err := client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create node: %v", err)
+			}
+			defer func() {
+				err := client.CoreV1().Nodes().Delete(context.TODO(), nodeName, metav1.DeleteOptions{})
+				if err != nil {
+					t.Fatalf("Failed to delete Node %v", err)
+				}
+			}()
+
+			createdPod, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), testPod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create pod: %v", err)
+			}
+			defer func() {
+				err := client.CoreV1().Pods(ns.Name).Delete(context.TODO(), createdPod.Name, metav1.DeleteOptions{})
+				if err != nil {
+					t.Fatalf("Failed to delete Node %v", err)
+				}
+			}()
+
+			podToUpdate := createdPod.DeepCopy()
+			tc.podUpdateFn(podToUpdate)
+
+			pollErr := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+				_, err = client.CoreV1().Pods(ns.Name).UpdateResize(ctx, podToUpdate.Name, podToUpdate, metav1.UpdateOptions{})
+				if tc.expectError == "" {
+					if err == nil {
+						return true, nil
+					}
+					if strings.Contains(err.Error(), "not found") {
+						return false, nil
+					}
+					return false, err
+				} else {
+					if err != nil {
+						if strings.Contains(err.Error(), tc.expectError) {
+							return true, nil
+						}
+						if strings.Contains(err.Error(), "not found") {
+							return false, nil
+						}
+						return false, err
+					}
+					return false, fmt.Errorf("expected error containing %q, but got no error", tc.expectError)
+				}
+			})
+			if pollErr != nil {
+				t.Errorf("Unexpected error: %v (last error during update: %v)", pollErr, err)
+			}
+		})
+	}
+}
+
+func TestPodResizeValidation(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "pod-resize-validation", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	ctx := context.Background()
+
+	createNode := func(name string, os string, cpu string, mem string) {
+		node := &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+				Labels: map[string]string{
+					v1.LabelOSStable: os,
+				},
+			},
+			Status: v1.NodeStatus{
+				Allocatable: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(cpu),
+					v1.ResourceMemory: resource.MustParse(mem),
+				},
+			},
+		}
+		if _, err := client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create node %s: %v", name, err)
+		}
+	}
+
+	createNode("linux-node-small", "linux", "2", "2Gi")
+	createNode("windows-node", "windows", "8", "16Gi")
+
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "test-pod-",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "pause",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("500m"),
+							v1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name            string
+		targetNode      string
+		resizeCPU       string
+		expectError     string
+		expectCauseType string
+	}{
+		{
+			name:       "valid resize on linux node",
+			targetNode: "linux-node-small",
+			resizeCPU:  "1",
+		},
+		{
+			name:            "fail resize exceeding node allocatable",
+			targetNode:      "linux-node-small",
+			resizeCPU:       "4", // Node only has 2
+			expectError:     "node didn't have enough allocatable resources: cpu",
+			expectCauseType: "NodeCapacity",
+		},
+		{
+			name:            "fail resize on non-linux node",
+			targetNode:      "windows-node",
+			resizeCPU:       "1",
+			expectError:     "pod resize is only supported on linux nodes",
+			expectCauseType: "UnsupportedPlatform",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			p := testPod.DeepCopy()
+			p.Spec.NodeName = tc.targetNode
+			pod, err := client.CoreV1().Pods(ns.Name).Create(ctx, p, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Error creating pod: %v", err)
+			}
+			defer func() {
+				err := client.CoreV1().Pods(ns.Name).Delete(ctx, pod.ObjectMeta.Name, metav1.DeleteOptions{})
+				if err != nil {
+					t.Logf("Failed to delete pod %s: %v", testPod.Name, err)
+				}
+			}()
+
+			pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse(tc.resizeCPU)
+			_, err = client.CoreV1().Pods(ns.Name).UpdateResize(ctx, pod.Name, pod, metav1.UpdateOptions{})
+
+			if tc.expectError == "" {
+				if err != nil {
+					t.Errorf("Expected success, got error: %v", err)
+				}
+			} else if err == nil {
+				t.Error("Expected error but got success")
+			} else if !strings.Contains(err.Error(), tc.expectError) {
+				t.Errorf("Expected error containing %q, got: %v", tc.expectError, err)
+			} else {
+				var statusErr *apierrors.StatusError
+				if !errors.As(err, &statusErr) {
+					t.Errorf("Expected a StatusError, got: %v", err)
+				}
+				if len(statusErr.ErrStatus.Details.Causes) == 0 {
+					t.Errorf("Expected error causes, but got none")
+				}
+				if tc.expectCauseType != string(statusErr.ErrStatus.Details.Causes[0].Type) {
+					t.Errorf("Expected cause type %q, got: %v", tc.expectCauseType, statusErr.ErrStatus.Details.Causes[0].Type)
+				}
+			}
+		})
+	}
+}
+
+func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	ns := framework.CreateNamespaceOrDie(client, "pod-level-resources", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	cpu := func(val string) v1.ResourceList {
+		return v1.ResourceList{v1.ResourceCPU: resource.MustParse(val)}
+	}
+
+	cReq := cpu("1")
+	cLim := cpu("2")
+	pReq := cpu("3")
+	pLim := cpu("4")
+
+	aggReq := cpu("2") // aggregated request for the 2 container cases
+	aggLim := cpu("4") // aggregated limit for the 2 containers cases
+
+	// For generating test case names.
+	quantityName := func(q v1.ResourceList) string {
+		switch {
+		case len(q) == 0:
+			return ""
+		case apiequality.Semantic.DeepEqual(q, cReq):
+			return "cReq"
+		case apiequality.Semantic.DeepEqual(q, cLim):
+			return "cLim"
+		case apiequality.Semantic.DeepEqual(q, pReq):
+			return "pReq"
+		case apiequality.Semantic.DeepEqual(q, pLim):
+			return "pLim"
+		case apiequality.Semantic.DeepEqual(q, aggReq):
+			return "aggReq"
+		case apiequality.Semantic.DeepEqual(q, aggLim):
+			return "aggLim"
+		}
+		return "custom"
+	}
+	resourceSummary := func(reqs, lims v1.ResourceList) string {
+		if len(reqs) == 0 && len(lims) == 0 {
+			return "none"
+		}
+		summary := quantityName(reqs) + "+" + quantityName(lims)
+		return strings.Trim(summary, "+") // Remove + if either reqs or lims is nil
+	}
+
+	type resources struct {
+		podReqs, podLims             v1.ResourceList
+		containerReqs, containerLims v1.ResourceList
+	}
+
+	tests := []struct {
+		name             string
+		featureOverrides featuregatetesting.FeatureOverrides
+		initial          resources
+		secondContainer  bool
+		tweakPod         func(pod *v1.Pod)
+		expected         resources
+		expectError      bool
+		expectedQOS      v1.PodQOSClass
+	}{
+		{
+			initial:     resources{nil, nil, nil, nil},
+			expected:    resources{nil, nil, nil, nil},
+			expectedQOS: v1.PodQOSBestEffort,
+		}, {
+			initial:  resources{nil, nil, nil, cLim},
+			expected: resources{nil, nil, cLim, cLim},
+		}, {
+			initial:  resources{nil, nil, cReq, nil},
+			expected: resources{nil, nil, cReq, nil},
+		}, {
+			initial:  resources{nil, nil, cReq, cLim},
+			expected: resources{nil, nil, cReq, cLim},
+		}, {
+			initial:  resources{nil, pLim, nil, nil},
+			expected: resources{pLim, pLim, nil, nil},
+		}, {
+			initial:  resources{nil, pLim, nil, cLim},
+			expected: resources{cLim, pLim, cLim, cLim}, // Pod requests default to container requests
+		}, {
+			initial:  resources{nil, pLim, cReq, nil},
+			expected: resources{cReq, pLim, cReq, nil}, // Pod requests default to container requests
+		}, {
+			initial:  resources{nil, pLim, cReq, cLim},
+			expected: resources{cReq, pLim, cReq, cLim}, // Pod requests default to container requests
+		}, {
+			initial:  resources{pReq, nil, nil, nil},
+			expected: resources{pReq, nil, nil, nil},
+		}, {
+			name:             "PodLevelResourcesFixDefaulting disabled: pod limits not defaulted from container limits (1 container)",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			initial:          resources{pReq, nil, nil, cLim},
+			expected:         resources{pReq, nil, cLim, cLim},
+		}, {
+			name:             "PodLevelResourcesFixDefaulting enabled: pod limits defaulted from container limits (1 container)",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			initial:          resources{pReq, nil, nil, cLim},
+			expected:         resources{pReq, pReq, cLim, cLim},
+		}, {
+			initial:  resources{pReq, nil, cReq, nil},
+			expected: resources{pReq, nil, cReq, nil},
+		}, {
+			name:             "PodLevelResourcesFixDefaulting disabled: pod limits not defaulted when container requests specified",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			initial:          resources{pReq, nil, cReq, cLim},
+			expected:         resources{pReq, nil, cReq, cLim},
+		}, {
+			name:             "PodLevelResourcesFixDefaulting enabled: pod limits defaulted when container requests specified",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			initial:          resources{pReq, nil, cReq, cLim},
+			expected:         resources{pReq, pReq, cReq, cLim},
+		}, {
+			initial:  resources{pReq, pLim, nil, nil},
+			expected: resources{pReq, pLim, nil, nil},
+		}, {
+			initial:  resources{pReq, pLim, nil, cLim},
+			expected: resources{pReq, pLim, cLim, cLim},
+		}, {
+			initial:  resources{pReq, pLim, cReq, nil},
+			expected: resources{pReq, pLim, cReq, nil},
+		}, {
+			initial:  resources{pReq, pLim, cReq, cLim},
+			expected: resources{pReq, pLim, cReq, cLim},
+		},
+		// 2 Container cases
+		{
+			secondContainer: true,
+			initial:         resources{nil, nil, nil, nil},
+			expected:        resources{nil, nil, nil, nil},
+			expectedQOS:     v1.PodQOSBestEffort,
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, nil, nil, cLim},
+			expected:        resources{nil, nil, cLim, cLim},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, nil, cReq, nil},
+			expected:        resources{nil, nil, cReq, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, nil, cReq, cLim},
+			expected:        resources{nil, nil, cReq, cLim},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, pLim, nil, nil},
+			expected:        resources{pLim, pLim, nil, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, pLim, nil, cLim},
+			expected:        resources{aggLim, pLim, cLim, cLim},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, pLim, cReq, nil},
+			expected:        resources{aggReq, pLim, cReq, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, pLim, cReq, cLim},
+			expected:        resources{aggReq, pLim, cReq, cLim},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, nil, nil, nil},
+			expected:        resources{pReq, nil, nil, nil},
+		}, {
+			name:             "PodLevelResourcesFixDefaulting disabled: pod limits not defaulted with 2 containers",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			secondContainer:  true,
+			initial:          resources{aggLim, nil, nil, cLim},
+			expected:         resources{aggLim, nil, cLim, cLim},
+		}, {
+			name:             "PodLevelResourcesFixDefaulting enabled: pod limits defaulted with 2 containers",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			secondContainer:  true,
+			initial:          resources{aggLim, nil, nil, cLim},
+			expected:         resources{aggLim, aggLim, cLim, cLim},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, nil, cReq, nil},
+			expected:        resources{pReq, nil, cReq, nil},
+		}, {
+			name:             "PodLevelResourcesFixDefaulting disabled: pod limits not defaulted with 2 containers and container requests",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			secondContainer:  true,
+			initial:          resources{pReq, nil, cReq, cLim},
+			expected:         resources{pReq, nil, cReq, cLim},
+		}, {
+			name:             "PodLevelResourcesFixDefaulting enabled: pod limits defaulted with 2 containers and container requests",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			secondContainer:  true,
+			initial:          resources{pReq, nil, cReq, cLim},
+			expected:         resources{pReq, aggLim, cReq, cLim},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, pLim, nil, nil},
+			expected:        resources{pReq, pLim, nil, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, pLim, nil, cLim},
+			expectError:     true, // pReq(3) < 2 * cLim(2)
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, pLim, cReq, nil},
+			expected:        resources{pReq, pLim, cReq, nil},
+		}, {
+			secondContainer: true,
+			initial:         resources{pReq, pLim, cReq, cLim},
+			expected:        resources{pReq, pLim, cReq, cLim},
+		},
+		// The following test cases invert the container & pod values to test error conditions.
+		{
+			initial:     resources{nil, cLim, nil, pLim},
+			expectError: true, // cLim < pLim
+		}, {
+			initial:     resources{nil, cLim, pReq, nil},
+			expectError: true, // Pod defaulted reqs to pReq > cLim
+		}, {
+			initial:     resources{nil, cLim, pReq, pLim},
+			expectError: true, // Pod defaulted reqs to pReq > cLim
+		}, {
+			initial:     resources{nil, cLim, cReq, pLim},
+			expectError: true, // Individual container limits must be <= pod limits
+		}, {
+			initial:     resources{cReq, nil, nil, pLim},
+			expectError: true, // Container defaulted reqs to pLim > cReq
+		}, {
+			initial:     resources{cReq, nil, pReq, nil},
+			expectError: true, // cReq < pReq
+		}, {
+			initial:     resources{cReq, nil, pReq, pLim},
+			expectError: true, // cReq < pReq
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, cLim, nil, cLim},
+			expectError:     true, // pod req defaults to 2x cLim
+		}, {
+			secondContainer: true,
+			initial:         resources{nil, cLim, cReq, cLim},
+			expected:        resources{aggReq, cLim, cReq, cLim}, // aggReq == cLim
+		},
+		{
+			name:             "CPU + memory at container level, only CPU at pod level (fix disabled)",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			initial: resources{
+				podReqs: cpu("2"),
+				podLims: cpu("2"),
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			expected: resources{
+				podReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				podLims: cpu("2"),
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			expectedQOS: v1.PodQOSBurstable,
+		},
+		{
+			name:             "CPU + memory at container level, only CPU at pod level (fix enabled)",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			initial: resources{
+				podReqs: cpu("2"),
+				podLims: cpu("2"),
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			expected: resources{
+				podReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				podLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			expectedQOS: v1.PodQOSBurstable,
+		},
+		{
+			name: "Ephemeral storage at pod level, cpu + mem at container level",
+			initial: resources{
+				podReqs: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+				podLims: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
+				},
+			},
+			expectError: true,
+		},
+		{
+			name: "Ephemeral storage at container level, cpu + mem at pod level",
+			initial: resources{
+				podReqs: pReq,
+				podLims: pLim,
+				containerReqs: v1.ResourceList{
+					v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+				},
+			},
+			expected: resources{
+				podReqs: pReq,
+				podLims: pLim,
+				containerReqs: v1.ResourceList{
+					v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+				},
+			},
+			expectedQOS: v1.PodQOSBurstable,
+		},
+		{
+			name:             "Combining propagation: pod requests cpu, container requests memory (fix disabled)",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			initial: resources{
+				podReqs:       cpu("1"),
+				containerReqs: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+			},
+			expected: resources{
+				podReqs: cpu("1"),
+				containerReqs: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+		},
+		{
+			name:             "Combining propagation: pod requests cpu, container requests memory (fix enabled)",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			initial: resources{
+				podReqs:       cpu("1"),
+				containerReqs: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+			},
+			expected: resources{
+				podReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				containerReqs: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+		},
+		{
+			name:             "Empty map pod resources (Requests: {}, Limits: {}) - fix disabled",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: false},
+			initial: resources{
+				podReqs:       v1.ResourceList{},
+				podLims:       v1.ResourceList{},
+				containerReqs: cReq,
+				containerLims: cLim,
+			},
+			expected:    resources{v1.ResourceList{}, v1.ResourceList{}, cReq, cLim},
+			expectedQOS: v1.PodQOSBestEffort,
+		},
+		{
+			name:             "Empty map pod resources (Requests: {}, Limits: {}) - fix enabled",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: true},
+			initial: resources{
+				podReqs:       v1.ResourceList{},
+				podLims:       v1.ResourceList{},
+				containerReqs: cReq,
+				containerLims: cLim,
+			},
+			expected:    resources{v1.ResourceList{}, v1.ResourceList{}, cReq, cLim},
+			expectedQOS: v1.PodQOSBurstable,
+		},
+		{
+			name:        "Empty requests map (Requests: {}, Limits: pLim)",
+			initial:     resources{v1.ResourceList{}, pLim, cReq, cLim},
+			expected:    resources{cReq, pLim, cReq, cLim},
+			expectedQOS: v1.PodQOSBurstable,
+		},
+		{
+			name:             "Empty limits map (Requests: pReq, Limits: {}) - fix disabled",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			initial:          resources{pReq, v1.ResourceList{}, cReq, cLim},
+			expected:         resources{pReq, v1.ResourceList{}, cReq, cLim},
+		},
+		{
+			name:             "Empty limits map (Requests: pReq, Limits: {}) - fix enabled",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			initial:          resources{pReq, v1.ResourceList{}, cReq, cLim},
+			expected:         resources{pReq, pReq, cReq, cLim},
+		},
+		{
+			name:             "Empty requests map with container limits (Requests: {}, Limits: nil) - fix disabled",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: false},
+			initial:          resources{v1.ResourceList{}, nil, cReq, cLim},
+			expected:         resources{v1.ResourceList{}, nil, cReq, cLim},
+			expectedQOS:      v1.PodQOSBestEffort,
+		},
+		{
+			name:             "Empty requests map with container limits (Requests: {}, Limits: nil) - fix enabled",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: true},
+			initial:          resources{v1.ResourceList{}, nil, cReq, cLim},
+			expected:         resources{v1.ResourceList{}, nil, cReq, cLim},
+			expectedQOS:      v1.PodQOSBurstable,
+		},
+		{
+			name:             "Empty limits map with container requests (Requests: nil, Limits: {}) - fix disabled",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: false},
+			initial:          resources{nil, v1.ResourceList{}, cReq, cLim},
+			expected:         resources{nil, v1.ResourceList{}, cReq, cLim},
+			expectedQOS:      v1.PodQOSBestEffort,
+		},
+		{
+			name:             "Empty limits map with container requests (Requests: nil, Limits: {}) - fix enabled",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: true},
+			initial:          resources{nil, v1.ResourceList{}, cReq, cLim},
+			expected:         resources{nil, v1.ResourceList{}, cReq, cLim},
+			expectedQOS:      v1.PodQOSBurstable,
+		},
+		{
+			name: "Zero variant: pod requests cpu 0, container requests cpu 1",
+			initial: resources{
+				podReqs:       cpu("0"),
+				containerReqs: cpu("1"),
+			},
+			expectError: true,
+		},
+		{
+			name: "Zero variant: pod requests cpu 0, pod limits cpu 0, container requests cpu 0, container limits cpu 0",
+			initial: resources{
+				podReqs:       cpu("0"),
+				podLims:       cpu("0"),
+				containerReqs: cpu("0"),
+				containerLims: cpu("0"),
+			},
+			expected: resources{
+				podReqs:       cpu("0"),
+				podLims:       cpu("0"),
+				containerReqs: cpu("0"),
+				containerLims: cpu("0"),
+			},
+			expectedQOS: v1.PodQOSBestEffort,
+		},
+		{
+			name: "Zero variant: pod requests cpu 0, pod limits cpu 0, container requests cpu 0",
+			initial: resources{
+				podReqs:       cpu("0"),
+				podLims:       cpu("0"),
+				containerReqs: cpu("0"),
+			},
+			expected: resources{
+				podReqs:       cpu("0"),
+				podLims:       cpu("0"),
+				containerReqs: cpu("0"),
+			},
+			expectedQOS: v1.PodQOSBestEffort,
+		},
+		{
+			name: "Zero variant: pod requests cpu 0, pod limits cpu 1, container requests cpu 0, container limits cpu 1",
+			initial: resources{
+				podReqs:       cpu("0"),
+				podLims:       cpu("1"),
+				containerReqs: cpu("0"),
+				containerLims: cpu("1"),
+			},
+			expected: resources{
+				podReqs:       cpu("0"),
+				podLims:       cpu("1"),
+				containerReqs: cpu("0"),
+				containerLims: cpu("1"),
+			},
+			expectedQOS: v1.PodQOSBurstable,
+		},
+		{
+			name:             "Zero variant (fix disabled): pod requests cpu 0, container requests cpu 0, container limits cpu 1",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			initial: resources{
+				podReqs:       cpu("0"),
+				containerReqs: cpu("0"),
+				containerLims: cpu("1"),
+			},
+			expected: resources{
+				podReqs:       cpu("0"),
+				containerReqs: cpu("0"),
+				containerLims: cpu("1"),
+			},
+			expectedQOS: v1.PodQOSBestEffort,
+		},
+		{
+			name:             "Zero variant (fix enabled): pod requests cpu 0, container requests cpu 0, container limits cpu 1",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			initial: resources{
+				podReqs:       cpu("0"),
+				containerReqs: cpu("0"),
+				containerLims: cpu("1"),
+			},
+			expected: resources{
+				podReqs:       cpu("0"),
+				podLims:       cpu("1"),
+				containerReqs: cpu("0"),
+				containerLims: cpu("1"),
+			},
+			expectedQOS: v1.PodQOSBurstable,
+		},
+		{
+			name: "Zero variant: pod limits cpu 0, container limits cpu 0",
+			initial: resources{
+				podLims:       cpu("0"),
+				containerLims: cpu("0"),
+			},
+			expected: resources{
+				podReqs:       cpu("0"),
+				podLims:       cpu("0"),
+				containerReqs: cpu("0"),
+				containerLims: cpu("0"),
+			},
+			expectedQOS: v1.PodQOSBestEffort,
+		},
+		{
+			name: "Zero variant: pod limits cpu 0, container requests cpu 1",
+			initial: resources{
+				podLims:       cpu("0"),
+				containerReqs: cpu("1"),
+			},
+			expectError: true,
+		},
+		// ---------------------------------------------------------------------
+		// Feature Gate Comparison Test Cases (Disabled vs. Enabled Side-by-Side)
+		// ---------------------------------------------------------------------
+
+		// 1. PR #137150: Empty pod resources QoS determination (BestEffort vs Guaranteed)
+		{
+			name:             "Empty pod resources QoS determination (fix disabled)",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: false},
+			initial: resources{
+				podReqs: v1.ResourceList{},
+				podLims: v1.ResourceList{},
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+			},
+			expected: resources{
+				podReqs: v1.ResourceList{},
+				podLims: v1.ResourceList{},
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+			},
+			expectedQOS: v1.PodQOSBestEffort,
+		},
+		{
+			name:             "Empty pod resources QoS determination (fix enabled)",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixKubeletQOSClass: true},
+			initial: resources{
+				podReqs: v1.ResourceList{},
+				podLims: v1.ResourceList{},
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+			},
+			expected: resources{
+				podReqs: v1.ResourceList{},
+				podLims: v1.ResourceList{},
+				containerReqs: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+				containerLims: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+			},
+			expectedQOS: v1.PodQOSGuaranteed,
+		},
+
+		// 2. PR #140514: Pod limits defaulted from container aggregate limits
+		{
+			name:             "PodLevelResourcesFixDefaulting disabled: pod limits not defaulted from container limits",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			secondContainer:  true,
+			initial:          resources{aggLim, nil, nil, cLim},
+			expected:         resources{aggLim, nil, cLim, cLim},
+		},
+		{
+			name:             "PodLevelResourcesFixDefaulting enabled: pod limits defaulted from container limits",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			secondContainer:  true,
+			initial:          resources{aggLim, nil, nil, cLim},
+			expected:         resources{aggLim, aggLim, cLim, cLim},
+		},
+
+		// 3. PR #140514: Pod requests defaulted from containers when pod limits empty
+		{
+			name:             "PodLevelResourcesFixDefaulting disabled: pod requests not defaulted from containers when pod limits empty",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			initial:          resources{nil, nil, cReq, nil},
+			expected:         resources{nil, nil, cReq, nil},
+		},
+		{
+			name:             "PodLevelResourcesFixDefaulting enabled: pod requests defaulted from containers when pod limits empty",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			initial:          resources{nil, nil, cReq, nil},
+			expected:         resources{nil, nil, cReq, nil},
+		},
+
+		// 4. PR #140514: Pod limits raised to pod request when aggregate container limit < pod request
+		{
+			name:             "PodLevelResourcesFixDefaulting disabled: pod limit not defaulted when aggregate limit less than pod request",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			secondContainer:  true,
+			initial:          resources{pReq, nil, cReq, cReq},
+			expected:         resources{pReq, nil, cReq, cReq},
+		},
+		{
+			name:             "PodLevelResourcesFixDefaulting enabled: pod limit raised to pod request when aggregate limit less than pod request",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			secondContainer:  true,
+			initial:          resources{pReq, nil, cReq, cReq},
+			expected:         resources{pReq, pReq, cReq, cReq},
+		},
+
+		// 5. PR #140514: Pod requests and limits defaulted from 2 containers when pod limits empty
+		{
+			name:             "PodLevelResourcesFixDefaulting disabled: pod requests and limits not defaulted from 2 containers when pod limits empty",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: false},
+			secondContainer:  true,
+			initial:          resources{nil, nil, cReq, cLim},
+			expected:         resources{nil, nil, cReq, cLim},
+		},
+		{
+			name:             "PodLevelResourcesFixDefaulting enabled: pod requests and limits defaulted from 2 containers when pod limits empty",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixDefaulting: true},
+			secondContainer:  true,
+			initial:          resources{nil, nil, cReq, cLim},
+			expected:         resources{nil, nil, cReq, cLim},
+		},
+	}
+
+	for i, test := range tests {
+		testName := test.name
+		if testName == "" {
+			testName = fmt.Sprintf("%d_pod:%s_container:%s", i,
+				resourceSummary(test.initial.podReqs, test.initial.podLims),
+				resourceSummary(test.initial.containerReqs, test.initial.containerLims))
+			if test.secondContainer {
+				testName += "_2containers"
+			}
+		}
+		t.Run(testName, func(t *testing.T) {
+			if len(test.featureOverrides) > 0 {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, test.featureOverrides)
+			}
+
+			var podResources *v1.ResourceRequirements
+			if test.initial.podReqs != nil || test.initial.podLims != nil {
+				podResources = &v1.ResourceRequirements{
+					Requests: test.initial.podReqs,
+					Limits:   test.initial.podLims,
+				}
+			}
+
+			containerResources := v1.ResourceRequirements{
+				Requests: test.initial.containerReqs,
+				Limits:   test.initial.containerLims,
+			}
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Spec: v1.PodSpec{
+					Resources: podResources,
+					Containers: []v1.Container{
+						{
+							Name:      "fake-name",
+							Image:     "fakeimage",
+							Resources: containerResources,
+						},
+					},
+				},
+			}
+
+			if test.secondContainer {
+				c2 := pod.Spec.Containers[0].DeepCopy()
+				c2.Name = "fake-name2"
+				pod.Spec.Containers = append(pod.Spec.Containers, *c2)
+			}
+
+			if test.tweakPod != nil {
+				test.tweakPod(pod)
+			}
+
+			result, err := client.CoreV1().Pods(ns.Name).Create(t.Context(), pod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+			if !test.expectError && err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			} else if test.expectError {
+				if err == nil {
+					t.Fatalf("Expected an error, but received none")
+				} else if !apierrors.IsInvalid(err) {
+					t.Fatalf("Expected an Invalid error, but got: %v", err)
+				} else {
+					return
+				}
+			}
+
+			expQOS := v1.PodQOSBurstable
+			if test.expectedQOS != "" {
+				expQOS = test.expectedQOS
+			}
+
+			if result.Status.QOSClass != expQOS {
+				t.Errorf("Expected QoS class %s; got: %s", expQOS, result.Status.QOSClass)
+			}
+
+			exp := test.expected
+			if exp.podReqs != nil || exp.podLims != nil {
+				expectedPodResources := &v1.ResourceRequirements{
+					Requests: exp.podReqs,
+					Limits:   exp.podLims,
+				}
+				if !apiequality.Semantic.DeepEqual(result.Spec.Resources, expectedPodResources) {
+					t.Errorf("Expected pod resources %s; got: %s", expectedPodResources.String(), result.Spec.Resources.String())
+				}
+			} else if result.Spec.Resources != nil {
+				t.Errorf("Expected empty pod resources, but got: %s", result.Spec.Resources.String())
+			}
+
+			if len(exp.containerReqs) > 0 || len(exp.containerLims) > 0 {
+				expectedContainerResources := v1.ResourceRequirements{
+					Requests: exp.containerReqs,
+					Limits:   exp.containerLims,
+				}
+				if !apiequality.Semantic.DeepEqual(result.Spec.Containers[0].Resources, expectedContainerResources) {
+					t.Errorf("Expected container resources %s; got: %s", expectedContainerResources.String(), result.Spec.Containers[0].Resources.String())
+				}
+				if test.secondContainer && len(result.Spec.Containers) > 1 {
+					if !apiequality.Semantic.DeepEqual(result.Spec.Containers[1].Resources, expectedContainerResources) {
+						t.Errorf("Expected second container resources %s; got: %s", expectedContainerResources.String(), result.Spec.Containers[1].Resources.String())
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestDRAStatusPreservedOnStatusUpdate verifies that the apiserver preserves
+// ResourceClaimStatuses when a DRA-unaware client overwrites the status of a
+// running pod and omits fields that it does not know about.
+func TestDRAStatusPreservedOnStatusUpdate(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
+
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "dra-status-preserve", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	ctx := context.Background()
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dra-pod",
+			Namespace: ns.Name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:  "c",
+				Image: "pause",
+			}},
+			ResourceClaims: []v1.PodResourceClaim{
+				{Name: "gpu", ResourceClaimName: new("dra-pod-gpu")},
+			},
+		},
+	}
+	pod, err := client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("create pod: %v", err)
+	}
+
+	// Simulate DRA controller writing resourceClaimStatuses.
+	wantStatuses := []v1.PodResourceClaimStatus{
+		{Name: "gpu", ResourceClaimName: new("dra-pod-gpu")},
+	}
+	pod.Status.ResourceClaimStatuses = wantStatuses
+	pod, err = client.CoreV1().Pods(ns.Name).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("set ResourceClaimStatuses: %v", err)
+	}
+	if len(pod.Status.ResourceClaimStatuses) == 0 {
+		t.Fatal("ResourceClaimStatuses not persisted after initial UpdateStatus")
+	}
+
+	// Simulate an old DRA-unaware client (e.g. Multus using k8s.io/client-go v0.29)
+	// calling UpdateStatus to write annotations. The round-tripped pod omits
+	// ResourceClaimStatuses because the old client does not know the field.
+	oldClientPod := pod.DeepCopy()
+	oldClientPod.Status.ResourceClaimStatuses = nil
+
+	updated, err := client.CoreV1().Pods(ns.Name).UpdateStatus(ctx, oldClientPod, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("old-client UpdateStatus: %v", err)
+	}
+
+	if diff := cmp.Diff(wantStatuses, updated.Status.ResourceClaimStatuses); diff != "" {
+		t.Errorf("ResourceClaimStatuses changed after old-client UpdateStatus (-want,+got):\n%s", diff)
+	}
+
+	// An explicit empty list remains a valid way for a field-aware client to
+	// clear a slice field.
+	clearPatch := []byte(`{"status":{"resourceClaimStatuses":[]}}`)
+	cleared, err := client.CoreV1().Pods(ns.Name).Patch(ctx, pod.Name, types.MergePatchType, clearPatch, metav1.PatchOptions{}, "status")
+	if err != nil {
+		t.Fatalf("clear ResourceClaimStatuses: %v", err)
+	}
+	if len(cleared.Status.ResourceClaimStatuses) != 0 {
+		t.Errorf("ResourceClaimStatuses not cleared: %v", cleared.Status.ResourceClaimStatuses)
+	}
+}

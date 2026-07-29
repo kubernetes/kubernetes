@@ -1,0 +1,14 @@
+# editorconfig.org
+
+root = true
+
+[*]
+insert_final_newline = true
+charset = utf-8
+trim_trailing_whitespace = true
+indent_style = tab
+indent_size = 8
+
+[*.{md,yml,yaml,json}]
+indent_style = space
+indent_size = 2

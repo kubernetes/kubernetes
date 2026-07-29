@@ -1,0 +1,17 @@
+SpdyStream
+Copyright 2014-2021 Docker Inc.
+
+This product includes software developed at
+Docker Inc. (https://www.docker.com/).
+
+SPDY implementation (spdy/)
+
+The spdy directory contains code derived from the Go project (golang.org/x/net).
+
+Copyright 2009-2013 The Go Authors.
+Licensed under the BSD 3-Clause License.
+
+Modifications Copyright 2014-2021 Docker Inc.
+
+The BSD license text and Go patent grant are included in
+spdy/LICENSE and spdy/PATENTS.

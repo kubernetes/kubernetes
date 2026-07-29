@@ -1,0 +1,239 @@
+# GangPreemptionBasic tests basic gang preemption scenario - podgroup is preempting pods that don't belong to any podgroup.
+- name: GangPreemptionBasic
+  featureGates:
+    GenericWorkload: true
+
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  # createNamespaces creates separate namespaces for different priority pods
+  # to easily manage and target them with distinct operations (like createPods).
+  - opcode: createNamespaces
+    prefix: gang-preempt
+    count: 2
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: templates/pod-low-priority.yaml
+    namespace: gang-preempt-1
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $initPods
+  - opcode: createPodGroups
+    countParam: $preemptorPodGroups
+    namespace: gang-preempt-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  - opcode: createPods
+    collectMetrics: true
+    countParam: $preemptorPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: gang-preempt-0
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      cpuRequest: $gangCpuRequest
+
+  workloads:
+  - name: 2Nodes_1PreemptorGang_2Pods_Evicting_10InitPods
+    labels: [short, integration-test]
+    params:
+      initNodes: 2
+      initPods: 10
+      preemptorPodGroups: 1
+      podsPerGroup: 2
+      # gangCpuRequest is set to 3970m. Assuming standard node capacity is 4000m,
+      # and low-priority pods request 40m, this high request forces the scheduler to preempt low-priority pods
+      # to fit the 3970m request on the node.
+      gangCpuRequest: 3970m
+  # In this scenario, there are 1000 low-priority pods on 100 nodes (10 pods/node, consuming 400m CPU/node).
+  # The single PodGroup requires 100 pods (1 per node) with 3970m CPU each.
+  # Since node capacity is typically 4000m, scheduling the PodGroup forces eviction of all 1000 low-priority pods
+  # (10 preemptions per PodGroup pod, 1000 preemptions in total).
+  - name: 100Nodes_1PreemptorGang_100Pods_Evicting_1000InitPods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      preemptorPodGroups: 1
+      podsPerGroup: 100
+      gangCpuRequest: 3970m
+  - name: 100Nodes_10PreemptorGangs_10Pods_Evicting_1000InitPods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      preemptorPodGroups: 10
+      podsPerGroup: 10
+      gangCpuRequest: 3970m
+
+# GangPreemptionPodGroups tests preemption scenario where podgroup preempts other podgroups.
+- name: GangPreemptionPodGroups
+  featureGates:
+    GenericWorkload: true
+
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  # createNamespaces creates separate namespaces for different priority pods
+  # to easily manage and target them with distinct operations (like createPods).
+  - opcode: createNamespaces
+    prefix: gang-preempt
+    count: 2
+  - opcode: createPodGroups
+    countParam: $lowPriorityGroups
+    namespace: gang-preempt-1
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      priority: 1000
+  - opcode: createPods
+    countParam: $lowPriorityGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: gang-preempt-1
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      cpuRequest: $lowPriorityCpuRequest
+      hostPortBase: 8000
+      priority: 1000
+  - opcode: createPodGroups
+    countParam: $highPriorityGroups
+    namespace: gang-preempt-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      priority: 9999999
+  - opcode: createPods
+    collectMetrics: true
+    countParam: $highPriorityGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: gang-preempt-0
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      cpuRequest: $highPriorityCpuRequest
+      hostPortBase: 9000
+      priority: 9999999
+
+  workloads:
+  - name: 2Nodes_1PreemptorGang_2Pods_Evicting_2LowPriorityGangs
+    labels: [short, integration-test]
+    params:
+      initNodes: 2
+      lowPriorityGroups: 2
+      highPriorityGroups: 1
+      podsPerGroup: 2
+      # low-priority pods consume 1200m per node (2 * 600m).
+      # preemptor requires 3500m. 2800m is available (4000m - 1200m).
+      # The preemptor evicts the low-priority pods to obtain the 700m more CPU it needs.
+      lowPriorityCpuRequest: 600m
+      highPriorityCpuRequest: 3500m
+  # Scenario where 100 nodes have 5 distinct low-priority PodGroups (each consuming 600m CPU per node).
+  # Total low-priority CPU consumption is 3000m per node.
+  # An incoming high-priority preemptor PodGroup (100 pods, spread as exactly 1 pod per node) 
+  # requests 3500m CPU per node.
+  # Since standard node capacity is 4000m, and 1000m is available (4000m - 3000m),
+  # the preemptor needs 2500m more CPU to schedule.
+  # It evicts all low-priority PodGroups to fit successfully.
+  - name: 100Nodes_1PreemptorGang_100Pods_Evicting_5LowPriorityGangs
+    labels: [performance]
+    params:
+      initNodes: 100
+      lowPriorityGroups: 5
+      highPriorityGroups: 1
+      podsPerGroup: 100
+      lowPriorityCpuRequest: 600m
+      highPriorityCpuRequest: 3500m
+  # Scenario where 100 nodes host 50 distinct low-priority PodGroups (10 pods each, 500 pods total).
+  # Assuming uniform spreading, each node runs 5 low-priority pods, consuming 3000m CPU (5 * 600m).
+  # There are 10 high-priority preemptor PodGroups (10 pods each, 100 pods total, exactly 1 per node).
+  # Each preemptor pod requests 3500m CPU.
+  # Since standard node capacity is 4000m, and 1000m is available (4000m - 3000m),
+  # the preemptor pod needs 2500m more CPU to schedule.
+  # To free up >=2500m, it must evict all 5 low-priority pods on that node.
+  # Globally, all 100 preemptor pods evict all 500 low-priority pods, failing all 50 low-priority PodGroups.
+  - name: 100Nodes_10PreemptorGangs_10Pods_Evicting_50LowPriorityGangs
+    labels: [performance]
+    params:
+      initNodes: 100
+      lowPriorityGroups: 50
+      highPriorityGroups: 10
+      podsPerGroup: 10
+      lowPriorityCpuRequest: 600m
+      highPriorityCpuRequest: 3500m
+
+# GangPreemptionAffinity benchmarks the performance of gang preemption (WorkloadAwarePreemption)
+# in the presence of pod affinity constraints.
+#
+# The scenario flow is:
+# 1. Create a set of high-priority "anchor pods" that are evenly distributed across all nodes
+#    using host port conflicts to ensure uniform spread.
+# 2. Fill the cluster with low-priority pods.
+# 3. Submit high-priority PodGroups (gangs) whose pods have required podAffinity targeting the
+#    labels of the anchor pods.
+# 4. This forces the gang pods to schedule on nodes containing anchor pods, triggering preemption
+#    of the low-priority pods on those specific nodes to accommodate the new gang pods.
+- name: GangPreemptionAffinity
+  featureGates:
+    GenericWorkload: true
+
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: gang-preempt
+    count: 3
+  # create high priority pods that podgroup will anchor on.
+  - opcode: createPods
+    countParam: $initNodes
+    podTemplatePath: templates/pod-anchor-high-priority.yaml
+    namespace: gang-preempt-2
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $initNodes
+  # create low priority pods that will be preempted
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: templates/pod-low-priority.yaml
+    namespace: gang-preempt-1
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $initPods
+  - opcode: createPodGroups
+    countParam: $preemptorPodGroups
+    namespace: gang-preempt-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  - opcode: createPods
+    collectMetrics: true
+    countParam: $preemptorPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: gang-preempt-0
+    podTemplatePath: templates/pod-gang-affinity.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+
+  workloads:
+  - name: 2Nodes_1PreemptorGang_2Pods_Evicting_10InitPods
+    labels: [short, integration-test]
+    params:
+      initNodes: 2
+      initPods: 10
+      preemptorPodGroups: 1
+      podsPerGroup: 2
+  - name: 100Nodes_1PreemptorGang_100Pods_Evicting_1000InitPods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      preemptorPodGroups: 1
+      podsPerGroup: 100
+  - name: 100Nodes_10PreemptorGangs_10Pods_Evicting_1000InitPods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      preemptorPodGroups: 10
+      podsPerGroup: 10

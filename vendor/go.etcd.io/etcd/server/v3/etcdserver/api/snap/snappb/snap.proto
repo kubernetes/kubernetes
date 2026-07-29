@@ -1,0 +1,9 @@
+syntax = "proto2";
+package snappb;
+
+option go_package = "go.etcd.io/etcd/server/v3/etcdserver/api/snap/snappb";
+
+message snapshot {
+	optional uint32 crc  = 1;
+	optional bytes data  = 2;
+}

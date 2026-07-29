@@ -1,0 +1,20 @@
+issues:
+  exclude-use-default: false
+
+linters:
+  disable-all: true
+  enable:
+  - asciicheck
+  - errcheck
+  - forcetypeassert
+  - gocritic
+  - gofmt
+  - goimports
+  - gosimple
+  - govet
+  - ineffassign
+  - misspell
+  - revive
+  - staticcheck
+  - typecheck
+  - unused

@@ -1,0 +1,4 @@
+# Replaced by individual roles for external-attacher, external-provisioner and external-snapshotter:
+# - https://github.com/kubernetes-csi/external-attacher/blob/master/deploy/kubernetes/rbac.yaml
+# - https://github.com/kubernetes-csi/external-provisioner/blob/master/deploy/kubernetes/rbac.yaml
+# - https://github.com/kubernetes-csi/external-snapshotter/blob/master/deploy/kubernetes/rbac.yaml

@@ -1,0 +1,7 @@
+rules:
+  # test/integration should not use test/e2e, but reusing the
+  # DRA test driver for the simulated cluster during scheduling
+  # tests is fine.
+  - selectorRegexp: k8s[.]io/kubernetes/test/e2e
+    allowedPrefixes:
+      - k8s.io/kubernetes/test/e2e/dra/test-driver

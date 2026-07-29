@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: event-exporter-sa
+  namespace: kube-system
+  labels:
+    k8s-app: event-exporter
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: event-exporter-rb
+  namespace: kube-system
+  labels:
+    k8s-app: event-exporter
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+- kind: ServiceAccount
+  name: event-exporter-sa
+  namespace: kube-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-exporter-v0.3.4
+  namespace: kube-system
+  labels:
+    k8s-app: event-exporter
+    version: v0.3.4
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: event-exporter
+      version: v0.3.4
+  template:
+    metadata:
+      labels:
+        k8s-app: event-exporter
+        version: v0.3.4
+    spec:
+      serviceAccountName: event-exporter-sa
+      containers:
+      - name: event-exporter
+        image: gke.gcr.io/event-exporter:v0.3.4-gke.0
+        command:
+        - /event-exporter
+        - -sink-opts=-stackdriver-resource-model={{ exporter_sd_resource_model }} -endpoint={{ exporter_sd_endpoint }}
+      # BEGIN_PROMETHEUS_TO_SD
+      - name: prometheus-to-sd-exporter
+        image: gke.gcr.io/prometheus-to-sd:v0.11.1-gke.1
+        command:
+          - /monitor
+          - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons
+          - --api-override={{ prometheus_to_sd_endpoint }}
+          - --source=event_exporter:http://localhost:80?whitelisted=stackdriver_sink_received_entry_count,stackdriver_sink_request_count,stackdriver_sink_successfully_sent_entry_count
+          - --pod-id=$(POD_NAME)
+          - --namespace-id=$(POD_NAMESPACE)
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+      # END_PROMETHEUS_TO_SD
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: ssl-certs
+        hostPath:
+          path: /etc/ssl/certs
