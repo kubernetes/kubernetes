@@ -47,12 +47,18 @@ func (memoryManager *mockMemoryManager) AddContainer(klog.Logger, *v1.Pod, *v1.C
 }
 
 type mockTopologyManager struct {
-	called bool
+	addContainerCalled    bool
+	removeContainerCalled bool
 	topologymanager.Manager
 }
 
 func (topologyManager *mockTopologyManager) AddContainer(klog.Logger, *v1.Pod, *v1.Container, string) {
-	topologyManager.called = true
+	topologyManager.addContainerCalled = true
+}
+
+func (topologyManager *mockTopologyManager) RemoveContainer(klog.Logger, string) error {
+	topologyManager.removeContainerCalled = true
+	return nil
 }
 
 func TestPreStartContainer(t *testing.T) {
@@ -102,8 +108,39 @@ func TestPreStartContainer(t *testing.T) {
 		if mManager != nil && !mManager.(*mockMemoryManager).called {
 			t.Errorf("When a Memory manager is provided it must have AddContainer called")
 		}
-		if !tManager.(*mockTopologyManager).called {
+		if !tManager.(*mockTopologyManager).addContainerCalled {
 			t.Errorf("TopologyManager's AddContainer method must be called during container startup")
 		}
+	}
+}
+
+func TestPostStopContainer(t *testing.T) {
+	tests := []struct {
+		name              string
+		lifecycle         internalContainerLifecycleImpl
+		expectRemoveCalled bool
+	}{
+		{
+			name: "When topology manager RemoveContainer is called",
+			lifecycle: internalContainerLifecycleImpl{
+				topologyManager: &mockTopologyManager{},
+			},
+			expectRemoveCalled: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			err := test.lifecycle.PostStopContainer(logger, "test-container-id")
+			if err != nil {
+				t.Errorf("PostStopContainer should not return an error, got: %v", err)
+			}
+
+			tManager := test.lifecycle.topologyManager.(*mockTopologyManager)
+			if test.expectRemoveCalled != tManager.removeContainerCalled {
+				t.Errorf("expected RemoveContainer called=%v, got called=%v", test.expectRemoveCalled, tManager.removeContainerCalled)
+			}
+		})
 	}
 }
