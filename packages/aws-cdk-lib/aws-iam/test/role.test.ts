@@ -961,7 +961,7 @@ describe('IAM role', () => {
     });
     role.assumeRolePolicy?.addStatements(new PolicyStatement({ actions: ['*'] }));
 
-    expect(() => app.synth()).toThrow(/A PolicyStatement used in a resource-based policy must specify at least one IAM principal/);
+    expect(() => app.synth()).toThrow(/A PolicyStatement used in a trust policy must specify at least one IAM principal/);
   });
 });
 
