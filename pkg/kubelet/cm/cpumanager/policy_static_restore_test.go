@@ -28,6 +28,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	resourcehelper "k8s.io/component-helpers/resource"
+	"k8s.io/klog/v2"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -102,29 +103,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 
 			sDir := t.TempDir()
 			logger, tCtx := ktesting.NewTestContext(t)
-			mgr, err := NewManager(
-				logger,
-				"static",
-				nil,
-				5*time.Second,
-				&cadvisorapi.MachineInfo{
-					NumCores: 4,
-					Topology: []cadvisorapi.Node{
-						{
-							Cores: []cadvisorapi.Core{
-								{Id: 0, Threads: []int{0}},
-								{Id: 1, Threads: []int{1}},
-								{Id: 2, Threads: []int{2}},
-								{Id: 3, Threads: []int{3}},
-							},
-						},
-					},
-				},
-				cpuset.New(),
-				v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(1, resource.DecimalSI)},
-				sDir,
-				topologymanager.NewFakeManager(logger),
-			)
+			mgr, err := newRestoreTestManager(logger, 4, sDir)
 			if err != nil {
 				t.Fatalf("could not create manager: %v", err)
 			}
@@ -177,29 +156,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 			}
 
 			// Re-create manager to simulate restart
-			mgr2, err := NewManager(
-				logger,
-				"static",
-				nil,
-				5*time.Second,
-				&cadvisorapi.MachineInfo{
-					NumCores: 4,
-					Topology: []cadvisorapi.Node{
-						{
-							Cores: []cadvisorapi.Core{
-								{Id: 0, Threads: []int{0}},
-								{Id: 1, Threads: []int{1}},
-								{Id: 2, Threads: []int{2}},
-								{Id: 3, Threads: []int{3}},
-							},
-						},
-					},
-				},
-				cpuset.New(),
-				v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(1, resource.DecimalSI)},
-				sDir,
-				topologymanager.NewFakeManager(logger),
-			)
+			mgr2, err := newRestoreTestManager(logger, 4, sDir)
 			if err != nil {
 				t.Fatalf("could not create manager 2: %v", err)
 			}
@@ -215,8 +172,8 @@ func TestCPUManagerRestoreState(t *testing.T) {
 				if podCPUSetRestored.IsEmpty() {
 					t.Errorf("expected pod cpu set to be present after restore")
 				}
-				if podCPUSetRestored.Size() != podCPUSet.Size() {
-					t.Errorf("expected pod cpu set size to be %d, got %d", podCPUSet.Size(), podCPUSetRestored.Size())
+				if !podCPUSetRestored.Equals(podCPUSet) {
+					t.Errorf("expected pod cpu set to be %q, got %q", podCPUSet, podCPUSetRestored)
 				}
 			} else if !podCPUSetRestored.IsEmpty() {
 				t.Errorf("expected no pod cpu set after restore, but got some")
@@ -246,4 +203,222 @@ func TestCPUManagerRestoreState(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPodLevelResourcesReallocationAfterRestart reproduces the scenario from
+// https://github.com/kubernetes/kubernetes/issues/140989: when a pod with
+// pod-level resources is re-admitted after a kubelet restart, the pod-level
+// CPU allocation restored from the state checkpoint must be preserved.
+//
+// Before the fix, allocatePodForAdd unconditionally re-allocated the pod:
+//   - on a 4 CPU node (1 reserved) the pod was rejected with "not enough cpus
+//     available to satisfy request: requested=2, available=1"
+//   - on a 6 CPU node the pod CPU set silently changed (e.g. 1-2 -> 3-4),
+//     leaking the originally assigned exclusive CPUs
+func TestPodLevelResourcesReallocationAfterRestart(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.WindowsCPUAndMemoryAffinity, true)
+	}
+
+	testCases := []struct {
+		description    string
+		numCPUs        int
+		podRequest     string
+		containerSpecs []*containerOptions
+	}{
+		{
+			description: "4 CPU node, pod requesting 2 CPUs",
+			numCPUs:     4,
+			podRequest:  "2",
+			containerSpecs: []*containerOptions{
+				{name: "container1", request: "2", limit: "2"},
+			},
+		},
+		{
+			description: "6 CPU node, pod requesting 2 CPUs",
+			numCPUs:     6,
+			podRequest:  "2",
+			containerSpecs: []*containerOptions{
+				{name: "container1", request: "2", limit: "2"},
+			},
+		},
+		{
+			description: "6 CPU node, pod requesting 4 CPUs split between two containers",
+			numCPUs:     6,
+			podRequest:  "4",
+			containerSpecs: []*containerOptions{
+				{name: "container1", request: "2", limit: "2"},
+				{name: "container2", request: "2", limit: "2"},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, true)
+
+			sDir := t.TempDir()
+			logger, tCtx := ktesting.NewTestContext(t)
+
+			// First manager instance - initial allocation
+			mgr, err := newRestoreTestManager(logger, tc.numCPUs, sDir)
+			if err != nil {
+				t.Fatalf("could not create manager: %v", err)
+			}
+
+			// Create pod with pod-level resources
+			pod := makeMultiContainerPodWithOptionsAndPodLevelResources(tc.podRequest, nil, tc.containerSpecs)
+			pod.Name = "test-pod"
+			pod.UID = types.UID("test-pod")
+
+			// Start manager
+			err = mgr.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			if err != nil {
+				t.Fatalf("could not start manager: %v", err)
+			}
+
+			// Initial pod-level allocation
+			err = mgr.AllocatePod(logger, pod, lifecycle.AddOperation)
+			if err != nil {
+				t.Fatalf("initial pod allocation failed: %v", err)
+			}
+
+			// Record the initial pod-level CPU assignment
+			initialPodCPUSet, ok := mgr.State().GetPodCPUSet(string(pod.UID))
+			if !ok {
+				t.Fatalf("expected pod cpu set to be present after initial allocation")
+			}
+			if initialPodCPUSet.IsEmpty() {
+				t.Fatalf("expected non-empty pod cpu set after initial allocation")
+			}
+
+			// Record container assignments
+			initialContainerAssignments := make(map[string]cpuset.CPUSet)
+			for i := range pod.Spec.Containers {
+				container := &pod.Spec.Containers[i]
+				cset, ok := mgr.State().GetCPUSet(string(pod.UID), container.Name)
+				if !ok {
+					t.Fatalf("expected container cpu set to be present for %s", container.Name)
+				}
+				initialContainerAssignments[container.Name] = cset
+			}
+
+			// Record default CPU set after allocation
+			defaultCPUSetAfterAlloc := mgr.State().GetDefaultCPUSet()
+
+			// Simulate kubelet restart by creating a new manager instance
+			// reading the same state directory.
+			mgr2, err := newRestoreTestManager(logger, tc.numCPUs, sDir)
+			if err != nil {
+				t.Fatalf("could not create manager 2: %v", err)
+			}
+
+			// Start the new manager (should restore state from checkpoint)
+			err = mgr2.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			if err != nil {
+				t.Fatalf("could not start manager 2: %v", err)
+			}
+
+			// The pod is re-admitted after the restart. This must restore the
+			// checkpointed allocation, not re-allocate it and not fail.
+			err = mgr2.AllocatePod(logger, pod, lifecycle.AddOperation)
+			if err != nil {
+				t.Fatalf("pod allocation after restart failed: %v", err)
+			}
+
+			// Verify that restored pod-level CPU set matches the initial one
+			restoredPodCPUSet, ok := mgr2.State().GetPodCPUSet(string(pod.UID))
+			if !ok {
+				t.Fatalf("expected pod cpu set to be present after restore")
+			}
+			if !restoredPodCPUSet.Equals(initialPodCPUSet) {
+				t.Errorf("pod cpu set changed after restart: before=%s, after=%s", initialPodCPUSet.String(), restoredPodCPUSet.String())
+			}
+
+			// Verify that container assignments match
+			for i := range pod.Spec.Containers {
+				container := &pod.Spec.Containers[i]
+				restoredCPUSet, ok := mgr2.State().GetCPUSet(string(pod.UID), container.Name)
+				if !ok {
+					t.Fatalf("expected container cpu set to be present for %s after restore", container.Name)
+				}
+				if !restoredCPUSet.Equals(initialContainerAssignments[container.Name]) {
+					t.Errorf("container %s cpu set changed after restart: before=%s, after=%s",
+						container.Name, initialContainerAssignments[container.Name].String(), restoredCPUSet.String())
+				}
+			}
+
+			// Verify that default CPU set was not modified
+			defaultCPUSetAfterRestore := mgr2.State().GetDefaultCPUSet()
+			if !defaultCPUSetAfterRestore.Equals(defaultCPUSetAfterAlloc) {
+				t.Errorf("default cpu set changed after restart: before=%s, after=%s",
+					defaultCPUSetAfterAlloc.String(), defaultCPUSetAfterRestore.String())
+			}
+
+			// Verify that pod-level CPUs + default CPUs cover all CPUs: nothing
+			// may leak.
+			coveredCPUs := restoredPodCPUSet.Union(defaultCPUSetAfterRestore)
+			if !coveredCPUs.Equals(allTestCPUs(tc.numCPUs)) {
+				t.Errorf("pod CPUs + default CPUs do not cover all CPUs: %s != %s",
+					coveredCPUs.String(), allTestCPUs(tc.numCPUs).String())
+			}
+
+			// Verify that container assignments are subset of pod-level CPUs
+			for i := range pod.Spec.Containers {
+				container := &pod.Spec.Containers[i]
+				if !initialContainerAssignments[container.Name].IsSubsetOf(initialPodCPUSet) {
+					t.Errorf("container %s assignments %s are not a subset of pod-level CPUs %s",
+						container.Name, initialContainerAssignments[container.Name].String(), initialPodCPUSet.String())
+				}
+			}
+
+		})
+	}
+}
+
+// newRestoreTestManager creates a CPU manager with the static policy on a
+// simple single-socket, single-NUMA-node topology with numCPUs cores (no SMT)
+// and 1 reserved CPU, backed by a checkpoint in stateDir.
+func newRestoreTestManager(logger klog.Logger, numCPUs int, stateDir string) (Manager, error) {
+	machineInfo := &cadvisorapi.MachineInfo{
+		NumCores: numCPUs,
+		Topology: []cadvisorapi.Node{
+			{
+				Cores: buildCoresTopology(numCPUs),
+			},
+		},
+	}
+	return NewManager(
+		logger,
+		"static",
+		nil,
+		5*time.Second,
+		machineInfo,
+		cpuset.New(),
+		v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(1, resource.DecimalSI)},
+		stateDir,
+		topologymanager.NewFakeManager(logger),
+	)
+}
+
+// buildCoresTopology creates a simple single-socket topology for testing
+func buildCoresTopology(numCPUs int) []cadvisorapi.Core {
+	cores := make([]cadvisorapi.Core, numCPUs)
+	for i := range numCPUs {
+		cores[i] = cadvisorapi.Core{
+			Id:      i,
+			Threads: []int{i},
+		}
+	}
+	return cores
+}
+
+// allTestCPUs returns the set of all the CPU IDs of a node with numCPUs CPUs.
+func allTestCPUs(numCPUs int) cpuset.CPUSet {
+	ids := make([]int, numCPUs)
+	for i := range ids {
+		ids[i] = i
+	}
+	return cpuset.New(ids...)
 }
