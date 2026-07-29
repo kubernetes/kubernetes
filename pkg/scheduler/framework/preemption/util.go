@@ -80,23 +80,11 @@ func MoreImportantVictim(vi1, vi2 Victim) bool {
 		return len(vi1.Pods()) > len(vi2.Pods())
 	}
 
-	return lessByStartTimeThenIdentity(vi1, vi2)
-}
-
-// lessByStartTimeThenIdentity ranks vi1 as more important than vi2 when vi1's
-// earliest start time is earlier. When the start times are equal (which happens
-// for pods without a recorded start time, whose start time falls back to the
-// current clock and can coincide on low-resolution timers), it falls back to a
-// deterministic comparison by pod identity. This keeps the victim ordering
-// stable across platforms instead of depending on the order in which victims
-// were constructed.
-func lessByStartTimeThenIdentity(vi1, vi2 Victim) bool {
 	t1, t2 := vi1.EarliestStartTime(), vi2.EarliestStartTime()
-	if t1 != nil && t2 != nil {
-		if !t1.Equal(t2) {
-			return t1.Before(t2)
-		}
+	if t1 != nil && t2 != nil && !t1.Equal(t2) {
+		return t1.Before(t2)
 	}
+
 	return podIdentityLess(vi1, vi2)
 }
 
