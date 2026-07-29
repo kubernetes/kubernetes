@@ -21,8 +21,6 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/test/coverage"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -77,6 +75,10 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"schedulingPolicy invalid union": {
 			input:        mkValidCompositePodGroup(clearSchedulingPolicy()),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "schedulingPolicy"), nil, "").WithOrigin("union")},
+		},
+		"policy with both basic and gang": {
+			input:        mkValidCompositePodGroup(setBothPolicies()),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "schedulingPolicy"), nil, "").WithOrigin("union")},
 		},
 		"schedulingPolicy gang minGroupCount zero": {
@@ -245,11 +247,70 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "priorityClassName"), nil, "").WithOrigin("immutable"),
 			},
 		},
-		"invalid schedulingPolicy update": {
-			oldObj:    mkValidCompositePodGroup(setResourceVersion("1")),
+		"valid update of gang minGroupCount": {
+			oldObj:    mkValidCompositePodGroup(setResourceVersion("1"), setGangPolicy(5)),
+			updateObj: mkValidCompositePodGroup(setResourceVersion("1"), setGangPolicy(3)),
+		},
+		"invalid update of gang minGroupCount to 0": {
+			oldObj:    mkValidCompositePodGroup(setResourceVersion("1"), setGangPolicy(5)),
+			updateObj: mkValidCompositePodGroup(setResourceVersion("1"), setGangPolicy(0)),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "schedulingPolicy", "gang", "minGroupCount"), ""),
+			},
+		},
+		"invalid update of gang minGroupCount": {
+			oldObj:    mkValidCompositePodGroup(setResourceVersion("1"), setGangPolicy(5)),
+			updateObj: mkValidCompositePodGroup(setResourceVersion("1"), setGangPolicy(-1)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "gang", "minGroupCount"), nil, "").WithOrigin("minimum"),
+			},
+		},
+		"invalid update from gang to basic policy": {
+			oldObj:    mkValidCompositePodGroup(setResourceVersion("1"), setGangPolicy(5)),
+			updateObj: mkValidCompositePodGroup(setResourceVersion("1"), setBasicPolicy()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "gang"), nil, "").WithOrigin("update"),
+			},
+		},
+		"invalid update from basic to gang policy": {
+			oldObj:    mkValidCompositePodGroup(setResourceVersion("1"), setBasicPolicy()),
 			updateObj: mkValidCompositePodGroup(setResourceVersion("1"), setGangPolicy(5)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "schedulingPolicy"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "gang"), nil, "").WithOrigin("update"),
+			},
+		},
+		"invalid update with neither basic nor gang": {
+			oldObj:    mkValidCompositePodGroup(setResourceVersion("1"), setGangPolicy(5)),
+			updateObj: mkValidCompositePodGroup(setResourceVersion("1"), clearSchedulingPolicy()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy"), nil, "").WithOrigin("union"),
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "gang"), nil, "").WithOrigin("update"),
+			},
+		},
+		"invalid update with both basic and gang": {
+			oldObj:    mkValidCompositePodGroup(setResourceVersion("1"), setGangPolicy(5)),
+			updateObj: mkValidCompositePodGroup(setResourceVersion("1"), setBothPolicies()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy"), nil, "").WithOrigin("union"),
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
+			},
+		},
+		"invalid update from basic policy with neither basic nor gang": {
+			oldObj:    mkValidCompositePodGroup(setResourceVersion("1"), setBasicPolicy()),
+			updateObj: mkValidCompositePodGroup(setResourceVersion("1"), clearSchedulingPolicy()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy"), nil, "").WithOrigin("union"),
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
+			},
+		},
+		"invalid update from basic policy with both basic and gang": {
+			oldObj:    mkValidCompositePodGroup(setResourceVersion("1"), setBasicPolicy()),
+			updateObj: mkValidCompositePodGroup(setResourceVersion("1"), setBothPolicies()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "schedulingPolicy"), nil, "").WithOrigin("union"),
+				field.Invalid(field.NewPath("spec", "schedulingPolicy", "gang"), nil, "").WithOrigin("update"),
 			},
 		},
 		"invalid workloadRef update": {
@@ -343,15 +404,6 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	updateObj := mkValidCompositePodGroup(setResourceVersion("1"))
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.NewStrategy(), meta.WithStringentFinalizerValidation())
 
-	// Disable checks that are currently impossible to test properly in isolation.
-	// FieldValueInvalid update rules for properties under spec.schedulingPolicy
-	// are impossible to hit because mutations inside the schedulingPolicy fail its top-level
-	// immutable check oldSelf == self, short-circuiting deeper validation.
-	gvk := schema.GroupVersionKind{Group: "scheduling.k8s.io", Version: apiVersion, Kind: "CompositePodGroup"}
-	coverage.RecordObservedRules(gvk, field.ErrorList{
-		field.Invalid(field.NewPath("spec", "schedulingPolicy", "basic"), nil, "").WithOrigin("immutable"),
-		field.Invalid(field.NewPath("spec", "schedulingPolicy", "gang"), nil, "").WithOrigin("update"),
-	})
 }
 
 func TestDeclarativeValidateStatusUpdate(t *testing.T) {
@@ -510,6 +562,25 @@ func setGangPolicy(minGroupCount int32) func(obj *scheduling.CompositePodGroup) 
 		obj.Spec.SchedulingPolicy = scheduling.CompositePodGroupSchedulingPolicy{
 			Gang: &scheduling.CompositeGangSchedulingPolicy{
 				MinGroupCount: minGroupCount,
+			},
+		}
+	}
+}
+
+func setBasicPolicy() func(obj *scheduling.CompositePodGroup) {
+	return func(obj *scheduling.CompositePodGroup) {
+		obj.Spec.SchedulingPolicy = scheduling.CompositePodGroupSchedulingPolicy{
+			Basic: &scheduling.CompositeBasicSchedulingPolicy{},
+		}
+	}
+}
+
+func setBothPolicies() func(obj *scheduling.CompositePodGroup) {
+	return func(obj *scheduling.CompositePodGroup) {
+		obj.Spec.SchedulingPolicy = scheduling.CompositePodGroupSchedulingPolicy{
+			Basic: &scheduling.CompositeBasicSchedulingPolicy{},
+			Gang: &scheduling.CompositeGangSchedulingPolicy{
+				MinGroupCount: 5,
 			},
 		}
 	}
