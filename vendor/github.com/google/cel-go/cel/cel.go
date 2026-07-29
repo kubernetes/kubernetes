@@ -17,3 +17,24 @@
 // CEL is a non-Turing complete expression language designed to parse, check, and evaluate
 // expressions against user-defined environments.
 package cel
+
+// Compile is a convenience function that constructs a new Env using the provided EnvOption values,
+// compiles the expression string, and plans an executable Program.
+//
+// Warning: Creating a new environment for every compilation is expensive. Environment setup should be done once
+// and shared across expression compilations when the options remain the same.
+func Compile(expression string, opts ...EnvOption) (Program, error) {
+	env, err := NewEnv(opts...)
+	if err != nil {
+		return nil, err
+	}
+	ast, iss := env.Compile(expression)
+	if iss.Err() != nil {
+		return nil, iss.Err()
+	}
+	prg, err := env.Program(ast, EvalOptions(OptOptimize))
+	if err != nil {
+		return nil, err
+	}
+	return prg, nil
+}

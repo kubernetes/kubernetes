@@ -363,23 +363,45 @@ func (lib listsLib) CompileOptions() []cel.EnvOption {
 	if lib.version >= 3 {
 		estimators := []checker.CostOption{
 			checker.OverloadCostEstimate("list_slice", estimateListSlice),
-			checker.OverloadCostEstimate("list_flatten", estimateListFlatten),
-			checker.OverloadCostEstimate("list_flatten_int", estimateListFlatten),
 			checker.OverloadCostEstimate("lists_range", estimateListsRange),
 			checker.OverloadCostEstimate("list_reverse", estimateListReverse),
-			checker.OverloadCostEstimate("list_distinct", estimateListDistinct),
 		}
-		for _, t := range comparableTypes {
+		if lib.version == 3 {
 			estimators = append(estimators,
-				checker.OverloadCostEstimate(
-					fmt.Sprintf("list_%s_sort", t.TypeName()),
-					estimateListSort(t),
-				),
-				checker.OverloadCostEstimate(
-					fmt.Sprintf("list_%s_sortByAssociatedKeys", t.TypeName()),
-					estimateListSortBy(t),
-				),
+				checker.OverloadCostEstimate("list_flatten", estimateListFlattenLegacy),
+				checker.OverloadCostEstimate("list_flatten_int", estimateListFlattenLegacy),
+				checker.OverloadCostEstimate("list_distinct", estimateListDistinctLegacy),
 			)
+			for _, t := range comparableTypes {
+				estimators = append(estimators,
+					checker.OverloadCostEstimate(
+						fmt.Sprintf("list_%s_sort", t.TypeName()),
+						estimateListSortLegacy(t),
+					),
+					checker.OverloadCostEstimate(
+						fmt.Sprintf("list_%s_sortByAssociatedKeys", t.TypeName()),
+						estimateListSortByLegacy(t),
+					),
+				)
+			}
+		} else {
+			estimators = append(estimators,
+				checker.OverloadCostEstimate("list_flatten", estimateListFlatten),
+				checker.OverloadCostEstimate("list_flatten_int", estimateListFlatten),
+				checker.OverloadCostEstimate("list_distinct", estimateListDistinct),
+			)
+			for _, t := range comparableTypes {
+				estimators = append(estimators,
+					checker.OverloadCostEstimate(
+						fmt.Sprintf("list_%s_sort", t.TypeName()),
+						estimateListSort(t),
+					),
+					checker.OverloadCostEstimate(
+						fmt.Sprintf("list_%s_sortByAssociatedKeys", t.TypeName()),
+						estimateListSortBy(t),
+					),
+				)
+			}
 		}
 		opts = append(opts, cel.CostEstimatorOptions(estimators...))
 	}
@@ -391,14 +413,22 @@ func (lib listsLib) CompileOptions() []cel.EnvOption {
 func (lib *listsLib) ProgramOptions() []cel.ProgramOption {
 	var opts []cel.ProgramOption
 	if lib.version >= 3 {
-		// TODO: Add cost trackers for list operations
 		trackers := []interpreter.CostTrackerOption{
 			interpreter.OverloadCostTracker("list_slice", trackListOutputSize),
-			interpreter.OverloadCostTracker("list_flatten", trackListFlatten),
-			interpreter.OverloadCostTracker("list_flatten_int", trackListFlatten),
 			interpreter.OverloadCostTracker("lists_range", trackListOutputSize),
 			interpreter.OverloadCostTracker("list_reverse", trackListOutputSize),
 			interpreter.OverloadCostTracker("list_distinct", trackListDistinct),
+		}
+		if lib.version == 3 {
+			trackers = append(trackers,
+				interpreter.OverloadCostTracker("list_flatten", trackListFlattenLegacy),
+				interpreter.OverloadCostTracker("list_flatten_int", trackListFlattenLegacy),
+			)
+		} else {
+			trackers = append(trackers,
+				interpreter.OverloadCostTracker("list_flatten", trackListFlatten),
+				interpreter.OverloadCostTracker("list_flatten_int", trackListFlatten),
+			)
 		}
 		for _, t := range comparableTypes {
 			trackers = append(trackers,
@@ -657,8 +687,27 @@ func estimateListReverse(estimator checker.CostEstimator, target *checker.AstNod
 	return estimateAllocatingListCall(1, estimateSize(estimator, *target))
 }
 
-// estimateListFlatten computes an O(n) flatten operation with a cost factor proportional to the flatten depth.
+// estimateListFlatten computes an O(n) flatten operation with a cost factor proportional to the total number of flattened items.
 func estimateListFlatten(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if target == nil || len(args) > 1 {
+		return nil
+	}
+	depth := uint64(1)
+	if len(args) == 1 {
+		depth = nodeAsUintValue(args[0], math.MaxUint)
+	}
+	var resSize checker.SizeEstimate
+	if (*target).Expr() != nil && (*target).Expr().Kind() == ast.ListKind {
+		szVal := estimateLiteralFlattenSize((*target).Expr(), depth)
+		resSize = checker.FixedSizeEstimate(szVal)
+	} else {
+		resSize = estimateFlattenSize(estimator, *target, depth)
+	}
+	cost := resSize.AsCost()
+	return estimateListCallWithDirectCost(cost, resSize, true)
+}
+
+func estimateListFlattenLegacy(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
 	if target == nil || len(args) > 1 {
 		return nil
 	}
@@ -669,6 +718,42 @@ func estimateListFlatten(estimator checker.CostEstimator, target *checker.AstNod
 	return estimateAllocatingListCall(float64(depth), estimateSize(estimator, *target))
 }
 
+func estimateFlattenSize(estimator checker.CostEstimator, node checker.AstNode, depth uint64) checker.SizeEstimate {
+	sz := estimateSize(estimator, node)
+	if depth == 0 {
+		return sz
+	}
+	tType := node.Type()
+	if tType.Kind() != types.ListKind || len(tType.Parameters()) == 0 {
+		return sz
+	}
+	elemType := tType.Parameters()[0]
+	elemNode := pathAstNode{
+		path: append(append([]string(nil), node.Path()...), "@items"),
+		t:    elemType,
+	}
+	flatElemSize := estimateFlattenSize(estimator, elemNode, depth-1)
+	return sz.Multiply(flatElemSize)
+}
+
+func estimateLiteralFlattenSize(expr ast.Expr, depth uint64) uint64 {
+	if depth == 0 {
+		if expr.Kind() == ast.ListKind {
+			return uint64(expr.AsList().Size())
+		}
+		return 1
+	}
+	if expr.Kind() != ast.ListKind {
+		return 1
+	}
+	listExpr := expr.AsList()
+	totalSize := uint64(0)
+	for _, el := range listExpr.Elements() {
+		totalSize += estimateLiteralFlattenSize(el, depth-1)
+	}
+	return totalSize
+}
+
 // Compute an O(n^2) with a cost factor of 2, equivalent to sets.contains with a result list
 // which can vary in size from 1 element to the original list size.
 func estimateListDistinct(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
@@ -676,8 +761,23 @@ func estimateListDistinct(estimator checker.CostEstimator, target *checker.AstNo
 		return nil
 	}
 	sz := estimateSize(estimator, *target)
-	costFactor := 2.0
-	return estimateAllocatingListCall(costFactor, sz.Multiply(sz))
+	elemType := types.DynType
+	tType := (*target).Type()
+	if tType.Kind() == types.ListKind && len(tType.Parameters()) > 0 {
+		elemType = tType.Parameters()[0]
+	}
+	itemSize := estimateItemSize(estimator, *target)
+	elemCost := estimateElementEqualityCost(estimator, elemType, itemSize)
+
+	costSize := sz.Multiply(sz)
+	cost := costSize.MultiplyByCost(elemCost).MultiplyByCostFactor(2.0)
+
+	minSize := uint64(0)
+	if sz.Min > 0 {
+		minSize = 1
+	}
+	resultSize := checker.SizeEstimate{Min: minSize, Max: sz.Max}
+	return estimateListCallWithDirectCost(cost, resultSize, true)
 }
 
 // estimateListSort computes an O(n^2) sort operation with a cost factor of 2 for the equality
@@ -698,37 +798,53 @@ func estimateListSortBy(u *types.Type) checker.FunctionEstimator {
 		if target == nil || len(args) != 1 {
 			return nil
 		}
-		// Estimate the size of the list used as the sort index
-		return estimateListSortCost(estimator, args[0], u)
+		// Estimate the size of the list used as the sort index, using target to resolve item size hints.
+		return estimateListSortByCost(estimator, *target, args[0], u)
 	}
+}
+
+func estimateListSortByCost(estimator checker.CostEstimator, target checker.AstNode, keysNode checker.AstNode, elemType *types.Type) *checker.CallEstimate {
+	sz := estimateSize(estimator, keysNode)
+	itemSize := estimateItemSize(estimator, target)
+	elemCost := estimateElementEqualityCost(estimator, elemType, itemSize)
+
+	costSize := sz.Multiply(sz)
+	cost := costSize.MultiplyByCost(elemCost).MultiplyByCostFactor(2.0)
+	return estimateListCallWithDirectCost(cost, sz, true)
 }
 
 // estimateListSortCost estimates an O(n^2) sort operation with a cost factor of 2 for the equality
 // operations which occur during the sort computation.
 func estimateListSortCost(estimator checker.CostEstimator, node checker.AstNode, elemType *types.Type) *checker.CallEstimate {
 	sz := estimateSize(estimator, node)
-	costFactor := 2.0
-	switch elemType {
-	case types.StringType, types.BytesType:
-		costFactor += common.StringTraversalCostFactor
-	}
-	return estimateAllocatingListCall(costFactor, sz.Multiply(sz))
+	itemSize := estimateItemSize(estimator, node)
+	elemCost := estimateElementEqualityCost(estimator, elemType, itemSize)
+
+	costSize := sz.Multiply(sz)
+	cost := costSize.MultiplyByCost(elemCost).MultiplyByCostFactor(2.0)
+	return estimateListCallWithDirectCost(cost, sz, true)
 }
 
 // estimateAllocatingListCall computes cost as a function of the size of the result list with a
 // baseline cost for the call dispatch and the associated list allocation.
 func estimateAllocatingListCall(costFactor float64, listSize checker.SizeEstimate) *checker.CallEstimate {
-	return estimateListCall(costFactor, listSize, true)
+	return estimateListCallWithResultSize(costFactor, listSize, listSize, true)
 }
 
-// estimateListCall computes cost as a function of the size of the target list and whether the
-// call allocates memory.
-func estimateListCall(costFactor float64, listSize checker.SizeEstimate, allocates bool) *checker.CallEstimate {
-	cost := listSize.MultiplyByCostFactor(costFactor).Add(callCostEstimate)
+// estimateListCallWithResultSize computes cost as a function of the size of the target list and whether the
+// call allocates memory, using a separate result size estimate for the output list.
+func estimateListCallWithResultSize(costFactor float64, costSize checker.SizeEstimate, resultSize checker.SizeEstimate, allocates bool) *checker.CallEstimate {
+	cost := costSize.MultiplyByCostFactor(costFactor)
+	return estimateListCallWithDirectCost(cost, resultSize, allocates)
+}
+
+// estimateListCallWithDirectCost computes cost using a pre-calculated CostEstimate and a separate result size estimate.
+func estimateListCallWithDirectCost(cost checker.CostEstimate, resultSize checker.SizeEstimate, allocates bool) *checker.CallEstimate {
 	if allocates {
 		cost = cost.Add(checker.FixedCostEstimate(common.ListCreateBaseCost))
 	}
-	return &checker.CallEstimate{CostEstimate: cost, ResultSize: &listSize}
+	cost = cost.Add(callCostEstimate)
+	return &checker.CallEstimate{CostEstimate: cost, ResultSize: &resultSize}
 }
 
 // trackListOutputSize computes cost as a function of the size of the result list.
@@ -736,9 +852,13 @@ func trackListOutputSize(_ []ref.Val, result ref.Val) *uint64 {
 	return trackAllocatingListCall(1, actualSize(result))
 }
 
-// trackListFlatten computes cost as a function of the size of the result list and the depth of
-// the flatten operation.
-func trackListFlatten(args []ref.Val, _ ref.Val) *uint64 {
+// trackListFlatten computes cost as a function of the size of the result list.
+func trackListFlatten(args []ref.Val, result ref.Val) *uint64 {
+	resSize := actualSize(result)
+	return trackAllocatingListCall(1.0, resSize)
+}
+
+func trackListFlattenLegacy(args []ref.Val, _ ref.Val) *uint64 {
 	depth := 1.0
 	if len(args) == 2 {
 		depth = float64(args[1].(types.Int))
@@ -784,4 +904,100 @@ func trackAllocatingListCall(costFactor float64, size uint64) *uint64 {
 	}
 	cost := safeAdd(uint64(float64(size)*costFactor), callCost, common.ListCreateBaseCost)
 	return &cost
+}
+
+func estimateListDistinctLegacy(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if target == nil || len(args) != 0 {
+		return nil
+	}
+	sz := estimateSize(estimator, *target)
+	costFactor := 2.0
+	tType := (*target).Type()
+	if tType.Kind() == types.ListKind && len(tType.Parameters()) > 0 {
+		elemType := tType.Parameters()[0]
+		if elemType.Kind() == types.StringKind || elemType.Kind() == types.BytesKind {
+			costFactor += common.StringTraversalCostFactor
+		}
+	}
+	return estimateAllocatingListCall(costFactor, sz.Multiply(sz))
+}
+
+func estimateListSortLegacy(t *types.Type) checker.FunctionEstimator {
+	return func(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+		if target == nil || len(args) != 0 {
+			return nil
+		}
+		return estimateListSortCostLegacy(estimator, *target, t)
+	}
+}
+
+func estimateListSortByLegacy(u *types.Type) checker.FunctionEstimator {
+	return func(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+		if target == nil || len(args) != 1 {
+			return nil
+		}
+		return estimateListSortCostLegacy(estimator, args[0], u)
+	}
+}
+
+func estimateListSortCostLegacy(estimator checker.CostEstimator, node checker.AstNode, elemType *types.Type) *checker.CallEstimate {
+	sz := estimateSize(estimator, node)
+	costFactor := 2.0
+	switch elemType {
+	case types.StringType, types.BytesType:
+		costFactor += common.StringTraversalCostFactor
+	}
+	return estimateAllocatingListCall(costFactor, sz.Multiply(sz))
+}
+
+type pathAstNode struct {
+	path []string
+	t    *types.Type
+}
+
+func (p pathAstNode) Path() []string {
+	return p.path
+}
+
+func (p pathAstNode) Type() *types.Type {
+	return p.t
+}
+
+func (p pathAstNode) Expr() ast.Expr {
+	return nil
+}
+
+func (p pathAstNode) ComputedSize() *checker.SizeEstimate {
+	return nil
+}
+
+func estimateItemSize(estimator checker.CostEstimator, node checker.AstNode) checker.SizeEstimate {
+	path := node.Path()
+	if len(path) == 0 {
+		return checker.SizeEstimate{Min: 0, Max: math.MaxUint64}
+	}
+	elemType := types.DynType
+	tType := node.Type()
+	if tType.Kind() == types.ListKind && len(tType.Parameters()) > 0 {
+		elemType = tType.Parameters()[0]
+	}
+	itemNode := pathAstNode{
+		path: append(append([]string(nil), path...), "@items"),
+		t:    elemType,
+	}
+	if l := estimator.EstimateSize(itemNode); l != nil {
+		return *l
+	}
+	return checker.SizeEstimate{Min: 0, Max: math.MaxUint64}
+}
+
+func estimateElementEqualityCost(estimator checker.CostEstimator, elemType *types.Type, itemSize checker.SizeEstimate) checker.CostEstimate {
+	switch elemType.Kind() {
+	case types.StringKind, types.BytesKind:
+		return itemSize.MultiplyByCostFactor(common.StringTraversalCostFactor)
+	case types.ListKind, types.MapKind, types.StructKind:
+		return checker.UnknownCostEstimate()
+	default:
+		return checker.FixedCostEstimate(1)
+	}
 }

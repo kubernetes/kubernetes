@@ -346,6 +346,32 @@ func LateFunctionBinding() OverloadOpt {
 	return decls.LateFunctionBinding()
 }
 
+// AsyncBinding provides the implementation of an asynchronous overload. The provided function
+// is called in its own goroutine with the provided context. The function should block until
+// the result is available, and the framework manages goroutine and channel lifecycle.
+//
+// This follows the same pattern used by gRPC-Go and other major Go frameworks where user
+// code is synchronous and the framework manages concurrency.
+//
+// Context contract: the function MUST return promptly once its context is cancelled. The
+// framework cannot forcibly terminate the goroutine running the function, so a function that
+// ignores cancellation will leak its goroutine and hold a concurrency slot (see
+// AsyncMaxConcurrency) until it returns on its own. For functions that may hang or that are not
+// under your control, wrap them with async.TimeoutBinding to bound their runtime.
+func AsyncBinding(fn functions.BlockingAsyncOp) OverloadOpt {
+	return decls.AsyncBinding(fn)
+}
+
+// SingletonAsyncBinding creates a singleton async function definition from a blocking function,
+// to be used with all function overloads. The provided function is called in its own goroutine
+// with the provided context.
+//
+// Note, this approach works well if operand is expected to have a specific trait which it implements,
+// e.g. traits.ContainerType. Otherwise, prefer per-overload async bindings.
+func SingletonAsyncBinding(fn functions.BlockingAsyncOp, traits ...int) FunctionOpt {
+	return decls.SingletonAsyncBinding(fn, traits...)
+}
+
 // OverloadIsNonStrict enables the function to be called with error and unknown argument values.
 //
 // Note: do not use this option unless absoluately necessary as it should be an uncommon feature.

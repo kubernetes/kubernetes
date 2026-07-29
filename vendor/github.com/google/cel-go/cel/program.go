@@ -18,7 +18,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
+	"github.com/google/cel-go/cel/async"
 	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/functions"
 	"github.com/google/cel-go/common/types"
@@ -52,6 +54,21 @@ type Program interface {
 	//
 	// The output contract for `ContextEval` is otherwise identical to the `Eval` method.
 	ContextEval(context.Context, any) (ref.Val, *EvalDetails, error)
+
+	// ConcurrentEval evaluates the program concurrently, returning a channel that will receive
+	// the final EvalResult when all asynchronous operations complete, or the context expires.
+	//
+	// The vars value may either be an `Activation` or `map[string]any`.
+	//
+	// Liveness: ConcurrentEval relies on context cancellation to terminate. If an async function
+	// never returns and does not honor its context, and the supplied context has no deadline, the
+	// call will block indefinitely. Always pass a context with a deadline or cancellation.
+	//
+	// Error handling is fail-fast: as soon as a re-evaluation pass yields an error, that error is
+	// returned and any still in-flight async calls are cancelled (their contexts are done) and
+	// their results discarded. Async functions should therefore be free of unwanted side effects
+	// on partial evaluation, or guard them with idempotency/cancellation handling.
+	ConcurrentEval(context.Context, any) <-chan EvalResult
 }
 
 // Activation used to resolve identifiers by name and references by id.
@@ -144,6 +161,13 @@ func (ed *EvalDetails) ActualCost() *uint64 {
 	return &cost
 }
 
+// EvalResult encapsulates the response from a ConcurrentEval call.
+type EvalResult struct {
+	Val         ref.Val
+	EvalDetails *EvalDetails
+	Err         error
+}
+
 // prog is the internal implementation of the Program interface.
 type prog struct {
 	*Env
@@ -164,6 +188,16 @@ type prog struct {
 	callCostEstimator interpreter.ActualCostEstimator
 	costOptions       []interpreter.CostTrackerOption
 	costLimit         *uint64
+
+	// hasAsync indicates the planned expression contains an asynchronous function call, which can
+	// only be resolved by ConcurrentEval.
+	hasAsync bool
+
+	// Async evaluation configuration used by ConcurrentEval.
+	drainStrategy             async.DrainStrategy
+	asyncObserver             async.Observer
+	asyncCompletionBufferSize int
+	asyncMaxConcurrency       int
 }
 
 // newProgram creates a program instance with an environment, an ast, and an optional list of
@@ -181,6 +215,7 @@ func newProgram(e *Env, a *ast.AST, opts []ProgramOption) (Program, error) {
 		plannerOptions: []interpreter.PlannerOption{},
 		dispatcher:     disp,
 		costOptions:    []interpreter.CostTrackerOption{},
+		drainStrategy:  async.DrainReady(100 * time.Microsecond),
 	}
 
 	// Configure the program via the ProgramOption values.
@@ -211,6 +246,17 @@ func newProgram(e *Env, a *ast.AST, opts []ProgramOption) (Program, error) {
 	err = disp.Add(e.functionBindings...)
 	if err != nil {
 		return nil, err
+	}
+
+	// Determine whether the environment declares any asynchronous function. Async is a property of
+	// the binding, so its presence is known from the environment alone, without inspecting the
+	// program plan. The synchronous entry points (Eval, ContextEval) reject programs from an env
+	// with async functions; callers needing synchronous evaluation should use a non-async env.
+	for _, b := range e.functionBindings {
+		if b.Async != nil {
+			p.hasAsync = true
+			break
+		}
 	}
 
 	// Set the attribute factory after the options have been set.
@@ -319,6 +365,11 @@ func (p *prog) Eval(input any) (out ref.Val, det *EvalDetails, err error) {
 			}
 		}
 	}()
+	// Asynchronous calls cannot be resolved by a single-pass evaluation. Reject before doing any
+	// work (this also covers ContextEval, which delegates here); ConcurrentEval does not call Eval.
+	if p.hasAsync {
+		return nil, nil, errAsyncRequiresConcurrentEval
+	}
 	// Build a hierarchical activation if there are default vars set.
 	var frame *interpreter.ExecutionFrame
 	if f, ok := input.(*interpreter.ExecutionFrame); ok {
@@ -383,3 +434,194 @@ func (p *prog) newExecutionFrame(input any) (*interpreter.ExecutionFrame, error)
 
 	return frame, nil
 }
+
+// newAsyncFrame creates an ExecutionFrame configured for asynchronous evaluation under the
+// given context, wiring the observer and concurrency limit from the program options.
+func (p *prog) newAsyncFrame(ctx context.Context, input any) (*interpreter.ExecutionFrame, error) {
+	frame, err := p.newExecutionFrame(input)
+	if err != nil {
+		return nil, err
+	}
+	if err := frame.SetContext(ctx, p.interruptCheckFrequency); err != nil {
+		frame.Close()
+		return nil, err
+	}
+	frame.SetAsyncObserver(p.asyncObserver)
+	frame.SetAsyncMaxConcurrency(resolveAsyncMaxConcurrency(p.asyncMaxConcurrency))
+	return frame, nil
+}
+
+// defaultAsyncMaxConcurrency bounds the number of concurrently launched async calls when the
+// program does not configure AsyncMaxConcurrency. It exists so that a wide fan-out (e.g. an async
+// call inside a comprehension over a large list) cannot spawn an unbounded number of goroutines.
+const defaultAsyncMaxConcurrency = 100
+
+// resolveAsyncMaxConcurrency maps the configured concurrency to the effective launch limit:
+//   - 0 (unset): apply defaultAsyncMaxConcurrency.
+//   - >0: use the configured value.
+//   - <0: unlimited (no launch limiter); use only if the caller bounds concurrency another way.
+func resolveAsyncMaxConcurrency(configured int) int {
+	if configured == 0 {
+		return defaultAsyncMaxConcurrency
+	}
+	return configured
+}
+
+// resolveCompletionBufferSize returns the size of the async completion channel. When unset, it
+// defaults to the effective launch concurrency so that all in-flight calls can report completion
+// without blocking. An unbuffered channel would make a completed call hold its launch slot until
+// the evaluator drained it, throttling effective concurrency to the drain rate.
+func (p *prog) resolveCompletionBufferSize() int {
+	if p.asyncCompletionBufferSize > 0 {
+		return p.asyncCompletionBufferSize
+	}
+	limit := resolveAsyncMaxConcurrency(p.asyncMaxConcurrency)
+	if limit < 0 {
+		// Unlimited launches: fall back to the default bound for the buffer so it stays finite.
+		return defaultAsyncMaxConcurrency
+	}
+	return limit
+}
+
+// ConcurrentEval implements the Program interface.
+func (p *prog) ConcurrentEval(ctx context.Context, input any) <-chan EvalResult {
+	resCh := make(chan EvalResult, 1)
+	if ctx == nil {
+		resCh <- EvalResult{Err: errors.New("context can not be nil")}
+		close(resCh)
+		return resCh
+	}
+
+	go func() {
+		defer close(resCh)
+		// Ensure concurrent eval handles panic / recovery properly
+		defer func() {
+			if r := recover(); r != nil {
+				switch t := r.(type) {
+				case interpreter.EvalCancelledError:
+					resCh <- EvalResult{Err: t}
+				default:
+					resCh <- EvalResult{Err: fmt.Errorf("internal error: %v", r)}
+				}
+			}
+		}()
+
+		frame, err := p.newAsyncFrame(ctx, input)
+		if err != nil {
+			resCh <- EvalResult{Err: err}
+			return
+		}
+		defer frame.Close()
+
+		// Completions are signaled to this channel as async calls finish. The asyncCallState
+		// fan-in also selects on ctx.Done(), so the sender will not leak if this loop returns early.
+		completions := make(chan int64, p.resolveCompletionBufferSize())
+		frame.SetCompletions(completions)
+
+		for {
+			var out ref.Val
+			var det *EvalDetails
+
+			if p.observable != nil {
+				det = &EvalDetails{}
+				out = p.observable.ObserveExec(frame, func(observed any) {
+					switch o := observed.(type) {
+					case interpreter.EvalState:
+						det.state = o
+					case *interpreter.CostTracker:
+						det.costTracker = o
+					}
+				})
+			} else {
+				out = p.interpretable.Exec(frame)
+			}
+
+			// Communicate errors quickly.
+			if types.IsError(out) {
+				var err error = out.(*types.Err)
+				if errors.Is(err, interpreter.InterruptError{}) {
+					err = fmt.Errorf("%w: %w", err, context.Cause(ctx))
+				}
+				resCh <- EvalResult{Val: out, EvalDetails: det, Err: err}
+				return
+			}
+
+			// A concrete (non-unknown) result is final.
+			unk, isUnknown := out.(*types.Unknown)
+			if !isUnknown || !unk.HasUnknownFunction() {
+				resCh <- EvalResult{Val: out, EvalDetails: det, Err: nil}
+				return
+			}
+
+			// Post-execution dispatch: launch only the async calls required by the unknown result.
+			frame.DispatchPendingAsyncCalls(unk.IDs())
+
+			// The result depends on one or more unresolved async calls. Wait for completions and
+			// re-evaluate according to the configured drain strategy.
+			var batch []async.Call
+
+			// Wait for at least one completion (or cancellation).
+			select {
+			case id := <-completions:
+				if call := frame.AsyncCall(id); call != nil {
+					batch = append(batch, call)
+				}
+			case <-ctx.Done():
+				resCh <- EvalResult{Val: out, EvalDetails: det, Err: ctx.Err()}
+				return
+			}
+
+			// Accumulate completions and consult the strategy.
+			var timer *time.Timer
+			reevaluate := false
+			for !reevaluate {
+				active := frame.ActiveAsyncCalls()
+				action := p.drainStrategy.NextAction(batch, active)
+				if action.Reevaluate {
+					break
+				}
+
+				var timeoutCh <-chan time.Time
+				if action.WaitDuration > 0 {
+					if timer == nil {
+						timer = time.NewTimer(action.WaitDuration)
+					} else {
+						if !timer.Stop() {
+							select {
+							case <-timer.C:
+							default:
+							}
+						}
+						timer.Reset(action.WaitDuration)
+					}
+					timeoutCh = timer.C
+				}
+
+				select {
+				case id := <-completions:
+					if call := frame.AsyncCall(id); call != nil {
+						batch = append(batch, call)
+					}
+				case <-timeoutCh:
+					reevaluate = true
+				case <-ctx.Done():
+					if timer != nil {
+						timer.Stop()
+					}
+					resCh <- EvalResult{Val: out, EvalDetails: det, Err: ctx.Err()}
+					return
+				}
+			}
+			if timer != nil {
+				timer.Stop()
+			}
+		}
+	}()
+
+	return resCh
+}
+
+// errAsyncRequiresConcurrentEval is returned by the synchronous entry points (Eval, ContextEval)
+// when the expression contains asynchronous function calls, which only ConcurrentEval can resolve.
+var errAsyncRequiresConcurrentEval = errors.New(
+	"expression contains asynchronous function calls; use ConcurrentEval")

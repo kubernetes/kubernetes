@@ -15,6 +15,7 @@
 package cel
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -25,11 +26,12 @@ import (
 )
 
 const (
-	durationValidatorName     = "cel.validator.duration"
-	regexValidatorName        = "cel.validator.matches"
-	timestampValidatorName    = "cel.validator.timestamp"
-	homogeneousValidatorName  = "cel.validator.homogeneous_literals"
-	nestingLimitValidatorName = "cel.validator.comprehension_nesting_limit"
+	durationValidatorName         = "cel.validator.duration"
+	regexValidatorName            = "cel.validator.matches"
+	timestampValidatorName        = "cel.validator.timestamp"
+	homogeneousValidatorName      = "cel.validator.homogeneous_literals"
+	nestingLimitValidatorName     = "cel.validator.comprehension_nesting_limit"
+	bindNestingLimitValidatorName = "cel.validator.bind_nesting_limit"
 
 	// HomogeneousAggregateLiteralExemptFunctions is the ValidatorConfig key used to configure
 	// the set of function names which are exempt from homogeneous type checks. The expected type
@@ -60,6 +62,23 @@ var (
 			}
 			return nil, fmt.Errorf("invalid validator: %s missing limit", nestingLimitValidatorName)
 		},
+		bindNestingLimitValidatorName: func(val *env.Validator) (ASTValidator, error) {
+			if limit, found := val.ConfigValue("limit"); found {
+				// In case of protos, config value is of type by google.protobuf.Value, which numeric values are always a double.
+				if val, isDouble := limit.(float64); isDouble {
+					if val != float64(int64(val)) {
+						return nil, fmt.Errorf("invalid validator: %s, limit value is not a whole number: %v", bindNestingLimitValidatorName, limit)
+					}
+					return ValidateBindNestingLimit(int(val)), nil
+				}
+
+				if val, isInt := limit.(int); isInt {
+					return ValidateBindNestingLimit(val), nil
+				}
+				return nil, fmt.Errorf("invalid validator: %s unsupported limit type: %v", bindNestingLimitValidatorName, limit)
+			}
+			return nil, fmt.Errorf("invalid validator: %s missing limit", bindNestingLimitValidatorName)
+		},
 		durationValidatorName: func(*env.Validator) (ASTValidator, error) {
 			return ValidateDurationLiterals(), nil
 		},
@@ -80,12 +99,20 @@ type ASTValidatorFactory func(*env.Validator) (ASTValidator, error)
 
 // ASTValidators configures a set of ASTValidator instances into the target environment.
 //
-// Validators are applied in the order in which the are specified and are treated as singletons.
-// The same ASTValidator with a given name will not be applied more than once.
+// Validators are applied in the order in which they are specified.
+// If an ASTValidator with the same name is already configured, it will be replaced.
 func ASTValidators(validators ...ASTValidator) EnvOption {
 	return func(e *Env) (*Env, error) {
 		for _, v := range validators {
-			if !e.HasValidator(v.Name()) {
+			found := false
+			for i, existing := range e.validators {
+				if existing.Name() == v.Name() {
+					e.validators[i] = v
+					found = true
+					break
+				}
+			}
+			if !found {
 				e.validators = append(e.validators, v)
 			}
 		}
@@ -232,6 +259,13 @@ func ValidateComprehensionNestingLimit(limit int) ASTValidator {
 	return nestingLimitValidator{limit: limit}
 }
 
+// ValidateBindNestingLimit ensures that cel.bind() macro nesting does not exceed the specified limit.
+//
+// This validator can be useful for preventing arbitrarily nested cel.bind() macro calls.
+func ValidateBindNestingLimit(limit int) ASTValidator {
+	return bindNestingLimitValidator{limit: limit}
+}
+
 type argChecker func(env *Env, call, arg ast.Expr) error
 
 func newFormatValidator(funcName string, argNum int, check argChecker) formatValidator {
@@ -284,8 +318,9 @@ func evalCall(env *Env, call, arg ast.Expr) error {
 	if err != nil {
 		return err
 	}
-	_, _, err = prg.Eval(NoVars())
-	return err
+	resCh := prg.ConcurrentEval(context.Background(), NoVars())
+	res := <-resCh
+	return res.Err
 }
 
 func compileRegex(_ *Env, _, arg ast.Expr) error {
@@ -430,8 +465,7 @@ func (v nestingLimitValidator) Validate(e *Env, _ ValidatorConfig, a *ast.AST, i
 			}
 			// When the comprehension has an empty range, continue to the next ancestor
 			// as this comprehension does not have any associated cost.
-			iterRange := e.AsComprehension().IterRange()
-			if iterRange.Kind() == ast.ListKind && iterRange.AsList().Size() == 0 {
+			if isEmptyRangeComprehension(e) {
 				e, hasParent = e.Parent()
 				continue
 			}
@@ -444,4 +478,69 @@ func (v nestingLimitValidator) Validate(e *Env, _ ValidatorConfig, a *ast.AST, i
 			e, hasParent = e.Parent()
 		}
 	}
+}
+
+type bindNestingLimitValidator struct {
+	limit int
+}
+
+// Name returns the name of the cel.bind nesting limit validator.
+func (v bindNestingLimitValidator) Name() string {
+	return bindNestingLimitValidatorName
+}
+
+// ToConfig converts the ASTValidator to an env.Validator specifying the validator name and the nesting limit
+// as an integer value: {"limit": int}
+func (v bindNestingLimitValidator) ToConfig() *env.Validator {
+	return env.NewValidator(v.Name()).SetConfig(map[string]any{"limit": v.limit})
+}
+
+// Validate implements the ASTValidator interface method.
+func (v bindNestingLimitValidator) Validate(e *Env, _ ValidatorConfig, a *ast.AST, iss *Issues) {
+	root := ast.NavigateAST(a)
+	comprehensions := ast.MatchDescendants(root, ast.KindMatcher(ast.ComprehensionKind))
+	var celBinds []ast.NavigableExpr
+	for _, comp := range comprehensions {
+		if isCelBind(comp) {
+			celBinds = append(celBinds, comp)
+		}
+	}
+	if len(celBinds) <= v.limit {
+		return
+	}
+	for _, comp := range celBinds {
+		count := 0
+		e := comp
+		hasParent := true
+		for hasParent {
+			if isCelBind(e) {
+				count++
+				if count > v.limit {
+					iss.ReportErrorAtID(comp.ID(), "cel.bind exceeds nesting limit")
+					break
+				}
+			}
+			e, hasParent = e.Parent()
+		}
+	}
+}
+
+func isEmptyRangeComprehension(e ast.NavigableExpr) bool {
+	if e.Kind() != ast.ComprehensionKind {
+		return false
+	}
+	iterRange := e.AsComprehension().IterRange()
+	return iterRange.Kind() == ast.ListKind && iterRange.AsList().Size() == 0
+}
+
+func isCelBind(e ast.NavigableExpr) bool {
+	if !isEmptyRangeComprehension(e) {
+		return false
+	}
+	compre := e.AsComprehension()
+	loopCond := compre.LoopCondition()
+	loopStep := compre.LoopStep()
+	return compre.IterVar() == unusedIterVar &&
+		loopCond.Kind() == ast.LiteralKind && loopCond.AsLiteral().Value() == false &&
+		loopStep.Kind() == ast.IdentKind && loopStep.AsIdent() == compre.AccuVar()
 }

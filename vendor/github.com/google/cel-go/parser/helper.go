@@ -45,6 +45,10 @@ func (p *parserHelper) getSourceInfo() *ast.SourceInfo {
 	return p.sourceInfo
 }
 
+func (p *parserHelper) expressionCount() int64 {
+	return p.nextID - 1
+}
+
 func (p *parserHelper) newLiteral(ctx any, value ref.Val) ast.Expr {
 	return p.exprFactory.NewLiteral(p.newID(ctx), value)
 }

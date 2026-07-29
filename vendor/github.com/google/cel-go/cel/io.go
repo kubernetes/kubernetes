@@ -52,7 +52,12 @@ func CheckedExprToAstWithSource(checkedExpr *exprpb.CheckedExpr, src Source) (*A
 	if err != nil {
 		return nil, err
 	}
-	return &Ast{source: src, impl: checked}, nil
+	out := &Ast{source: src, impl: checked}
+	if err := checkLoadedASTDepth(checked); err != nil {
+		out.loadErr = err
+		return out, err
+	}
+	return out, nil
 }
 
 // AstToCheckedExpr converts an Ast to an protobuf CheckedExpr value.
@@ -83,7 +88,26 @@ func ParsedExprToAstWithSource(parsedExpr *exprpb.ParsedExpr, src Source) *Ast {
 		src = common.NewInfoSource(parsedExpr.GetSourceInfo())
 	}
 	e, _ := ast.ProtoToExpr(parsedExpr.GetExpr())
-	return &Ast{source: src, impl: ast.NewAST(e, info)}
+	out := &Ast{source: src, impl: ast.NewAST(e, info)}
+	// ParsedExprToAstWithSource has no error return, so record an over-depth violation on the Ast
+	// to be surfaced when it is later checked or planned.
+	out.loadErr = checkLoadedASTDepth(out.impl)
+	return out
+}
+
+// checkLoadedASTDepth guards ASTs that enter through the proto conversion helpers
+// (ParsedExprToAst / CheckedExprToAst) against nesting deeper than the parser's recursion limit.
+// Those entry points bypass the parser, so without this check a deeply nested loaded AST could
+// exhaust the Go stack during later checking or planning. It returns a normal error rather than
+// risking that overflow; the traversal itself is bounded so it stays safe on the same input.
+//
+// Embedders that fully control their AST inputs can skip this by building the AST through the
+// common/ast package directly instead of these conversion helpers.
+func checkLoadedASTDepth(a *ast.AST) error {
+	if ast.ExceedsDepth(a, defaultMaxASTDepth) {
+		return fmt.Errorf("input exceeds maximum expression nesting depth: %d", defaultMaxASTDepth)
+	}
+	return nil
 }
 
 // AstToParsedExpr converts an Ast to an protobuf ParsedExpr value.

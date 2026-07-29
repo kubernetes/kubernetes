@@ -164,6 +164,10 @@ func fieldNameByTag(structTagToParse string) func(field reflect.StructField) str
 	}
 }
 
+func isSkippedFieldName(name string) bool {
+	return name == "" || name == "-"
+}
+
 type nativeTypeOptions struct {
 	// fieldNameHandler controls how CEL should perform struct field renames.
 	// This is most commonly used for switching to parsing based off the struct field tag,
@@ -286,9 +290,13 @@ func toFieldName(fieldNameHandler NativeTypesFieldNameHandler, f reflect.StructF
 func (tp *nativeTypeProvider) FindStructFieldNames(typeName string) ([]string, bool) {
 	if t, found := tp.nativeTypes[typeName]; found {
 		fieldCount := t.refType.NumField()
-		fields := make([]string, fieldCount)
+		fields := make([]string, 0, fieldCount)
 		for i := 0; i < fieldCount; i++ {
-			fields[i] = toFieldName(tp.options.fieldNameHandler, t.refType.Field(i))
+			fieldName := toFieldName(tp.options.fieldNameHandler, t.refType.Field(i))
+			if isSkippedFieldName(fieldName) {
+				continue
+			}
+			fields = append(fields, fieldName)
 		}
 		return fields, true
 	}
@@ -509,6 +517,9 @@ func (o *nativeObj) ConvertToNative(typeDesc reflect.Type) (any, error) {
 				continue
 			}
 			fieldName := toFieldName(o.valType.fieldNameHandler, fieldType)
+			if isSkippedFieldName(fieldName) {
+				continue
+			}
 			fieldCELVal := o.NativeToValue(fieldValue.Interface())
 			fieldJSONVal, err := fieldCELVal.ConvertToNative(jsonValueType)
 			if err != nil {
@@ -667,7 +678,9 @@ func newNativeType(fieldNameHandler NativeTypesFieldNameHandler, rawType reflect
 		for idx := 0; idx < refType.NumField(); idx++ {
 			field := refType.Field(idx)
 			fieldName := toFieldName(fieldNameHandler, field)
-
+			if isSkippedFieldName(fieldName) {
+				continue
+			}
 			if _, found := fieldNames[fieldName]; found {
 				return nil, fmt.Errorf("invalid field name `%s` in struct `%s`: %w", fieldName, refType.Name(), errDuplicatedFieldName)
 			} else {
@@ -737,6 +750,10 @@ func (t *nativeType) Value() any {
 // fieldByName returns the corresponding reflect.StructField for the give name either by matching
 // field tag or field name.
 func (t *nativeType) fieldByName(fieldName string) (reflect.StructField, bool) {
+	if isSkippedFieldName(fieldName) {
+		return reflect.StructField{}, false
+	}
+
 	if t.fieldNameHandler == nil {
 		return t.refType.FieldByName(fieldName)
 	}
