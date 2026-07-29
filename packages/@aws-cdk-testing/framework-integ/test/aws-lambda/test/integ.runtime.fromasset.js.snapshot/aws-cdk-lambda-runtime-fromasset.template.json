@@ -1,6 +1,6 @@
 {
  "Resources": {
-  "MyFunctionJava21ServiceRole0645B770": {
+  "MyFunctionjava21ServiceRole8169D0D8": {
    "Type": "AWS::IAM::Role",
    "Properties": {
     "AssumeRolePolicyDocument": {
@@ -31,7 +31,7 @@
     ]
    }
   },
-  "MyFunctionJava216AE56E90": {
+  "MyFunctionjava219D7C6882": {
    "Type": "AWS::Lambda::Function",
    "Properties": {
     "Code": {
@@ -43,17 +43,17 @@
     "Handler": "com.mycompany.app.LambdaMethodHandler::handleRequest",
     "Role": {
      "Fn::GetAtt": [
-      "MyFunctionJava21ServiceRole0645B770",
+      "MyFunctionjava21ServiceRole8169D0D8",
       "Arn"
      ]
     },
     "Runtime": "java21"
    },
    "DependsOn": [
-    "MyFunctionJava21ServiceRole0645B770"
+    "MyFunctionjava21ServiceRole8169D0D8"
    ]
   },
-  "MyFunctionJava25ServiceRole7485EA0E": {
+  "MyFunctionjava25ServiceRole2542F382": {
    "Type": "AWS::IAM::Role",
    "Properties": {
     "AssumeRolePolicyDocument": {
@@ -84,7 +84,7 @@
     ]
    }
   },
-  "MyFunctionJava25D0EF0C44": {
+  "MyFunctionjava251668460C": {
    "Type": "AWS::Lambda::Function",
    "Properties": {
     "Code": {
@@ -96,32 +96,215 @@
     "Handler": "com.mycompany.app.LambdaMethodHandler::handleRequest",
     "Role": {
      "Fn::GetAtt": [
-      "MyFunctionJava25ServiceRole7485EA0E",
+      "MyFunctionjava25ServiceRole2542F382",
       "Arn"
      ]
     },
     "Runtime": "java25"
    },
    "DependsOn": [
-    "MyFunctionJava25ServiceRole7485EA0E"
+    "MyFunctionjava25ServiceRole2542F382"
+   ]
+  },
+  "MyFunctionjava8al2023ServiceRole5ECF6711": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  "MyFunctionjava8al2023D439527D": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "ff6ca8da1c8c599aa9f53b242d0e817f8a336ad653e62805a13a5ad46ea7ebe1.zip"
+    },
+    "Handler": "com.mycompany.app.LambdaMethodHandler::handleRequest",
+    "Role": {
+     "Fn::GetAtt": [
+      "MyFunctionjava8al2023ServiceRole5ECF6711",
+      "Arn"
+     ]
+    },
+    "Runtime": "java8.al2023"
+   },
+   "DependsOn": [
+    "MyFunctionjava8al2023ServiceRole5ECF6711"
+   ]
+  },
+  "MyFunctionjava11al2023ServiceRoleB58B1837": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  "MyFunctionjava11al2023389432C9": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "ff6ca8da1c8c599aa9f53b242d0e817f8a336ad653e62805a13a5ad46ea7ebe1.zip"
+    },
+    "Handler": "com.mycompany.app.LambdaMethodHandler::handleRequest",
+    "Role": {
+     "Fn::GetAtt": [
+      "MyFunctionjava11al2023ServiceRoleB58B1837",
+      "Arn"
+     ]
+    },
+    "Runtime": "java11.al2023"
+   },
+   "DependsOn": [
+    "MyFunctionjava11al2023ServiceRoleB58B1837"
+   ]
+  },
+  "MyFunctionjava17al2023ServiceRole24581F1F": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  "MyFunctionjava17al202362B14D9A": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "ff6ca8da1c8c599aa9f53b242d0e817f8a336ad653e62805a13a5ad46ea7ebe1.zip"
+    },
+    "Handler": "com.mycompany.app.LambdaMethodHandler::handleRequest",
+    "Role": {
+     "Fn::GetAtt": [
+      "MyFunctionjava17al2023ServiceRole24581F1F",
+      "Arn"
+     ]
+    },
+    "Runtime": "java17.al2023"
+   },
+   "DependsOn": [
+    "MyFunctionjava17al2023ServiceRole24581F1F"
    ]
   }
  },
  "Outputs": {
-  "ExportsOutputRefMyFunctionJava216AE56E906B018223": {
+  "ExportsOutputRefMyFunctionjava219D7C688202DE2695": {
    "Value": {
-    "Ref": "MyFunctionJava216AE56E90"
+    "Ref": "MyFunctionjava219D7C6882"
    },
    "Export": {
-    "Name": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionJava216AE56E906B018223"
+    "Name": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava219D7C688202DE2695"
    }
   },
-  "ExportsOutputRefMyFunctionJava25D0EF0C44D46CC469": {
+  "ExportsOutputRefMyFunctionjava251668460C94EC0E85": {
    "Value": {
-    "Ref": "MyFunctionJava25D0EF0C44"
+    "Ref": "MyFunctionjava251668460C"
    },
    "Export": {
-    "Name": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionJava25D0EF0C44D46CC469"
+    "Name": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava251668460C94EC0E85"
+   }
+  },
+  "ExportsOutputRefMyFunctionjava8al2023D439527D183066BD": {
+   "Value": {
+    "Ref": "MyFunctionjava8al2023D439527D"
+   },
+   "Export": {
+    "Name": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava8al2023D439527D183066BD"
+   }
+  },
+  "ExportsOutputRefMyFunctionjava11al2023389432C9E971D17F": {
+   "Value": {
+    "Ref": "MyFunctionjava11al2023389432C9"
+   },
+   "Export": {
+    "Name": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava11al2023389432C9E971D17F"
+   }
+  },
+  "ExportsOutputRefMyFunctionjava17al202362B14D9A6D9D7F9C": {
+   "Value": {
+    "Ref": "MyFunctionjava17al202362B14D9A"
+   },
+   "Export": {
+    "Name": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava17al202362B14D9A6D9D7F9C"
    }
   }
  },
