@@ -4353,3 +4353,53 @@ describe('deletionProtection', () => {
     });
   });
 });
+
+describe('controlPlaneScalingTier', () => {
+  test.each([
+    [eks.ControlPlaneScalingTier.STANDARD, 'standard'],
+    [eks.ControlPlaneScalingTier.TIER_XL, 'tier-xl'],
+    [eks.ControlPlaneScalingTier.TIER_2XL, 'tier-2xl'],
+    [eks.ControlPlaneScalingTier.TIER_4XL, 'tier-4xl'],
+    [eks.ControlPlaneScalingTier.TIER_8XL, 'tier-8xl'],
+  ])(
+    'controlPlaneScalingTier(%s) should configure controlPlaneScalingConfig',
+    (tier, expected) => {
+      // GIVEN
+      const { stack } = testFixture();
+
+      // WHEN
+      new eks.Cluster(stack, 'Cluster', {
+        version: CLUSTER_VERSION,
+        controlPlaneScalingTier: tier,
+        kubectlLayer: new KubectlV31Layer(stack, 'KubectlLayer'),
+      });
+
+      // THEN
+      Template.fromStack(stack).hasResourceProperties('Custom::AWSCDK-EKS-Cluster', {
+        Config: {
+          controlPlaneScalingConfig: {
+            tier: expected,
+          },
+        },
+      });
+    },
+  );
+
+  test('controlPlaneScalingConfig is not set when controlPlaneScalingTier is not provided', () => {
+    // GIVEN
+    const { stack } = testFixture();
+
+    // WHEN
+    new eks.Cluster(stack, 'Cluster', {
+      version: CLUSTER_VERSION,
+      kubectlLayer: new KubectlV31Layer(stack, 'KubectlLayer'),
+    });
+
+    // THEN
+    Template.fromStack(stack).hasResourceProperties('Custom::AWSCDK-EKS-Cluster', {
+      Config: {
+        controlPlaneScalingConfig: Match.absent(),
+      },
+    });
+  });
+});

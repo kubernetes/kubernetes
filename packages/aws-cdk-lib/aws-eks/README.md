@@ -11,6 +11,7 @@ In addition, the library also supports defining Kubernetes resource manifests wi
   - [Quick Start](#quick-start)
   - [Architectural Overview](#architectural-overview)
   - [Provisioning clusters](#provisioning-clusters)
+    - [Provisioned Control Plane](#provisioned-control-plane)
     - [Managed node groups](#managed-node-groups)
       - [Node Groups with IPv6 Support](#node-groups-with-ipv6-support)
       - [Spot Instances Support](#spot-instances-support)
@@ -192,6 +193,30 @@ new eks.Cluster(this, 'HelloEKS', {
   deletionProtection: true,
 });
 ```
+
+### Provisioned Control Plane
+
+Amazon EKS Provisioned Control Plane allows you to select a scaling tier to ensure high and predictable performance for demanding workloads such as AI training/inference, high-performance computing, or large-scale data processing.
+
+```ts
+import { KubectlV35Layer } from '@aws-cdk/lambda-layer-kubectl-v35';
+
+new eks.Cluster(this, 'HighPerformanceCluster', {
+  version: eks.KubernetesVersion.V1_35,
+  kubectlLayer: new KubectlV35Layer(this, 'kubectl'),
+  controlPlaneScalingTier: eks.ControlPlaneScalingTier.TIER_XL,
+});
+```
+
+Available scaling tiers:
+
+- `STANDARD` - Standard control plane (default, no additional cost)
+- `TIER_XL` - Extra-large provisioned tier
+- `TIER_2XL` - 2x extra-large provisioned tier
+- `TIER_4XL` - 4x extra-large provisioned tier
+- `TIER_8XL` - 8x extra-large provisioned tier
+
+> For more details visit [Amazon EKS Provisioned Control Plane](https://docs.aws.amazon.com/eks/latest/userguide/eks-provisioned-control-plane.html).
 
 > **NOTE: Only 1 cluster per stack is supported.** If you have a use-case for multiple clusters per stack, or would like to understand more about this limitation, see <https://github.com/aws/aws-cdk/issues/10073>.
 
