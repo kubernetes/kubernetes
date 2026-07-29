@@ -1,5 +1,5 @@
 {
-  "version": "48.0.0",
+  "version": "54.0.0",
   "testCases": {
     "aws-glue-job-pyspark-etl-integ-test/DefaultTest": {
       "stacks": [
@@ -9,5 +9,6 @@
       "assertionStackName": "awsgluejobpysparketlintegtestDefaultTestDeployAssertED1ACE14"
     }
   },
-  "minimumCliVersion": "2.1033.0"
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
 }

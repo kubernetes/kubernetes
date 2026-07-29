@@ -527,6 +527,61 @@ export class Cluster extends Resource implements ICluster {
   }
 
   /**
+   * Use an existing AWS Cloud Map namespace as the default namespace for this cluster.
+   *
+   * Unlike `addDefaultCloudMapNamespace`, this method does not create a new namespace;
+   * it registers a namespace that already exists (created elsewhere in the app or
+   * imported) as the cluster's default namespace.
+   */
+  @MethodMetadata()
+  public addExistingDefaultCloudMapNamespace(options: ExistingCloudMapNamespaceOptions): cloudmap.INamespace {
+    if (this._defaultCloudMapNamespace !== undefined) {
+      throw new ValidationError(lit`OnlyDefaultNamespaceOnce`, 'Can only add default namespace once.', this);
+    }
+
+    // Cross-region validation (catches when namespace is defined in a different CDK stack)
+    const clusterStack = Stack.of(this);
+    const nsStack = Stack.of(options.namespace);
+    if (!Token.isUnresolved(clusterStack.region) && !Token.isUnresolved(nsStack.region)
+        && clusterStack.region !== nsStack.region) {
+      throw new ValidationError(lit`CrossRegionNamespace`,
+        `Cloud Map namespace must be in the same region as the ECS cluster, got cluster region ${JSON.stringify(clusterStack.region)} and namespace region ${JSON.stringify(nsStack.region)}`, this);
+    }
+
+    // Cross-account warning — valid but requires AWS RAM sharing
+    if (!Token.isUnresolved(clusterStack.account) && !Token.isUnresolved(nsStack.account)
+        && clusterStack.account !== nsStack.account) {
+      Annotations.of(this).addWarningV2('@aws-cdk/aws-ecs:crossAccountNamespace',
+        'The provided Cloud Map namespace belongs to a different account. ' +
+        'Ensure AWS Resource Access Manager (RAM) sharing is configured. ' +
+        'See https://docs.aws.amazon.com/cloud-map/latest/dg/sharing.html');
+    }
+
+    // Private DNS namespaces are VPC-bound — warn about potential VPC mismatch
+    if (options.namespace.type === cloudmap.NamespaceType.DNS_PRIVATE) {
+      Annotations.of(this).addWarningV2('@aws-cdk/aws-ecs:privateDnsNamespaceVpc',
+        'When using an existing PrivateDnsNamespace, ensure it is associated with the ' +
+        'same VPC as this ECS cluster for service discovery to function correctly.');
+    }
+
+    this._defaultCloudMapNamespace = options.namespace;
+    if (options.useForServiceConnect) {
+      // Validate ARN is well-formed for imported namespaces
+      const nsArn = options.namespace.namespaceArn;
+      if (!Token.isUnresolved(nsArn) && !nsArn.startsWith('arn:')) {
+        throw new ValidationError(lit`InvalidNamespaceArn`,
+          `The imported namespace does not have a valid ARN, got ${JSON.stringify(nsArn)}. ` +
+          'Ensure it is imported with a full ARN when used for Service Connect', this);
+      }
+      this._cfnCluster.serviceConnectDefaults = {
+        namespace: nsArn,
+      };
+    }
+
+    return options.namespace;
+  }
+
+  /**
    * Getter for _defaultCapacityProviderStrategy. This is necessary to correctly create Capacity Provider Associations.
    */
   public get defaultCapacityProviderStrategy() {
@@ -1181,9 +1236,21 @@ export interface AddCapacityOptions extends AddAutoScalingGroupCapacityOptions, 
 }
 
 /**
+ * Options shared by all ways of setting the default AWS Cloud Map namespace of a cluster.
+ */
+export interface CloudMapNamespaceOptionsBase {
+  /**
+   * This property specifies whether to set the provided namespace as the service connect default in the cluster properties.
+   *
+   * @default false
+   */
+  readonly useForServiceConnect?: boolean;
+}
+
+/**
  * The options for creating an AWS Cloud Map namespace.
  */
-export interface CloudMapNamespaceOptions {
+export interface CloudMapNamespaceOptions extends CloudMapNamespaceOptionsBase {
   /**
    * The name of the namespace, such as example.com.
    */
@@ -1202,14 +1269,21 @@ export interface CloudMapNamespaceOptions {
    * @default VPC of the cluster for Private DNS Namespace, otherwise none
    */
   readonly vpc?: ec2.IVpc;
+}
 
+/**
+ * The options for using an existing AWS Cloud Map namespace as the default namespace of a cluster.
+ */
+export interface ExistingCloudMapNamespaceOptions extends CloudMapNamespaceOptionsBase {
   /**
-   * This property specifies whether to set the provided namespace as the service connect default in the cluster properties.
+   * The existing Cloud Map namespace to use as the cluster's default namespace.
    *
-   * @default false
+   * The full `INamespace` is required (rather than a ref) because the cluster needs the
+   * namespace name, ARN and type to wire up Service Discovery and Service Connect.
+   *
+   * [disable-awslint:prefer-ref-interface]
    */
-  readonly useForServiceConnect?: boolean;
-
+  readonly namespace: cloudmap.INamespace;
 }
 
 /**

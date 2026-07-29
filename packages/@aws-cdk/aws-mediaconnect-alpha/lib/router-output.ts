@@ -46,14 +46,14 @@ export class RouterOutputProtocolOptions {
 }
 
 /**
- * Routing tier that determines the maximum number of outputs for the Router Output
+ * Routing tier that determines the maximum bitrate (in Mbps) for a Router Output.
  */
 export class RouterOutputTier {
-  /** Supports up to 100 outputs */
+  /** Up to 100 Mbps */
   public static readonly OUTPUT_100 = new RouterOutputTier('OUTPUT_100');
-  /** Supports up to 50 outputs */
+  /** Up to 50 Mbps */
   public static readonly OUTPUT_50 = new RouterOutputTier('OUTPUT_50');
-  /** Supports up to 20 outputs */
+  /** Up to 20 Mbps */
   public static readonly OUTPUT_20 = new RouterOutputTier('OUTPUT_20');
 
   /**
@@ -340,8 +340,6 @@ export class RouterOutputProtocol {
    *
    * @example
    *
-   *    import { Duration } from 'aws-cdk-lib';
-   *
    *    RouterOutputProtocol.srtListener({
    *      port: 5000,
    *      minimumLatency: Duration.millis(125),
@@ -364,8 +362,6 @@ export class RouterOutputProtocol {
    * Create an SRT Caller protocol configuration
    *
    * @example
-   *
-   *    import { Duration } from 'aws-cdk-lib';
    *
    *    RouterOutputProtocol.srtCaller({
    *      destinationAddress: '10.0.0.1',

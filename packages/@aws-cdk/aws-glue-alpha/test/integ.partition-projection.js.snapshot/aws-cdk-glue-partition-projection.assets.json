@@ -1,5 +1,5 @@
 {
-  "version": "48.0.0",
+  "version": "54.0.0",
   "files": {
     "f0b62fe7856df25f96634ec796c98551b0d4264ff09de58b08a89cc5e53a6808": {
       "displayName": "aws-cdk-glue-partition-projection Template",

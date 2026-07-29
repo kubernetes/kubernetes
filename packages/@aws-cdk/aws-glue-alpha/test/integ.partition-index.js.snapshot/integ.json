@@ -1,15 +1,14 @@
 {
-  "version": "53.0.0",
+  "version": "54.0.0",
   "testCases": {
-    "integ.partition-index": {
+    "glue-partition-index-integ/DefaultTest": {
       "stacks": [
         "aws-cdk-glue"
       ],
-      "diffAssets": false,
-      "stackUpdateWorkflow": true
+      "assertionStack": "glue-partition-index-integ/DefaultTest/DeployAssert",
+      "assertionStackName": "gluepartitionindexintegDefaultTestDeployAssert364C2B0F"
     }
   },
-  "synthContext": {},
-  "enableLookups": false,
-  "minimumCliVersion": "2.1108.0"
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
 }

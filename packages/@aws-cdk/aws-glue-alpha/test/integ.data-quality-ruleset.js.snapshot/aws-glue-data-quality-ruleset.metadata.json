@@ -1,0 +1,62 @@
+{
+  "/aws-glue-data-quality-ruleset/DataBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-glue-data-quality-ruleset/MyDatabase": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-glue-data-quality-ruleset/CSVTable": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-glue-data-quality-ruleset/DataQualityRuleset": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-glue-data-quality-ruleset/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-glue-data-quality-ruleset/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-glue-data-quality-ruleset/DataBucket/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DataBucketE3889A50"
+    }
+  ],
+  "/aws-glue-data-quality-ruleset/MyDatabase/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyDatabase1E2517DB"
+    }
+  ],
+  "/aws-glue-data-quality-ruleset/CSVTable/Table": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CSVTableE499CABA"
+    }
+  ],
+  "/aws-glue-data-quality-ruleset/DataQualityRuleset/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DataQualityRulesetBB177ADB"
+    }
+  ]
+}

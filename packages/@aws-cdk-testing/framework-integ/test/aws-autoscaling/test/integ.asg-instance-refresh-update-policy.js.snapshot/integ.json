@@ -1,0 +1,13 @@
+{
+  "version": "53.0.0",
+  "testCases": {
+    "AutoScalingInstanceRefreshUpdatePolicyTest/DefaultTest": {
+      "stacks": [
+        "aws-cdk-autoscaling-instance-refresh-update-policy"
+      ],
+      "assertionStack": "AutoScalingInstanceRefreshUpdatePolicyTest/DefaultTest/DeployAssert",
+      "assertionStackName": "AutoScalingInstanceRefreshUpdatePolicyTestDefaultTestDeployAssertCC316696"
+    }
+  },
+  "minimumCliVersion": "2.1123.0"
+}

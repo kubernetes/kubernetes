@@ -10,37 +10,34 @@ const app = new App({
 });
 const stack = new Stack(app, 'aws-cdk-lambda-runtime-fromasset');
 
-const lambdaFunctionJava21 = new Function(stack, 'MyFunctionJava21', {
-  runtime: Runtime.JAVA_21,
-  handler: 'com.mycompany.app.LambdaMethodHandler::handleRequest',
-  code: Code.fromAsset(path.join(__dirname, 'my-app-1.0-SNAPSHOT.zip')),
-});
+const runtimes = [
+  Runtime.JAVA_21,
+  Runtime.JAVA_25,
+  Runtime.JAVA_8_AL2023,
+  Runtime.JAVA_11_AL2023,
+  Runtime.JAVA_17_AL2023,
+];
 
-const lambdaFunctionJava25 = new Function(stack, 'MyFunctionJava25', {
-  runtime: Runtime.JAVA_25,
-  handler: 'com.mycompany.app.LambdaMethodHandler::handleRequest',
-  code: Code.fromAsset(path.join(__dirname, 'my-app-1.0-SNAPSHOT.zip')),
+const functions = runtimes.map((runtime) => {
+  return new Function(stack, `MyFunction-${runtime.name}`, {
+    runtime,
+    handler: 'com.mycompany.app.LambdaMethodHandler::handleRequest',
+    code: Code.fromAsset(path.join(__dirname, 'my-app-1.0-SNAPSHOT.zip')),
+  });
 });
 
 const integTest = new integ.IntegTest(app, 'Integ', { testCases: [stack] });
 
-const invokeJava21 = integTest.assertions.invokeFunction({
-  functionName: lambdaFunctionJava21.functionName,
-  payload: '123',
-});
+for (const fn of functions) {
+  const invoke = integTest.assertions.invokeFunction({
+    functionName: fn.functionName,
+    payload: '123',
+  });
 
-invokeJava21.expect(integ.ExpectedResult.objectLike({
-  Payload: '"123"',
-}));
-
-const invokeJava25 = integTest.assertions.invokeFunction({
-  functionName: lambdaFunctionJava25.functionName,
-  payload: '123',
-});
-
-invokeJava25.expect(integ.ExpectedResult.objectLike({
-  Payload: '"123"',
-}));
+  invoke.expect(integ.ExpectedResult.objectLike({
+    Payload: '"123"',
+  }));
+}
 
 app.synth();
 

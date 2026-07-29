@@ -1,13 +1,14 @@
 {
-  "version": "32.0.0",
+  "version": "54.0.0",
   "files": {
     "b9515accbd6b765c36fbffa5adb190fc8f6d1f67573ab2655ede370368887799": {
+      "displayName": "aws-glue-data-quality-ruleset Template",
       "source": {
         "path": "aws-glue-data-quality-ruleset.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "current_account-current_region": {
+        "current_account-current_region-fc7963a4": {
           "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
           "objectKey": "b9515accbd6b765c36fbffa5adb190fc8f6d1f67573ab2655ede370368887799.json",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"

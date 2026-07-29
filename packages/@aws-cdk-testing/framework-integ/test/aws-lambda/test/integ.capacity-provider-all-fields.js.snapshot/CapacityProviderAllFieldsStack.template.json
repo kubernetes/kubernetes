@@ -489,7 +489,7 @@
      "S3Bucket": {
       "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
      },
-     "S3Key": "55549d0bfa9628b306c349544b7d95017221e259e17875f3d38f2a3d2da5043f.zip"
+     "S3Key": "bea78ce725e22a5e0d82378f6b49028c09ba86499286d6945a0506e820854e92.zip"
     },
     "Timeout": 900,
     "MemorySize": 128,
@@ -554,6 +554,15 @@
     ]
    }
   },
+  "CpLogGroup34FBACFC": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": "/aws/lambda/capacity-provider/integ-test",
+    "RetentionInDays": 731
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
   "CapacityProvider7AA4F436": {
    "Type": "AWS::Lambda::CapacityProvider",
    "Properties": {
@@ -581,6 +590,14 @@
        "OperatorRole6A7B6B68",
        "Arn"
       ]
+     }
+    },
+    "TelemetryConfig": {
+     "LoggingConfig": {
+      "LogGroup": {
+       "Ref": "CpLogGroup34FBACFC"
+      },
+      "SystemLogLevel": "DEBUG"
      }
     },
     "VpcConfig": {

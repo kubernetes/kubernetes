@@ -1,5 +1,5 @@
 {
-  "version": "38.0.1",
+  "version": "54.0.0",
   "testCases": {
     "aws-glue-job-scalasparkflex-etl-integ-test/DefaultTest": {
       "stacks": [
@@ -8,5 +8,7 @@
       "assertionStack": "aws-glue-job-scalasparkflex-etl-integ-test/DefaultTest/DeployAssert",
       "assertionStackName": "awsgluejobscalasparkflexetlintegtestDefaultTestDeployAssert8009E6FC"
     }
-  }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
 }

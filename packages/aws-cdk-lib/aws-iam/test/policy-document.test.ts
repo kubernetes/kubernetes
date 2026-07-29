@@ -22,23 +22,23 @@ describe('IAM policy document', () => {
 
     expect(stack.resolve(p.toStatementJson())).toEqual({
       Action:
-      ['sqs:SendMessage',
-        'dynamodb:CreateTable',
-        'dynamodb:DeleteTable'],
+        ['sqs:SendMessage',
+          'dynamodb:CreateTable',
+          'dynamodb:DeleteTable'],
       Resource: ['myQueue', 'yourQueue', '*'],
       Effect: 'Allow',
       Principal:
       {
         AWS:
-         {
-           'Fn::Join':
-          ['',
-            ['arn:',
-              { Ref: 'AWS::Partition' },
-              ':iam::my',
-              { account: 'account' },
-              'name:root']],
-         },
+        {
+          'Fn::Join':
+            ['',
+              ['arn:',
+                { Ref: 'AWS::Partition' },
+                ':iam::my',
+                { account: 'account' },
+                'name:root']],
+        },
       },
       Condition: { StringEquals: { 'sts:ExternalId': '12221121221' } },
     });
@@ -853,7 +853,10 @@ describe('IAM policy document', () => {
     // THEN
     const validationErrorsForResourcePolicy: string[] = policyStatement.validateForResourcePolicy();
     // const validationErrorsForIdentityPolicy: string[] = policyStatement.validateForIdentityPolicy();
-    expect(validationErrorsForResourcePolicy).toEqual(['A PolicyStatement must specify at least one \'action\' or \'notAction\'.']);
+    expect(validationErrorsForResourcePolicy).toEqual([
+      'A PolicyStatement must specify at least one \'action\' or \'notAction\'.',
+      'A PolicyStatement used in a resource-based policy must specify at least one resource.',
+    ]);
   });
 
   test('validation error if policy statement for resource-based policy has no principals specified', () => {
@@ -863,6 +866,105 @@ describe('IAM policy document', () => {
 
     // THEN
     const validationErrors: string[] = policyStatement.validateForResourcePolicy();
+    expect(validationErrors).toEqual([
+      'A PolicyStatement used in a resource-based policy must specify at least one IAM principal.',
+      'A PolicyStatement used in a resource-based policy must specify at least one resource.',
+    ]);
+  });
+
+  test('validation error if policy statement for resource-based policy has no resources specified', () => {
+    const policyStatement = new PolicyStatement({
+      actions: ['s3:GetObject'],
+      principals: [new AnyPrincipal()],
+      // Missing: resources
+    });
+
+    // THEN
+    const validationErrors: string[] = policyStatement.validateForResourcePolicy();
+    expect(validationErrors).toEqual(['A PolicyStatement used in a resource-based policy must specify at least one resource.']);
+  });
+
+  test('validation passes when both principals and resources are specified', () => {
+    const policyStatement = new PolicyStatement({
+      actions: ['s3:GetObject'],
+      principals: [new AnyPrincipal()],
+      resources: ['arn:aws:s3:::my-bucket/*'],
+    });
+
+    // THEN
+    const validationErrors: string[] = policyStatement.validateForResourcePolicy();
+    expect(validationErrors).toEqual([]);
+  });
+
+  test('validation passes with NotResource instead of Resource', () => {
+    const policyStatement = new PolicyStatement({
+      actions: ['s3:GetObject'],
+      principals: [new AnyPrincipal()],
+      notResources: ['arn:aws:s3:::excluded-bucket/*'],
+    });
+
+    // THEN
+    const validationErrors: string[] = policyStatement.validateForResourcePolicy();
+    expect(validationErrors).toEqual([]);
+  });
+
+  test('validation error if policy statement for resource-based policy has neither principals nor resources', () => {
+    const policyStatement = new PolicyStatement({
+      actions: ['s3:GetObject'],
+      // Missing: both principals and resources
+    });
+
+    // THEN
+    const validationErrors: string[] = policyStatement.validateForResourcePolicy();
+    expect(validationErrors).toEqual([
+      'A PolicyStatement used in a resource-based policy must specify at least one IAM principal.',
+      'A PolicyStatement used in a resource-based policy must specify at least one resource.',
+    ]);
+  });
+
+  test('validation error if policy statement for trust policy has no principals specified', () => {
+    const policyStatement = new PolicyStatement({
+      actions: ['sts:AssumeRole'],
+      // Missing: principals (resources not needed for trust policies)
+    });
+
+    // THEN
+    const validationErrors: string[] = policyStatement.validateForTrustPolicy();
+    expect(validationErrors).toEqual(['A PolicyStatement used in a trust policy must specify at least one IAM principal.']);
+  });
+
+  test('validation passes for trust policy with principals but no resources', () => {
+    const policyStatement = new PolicyStatement({
+      actions: ['sts:AssumeRole'],
+      principals: [new AnyPrincipal()],
+      // No resources needed for trust policies
+    });
+
+    // THEN
+    const validationErrors: string[] = policyStatement.validateForTrustPolicy();
+    expect(validationErrors).toEqual([]);
+  });
+
+  test('validation passes for resource-based policy with skipResourceValidation option', () => {
+    const policyStatement = new PolicyStatement({
+      actions: ['ecr:GetDownloadUrlForLayer'],
+      principals: [new AnyPrincipal()],
+      // Missing: resources (but validation is skipped)
+    });
+
+    // THEN
+    const validationErrors: string[] = policyStatement.validateForResourcePolicy({ skipResourceValidation: true });
+    expect(validationErrors).toEqual([]);
+  });
+
+  test('validation still requires principals even with skipResourceValidation', () => {
+    const policyStatement = new PolicyStatement({
+      actions: ['ecr:GetDownloadUrlForLayer'],
+      // Missing: both principals and resources
+    });
+
+    // THEN
+    const validationErrors: string[] = policyStatement.validateForResourcePolicy({ skipResourceValidation: true });
     expect(validationErrors).toEqual(['A PolicyStatement used in a resource-based policy must specify at least one IAM principal.']);
   });
 });

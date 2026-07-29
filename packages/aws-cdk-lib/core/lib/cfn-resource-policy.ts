@@ -131,6 +131,14 @@ export interface CfnUpdatePolicy {
   readonly autoScalingRollingUpdate?: CfnAutoScalingRollingUpdate;
 
   /**
+   * To specify how AWS CloudFormation handles instance refresh for an Auto Scaling group, use the
+   * AutoScalingInstanceRefresh policy. This policy triggers an instance refresh when certain properties
+   * of the Auto Scaling group change (such as launch template or mixed instances policy), replacing
+   * instances gradually while maintaining availability.
+   */
+  readonly autoScalingInstanceRefresh?: CfnAutoScalingInstanceRefresh;
+
+  /**
    * To specify how AWS CloudFormation handles updates for the MinSize, MaxSize, and DesiredCapacity properties when
    * the AWS::AutoScaling::AutoScalingGroup resource has an associated scheduled action, use the AutoScalingScheduledAction
    * policy.
@@ -293,4 +301,116 @@ export interface CfnCodeDeployLambdaAliasUpdate {
    * The name of the Lambda function to run after traffic routing completes.
    */
   readonly afterAllowTrafficHook?: string;
+}
+
+/**
+ * To specify how AWS CloudFormation handles instance refresh for an Auto Scaling group, use the
+ * AutoScalingInstanceRefresh update policy. When properties that trigger an instance refresh change
+ * (such as LaunchTemplate or MixedInstancesPolicy), CloudFormation starts an instance refresh to
+ * replace instances gradually.
+ *
+ * This policy is mutually exclusive with AutoScalingRollingUpdate.
+ */
+export interface CfnAutoScalingInstanceRefresh {
+  /**
+   * The strategy to use for the instance refresh.
+   */
+  readonly strategy: string;
+
+  /**
+   * The preferences for the instance refresh.
+   */
+  readonly preferences?: CfnAutoScalingInstanceRefreshPreferences;
+}
+
+/**
+ * Preferences for the AutoScalingInstanceRefresh update policy.
+ */
+export interface CfnAutoScalingInstanceRefreshPreferences {
+  /**
+   * The minimum percentage of the group to keep in service, healthy, and ready to use
+   * to support your workload during the instance refresh.
+   *
+   * @default - the value set in the Auto Scaling group's instance maintenance policy, if defined; otherwise 100 when the strategy is Rolling, or 90 when the strategy is ReplaceRootVolume
+   */
+  readonly minHealthyPercentage?: number;
+
+  /**
+   * The maximum percentage of the group that can be in service and healthy, or pending,
+   * to support your workload during the instance refresh. Used to control batch size.
+   *
+   * @default - the value set in the Auto Scaling group's instance maintenance policy, if defined; otherwise 110 when the strategy is Rolling, or 100 when the strategy is ReplaceRootVolume
+   */
+  readonly maxHealthyPercentage?: number;
+
+  /**
+   * The number of seconds to wait after a new instance enters the InService state before
+   * moving on to replacing the next instance.
+   *
+   * @default - the group's DefaultInstanceWarmup if defined; otherwise the group's HealthCheckGracePeriod
+   */
+  readonly instanceWarmup?: number;
+
+  /**
+   * Indicates whether skip matching is enabled. If true, instances that already match the
+   * desired configuration are not replaced.
+   *
+   * @default true
+   */
+  readonly skipMatching?: boolean;
+
+  /**
+   * Threshold values for each checkpoint in ascending order. Each number is a percentage of
+   * the total number of instances in the group. When the percentage of instances that have
+   * been replaced reaches a checkpoint, the refresh waits for the configured checkpoint delay
+   * before continuing.
+   *
+   * @default - no checkpoints
+   */
+  readonly checkpointPercentages?: number[];
+
+  /**
+   * The number of seconds to wait after a checkpoint is reached before continuing.
+   *
+   * @default - 3600 seconds (1 hour), applied only when checkpointPercentages is set
+   */
+  readonly checkpointDelay?: number;
+
+  /**
+   * The number of seconds after an instance refresh completes successfully before
+   * CloudFormation considers the update successful.
+   *
+   * @default 0
+   */
+  readonly bakeTime?: number;
+
+  /**
+   * The CloudWatch alarms to monitor during the instance refresh. If any alarm goes into
+   * ALARM state, the instance refresh fails.
+   */
+  readonly alarmSpecification?: CfnAutoScalingInstanceRefreshAlarmSpecification;
+
+  /**
+   * Specifies the behavior of instances that are protected from scale in during an instance refresh.
+   *
+   * @default 'Wait'
+   */
+  readonly scaleInProtectedInstances?: string;
+
+  /**
+   * Specifies the behavior of instances in standby during an instance refresh.
+   *
+   * @default 'Wait'
+   */
+  readonly standbyInstances?: string;
+}
+
+/**
+ * Alarm specification for the AutoScalingInstanceRefresh update policy.
+ */
+export interface CfnAutoScalingInstanceRefreshAlarmSpecification {
+  /**
+   * The names of the CloudWatch alarms to monitor.
+   */
+  readonly alarms?: string[];
 }

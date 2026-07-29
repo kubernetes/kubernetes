@@ -42,6 +42,7 @@
     "@aws-sdk/client-cloudwatch-logs": "3.632.0",
     "@aws-sdk/client-dynamodb": "3.632.0",
     "@aws-sdk/client-eks": "3.632.0",
+    "@aws-sdk/client-glue": "3.632.0",
     "@aws-sdk/client-sts": "3.632.0",
     "@smithy/node-http-handler": "3.3.3",
     "@smithy/util-stream": "3.3.4",

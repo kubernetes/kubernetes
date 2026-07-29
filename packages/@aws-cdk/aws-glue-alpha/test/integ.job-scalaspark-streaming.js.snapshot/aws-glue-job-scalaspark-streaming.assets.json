@@ -1,13 +1,14 @@
 {
-  "version": "38.0.1",
+  "version": "54.0.0",
   "files": {
     "e305655b966b957f91fcec580e3f8703573eb6b69528c5d52190d72579c91602": {
+      "displayName": "BasicScalaSparkStreamingJob/Codeb9c3d0890aee06c3b673670fca714c59",
       "source": {
         "path": "asset.e305655b966b957f91fcec580e3f8703573eb6b69528c5d52190d72579c91602.jar",
         "packaging": "file"
       },
       "destinations": {
-        "current_account-current_region": {
+        "current_account-current_region-52d31c7f": {
           "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
           "objectKey": "e305655b966b957f91fcec580e3f8703573eb6b69528c5d52190d72579c91602.jar",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
@@ -15,12 +16,13 @@
       }
     },
     "98deadb899c73aece21dfd4bd6d75bb5b1df86ac6ba8e388e75564817f530423": {
+      "displayName": "aws-glue-job-scalaspark-streaming Template",
       "source": {
         "path": "aws-glue-job-scalaspark-streaming.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "current_account-current_region": {
+        "current_account-current_region-272c6600": {
           "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
           "objectKey": "98deadb899c73aece21dfd4bd6d75bb5b1df86ac6ba8e388e75564817f530423.json",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"

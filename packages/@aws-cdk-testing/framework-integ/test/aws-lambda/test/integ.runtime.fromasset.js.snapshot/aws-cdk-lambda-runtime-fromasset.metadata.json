@@ -1,14 +1,5 @@
 {
-  "/aws-cdk-lambda-runtime-fromasset": [
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.runtime.fromasset.js:12:15)",
-        "...node internals..."
-      ]
-    }
-  ],
-  "/aws-cdk-lambda-runtime-fromasset/MyFunctionJava21": [
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java21": [
     {
       "type": "aws:cdk:analytics:construct",
       "data": {
@@ -18,7 +9,37 @@
       }
     }
   ],
-  "/aws-cdk-lambda-runtime-fromasset/MyFunctionJava25": [
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java25": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "runtime": "*",
+        "handler": "*",
+        "code": "*"
+      }
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java8.al2023": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "runtime": "*",
+        "handler": "*",
+        "code": "*"
+      }
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java11.al2023": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "runtime": "*",
+        "handler": "*",
+        "code": "*"
+      }
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java17.al2023": [
     {
       "type": "aws:cdk:analytics:construct",
       "data": {
@@ -32,45 +53,15 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "BootstrapVersion"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:261:19)",
-        "DefaultStackSynthesizer.addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:161:9)",
-        "DefaultStackSynthesizer.synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:302:18)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:433: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:433:3)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:490:9)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:487:9)",
-        "synthesizeTree (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:426:5)",
-        "synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:54:5)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stage.js:179:96)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/app.js:167:27)"
-      ]
     }
   ],
   "/aws-cdk-lambda-runtime-fromasset/CheckBootstrapVersion": [
     {
       "type": "aws:cdk:logicalId",
       "data": "CheckBootstrapVersion"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:269:5)",
-        "DefaultStackSynthesizer.addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:161:9)",
-        "DefaultStackSynthesizer.synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:302:18)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:433: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:433:3)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:490:9)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:487:9)",
-        "synthesizeTree (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:426:5)",
-        "synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:54:5)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stage.js:179:96)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/app.js:167:27)"
-      ]
     }
   ],
-  "/aws-cdk-lambda-runtime-fromasset/MyFunctionJava21/ServiceRole": [
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java21/ServiceRole": [
     {
       "type": "aws:cdk:analytics:construct",
       "data": {
@@ -86,22 +77,13 @@
       }
     }
   ],
-  "/aws-cdk-lambda-runtime-fromasset/MyFunctionJava21/Resource": [
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java21/Resource": [
     {
       "type": "aws:cdk:logicalId",
-      "data": "MyFunctionJava216AE56E90"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function.js:691:29)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.runtime.fromasset.js:13:30)",
-        "...node internals..."
-      ]
+      "data": "MyFunctionjava219D7C6882"
     }
   ],
-  "/aws-cdk-lambda-runtime-fromasset/MyFunctionJava25/ServiceRole": [
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java25/ServiceRole": [
     {
       "type": "aws:cdk:analytics:construct",
       "data": {
@@ -117,104 +99,163 @@
       }
     }
   ],
-  "/aws-cdk-lambda-runtime-fromasset/MyFunctionJava25/Resource": [
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java25/Resource": [
     {
       "type": "aws:cdk:logicalId",
-      "data": "MyFunctionJava25D0EF0C44"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function.js:691:29)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.runtime.fromasset.js:18:30)",
-        "...node internals..."
-      ]
+      "data": "MyFunctionjava251668460C"
     }
   ],
-  "/aws-cdk-lambda-runtime-fromasset/Exports/Output{\"Ref\":\"MyFunctionJava216AE56E90\"}": [
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java8.al2023/ServiceRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "managedPolicies": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java8.al2023/Resource": [
     {
       "type": "aws:cdk:logicalId",
-      "data": "ExportsOutputRefMyFunctionJava216AE56E906B018223"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "Stack.exportValue (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack.js:1113:17)",
-        "createImportValue (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/refs.js:250:33)",
-        "resolveValue (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/refs.js:177:16)",
-        "resolveReferences (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/refs.js:53:30)",
-        "prepareApp (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/prepare-app.js:46:36)",
-        "synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:42:36)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stage.js:179:96)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/app.js:167:27)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.runtime.fromasset.js:38:5)",
-        "...node internals..."
-      ]
+      "data": "MyFunctionjava8al2023D439527D"
     }
   ],
-  "/aws-cdk-lambda-runtime-fromasset/Exports/Output{\"Ref\":\"MyFunctionJava25D0EF0C44\"}": [
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java11.al2023/ServiceRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "managedPolicies": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java11.al2023/Resource": [
     {
       "type": "aws:cdk:logicalId",
-      "data": "ExportsOutputRefMyFunctionJava25D0EF0C44D46CC469"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "Stack.exportValue (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack.js:1113:17)",
-        "createImportValue (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/refs.js:250:33)",
-        "resolveValue (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/refs.js:177:16)",
-        "resolveReferences (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/refs.js:53:30)",
-        "prepareApp (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/prepare-app.js:46:36)",
-        "synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:42:36)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stage.js:179:96)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/app.js:167:27)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.runtime.fromasset.js:38:5)",
-        "...node internals..."
-      ]
+      "data": "MyFunctionjava11al2023389432C9"
     }
   ],
-  "/aws-cdk-lambda-runtime-fromasset/MyFunctionJava21/ServiceRole/Resource": [
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java17.al2023/ServiceRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "managedPolicies": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java17.al2023/Resource": [
     {
       "type": "aws:cdk:logicalId",
-      "data": "MyFunctionJava21ServiceRole0645B770"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:450:34)",
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function.js:606:39)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.runtime.fromasset.js:13:30)",
-        "...node internals..."
-      ]
+      "data": "MyFunctionjava17al202362B14D9A"
     }
   ],
-  "/aws-cdk-lambda-runtime-fromasset/MyFunctionJava21/Code/AssetBucket": [
+  "/aws-cdk-lambda-runtime-fromasset/Exports/Output{\"Ref\":\"MyFunctionjava219D7C6882\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefMyFunctionjava219D7C688202DE2695"
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/Exports/Output{\"Ref\":\"MyFunctionjava251668460C\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefMyFunctionjava251668460C94EC0E85"
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/Exports/Output{\"Ref\":\"MyFunctionjava8al2023D439527D\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefMyFunctionjava8al2023D439527D183066BD"
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/Exports/Output{\"Ref\":\"MyFunctionjava11al2023389432C9\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefMyFunctionjava11al2023389432C9E971D17F"
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/Exports/Output{\"Ref\":\"MyFunctionjava17al202362B14D9A\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefMyFunctionjava17al202362B14D9A6D9D7F9C"
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java21/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyFunctionjava21ServiceRole8169D0D8"
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java21/Code/AssetBucket": [
     {
       "type": "aws:cdk:analytics:construct",
       "data": "*"
     }
   ],
-  "/aws-cdk-lambda-runtime-fromasset/MyFunctionJava25/ServiceRole/Resource": [
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java25/ServiceRole/Resource": [
     {
       "type": "aws:cdk:logicalId",
-      "data": "MyFunctionJava25ServiceRole7485EA0E"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:450:34)",
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function.js:606:39)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.runtime.fromasset.js:18:30)",
-        "...node internals..."
-      ]
+      "data": "MyFunctionjava25ServiceRole2542F382"
     }
   ],
-  "/aws-cdk-lambda-runtime-fromasset/MyFunctionJava25/Code/AssetBucket": [
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java25/Code/AssetBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java8.al2023/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyFunctionjava8al2023ServiceRole5ECF6711"
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java8.al2023/Code/AssetBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java11.al2023/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyFunctionjava11al2023ServiceRoleB58B1837"
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java11.al2023/Code/AssetBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java17.al2023/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyFunctionjava17al2023ServiceRole24581F1F"
+    }
+  ],
+  "/aws-cdk-lambda-runtime-fromasset/MyFunction-java17.al2023/Code/AssetBucket": [
     {
       "type": "aws:cdk:analytics:construct",
       "data": "*"

@@ -1,6 +1,6 @@
 {
   "name": "@aws-cdk/aws-mediaconnect-alpha",
-  "private": true,
+  "private": false,
   "version": "0.0.0",
   "description": "The CDK construct library for AWS Elemental MediaConnect",
   "main": "lib/index.js",
@@ -27,6 +27,10 @@
           "Framework :: AWS CDK",
           "Framework :: AWS CDK :: 2"
         ]
+      },
+      "go": {
+        "moduleName": "github.com/aws/aws-cdk-go",
+        "packageName": "awsmediaconnectalpha"
       }
     },
     "metadata": {
@@ -101,5 +105,14 @@
     "env": {
       "AWSLINT_BASE_CONSTRUCT": true
     }
+  },
+  "publishConfig": {
+    "tag": "latest"
+  },
+  "pkglint": {
+    "exclude": [
+      "naming/package-matches-directory",
+      "assert/assert-dependency"
+    ]
   }
 }

@@ -2,6 +2,7 @@ import { Template, Match } from '../../assertions';
 import * as ec2 from '../../aws-ec2';
 import * as iam from '../../aws-iam';
 import * as kms from '../../aws-kms';
+import * as logs from '../../aws-logs';
 import * as cdk from '../../core';
 import { Arn, ArnFormat } from '../../core';
 import * as lambda from '../lib';
@@ -664,6 +665,90 @@ describe('capacity provider', () => {
           },
         });
       }).toThrow('maxExecutionEnvironments must be between 0 and 15000, but was 15001');
+    });
+  });
+
+  describe('telemetry config', () => {
+    beforeEach(() => {
+      // TelemetryConfig is not yet in the bundled CFN schema — acknowledge the validation warning
+      cdk.Validations.of(stack).acknowledge({ id: 'CloudFormation-Validate::F3002', reason: 'TelemetryConfig is a newly launched property not yet in the bundled schema' });
+    });
+
+    test('sets TelemetryConfig with systemLogLevel only', () => {
+      // WHEN
+      new lambda.CapacityProvider(stack, 'CP', {
+        securityGroups: [securityGroup],
+        subnets,
+        systemLogLevel: lambda.SystemLogLevel.DEBUG,
+      });
+
+      // THEN
+      Template.fromStack(stack).hasResourceProperties('AWS::Lambda::CapacityProvider', {
+        TelemetryConfig: {
+          LoggingConfig: {
+            SystemLogLevel: 'DEBUG',
+          },
+        },
+      });
+    });
+
+    test('sets TelemetryConfig with logGroup only', () => {
+      // GIVEN
+      const logGroup = new logs.LogGroup(stack, 'LogGroup');
+
+      // WHEN
+      new lambda.CapacityProvider(stack, 'CP', {
+        securityGroups: [securityGroup],
+        subnets,
+        logGroup,
+      });
+
+      // THEN
+      Template.fromStack(stack).hasResourceProperties('AWS::Lambda::CapacityProvider', {
+        TelemetryConfig: {
+          LoggingConfig: {
+            LogGroup: { Ref: Match.stringLikeRegexp('LogGroup') },
+          },
+        },
+      });
+    });
+
+    test('sets TelemetryConfig with both logGroup and systemLogLevel', () => {
+      // GIVEN
+      const logGroup = new logs.LogGroup(stack, 'LogGroup', {
+        logGroupName: '/my-app/scaling',
+      });
+
+      // WHEN
+      new lambda.CapacityProvider(stack, 'CP', {
+        securityGroups: [securityGroup],
+        subnets,
+        logGroup,
+        systemLogLevel: lambda.SystemLogLevel.WARN,
+      });
+
+      // THEN
+      Template.fromStack(stack).hasResourceProperties('AWS::Lambda::CapacityProvider', {
+        TelemetryConfig: {
+          LoggingConfig: {
+            LogGroup: { Ref: Match.stringLikeRegexp('LogGroup') },
+            SystemLogLevel: 'WARN',
+          },
+        },
+      });
+    });
+
+    test('does not emit TelemetryConfig when neither logGroup nor systemLogLevel specified', () => {
+      // WHEN
+      new lambda.CapacityProvider(stack, 'CP', {
+        securityGroups: [securityGroup],
+        subnets,
+      });
+
+      // THEN
+      Template.fromStack(stack).hasResourceProperties('AWS::Lambda::CapacityProvider', {
+        TelemetryConfig: Match.absent(),
+      });
     });
   });
 });

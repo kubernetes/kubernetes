@@ -1,0 +1,20 @@
+{
+  "version": "54.0.0",
+  "files": {
+    "6e8c2853ad81b105a094fe9e2d26092f504bc7e44d7246b7365d1dae4cbb262b": {
+      "displayName": "aws-ecs-cluster-existing-namespace Template",
+      "source": {
+        "path": "aws-ecs-cluster-existing-namespace.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-d2141887": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "6e8c2853ad81b105a094fe9e2d26092f504bc7e44d7246b7365d1dae4cbb262b.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}
