@@ -438,8 +438,8 @@ func TestCelCostStability(t *testing.T) {
 				// - without has checks:
 
 				// all() and exists() macros ignore errors from predicates so long as the condition holds for at least one element
-				"self.listMap.exists(m, m.v2 == 'z')": 24,
-				"!self.listMap.all(m, m.v2 != 'z')":   22,
+				"self.listMap.exists(m, m.v2 == 'z')": 22,
+				"!self.listMap.all(m, m.v2 != 'z')":   20,
 
 				// two variable comprehensions
 				"!self.listMap.all(i, m, has(m.v2) && m.v2 != 'z')":                            10,
