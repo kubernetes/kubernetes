@@ -270,3 +270,39 @@ func TestCompositePodGroupState_Children(t *testing.T) {
 		t.Errorf("Unexpected children result (-want,+got):\n%s", diff)
 	}
 }
+
+func TestCompositePodGroupState_ChildrenCounts(t *testing.T) {
+	cpgs := newCompositePodGroupState()
+
+	if rc := cpgs.ReadyChildrenCount(); rc != 0 {
+		t.Errorf("Expected 0 ready children, got %d", rc)
+	}
+	if sc := cpgs.ScheduledChildrenCount(); sc != 0 {
+		t.Errorf("Expected 0 scheduled children, got %d", sc)
+	}
+
+	oldGen := cpgs.compositePodGroupStateData.generation
+	cpgs.addReadyChildren(2)
+	cpgs.addScheduledChildren(1)
+
+	if rc := cpgs.ReadyChildrenCount(); rc != 2 {
+		t.Errorf("Expected 2 ready children, got %d", rc)
+	}
+	if sc := cpgs.ScheduledChildrenCount(); sc != 1 {
+		t.Errorf("Expected 1 scheduled children, got %d", sc)
+	}
+	if newGen := cpgs.compositePodGroupStateData.generation; newGen <= oldGen {
+		t.Errorf("Expected generation to increase, got %d <= %d", newGen, oldGen)
+	}
+
+	snap := cpgs.snapshot()
+	if rc := snap.ReadyChildrenCount(); rc != 2 {
+		t.Errorf("Expected 2 ready children in snapshot, got %d", rc)
+	}
+	if sc := snap.ScheduledChildrenCount(); sc != 1 {
+		t.Errorf("Expected 1 scheduled children in snapshot, got %d", sc)
+	}
+	if snapGen := snap.generation; snapGen != cpgs.compositePodGroupStateData.generation {
+		t.Errorf("Expected generation %d in snapshot, got %d", cpgs.compositePodGroupStateData.generation, snapGen)
+	}
+}

@@ -228,6 +228,10 @@ type compositePodGroupStateData struct {
 	compositePodGroup *schedulingv1alpha3.CompositePodGroup
 	// children tracks all keys for child pod groups and composite pod groups.
 	children sets.Set[fwk.EntityKey]
+	// readyChildren tracks the number of ready child groups that are known to the scheduler.
+	readyChildren int
+	// scheduledChildren tracks the number of child groups that are ready for scheduling (assumed or assigned).
+	scheduledChildren int
 }
 
 func newCompositePodGroupStateData() compositePodGroupStateData {
@@ -246,6 +250,8 @@ func (d *compositePodGroupStateData) clone() compositePodGroupStateData {
 		generation:        d.generation,
 		compositePodGroup: d.compositePodGroup,
 		children:          d.children.Clone(),
+		readyChildren:     d.readyChildren,
+		scheduledChildren: d.scheduledChildren,
 	}
 }
 
@@ -274,6 +280,18 @@ func (d *compositePodGroupStateData) addChild(child fwk.EntityKey) {
 func (d *compositePodGroupStateData) removeChild(child fwk.EntityKey) {
 	d.generation = nextPodGroupGeneration()
 	d.children.Delete(child)
+}
+
+// addReadyChildren applies a delta to the ready children count.
+func (d *compositePodGroupStateData) addReadyChildren(delta int) {
+	d.generation = nextPodGroupGeneration()
+	d.readyChildren += delta
+}
+
+// addScheduledChildren applies a delta to the scheduled children count.
+func (d *compositePodGroupStateData) addScheduledChildren(delta int) {
+	d.generation = nextPodGroupGeneration()
+	d.scheduledChildren += delta
 }
 
 // getChildren returns all child groups for this group.
@@ -504,6 +522,39 @@ func (cpgs *compositePodGroupState) GetChildren() []fwk.EntityKey {
 	return cpgs.compositePodGroupStateData.getChildren()
 }
 
+// ReadyChildrenCount returns the number of all ready child groups that are known to the scheduler.
+// Ready is basically having at least 1 podgroup for basic podgroups and at least minGroupCount children for others.
+func (cpgs *compositePodGroupState) ReadyChildrenCount() int {
+	cpgs.lock.RLock()
+	defer cpgs.lock.RUnlock()
+
+	return cpgs.compositePodGroupStateData.readyChildren
+}
+
+// ScheduledChildrenCount returns the number of scheduled ready child groups.
+func (cpgs *compositePodGroupState) ScheduledChildrenCount() int {
+	cpgs.lock.RLock()
+	defer cpgs.lock.RUnlock()
+
+	return cpgs.compositePodGroupStateData.scheduledChildren
+}
+
+// addReadyChildren applies a delta to the ready children count and increments generation.
+func (cpgs *compositePodGroupState) addReadyChildren(delta int) {
+	cpgs.lock.Lock()
+	defer cpgs.lock.Unlock()
+
+	cpgs.compositePodGroupStateData.addReadyChildren(delta)
+}
+
+// addScheduledChildren applies a delta to the scheduled children count and increments generation.
+func (cpgs *compositePodGroupState) addScheduledChildren(delta int) {
+	cpgs.lock.Lock()
+	defer cpgs.lock.Unlock()
+
+	cpgs.compositePodGroupStateData.addScheduledChildren(delta)
+}
+
 // podGroupStateSnapshot is an immutable, point-in-time copy of a podGroupState.
 // It is taken before a pod group scheduling cycle and used to track states of pods
 // during the cycle without modifying the live state of pods.
@@ -570,4 +621,15 @@ type compositePodGroupStateSnapshot struct {
 // GetChildren returns the keys of the child groups.
 func (s *compositePodGroupStateSnapshot) GetChildren() []fwk.EntityKey {
 	return s.compositePodGroupStateData.getChildren()
+}
+
+// ReadyChildrenCount returns the number of all ready child groups that are known to the scheduler.
+// Ready is basically having at least 1 podgroup for basic podgroups and at least minGroupCount children for others.
+func (s *compositePodGroupStateSnapshot) ReadyChildrenCount() int {
+	return s.compositePodGroupStateData.readyChildren
+}
+
+// ScheduledChildrenCount returns the number of scheduled ready child groups.
+func (s *compositePodGroupStateSnapshot) ScheduledChildrenCount() int {
+	return s.compositePodGroupStateData.scheduledChildren
 }

@@ -224,6 +224,18 @@ type PodGroupManager interface {
 	BuildHierarchySnapshotFromPod(pod *v1.Pod) (PodGroupManager, error)
 	// GetRootKeyForGroup returns the root key of the given EntityKey.
 	GetRootKeyForGroup(key EntityKey) (EntityKey, bool, error)
+	// GetRootGroup returns the RootGroup containing the root key, PodGroup/PodGroupState (if root is a PodGroup),
+	// or CompositePodGroup/CompositePodGroupState (if root is a CompositePodGroup) for the given EntityKey.
+	GetRootGroup(key EntityKey) (RootGroup, error)
+}
+
+// RootGroup contains the root key and the associated PodGroup or CompositePodGroup API object and state.
+type RootGroup struct {
+	Key                    EntityKey
+	PodGroup               *schedulingapi.PodGroup
+	PodGroupState          PodGroupState
+	CompositePodGroup      *schedulingv1alpha3.CompositePodGroup
+	CompositePodGroupState CompositePodGroupState
 }
 
 // PodGroupState provides an interface to view the state of a single pod group.
@@ -251,4 +263,9 @@ type PodGroupState interface {
 type CompositePodGroupState interface {
 	// GetChildren returns the keys of child groups.
 	GetChildren() []EntityKey
+	// ReadyChildrenCount returns the number of all ready child groups that are known to the scheduler.
+	// Ready is basically having at least 1 podgroup for basic podgroups and at least minGroupCount children for others.
+	ReadyChildrenCount() int
+	// ScheduledChildrenCount returns the number of scheduled ready child groups.
+	ScheduledChildrenCount() int
 }

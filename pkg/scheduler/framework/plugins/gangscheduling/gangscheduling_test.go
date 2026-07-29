@@ -957,7 +957,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			isCompositePodGroupEnabled: true,
 			initialPods:                []*v1.Pod{p2, p3, p4, p5},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{},
-			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "failed to build hierarchy snapshot: pod group object not found in state for podgroup/ns1/pg1"),
+			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `waiting for pods's pod group "pg1" to appear in scheduling queue`),
 		},
 		{
 			name:                       "gang pod fails PreEnqueue when quorum is not met (CPG=false)",
@@ -1895,5 +1895,31 @@ func (m *mockPodGroupManager) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityK
 		default:
 			return currentKey, true, nil
 		}
+	}
+}
+
+func (m *mockPodGroupManager) GetRootGroup(key fwk.EntityKey) (fwk.RootGroup, error) {
+	rootKey, ok, err := m.GetRootKeyForGroup(key)
+	if err != nil {
+		return fwk.RootGroup{}, err
+	}
+	if !ok {
+		return fwk.RootGroup{}, nil
+	}
+	switch rootKey.Type {
+	case fwk.PodGroupKeyType:
+		pg, ok := m.pgs[rootKey.Name]
+		if !ok {
+			return fwk.RootGroup{Key: rootKey}, nil
+		}
+		return fwk.RootGroup{Key: rootKey, PodGroup: pg}, nil
+	case fwk.CompositePodGroupKeyType:
+		cpg, ok := m.cpgs[rootKey.Name]
+		if !ok {
+			return fwk.RootGroup{Key: rootKey}, nil
+		}
+		return fwk.RootGroup{Key: rootKey, CompositePodGroup: cpg}, nil
+	default:
+		return fwk.RootGroup{Key: rootKey}, nil
 	}
 }
