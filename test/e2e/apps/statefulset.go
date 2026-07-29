@@ -2301,7 +2301,11 @@ func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
 
 func (c *cockroachDBTester) deploy(ctx context.Context, ns string) *appsv1.StatefulSet {
 	c.ss = e2estatefulset.CreateStatefulSet(ctx, c.client, cockroachDBManifestPath, ns)
-	framework.Logf("Deployed statefulset %v, initializing database", c.ss.Name)
+	framework.Logf("Deployed statefulset %v, initializing cluster", c.ss.Name)
+	podName := fmt.Sprintf("%v-0", c.ss.Name)
+	initCmd := fmt.Sprintf("/cockroach/cockroach init --insecure --host %s.cockroachdb", podName)
+	framework.Logf("%s", e2ekubectl.RunKubectlOrDie(ns, "exec", podName, "--", "/bin/sh", "-c", initCmd))
+	framework.Logf("Initialized cluster, initializing database")
 	for _, cmd := range []string{
 		"CREATE DATABASE IF NOT EXISTS foo;",
 		"CREATE TABLE IF NOT EXISTS foo.bar (k STRING PRIMARY KEY, v STRING);",
