@@ -94,7 +94,6 @@ func tmpSocketDir() (socketDir, socketName, pluginSocketName string, err error) 
 	}
 	socketName = filepath.Join(socketDir, "server.sock")
 	pluginSocketName = filepath.Join(socketDir, "device-plugin.sock")
-	os.MkdirAll(socketDir, 0755)
 	return
 }
 
@@ -347,7 +346,6 @@ func setupPluginManager(t *testing.T, pluginSocketName string, m Manager) plugin
 }
 
 func runPluginManager(ctx context.Context, pluginManager pluginmanager.PluginManager) {
-	// FIXME: Replace sets.Set[string] with sets.Set[string]
 	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 	go pluginManager.Run(ctx, sourcesReady, wait.NeverStop)
 }
@@ -484,9 +482,9 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	require.NoError(t, err)
 	as.False(e2.stopTime.IsZero())
 	_, err = e2.allocate(tCtx, []string{"Device1"})
-	reflect.DeepEqual(err, fmt.Errorf(errEndpointStopped, e2))
+	require.EqualError(t, err, fmt.Sprintf(errEndpointStopped, e2))
 	_, err = e2.preStartContainer(tCtx, []string{"Device1"})
-	reflect.DeepEqual(err, fmt.Errorf(errEndpointStopped, e2))
+	require.EqualError(t, err, fmt.Sprintf(errEndpointStopped, e2))
 	// Marks resourceName2 unhealthy and verifies its capacity/allocatable are
 	// correctly updated.
 	testManager.markResourceUnhealthy(logger, resourceName2)
