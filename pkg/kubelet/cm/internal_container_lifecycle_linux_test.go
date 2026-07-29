@@ -62,12 +62,12 @@ func TestPreCreateContainer(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                        string
-		lifecycle                   internalContainerLifecycleImpl
-		expectedCpusetCpus          string
-		expectedCpusetMems          string
-		expectCpusetCpusSet         bool
-		expectCpusetMemsSet         bool
+		name                string
+		lifecycle           internalContainerLifecycleImpl
+		expectedCpusetCpus  string
+		expectedCpusetMems  string
+		expectCpusetCpusSet bool
+		expectCpusetMemsSet bool
 	}{
 		{
 			name: "CPU manager with allocated CPUs sets CpusetCpus",
@@ -96,6 +96,19 @@ func TestPreCreateContainer(t *testing.T) {
 			expectCpusetMemsSet: false,
 		},
 		{
+			name: "CPU manager with non-contiguous CPUs sets CpusetCpus with comma-separated values",
+			lifecycle: internalContainerLifecycleImpl{
+				cpuManager: &mockCPUManagerWithAffinity{
+					cpuAffinity: cpuset.New(0, 2, 4),
+				},
+				memoryManager:   nil,
+				topologyManager: &mockTopologyManager{},
+			},
+			expectCpusetCpusSet: true,
+			expectedCpusetCpus:  "0,2,4",
+			expectCpusetMemsSet: false,
+		},
+		{
 			name: "Memory manager with NUMA nodes sets CpusetMems",
 			lifecycle: internalContainerLifecycleImpl{
 				cpuManager: nil,
@@ -108,6 +121,20 @@ func TestPreCreateContainer(t *testing.T) {
 			expectedCpusetCpus:  "",
 			expectCpusetMemsSet: true,
 			expectedCpusetMems:  "0,1",
+		},
+		{
+			name: "Memory manager with single NUMA node sets CpusetMems without comma",
+			lifecycle: internalContainerLifecycleImpl{
+				cpuManager: nil,
+				memoryManager: &mockMemoryManagerWithNUMA{
+					numaNodes: sets.New[int](2),
+				},
+				topologyManager: &mockTopologyManager{},
+			},
+			expectCpusetCpusSet: false,
+			expectedCpusetCpus:  "",
+			expectCpusetMemsSet: true,
+			expectedCpusetMems:  "2",
 		},
 		{
 			name: "Memory manager with empty NUMA nodes does not set CpusetMems",
@@ -186,4 +213,146 @@ func TestPreCreateContainer(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPreCreateContainerDoesNotOverwriteExistingLinuxConfig(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "test-pod-uid",
+		},
+	}
+	container := &v1.Container{
+		Name: "test-container",
+	}
+
+	containerConfig := &runtimeapi.ContainerConfig{
+		Linux: &runtimeapi.LinuxContainerConfig{
+			Resources: &runtimeapi.LinuxContainerResources{
+				CpusetCpus: "existing-value",
+				CpusetMems: "existing-mems",
+			},
+		},
+	}
+
+	lifecycle := internalContainerLifecycleImpl{
+		cpuManager:      nil,
+		memoryManager:   nil,
+		topologyManager: &mockTopologyManager{},
+	}
+
+	err := lifecycle.PreCreateContainer(logger, pod, container, containerConfig)
+	if err != nil {
+		t.Errorf("PreCreateContainer should not return an error, got: %v", err)
+	}
+
+	if containerConfig.Linux.Resources.CpusetCpus != "existing-value" {
+		t.Errorf("expected existing CpusetCpus to be preserved when no managers set new values, got %q", containerConfig.Linux.Resources.CpusetCpus)
+	}
+	if containerConfig.Linux.Resources.CpusetMems != "existing-mems" {
+		t.Errorf("expected existing CpusetMems to be preserved when no managers set new values, got %q", containerConfig.Linux.Resources.CpusetMems)
+	}
+}
+
+func TestPreCreateContainerOverwritesExistingValuesWhenManagersProvideThem(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "test-pod-uid",
+		},
+	}
+	container := &v1.Container{
+		Name: "test-container",
+	}
+
+	containerConfig := &runtimeapi.ContainerConfig{
+		Linux: &runtimeapi.LinuxContainerConfig{
+			Resources: &runtimeapi.LinuxContainerResources{
+				CpusetCpus: "existing-value",
+				CpusetMems: "existing-mems",
+			},
+		},
+	}
+
+	lifecycle := internalContainerLifecycleImpl{
+		cpuManager: &mockCPUManagerWithAffinity{
+			cpuAffinity: cpuset.New(0),
+		},
+		memoryManager: &mockMemoryManagerWithNUMA{
+			numaNodes: sets.New[int](1),
+		},
+		topologyManager: &mockTopologyManager{},
+	}
+
+	err := lifecycle.PreCreateContainer(logger, pod, container, containerConfig)
+	if err != nil {
+		t.Errorf("PreCreateContainer should not return an error, got: %v", err)
+	}
+
+	if containerConfig.Linux.Resources.CpusetCpus != "0" {
+		t.Errorf("expected CpusetCpus to be overwritten to %q, got %q", "0", containerConfig.Linux.Resources.CpusetCpus)
+	}
+	if containerConfig.Linux.Resources.CpusetMems != "1" {
+		t.Errorf("expected CpusetMems to be overwritten to %q, got %q", "1", containerConfig.Linux.Resources.CpusetMems)
+	}
+}
+
+func TestPreCreateContainerPodUIDPassedCorrectly(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	type trackedCall struct {
+		podUID         string
+		containerName  string
+	}
+	track := &trackedCall{}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "my-pod-uid",
+		},
+	}
+	container := &v1.Container{
+		Name: "my-container",
+	}
+
+	containerConfig := &runtimeapi.ContainerConfig{
+		Linux: &runtimeapi.LinuxContainerConfig{
+			Resources: &runtimeapi.LinuxContainerResources{},
+		},
+	}
+
+	lifecycle := internalContainerLifecycleImpl{
+		cpuManager: &mockCPUManagerTrackingArgs{
+			cpuAffinity: cpuset.New(0),
+			track:       track,
+		},
+		memoryManager:   nil,
+		topologyManager: &mockTopologyManager{},
+	}
+
+	_ = lifecycle.PreCreateContainer(logger, pod, container, containerConfig)
+
+	if track.podUID != "my-pod-uid" {
+		t.Errorf("expected GetCPUAffinity called with podUID=%q, got %q", "my-pod-uid", track.podUID)
+	}
+	if track.containerName != "my-container" {
+		t.Errorf("expected GetCPUAffinity called with containerName=%q, got %q", "my-container", track.containerName)
+	}
+}
+
+type mockCPUManagerTrackingArgs struct {
+	cpuAffinity cpuset.CPUSet
+	track       *struct {
+		podUID        string
+		containerName string
+	}
+	cpumanager.Manager
+}
+
+func (m *mockCPUManagerTrackingArgs) GetCPUAffinity(podUID string, containerName string) cpuset.CPUSet {
+	m.track.podUID = podUID
+	m.track.containerName = containerName
+	return m.cpuAffinity
 }
