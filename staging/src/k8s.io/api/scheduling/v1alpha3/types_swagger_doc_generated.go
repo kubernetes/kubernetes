@@ -71,7 +71,7 @@ func (CompositeDisruptionMode) SwaggerDoc() map[string]string {
 
 var map_CompositeGangSchedulingPolicy = map[string]string{
 	"":              "CompositeGangSchedulingPolicy indicates that the groups belonging to the composite group should be scheduled using all-or-nothing semantics.",
-	"minGroupCount": "minGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
+	"minGroupCount": "minGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer. This field is mutable to support workload scaling.\n\nNote that the scheduler operates on an eventually consistent model. Updates to minGroupCount may not be immediately reflected in scheduling decisions due to propagation delays. If minGroupCount is updated while a scheduling cycle is in progress for that group, the new value may not take effect until the next cycle. Moreover, minGroupCount is only enforced during scheduling, meaning that modifications to this field do not affect already-scheduled pods, applying only to those evaluated in future cycles.",
 }
 
 func (CompositeGangSchedulingPolicy) SwaggerDoc() map[string]string {
@@ -109,9 +109,9 @@ func (CompositePodGroupSchedulingConstraints) SwaggerDoc() map[string]string {
 }
 
 var map_CompositePodGroupSchedulingPolicy = map[string]string{
-	"":      "CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set.",
-	"basic": "basic specifies that the groups of this composite group should be scheduled independently. This field is immutable.",
-	"gang":  "gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics.",
+	"":      "CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set. The policy is chosen at creation time by setting either the Basic or Gang field. The CompositePodGroup may not change policy after creation. Fields within chosen policy may be updated after creation when their individual fields allow it.",
+	"basic": "basic specifies that the groups of this composite group should be scheduled independently. Setting this field at group creation time opts this group to basic scheduling; this field cannot be changed afterward.",
+	"gang":  "gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics. Setting this field at group creation time opts this group to gang scheduling; this field cannot be set or unset afterward. The minGroupCount field within Gang scheduling policy remains mutable after group creation.",
 }
 
 func (CompositePodGroupSchedulingPolicy) SwaggerDoc() map[string]string {
@@ -122,7 +122,7 @@ var map_CompositePodGroupSpec = map[string]string{
 	"":                            "CompositePodGroupSpec defines the desired state of CompositePodGroup.",
 	"parentCompositePodGroupName": "parentCompositePodGroupName contains the name of the parent composite pod group within the same namespace as this composite pod group. It must be a DNS name. If it's nil, then this composite pod group is a root of a workload's hierarchy. This field is immutable.",
 	"workloadRef":                 "workloadRef references an optional CompositePodGroup template within the Workload object that was used to create the CompositePodGroup. This field is required. This field is immutable.",
-	"schedulingPolicy":            "schedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable.",
+	"schedulingPolicy":            "schedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.",
 	"schedulingConstraints":       "schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable.",
 	"disruptionMode":              "disruptionMode defines the mode in which a given CompositePodGroup can be disrupted. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. One of Single, All. Defaults to Single if unset. This field is immutable.",
 	"priorityClassName":           "priorityClassName defines the priority that should be considered when scheduling this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the composite pod group's priority will be zero). This field is immutable.",
