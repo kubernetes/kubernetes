@@ -44,8 +44,15 @@ const (
 	// for not causing a read timeout.
 	connReadLimitByte = 64 * 1024
 
-	// snapshotLimitByte limits the snapshot size to 1TB
-	snapshotLimitByte = 1 * 1024 * 1024 * 1024 * 1024
+	// snapshotLimitByte limits the size of the raft snapshot *message*
+	// (metadata plus the small membership blob embedded in
+	// raftpb.Snapshot.Data). It does NOT bound the actual database
+	// snapshot, which is streamed separately as the rest of the request
+	// body (see snapshotHandler.ServeHTTP and SaveDBFrom) and can be
+	// arbitrarily large. 64MB leaves generous headroom over realistic
+	// envelope sizes while avoiding a huge allocation from a corrupt or
+	// malicious length prefix.
+	snapshotLimitByte = 64 * 1024 * 1024
 )
 
 var (
@@ -219,7 +226,9 @@ func (h *snapshotHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	addRemoteFromRequest(h.tr, r)
 
 	dec := &messageDecoder{r: r.Body}
-	// let snapshots be very large since they can exceed 512MB for large installations
+	// This only decodes the raft message envelope; the actual database
+	// snapshot bytes that follow in the body are read separately below
+	// via h.snapshotter.SaveDBFrom and are not subject to this limit.
 	m, err := dec.decodeLimit(snapshotLimitByte)
 	from := types.ID(m.GetFrom()).String()
 	if err != nil {
