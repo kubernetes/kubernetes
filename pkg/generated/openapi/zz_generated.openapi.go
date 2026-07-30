@@ -17591,7 +17591,7 @@ func schema_k8sio_api_batch_v1beta1_CronJobSpec(ref common.ReferenceCallback) co
 						},
 					},
 				},
-				Required: []string{"schedule"},
+				Required: []string{"schedule", "jobTemplate"},
 			},
 		},
 		Dependencies: []string{
@@ -17666,6 +17666,7 @@ func schema_k8sio_api_batch_v1beta1_JobTemplateSpec(ref common.ReferenceCallback
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{

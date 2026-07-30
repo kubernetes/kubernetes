@@ -99,7 +99,7 @@ message CronJobSpec {
   optional bool suspend = 4;
 
   // Specifies the job that will be created when executing a CronJob.
-  // +optional
+  // +required
   optional JobTemplateSpec jobTemplate = 5;
 
   // The number of successful finished jobs to retain.
@@ -141,7 +141,7 @@ message JobTemplateSpec {
 
   // Specification of the desired behavior of the job.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional .k8s.io.api.batch.v1.JobSpec spec = 2;
 }
 
