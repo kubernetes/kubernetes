@@ -93,7 +93,7 @@ func (pl *PodGroupPodsCount) NormalizePlacementScore(ctx context.Context, state 
 func (pl *PodGroupPodsCount) getScheduledPodsCount(podGroup fwk.PodGroupInfo) (int, error) {
 	if pl.fts.EnableCompositePodGroup {
 		count := 0
-		for podGroupState, err := range helper.GetPodGroupStates(pl.handle.SnapshotSharedLister(), fwk.MustParseEntityKey(podGroup.GetKey())) {
+		for podGroupState, err := range helper.GetPodGroupStates(pl.handle.SnapshotSharedLister(), podGroup.GetKey()) {
 			if err != nil {
 				return 0, err
 			}

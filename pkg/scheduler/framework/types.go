@@ -1223,8 +1223,11 @@ func (pgi *PodGroupInfo) GetType() fwk.EntityKeyType {
 	return pgi.Type
 }
 
-func (pgi *PodGroupInfo) GetKey() string {
-	return fmt.Sprintf("%s/%s/%s", pgi.Type, pgi.Namespace, pgi.Name)
+func (pgi *PodGroupInfo) GetKey() fwk.EntityKey {
+	if pgi.Type == fwk.CompositePodGroupKeyType {
+		return fwk.CompositePodGroupKey(pgi.Namespace, pgi.Name)
+	}
+	return fwk.PodGroupKey(pgi.Namespace, pgi.Name)
 }
 
 // GetUnscheduledPods returns the unscheduled pods for this pod group.
