@@ -1075,7 +1075,6 @@ func TestPreemption(t *testing.T) {
 									}
 								}
 
-								filter.Tokens = test.initTokens
 								filter.EnablePreFilter = test.enablePreFilter
 								filter.Unresolvable = test.unresolvable
 								pods := make([]*v1.Pod, len(test.existingPods))
@@ -1096,7 +1095,7 @@ func TestPreemption(t *testing.T) {
 								// Wait for preemption of pods and make sure the other ones are not preempted.
 								for i, p := range pods {
 									if _, found := test.preemptedPodIndexes[i]; found {
-										if err = wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false,
+										if err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false,
 											podIsGettingEvicted(cs, p.Namespace, p.Name)); err != nil {
 											t.Errorf("Pod %v/%v is not getting evicted.", p.Namespace, p.Name)
 										}
@@ -2125,7 +2124,7 @@ func TestAsyncPreemption(t *testing.T) {
 						}
 					case scenario.schedulePod != nil:
 						lastFailure := ""
-						if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+						if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 							if len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == 0 {
 								lastFailure = fmt.Sprintf("Expected the pod %s to be scheduled, but no pod arrives at the activeQ", scenario.schedulePod.podName)
 								return false, nil
@@ -2148,7 +2147,7 @@ func TestAsyncPreemption(t *testing.T) {
 						testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
 
 						if scenario.schedulePod.expectSuccess {
-							if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, testCtx.NS.Name, scenario.schedulePod.podName)); err != nil {
+							if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, testCtx.NS.Name, scenario.schedulePod.podName)); err != nil {
 								t.Fatalf("Expected the pod %s to be scheduled", scenario.schedulePod.podName)
 							}
 						} else if scenario.schedulePod.expectUnschedulable {
@@ -2188,7 +2187,7 @@ func TestAsyncPreemption(t *testing.T) {
 							t.Fatalf("Expected the pod %s to be gated", scenario.podGatedInQueue)
 						}
 					case scenario.podRunningPreemption != nil:
-						if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+						if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 							return preemptionPlugin.Executor.IsPodRunningPreemption(createdPods[*scenario.podRunningPreemption].GetUID()), nil
 						}); err != nil {
 							t.Fatalf("Expected the pod %s to be running preemption", createdPods[*scenario.podRunningPreemption].Name)
@@ -2510,7 +2509,7 @@ func TestPreemptionRespectsWaitingPod(t *testing.T) {
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("Timed out waiting for victim to reach WaitOnPermit")
 	}
-	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		return testCtx.Scheduler.Profiles[v1.DefaultSchedulerName].GetWaitingPod(victim.UID) != nil, nil
 	}); err != nil {
 		t.Fatalf("Timed out waiting for victim to be recorded as a waiting pod: %v", err)
@@ -2538,7 +2537,7 @@ func TestPreemptionRespectsWaitingPod(t *testing.T) {
 	// The victim should NOT be deleted from API server.
 	// Instead the victim  should go to the backoff queue and get rescheduled eventually.
 	t.Logf("Waiting for preemptor to be scheduled")
-	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 15*time.Second, false, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 15*time.Second, false, func(ctx context.Context) (bool, error) {
 		// Ensure that victim is not deleted
 		_, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(ctx, victim.Name, metav1.GetOptions{})
 		if err != nil {
@@ -2562,7 +2561,7 @@ func TestPreemptionRespectsWaitingPod(t *testing.T) {
 	}
 
 	t.Logf("waiting for victim to be rescheduled")
-	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 15*time.Second, false, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 15*time.Second, false, func(ctx context.Context) (bool, error) {
 		v, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(ctx, victim.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -2749,7 +2748,7 @@ func TestPreemptionRespectsBindingPod(t *testing.T) {
 	// It should call CancelPod() on the victim's BindingPod, causing it to go to backoff queue.
 	// The victim pod should NOT be deleted from API server.
 	// Instead it should be rescheduled onto a smaller node.
-	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 		// Check if victim is deleted
 		v, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(ctx, victim.Name, metav1.GetOptions{})
 		if err != nil {
@@ -2770,7 +2769,7 @@ func TestPreemptionRespectsBindingPod(t *testing.T) {
 	}
 
 	// 5. Wait for preemptor to be scheduled.
-	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 		p, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(ctx, preemptor.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -3166,7 +3165,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 										createdPods = append(createdPods, pod)
 									case scenario.schedulePod != nil:
 										lastFailure := ""
-										if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+										if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 											if len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == 0 {
 												lastFailure = fmt.Sprintf("Expected the pod %s to be scheduled, but no pod arrives at the activeQ", scenario.schedulePod.podName)
 												return false, nil
@@ -3186,7 +3185,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 										testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
 
 										if scenario.schedulePod.expectSuccess {
-											if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, testCtx.NS.Name, scenario.schedulePod.podName)); err != nil {
+											if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, testCtx.NS.Name, scenario.schedulePod.podName)); err != nil {
 												t.Fatalf("Expected the pod %s to be scheduled", scenario.schedulePod.podName)
 											}
 										} else if scenario.schedulePod.expectUnschedulable {
