@@ -50,6 +50,7 @@
     "@aws-cdk/lambda-layer-kubectl-v33": "^2.2.2",
     "@aws-cdk/lambda-layer-kubectl-v34": "^2.2.2",
     "@aws-cdk/lambda-layer-kubectl-v35": "^2.2.2",
+    "@aws-cdk/lambda-layer-kubectl-v36": "^2.0.0",
     "@aws-cdk/region-info": "0.0.0",
     "aws-cdk-lib": "0.0.0",
     "cdk8s": "2.70.83",

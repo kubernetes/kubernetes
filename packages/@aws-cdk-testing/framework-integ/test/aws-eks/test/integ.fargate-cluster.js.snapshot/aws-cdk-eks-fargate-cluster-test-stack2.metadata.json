@@ -124,7 +124,7 @@
       "data": [
         "new LayerVersion (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/layers.js:164:30)",
         "new LayerVersion (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "...new KubectlV35Layer in @aws-cdk/lambda-layer-kubectl-v35...",
+        "...new KubectlV36Layer in @aws-cdk/lambda-layer-kubectl-v36...",
         "getClusterVersionConfig (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks/test/integ-tests-kubernetes-version.js:43:23)",
         "new EksFargateClusterStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks/test/integ.fargate-cluster.js:16:77)",
         "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks/test/integ.fargate-cluster.js:37:16)",

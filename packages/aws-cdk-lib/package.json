@@ -568,6 +568,7 @@
   "jsiiRosetta": {
     "exampleDependencies": {
       "@aws-cdk/lambda-layer-kubectl-v35": "^2.0.0",
+      "@aws-cdk/lambda-layer-kubectl-v36": "^2.0.0",
       "cdk8s-plus-25": "^2.7.0",
       "@aws-cdk/aws-glue-alpha": "^0.0.0"
     }

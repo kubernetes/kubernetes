@@ -404,7 +404,7 @@
      },
      "S3Key": "83632ece0504813b45bee35f07cc09a93e3db6c74796e1adbcb7990e7f251f17.zip"
     },
-    "Description": "/opt/kubectl/kubectl 1.35.2; /opt/helm/helm 4.1.3",
+    "Description": "/opt/kubectl/kubectl 1.36.2; /opt/helm/helm 4.2.2",
     "LicenseInfo": "Apache-2.0"
    }
   },
@@ -731,7 +731,7 @@
      ]
     },
     "Config": {
-     "version": "1.35",
+     "version": "1.36",
      "roleArn": {
       "Fn::GetAtt": [
        "FargateClusterRole8E36B33A",

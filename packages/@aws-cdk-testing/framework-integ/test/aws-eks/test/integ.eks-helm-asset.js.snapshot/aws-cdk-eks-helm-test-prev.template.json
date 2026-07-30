@@ -434,9 +434,9 @@
      "S3Bucket": {
       "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
      },
-     "S3Key": "d84d64068faf799fed94f142d864b68f8c0890bc8eb87a843c523c550a90ad6a.zip"
+     "S3Key": "83632ece0504813b45bee35f07cc09a93e3db6c74796e1adbcb7990e7f251f17.zip"
     },
-    "Description": "/opt/kubectl/kubectl 1.34.5; /opt/helm/helm 4.1.3",
+    "Description": "/opt/kubectl/kubectl 1.35.2; /opt/helm/helm 4.1.3",
     "LicenseInfo": "Apache-2.0"
    }
   },
@@ -796,7 +796,7 @@
      ]
     },
     "Config": {
-     "version": "1.34",
+     "version": "1.35",
      "roleArn": {
       "Fn::GetAtt": [
        "ClusterRoleFA261979",
@@ -1356,7 +1356,7 @@
      ]
     },
     "RejectUnauthorized": true,
-    "CodeHash": "8be22d8be71ebe9e2ddfe3ec85cf2145bb8a6c967f2678a983b4fede3cfe7ab8"
+    "CodeHash": "a6c501b56f95db60850de11c6ca7d936d88fdfc2f444fb39d5f76faaab8c1815"
    },
    "UpdateReplacePolicy": "Delete",
    "DeletionPolicy": "Delete"
@@ -1494,7 +1494,7 @@
        {
         "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
        },
-       "/1bf2e7044e912314ffcf89da89d5cfab83b1dd2f952f6676024a228e20768dbc.json"
+       "/69f022296977251a1e8b0e1d2e11d3b9a77dfa928a4cf737189fd27c4eadae3a.json"
       ]
      ]
     }
@@ -1544,7 +1544,7 @@
        {
         "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
        },
-       "/522b6a5b13ccc2dff59e3b02e438f258c098972754b6595ca4f6c7519c09920b.json"
+       "/8ce2b01a9d42c0a35ee0f3388c2194d4275196b27de84aabbc6a39b0c7a777cc.json"
       ]
      ]
     }
@@ -1610,7 +1610,7 @@
      "S3Bucket": {
       "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
      },
-     "S3Key": "8be22d8be71ebe9e2ddfe3ec85cf2145bb8a6c967f2678a983b4fede3cfe7ab8.zip"
+     "S3Key": "a6c501b56f95db60850de11c6ca7d936d88fdfc2f444fb39d5f76faaab8c1815.zip"
     },
     "Timeout": 900,
     "MemorySize": 128,
@@ -1656,7 +1656,7 @@
      "S3Bucket": {
       "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
      },
-     "S3Key": "fe5389ebbb8870ff584c1c39f7a2d0be1aaf1cd5965c37fd4b4ce98eebd89a0d.zip"
+     "S3Key": "85c6e40ff0a55dc4cc75dffdac4b4413e7fea1300b27094da3bed536f3f8c173.zip"
     },
     "Timeout": 900,
     "MemorySize": 128,
