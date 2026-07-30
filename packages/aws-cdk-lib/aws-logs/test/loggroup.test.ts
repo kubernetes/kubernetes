@@ -3,7 +3,7 @@ import { Template } from '../../assertions';
 import * as iam from '../../aws-iam';
 import * as kms from '../../aws-kms';
 import { Bucket } from '../../aws-s3';
-import { App, CfnParameter, Fn, RemovalPolicy, Stack, Validations } from '../../core';
+import { App, CfnParameter, Fn, RemovalPolicy, Stack } from '../../core';
 import type { ILogGroup, ILogSubscriptionDestination } from '../lib';
 import { LogGroupGrants, LogGroup, RetentionDays, LogGroupClass, DataProtectionPolicy, DataIdentifier, CustomDataIdentifier, FilterPattern, FieldIndexPolicy, ParserProcessor, ParserProcessorType, JsonMutatorType, JsonMutatorProcessor, CfnLogGroup } from '../lib';
 
@@ -101,12 +101,6 @@ describe('log group', () => {
     // GIVEN
     const stack = new Stack();
 
-    // Local silence for the test, this is very unlikely to occur in practice.
-    // https://github.com/aws-cloudformation/cloudformation-validate/issues/185
-    Validations.of(stack).acknowledge({
-      id: 'CloudFormation-Validate::W3030',
-      reason: 'Only for this test',
-    });
     const parameter = new CfnParameter(stack, 'RetentionInDays', { default: 30, type: 'Number' });
 
     // WHEN

@@ -11,7 +11,6 @@ import * as ecs from '../lib';
 export function acknowledgeTestValidationRules(scope: IConstruct) {
   cdk.Validations.of(scope).acknowledge(
     { id: 'CloudFormation-Validate::W3697', reason: 'LaunchConfiguration used intentionally in tests' },
-    { id: 'CloudFormation-Validate::E9004', reason: 'Intentionally testing invalid Fargate CPU/Memory combinations' },
     { id: 'CloudFormation-Validate::W9013', reason: 'Duplicate subnets are intentional in tests' },
     { id: 'CloudFormation-Validate::W2001', reason: 'Unreferenced parameters are expected in test stacks' },
     { id: 'CloudFormation-Validate::W2531', reason: 'Hardcoded ARNs are expected in tests' },

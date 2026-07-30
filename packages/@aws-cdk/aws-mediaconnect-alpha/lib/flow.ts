@@ -1,5 +1,5 @@
 import type { Bitrate, IResource, RemovalPolicy } from 'aws-cdk-lib';
-import { ArnFormat, Resource, Lazy, Names, Duration, Stack, Token, Fn, UnscopedValidationError, Validations, ValidationError } from 'aws-cdk-lib';
+import { ArnFormat, Resource, Lazy, Names, Duration, Stack, Token, Fn, UnscopedValidationError, ValidationError } from 'aws-cdk-lib';
 import type { MetricOptions } from 'aws-cdk-lib/aws-cloudwatch';
 import { Metric, Unit } from 'aws-cdk-lib/aws-cloudwatch';
 import { CfnFlow } from 'aws-cdk-lib/aws-mediaconnect';
@@ -1505,15 +1505,6 @@ export class Flow extends FlowBase implements IFlow {
         }] : undefined,
       } : undefined,
       vpcInterfaces: Lazy.any({ produce: () => this.vpcInterfaces }, { omitEmptyArray: true }),
-    });
-
-    // cfn-validate false positive: the engine's embedded schema flags Flow.Source as deprecated,
-    // but it is a required, current property (no alternative exists). Remove once the upstream
-    // schema is corrected.
-    // Tracking: https://github.com/aws-cloudformation/cloudformation-validate/issues/144
-    Validations.of(flow).acknowledge({
-      id: 'CloudFormation-Validate::W9009',
-      reason: 'cfn-validate false positive: MediaConnect Flow.Source is required and not deprecated (see cloudformation-validate#144)',
     });
 
     this.flowArn = flow.attrFlowArn;

@@ -11,7 +11,6 @@ const THE_RUNTIME = new lambda.Runtime('node99.x', lambda.RuntimeFamily.NODEJS, 
 function testStack() {
   const stack = new Stack();
   Validations.of(stack).acknowledge(
-    { id: 'CloudFormation-Validate::E3071', reason: 'Tests intentionally use a bogus runtime' },
     { id: 'CloudFormation-Validate::W3030', reason: 'Tests intentionally use a bogus runtime' },
   );
   return stack;

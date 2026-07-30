@@ -7,10 +7,7 @@ import * as cdk from '../../core';
  */
 export function acknowledgeTestValidationRules(scope: IConstruct) {
   cdk.Validations.of(scope).acknowledge(
-    { id: 'CloudFormation-Validate::E1152', reason: 'SSM parameter reference is resolved at deploy time' },
     { id: 'CloudFormation-Validate::W3697', reason: 'LaunchConfiguration used intentionally in tests' },
-    { id: 'CloudFormation-Validate::E3049', reason: 'HostPort 0 with dynamic port mapping is intentional in tests' },
-    { id: 'CloudFormation-Validate::E9004', reason: 'Intentionally testing invalid Fargate CPU/Memory combinations' },
     { id: 'CloudFormation-Validate::E3047', reason: 'Intentionally testing invalid Fargate CPU/Memory combinations' },
     { id: 'CloudFormation-Validate::W9013', reason: 'Duplicate subnets are intentional in tests' },
     { id: 'CloudFormation-Validate::W9002', reason: 'Deprecated properties used intentionally in tests' },

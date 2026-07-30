@@ -156,7 +156,7 @@ describe('PasswordUser', () => {
         userId: 'test-user',
         accessControl: AccessControl.fromAccessString('on ~* +@all'),
         passwords: [
-          SecretValue.ssmSecure('/elasticache/user/password'),
+          SecretValue.secretsManager('elasticache/user/password'),
           SecretValue.unsafePlainText('plaintext-password'),
         ],
       });

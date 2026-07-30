@@ -121,7 +121,7 @@
     "@aws-cdk/asset-node-proxy-agent-v6": "^2.1.2",
     "@aws-cdk/cloud-assembly-api": "^2.2.6",
     "@aws-cdk/cloud-assembly-schema": "^54.11.0",
-    "@aws/cloudformation-validate": "1.5.1-beta",
+    "@aws/cloudformation-validate": "1.6.0-beta",
     "@balena/dockerignore": "^1.0.2",
     "case": "1.6.3",
     "fs-extra": "^11.3.6",

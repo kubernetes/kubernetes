@@ -29,7 +29,6 @@ const APP_INIT_HOOK_SYMBOL = Symbol.for('@aws-cdk/core.App#initHook');
     { id: 'CloudFormation-Validate::W9010', reason: 'Hardcoded AMI IDs are fine in tests' },
     { id: 'CloudFormation-Validate::E3710', reason: 'We still have tests for shutdown services' },
     { id: 'CloudFormation-Validate::F3006', reason: 'We invent a lot of resource types for tests.' },
-    { id: 'CloudFormation-Validate::E3702', reason: 'Structurally malformed CodePipeline tests.' },
     { id: 'CloudFormation-Validate::E3677', reason: 'ZipFile does not support node99.x' },
     { id: 'CloudFormation-Validate::W9012', reason: 'We inject bogus AWS AccountIds on the regular (12345) and so on' },
     { id: 'CloudFormation-Validate::E1152', reason: 'Invalid AMI IDs all over the place' },
