@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import type * as acmpca from 'aws-cdk-lib/aws-acmpca';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -14,7 +15,6 @@ import { propertyInjectable } from 'aws-cdk-lib/core/lib/prop-injectable';
 import * as cr from 'aws-cdk-lib/custom-resources';
 import { S3_CREATE_DEFAULT_LOGGING_POLICY } from 'aws-cdk-lib/cx-api';
 import type * as constructs from 'constructs';
-import { addressOf } from 'constructs/lib/private/uniqueid';
 import type { KafkaVersion } from './';
 
 /**
@@ -458,7 +458,7 @@ export class ClientAuthentication {
   private constructor(
     public readonly saslProps?: SaslAuthProps,
     public readonly tlsProps?: TlsAuthProps,
-  ) {}
+  ) { }
 }
 
 /**
@@ -513,7 +513,7 @@ export class Cluster extends ClusterBase {
       throw new core.ValidationError(lit`ClientAuthRequiresTls`, 'To enable client authentication, you must enabled TLS-encrypted traffic between clients and brokers.', this);
     } else if (
       props.encryptionInTransit?.clientBroker ===
-        ClientBrokerEncryption.TLS_PLAINTEXT &&
+      ClientBrokerEncryption.TLS_PLAINTEXT &&
       (props.clientAuthentication?.saslProps?.scram ||
         props.clientAuthentication?.saslProps?.iam)
     ) {
@@ -575,7 +575,7 @@ export class Cluster extends ClusterBase {
     const encryptionAtRest = props.ebsStorageInfo?.encryptionKey
       ? {
         dataVolumeKmsKeyId:
-            props.ebsStorageInfo.encryptionKey.keyRef.keyId,
+          props.ebsStorageInfo.encryptionKey.keyRef.keyId,
       }
       : undefined; // MSK will create the managed key
 
@@ -588,7 +588,7 @@ export class Cluster extends ClusterBase {
 
     const openMonitoring =
       props.monitoring?.enablePrometheusJmxExporter ||
-      props.monitoring?.enablePrometheusNodeExporter
+        props.monitoring?.enablePrometheusNodeExporter
         ? {
           prometheus: {
             jmxExporter: props.monitoring?.enablePrometheusJmxExporter
@@ -710,8 +710,8 @@ export class Cluster extends ClusterBase {
       const { saslProps, tlsProps } = props.clientAuthentication;
       clientAuthentication = {
         sasl: saslProps ? {
-          iam: saslProps.iam ? { enabled: true }: undefined,
-          scram: saslProps.scram ? { enabled: true }: undefined,
+          iam: saslProps.iam ? { enabled: true } : undefined,
+          scram: saslProps.scram ? { enabled: true } : undefined,
         } : undefined,
         tls: tlsProps?.certificateAuthorities ? {
           certificateAuthorityArnList: tlsProps.certificateAuthorities?.map((ca) => ca.certificateAuthorityArn),
@@ -768,7 +768,7 @@ export class Cluster extends ClusterBase {
     return this.resource.ref;
   }
 
-  private mskInstanceType(instanceType: ec2.InstanceType, express?:boolean): string {
+  private mskInstanceType(instanceType: ec2.InstanceType, express?: boolean): string {
     const prefix = express ? 'express.' : 'kafka.';
     return `${prefix}${instanceType.toString()}`;
   }
@@ -953,3 +953,39 @@ export class Cluster extends ClusterBase {
     }
   }
 }
+
+/**
+ * Constructs with this id are completely hidden from the address calculation.
+ */
+const HIDDEN_ID = 'Default';
+
+/**
+ * Separator used to delimit path components while calculating an address.
+ *
+ * Ids are sanitized before they become path components (see `sanitizeId()` in
+ * `construct.ts`), so that a single component never contains this character.
+ * Otherwise one component could hash like several: the single component
+ * `a<sep>b` would be fed to the hash exactly like the two components `a` and
+ * `b`.
+ */
+export const ADDR_SEP = '\n';
+
+/**
+ * Calculates the construct addr based on path components.
+ *
+ * Components named `Default` (case sensitive) are excluded from addr
+ * calculation to allow tree refactorings.
+ */
+const addressOf = (components: string[]) => {
+  const hash = createHash('sha1');
+  for (const c of components) {
+    // skip components called "Default" to enable refactorings
+    if (c === HIDDEN_ID) { continue; }
+
+    hash.update(c);
+    hash.update(ADDR_SEP);
+  }
+
+  // prefix with "c8" so to ensure it starts with non-digit.
+  return 'c8' + hash.digest('hex');
+};
