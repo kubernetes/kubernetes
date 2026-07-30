@@ -26,7 +26,11 @@ Run `make help` for all available targets. Common workflows:
 
 ```
 make test WHAT=./pkg/kubelet GOFLAGS=-v     # Unit tests (one package)
+
+# Integration tests require etcd. Run hack/install-etcd.sh and set PATH!
+# Example: ./hack/install-etcd.sh && export PATH="${PWD}/third_party/etcd:${PATH}" && make test-integration WHAT=./test/integration/scheduler
 make test-integration WHAT=./test/integration/scheduler
+
 make verify                                 # All verification checks
 make update                                 # ALL generators and formatters
 ```
