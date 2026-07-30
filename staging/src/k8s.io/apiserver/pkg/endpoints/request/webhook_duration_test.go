@@ -88,7 +88,7 @@ func TestSumOfMaxPerRoundTracker(t *testing.T) {
 	if got := tracker.GetLatency(); got != 0 {
 		t.Errorf("round 1 before CommitRound: want 0, got %v", got)
 	}
-	tracker.(RoundCommitter).CommitRound()
+	tracker.CommitRound()
 	if got := tracker.GetLatency(); got != 400 {
 		t.Errorf("after round 1 CommitRound: want 400, got %v", got)
 	}
@@ -97,19 +97,19 @@ func TestSumOfMaxPerRoundTracker(t *testing.T) {
 	for _, d := range []time.Duration{300, 150} {
 		tracker.Track(func() { clk.Step(d) })
 	}
-	tracker.(RoundCommitter).CommitRound()
+	tracker.CommitRound()
 	if got := tracker.GetLatency(); got != 700 {
 		t.Errorf("after round 2 CommitRound: want 700 (400+300), got %v", got)
 	}
 
 	// round 3
 	tracker.Track(func() { clk.Step(50) })
-	tracker.(RoundCommitter).CommitRound()
+	tracker.CommitRound()
 	if got := tracker.GetLatency(); got != 750 {
 		t.Errorf("after round 3 CommitRound: want 750 (400+300+50), got %v", got)
 	}
 
-	tracker.(RoundCommitter).CommitRound()
+	tracker.CommitRound()
 	if got := tracker.GetLatency(); got != 750 {
 		t.Errorf("after empty CommitRound: want 750, got %v", got)
 	}
