@@ -51,7 +51,7 @@ const sourceAction = new cpactions.S3SourceAction({
 
 const project = new codebuild.PipelineProject(stack, 'EcsProject', {
   environment: {
-    buildImage: codebuild.LinuxBuildImage.UBUNTU_14_04_DOCKER_17_09_0,
+    buildImage: codebuild.LinuxBuildImage.STANDARD_7_0,
     privileged: true,
   },
   buildSpec: codebuild.BuildSpec.fromObject({
