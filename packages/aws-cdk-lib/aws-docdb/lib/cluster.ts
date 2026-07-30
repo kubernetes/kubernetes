@@ -21,6 +21,15 @@ const MIN_ENGINE_VERSION_FOR_IO_OPTIMIZED_STORAGE = 5;
 const MIN_ENGINE_VERSION_FOR_SERVERLESS = 5;
 
 /**
+ * Matches the DocumentDB maintenance window format `ddd:hh24:mi-ddd:hh24:mi`
+ * Days: mon | tue | wed | thu | fri | sat | sun (case-insensitive).
+ * Time: 00-23 hour, 00-59 minute.
+ *
+ * @see https://docs.aws.amazon.com/documentdb/latest/developerguide/db-instance-maintain.html#maintenance-window
+ */
+const MAINTENANCE_WINDOW_REGEX = /^(mon|tue|wed|thu|fri|sat|sun):(2[0-3]|[01]\d):[0-5]\d-(mon|tue|wed|thu|fri|sat|sun):(2[0-3]|[01]\d):[0-5]\d$/i;
+
+/**
  * ServerlessV2 scaling configuration for DocumentDB clusters
  */
 export interface ServerlessV2ScalingConfiguration {
@@ -188,6 +197,25 @@ export interface DatabaseClusterProps {
    * @see https://docs.aws.amazon.com/documentdb/latest/developerguide/db-instance-maintain.html#maintenance-window
    */
   readonly preferredMaintenanceWindow?: string;
+
+  /**
+   * The weekly time range during which system maintenance can occur on the cluster's instances.
+   *
+   * The cluster-level `preferredMaintenanceWindow` applies to cluster-wide maintenance events; this prop
+   * applies to each auto-created instance independently. To use the same window for both, set this prop
+   * to the same value as `preferredMaintenanceWindow`.
+   *
+   * Format: `ddd:hh24:mi-ddd:hh24:mi`. Must be at least 30 minutes long.
+   * Example: 'sat:09:00-sat:09:30'
+   *
+   * Only applicable to provisioned clusters; has no effect on serverless clusters because they do not
+   * create instances.
+   *
+   * @default - a 30-minute window selected at random from an 8-hour block of time for each AWS Region,
+   * occurring on a random day of the week.
+   * @see https://docs.aws.amazon.com/documentdb/latest/developerguide/db-instance-maintain.html#maintenance-window
+   */
+  readonly instanceMaintenanceWindow?: string;
 
   /**
    * The removal policy to apply when the cluster and its instances are removed
@@ -518,6 +546,17 @@ export class DatabaseCluster extends DatabaseClusterBase {
     if (!props.instanceType && !props.serverlessV2ScalingConfiguration) {
       throw new ValidationError(lit`InstanceTypeOrServerlessConfigurationRequired`, 'Either instanceType (for provisioned clusters) or serverlessV2ScalingConfiguration (for serverless clusters) must be specified', this);
     }
+
+    if (props.preferredMaintenanceWindow !== undefined && !Token.isUnresolved(props.preferredMaintenanceWindow)
+          && !MAINTENANCE_WINDOW_REGEX.test(props.preferredMaintenanceWindow)) {
+      throw new ValidationError(lit`InvalidClusterMaintenanceWindowFormat`, 'preferredMaintenanceWindow must be in the format ddd:hh24:mi-ddd:hh24:mi, e.g. sat:09:00-sat:09:30', this);
+    }
+
+    if (props.instanceMaintenanceWindow !== undefined && !Token.isUnresolved(props.instanceMaintenanceWindow)
+          && !MAINTENANCE_WINDOW_REGEX.test(props.instanceMaintenanceWindow)) {
+      throw new ValidationError(lit`InvalidInstanceMaintenanceWindowFormat`, 'instanceMaintenanceWindow must be in the format ddd:hh24:mi-ddd:hh24:mi, e.g. sat:09:00-sat:09:30', this);
+    }
+
     const isServerless = !!props.serverlessV2ScalingConfiguration;
     if (isServerless && props.instanceType) {
       throw new ValidationError(lit`CannotSpecifyBothInstanceTypeAndServerlessConfiguration`, 'Cannot specify both instanceType and serverlessV2ScalingConfiguration', this);
@@ -676,6 +715,7 @@ export class DatabaseCluster extends DatabaseClusterBase {
           dbInstanceClass: databaseInstanceType(props.instanceType!),
           enablePerformanceInsights: props.enablePerformanceInsights,
           caCertificateIdentifier: caCertificateIdentifier,
+          preferredMaintenanceWindow: props.instanceMaintenanceWindow,
         });
 
         instance.applyRemovalPolicy(instanceRemovalPolicy, {

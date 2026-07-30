@@ -1,0 +1,20 @@
+{
+  "version": "54.0.0",
+  "files": {
+    "f1b550d266d9efd568ab5384c570532dade51da410acbdec6a0e902d0c242eab": {
+      "displayName": "aws-cdk-docdb-instance-maintenance-window Template",
+      "source": {
+        "path": "aws-cdk-docdb-instance-maintenance-window.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-d2caf87e": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "f1b550d266d9efd568ab5384c570532dade51da410acbdec6a0e902d0c242eab.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}
