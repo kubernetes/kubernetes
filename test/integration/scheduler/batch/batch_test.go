@@ -511,7 +511,7 @@ func resources(maxPods int) v1.ResourceList {
 func newNode(d *nodeDef) *v1.Node {
 	n := st.MakeNode()
 	n.Name(d.name)
-	n.Labels = d.labels
+	n.Labels(d.labels)
 	n.Status.Capacity = resources(d.maxPods)
 	n.Status.Allocatable = resources(d.maxPods)
 	return n.Obj()
