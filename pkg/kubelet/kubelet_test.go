@@ -2798,6 +2798,18 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, podToReject, v1.PodFailed)
+	status, found := kl.statusManager.GetPodStatus(podToReject.UID)
+	require.True(t, found, "Status of pod %q is not found in the status map", podToReject.UID)
+	var rejectedCondition *v1.PodCondition
+	for i := range status.Conditions {
+		if status.Conditions[i].Type == v1.PodRejected {
+			rejectedCondition = &status.Conditions[i]
+			break
+		}
+	}
+	require.NotNil(t, rejectedCondition)
+	assert.Equal(t, v1.ConditionTrue, rejectedCondition.Status)
+	assert.Equal(t, "Pod was rejected: Pod is rejected", rejectedCondition.Message)
 	checkPodStatus(t, kl, podToAdmit, v1.PodPending)
 }
 

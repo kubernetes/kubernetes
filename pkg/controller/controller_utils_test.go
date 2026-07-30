@@ -1787,3 +1787,39 @@ func TestFilterPodsByOwner(t *testing.T) {
 		})
 	}
 }
+
+func TestPodIsRejectedFinished(t *testing.T) {
+	tests := []struct {
+		name string
+		pod  *v1.Pod
+		want bool
+	}{
+		{
+			name: "rejected failed pod",
+			pod: &v1.Pod{Status: v1.PodStatus{
+				Phase:      v1.PodFailed,
+				Conditions: []v1.PodCondition{{Type: v1.PodRejected, Status: v1.ConditionTrue}},
+			}},
+			want: true,
+		},
+		{
+			name: "rejected non-terminal pod",
+			pod: &v1.Pod{Status: v1.PodStatus{
+				Phase:      v1.PodPending,
+				Conditions: []v1.PodCondition{{Type: v1.PodRejected, Status: v1.ConditionTrue}},
+			}},
+		},
+		{
+			name: "failed pod without rejection condition",
+			pod:  &v1.Pod{Status: v1.PodStatus{Phase: v1.PodFailed}},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := PodIsRejectedFinished(tc.pod); got != tc.want {
+				t.Errorf("PodIsRejectedFinished() = %t, want %t", got, tc.want)
+			}
+		})
+	}
+}

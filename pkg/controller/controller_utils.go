@@ -1450,3 +1450,17 @@ func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, la
 		return nil
 	})
 }
+
+// PodIsRejectedFinished returns true if the kubelet rejected the pod during
+// admission and recorded its terminal status.
+func PodIsRejectedFinished(pod *v1.Pod) bool {
+	if pod.Status.Phase != v1.PodFailed {
+		return false
+	}
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodRejected && condition.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}

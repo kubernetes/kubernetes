@@ -3369,6 +3369,9 @@ const (
 	PodResizeInProgress PodConditionType = "PodResizeInProgress"
 	// AllContainersRestarting indicates that all containers of the pod is being restarted.
 	AllContainersRestarting PodConditionType = "AllContainersRestarting"
+
+	// PodRejected indicates that the kubelet has rejected the pod during admission.
+	PodRejected PodConditionType = "PodRejected"
 )
 
 // PodCondition represents pod's condition

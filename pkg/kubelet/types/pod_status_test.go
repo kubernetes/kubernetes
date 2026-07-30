@@ -33,6 +33,7 @@ func TestPodConditionByKubelet(t *testing.T) {
 		v1.PodReady,
 		v1.PodInitialized,
 		v1.ContainersReady,
+		v1.PodRejected,
 		v1.PodReadyToStartContainers,
 	}
 

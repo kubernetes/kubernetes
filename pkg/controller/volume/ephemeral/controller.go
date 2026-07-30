@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	controllerutil "k8s.io/kubernetes/pkg/controller"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -110,6 +111,7 @@ func NewController(
 		// PVC.
 		// Deletion of the PVC is handled through the owner reference and garbage collection.
 		// Therefore pod deletions also can be ignored.
+		UpdateFunc: ec.updatePod,
 	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return nil, fmt.Errorf("could not add pod event handler: %w", err)
@@ -274,8 +276,16 @@ func (ec *ephemeralController) handleVolume(ctx context.Context, pod *v1.Pod, vo
 		if err := ephemeral.VolumeIsForPod(pod, pvc); err != nil {
 			return err
 		}
+		if controllerutil.PodIsRejectedFinished(pod) {
+			return ec.kubeClient.CoreV1().PersistentVolumeClaims(pod.Namespace).Delete(ctx, pvcName, metav1.DeleteOptions{})
+		}
 		// Already created, nothing more to do.
 		logger.V(5).Info("Ephemeral: PVC already created", "volumeName", vol.Name, "PVC", klog.KObj(pvc))
+		return nil
+	}
+
+	// No need to create PVC
+	if controllerutil.PodIsRejectedFinished(pod) {
 		return nil
 	}
 
@@ -306,4 +316,27 @@ func (ec *ephemeralController) handleVolume(ctx context.Context, pod *v1.Pod, vo
 		return fmt.Errorf("create PVC %s: %v", pvcName, err)
 	}
 	return nil
+}
+
+func (ec *ephemeralController) updatePod(old, new interface{}) {
+	pod, ok := new.(*v1.Pod)
+	if !ok {
+		return
+	}
+	if pod.DeletionTimestamp != nil || !controllerutil.PodIsRejectedFinished(pod) {
+		return
+	}
+
+	for _, vol := range pod.Spec.Volumes {
+		if vol.Ephemeral != nil {
+			// It has at least one ephemeral inline volume, work on it.
+			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(pod)
+			if err != nil {
+				runtime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", pod, err))
+				return
+			}
+			ec.queue.Add(key)
+			break
+		}
+	}
 }
