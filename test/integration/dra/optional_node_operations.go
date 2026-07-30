@@ -126,9 +126,21 @@ func testOptionalNodeOperations(tCtx ktesting.TContext, enabled bool) {
 			}
 
 			if tt.expectScheduled {
+				// The PodScheduled condition checked by [waitForPodScheduled] could
+				// converge to either a True or False status due to a race
+				// condition, but Pods should still ultimately be scheduled:
+				// https://github.com/kubernetes/kubernetes/issues/139417#issuecomment-4651436886
 				for _, pod := range pods {
-					scheduledPod := waitForPodScheduled(tCtx, namespace, pod.Name)
-					tCtx.Expect(scheduledPod.Spec.NodeName).To(gomega.Equal(tt.expectedNode), "pod should be scheduled to %s", tt.expectedNode)
+					tCtx.Eventually(func(tCtx ktesting.TContext) (string, error) {
+						p, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+						if err != nil {
+							return "", err
+						}
+						return p.Spec.NodeName, nil
+					}).WithTimeout(schedulingTimeout).Should(
+						gomega.Equal(tt.expectedNode),
+						"pod %s should be scheduled to %s", pod.Name, tt.expectedNode,
+					)
 				}
 			} else {
 				// Verify that the pod with node selector (the last one) is unschedulable.
