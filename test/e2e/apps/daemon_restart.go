@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/onsi/gomega"
 	"strconv"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -126,6 +127,10 @@ func (r *RestartDaemonConfig) waitUp(ctx context.Context) {
 			if err != nil {
 				framework.Logf("Unable to parse healthz http return code: %v", err)
 			} else if httpCode == 200 {
+				if err := r.verifyDaemonReadiness(ctx); err != nil {
+					framework.Logf("Daemon not ready: %v", err)
+					return false, nil
+				}
 				return true, nil
 			}
 		}
@@ -379,3 +384,21 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 		}
 	})
 })
+
+func (r *RestartDaemonConfig) verifyDaemonReadiness(ctx context.Context) error {
+	if r.daemonName != "kubelet" {
+		return nil
+	}
+	if framework.NodeOSDistroIs("windows") {
+		return nil
+	}
+	cmd := fmt.Sprintf("curl -s -o /dev/null -I -w \"%%{http_code}\" http://localhost:%d/healthz/syncloop", r.healthzPort)
+	result, err := e2essh.NodeExec(ctx, r.nodeName, cmd, framework.TestContext.Provider)
+	if err != nil {
+		return fmt.Errorf("syncloop health check failed: %w", err)
+	}
+	if result.Code != 0 || strings.TrimSpace(result.Stdout) != "200" {
+		return fmt.Errorf("kubelet syncloop health check returned %s (exit code %d)", strings.TrimSpace(result.Stdout), result.Code)
+	}
+	return nil
+}
