@@ -60,7 +60,6 @@ const vpcInterface = VpcInterface.define({
   networkInterfaceType: NetworkInterface.EFA,
 });
 new Flow(stack, 'flow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowSize: FlowSize.LARGE_4X,
   mediaStreams: [videoMediaStream],
   vpcInterfaces: [vpcInterface],

@@ -102,7 +102,6 @@ const routerOutput = new RouterOutput(stack, 'mediaLiveNoInput', {
 
 // Test 5: MediaConnect Flow Output (using created flow)
 const flow = new Flow(stack, 'TestFlow2', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'source-flow',
   availabilityZone: `${stack.region}a`,
   source: SourceConfiguration.router({

@@ -12,9 +12,7 @@
      "SourceListenerPort": 5000,
      "StreamId": "integ-srt-caller-stream"
     }
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   }
  },
  "Parameters": {

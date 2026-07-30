@@ -843,8 +843,7 @@ var require_helpers_internal = __commonJS({
   "../../aws-cdk-lib/assertions/lib/helpers-internal/index.js"(exports2) {
     "use strict";
     var __createBinding2 = exports2 && exports2.__createBinding || (Object.create ? (function(o, m, k, k2) {
-      if (k2 === void 0)
-        k2 = k;
+      if (k2 === void 0) k2 = k;
       var desc = Object.getOwnPropertyDescriptor(m, k);
       if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
         desc = { enumerable: true, get: function() {
@@ -853,35 +852,15 @@ var require_helpers_internal = __commonJS({
       }
       Object.defineProperty(o, k2, desc);
     }) : (function(o, m, k, k2) {
-      if (k2 === void 0)
-        k2 = k;
+      if (k2 === void 0) k2 = k;
       o[k2] = m[k];
     }));
     var __exportStar2 = exports2 && exports2.__exportStar || function(m, exports3) {
-      for (var p in m)
-        if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports3, p))
-          __createBinding2(exports3, m, p);
+      for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports3, p)) __createBinding2(exports3, m, p);
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
-    var _noFold;
-    exports2.Match = void 0;
-    Object.defineProperty(exports2, _noFold = "Match", { enumerable: true, configurable: true, get: () => {
-      var value = (init_match(), __toCommonJS(match_exports)).Match;
-      Object.defineProperty(exports2, _noFold = "Match", { enumerable: true, configurable: true, value });
-      return value;
-    } });
-    exports2.Matcher = void 0;
-    Object.defineProperty(exports2, _noFold = "Matcher", { enumerable: true, configurable: true, get: () => {
-      var value = (init_matcher(), __toCommonJS(matcher_exports)).Matcher;
-      Object.defineProperty(exports2, _noFold = "Matcher", { enumerable: true, configurable: true, value });
-      return value;
-    } });
-    exports2.MatchResult = void 0;
-    Object.defineProperty(exports2, _noFold = "MatchResult", { enumerable: true, configurable: true, get: () => {
-      var value = (init_matcher(), __toCommonJS(matcher_exports)).MatchResult;
-      Object.defineProperty(exports2, _noFold = "MatchResult", { enumerable: true, configurable: true, value });
-      return value;
-    } });
+    __exportStar2((init_match(), __toCommonJS(match_exports)), exports2);
+    __exportStar2((init_matcher(), __toCommonJS(matcher_exports)), exports2);
   }
 });
 

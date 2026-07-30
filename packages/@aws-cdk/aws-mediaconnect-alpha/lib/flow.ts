@@ -1,4 +1,4 @@
-import type { Bitrate, IResource, RemovalPolicy } from 'aws-cdk-lib';
+import type { Bitrate, IResource } from 'aws-cdk-lib';
 import { ArnFormat, Resource, Lazy, Names, Duration, Stack, Token, Fn, UnscopedValidationError, ValidationError } from 'aws-cdk-lib';
 import type { MetricOptions } from 'aws-cdk-lib/aws-cloudwatch';
 import { Metric, Unit } from 'aws-cdk-lib/aws-cloudwatch';
@@ -845,19 +845,6 @@ export interface FlowProps {
    */
   readonly vpcInterfaces?: VpcInterfaceConfig[];
 
-  /**
-   * Policy to apply when the flow is removed from the stack.
-   *
-   * Defaults to `RETAIN` because a flow is a live transport, not a data store, and MediaConnect
-   * won't delete an active flow — it must be stopped first. Retaining by default avoids an
-   * unplanned teardown of a running flow and everything wired to it.
-   *
-   * Trade-off: a destroyed stack leaves the flow behind (still running, still billing). Set
-   * `RemovalPolicy.DESTROY` if you want it removed together with the stack.
-   *
-   * @default RemovalPolicy.RETAIN
-   */
-  readonly removalPolicy?: RemovalPolicy;
 }
 
 /**
@@ -1516,8 +1503,6 @@ export class Flow extends FlowBase implements IFlow {
     this._ndiState = props.ndiConfig?.ndiState ?? State.DISABLED;
     this._sourceProtocol = sourceConfig.protocol;
     this._hasListenerSource = Flow.isListenerStyleProtocol(sourceConfig.protocol);
-
-    flow.applyRemovalPolicy(props.removalPolicy);
 
     this.node.addValidation({
       validate: () => {

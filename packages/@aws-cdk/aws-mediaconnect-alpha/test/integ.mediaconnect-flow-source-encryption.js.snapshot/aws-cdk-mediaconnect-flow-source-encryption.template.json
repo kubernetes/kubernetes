@@ -133,9 +133,7 @@
      "Protocol": "srt-listener",
      "WhitelistCidr": "198.51.100.0/24"
     }
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "ZixiPushFlowEncryptionRoleEEFFB7D7": {
    "Type": "AWS::IAM::Role",
@@ -244,9 +242,7 @@
      "Protocol": "zixi-push",
      "WhitelistCidr": "198.51.100.0/24"
     }
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "SrtCallerFlowEncryptionRole4D061A8C": {
    "Type": "AWS::IAM::Role",
@@ -355,9 +351,7 @@
      "SourceListenerPort": 5000,
      "StreamId": "integ-srt-caller-decrypted-stream"
     }
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   }
  },
  "Parameters": {

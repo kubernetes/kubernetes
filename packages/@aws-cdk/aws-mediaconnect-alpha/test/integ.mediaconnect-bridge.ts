@@ -17,14 +17,12 @@ const network = GatewayNetwork.define({
 });
 
 const gateway = new Gateway(stack, 'gateway', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   egressCidrBlocks: ['10.0.0.0/23'],
   networks: [network],
 });
 
 // Test 1: Ingress Bridge with Network Source
 new Bridge(stack, 'bridge', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   config: BridgeConfiguration.ingress({
     maxBitrate: cdk.Bitrate.mbps(5),
     maxOutputs: 1,
@@ -42,7 +40,6 @@ new Bridge(stack, 'bridge', {
 });
 
 const flow = new Flow(stack, 'test-flow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   source: SourceConfiguration.rtp({
     port: 5000,
     flowSourceName: 'ingest',
@@ -52,7 +49,6 @@ const flow = new Flow(stack, 'test-flow', {
 
 // Test 2: Egress Bridge with Network Output using BridgeOutputConfiguration
 new Bridge(stack, 'bridgeWithOutput', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   config: BridgeConfiguration.egress({
     maxBitrate: cdk.Bitrate.mbps(10),
     flowSources: [{

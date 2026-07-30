@@ -10,9 +10,7 @@
      "Protocol": "rtp",
      "WhitelistCidr": "10.1.0.0/16"
     }
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "TransitRoleF5930357": {
    "Type": "AWS::IAM::Role",

@@ -13,9 +13,7 @@
       "Name": "network-1"
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "testvpc5C6845CD": {
    "Type": "AWS::EC2::VPC",
@@ -347,9 +345,7 @@
       }
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "egressBridgeWithVpc472FE3B3": {
    "Type": "AWS::MediaConnect::Bridge",
@@ -392,9 +388,7 @@
       }
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   }
  },
  "Parameters": {

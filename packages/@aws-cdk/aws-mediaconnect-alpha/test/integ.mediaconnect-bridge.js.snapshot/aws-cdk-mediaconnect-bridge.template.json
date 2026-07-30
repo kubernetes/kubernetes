@@ -13,9 +13,7 @@
       "Name": "network-1"
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "bridge6E10D0E7": {
    "Type": "AWS::MediaConnect::Bridge",
@@ -43,9 +41,7 @@
       }
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "testflowB44BC918": {
    "Type": "AWS::MediaConnect::Flow",
@@ -57,9 +53,7 @@
      "Protocol": "rtp",
      "WhitelistCidr": "203.0.113.0/24"
     }
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "bridgeWithOutputCB448FD8": {
    "Type": "AWS::MediaConnect::Bridge",
@@ -99,9 +93,7 @@
       }
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   }
  },
  "Parameters": {

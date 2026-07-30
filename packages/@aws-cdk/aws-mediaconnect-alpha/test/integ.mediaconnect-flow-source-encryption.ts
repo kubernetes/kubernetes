@@ -32,7 +32,6 @@ const srtCallerSecret = new Secret(stack, 'SrtCallerSecret', {
 
 // SRT Listener source with auto-role decryption.
 new Flow(stack, 'SrtListenerFlow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'srt-listener-decryption-flow',
   source: SourceConfiguration.srtListener({
     flowSourceName: 'srt-listener-decrypted',
@@ -48,7 +47,6 @@ new Flow(stack, 'SrtListenerFlow', {
 
 // Zixi Push source with auto-role static-key decryption.
 new Flow(stack, 'ZixiPushFlow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'zixi-push-decryption-flow',
   source: SourceConfiguration.zixiPush({
     flowSourceName: 'zixi-push-decrypted',
@@ -65,7 +63,6 @@ new Flow(stack, 'ZixiPushFlow', {
 // SRT Caller source with auto-role decryption. SRT Caller initiates the outbound
 // connection, so no CIDR allow list is configured — a public internet target is used.
 new Flow(stack, 'SrtCallerFlow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'srt-caller-decryption-flow',
   source: SourceConfiguration.srtCaller({
     flowSourceName: 'srt-caller-decrypted',

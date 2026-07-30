@@ -1,4 +1,4 @@
-import type { IResource, RemovalPolicy } from 'aws-cdk-lib';
+import type { IResource } from 'aws-cdk-lib';
 import { Annotations, Duration, Resource, Lazy, Names, Token, ValidationError } from 'aws-cdk-lib';
 import type { MetricOptions } from 'aws-cdk-lib/aws-cloudwatch';
 import { Metric, Unit } from 'aws-cdk-lib/aws-cloudwatch';
@@ -107,16 +107,6 @@ export interface GatewayProps {
    */
   readonly networks: GatewayNetwork[];
 
-  /**
-   * Policy to apply when the gateway is removed from the stack.
-   *
-   * Defaults to `RETAIN` because a gateway is long-lived, on-premises infrastructure that hosts
-   * bridges, not a data store. Retaining by default avoids an unplanned teardown. Set
-   * `RemovalPolicy.DESTROY` if you want it removed with the stack.
-   *
-   * @default RemovalPolicy.RETAIN
-   */
-  readonly removalPolicy?: RemovalPolicy;
 }
 
 abstract class GatewayBase extends Resource implements IGateway {
@@ -267,8 +257,6 @@ export class Gateway extends GatewayBase implements IGateway {
 
     this.gatewayArn = resource.attrGatewayArn;
     this.gatewayState = resource.attrGatewayState;
-
-    resource.applyRemovalPolicy(props.removalPolicy);
 
     // Validate gateway network name uniqueness at synth time. Names must be unique
     // within a gateway; the service rejects duplicates at deploy time.

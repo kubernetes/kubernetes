@@ -14,7 +14,6 @@ const app = new cdk.App();
 const stack = new cdk.Stack(app, 'aws-cdk-mediaconnect-flow-rist');
 
 new Flow(stack, 'Flow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'rist-source-flow',
   source: SourceConfiguration.rist({
     flowSourceName: 'rist-source',

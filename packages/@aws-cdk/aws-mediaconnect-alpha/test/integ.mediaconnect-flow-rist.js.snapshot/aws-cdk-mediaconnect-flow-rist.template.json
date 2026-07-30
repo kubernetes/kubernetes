@@ -11,9 +11,7 @@
      "Protocol": "rist",
      "WhitelistCidr": "10.0.0.0/16"
     }
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   }
  },
  "Parameters": {

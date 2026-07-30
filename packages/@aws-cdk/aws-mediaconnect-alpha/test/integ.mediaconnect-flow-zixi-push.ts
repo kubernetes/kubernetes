@@ -26,7 +26,6 @@ const stack = new cdk.Stack(app, 'aws-cdk-mediaconnect-flow-zixi-push');
 
 // Standard Zixi Push source on the public internet.
 new Flow(stack, 'StandardFlow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'zixi-push-standard-flow',
   source: SourceConfiguration.zixiPush({
     flowSourceName: 'zixi-push-standard-source',
@@ -77,7 +76,6 @@ const vpcInterface = VpcInterface.define({
 });
 
 new Flow(stack, 'VpcFlow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'zixi-push-vpc-flow',
   vpcInterfaces: [vpcInterface],
   source: SourceConfiguration.zixiPush({

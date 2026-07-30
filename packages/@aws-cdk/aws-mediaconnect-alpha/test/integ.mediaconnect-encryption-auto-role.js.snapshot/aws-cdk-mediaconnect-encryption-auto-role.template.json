@@ -151,9 +151,7 @@
       "EncryptionKeyType": "SECRETS_MANAGER"
      }
     }
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "ZixiPullOutputEncryptionRole49B6B2B6": {
    "Type": "AWS::IAM::Role",

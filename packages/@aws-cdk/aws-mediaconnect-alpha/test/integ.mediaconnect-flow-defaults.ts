@@ -33,7 +33,6 @@ const stack = new cdk.Stack(app, 'aws-cdk-mediaconnect-flow-defaults');
 
 // RIST source — omit maxLatency, expect service default 2000 ms.
 const ristFlow = new Flow(stack, 'RistFlow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'defaults-rist',
   source: SourceConfiguration.rist({
     flowSourceName: 'rist-default',
@@ -44,7 +43,6 @@ const ristFlow = new Flow(stack, 'RistFlow', {
 
 // Failover (MERGE) — omit recoveryWindow, expect service default 200 ms.
 const mergeFlow = new Flow(stack, 'MergeFlow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'defaults-merge',
   source: SourceConfiguration.rist({
     flowSourceName: 'merge-primary',

@@ -14,7 +14,6 @@ const stack = new cdk.Stack(app, 'aws-cdk-mediaconnect-router-input-flow');
 
 // Create a source Flow for the RouterInput to consume
 const sourceFlow = new Flow(stack, 'SourceFlow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'router-input-source-flow',
   source: SourceConfiguration.rtp({
     flowSourceName: 'source-for-router',

@@ -15,7 +15,6 @@ const app = new cdk.App();
 const stack = new cdk.Stack(app, 'aws-cdk-mediaconnect-flow-srt-caller');
 
 new Flow(stack, 'Flow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'srt-caller-source-flow',
   source: SourceConfiguration.srtCaller({
     flowSourceName: 'srt-caller-source',

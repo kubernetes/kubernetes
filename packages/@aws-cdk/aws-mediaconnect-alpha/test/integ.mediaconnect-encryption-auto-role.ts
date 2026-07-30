@@ -52,7 +52,6 @@ const routerTransitSecret = new Secret(stack, 'RouterTransitSecret', {
 
 // Flow with TransitEncryption auto-role on the router source.
 const flow = new Flow(stack, 'Flow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'auto-role-flow',
   source: SourceConfiguration.router({
     decryption: {

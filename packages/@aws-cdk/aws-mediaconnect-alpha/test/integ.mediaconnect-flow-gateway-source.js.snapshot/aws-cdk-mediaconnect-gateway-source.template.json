@@ -404,9 +404,7 @@
       "Name": "gw-network"
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "IngressBridge39ECBE25": {
    "Type": "AWS::MediaConnect::Bridge",
@@ -434,9 +432,7 @@
       }
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "GatewaySourceFlow4CA80C6A": {
    "Type": "AWS::MediaConnect::Flow",
@@ -486,9 +482,7 @@
       }
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "GatewaySourceFlowRouterFlowOutput7164C5F2": {
    "Type": "AWS::MediaConnect::FlowOutput",

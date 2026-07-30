@@ -182,7 +182,7 @@
         "Validations.acknowledge (/Users/jamiepm/opensource/aws-cdk/packages/aws-cdk-lib/core/lib/validation/validations.js:122:18)",
         "new Flow (/Users/jamiepm/opensource/aws-cdk/packages/@aws-cdk/aws-mediaconnect-alpha/lib/flow.js:908:48)",
         "new Flow (/Users/jamiepm/opensource/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "Object.<anonymous> (/Users/jamiepm/opensource/aws-cdk/packages/@aws-cdk/aws-mediaconnect-alpha/test/integ.mediaconnect-bridge-vpc.js:114:20)",
+        "Object.<anonymous> (/Users/jamiepm/opensource/aws-cdk/packages/@aws-cdk/aws-mediaconnect-alpha/test/integ.mediaconnect-bridge-vpc.js:113:20)",
         "Module._compile (node:internal/modules/cjs/loader:1761:14)",
         "Object..js (node:internal/modules/cjs/loader:1893:10)",
         "Module.load (node:internal/modules/cjs/loader:1481:32)",

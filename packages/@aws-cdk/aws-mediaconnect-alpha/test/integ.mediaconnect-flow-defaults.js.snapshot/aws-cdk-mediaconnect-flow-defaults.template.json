@@ -10,9 +10,7 @@
      "Protocol": "rist",
      "WhitelistCidr": "203.0.113.0/24"
     }
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "MergeFlow70FCE4A4": {
    "Type": "AWS::MediaConnect::Flow",
@@ -28,9 +26,7 @@
      "FailoverMode": "MERGE",
      "State": "ENABLED"
     }
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "OutputDefault1A6CCE07": {
    "Type": "AWS::MediaConnect::FlowOutput",

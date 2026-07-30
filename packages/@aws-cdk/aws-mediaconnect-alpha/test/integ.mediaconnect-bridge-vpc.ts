@@ -20,7 +20,6 @@ const network = GatewayNetwork.define({
 });
 
 const gateway = new Gateway(stack, 'gateway', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   egressCidrBlocks: ['10.0.0.0/23'],
   networks: [network],
 });
@@ -89,7 +88,6 @@ const router = new RouterOutput(stack, 'rtpOutput', {
 
 // Create a flow to use as source for egress bridge
 const sourceFlow = new Flow(stack, 'SourceFlow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'bridge-source-flow',
   availabilityZone: `${stack.region}a`,
   vpcInterfaces: [vpcInterface],
@@ -100,7 +98,6 @@ const sourceFlow = new Flow(stack, 'SourceFlow', {
 
 // Egress Bridge with Flow Source and VPC Interface
 new Bridge(stack, 'egressBridgeWithVpc', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   bridgeName: 'test-egress-bridge-vpc',
   config: BridgeConfiguration.egress({
     maxBitrate: cdk.Bitrate.mbps(10),

@@ -6,7 +6,7 @@
  */
 
 import { IntegTest } from '@aws-cdk/integ-tests-alpha';
-import { App, Bitrate, RemovalPolicy, Stack } from 'aws-cdk-lib';
+import { App, Bitrate, Stack } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
@@ -89,7 +89,6 @@ const sourceRouterOutput = new mediaconnect.RouterOutput(stack, 'SourceRouterOut
 
 // Flow with Router Source (with transit encryption)
 const flow = new mediaconnect.Flow(stack, 'RouterSourceFlow', {
-  removalPolicy: RemovalPolicy.DESTROY,
   flowName: 'router-source-flow',
   availabilityZone: stack.availabilityZones[0],
   vpcInterfaces: [outputVpcInterface],
