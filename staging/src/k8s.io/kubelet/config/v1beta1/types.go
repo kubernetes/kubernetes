@@ -222,24 +222,22 @@ type KubeletConfiguration struct {
 	// +optional
 	ServerTLSBootstrap bool `json:"serverTLSBootstrap,omitempty"`
 	// authentication specifies how requests to the Kubelet's server are authenticated.
-	// ```yaml
-	// Defaults:
-	//   anonymous:
-	//     enabled: false
-	//   webhook:
-	//     enabled: true
-	//     cacheTTL: "2m"
-	// ```
+	//
+	//	Defaults:
+	//		anonymous:
+	//			enabled: false
+	//		webhook:
+	//			enabled: true
+	//			cacheTTL: "2m"
 	// +optional
 	Authentication KubeletAuthentication `json:"authentication"`
 	// authorization specifies how requests to the Kubelet's server are authorized.
-	// ```yaml
-	// Defaults:
-	//   mode: Webhook
-	//   webhook:
-	//     cacheAuthorizedTTL: "5m"
-	//     cacheUnauthorizedTTL: "30s"
-	//```
+	//
+	//	Defaults:
+	//		mode: Webhook
+	//		webhook:
+	//			cacheAuthorizedTTL: "5m"
+	//			cacheUnauthorizedTTL: "30s"
 	// +optional
 	Authorization KubeletAuthorization `json:"authorization"`
 	// registryPullQPS is the limit of registry pulls per second.
