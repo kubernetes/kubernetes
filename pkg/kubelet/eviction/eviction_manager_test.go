@@ -34,6 +34,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -3294,5 +3295,46 @@ func TestContainerEphemeralStorageLimitEvictionForRestartableInitContainers(t *t
 	}
 	if len(evictedPods) != 1 || evictedPods[0].Name != pod.Name {
 		t.Fatalf("Expected evicted pod %q, got %v", pod.Name, evictedPods)
+	}
+}
+
+func TestContainerEphemeralStorageLimitEvictionWithDedicatedImageFs(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	writer := newContainer("writer", newResourceList("", "", ""), newResourceList("", "", "500Mi"))
+	sidecar := newContainer("sidecar", newResourceList("", "", ""), newResourceList("", "", "500Mi"))
+	pod := newPod("container-ephemeral-storage-repro", 0, []v1.Container{writer, sidecar}, nil)
+
+	writerRootfs := resource.MustParse("700Mi")
+	writerRootfsUsed := uint64(writerRootfs.Value())
+	sidecarRootfsUsed := uint64(0)
+	logUsed := uint64(0)
+	podStats := statsapi.PodStats{
+		Containers: []statsapi.ContainerStats{
+			{
+				Name:   "writer",
+				Logs:   &statsapi.FsStats{UsedBytes: &logUsed},
+				Rootfs: &statsapi.FsStats{UsedBytes: &writerRootfsUsed},
+			},
+			{
+				Name:   "sidecar",
+				Logs:   &statsapi.FsStats{UsedBytes: &logUsed},
+				Rootfs: &statsapi.FsStats{UsedBytes: &sidecarRootfsUsed},
+			},
+		},
+	}
+
+	podKiller := &mockPodKiller{}
+	mgr := &managerImpl{
+		killPodFunc:      podKiller.killPodNow,
+		recorder:         &record.FakeRecorder{},
+		dedicatedImageFs: ptr.To(true),
+	}
+
+	if !mgr.containerEphemeralStorageLimitEviction(klog.FromContext(tCtx), podStats, pod) {
+		t.Fatal("Expected pod eviction when a container rootfs exceeds its ephemeral-storage limit")
+	}
+	if podKiller.pod == nil || podKiller.pod.Name != pod.Name {
+		t.Fatalf("Expected pod %q to be evicted, got %v", pod.Name, podKiller.pod)
 	}
 }
