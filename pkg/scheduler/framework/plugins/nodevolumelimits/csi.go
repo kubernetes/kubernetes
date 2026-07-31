@@ -622,6 +622,8 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 	}
 	csiTranslator := csitrans.New()
 
+	// The blank lines around the long field keep gofmt output the same
+	// on all architectures, see issue #141074.
 	return &CSILimits{
 		csiManager:               handle.SharedCSIManager(),
 		pvLister:                 pvLister,
@@ -630,7 +632,9 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 		vaLister:                 vaLister,
 		csiDriverLister:          csiDriverLister,
 		enableVolumeLimitScaling: fts.EnableVolumeLimitScaling,
+
 		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
+
 		randomVolumeIDPrefix: rand.String(32),
 		translator:           csiTranslator,
 		vaIndexer:            vaInformer.GetIndexer(),
