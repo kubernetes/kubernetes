@@ -71,6 +71,20 @@ func newGetTemplateFn(nodeName types.NodeName, getAddresses func() []v1.NodeAddr
 	}
 }
 
+type combinedCounter struct {
+	certificateRenewFailure      certificate.Counter
+	certificateRenewFailureTotal certificate.Counter
+}
+
+func (c combinedCounter) Inc() {
+	if c.certificateRenewFailure != nil {
+		c.certificateRenewFailure.Inc()
+	}
+	if c.certificateRenewFailureTotal != nil {
+		c.certificateRenewFailureTotal.Inc()
+	}
+}
+
 // NewKubeletServerCertificateManager creates a certificate manager for the kubelet when retrieving a server certificate
 // or returns an error.
 func NewKubeletServerCertificateManager(logger klog.Logger, kubeClient clientset.Interface, kubeCfg *kubeletconfig.KubeletConfiguration, nodeName types.NodeName, getAddresses func() []v1.NodeAddress, certDirectory string) (certificate.Manager, error) {
@@ -138,14 +152,16 @@ func NewKubeletServerCertificateManager(logger klog.Logger, kubeClient clientset
 	getTemplate := newGetTemplateFn(nodeName, getAddresses)
 
 	config := certificate.Config{
-		ClientsetFn:                  clientsetFn,
-		GetTemplate:                  getTemplate,
-		SignerName:                   certificates.KubeletServingSignerName,
-		GetUsages:                    certificate.DefaultKubeletServingGetUsages,
-		CertificateStore:             certificateStore,
-		CertificateRotation:          certificateRotationAge,
-		CertificateRenewFailure:      certificateRenewFailure,
-		CertificateRenewFailureTotal: certificateRenewFailureTotal,
+		ClientsetFn:         clientsetFn,
+		GetTemplate:         getTemplate,
+		SignerName:          certificates.KubeletServingSignerName,
+		GetUsages:           certificate.DefaultKubeletServingGetUsages,
+		CertificateStore:    certificateStore,
+		CertificateRotation: certificateRotationAge,
+		CertificateRenewFailure: combinedCounter{
+			certificateRenewFailure:      certificateRenewFailure,
+			certificateRenewFailureTotal: certificateRenewFailureTotal,
+		},
 	}
 	config.GenerateKey = keyalgorithm.KeyGeneratorFunc(kubeCfg.ServerCertificateKeyAlgorithm)
 
@@ -276,11 +292,13 @@ func NewKubeletClientCertificateManager(
 		// provide a higher privileged certificate as initial data that will
 		// then be rotated immediately. This code path is used by kubeadm on
 		// the masters.
-		BootstrapCertificatePEM:      bootstrapCertData,
-		BootstrapKeyPEM:              bootstrapKeyData,
-		CertificateStore:             certificateStore,
-		CertificateRenewFailure:      certificateRenewFailure,
-		CertificateRenewFailureTotal: certificateRenewFailureTotal,
+		BootstrapCertificatePEM: bootstrapCertData,
+		BootstrapKeyPEM:         bootstrapKeyData,
+		CertificateStore:        certificateStore,
+		CertificateRenewFailure: combinedCounter{
+			certificateRenewFailure:      certificateRenewFailure,
+			certificateRenewFailureTotal: certificateRenewFailureTotal,
+		},
 	}
 	config.GenerateKey = keyalgorithm.KeyGeneratorFunc(keyAlgorithm)
 	m, err := certificate.NewManager(&config)
