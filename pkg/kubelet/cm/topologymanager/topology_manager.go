@@ -260,7 +260,9 @@ func NewManager(logger klog.Logger, topology []cadvisorapi.Node, topologyPolicyN
 func (m *manager) initializeMetrics() {
 	// ensure the values exist
 	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Add(0)
+	metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Add(0)
 	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Add(0)
+	metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Add(0)
 	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Add(0)
 	metrics.ContainerAlignedComputeResourcesFailureTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Add(0)
 	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Add(0)
