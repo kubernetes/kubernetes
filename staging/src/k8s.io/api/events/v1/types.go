@@ -102,6 +102,7 @@ type Event struct {
 // continuously for some time. How often to update the EventSeries is up to the event reporters.
 // The default event reporter in "k8s.io/client-go/tools/events/event_broadcaster.go" shows
 // how this struct is updated on heartbeats and can guide customized reporter implementations.
+// +structType=atomic
 type EventSeries struct {
 	// count is the number of occurrences in this series up to the last heartbeat time.
 	Count int32 `json:"count" protobuf:"varint,1,opt,name=count"`

@@ -7996,6 +7996,7 @@ type Event struct {
 
 // EventSeries contain information on series of events, i.e. thing that was/is happening
 // continuously for some time.
+// +structType=atomic
 type EventSeries struct {
 	// Number of occurrences in this series up to the last heartbeat time
 	Count int32 `json:"count,omitempty" protobuf:"varint,1,name=count"`
