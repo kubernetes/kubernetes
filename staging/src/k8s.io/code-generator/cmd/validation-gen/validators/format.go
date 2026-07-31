@@ -64,6 +64,7 @@ var (
 	resourcePoolNameValidator           = types.Name{Package: libValidationPkg, Name: "ResourcePoolName"}
 	shortNameValidator                  = types.Name{Package: libValidationPkg, Name: "ShortName"}
 	uuidValidator                       = types.Name{Package: libValidationPkg, Name: "UUID"}
+	reasonValidator                     = types.Name{Package: libValidationPkg, Name: "Reason"}
 )
 
 func (formatTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
@@ -129,7 +130,11 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 	case "k8s-uuid":
 		return Function(formatTagName, DefaultFlags, uuidValidator).
 			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-uuid", ""}), nil
+	case "k8s-reason":
+		return Function(formatTagName, DefaultFlags, reasonValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-reason", ""}), nil
 	}
+
 	// TODO: Flesh out the list of validation functions
 
 	return FunctionGen{}, fmt.Errorf("unsupported validation format %q", format)
