@@ -5,7 +5,7 @@ import { Metric, Unit } from 'aws-cdk-lib/aws-cloudwatch';
 import { CfnGateway } from 'aws-cdk-lib/aws-mediaconnect';
 import type { IGatewayRef, GatewayReference } from 'aws-cdk-lib/aws-mediaconnect';
 import { lit } from 'aws-cdk-lib/core/lib/helpers-internal';
-import { addConstructMetadata } from 'aws-cdk-lib/core/lib/metadata-resource';
+import { addConstructMetadata, MethodMetadata } from 'aws-cdk-lib/core/lib/metadata-resource';
 import { propertyInjectable } from 'aws-cdk-lib/core/lib/prop-injectable';
 import type { Construct } from 'constructs';
 import type { GatewayNetwork } from './shared';
@@ -274,6 +274,7 @@ export class Gateway extends GatewayBase implements IGateway {
   /**
    * Add a network to this gateway.
    */
+  @MethodMetadata()
   public addNetwork(network: GatewayNetwork): GatewayNetwork {
     this.networks.push(network);
     return network;

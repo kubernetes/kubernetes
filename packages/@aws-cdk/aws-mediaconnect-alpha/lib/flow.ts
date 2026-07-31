@@ -5,7 +5,7 @@ import { Metric, Unit } from 'aws-cdk-lib/aws-cloudwatch';
 import { CfnFlow } from 'aws-cdk-lib/aws-mediaconnect';
 import type { IFlowRef, FlowReference } from 'aws-cdk-lib/aws-mediaconnect';
 import { lit } from 'aws-cdk-lib/core/lib/helpers-internal';
-import { addConstructMetadata } from 'aws-cdk-lib/core/lib/metadata-resource';
+import { addConstructMetadata, MethodMetadata } from 'aws-cdk-lib/core/lib/metadata-resource';
 import { propertyInjectable } from 'aws-cdk-lib/core/lib/prop-injectable';
 import type { Construct } from 'constructs';
 import type { IFlowOutput, OutputConfiguration } from './flow-output';
@@ -1677,6 +1677,7 @@ export class Flow extends FlowBase implements IFlow {
   /**
    * Add a VPC interface to this flow.
    */
+  @MethodMetadata()
   public addVpcInterface(vpc: VpcInterfaceConfig) {
     this.vpcInterfaces.push({
       name: vpc.name,
