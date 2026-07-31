@@ -810,7 +810,7 @@ func TestPreEnqueue(t *testing.T) {
 					features.TopologyAwareWorkloadScheduling: isCPGEnabled,
 					features.CompositePodGroup:               isCPGEnabled,
 				})
-				logger, ctx := ktesting.NewTestContext(t)
+				_, ctx := ktesting.NewTestContext(t)
 				cache := internalcache.New(ctx, nil, true, isCPGEnabled)
 
 				informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
@@ -837,15 +837,15 @@ func TestPreEnqueue(t *testing.T) {
 					if err != nil {
 						t.Fatalf("Failed to add podGroup %s to store: %v", pg.Name, err)
 					}
-					cache.AddPodGroup(pg)
+					cache.AddGenericPodGroup(schedulerframework.NewGenericPodGroup(pg))
 				}
 				if isCPGEnabled {
 					for _, cpg := range tt.initialCompositePodGroups {
 						err := informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer().GetStore().Add(cpg)
 						if err != nil {
-							t.Fatalf("Failed to add cpg %s to store: %v", cpg.Name, err)
+							t.Fatalf("Failed to add podGroup %s to store: %v", cpg.Name, err)
 						}
-						cache.AddCompositePodGroup(logger, cpg)
+						cache.AddGenericPodGroup(schedulerframework.NewGenericCompositePodGroup(cpg))
 					}
 				}
 
@@ -1017,8 +1017,6 @@ func TestPlacementFeasible(t *testing.T) {
 					namespace := "default"
 
 					pgInfo := &schedulerframework.PodGroupInfo{
-						Namespace:       namespace,
-						Name:            pgName,
 						UnscheduledPods: tc.unscheduledPods,
 					}
 
@@ -1031,8 +1029,7 @@ func TestPlacementFeasible(t *testing.T) {
 						} else {
 							cpg.Spec.SchedulingPolicy.Basic = &schedulingv1alpha3.CompositeBasicSchedulingPolicy{}
 						}
-						pgInfo.Type = fwk.CompositePodGroupKeyType
-						pgInfo.CompositePodGroup = cpg
+						pgInfo.GenericPodGroup = schedulerframework.NewGenericCompositePodGroup(cpg)
 						objs = append(objs, cpg)
 					} else {
 						pg := st.MakePodGroup().Namespace(namespace).Name(pgName).ParentCompositePodGroup("cpg-root").Obj()
@@ -1041,8 +1038,7 @@ func TestPlacementFeasible(t *testing.T) {
 						} else {
 							pg.Spec.SchedulingPolicy.Basic = &schedulingv1beta1.BasicSchedulingPolicy{}
 						}
-						pgInfo.Type = fwk.PodGroupKeyType
-						pgInfo.PodGroup = pg
+						pgInfo.GenericPodGroup = schedulerframework.NewGenericPodGroup(pg)
 						objs = append(objs, pg)
 					}
 

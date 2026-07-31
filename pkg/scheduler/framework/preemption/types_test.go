@@ -894,11 +894,11 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 			}
 
 			for _, pg := range pgs {
-				cache.AddPodGroup(pg)
+				cache.AddGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 			if tt.enableCompositePodGroup {
 				for _, cpg := range cpgs {
-					cache.AddCompositePodGroup(logger, cpg)
+					cache.AddGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 				}
 			}
 
@@ -1154,25 +1154,20 @@ func TestNewDomainVictim(t *testing.T) {
 }
 
 func newTestPodGroupInfo(pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup, pods []*v1.Pod) *framework.PodGroupInfo {
-	pgi := &framework.PodGroupInfo{
-		UnscheduledPods:   pods,
-		PodGroup:          pg,
-		CompositePodGroup: cpg,
-	}
 	if cpg != nil {
-		pgi.Name = cpg.Name
-		pgi.Namespace = cpg.Namespace
-		pgi.Type = fwk.CompositePodGroupKeyType
-		pgi.Children = []*framework.PodGroupInfo{
-			{
-				PodGroup:        &schedulingv1beta1.PodGroup{},
-				UnscheduledPods: pods,
+		return &framework.PodGroupInfo{
+			GenericPodGroup: framework.NewGenericCompositePodGroup(cpg),
+			UnscheduledPods: pods,
+			Children: []*framework.PodGroupInfo{
+				{
+					GenericPodGroup: framework.NewGenericPodGroup(&schedulingv1beta1.PodGroup{}),
+					UnscheduledPods: pods,
+				},
 			},
 		}
-	} else if pg != nil {
-		pgi.Name = pg.Name
-		pgi.Namespace = pg.Namespace
-		pgi.Type = fwk.PodGroupKeyType
 	}
-	return pgi
+	return &framework.PodGroupInfo{
+		GenericPodGroup: framework.NewGenericPodGroup(pg),
+		UnscheduledPods: pods,
+	}
 }
