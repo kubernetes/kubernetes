@@ -218,6 +218,9 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 				"kubelet_container_aligned_compute_resources_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::physical_cpu": timelessSample(1),
 				}),
+				"kubelet_container_aligned_compute_resources_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::physical_cpu": timelessSample(1),
+				}),
 				"kubelet_container_aligned_compute_resources_failure_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::physical_cpu": timelessSample(0),
 				}),
@@ -353,6 +356,9 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 				"kubelet_container_aligned_compute_resources_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::uncore_cache": timelessSample(1),
 				}),
+				"kubelet_container_aligned_compute_resources_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::uncore_cache": timelessSample(1),
+				}),
 			})
 
 			ginkgo.By("Giving the Kubelet time to update the alignment metrics")
@@ -376,6 +382,9 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			idFn := makeCustomPairID("scope", "boundary")
 			matchAlignmentMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 				"kubelet_container_aligned_compute_resources_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::uncore_cache": timelessSample(1),
+				}),
+				"kubelet_container_aligned_compute_resources_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::uncore_cache": timelessSample(1),
 				}),
 			})
@@ -404,6 +413,9 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			idFn := makeCustomPairID("scope", "boundary")
 			matchAlignmentMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 				"kubelet_container_aligned_compute_resources_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::uncore_cache": timelessSample(0),
+				}),
+				"kubelet_container_aligned_compute_resources_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::uncore_cache": timelessSample(0),
 				}),
 			})
