@@ -160,14 +160,6 @@ func (c *compositePodGroupStateContract) GetChildren() []fwk.EntityKey {
 	return nil
 }
 
-func (c *compositePodGroupStateContract) ReadyChildrenCount() int {
-	return 0
-}
-
-func (c *compositePodGroupStateContract) ScheduledChildrenCount() int {
-	return 0
-}
-
 type resourceSliceListerContract struct{}
 
 func (c *resourceSliceListerContract) ListWithDeviceTaintRules() ([]*resourceapi.ResourceSlice, error) {

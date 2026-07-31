@@ -224,17 +224,25 @@ type PodGroupManager interface {
 	BuildHierarchySnapshotFromPod(pod *v1.Pod) (PodGroupManager, error)
 	// GetRootKeyForGroup returns the root key of the given EntityKey.
 	GetRootKeyForGroup(key EntityKey) (EntityKey, bool, error)
-	// GetRootGroup returns the RootGroup containing the root key, PodGroup/PodGroupState (if root is a PodGroup),
-	// or CompositePodGroup/CompositePodGroupState (if root is a CompositePodGroup) for the given EntityKey.
+	// GetRootGroup traverses parent links from key to locate the top-most root entity in the hierarchy.
+	// It returns a RootGroup containing the root's EntityKey alongside its authoritative API object and cache state.
 	GetRootGroup(key EntityKey) (RootGroup, error)
 }
 
-// RootGroup contains the root key and the associated PodGroup or CompositePodGroup API object and state.
+// RootGroup represents the apex of a scheduling hierarchy for a given entity (Pod, PodGroup, or CompositePodGroup).
+// In a nested gang-scheduling tree, the root is the top-most ancestor with no parent CompositePodGroup.
+// A hierarchy may be rooted at either a standalone PodGroup or a CompositePodGroup. Exactly one pair of
+// (PodGroup, PodGroupState) or (CompositePodGroup, CompositePodGroupState) will be populated based on Key.Type.
 type RootGroup struct {
-	Key                    EntityKey
-	PodGroup               *schedulingapi.PodGroup
-	PodGroupState          PodGroupState
-	CompositePodGroup      *schedulingv1alpha3.CompositePodGroup
+	// Key identifies the root entity of the hierarchy (either a PodGroupKeyType or CompositePodGroupKeyType).
+	Key EntityKey
+	// PodGroup is populated when the hierarchy root is a standalone PodGroup (i.e. Key.Type == PodGroupKeyType).
+	PodGroup *schedulingapi.PodGroup
+	// PodGroupState holds the scheduler cache state corresponding to PodGroup when the root is a PodGroup.
+	PodGroupState PodGroupState
+	// CompositePodGroup is populated when the hierarchy root is a CompositePodGroup (i.e. Key.Type == CompositePodGroupKeyType).
+	CompositePodGroup *schedulingv1alpha3.CompositePodGroup
+	// CompositePodGroupState holds the scheduler cache state corresponding to CompositePodGroup when the root is a CompositePodGroup.
 	CompositePodGroupState CompositePodGroupState
 }
 
@@ -263,9 +271,4 @@ type PodGroupState interface {
 type CompositePodGroupState interface {
 	// GetChildren returns the keys of child groups.
 	GetChildren() []EntityKey
-	// ReadyChildrenCount returns the number of all ready child groups that are known to the scheduler.
-	// Ready is basically having at least 1 podgroup for basic podgroups and at least minGroupCount children for others.
-	ReadyChildrenCount() int
-	// ScheduledChildrenCount returns the number of scheduled ready child groups.
-	ScheduledChildrenCount() int
 }

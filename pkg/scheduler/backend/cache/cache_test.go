@@ -704,12 +704,9 @@ func Test_AddPodGroupMember(t *testing.T) {
 		name                    string
 		initPodGroup            *schedulingv1beta1.PodGroup
 		pod                     *v1.Pod
-		initCPGs                []*schedulingv1alpha3.CompositePodGroup
 		genericWorkloadEnabled  bool
 		expectInUnscheduledPods bool
 		expectInAssignedPods    bool
-		wantReadyChildren       map[fwk.EntityKey]int
-		wantScheduledChildren   map[fwk.EntityKey]int
 	}{
 		{
 			name:                   "add pod group member with GenericWorkload disabled should be no-op",
@@ -740,41 +737,12 @@ func Test_AddPodGroupMember(t *testing.T) {
 			genericWorkloadEnabled: true,
 			expectInAssignedPods:   true,
 		},
-		{
-			name:                    "add unscheduled pod group member bubbles up ready but not scheduled-ready",
-			initCPGs:                []*schedulingv1alpha3.CompositePodGroup{st.MakeCompositePodGroup().Name("cpg1").Namespace("namespace").Obj()},
-			initPodGroup:            st.MakePodGroup().Namespace("namespace").Name("pg").ParentCompositePodGroup("cpg1").MinCount(1).Obj(),
-			pod:                     unscheduledPodGroupMember,
-			genericWorkloadEnabled:  true,
-			expectInUnscheduledPods: true,
-			wantReadyChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("namespace", "cpg1"): 1,
-			},
-			wantScheduledChildren: map[fwk.EntityKey]int{},
-		},
-		{
-			name:                   "add assigned pod group member bubbles up both ready and scheduled-ready",
-			initCPGs:               []*schedulingv1alpha3.CompositePodGroup{st.MakeCompositePodGroup().Name("cpg1").Namespace("namespace").Obj()},
-			initPodGroup:           st.MakePodGroup().Namespace("namespace").Name("pg").ParentCompositePodGroup("cpg1").MinCount(1).Obj(),
-			pod:                    assignedPodGroupMember,
-			genericWorkloadEnabled: true,
-			expectInAssignedPods:   true,
-			wantReadyChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("namespace", "cpg1"): 1,
-			},
-			wantScheduledChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("namespace", "cpg1"): 1,
-			},
-		},
 	}
 
 	for _, tt := range tests {
 		for _, cpgEnabled := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%v, cpgEnabled=%v", tt.name, cpgEnabled), func(t *testing.T) {
 				cache := newCache(context.Background(), time.Second, nil, tt.genericWorkloadEnabled, cpgEnabled)
-				for _, cpg := range tt.initCPGs {
-					cache.AddCompositePodGroup(klog.Background(), cpg)
-				}
 				if tt.initPodGroup != nil {
 					cache.AddPodGroup(tt.initPodGroup)
 				}
@@ -800,42 +768,6 @@ func Test_AddPodGroupMember(t *testing.T) {
 
 				if inAssignedPods := podGroupState.AssignedPods().Has(tt.pod.UID); inAssignedPods != tt.expectInAssignedPods {
 					t.Errorf("expected pod in AssignedPods: %v, got %v", tt.expectInAssignedPods, inAssignedPods)
-				}
-
-				if tt.wantReadyChildren != nil {
-					gotReadiness := make(map[fwk.EntityKey]int)
-					if cpgEnabled {
-						for k, cpgs := range cache.compositePodGroupStates {
-							if rc := cpgs.ReadyChildrenCount(); rc > 0 {
-								gotReadiness[k] = rc
-							}
-						}
-					}
-					wantReady := tt.wantReadyChildren
-					if !cpgEnabled {
-						wantReady = map[fwk.EntityKey]int{}
-					}
-					if diff := cmp.Diff(wantReady, gotReadiness); diff != "" {
-						t.Errorf("Unexpected readiness (-want,+got)\n%s", diff)
-					}
-				}
-
-				if tt.wantScheduledChildren != nil {
-					gotScheduled := make(map[fwk.EntityKey]int)
-					if cpgEnabled {
-						for k, cpgs := range cache.compositePodGroupStates {
-							if sc := cpgs.ScheduledChildrenCount(); sc > 0 {
-								gotScheduled[k] = sc
-							}
-						}
-					}
-					wantSched := tt.wantScheduledChildren
-					if !cpgEnabled {
-						wantSched = map[fwk.EntityKey]int{}
-					}
-					if diff := cmp.Diff(wantSched, gotScheduled); diff != "" {
-						t.Errorf("Unexpected scheduled children (-want,+got)\n%s", diff)
-					}
 				}
 			})
 		}
@@ -864,13 +796,9 @@ func Test_UpdatePodGroupMember(t *testing.T) {
 		oldPod                  *v1.Pod
 		newPod                  *v1.Pod
 		genericWorkloadEnabled  bool
-		initCPGs                []*schedulingv1alpha3.CompositePodGroup
-		initPodGroup            *schedulingv1beta1.PodGroup
 		expectInAssumedPods     bool
 		expectInUnscheduledPods bool
 		expectInAssignedPods    bool
-		wantReadyChildren       map[fwk.EntityKey]int
-		wantScheduledChildren   map[fwk.EntityKey]int
 	}{
 		{
 			name:                   "update a pod group member with GenericWorkload disabled should be a no-op",
@@ -900,21 +828,6 @@ func Test_UpdatePodGroupMember(t *testing.T) {
 			genericWorkloadEnabled: true,
 			expectInAssignedPods:   true,
 		},
-		{
-			name:                   "update pod group member from unscheduled to assigned bubbles up scheduled-ready to CPG",
-			initCPGs:               []*schedulingv1alpha3.CompositePodGroup{st.MakeCompositePodGroup().Name("cpg1").Namespace("namespace").Obj()},
-			initPodGroup:           st.MakePodGroup().Namespace("namespace").Name("pg").ParentCompositePodGroup("cpg1").MinCount(1).Obj(),
-			oldPod:                 pod,
-			newPod:                 assignedPod,
-			genericWorkloadEnabled: true,
-			expectInAssignedPods:   true,
-			wantReadyChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("namespace", "cpg1"): 1,
-			},
-			wantScheduledChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("namespace", "cpg1"): 1,
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -922,12 +835,6 @@ func Test_UpdatePodGroupMember(t *testing.T) {
 			t.Run(fmt.Sprintf("%v, cpgEnabled=%v", tt.name, cpgEnabled), func(t *testing.T) {
 				logger, _ := ktesting.NewTestContext(t)
 				cache := newCache(context.Background(), time.Second, nil, tt.genericWorkloadEnabled, cpgEnabled)
-				for _, cpg := range tt.initCPGs {
-					cache.AddCompositePodGroup(logger, cpg)
-				}
-				if tt.initPodGroup != nil {
-					cache.AddPodGroup(tt.initPodGroup)
-				}
 				cache.AddPodGroupMember(tt.oldPod)
 
 				newPod := tt.newPod
@@ -966,42 +873,6 @@ func Test_UpdatePodGroupMember(t *testing.T) {
 				if diff := cmp.Diff(tt.newPod, gotPod); diff != "" {
 					t.Errorf("stored pod does not match newPod (-want +got):\n%s", diff)
 				}
-
-				if tt.wantReadyChildren != nil {
-					gotReadiness := make(map[fwk.EntityKey]int)
-					if cpgEnabled {
-						for k, cpgs := range cache.compositePodGroupStates {
-							if rc := cpgs.ReadyChildrenCount(); rc > 0 {
-								gotReadiness[k] = rc
-							}
-						}
-					}
-					wantReady := tt.wantReadyChildren
-					if !cpgEnabled {
-						wantReady = map[fwk.EntityKey]int{}
-					}
-					if diff := cmp.Diff(wantReady, gotReadiness); diff != "" {
-						t.Errorf("Unexpected readiness (-want,+got)\n%s", diff)
-					}
-				}
-
-				if tt.wantScheduledChildren != nil {
-					gotScheduled := make(map[fwk.EntityKey]int)
-					if cpgEnabled {
-						for k, cpgs := range cache.compositePodGroupStates {
-							if sc := cpgs.ScheduledChildrenCount(); sc > 0 {
-								gotScheduled[k] = sc
-							}
-						}
-					}
-					wantSched := tt.wantScheduledChildren
-					if !cpgEnabled {
-						wantSched = map[fwk.EntityKey]int{}
-					}
-					if diff := cmp.Diff(wantSched, gotScheduled); diff != "" {
-						t.Errorf("Unexpected scheduled children (-want,+got)\n%s", diff)
-					}
-				}
 			})
 		}
 	}
@@ -1020,11 +891,8 @@ func Test_RemovePodGroupMember(t *testing.T) {
 		initPods                 []*v1.Pod
 		initPodGroup             *schedulingv1beta1.PodGroup
 		podToDelete              *v1.Pod
-		initCPGs                 []*schedulingv1alpha3.CompositePodGroup
 		expectPodGroupStateCount int
 		genericWorkloadEnabled   bool
-		wantReadyChildren        map[fwk.EntityKey]int
-		wantScheduledChildren    map[fwk.EntityKey]int
 	}{
 		{
 			name:                     "remove a pod from a group with multiple pods",
@@ -1061,17 +929,6 @@ func Test_RemovePodGroupMember(t *testing.T) {
 			podToDelete:              pod1,
 			genericWorkloadEnabled:   false,
 		},
-		{
-			name:                     "remove assigned pod group member bubbles down readiness and scheduled-readiness",
-			initCPGs:                 []*schedulingv1alpha3.CompositePodGroup{st.MakeCompositePodGroup().Name("cpg1").Namespace("namespace").Obj()},
-			initPods:                 []*v1.Pod{pod2},
-			initPodGroup:             st.MakePodGroup().Namespace("namespace").Name(podGroupName).ParentCompositePodGroup("cpg1").MinCount(1).Obj(),
-			podToDelete:              pod2,
-			expectPodGroupStateCount: 1,
-			genericWorkloadEnabled:   true,
-			wantReadyChildren:        map[fwk.EntityKey]int{},
-			wantScheduledChildren:    map[fwk.EntityKey]int{},
-		},
 	}
 
 	for _, tt := range tests {
@@ -1079,9 +936,6 @@ func Test_RemovePodGroupMember(t *testing.T) {
 			t.Run(fmt.Sprintf("%v, cpgEnabled=%v", tt.name, cpgEnabled), func(t *testing.T) {
 				cache := newCache(context.Background(), time.Second, nil, tt.genericWorkloadEnabled, cpgEnabled)
 
-				for _, cpg := range tt.initCPGs {
-					cache.AddCompositePodGroup(klog.Background(), cpg)
-				}
 				if tt.initPodGroup != nil {
 					cache.AddPodGroup(tt.initPodGroup)
 				}
@@ -1095,42 +949,6 @@ func Test_RemovePodGroupMember(t *testing.T) {
 				podGroupStateCount := len(cache.podGroupStates)
 				if podGroupStateCount != tt.expectPodGroupStateCount {
 					t.Errorf("expected %d pod groups remaining, got %d", tt.expectPodGroupStateCount, podGroupStateCount)
-				}
-
-				if tt.wantReadyChildren != nil {
-					gotReadiness := make(map[fwk.EntityKey]int)
-					if cpgEnabled {
-						for k, cpgs := range cache.compositePodGroupStates {
-							if rc := cpgs.ReadyChildrenCount(); rc > 0 {
-								gotReadiness[k] = rc
-							}
-						}
-					}
-					wantReady := tt.wantReadyChildren
-					if !cpgEnabled {
-						wantReady = map[fwk.EntityKey]int{}
-					}
-					if diff := cmp.Diff(wantReady, gotReadiness); diff != "" {
-						t.Errorf("Unexpected readiness (-want,+got)\n%s", diff)
-					}
-				}
-
-				if tt.wantScheduledChildren != nil {
-					gotScheduled := make(map[fwk.EntityKey]int)
-					if cpgEnabled {
-						for k, cpgs := range cache.compositePodGroupStates {
-							if sc := cpgs.ScheduledChildrenCount(); sc > 0 {
-								gotScheduled[k] = sc
-							}
-						}
-					}
-					wantSched := tt.wantScheduledChildren
-					if !cpgEnabled {
-						wantSched = map[fwk.EntityKey]int{}
-					}
-					if diff := cmp.Diff(wantSched, gotScheduled); diff != "" {
-						t.Errorf("Unexpected scheduled children (-want,+got)\n%s", diff)
-					}
 				}
 
 				if podGroupStateCount == 0 {
@@ -1171,8 +989,6 @@ func Test_AddPodGroup(t *testing.T) {
 		podGroupsToAdd           []*schedulingv1beta1.PodGroup
 		wantPodGroups            map[fwk.EntityKey]*schedulingv1beta1.PodGroup
 		wantChildren             map[fwk.EntityKey]sets.Set[fwk.EntityKey]
-		wantReadyChildren        map[fwk.EntityKey]int
-		wantScheduledChildren    map[fwk.EntityKey]int
 	}{
 		{
 			name:                     "add pod group with GenericWorkload disabled should be no-op",
@@ -1276,83 +1092,6 @@ func Test_AddPodGroup(t *testing.T) {
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
-		{
-			name:                     "add ready pod group with parent bubbles up readiness",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: true,
-			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpgChild},
-			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{st.MakePodGroup().Name("pgReady").Namespace("ns1").UID("uidR").ParentCompositePodGroup("cpgChild").MinCount(0).Obj()},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pgReady"): st.MakePodGroup().Name("pgReady").Namespace("ns1").UID("uidR").ParentCompositePodGroup("cpgChild").MinCount(0).Obj(),
-			},
-			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
-				fwk.CompositePodGroupKey("ns1", "cpgChild"): sets.New(
-					fwk.PodGroupKey("ns1", "pgReady"),
-				),
-				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(
-					fwk.CompositePodGroupKey("ns1", "cpgChild"),
-				),
-			},
-			wantReadyChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("ns1", "cpgChild"): 1,
-				fwk.CompositePodGroupKey("ns1", "cpg1"):     1,
-			},
-			wantScheduledChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("ns1", "cpgChild"): 1,
-				fwk.CompositePodGroupKey("ns1", "cpg1"):     1,
-			},
-		},
-		{
-			name:                     "add pod group with unscheduled member bubbles up ready but not scheduled-ready",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: true,
-			initPod:                  st.MakePod().Name("pUnscheduled").Namespace("ns1").PodGroupName("pgMember").Obj(),
-			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpgChild},
-			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{st.MakePodGroup().Name("pgMember").Namespace("ns1").UID("uidM").ParentCompositePodGroup("cpgChild").MinCount(1).Obj()},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pgMember"): st.MakePodGroup().Name("pgMember").Namespace("ns1").UID("uidM").ParentCompositePodGroup("cpgChild").MinCount(1).Obj(),
-			},
-			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
-				fwk.CompositePodGroupKey("ns1", "cpgChild"): sets.New(
-					fwk.PodGroupKey("ns1", "pgMember"),
-				),
-				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(
-					fwk.CompositePodGroupKey("ns1", "cpgChild"),
-				),
-			},
-			wantReadyChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("ns1", "cpgChild"): 1,
-				fwk.CompositePodGroupKey("ns1", "cpg1"):     1,
-			},
-			wantScheduledChildren: map[fwk.EntityKey]int{},
-		},
-		{
-			name:                     "add pod group with assigned member bubbles up both ready and scheduled-ready",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: true,
-			initPod:                  st.MakePod().Name("pAssigned").Namespace("ns1").Node("node1").PodGroupName("pgAssigned").Obj(),
-			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpgChild},
-			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{st.MakePodGroup().Name("pgAssigned").Namespace("ns1").UID("uidA").ParentCompositePodGroup("cpgChild").MinCount(1).Obj()},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pgAssigned"): st.MakePodGroup().Name("pgAssigned").Namespace("ns1").UID("uidA").ParentCompositePodGroup("cpgChild").MinCount(1).Obj(),
-			},
-			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
-				fwk.CompositePodGroupKey("ns1", "cpgChild"): sets.New(
-					fwk.PodGroupKey("ns1", "pgAssigned"),
-				),
-				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(
-					fwk.CompositePodGroupKey("ns1", "cpgChild"),
-				),
-			},
-			wantReadyChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("ns1", "cpgChild"): 1,
-				fwk.CompositePodGroupKey("ns1", "cpg1"):     1,
-			},
-			wantScheduledChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("ns1", "cpgChild"): 1,
-				fwk.CompositePodGroupKey("ns1", "cpg1"):     1,
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -1398,17 +1137,6 @@ func Test_AddPodGroup(t *testing.T) {
 			if diff := cmp.Diff(tt.wantChildren, gotChildren); diff != "" {
 				t.Errorf("Unexpected children (-want,+got)\n%s", diff)
 			}
-			if tt.wantReadyChildren != nil {
-				gotReadiness := make(map[fwk.EntityKey]int)
-				for k, cpgs := range cache.compositePodGroupStates {
-					if rc := cpgs.ReadyChildrenCount(); rc > 0 {
-						gotReadiness[k] = rc
-					}
-				}
-				if diff := cmp.Diff(tt.wantReadyChildren, gotReadiness); diff != "" {
-					t.Errorf("Unexpected readiness (-want,+got)\n%s", diff)
-				}
-			}
 		})
 	}
 }
@@ -1424,8 +1152,6 @@ func Test_UpdatePodGroup(t *testing.T) {
 		newPodGroup            *schedulingv1beta1.PodGroup
 		genericWorkloadEnabled bool
 		expectPodGroup         *schedulingv1beta1.PodGroup
-		wantReadyChildren      map[fwk.EntityKey]int
-		wantScheduledChildren  map[fwk.EntityKey]int
 	}{
 		{
 			name:                   "update pod group with GenericWorkload disabled should be no-op",
@@ -1440,20 +1166,6 @@ func Test_UpdatePodGroup(t *testing.T) {
 			newPodGroup:            newPodGroup,
 			genericWorkloadEnabled: true,
 			expectPodGroup:         newPodGroup,
-		},
-		{
-			name:                   "update pod group changes readiness and bubbles up",
-			genericWorkloadEnabled: true,
-			initPodGroup:           st.MakePodGroup().Name("pgReady").Namespace("ns").UID("uidR").ParentCompositePodGroup("cpg1").MinCount(2).Obj(),
-			oldPodGroup:            st.MakePodGroup().Name("pgReady").Namespace("ns").UID("uidR").ParentCompositePodGroup("cpg1").MinCount(2).Obj(),
-			newPodGroup:            st.MakePodGroup().Name("pgReady").Namespace("ns").UID("uidR").ParentCompositePodGroup("cpg1").MinCount(0).Obj(),
-			expectPodGroup:         st.MakePodGroup().Name("pgReady").Namespace("ns").UID("uidR").ParentCompositePodGroup("cpg1").MinCount(0).Obj(),
-			wantReadyChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("ns", "cpg1"): 1,
-			},
-			wantScheduledChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("ns", "cpg1"): 1,
-			},
 		},
 	}
 
@@ -1503,8 +1215,6 @@ func Test_RemovePodGroup(t *testing.T) {
 		expectPodsCount          int
 		wantPodGroups            map[fwk.EntityKey]*schedulingv1beta1.PodGroup
 		wantChildren             map[fwk.EntityKey]sets.Set[fwk.EntityKey]
-		wantReadyChildren        map[fwk.EntityKey]int
-		wantScheduledChildren    map[fwk.EntityKey]int
 	}{
 		{
 			name:                     "remove pod group with GenericWorkload disabled should be no-op",
@@ -1554,19 +1264,6 @@ func Test_RemovePodGroup(t *testing.T) {
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				cpg1Key: sets.New(fwk.CompositePodGroupKey("ns1", "cpgChild")),
 			},
-		},
-		{
-			name:                     "remove ready pod group with parent bubbles down readiness",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: true,
-			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{st.MakeCompositePodGroup().Name("cpg1").Namespace("ns").Obj()},
-			initialPodGroups:         []*schedulingv1beta1.PodGroup{st.MakePodGroup().Name("pgReady").Namespace("ns").UID("uidR").ParentCompositePodGroup("cpg1").MinCount(0).Obj()},
-			podGroupToDelete:         st.MakePodGroup().Name("pgReady").Namespace("ns").UID("uidR").ParentCompositePodGroup("cpg1").MinCount(0).Obj(),
-			expectStateExists:        "false",
-			wantPodGroups:            map[fwk.EntityKey]*schedulingv1beta1.PodGroup{},
-			wantChildren:             map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
-			wantReadyChildren:        map[fwk.EntityKey]int{},
-			wantScheduledChildren:    map[fwk.EntityKey]int{},
 		},
 	}
 
@@ -1631,28 +1328,6 @@ func Test_RemovePodGroup(t *testing.T) {
 				}
 				if diff := cmp.Diff(tt.wantChildren, gotChildren); diff != "" {
 					t.Errorf("Unexpected children (-want,+got)\\n%s", diff)
-				}
-			}
-			if tt.wantReadyChildren != nil {
-				gotReadiness := make(map[fwk.EntityKey]int)
-				for k, cpgs := range cache.compositePodGroupStates {
-					if rc := cpgs.ReadyChildrenCount(); rc > 0 {
-						gotReadiness[k] = rc
-					}
-				}
-				if diff := cmp.Diff(tt.wantReadyChildren, gotReadiness); diff != "" {
-					t.Errorf("Unexpected readiness (-want,+got)\n%s", diff)
-				}
-			}
-			if tt.wantScheduledChildren != nil {
-				gotScheduled := make(map[fwk.EntityKey]int)
-				for k, cpgs := range cache.compositePodGroupStates {
-					if sc := cpgs.ScheduledChildrenCount(); sc > 0 {
-						gotScheduled[k] = sc
-					}
-				}
-				if diff := cmp.Diff(tt.wantScheduledChildren, gotScheduled); diff != "" {
-					t.Errorf("Unexpected scheduled children (-want,+got)\n%s", diff)
 				}
 			}
 		})
@@ -1948,13 +1623,9 @@ func TestForgetPodGroupMember(t *testing.T) {
 	tests := []struct {
 		name                   string
 		pod                    *v1.Pod
-		initCPGs               []*schedulingv1alpha3.CompositePodGroup
-		initPodGroup           *schedulingv1beta1.PodGroup
 		expectInAssigned       bool
 		expectInUnscheduled    bool
 		genericWorkloadEnabled bool
-		wantReadyChildren      map[fwk.EntityKey]int
-		wantScheduledChildren  map[fwk.EntityKey]int
 	}{
 		{
 			name: "forget pod group member with GenericWorkload disabled",
@@ -1972,18 +1643,6 @@ func TestForgetPodGroupMember(t *testing.T) {
 			genericWorkloadEnabled: true,
 			expectInAssigned:       true,
 		},
-		{
-			name:                   "forget pod group member bubbles down scheduled-ready on CPG",
-			initCPGs:               []*schedulingv1alpha3.CompositePodGroup{st.MakeCompositePodGroup().Name("cpg1").Namespace("test-ns").Obj()},
-			initPodGroup:           st.MakePodGroup().Namespace("test-ns").Name("pg").ParentCompositePodGroup("cpg1").MinCount(1).Obj(),
-			pod:                    pod,
-			genericWorkloadEnabled: true,
-			expectInUnscheduled:    true,
-			wantReadyChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("test-ns", "cpg1"): 1,
-			},
-			wantScheduledChildren: map[fwk.EntityKey]int{},
-		},
 	}
 
 	for _, tt := range tests {
@@ -1994,12 +1653,6 @@ func TestForgetPodGroupMember(t *testing.T) {
 				defer cancel()
 
 				cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled, cpgEnabled)
-				for _, cpg := range tt.initCPGs {
-					cache.AddCompositePodGroup(logger, cpg)
-				}
-				if tt.initPodGroup != nil {
-					cache.AddPodGroup(tt.initPodGroup)
-				}
 				cache.AddPodGroupMember(tt.pod)
 				if err := cache.AssumePod(logger, podWithNodeName); err != nil {
 					t.Fatalf("AssumePod failed: %v", err)
@@ -2030,42 +1683,6 @@ func TestForgetPodGroupMember(t *testing.T) {
 				}
 				if inUnscheduled := pgs.UnscheduledPods()[tt.pod.Name] != nil; inUnscheduled != tt.expectInUnscheduled {
 					t.Errorf("pod in unscheduledPods: got %v, want %v", inUnscheduled, tt.expectInUnscheduled)
-				}
-
-				if tt.wantReadyChildren != nil {
-					gotReadiness := make(map[fwk.EntityKey]int)
-					if cpgEnabled {
-						for k, cpgs := range cache.compositePodGroupStates {
-							if rc := cpgs.ReadyChildrenCount(); rc > 0 {
-								gotReadiness[k] = rc
-							}
-						}
-					}
-					wantReady := tt.wantReadyChildren
-					if !cpgEnabled {
-						wantReady = map[fwk.EntityKey]int{}
-					}
-					if diff := cmp.Diff(wantReady, gotReadiness); diff != "" {
-						t.Errorf("Unexpected readiness (-want,+got)\n%s", diff)
-					}
-				}
-
-				if tt.wantScheduledChildren != nil {
-					gotScheduled := make(map[fwk.EntityKey]int)
-					if cpgEnabled {
-						for k, cpgs := range cache.compositePodGroupStates {
-							if sc := cpgs.ScheduledChildrenCount(); sc > 0 {
-								gotScheduled[k] = sc
-							}
-						}
-					}
-					wantSched := tt.wantScheduledChildren
-					if !cpgEnabled {
-						wantSched = map[fwk.EntityKey]int{}
-					}
-					if diff := cmp.Diff(wantSched, gotScheduled); diff != "" {
-						t.Errorf("Unexpected scheduled children (-want,+got)\n%s", diff)
-					}
 				}
 			})
 		}
@@ -2188,12 +1805,8 @@ func TestAssumePodGroupMember(t *testing.T) {
 		name                   string
 		genericWorkloadEnabled bool
 		pod                    *v1.Pod
-		initCPGs               []*schedulingv1alpha3.CompositePodGroup
-		initPodGroup           *schedulingv1beta1.PodGroup
 		expectInAssumed        bool
 		expectInAssigned       bool
-		wantReadyChildren      map[fwk.EntityKey]int
-		wantScheduledChildren  map[fwk.EntityKey]int
 	}{
 		{
 			name: "assume a pod group member with GenericWorkload disabled",
@@ -2211,20 +1824,6 @@ func TestAssumePodGroupMember(t *testing.T) {
 			genericWorkloadEnabled: true,
 			expectInAssigned:       true,
 		},
-		{
-			name:                   "assume pod group member bubbles up scheduled-ready to CPG",
-			initCPGs:               []*schedulingv1alpha3.CompositePodGroup{st.MakeCompositePodGroup().Name("cpg1").Namespace("test-ns").Obj()},
-			initPodGroup:           st.MakePodGroup().Namespace("test-ns").Name("pg").ParentCompositePodGroup("cpg1").MinCount(1).Obj(),
-			pod:                    pod,
-			genericWorkloadEnabled: true,
-			expectInAssumed:        true,
-			wantReadyChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("test-ns", "cpg1"): 1,
-			},
-			wantScheduledChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("test-ns", "cpg1"): 1,
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -2235,12 +1834,6 @@ func TestAssumePodGroupMember(t *testing.T) {
 				defer cancel()
 
 				cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled, cpgEnabled)
-				for _, cpg := range tt.initCPGs {
-					cache.AddCompositePodGroup(logger, cpg)
-				}
-				if tt.initPodGroup != nil {
-					cache.AddPodGroup(tt.initPodGroup)
-				}
 				cache.AddPodGroupMember(tt.pod)
 
 				if err := cache.AssumePod(logger, podWithNodeName); err != nil {
@@ -2264,42 +1857,6 @@ func TestAssumePodGroupMember(t *testing.T) {
 				}
 				if inAssumed := pgs.AssumedPods().Has(tt.pod.UID); inAssumed != tt.expectInAssumed {
 					t.Errorf("pod in assumedPods: got %v, want %v", inAssumed, tt.expectInAssumed)
-				}
-
-				if tt.wantReadyChildren != nil {
-					gotReadiness := make(map[fwk.EntityKey]int)
-					if cpgEnabled {
-						for k, cpgs := range cache.compositePodGroupStates {
-							if rc := cpgs.ReadyChildrenCount(); rc > 0 {
-								gotReadiness[k] = rc
-							}
-						}
-					}
-					wantReady := tt.wantReadyChildren
-					if !cpgEnabled {
-						wantReady = map[fwk.EntityKey]int{}
-					}
-					if diff := cmp.Diff(wantReady, gotReadiness); diff != "" {
-						t.Errorf("Unexpected readiness (-want,+got)\n%s", diff)
-					}
-				}
-
-				if tt.wantScheduledChildren != nil {
-					gotScheduled := make(map[fwk.EntityKey]int)
-					if cpgEnabled {
-						for k, cpgs := range cache.compositePodGroupStates {
-							if sc := cpgs.ScheduledChildrenCount(); sc > 0 {
-								gotScheduled[k] = sc
-							}
-						}
-					}
-					wantSched := tt.wantScheduledChildren
-					if !cpgEnabled {
-						wantSched = map[fwk.EntityKey]int{}
-					}
-					if diff := cmp.Diff(wantSched, gotScheduled); diff != "" {
-						t.Errorf("Unexpected scheduled children (-want,+got)\n%s", diff)
-					}
 				}
 			})
 		}
@@ -3765,13 +3322,11 @@ func Test_AddCompositePodGroup(t *testing.T) {
 	cpg1Key := fwk.CompositePodGroupKey("ns1", "cpg1")
 
 	tests := []struct {
-		name                  string
-		initialPGs            []*schedulingv1beta1.PodGroup
-		cpgsToAdd             []*schedulingv1alpha3.CompositePodGroup
-		wantCPGs              map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup
-		wantChildren          map[fwk.EntityKey]sets.Set[fwk.EntityKey]
-		wantReadyChildren     map[fwk.EntityKey]int
-		wantScheduledChildren map[fwk.EntityKey]int
+		name         string
+		initialPGs   []*schedulingv1beta1.PodGroup
+		cpgsToAdd    []*schedulingv1alpha3.CompositePodGroup
+		wantCPGs     map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup
+		wantChildren map[fwk.EntityKey]sets.Set[fwk.EntityKey]
 	}{
 		{
 			name:      "add multiple composite pod groups",
@@ -3810,26 +3365,6 @@ func Test_AddCompositePodGroup(t *testing.T) {
 				),
 			},
 		},
-		{
-			name: "add ready composite pod group with parent bubbles up readiness",
-			cpgsToAdd: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpgReady").Namespace("ns1").ParentCompositePodGroup("cpg1").MinGroupCount(0).Obj(),
-			},
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
-				fwk.CompositePodGroupKey("ns1", "cpgReady"): st.MakeCompositePodGroup().Name("cpgReady").Namespace("ns1").ParentCompositePodGroup("cpg1").MinGroupCount(0).Obj(),
-			},
-			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
-				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(
-					fwk.CompositePodGroupKey("ns1", "cpgReady"),
-				),
-			},
-			wantReadyChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("ns1", "cpg1"): 1,
-			},
-			wantScheduledChildren: map[fwk.EntityKey]int{
-				fwk.CompositePodGroupKey("ns1", "cpg1"): 1,
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -3863,28 +3398,6 @@ func Test_AddCompositePodGroup(t *testing.T) {
 			if diff := cmp.Diff(tt.wantChildren, gotChildren); diff != "" {
 				t.Errorf("Unexpected children (-want,+got)\\n%s", diff)
 			}
-			if tt.wantReadyChildren != nil {
-				gotReadiness := make(map[fwk.EntityKey]int)
-				for k, cpgs := range cache.compositePodGroupStates {
-					if rc := cpgs.ReadyChildrenCount(); rc > 0 {
-						gotReadiness[k] = rc
-					}
-				}
-				if diff := cmp.Diff(tt.wantReadyChildren, gotReadiness); diff != "" {
-					t.Errorf("Unexpected readiness (-want,+got)\n%s", diff)
-				}
-			}
-			if tt.wantScheduledChildren != nil {
-				gotScheduled := make(map[fwk.EntityKey]int)
-				for k, cpgs := range cache.compositePodGroupStates {
-					if sc := cpgs.ScheduledChildrenCount(); sc > 0 {
-						gotScheduled[k] = sc
-					}
-				}
-				if diff := cmp.Diff(tt.wantScheduledChildren, gotScheduled); diff != "" {
-					t.Errorf("Unexpected scheduled children (-want,+got)\n%s", diff)
-				}
-			}
 		})
 	}
 }
@@ -3903,14 +3416,12 @@ func Test_RemoveCompositePodGroup(t *testing.T) {
 	cpgMidKey := fwk.CompositePodGroupKey("ns1", "cpgMid")
 
 	tests := []struct {
-		name                  string
-		initialPGs            []*schedulingv1beta1.PodGroup
-		initialCPGs           []*schedulingv1alpha3.CompositePodGroup
-		cpgToDelete           *schedulingv1alpha3.CompositePodGroup
-		wantCPGs              map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup
-		wantChildren          map[fwk.EntityKey]sets.Set[fwk.EntityKey]
-		wantReadyChildren     map[fwk.EntityKey]int
-		wantScheduledChildren map[fwk.EntityKey]int
+		name         string
+		initialPGs   []*schedulingv1beta1.PodGroup
+		initialCPGs  []*schedulingv1alpha3.CompositePodGroup
+		cpgToDelete  *schedulingv1alpha3.CompositePodGroup
+		wantCPGs     map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup
+		wantChildren map[fwk.EntityKey]sets.Set[fwk.EntityKey]
 	}{
 		{
 			name:         "delete composite pod group with parent, cleans up children map",
@@ -3946,20 +3457,6 @@ func Test_RemoveCompositePodGroup(t *testing.T) {
 				cpgMidKey: sets.New(fwk.PodGroupKey("ns1", "pgLeaf")),
 			},
 		},
-		{
-			name: "remove ready composite pod group with parent bubbles down readiness",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").Obj(),
-				st.MakeCompositePodGroup().Name("cpgReady").Namespace("ns1").ParentCompositePodGroup("cpg1").MinGroupCount(0).Obj(),
-			},
-			cpgToDelete: st.MakeCompositePodGroup().Name("cpgReady").Namespace("ns1").ParentCompositePodGroup("cpg1").MinGroupCount(0).Obj(),
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
-				fwk.CompositePodGroupKey("ns1", "cpg1"): st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").Obj(),
-			},
-			wantChildren:          map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
-			wantReadyChildren:     map[fwk.EntityKey]int{},
-			wantScheduledChildren: map[fwk.EntityKey]int{},
-		},
 	}
 
 	for _, tt := range tests {
@@ -3994,28 +3491,6 @@ func Test_RemoveCompositePodGroup(t *testing.T) {
 			}
 			if diff := cmp.Diff(tt.wantChildren, gotChildren); diff != "" {
 				t.Errorf("Unexpected children (-want,+got)\\n%s", diff)
-			}
-			if tt.wantReadyChildren != nil {
-				gotReadiness := make(map[fwk.EntityKey]int)
-				for k, cpgs := range cache.compositePodGroupStates {
-					if rc := cpgs.ReadyChildrenCount(); rc > 0 {
-						gotReadiness[k] = rc
-					}
-				}
-				if diff := cmp.Diff(tt.wantReadyChildren, gotReadiness); diff != "" {
-					t.Errorf("Unexpected readiness (-want,+got)\n%s", diff)
-				}
-			}
-			if tt.wantScheduledChildren != nil {
-				gotScheduled := make(map[fwk.EntityKey]int)
-				for k, cpgs := range cache.compositePodGroupStates {
-					if sc := cpgs.ScheduledChildrenCount(); sc > 0 {
-						gotScheduled[k] = sc
-					}
-				}
-				if diff := cmp.Diff(tt.wantScheduledChildren, gotScheduled); diff != "" {
-					t.Errorf("Unexpected scheduled children (-want,+got)\n%s", diff)
-				}
 			}
 		})
 	}

@@ -919,17 +919,7 @@ func (cache *cacheImpl) addPodGroupMember(pod *v1.Pod) {
 		cache.podGroupStates[key] = podGroupState
 	}
 
-	// Capture readiness before mutating podGroupState so we only propagate a count delta
-	// to parent CompositePodGroups if adding this pod caused a ready state transition.
-	wasReady := cache.isPGReady(podGroupState)
-	wasScheduledReady := cache.isPGScheduled(podGroupState)
-
 	podGroupState.addPod(pod)
-
-	if cache.compositePodGroupEnabled {
-		cache.propagateReadinessUpdate(key, wasReady)
-		cache.propagateScheduledUpdate(key, wasScheduledReady)
-	}
 }
 
 // updatePodGroupMember updates the pod entry inside its pod group state.
@@ -942,15 +932,7 @@ func (cache *cacheImpl) updatePodGroupMember(logger klog.Logger, oldPod, newPod 
 		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for update, this indicates a missed add event", "pod", klog.KObj(newPod), "fwk.EntityKey", key)
 		return
 	}
-	// Capture scheduled readiness before update so we only propagate a count delta
-	// to parent CompositePodGroups if updating this pod caused a scheduled ready transition.
-	wasScheduledReady := cache.isPGScheduled(podGroupState)
-
 	podGroupState.updatePod(oldPod, newPod)
-
-	if cache.compositePodGroupEnabled {
-		cache.propagateScheduledUpdate(key, wasScheduledReady)
-	}
 }
 
 // removePodGroupMember removes the pod from its pod group state, deleting the group entry when empty.
@@ -961,17 +943,8 @@ func (cache *cacheImpl) removePodGroupMember(pod *v1.Pod) {
 	if !exists {
 		return
 	}
-	// Capture readiness before mutating podGroupState so we only propagate a count delta
-	// to parent CompositePodGroups if removing this pod caused a ready state transition.
-	wasReady := cache.isPGReady(podGroupState)
-	wasScheduledReady := cache.isPGScheduled(podGroupState)
-
 	podGroupState.deletePod(pod.UID)
 
-	if cache.compositePodGroupEnabled {
-		cache.propagateReadinessUpdate(key, wasReady)
-		cache.propagateScheduledUpdate(key, wasScheduledReady)
-	}
 	if podGroupState.empty() {
 		// podGroupState can exist without the member pods, but when the PodGroup object exists.
 		// Only when there are no member pods and the PodGroup object is removed, the podGroupState can be removed.
@@ -990,15 +963,7 @@ func (cache *cacheImpl) assumePodGroupMember(pod *v1.Pod) {
 		cache.podGroupStates[key] = podGroupState
 	}
 
-	// Capture scheduled readiness before assumption so we only propagate a count delta
-	// to parent CompositePodGroups if assuming this pod caused a scheduled ready transition.
-	wasScheduledReady := cache.isPGScheduled(podGroupState)
-
 	podGroupState.assumePod(pod)
-
-	if cache.compositePodGroupEnabled {
-		cache.propagateScheduledUpdate(key, wasScheduledReady)
-	}
 }
 
 // forgetPodGroupMember moves the pod back from assumed to unscheduled in its pod group state.
@@ -1011,15 +976,7 @@ func (cache *cacheImpl) forgetPodGroupMember(logger klog.Logger, pod *v1.Pod) {
 		return
 	}
 
-	// Capture scheduled readiness before forgetting pod so we only propagate a count delta
-	// to parent CompositePodGroups if forgetting this pod caused a scheduled ready transition.
-	wasScheduledReady := cache.isPGScheduled(pgs)
-
 	pgs.forgetPod(pod.UID)
-
-	if cache.compositePodGroupEnabled {
-		cache.propagateScheduledUpdate(key, wasScheduledReady)
-	}
 }
 
 // PodGroupStates returns the PodGroupStateLister for this cache.
@@ -1152,95 +1109,6 @@ func (cache *cacheImpl) refreshPVCRefCountsDelta(nodeInfo *framework.NodeInfo, s
 	}
 }
 
-// isPGReady returns whether the PodGroup has met its Gang Scheduling minCount threshold.
-func (cache *cacheImpl) isPGReady(pgs *podGroupState) bool {
-	pgs.lock.RLock()
-	defer pgs.lock.RUnlock()
-
-	if pgs.podGroup == nil {
-		return false
-	}
-	minCount := 1
-	if pgs.podGroup.Spec.SchedulingPolicy.Gang != nil {
-		minCount = int(pgs.podGroup.Spec.SchedulingPolicy.Gang.MinCount)
-	}
-	return pgs.podGroupStateData.allPodsCount() >= minCount
-}
-
-// isPGScheduled returns whether the PodGroup has met its Gang Scheduling minCount threshold for scheduled pods (assumed or assigned).
-func (cache *cacheImpl) isPGScheduled(pgs *podGroupState) bool {
-	pgs.lock.RLock()
-	defer pgs.lock.RUnlock()
-
-	if pgs.podGroup == nil {
-		return false
-	}
-	minCount := 1
-	if pgs.podGroup.Spec.SchedulingPolicy.Gang != nil {
-		minCount = int(pgs.podGroup.Spec.SchedulingPolicy.Gang.MinCount)
-	}
-	return pgs.podGroupStateData.scheduledPodsCount() >= minCount
-}
-
-// isCPGReady returns whether the CompositePodGroup has met its Gang Scheduling minGroupCount threshold.
-func (cache *cacheImpl) isCPGReady(cpgs *compositePodGroupState) bool {
-	cpgs.lock.RLock()
-	defer cpgs.lock.RUnlock()
-
-	if cpgs.compositePodGroup == nil {
-		return false
-	}
-	minGroupCount := 1
-	if cpgs.compositePodGroup.Spec.SchedulingPolicy.Gang != nil {
-		minGroupCount = int(cpgs.compositePodGroup.Spec.SchedulingPolicy.Gang.MinGroupCount)
-	}
-	return cpgs.compositePodGroupStateData.readyChildren >= minGroupCount
-}
-
-// isCPGScheduled returns whether the CompositePodGroup has met its Gang Scheduling minGroupCount threshold for scheduled child groups.
-func (cache *cacheImpl) isCPGScheduled(cpgs *compositePodGroupState) bool {
-	cpgs.lock.RLock()
-	defer cpgs.lock.RUnlock()
-
-	if cpgs.compositePodGroup == nil {
-		return false
-	}
-	minGroupCount := 1
-	if cpgs.compositePodGroup.Spec.SchedulingPolicy.Gang != nil {
-		minGroupCount = int(cpgs.compositePodGroup.Spec.SchedulingPolicy.Gang.MinGroupCount)
-	}
-	return cpgs.compositePodGroupStateData.scheduledChildren >= minGroupCount
-}
-
-// updateChildrenCount recursively propagates readiness transitions up the CompositePodGroup hierarchy.
-// Assumes that the cache lock is already held.
-func (cache *cacheImpl) updateChildrenCount(parentKey fwk.EntityKey, delta int, isCPGReady func(*compositePodGroupState) bool, addChildren func(*compositePodGroupState, int), propagate func(fwk.EntityKey, bool)) {
-	if delta == 0 {
-		return
-	}
-	parent, exists := cache.compositePodGroupStates[parentKey]
-	if !exists {
-		return
-	}
-	// Capture parent readiness before adding child count so that recursive propagation
-	// only occurs if the parent CompositePodGroup itself transitioned ready state.
-	wasReady := isCPGReady(parent)
-	addChildren(parent, delta)
-	propagate(parentKey, wasReady)
-}
-
-// updateReadyChildrenCount recursively propagates ready transitions up the CompositePodGroup hierarchy.
-// Assumes that the cache lock is already held.
-func (cache *cacheImpl) updateReadyChildrenCount(parentKey fwk.EntityKey, readyDelta int) {
-	cache.updateChildrenCount(parentKey, readyDelta, cache.isCPGReady, (*compositePodGroupState).addReadyChildren, cache.propagateReadinessUpdate)
-}
-
-// updateScheduledChildrenCount recursively propagates scheduled readiness transitions up the CompositePodGroup hierarchy.
-// Assumes that the cache lock is already held.
-func (cache *cacheImpl) updateScheduledChildrenCount(parentKey fwk.EntityKey, scheduledDelta int) {
-	cache.updateChildrenCount(parentKey, scheduledDelta, cache.isCPGScheduled, (*compositePodGroupState).addScheduledChildren, cache.propagateScheduledUpdate)
-}
-
 // applyPVCRefCountDelta merges cache.pvcRefCountsDelta into the snapshot's
 // PVC ref counts, removes entries that reach zero, and clears the delta.
 func (cache *cacheImpl) applyPVCRefCountDelta(snapshot *Snapshot) error {
@@ -1289,10 +1157,6 @@ func (cache *cacheImpl) AddPodGroup(podGroup *schedulingv1beta1.PodGroup) {
 	}
 
 	parent.addChild(key)
-	// Propagate with wasReady=false so that if adding the child key or prior pod members
-	// already satisfied this PodGroup's quorum, the transition is propagated to the parent.
-	cache.propagateReadinessUpdate(key, false)
-	cache.propagateScheduledUpdate(key, false)
 }
 
 // UpdatePodGroup updates a pod group object in the cache.
@@ -1310,16 +1174,7 @@ func (cache *cacheImpl) UpdatePodGroup(logger klog.Logger, oldPodGroup, newPodGr
 		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for update, this indicates a missed add event", "podGroup", klog.KObj(newPodGroup))
 		return
 	}
-	// Capture readiness before updating PodGroup spec so we only propagate a count delta
-	// if policy or quorum threshold changes caused a ready state transition.
-	wasReady := cache.isPGReady(pgs)
-	wasScheduledReady := cache.isPGScheduled(pgs)
 	pgs.setPodGroup(newPodGroup)
-
-	if cache.compositePodGroupEnabled {
-		cache.propagateReadinessUpdate(key, wasReady)
-		cache.propagateScheduledUpdate(key, wasScheduledReady)
-	}
 }
 
 // RemovePodGroup removes a pod group object from the cache.
@@ -1338,31 +1193,10 @@ func (cache *cacheImpl) RemovePodGroup(logger klog.Logger, podGroup *schedulingv
 		return
 	}
 
-	wasReady := cache.isPGReady(pgs)
-	wasScheduledReady := cache.isPGScheduled(pgs)
-
 	if cache.compositePodGroupEnabled && podGroup.Spec.ParentCompositePodGroupName != nil {
 		parentKey := fwk.CompositePodGroupKey(podGroup.Namespace, *podGroup.Spec.ParentCompositePodGroupName)
 		if parent, exists := cache.compositePodGroupStates[parentKey]; exists {
-
-			wasChild := parent.children.Has(key)
-
 			parent.removeChild(key)
-
-			if wasChild {
-				readyDelta := 0
-				if wasReady {
-					readyDelta = -1
-				}
-				cache.updateReadyChildrenCount(parentKey, readyDelta)
-
-				scheduledDelta := 0
-				if wasScheduledReady {
-					scheduledDelta = -1
-				}
-				cache.updateScheduledChildrenCount(parentKey, scheduledDelta)
-			}
-
 			if parent.empty() {
 				// podGroupState can exist without the PodGroup object, but when any of the member pods exists.
 				delete(cache.compositePodGroupStates, parentKey)
@@ -1404,11 +1238,6 @@ func (cache *cacheImpl) AddCompositePodGroup(logger klog.Logger, cpg *scheduling
 		cache.compositePodGroupStates[parentKey] = parent
 	}
 	parent.addChild(key)
-
-	// Propagate with wasReady=false so that if existing child groups already satisfied
-	// this CompositePodGroup's quorum, the transition is propagated to the parent.
-	cache.propagateReadinessUpdate(key, false)
-	cache.propagateScheduledUpdate(key, false)
 }
 
 // UpdateCompositePodGroup updates a composite pod group in the cache.
@@ -1426,15 +1255,7 @@ func (cache *cacheImpl) UpdateCompositePodGroup(logger klog.Logger, oldCPG, newC
 		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for update, this indicates a missed add event", "podGroup", klog.KObj(newCPG))
 		return
 	}
-	// Capture readiness before updating CompositePodGroup spec so we only propagate a count delta
-	// if policy or quorum threshold changes caused a ready state transition.
-	wasReady := cache.isCPGReady(pgs)
-	wasScheduledReady := cache.isCPGScheduled(pgs)
-
 	pgs.setCompositePodGroup(newCPG)
-
-	cache.propagateReadinessUpdate(key, wasReady)
-	cache.propagateScheduledUpdate(key, wasScheduledReady)
 }
 
 // RemoveCompositePodGroup removes a composite pod group from the cache.
@@ -1453,36 +1274,13 @@ func (cache *cacheImpl) RemoveCompositePodGroup(logger klog.Logger, cpg *schedul
 		return
 	}
 
-	wasReady := cache.isCPGReady(cpgs)
-	wasScheduledReady := cache.isCPGScheduled(cpgs)
-
 	if cpgs.compositePodGroup != nil && cpgs.compositePodGroup.Spec.ParentCompositePodGroupName != nil {
 		parentKey := fwk.CompositePodGroupKey(cpg.Namespace, *cpgs.compositePodGroup.Spec.ParentCompositePodGroupName)
-		parent, exists := cache.compositePodGroupStates[parentKey]
-		if !exists {
-			return
-		}
-
-		wasChild := parent.children.Has(key)
-
-		parent.removeChild(key)
-
-		if wasChild {
-			readyDelta := 0
-			if wasReady {
-				readyDelta = -1
+		if parent, exists := cache.compositePodGroupStates[parentKey]; exists {
+			parent.removeChild(key)
+			if parent.empty() {
+				delete(cache.compositePodGroupStates, parentKey)
 			}
-			cache.updateReadyChildrenCount(parentKey, readyDelta)
-
-			scheduledDelta := 0
-			if wasScheduledReady {
-				scheduledDelta = -1
-			}
-			cache.updateScheduledChildrenCount(parentKey, scheduledDelta)
-		}
-
-		if parent.empty() {
-			delete(cache.compositePodGroupStates, parentKey)
 		}
 	}
 
@@ -1665,48 +1463,4 @@ func (cache *cacheImpl) GetRootGroup(key fwk.EntityKey) (fwk.RootGroup, error) {
 	default:
 		return fwk.RootGroup{}, fmt.Errorf("unsupported root key type %s for %s", rootKey.Type, key.String())
 	}
-}
-
-// getGroupReadinessAndParent returns the readiness status and parent CompositePodGroup key for an entity key.
-func (cache *cacheImpl) getGroupReadinessAndParent(key fwk.EntityKey, pgCheck func(*podGroupState) bool, cpgCheck func(*compositePodGroupState) bool) (bool, *fwk.EntityKey) {
-	if pgs, exists := cache.podGroupStates[key]; exists {
-		if pgs.PodGroup() == nil || pgs.PodGroup().Spec.ParentCompositePodGroupName == nil {
-			return false, nil
-		}
-		parentKey := fwk.CompositePodGroupKey(pgs.PodGroup().Namespace, *pgs.PodGroup().Spec.ParentCompositePodGroupName)
-		return pgCheck(pgs), &parentKey
-	}
-	if cpgs, exists := cache.compositePodGroupStates[key]; exists {
-		if cpgs.CompositePodGroup() == nil || cpgs.CompositePodGroup().Spec.ParentCompositePodGroupName == nil {
-			return false, nil
-		}
-		parentKey := fwk.CompositePodGroupKey(cpgs.CompositePodGroup().Namespace, *cpgs.CompositePodGroup().Spec.ParentCompositePodGroupName)
-		return cpgCheck(cpgs), &parentKey
-	}
-	return false, nil
-}
-
-// propagateUpdate evaluates readiness transitions for an entity and recursively updates its parent CompositePodGroup.
-// It compares the previous ready state (wasReady) with the current ready state (isNowReady);
-// if they differ, it recursively propagates a +1 or -1 delta to the parent group.
-func (cache *cacheImpl) propagateUpdate(key fwk.EntityKey, wasReady bool, pgCheck func(*podGroupState) bool, cpgCheck func(*compositePodGroupState) bool, updateParent func(fwk.EntityKey, int)) {
-	isNowReady, parentKey := cache.getGroupReadinessAndParent(key, pgCheck, cpgCheck)
-	if parentKey == nil || wasReady == isNowReady {
-		return
-	}
-	delta := -1
-	if isNowReady {
-		delta = 1
-	}
-	updateParent(*parentKey, delta)
-}
-
-// propagateReadinessUpdate evaluates ready transitions for an entity key and propagates to parents.
-func (cache *cacheImpl) propagateReadinessUpdate(key fwk.EntityKey, wasReady bool) {
-	cache.propagateUpdate(key, wasReady, cache.isPGReady, cache.isCPGReady, cache.updateReadyChildrenCount)
-}
-
-// propagateScheduledUpdate evaluates scheduled readiness transitions for an entity key and propagates to parents.
-func (cache *cacheImpl) propagateScheduledUpdate(key fwk.EntityKey, wasScheduledReady bool) {
-	cache.propagateUpdate(key, wasScheduledReady, cache.isPGScheduled, cache.isCPGScheduled, cache.updateScheduledChildrenCount)
 }

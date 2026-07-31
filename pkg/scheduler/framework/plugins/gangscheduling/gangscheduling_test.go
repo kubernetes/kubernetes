@@ -1165,8 +1165,10 @@ func TestGangSchedulingFlow(t *testing.T) {
 			}
 
 			for _, p := range tt.initialPods {
+				informerFactory.Core().V1().Pods().Informer().GetStore().Add(p)
 				cache.AddPodGroupMember(p)
 			}
+			informerFactory.Core().V1().Pods().Informer().GetStore().Add(tt.pod)
 			cache.AddPodGroupMember(tt.pod)
 
 			p, err := New(ctx, nil, fh, feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: tt.isCompositePodGroupEnabled})
