@@ -4,7 +4,7 @@
   "pluginReports": [
     {
       "pluginName": "CloudFormation Validate",
-      "pluginVersion": "1.2.0",
+      "pluginVersion": "1.5.0",
       "conclusion": "success",
       "violations": [
         {
@@ -19,34 +19,6 @@
               "constructPath": ""
             }
           ]
-        }
-      ],
-      "suppressedViolations": [
-        {
-          "ruleName": "W9009",
-          "description": "Source: Property 'Source' is deprecated",
-          "severity": "warning",
-          "ruleMetadata": {
-            "category": "Deprecation"
-          },
-          "violatingConstructs": [
-            {
-              "constructPath": "aws-cdk-mediaconnect-router-output-encryption/EncryptedTestFlow/Resource",
-              "constructFqn": "aws-cdk-lib.aws_mediaconnect.CfnFlow",
-              "libraryVersion": "0.0.0",
-              "cloudFormationResource": {
-                "templatePath": "/Users/jamiepm/opensource/aws-cdk/packages/@aws-cdk/aws-mediaconnect-alpha/test/integ.mediaconnect-router-output-encryption.js.snapshot/aws-cdk-mediaconnect-router-output-encryption.template.json",
-                "logicalId": "EncryptedTestFlow3A9F0DF5",
-                "propertyPaths": [
-                  "Properties.Source"
-                ]
-              }
-            }
-          ],
-          "acknowledgedId": "CloudFormation-Validate::W9009",
-          "reason": "cfn-validate false positive: MediaConnect Flow.Source is required and not deprecated (see cloudformation-validate#144)",
-          "acknowledgedAt": "aws-cdk-mediaconnect-router-output-encryption/EncryptedTestFlow/Resource",
-          "acknowledgedStackTrace": "Validations.recordAcknowledgment (/Users/jamiepm/opensource/aws-cdk/packages/aws-cdk-lib/core/lib/validation/validations.js:129:25)\nValidations.acknowledge (/Users/jamiepm/opensource/aws-cdk/packages/aws-cdk-lib/core/lib/validation/validations.js:122:18)\nnew Flow (/Users/jamiepm/opensource/aws-cdk/packages/@aws-cdk/aws-mediaconnect-alpha/lib/flow.js:908:48)\nnew Flow (/Users/jamiepm/opensource/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)\nObject.<anonymous> (/Users/jamiepm/opensource/aws-cdk/packages/@aws-cdk/aws-mediaconnect-alpha/test/integ.mediaconnect-router-output-encryption.js:65:27)\nModule._compile (node:internal/modules/cjs/loader:1761:14)\nObject..js (node:internal/modules/cjs/loader:1893:10)\nModule.load (node:internal/modules/cjs/loader:1481:32)\nModule._load (node:internal/modules/cjs/loader:1300:12)\nTracingChannel.traceSync (node:diagnostics_channel:328:14)\nwrapModuleLoad (node:internal/modules/cjs/loader:245:24)\nModule.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\nnode:internal/main/run_main_module:33:47"
         }
       ]
     }

@@ -10,9 +10,7 @@
      "Protocol": "rtp",
      "WhitelistCidr": "203.0.113.0/24"
     }
-   },
-   "UpdateReplacePolicy": "Retain",
-   "DeletionPolicy": "Retain"
+   }
   },
   "NetworkInterface4FC75A07": {
    "Type": "AWS::MediaConnect::RouterNetworkInterface",

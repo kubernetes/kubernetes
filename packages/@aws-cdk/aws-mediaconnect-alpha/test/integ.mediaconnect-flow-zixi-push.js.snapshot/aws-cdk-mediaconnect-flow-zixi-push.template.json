@@ -12,9 +12,7 @@
      "Protocol": "zixi-push",
      "WhitelistCidr": "10.0.0.0/16"
     }
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "Vpc8378EB38": {
    "Type": "AWS::EC2::VPC",
@@ -398,9 +396,7 @@
       }
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   }
  },
  "Parameters": {

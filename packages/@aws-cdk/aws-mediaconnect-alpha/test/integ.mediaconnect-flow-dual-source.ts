@@ -7,7 +7,7 @@
  */
 
 import { IntegTest } from '@aws-cdk/integ-tests-alpha';
-import { App, Bitrate, Duration, RemovalPolicy, Stack } from 'aws-cdk-lib';
+import { App, Bitrate, Duration, Stack } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
@@ -72,7 +72,6 @@ const outputVpcInterface = mediaconnect.VpcInterface.define({
 
 // Flow with Primary Source (VPC, not encrypted) + maintenance + source monitoring
 const flow = new mediaconnect.Flow(stack, 'DualSourceFlow', {
-  removalPolicy: RemovalPolicy.DESTROY,
   flowName: 'dual-source-flow',
   // Matches the explicit subnet's AZ; resolves at deploy time via the region token.
   availabilityZone: `${stack.region}a`,

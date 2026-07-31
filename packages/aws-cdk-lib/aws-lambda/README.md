@@ -807,6 +807,49 @@ const excludeCapacityProvider = new lambda.CapacityProvider(this, 'MyCapacityPro
 });
 ```
 
+### System Logging
+
+You can configure system logging to monitor capacity provider scaling activity:
+
+```ts
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import * as logs from 'aws-cdk-lib/aws-logs';
+
+const vpc = new ec2.Vpc(this, 'MyVpc');
+const securityGroup = new ec2.SecurityGroup(this, 'SecurityGroup', { vpc });
+
+const capacityProvider = new lambda.CapacityProvider(this, 'MyCapacityProvider', {
+  subnets: vpc.privateSubnets,
+  securityGroups: [securityGroup],
+  logGroup: new logs.LogGroup(this, 'CpLogs', {
+    logGroupName: '/aws/lambda/capacity-provider/my-cp',
+  }),
+  systemLogLevel: lambda.SystemLogLevel.DEBUG,
+});
+```
+
+### Tag Propagation
+
+You can propagate explicit tags to managed resources (EC2 instances, ENIs, EBS volumes) launched by the capacity provider:
+
+```ts
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
+
+const vpc = new ec2.Vpc(this, 'MyVpc');
+const securityGroup = new ec2.SecurityGroup(this, 'SecurityGroup', { vpc });
+
+const capacityProvider = new lambda.CapacityProvider(this, 'MyCapacityProvider', {
+  subnets: vpc.privateSubnets,
+  securityGroups: [securityGroup],
+  propagateTags: lambda.PropagateTags.explicit({
+    CostCenter: 'Engineering',
+    Project: 'MyProject',
+  }),
+});
+```
+
+Use `PropagateTags.none()` to explicitly disable propagation, or omit the prop entirely (defaults to no propagation). Up to 40 tags can be specified with `PropagateTags.explicit()`.
+
 ### Using a Capacity Provider with Lambda Functions
 
 Once you have a capacity provider, you can configure Lambda functions to use it:
@@ -922,6 +965,8 @@ const capacityProvider = new lambda.CapacityProvider(this, 'MyCapacityProvider',
 | maxVCpuCount | number | No | Maximum number of EC2 instances for scaling. |
 | scalingOptions | ScalingOptions | No | Scaling configuration including policies. |
 | kmsKey | IKey | No | KMS key for encrypting capacity provider data. |
+| logGroup | ILogGroup | No | CloudWatch log group for capacity provider system logs. |
+| systemLogLevel | SystemLogLevel | No | Level of detail for capacity provider system logs (DEBUG, INFO, WARN). |
 
 ## Lambda Insights
 

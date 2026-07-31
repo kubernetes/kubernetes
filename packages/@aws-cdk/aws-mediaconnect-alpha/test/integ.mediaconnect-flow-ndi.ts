@@ -55,7 +55,6 @@ const vpcInterface = VpcInterface.define({
 });
 
 new Flow(stack, 'flow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowSize: FlowSize.LARGE,
   vpcInterfaces: [vpcInterface],
   ndiConfig: {
@@ -78,7 +77,6 @@ new Flow(stack, 'flow', {
 // service applies EncodingProfile.DISTRIBUTION_H264_DEFAULT and 20 Mbps videoMaxBitrate,
 // plus a generated 12-character NDI machineName when omitted.
 const sourceDefaultsFlow = new Flow(stack, 'sourceDefaultsFlow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'ndi-source-defaults',
   flowSize: FlowSize.LARGE,
   vpcInterfaces: [vpcInterface],
@@ -105,7 +103,6 @@ const sourceDefaultsFlow = new Flow(stack, 'sourceDefaultsFlow', {
 // so this flow uses a non-NDI source. NDI outputs still require ndiState ENABLED
 // and FlowSize.LARGE on the parent flow.
 const outputDefaultsFlow = new Flow(stack, 'outputDefaultsFlow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'ndi-output-defaults',
   flowSize: FlowSize.LARGE,
   vpcInterfaces: [vpcInterface],

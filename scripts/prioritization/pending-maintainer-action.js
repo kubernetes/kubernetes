@@ -11,10 +11,12 @@
  *
  * Each week gets its own tracking issue, identified by the marker label
  * (`ci-pending-tracking`) plus an ISO week key in the title (e.g.
- * `2026-July13-W29`, where `July13` is the Monday the week starts on).
+ * `2026-July13-W29`, where `July13` is the Monday the week starts on). The
+ * issue lists only the PRs whose pending state began during that week (by
+ * `pendingSince` ISO week), not every currently-pending PR.
  * On the first run of a week the issue is created; subsequent runs in the same
- * week update its body with the current list of pending PRs. Issues from
- * previous weeks are left open for maintainers to review and close manually.
+ * week update its body with that week's pending PRs. Issues from previous weeks
+ * are left open for maintainers to review and close manually.
  *
  * Supports a DRY_RUN mode (set env DRY_RUN=true) to log intended issue
  * creation/updates without writing anything.
@@ -157,14 +159,14 @@ function renderIssueBody({ owner, repo, weekKey, flaggedPrs }) {
     .join(' · ');
 
   const lines = [
-    `Beginning-contributor PRs pending maintainer CI action for week **${weekKey}**.`,
+    `Beginning-contributor PRs that entered pending maintainer CI action during week **${weekKey}**.`,
     '',
     `_Last updated: ${new Date().toISOString()} (refreshed daily by the [Pending Maintainer Action Check workflow](${workflowUrl}))_`,
     '',
   ];
 
   if (flaggedPrs.length === 0) {
-    lines.push('No PRs currently pending maintainer CI action. :tada:');
+    lines.push(`No PRs entered pending maintainer CI action during week **${weekKey}**. :tada:`);
   } else {
     lines.push(`**${flaggedPrs.length} PR(s)** — ${summary}`);
     for (const reason of Object.keys(counts)) {
@@ -252,16 +254,24 @@ module.exports = async ({ github, context }) => {
   const title = `CI pending maintainer action: week ${weekKey}`;
   const existingIssue = await findTrackingIssue({ github, owner, repo, weekKey });
 
-  if (flaggedPrs.length === 0 && !existingIssue) {
-    console.log(`No PRs pending maintainer action and no tracking issue for ${weekKey}; nothing to do.`);
+  // Keep only PRs whose pending state began this ISO week. Comparing week keys
+  // (rather than a separate date window) stays in lockstep with the title and
+  // reuses the ISO year-boundary handling isoWeekKey already encodes.
+  const weeklyPrs = flaggedPrs.filter(
+    ({ pendingSince }) => isoWeekKey(new Date(pendingSince)) === weekKey,
+  );
+  console.log(`${weeklyPrs.length} of ${flaggedPrs.length} pending PR(s) entered the pending state during week ${weekKey}`);
+
+  if (weeklyPrs.length === 0 && !existingIssue) {
+    console.log(`No PRs entered the pending state during week ${weekKey} and no tracking issue exists; nothing to do.`);
     return;
   }
 
-  const body = renderIssueBody({ owner, repo, weekKey, flaggedPrs });
+  const body = renderIssueBody({ owner, repo, weekKey, flaggedPrs: weeklyPrs });
 
   if (existingIssue) {
     if (DRY_RUN) {
-      console.log(`[DRY RUN] would update tracking issue #${existingIssue.number} with ${flaggedPrs.length} PR(s)`);
+      console.log(`[DRY RUN] would update tracking issue #${existingIssue.number} with ${weeklyPrs.length} PR(s)`);
     } else {
       await github.rest.issues.update({
         owner,
@@ -269,11 +279,11 @@ module.exports = async ({ github, context }) => {
         issue_number: existingIssue.number,
         body,
       });
-      console.log(`Updated tracking issue #${existingIssue.number} with ${flaggedPrs.length} PR(s)`);
+      console.log(`Updated tracking issue #${existingIssue.number} with ${weeklyPrs.length} PR(s)`);
     }
   } else {
     if (DRY_RUN) {
-      console.log(`[DRY RUN] would create tracking issue "${title}" with ${flaggedPrs.length} PR(s)`);
+      console.log(`[DRY RUN] would create tracking issue "${title}" with ${weeklyPrs.length} PR(s)`);
     } else {
       const { data: issue } = await github.rest.issues.create({
         owner,
@@ -282,7 +292,7 @@ module.exports = async ({ github, context }) => {
         body,
         labels: [CONFIG.trackingLabel],
       });
-      console.log(`Created tracking issue #${issue.number} ("${title}") with ${flaggedPrs.length} PR(s)`);
+      console.log(`Created tracking issue #${issue.number} ("${title}") with ${weeklyPrs.length} PR(s)`);
     }
   }
 };

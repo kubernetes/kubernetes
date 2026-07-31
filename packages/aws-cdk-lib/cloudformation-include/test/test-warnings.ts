@@ -8,7 +8,9 @@ export function acknowledgeTestWarnings(construct: IConstruct) {
     'E3045',
     'F0005',
     'F0013',
-    'F0014',
+    // This fixture intentionally uses a CDK intrinsic object as an operand where Fn::Equals expects a scalar.
+    // Validator reports this invalid Fn::Equals operand as E8003 instead of the broader F0014.
+    'E8003',
     'F1029',
     'F2002',
     'F2012',
@@ -20,6 +22,12 @@ export function acknowledgeTestWarnings(construct: IConstruct) {
     'F3012',
     'F3014',
     'W1020',
+    // This fixture intentionally contains an unused Fn::Sub variable to test that
+    // cloudformation-include preserves the original expression unchanged.
+    'W1019',
+    // These fixtures intentionally contain literal AWS::Region and AWS::NoValue strings.
+    // The tests exercise template ingestion, not W1054's recommendation to replace them with Ref.
+    'W1054',
     'W1102',
     'W2531',
     'W3011',

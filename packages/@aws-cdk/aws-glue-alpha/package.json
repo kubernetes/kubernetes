@@ -67,7 +67,10 @@
   "cdk-build": {
     "env": {
       "AWSLINT_BASE_CONSTRUCT": "true"
-    }
+    },
+    "pre": [
+      "./scripts/airlift-custom-resource-handlers.sh"
+    ]
   },
   "keywords": [
     "aws",
@@ -85,6 +88,7 @@
     "@aws-cdk/cdk-build-tools": "0.0.0",
     "@aws-cdk/integ-runner": "^2.202.3",
     "@aws-cdk/integ-tests-alpha": "0.0.0",
+    "@aws-cdk/custom-resource-handlers": "0.0.0",
     "@aws-cdk/pkglint": "0.0.0",
     "@types/jest": "^29.5.14",
     "aws-cdk-lib": "0.0.0",

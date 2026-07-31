@@ -1,6 +1,6 @@
 {
  "Resources": {
-  "LambdaInvokead15057b150d3182403e8b2ac7f9b05e": {
+  "LambdaInvoke86cbd80c99f3c221024b8dc8000e0867": {
    "Type": "Custom::DeployAssert@SdkCallLambdainvoke",
    "Properties": {
     "ServiceToken": {
@@ -19,7 +19,7 @@
        [
         "\"",
         {
-         "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionJava216AE56E906B018223"
+         "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava219D7C688202DE2695"
         },
         "\""
        ]
@@ -28,17 +28,17 @@
      "Payload": "\"123\""
     },
     "flattenResponse": "false",
-    "salt": "1779976646651"
+    "salt": "1785232704000"
    },
    "UpdateReplacePolicy": "Delete",
    "DeletionPolicy": "Delete"
   },
-  "LambdaInvokead15057b150d3182403e8b2ac7f9b05eInvoke155A3F85": {
+  "LambdaInvoke86cbd80c99f3c221024b8dc8000e0867Invoke98B7A432": {
    "Type": "AWS::Lambda::Permission",
    "Properties": {
     "Action": "lambda:InvokeFunction",
     "FunctionName": {
-     "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionJava216AE56E906B018223"
+     "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava219D7C688202DE2695"
     },
     "Principal": {
      "Fn::GetAtt": [
@@ -107,7 +107,7 @@
              },
              ":function:",
              {
-              "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionJava216AE56E906B018223"
+              "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava219D7C688202DE2695"
              }
             ]
            ]
@@ -147,7 +147,127 @@
              },
              ":function:",
              {
-              "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionJava25D0EF0C44D46CC469"
+              "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava251668460C94EC0E85"
+             }
+            ]
+           ]
+          }
+         ]
+        },
+        {
+         "Action": [
+          "lambda:Invoke"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          "*"
+         ]
+        },
+        {
+         "Action": [
+          "lambda:InvokeFunction"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:",
+             {
+              "Ref": "AWS::Partition"
+             },
+             ":lambda:",
+             {
+              "Ref": "AWS::Region"
+             },
+             ":",
+             {
+              "Ref": "AWS::AccountId"
+             },
+             ":function:",
+             {
+              "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava8al2023D439527D183066BD"
+             }
+            ]
+           ]
+          }
+         ]
+        },
+        {
+         "Action": [
+          "lambda:Invoke"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          "*"
+         ]
+        },
+        {
+         "Action": [
+          "lambda:InvokeFunction"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:",
+             {
+              "Ref": "AWS::Partition"
+             },
+             ":lambda:",
+             {
+              "Ref": "AWS::Region"
+             },
+             ":",
+             {
+              "Ref": "AWS::AccountId"
+             },
+             ":function:",
+             {
+              "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava11al2023389432C9E971D17F"
+             }
+            ]
+           ]
+          }
+         ]
+        },
+        {
+         "Action": [
+          "lambda:Invoke"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          "*"
+         ]
+        },
+        {
+         "Action": [
+          "lambda:InvokeFunction"
+         ],
+         "Effect": "Allow",
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:",
+             {
+              "Ref": "AWS::Partition"
+             },
+             ":lambda:",
+             {
+              "Ref": "AWS::Region"
+             },
+             ":",
+             {
+              "Ref": "AWS::AccountId"
+             },
+             ":function:",
+             {
+              "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava17al202362B14D9A6D9D7F9C"
              }
             ]
            ]
@@ -168,7 +288,7 @@
      "S3Bucket": {
       "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
      },
-     "S3Key": "642d8e8ca8e53fa044f62ae97b83bfd1c4198d5257165b8720d3d698fe1fc9b5.zip"
+     "S3Key": "6ffc47b88143a52aa50e26c31da776854b28dff0e45b1a97d7c1e530d59590ad.zip"
     },
     "Timeout": 120,
     "Handler": "index.handler",
@@ -177,10 +297,14 @@
       "SingletonFunction1488541a7b23466481b69b4408076b81Role37ABCE73",
       "Arn"
      ]
+    },
+    "LoggingConfig": {
+     "LogFormat": "JSON",
+     "ApplicationLogLevel": "FATAL"
     }
    }
   },
-  "LambdaInvoke2a1fb911a476402fe51044e555a4aab2": {
+  "LambdaInvokecd5525bef257d565f696d90f327fd8b1": {
    "Type": "Custom::DeployAssert@SdkCallLambdainvoke",
    "Properties": {
     "ServiceToken": {
@@ -199,7 +323,7 @@
        [
         "\"",
         {
-         "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionJava25D0EF0C44D46CC469"
+         "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava251668460C94EC0E85"
         },
         "\""
        ]
@@ -208,17 +332,161 @@
      "Payload": "\"123\""
     },
     "flattenResponse": "false",
-    "salt": "1779976646653"
+    "salt": "1785232704002"
    },
    "UpdateReplacePolicy": "Delete",
    "DeletionPolicy": "Delete"
   },
-  "LambdaInvoke2a1fb911a476402fe51044e555a4aab2InvokeDB691501": {
+  "LambdaInvokecd5525bef257d565f696d90f327fd8b1Invoke389C5433": {
    "Type": "AWS::Lambda::Permission",
    "Properties": {
     "Action": "lambda:InvokeFunction",
     "FunctionName": {
-     "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionJava25D0EF0C44D46CC469"
+     "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava251668460C94EC0E85"
+    },
+    "Principal": {
+     "Fn::GetAtt": [
+      "SingletonFunction1488541a7b23466481b69b4408076b81Role37ABCE73",
+      "Arn"
+     ]
+    }
+   }
+  },
+  "LambdaInvoked3a1aa0a03d6f9d8b836fa1aef5bee0b": {
+   "Type": "Custom::DeployAssert@SdkCallLambdainvoke",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "SingletonFunction1488541a7b23466481b69b4408076b81HandlerCD40AE9F",
+      "Arn"
+     ]
+    },
+    "service": "Lambda",
+    "api": "invoke",
+    "expected": "{\"$ObjectLike\":{\"Payload\":\"\\\"123\\\"\"}}",
+    "parameters": {
+     "FunctionName": {
+      "Fn::Join": [
+       "",
+       [
+        "\"",
+        {
+         "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava8al2023D439527D183066BD"
+        },
+        "\""
+       ]
+      ]
+     },
+     "Payload": "\"123\""
+    },
+    "flattenResponse": "false",
+    "salt": "1785232704003"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "LambdaInvoked3a1aa0a03d6f9d8b836fa1aef5bee0bInvoke554345D9": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava8al2023D439527D183066BD"
+    },
+    "Principal": {
+     "Fn::GetAtt": [
+      "SingletonFunction1488541a7b23466481b69b4408076b81Role37ABCE73",
+      "Arn"
+     ]
+    }
+   }
+  },
+  "LambdaInvoke281ba9cbfd9449899923c96028fa1df9": {
+   "Type": "Custom::DeployAssert@SdkCallLambdainvoke",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "SingletonFunction1488541a7b23466481b69b4408076b81HandlerCD40AE9F",
+      "Arn"
+     ]
+    },
+    "service": "Lambda",
+    "api": "invoke",
+    "expected": "{\"$ObjectLike\":{\"Payload\":\"\\\"123\\\"\"}}",
+    "parameters": {
+     "FunctionName": {
+      "Fn::Join": [
+       "",
+       [
+        "\"",
+        {
+         "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava11al2023389432C9E971D17F"
+        },
+        "\""
+       ]
+      ]
+     },
+     "Payload": "\"123\""
+    },
+    "flattenResponse": "false",
+    "salt": "1785232704003"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "LambdaInvoke281ba9cbfd9449899923c96028fa1df9InvokeBD41376E": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava11al2023389432C9E971D17F"
+    },
+    "Principal": {
+     "Fn::GetAtt": [
+      "SingletonFunction1488541a7b23466481b69b4408076b81Role37ABCE73",
+      "Arn"
+     ]
+    }
+   }
+  },
+  "LambdaInvoke7305959975f394416e9903733633c268": {
+   "Type": "Custom::DeployAssert@SdkCallLambdainvoke",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "SingletonFunction1488541a7b23466481b69b4408076b81HandlerCD40AE9F",
+      "Arn"
+     ]
+    },
+    "service": "Lambda",
+    "api": "invoke",
+    "expected": "{\"$ObjectLike\":{\"Payload\":\"\\\"123\\\"\"}}",
+    "parameters": {
+     "FunctionName": {
+      "Fn::Join": [
+       "",
+       [
+        "\"",
+        {
+         "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava17al202362B14D9A6D9D7F9C"
+        },
+        "\""
+       ]
+      ]
+     },
+     "Payload": "\"123\""
+    },
+    "flattenResponse": "false",
+    "salt": "1785232704003"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "LambdaInvoke7305959975f394416e9903733633c268Invoke1E95AFCD": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::ImportValue": "aws-cdk-lambda-runtime-fromasset:ExportsOutputRefMyFunctionjava17al202362B14D9A6D9D7F9C"
     },
     "Principal": {
      "Fn::GetAtt": [
@@ -230,18 +498,42 @@
   }
  },
  "Outputs": {
-  "AssertionResultsLambdaInvokead15057b150d3182403e8b2ac7f9b05e": {
+  "AssertionResultsLambdaInvoke86cbd80c99f3c221024b8dc8000e0867": {
    "Value": {
     "Fn::GetAtt": [
-     "LambdaInvokead15057b150d3182403e8b2ac7f9b05e",
+     "LambdaInvoke86cbd80c99f3c221024b8dc8000e0867",
      "assertion"
     ]
    }
   },
-  "AssertionResultsLambdaInvoke2a1fb911a476402fe51044e555a4aab2": {
+  "AssertionResultsLambdaInvokecd5525bef257d565f696d90f327fd8b1": {
    "Value": {
     "Fn::GetAtt": [
-     "LambdaInvoke2a1fb911a476402fe51044e555a4aab2",
+     "LambdaInvokecd5525bef257d565f696d90f327fd8b1",
+     "assertion"
+    ]
+   }
+  },
+  "AssertionResultsLambdaInvoked3a1aa0a03d6f9d8b836fa1aef5bee0b": {
+   "Value": {
+    "Fn::GetAtt": [
+     "LambdaInvoked3a1aa0a03d6f9d8b836fa1aef5bee0b",
+     "assertion"
+    ]
+   }
+  },
+  "AssertionResultsLambdaInvoke281ba9cbfd9449899923c96028fa1df9": {
+   "Value": {
+    "Fn::GetAtt": [
+     "LambdaInvoke281ba9cbfd9449899923c96028fa1df9",
+     "assertion"
+    ]
+   }
+  },
+  "AssertionResultsLambdaInvoke7305959975f394416e9903733633c268": {
+   "Value": {
+    "Fn::GetAtt": [
+     "LambdaInvoke7305959975f394416e9903733633c268",
      "assertion"
     ]
    }

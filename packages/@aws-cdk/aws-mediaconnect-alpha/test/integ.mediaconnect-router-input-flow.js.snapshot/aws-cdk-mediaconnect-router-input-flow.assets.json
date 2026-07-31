@@ -1,16 +1,16 @@
 {
   "version": "54.0.0",
   "files": {
-    "2fc7320dd69c5264173910b2e9bc0d3e5afdba06722ab4861e15f00f9070dd01": {
+    "7242144b7df17a3c5f6a5e362c38b174ea62df313b447d664a96b6cbd9b67f7e": {
       "displayName": "aws-cdk-mediaconnect-router-input-flow Template",
       "source": {
         "path": "aws-cdk-mediaconnect-router-input-flow.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "current_account-current_region-3664ca48": {
+        "current_account-current_region-d484cf6b": {
           "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
-          "objectKey": "2fc7320dd69c5264173910b2e9bc0d3e5afdba06722ab4861e15f00f9070dd01.json",
+          "objectKey": "7242144b7df17a3c5f6a5e362c38b174ea62df313b447d664a96b6cbd9b67f7e.json",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
         }
       }

@@ -393,9 +393,7 @@
       }
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "sourceDefaultsFlowC69F6FE4": {
    "Type": "AWS::MediaConnect::Flow",
@@ -439,9 +437,7 @@
       }
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "outputDefaultsFlow8820AEB5": {
    "Type": "AWS::MediaConnect::Flow",
@@ -485,9 +481,7 @@
       }
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "outputDefaultsFlowNdiOutput70626DD6": {
    "Type": "AWS::MediaConnect::FlowOutput",

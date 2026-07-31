@@ -33,7 +33,6 @@ beforeEach(() => {
 
 function acknowledgeProblems() {
   Validations.of(app).acknowledge(
-    { id: 'CloudFormation-Validate::F3006', reason: 'We are using fake resource types here' },
     { id: 'CloudFormation-Validate::F0001', reason: 'Empty resource sections' },
   );
 }

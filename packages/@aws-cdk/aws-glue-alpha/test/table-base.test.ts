@@ -350,6 +350,156 @@ describe('parition indexes', () => {
         keyNames: ['part'],
       })).toThrow(/Index name must be between 1 and 255 characters, but got 0/);
     });
+
+    test('auto-generated index name stays within the limit even for long key names', () => {
+      const stack = new cdk.Stack();
+      const database = new glue.Database(stack, 'Database');
+
+      const longKeys = ['a'.repeat(60), 'b'.repeat(60)];
+      const table = new glue.S3Table(stack, 'Table', {
+        database,
+        columns: [{ name: 'col', type: glue.Schema.STRING }],
+        partitionKeys: longKeys.map(name => ({ name, type: glue.Schema.STRING })),
+        dataFormat: glue.DataFormat.JSON,
+      });
+
+      // No indexName provided -> the name is generated from the (very long) keys.
+      table.addPartitionIndex({ keyNames: longKeys });
+
+      const resources = Template.fromStack(stack).findResources('Custom::GluePartitionIndex');
+      const indexNames = Object.values(resources).map((r: any) => r.Properties.IndexName as string);
+      expect(indexNames).toHaveLength(1);
+      expect(indexNames[0].length).toBeLessThanOrEqual(80);
+    });
+
+    test('fails to auto-generate a name when key names are tokenized', () => {
+      const stack = new cdk.Stack();
+      const database = new glue.Database(stack, 'Database');
+
+      const table = new glue.S3Table(stack, 'Table', {
+        database,
+        columns: [{ name: 'col', type: glue.Schema.STRING }],
+        partitionKeys: [{ name: 'part', type: glue.Schema.SMALL_INT }],
+        dataFormat: glue.DataFormat.JSON,
+      });
+
+      const tokenKey = cdk.Lazy.string({ produce: () => 'part' });
+
+      // No indexName provided + tokenized key -> nothing stable to generate from.
+      expect(() => table.addPartitionIndex({ keyNames: [tokenKey] }))
+        .toThrow(/cannot auto-generate a stable partition index name from tokenized key names/);
+    });
+
+    test('accepts tokenized key names when an explicit indexName is given', () => {
+      const stack = new cdk.Stack();
+      const database = new glue.Database(stack, 'Database');
+
+      const table = new glue.S3Table(stack, 'Table', {
+        database,
+        columns: [{ name: 'col', type: glue.Schema.STRING }],
+        partitionKeys: [{ name: 'part', type: glue.Schema.SMALL_INT }],
+        dataFormat: glue.DataFormat.JSON,
+      });
+
+      const tokenKey = cdk.Lazy.string({ produce: () => 'part' });
+
+      // An explicit indexName supplies the stable name generation cannot.
+      table.addPartitionIndex({ indexName: 'my-index', keyNames: [tokenKey] });
+
+      const resources = Template.fromStack(stack).findResources('Custom::GluePartitionIndex');
+      const indexNames = Object.values(resources).map((r: any) => r.Properties.IndexName as string);
+      expect(indexNames).toEqual(['my-index']);
+    });
+
+    test('distinct long key sets generate distinct auto-generated index names', () => {
+      const stack = new cdk.Stack();
+      const database = new glue.Database(stack, 'Database');
+
+      const keysA = ['a'.repeat(60), 'b'.repeat(60)];
+      const keysB = ['a'.repeat(60), 'c'.repeat(60)];
+      const table = new glue.S3Table(stack, 'Table', {
+        database,
+        columns: [{ name: 'col', type: glue.Schema.STRING }],
+        partitionKeys: [...keysA, 'c'.repeat(60)].map(name => ({ name, type: glue.Schema.STRING })),
+        dataFormat: glue.DataFormat.JSON,
+      });
+
+      table.addPartitionIndex({ keyNames: keysA });
+      table.addPartitionIndex({ keyNames: keysB });
+
+      const resources = Template.fromStack(stack).findResources('Custom::GluePartitionIndex');
+      const indexNames = Object.values(resources).map((r: any) => r.Properties.IndexName as string);
+      expect(indexNames).toHaveLength(2);
+      expect(indexNames[0]).not.toEqual(indexNames[1]);
+      indexNames.forEach(name => expect(name.length).toBeLessThanOrEqual(80));
+    });
+
+    test('each new partition index depends on the previous one', () => {
+      const stack = new cdk.Stack();
+      const database = new glue.Database(stack, 'Database');
+
+      const table = new glue.S3Table(stack, 'Table', {
+        database,
+        columns: [{ name: 'col', type: glue.Schema.STRING }],
+        partitionKeys: [
+          { name: 'year', type: glue.Schema.SMALL_INT },
+          { name: 'month', type: glue.Schema.SMALL_INT },
+        ],
+        dataFormat: glue.DataFormat.JSON,
+      });
+
+      table.addPartitionIndex({ indexName: 'index1', keyNames: ['year'] });
+      table.addPartitionIndex({ indexName: 'index2', keyNames: ['month'] });
+
+      const template = Template.fromStack(stack);
+      const resources = template.toJSON().Resources;
+
+      // Find the index2 custom resource by logical ID
+      const index2LogicalId = Object.keys(resources).find(k =>
+        k.includes('partitionindexindex2') && resources[k].Type === 'Custom::GluePartitionIndex',
+      )!;
+
+      // index2 should depend on index1 (not the other way around)
+      expect(resources[index2LogicalId].DependsOn).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/partitionindexindex1/),
+        ]),
+      );
+    });
+
+    test('grants partition index permissions to the handler roles only once per table', () => {
+      const stack = new cdk.Stack();
+      const database = new glue.Database(stack, 'Database');
+
+      const table = new glue.S3Table(stack, 'Table', {
+        database,
+        columns: [{ name: 'col', type: glue.Schema.STRING }],
+        partitionKeys: [
+          { name: 'year', type: glue.Schema.SMALL_INT },
+          { name: 'month', type: glue.Schema.SMALL_INT },
+          { name: 'day', type: glue.Schema.SMALL_INT },
+        ],
+        dataFormat: glue.DataFormat.JSON,
+      });
+
+      table.addPartitionIndex({ indexName: 'index1', keyNames: ['year'] });
+      table.addPartitionIndex({ indexName: 'index2', keyNames: ['month'] });
+      table.addPartitionIndex({ indexName: 'index3', keyNames: ['day'] });
+
+      const template = Template.fromStack(stack);
+
+      // The permissions are granted once per table, not once per index. Both the
+      // onEvent and isComplete handler roles carry a CreatePartitionIndex statement
+      // (isComplete recreates the index when a key change is applied), so with three
+      // indexes we expect exactly two statements (one per handler role), not six.
+      const policies = template.findResources('AWS::IAM::Policy');
+      const createStatements = Object.values(policies).flatMap((policy: any) =>
+        policy.Properties.PolicyDocument.Statement.filter(
+          (s: any) => Array.isArray(s.Action) && s.Action.includes('glue:CreatePartitionIndex'),
+        ),
+      );
+      expect(createStatements).toHaveLength(2);
+    });
   });
 });
 

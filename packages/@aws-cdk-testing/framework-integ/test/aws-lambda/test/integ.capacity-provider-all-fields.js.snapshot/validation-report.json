@@ -1,0 +1,48 @@
+{
+  "version": "54.0.0",
+  "title": "Validation Report",
+  "pluginReports": [
+    {
+      "pluginName": "CloudFormation Validate",
+      "pluginVersion": "1.2.0",
+      "conclusion": "success",
+      "violations": [
+        {
+          "ruleName": "F3002",
+          "description": "TelemetryConfig: Additional properties are not allowed ('TelemetryConfig' was unexpected)",
+          "severity": "warning",
+          "ruleMetadata": {
+            "category": "Schema"
+          },
+          "violatingConstructs": [
+            {
+              "constructPath": "CapacityProviderAllFieldsStack/CapacityProvider/Resource",
+              "constructFqn": "aws-cdk-lib.aws_lambda.CfnCapacityProvider",
+              "libraryVersion": "0.0.0",
+              "cloudFormationResource": {
+                "templatePath": "/local/home/vichym/.meshclaw/workspace/02-Projects/lmi-cp-telemetryconfig-support/code/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.capacity-provider-all-fields.js.snapshot/CapacityProviderAllFieldsStack.template.json",
+                "logicalId": "CapacityProvider7AA4F436",
+                "propertyPaths": [
+                  "Properties.TelemetryConfig"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "ruleName": "F0001",
+          "description": "Resources section must exist and be non-empty",
+          "severity": "warning",
+          "ruleMetadata": {
+            "category": "Structure"
+          },
+          "violatingConstructs": [
+            {
+              "constructPath": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

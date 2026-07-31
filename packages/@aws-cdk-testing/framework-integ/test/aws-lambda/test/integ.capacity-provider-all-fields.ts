@@ -1,6 +1,7 @@
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import * as cdk from 'aws-cdk-lib/core';
 import * as integ from '@aws-cdk/integ-tests-alpha';
 
@@ -15,6 +16,11 @@ const operatorRole = new iam.Role(stack, 'OperatorRole', {
   managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('AWSLambdaManagedEC2ResourceOperator')],
 });
 
+const logGroup = new logs.LogGroup(stack, 'CpLogGroup', {
+  logGroupName: '/aws/lambda/capacity-provider/integ-test',
+  removalPolicy: cdk.RemovalPolicy.DESTROY,
+});
+
 new lambda.CapacityProvider(stack, 'CapacityProvider', {
   subnets: vpc.privateSubnets,
   securityGroups: [securityGroup],
@@ -25,6 +31,8 @@ new lambda.CapacityProvider(stack, 'CapacityProvider', {
   scalingOptions: lambda.ScalingOptions.manual([
     lambda.TargetTrackingScalingPolicy.cpuUtilization(70),
   ]),
+  logGroup: logGroup,
+  systemLogLevel: lambda.SystemLogLevel.DEBUG,
 });
 
 new integ.IntegTest(app, 'CapacityProviderAllFieldsTest', {

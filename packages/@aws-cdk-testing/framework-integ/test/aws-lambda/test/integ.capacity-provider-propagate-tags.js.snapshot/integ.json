@@ -1,0 +1,14 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "CapacityProviderPropagateTagsTest/DefaultTest": {
+      "stacks": [
+        "CapacityProviderPropagateTagsStack"
+      ],
+      "assertionStack": "CapacityProviderPropagateTagsTest/DefaultTest/DeployAssert",
+      "assertionStackName": "CapacityProviderPropagateTagsTestDefaultTestDeployAssert1B8D7E4D"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}

@@ -502,9 +502,7 @@
       }
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "RouterSourceFlowRouterFlowOutput6EEA688D": {
    "Type": "AWS::MediaConnect::FlowOutput",

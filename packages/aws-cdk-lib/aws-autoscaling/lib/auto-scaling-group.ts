@@ -21,7 +21,7 @@ import type * as elb from '../../aws-elasticloadbalancing';
 import * as elbv2 from '../../aws-elasticloadbalancingv2';
 import * as iam from '../../aws-iam';
 import type * as sns from '../../aws-sns';
-import type { CfnAutoScalingRollingUpdate, CfnCreationPolicy, CfnUpdatePolicy, IResource } from '../../core';
+import type { CfnAutoScalingInstanceRefreshPreferences, CfnAutoScalingRollingUpdate, CfnCreationPolicy, CfnUpdatePolicy, IResource } from '../../core';
 import {
   Annotations,
   Aspects,
@@ -1032,6 +1032,42 @@ export abstract class UpdatePolicy {
   }
 
   /**
+   * Use instance refresh to update the instances in the AutoScalingGroup
+   *
+   * When properties that trigger an instance refresh change (such as LaunchTemplate
+   * or MixedInstancesPolicy), CloudFormation starts an instance refresh to replace
+   * instances gradually while maintaining availability.
+   */
+  public static instanceRefresh(options: InstanceRefreshOptions): UpdatePolicy {
+    validateInstanceRefreshPreferences(options);
+
+    return new class extends UpdatePolicy {
+      public _renderUpdatePolicy(): CfnUpdatePolicy {
+        const alarmNames = options.alarms?.map(alarm => alarm.alarmRef.alarmName);
+        const preferences: CfnAutoScalingInstanceRefreshPreferences = {
+          minHealthyPercentage: options.minHealthyPercentage,
+          maxHealthyPercentage: options.maxHealthyPercentage,
+          instanceWarmup: options.instanceWarmup?.toSeconds(),
+          skipMatching: options.skipMatching,
+          checkpointPercentages: options.checkpointPercentages,
+          checkpointDelay: options.checkpointDelay?.toSeconds(),
+          bakeTime: options.bakeTime?.toSeconds(),
+          alarmSpecification: alarmNames && alarmNames.length > 0 ? { alarms: alarmNames } : undefined,
+          scaleInProtectedInstances: options.scaleInProtectedInstances,
+          standbyInstances: options.standbyInstances,
+        };
+        const hasPreferences = Object.values(preferences).some(value => value !== undefined);
+        return {
+          autoScalingInstanceRefresh: {
+            strategy: options.strategy,
+            preferences: hasPreferences ? preferences : undefined,
+          },
+        };
+      }
+    }();
+  }
+
+  /**
    * Render the ASG's CreationPolicy
    * @internal
    */
@@ -1102,6 +1138,153 @@ export interface RollingUpdateOptions {
    * @default - The `minSuccessPercentage` configured for `signals` on the AutoScalingGroup
    */
   readonly minSuccessPercentage?: number;
+}
+
+/**
+ * The strategy to use for the instance refresh.
+ */
+export enum InstanceRefreshStrategy {
+  /**
+   * Terminate instances and launch new ones to replace them.
+   */
+  ROLLING = 'Rolling',
+
+  /**
+   * Replace the root volume of instances in place.
+   *
+   * When this strategy is used, only `ImageId` changes within the launch template or mixed
+   * instances policy are allowed. Other property changes may cause the stack update to fail.
+   */
+  REPLACE_ROOT_VOLUME = 'ReplaceRootVolume',
+}
+
+/**
+ * The behavior of instances that are protected from scale in during an instance refresh.
+ */
+export enum ScaleInProtectedInstances {
+  /**
+   * Refresh instances that are protected from scale in.
+   */
+  REFRESH = 'Refresh',
+
+  /**
+   * Ignore instances that are protected from scale in.
+   */
+  IGNORE = 'Ignore',
+
+  /**
+   * Wait until instances are no longer protected from scale in, then refresh them.
+   */
+  WAIT = 'Wait',
+}
+
+/**
+ * The behavior of instances in standby during an instance refresh.
+ */
+export enum StandbyInstances {
+  /**
+   * Terminate instances in standby and launch new ones to replace them.
+   */
+  TERMINATE = 'Terminate',
+
+  /**
+   * Ignore instances in standby.
+   */
+  IGNORE = 'Ignore',
+
+  /**
+   * Wait until instances are taken out of standby, then refresh them.
+   */
+  WAIT = 'Wait',
+}
+
+/**
+ * Options for customizing the instance refresh update policy.
+ */
+export interface InstanceRefreshOptions {
+  /**
+   * The strategy to use for the instance refresh.
+   */
+  readonly strategy: InstanceRefreshStrategy;
+
+  /**
+   * The minimum percentage of the group to keep in service, healthy, and ready to use
+   * to support your workload during the instance refresh, expressed as a percentage of
+   * the group's desired capacity.
+   *
+   * @default - the value set in the Auto Scaling group's instance maintenance policy, if defined; otherwise 100 when the strategy is Rolling, or 90 when the strategy is ReplaceRootVolume
+   */
+  readonly minHealthyPercentage?: number;
+
+  /**
+   * The maximum percentage of the group that can be in service and healthy, or pending,
+   * to support your workload during the instance refresh. The difference between
+   * `maxHealthyPercentage` and `minHealthyPercentage` cannot be greater than 100. A larger
+   * range increases the number of instances that can be replaced at the same time.
+   *
+   * @default - the value set in the Auto Scaling group's instance maintenance policy, if defined; otherwise 110 when the strategy is Rolling, or 100 when the strategy is ReplaceRootVolume
+   */
+  readonly maxHealthyPercentage?: number;
+
+  /**
+   * The amount of time to wait after a new instance enters the InService state before
+   * moving on to refresh the next instance.
+   *
+   * @default - the group's DefaultInstanceWarmup if defined; otherwise the group's HealthCheckGracePeriod
+   */
+  readonly instanceWarmup?: Duration;
+
+  /**
+   * Indicates whether skip matching is enabled.
+   *
+   * @default true
+   */
+  readonly skipMatching?: boolean;
+
+  /**
+   * Threshold values for each checkpoint in ascending order. Each number must be unique.
+   * To replace all instances in the group, the last number in the array must be 100.
+   *
+   * @default - no checkpoints
+   */
+  readonly checkpointPercentages?: number[];
+
+  /**
+   * The amount of time to wait after a checkpoint is reached before continuing.
+   *
+   * @default - 3600 seconds (1 hour), applied only when checkpointPercentages is set
+   */
+  readonly checkpointDelay?: Duration;
+
+  /**
+   * The amount of time after an instance refresh completes successfully before
+   * CloudFormation considers the update successful.
+   *
+   * @default Duration.seconds(0)
+   */
+  readonly bakeTime?: Duration;
+
+  /**
+   * The CloudWatch alarms to monitor during the instance refresh. If any of the alarms goes into
+   * ALARM state, the instance refresh fails. You can specify up to 10 alarms.
+   *
+   * @default - no alarms
+   */
+  readonly alarms?: cloudwatch.IAlarmRef[];
+
+  /**
+   * Specifies the behavior of instances that are protected from scale in during an instance refresh.
+   *
+   * @default ScaleInProtectedInstances.WAIT
+   */
+  readonly scaleInProtectedInstances?: ScaleInProtectedInstances;
+
+  /**
+   * Specifies the behavior of instances in standby during an instance refresh.
+   *
+   * @default StandbyInstances.WAIT
+   */
+  readonly standbyInstances?: StandbyInstances;
 }
 
 /**
@@ -2035,6 +2218,14 @@ export class AutoScalingGroup extends AutoScalingGroupBase implements
     this.autoScalingGroup.cfnOptions.updatePolicy = props.updatePolicy?._renderUpdatePolicy({
       creationPolicy: this.autoScalingGroup.cfnOptions.creationPolicy,
     });
+
+    if (props.signals && this.autoScalingGroup.cfnOptions.updatePolicy?.autoScalingInstanceRefresh) {
+      Annotations.of(this).addWarningV2(
+        '@aws-cdk/aws-autoscaling:signalsNotUsedByInstanceRefresh',
+        'Instance refresh doesn\'t support the cfn-signal helper script. For information about how to verify instance readiness during an instance refresh, see Verify instance readiness during an instance refresh. ' +
+        'https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-attribute-updatepolicy.html#cfn-attributes-updatepolicy-instancerefresh-readiness',
+      );
+    }
   }
 
   private applyLegacySignalUpdatePolicies(props: AutoScalingGroupProps) {
@@ -2598,6 +2789,68 @@ function renderRollingUpdateConfig(config: RollingUpdateConfiguration = {}): Cfn
 function validatePercentage(x?: number): number | undefined {
   if (x === undefined || (0 <= x && x <= 100)) { return x; }
   throw new UnscopedValidationError(lit`ExpectedPercentage`, `Expected: a percentage 0..100, got: ${x}`);
+}
+
+function validateInstanceRefreshPreferences(options: InstanceRefreshOptions): void {
+  const { minHealthyPercentage, maxHealthyPercentage } = options;
+
+  if (minHealthyPercentage !== undefined && !Token.isUnresolved(minHealthyPercentage) &&
+      (minHealthyPercentage < 0 || minHealthyPercentage > 100)) {
+    throw new UnscopedValidationError(lit`InstanceRefreshMinHealthyPercentage`, `minHealthyPercentage must be between 0 and 100, got ${minHealthyPercentage}`);
+  }
+
+  if (maxHealthyPercentage !== undefined && !Token.isUnresolved(maxHealthyPercentage) &&
+      (maxHealthyPercentage < 100 || maxHealthyPercentage > 200)) {
+    throw new UnscopedValidationError(lit`InstanceRefreshMaxHealthyPercentage`, `maxHealthyPercentage must be between 100 and 200, got ${maxHealthyPercentage}`);
+  }
+
+  // CloudFormation requires minHealthyPercentage whenever maxHealthyPercentage is set. The reverse is
+  // allowed: minHealthyPercentage may be set on its own, and each value falls back independently when omitted.
+  if (maxHealthyPercentage !== undefined && minHealthyPercentage === undefined) {
+    throw new UnscopedValidationError(lit`InstanceRefreshMaxRequiresMin`, 'maxHealthyPercentage requires minHealthyPercentage to be specified');
+  }
+
+  if (minHealthyPercentage !== undefined && maxHealthyPercentage !== undefined &&
+      !Token.isUnresolved(minHealthyPercentage) && !Token.isUnresolved(maxHealthyPercentage) &&
+      maxHealthyPercentage - minHealthyPercentage > 100) {
+    throw new UnscopedValidationError(lit`InstanceRefreshHealthyPercentageDifference`, `the difference between minHealthyPercentage and maxHealthyPercentage cannot be greater than 100, got ${maxHealthyPercentage - minHealthyPercentage}`);
+  }
+
+  // Duration already rejects negative values, so only the upper bound needs checking here.
+  if (options.bakeTime !== undefined && !options.bakeTime.isUnresolved() && options.bakeTime.toSeconds() > 172800) {
+    throw new UnscopedValidationError(lit`InstanceRefreshBakeTime`, `bakeTime must be between 0 and 172800 seconds, got ${options.bakeTime.toSeconds()}`);
+  }
+
+  if (options.checkpointDelay !== undefined && !options.checkpointDelay.isUnresolved() && options.checkpointDelay.toSeconds() > 172800) {
+    throw new UnscopedValidationError(lit`InstanceRefreshCheckpointDelay`, `checkpointDelay must be between 0 and 172800 seconds, got ${options.checkpointDelay.toSeconds()}`);
+  }
+
+  // Instance Refresh requires checkpointPercentages whenever checkpointDelay is set.
+  if (options.checkpointDelay !== undefined && options.checkpointPercentages === undefined) {
+    throw new UnscopedValidationError(lit`InstanceRefreshCheckpointDelayRequiresPercentages`, 'checkpointDelay requires checkpointPercentages to be specified');
+  }
+
+  const checkpointPercentages = options.checkpointPercentages;
+  if (checkpointPercentages !== undefined && !Token.isUnresolved(checkpointPercentages)) {
+    const values = checkpointPercentages.filter(value => !Token.isUnresolved(value));
+
+    if (values.some(value => value < 1 || value > 100)) {
+      throw new UnscopedValidationError(lit`InstanceRefreshCheckpointPercentagesRange`, `each value in checkpointPercentages must be between 1 and 100, got ${JSON.stringify(checkpointPercentages)}`);
+    }
+
+    if (new Set(values).size !== values.length) {
+      throw new UnscopedValidationError(lit`InstanceRefreshCheckpointPercentagesUnique`, `each value in checkpointPercentages must be unique, got ${JSON.stringify(checkpointPercentages)}`);
+    }
+
+    const isAscending = values.every((value, i) => i === 0 || values[i - 1] < value);
+    if (!isAscending) {
+      throw new UnscopedValidationError(lit`InstanceRefreshCheckpointPercentagesAscending`, `checkpointPercentages must be in ascending order, got ${JSON.stringify(checkpointPercentages)}`);
+    }
+  }
+
+  if (options.alarms !== undefined && !Token.isUnresolved(options.alarms) && options.alarms.length > 10) {
+    throw new UnscopedValidationError(lit`InstanceRefreshAlarms`, `a maximum of 10 alarms can be specified, got ${options.alarms.length}`);
+  }
 }
 
 /**

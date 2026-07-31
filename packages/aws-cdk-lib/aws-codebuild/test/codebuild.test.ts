@@ -1690,7 +1690,7 @@ test('fromCodebuildImage', () => {
 });
 
 describe('Windows2019 image', () => {
-  describe('WIN_SERVER_CORE_2016_BASE', () => {
+  describe('WIN_SERVER_CORE_2019_BASE', () => {
     test('has type WINDOWS_SERVER_2019_CONTAINER and default ComputeType MEDIUM', () => {
       const stack = new cdk.Stack();
       new codebuild.PipelineProject(stack, 'Project', {

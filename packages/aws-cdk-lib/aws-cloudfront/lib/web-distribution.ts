@@ -1034,10 +1034,6 @@ export class CloudFrontWebDistribution extends cdk.Resource implements IDistribu
     }
 
     const distribution = new CfnDistribution(this, 'CFDistribution', { distributionConfig });
-    cdk.Validations.of(distribution).acknowledge({
-      id: 'CloudFormation-Validate::W9009',
-      reason: 'distributionConfig is deprecated, but still in use for historical reasons',
-    });
     this.distributionRef = distribution.distributionRef;
     this.node.defaultChild = distribution;
     this.domainName = distribution.attrDomainName;

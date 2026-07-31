@@ -355,9 +355,7 @@
       }
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "DualSourceFlowRouterFlowOutputC0A2C3C5": {
    "Type": "AWS::MediaConnect::FlowOutput",

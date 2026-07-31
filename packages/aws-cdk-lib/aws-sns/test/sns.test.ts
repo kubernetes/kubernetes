@@ -633,10 +633,12 @@ describe('Topic', () => {
     topic.addToResourcePolicy(new iam.PolicyStatement({
       actions: ['service:statement0'],
       principals: [new iam.ArnPrincipal('arn')],
+      resources: ['*'],
     }));
     topic.addToResourcePolicy(new iam.PolicyStatement({
       actions: ['service:statement1'],
       principals: [new iam.ArnPrincipal('arn')],
+      resources: ['*'],
     }));
 
     Template.fromStack(stack).hasResourceProperties('AWS::SNS::TopicPolicy', {

@@ -11,6 +11,19 @@ import * as cdk from '../../core';
 import { UnscopedValidationError } from '../../core';
 import { lit } from '../../core/lib/private/literal-string';
 
+/**
+ * Options for resource-based policy validation
+ */
+export interface ResourcePolicyValidationOptions {
+  /**
+   * Whether to skip resource validation for policies where resources are implicit
+   * (e.g., ECR repository policies where the resource is the repository itself)
+   *
+   * @default false
+   */
+  readonly skipResourceValidation?: boolean;
+}
+
 const ensureArrayOrUndefined = (field: any) => {
   if (field === undefined) {
     return undefined;
@@ -82,7 +95,7 @@ export class PolicyStatement {
   private readonly _notPrincipal: { [key: string]: any[] } = {};
   private readonly _resource = new OrderedSet<string>();
   private readonly _notResource = new OrderedSet<string>();
-  private readonly _condition: { [key: string]: any } = { };
+  private readonly _condition: { [key: string]: any } = {};
   private _sid?: string;
   private _effect: Effect;
   private principalConditionsJson?: string;
@@ -542,13 +555,34 @@ export class PolicyStatement {
   /**
    * Validate that the policy statement satisfies all requirements for a resource-based policy.
    *
+   * @param options Optional validation options
    * @returns An array of validation error messages, or an empty array if the statement is valid.
    */
-  public validateForResourcePolicy(): string[] {
+  public validateForResourcePolicy(options?: ResourcePolicyValidationOptions): string[] {
     const errors = this.validateForAnyPolicy();
     if (this._principals.length === 0 && this._notPrincipals.length === 0) {
       errors.push('A PolicyStatement used in a resource-based policy must specify at least one IAM principal.');
     }
+    // Only validate resources if not explicitly skipped (for services like ECR where resources are implicit)
+    if (!options?.skipResourceValidation && this._resource.length === 0 && this._notResource.length === 0) {
+      errors.push('A PolicyStatement used in a resource-based policy must specify at least one resource.');
+    }
+    return errors;
+  }
+
+  /**
+   * Validate that the policy statement satisfies all requirements for a trust policy (assume role policy).
+   *
+   * Trust policies are a special type of resource-based policy where the resource is implicit (the role itself).
+   *
+   * @returns An array of validation error messages, or an empty array if the statement is valid.
+   */
+  public validateForTrustPolicy(): string[] {
+    const errors = this.validateForAnyPolicy();
+    if (this._principals.length === 0 && this._notPrincipals.length === 0) {
+      errors.push('A PolicyStatement used in a trust policy must specify at least one IAM principal.');
+    }
+    // Note: Trust policies do not require resources because the resource is implicit (the role itself)
     return errors;
   }
 
@@ -795,7 +829,7 @@ export interface PolicyStatementProps {
    *
    * @default - no condition
    */
-  readonly conditions?: {[key: string]: any};
+  readonly conditions?: { [key: string]: any };
 
   /**
    * Whether to allow or deny the actions in this statement
@@ -808,12 +842,12 @@ export interface PolicyStatementProps {
 class JsonPrincipal extends PrincipalBase {
   public readonly policyFragment: PrincipalPolicyFragment;
 
-  constructor(json: any = { }) {
+  constructor(json: any = {}) {
     super();
 
     // special case: if principal is a string, turn it into a "LiteralString" principal,
     // so we render the exact same string back out.
-    if (typeof(json) === 'string') {
+    if (typeof (json) === 'string') {
       json = { [LITERAL_STRING_KEY]: [json] };
     }
     if (typeof(json) !== 'object') {

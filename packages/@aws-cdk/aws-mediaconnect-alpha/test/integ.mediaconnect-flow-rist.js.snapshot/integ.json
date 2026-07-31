@@ -9,5 +9,6 @@
       "assertionStackName": "cdkintegemxflowristDefaultTestDeployAssert325615E2"
     }
   },
-  "minimumCliVersion": "2.1126.0"
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
 }

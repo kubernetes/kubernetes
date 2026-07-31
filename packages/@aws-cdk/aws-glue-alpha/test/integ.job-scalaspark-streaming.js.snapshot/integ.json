@@ -1,5 +1,5 @@
 {
-  "version": "38.0.1",
+  "version": "54.0.0",
   "testCases": {
     "aws-glue-job-scalaspark-streaming-integ-test/DefaultTest": {
       "stacks": [
@@ -8,5 +8,7 @@
       "assertionStack": "aws-glue-job-scalaspark-streaming-integ-test/DefaultTest/DeployAssert",
       "assertionStackName": "awsgluejobscalasparkstreamingintegtestDefaultTestDeployAssertCD3F6A81"
     }
-  }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
 }

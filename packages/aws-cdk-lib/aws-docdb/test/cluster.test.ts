@@ -617,13 +617,142 @@ describe('DatabaseCluster', () => {
       },
       vpc,
       instanceType: ec2.InstanceType.of(ec2.InstanceClass.R5, ec2.InstanceSize.SMALL),
-      preferredMaintenanceWindow: '07:34-08:04',
+      preferredMaintenanceWindow: 'tue:07:34-tue:08:04',
     });
 
     // THEN
     Template.fromStack(stack).hasResourceProperties('AWS::DocDB::DBCluster', {
-      PreferredMaintenanceWindow: '07:34-08:04',
+      PreferredMaintenanceWindow: 'tue:07:34-tue:08:04',
     });
+  });
+
+  test('instanceMaintenanceWindow propagates to all auto-created instances', () => {
+    // GIVEN
+    const stack = testStack();
+    const vpc = new ec2.Vpc(stack, 'VPC');
+
+    // WHEN
+    new DatabaseCluster(stack, 'Database', {
+      masterUser: {
+        username: 'admin',
+      },
+      vpc,
+      preferredMaintenanceWindow: 'tue:04:17-tue:04:47',
+      instances: 2,
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.R5, ec2.InstanceSize.SMALL),
+      instanceMaintenanceWindow: 'sat:09:00-sat:09:30',
+    });
+
+    // THEN
+    const template = Template.fromStack(stack);
+    template.hasResourceProperties('AWS::DocDB::DBCluster', {
+      PreferredMaintenanceWindow: 'tue:04:17-tue:04:47',
+    });
+    template.resourceCountIs('AWS::DocDB::DBInstance', 2);
+    template.allResources('AWS::DocDB::DBInstance', {
+      Properties: Match.objectLike({
+        PreferredMaintenanceWindow: 'sat:09:00-sat:09:30',
+      }),
+    });
+  });
+
+  test('maintenance window is omitted on instances when instanceMaintenanceWindow is not set', () => {
+    // GIVEN
+    const stack = testStack();
+    const vpc = new ec2.Vpc(stack, 'VPC');
+
+    // WHEN
+    new DatabaseCluster(stack, 'Database', {
+      masterUser: {
+        username: 'admin',
+      },
+      vpc,
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.R5, ec2.InstanceSize.SMALL),
+    });
+
+    // THEN
+    Template.fromStack(stack).hasResourceProperties('AWS::DocDB::DBInstance', {
+      PreferredMaintenanceWindow: Match.absent(),
+    });
+  });
+
+  test.each([
+    'mon:00:00-mon:00:30',
+    'sun:23:45-mon:00:15',
+    'wed:12:00-thu:11:59',
+    'SAT:09:00-SAT:09:30', // case-insensitive
+  ])('accepts valid maintenance window %s', (window) => {
+    // GIVEN
+    const stack = testStack();
+    const vpc = new ec2.Vpc(stack, 'VPC');
+
+    // WHEN / THEN
+    expect(() => new DatabaseCluster(stack, 'Database', {
+      masterUser: { username: 'admin' },
+      vpc,
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.R5, ec2.InstanceSize.SMALL),
+      preferredMaintenanceWindow: window,
+      instanceMaintenanceWindow: window,
+    })).not.toThrow();
+  });
+
+  test.each([
+    ['07:34-08:04', 'missing day prefix'],
+    ['tue:04:17', 'missing end range'],
+    ['funday:04:17-tue:04:47', 'invalid day'],
+    ['tue:24:00-tue:24:30', 'invalid hour'],
+    ['tue:04:60-tue:05:30', 'invalid minute'],
+    ['tue:04:17-tue:04:47 ', 'trailing whitespace'],
+    ['', 'empty string'],
+  ])('fails for invalid preferredMaintenanceWindow %s (%s)', (window, _reason) => {
+    // GIVEN
+    const stack = testStack();
+    const vpc = new ec2.Vpc(stack, 'VPC');
+
+    // WHEN / THEN
+    expect(() => new DatabaseCluster(stack, 'Database', {
+      masterUser: { username: 'admin' },
+      vpc,
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.R5, ec2.InstanceSize.SMALL),
+      preferredMaintenanceWindow: window,
+    })).toThrow(/preferredMaintenanceWindow must be in the format ddd:hh24:mi-ddd:hh24:mi/);
+  });
+
+  test.each([
+    ['07:34-08:04', 'missing day prefix'],
+    ['funday:04:17-tue:04:47', 'invalid day'],
+    ['tue:24:00-tue:24:30', 'invalid hour'],
+    ['tue:04:60-tue:05:30', 'invalid minute'],
+    ['', 'empty string'],
+  ])('fails for invalid instanceMaintenanceWindow %s (%s)', (window, _reason) => {
+    // GIVEN
+    const stack = testStack();
+    const vpc = new ec2.Vpc(stack, 'VPC');
+
+    // WHEN / THEN
+    expect(() => new DatabaseCluster(stack, 'Database', {
+      masterUser: { username: 'admin' },
+      vpc,
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.R5, ec2.InstanceSize.SMALL),
+      instanceMaintenanceWindow: window,
+    })).toThrow(/instanceMaintenanceWindow must be in the format ddd:hh24:mi-ddd:hh24:mi/);
+  });
+
+  test('skips maintenance window validation for tokenized values', () => {
+    // GIVEN
+    const stack = testStack();
+    const vpc = new ec2.Vpc(stack, 'VPC');
+    const clusterWindow = new cdk.CfnParameter(stack, 'ClusterWindow', { type: 'String' }).valueAsString;
+    const instanceWindow = new cdk.CfnParameter(stack, 'InstanceWindow', { type: 'String' }).valueAsString;
+
+    // WHEN / THEN
+    expect(() => new DatabaseCluster(stack, 'Database', {
+      masterUser: { username: 'admin' },
+      vpc,
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.R5, ec2.InstanceSize.SMALL),
+      preferredMaintenanceWindow: clusterWindow,
+      instanceMaintenanceWindow: instanceWindow,
+    })).not.toThrow();
   });
 
   test('can configure CloudWatchLogs for audit', () => {

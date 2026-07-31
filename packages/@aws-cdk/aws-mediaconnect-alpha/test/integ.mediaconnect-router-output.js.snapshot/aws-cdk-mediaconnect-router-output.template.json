@@ -211,9 +211,7 @@
       "EncryptionKeyType": "AUTOMATIC"
      }
     }
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "flowOutputC9CABCE8": {
    "Type": "AWS::MediaConnect::RouterOutput",

@@ -1555,6 +1555,51 @@ ecsService.associateCloudMapService({
 });
 ```
 
+### Using an Existing Cloud Map Namespace
+
+You can use an existing Cloud Map namespace as the default namespace for a cluster
+instead of creating a new one. This is useful when you want to share a namespace
+across multiple clusters or when you want to use a namespace that was created
+outside of CDK:
+
+```ts
+declare const vpc: ec2.Vpc;
+
+// Create or reference an existing namespace
+const existingNamespace = new cloudmap.PrivateDnsNamespace(this, 'Namespace', {
+  name: 'example.local',
+  vpc,
+});
+
+const cluster = new ecs.Cluster(this, 'Cluster', { vpc });
+
+// Use the existing namespace as the default
+cluster.addExistingDefaultCloudMapNamespace({
+  namespace: existingNamespace,
+  useForServiceConnect: true,
+});
+```
+
+You can also import an existing namespace:
+
+```ts
+declare const vpc: ec2.Vpc;
+
+const importedNamespace = cloudmap.PrivateDnsNamespace.fromPrivateDnsNamespaceAttributes(
+  this, 'ImportedNamespace', {
+    namespaceId: 'ns-xxxxxxxxxxxxx',
+    namespaceArn: 'arn:aws:servicediscovery:us-east-1:123456789012:namespace/ns-xxxxxxxxxxxxx',
+    namespaceName: 'example.local',
+  }
+);
+
+const cluster = new ecs.Cluster(this, 'Cluster', { vpc });
+
+cluster.addExistingDefaultCloudMapNamespace({
+  namespace: importedNamespace,
+});
+```
+
 ## Capacity Providers
 
 There are two major families of Capacity Providers: [AWS

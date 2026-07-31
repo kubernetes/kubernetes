@@ -1,5 +1,5 @@
 {
-  "version": "53.0.0",
+  "version": "54.0.0",
   "testCases": {
     "CapacityProviderAllFieldsTest/DefaultTest": {
       "stacks": [
@@ -21,5 +21,6 @@
       "assertionStackName": "CapacityProviderAllFieldsTestDefaultTestDeployAssert66FA2D60"
     }
   },
-  "minimumCliVersion": "2.1123.0"
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
 }

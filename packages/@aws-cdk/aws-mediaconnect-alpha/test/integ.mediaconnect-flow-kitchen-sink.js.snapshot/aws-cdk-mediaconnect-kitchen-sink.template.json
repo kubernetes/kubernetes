@@ -471,9 +471,7 @@
       }
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "NdiOutput5A3EFE8F": {
    "Type": "AWS::MediaConnect::FlowOutput",

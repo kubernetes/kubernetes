@@ -6,7 +6,7 @@
  */
 
 import { IntegTest } from '@aws-cdk/integ-tests-alpha';
-import { App, Bitrate, RemovalPolicy, Stack } from 'aws-cdk-lib';
+import { App, Bitrate, Stack } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
@@ -71,14 +71,12 @@ const gwNetwork = mediaconnect.GatewayNetwork.define({
 });
 
 const gateway = new mediaconnect.Gateway(stack, 'Gateway', {
-  removalPolicy: RemovalPolicy.DESTROY,
   gatewayName: 'gateway-source-gw',
   egressCidrBlocks: ['10.0.0.0/16'],
   networks: [gwNetwork],
 });
 
 const bridge = new mediaconnect.Bridge(stack, 'IngressBridge', {
-  removalPolicy: RemovalPolicy.DESTROY,
   bridgeName: 'ingress-bridge',
   gateway,
   config: mediaconnect.BridgeConfiguration.ingress({
@@ -98,7 +96,6 @@ const bridge = new mediaconnect.Bridge(stack, 'IngressBridge', {
 
 // Flow with Gateway Bridge Source
 const flow = new mediaconnect.Flow(stack, 'GatewaySourceFlow', {
-  removalPolicy: RemovalPolicy.DESTROY,
   flowName: 'gateway-source-flow',
   availabilityZone: stack.availabilityZones[0],
   vpcInterfaces: [outputVpcInterface],

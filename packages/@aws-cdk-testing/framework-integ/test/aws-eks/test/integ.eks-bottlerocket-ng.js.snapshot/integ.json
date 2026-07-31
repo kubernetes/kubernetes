@@ -1,5 +1,5 @@
 {
-  "version": "53.0.0",
+  "version": "54.0.0",
   "testCases": {
     "aws-cdk-eks-cluster-bottlerocket-ng/DefaultTest": {
       "stacks": [
@@ -10,5 +10,6 @@
       "assertionStackName": "awscdkeksclusterbottlerocketngDefaultTestDeployAssert6C42FFE7"
     }
   },
-  "minimumCliVersion": "2.1125.0"
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
 }

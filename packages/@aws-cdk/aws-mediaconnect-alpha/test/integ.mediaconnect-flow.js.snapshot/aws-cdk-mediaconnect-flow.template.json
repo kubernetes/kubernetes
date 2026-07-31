@@ -12,9 +12,7 @@
      "Protocol": "rtp-fec",
      "WhitelistCidr": "10.1.0.0/16"
     }
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   }
  },
  "Parameters": {

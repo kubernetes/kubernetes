@@ -36,7 +36,6 @@ const transitGrant = transitSecret.grantRead(mediaConnectRole);
 
 // Create a MediaConnect flow for testing encrypted router output
 const encryptedTestFlow = new Flow(stack, 'EncryptedTestFlow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'test-encrypted-router-output-flow',
   source: SourceConfiguration.router({
     decryption: {

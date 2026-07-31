@@ -6,7 +6,7 @@ import {
   SecurityGroup, SubnetType,
 } from '../../aws-ec2';
 import type { IResource } from '../../core';
-import { Duration, Resource, Token, Validations } from '../../core';
+import { Duration, Resource, Token } from '../../core';
 import { ValidationError } from '../../core/lib/errors';
 import type { IArrayBox } from '../../core/lib/helpers-internal';
 import { Box } from '../../core/lib/helpers-internal';
@@ -278,12 +278,6 @@ export class LoadBalancer extends Resource implements ILoadBalancer, IConnectabl
 
   constructor(scope: Construct, id: string, props: LoadBalancerProps) {
     super(scope, id);
-
-    // https://github.com/aws-cloudformation/cloudformation-validate/issues/186
-    Validations.of(this).acknowledge({
-      id: 'CloudFormation-Validate::W3030',
-      reason: 'Validation will incorrectly flag a lowercase protocol as invalid.',
-    });
 
     // Enhanced CDK Analytics Telemetry
     addConstructMetadata(this, props);

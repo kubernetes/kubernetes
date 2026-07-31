@@ -2029,7 +2029,7 @@ test('with filter policy scope MessageBody', () => {
 });
 
 test('region property is present on an imported topic - sqs', () => {
-  const imported = sns.Topic.fromTopicArn(stack, 'mytopic', 'arn:aws:sns:us-east-1:1234567890:mytopic');
+  const imported = sns.Topic.fromTopicArn(stack, 'mytopic', 'arn:aws:sns:us-east-1:123456789012:mytopic');
   const queue = new sqs.Queue(stack, 'myqueue');
   imported.addSubscription(new subs.SqsSubscription(queue));
 
@@ -2052,7 +2052,7 @@ test('region property on an imported topic as a parameter - sqs', () => {
 });
 
 test('region property is present on an imported topic - lambda', () => {
-  const imported = sns.Topic.fromTopicArn(stack, 'mytopic', 'arn:aws:sns:us-east-1:1234567890:mytopic');
+  const imported = sns.Topic.fromTopicArn(stack, 'mytopic', 'arn:aws:sns:us-east-1:123456789012:mytopic');
   const func = new lambda.Function(stack, 'MyFunc', {
     runtime: lambda.Runtime.NODEJS_LATEST,
     handler: 'index.handler',

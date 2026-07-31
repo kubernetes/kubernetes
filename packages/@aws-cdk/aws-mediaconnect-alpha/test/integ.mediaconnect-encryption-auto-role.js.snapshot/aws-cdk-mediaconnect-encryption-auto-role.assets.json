@@ -1,16 +1,16 @@
 {
   "version": "54.0.0",
   "files": {
-    "4b56db1aee25cfa308a3c9c7d995902d0a2ff28c1252897cac0a3ef630482756": {
+    "6517007364314d54a73e21175a8ac3b15c01ade8d3fdad80e8aaf0adba027a67": {
       "displayName": "aws-cdk-mediaconnect-encryption-auto-role Template",
       "source": {
         "path": "aws-cdk-mediaconnect-encryption-auto-role.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "current_account-current_region-c83edb0e": {
+        "current_account-current_region-a35d94d2": {
           "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
-          "objectKey": "4b56db1aee25cfa308a3c9c7d995902d0a2ff28c1252897cac0a3ef630482756.json",
+          "objectKey": "6517007364314d54a73e21175a8ac3b15c01ade8d3fdad80e8aaf0adba027a67.json",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
         }
       }

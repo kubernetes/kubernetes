@@ -1,0 +1,13 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "DocdbClusterInstanceMaintenanceWindowInteg/DefaultTest": {
+      "stacks": [
+        "aws-cdk-docdb-instance-maintenance-window"
+      ],
+      "assertionStack": "DocdbClusterInstanceMaintenanceWindowInteg/DefaultTest/DeployAssert",
+      "assertionStackName": "DocdbClusterInstanceMaintenanceWindowIntegDefaultTestDeployAssert7CE0A1D7"
+    }
+  },
+  "minimumCliVersion": "2.1126.0"
+}

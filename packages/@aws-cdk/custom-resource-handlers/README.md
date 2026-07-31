@@ -36,6 +36,7 @@ and included as part of the `aws-cdk-lib` package.
 ## Experimental
 
 - aws-amplify-alpha/asset-deployment-handler
+- aws-glue-alpha/partition-index-handler
 - aws-redshift-alpha/asset-deployment-handler
 
 These handlers are excluded from `aws-cdk-lib/custom-resource-handlers` and are individually

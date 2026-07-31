@@ -1,5 +1,5 @@
 {
-  "version": "38.0.1",
+  "version": "54.0.0",
   "testCases": {
     "aws-cdk-glue-workflow-trigger-integ/DefaultTest": {
       "stacks": [
@@ -8,5 +8,7 @@
       "assertionStack": "aws-cdk-glue-workflow-trigger-integ/DefaultTest/DeployAssert",
       "assertionStackName": "awscdkglueworkflowtriggerintegDefaultTestDeployAssert43E79173"
     }
-  }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
 }

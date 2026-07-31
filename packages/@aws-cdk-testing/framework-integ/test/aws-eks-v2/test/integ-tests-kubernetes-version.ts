@@ -6,6 +6,7 @@ import { KubectlV32Layer } from '@aws-cdk/lambda-layer-kubectl-v32';
 import { KubectlV33Layer } from '@aws-cdk/lambda-layer-kubectl-v33';
 import { KubectlV34Layer } from '@aws-cdk/lambda-layer-kubectl-v34';
 import { KubectlV35Layer } from '@aws-cdk/lambda-layer-kubectl-v35';
+import { KubectlV36Layer } from '@aws-cdk/lambda-layer-kubectl-v36';
 import type { Construct } from 'constructs';
 import * as eks from 'aws-cdk-lib/aws-eks-v2';
 
@@ -21,6 +22,7 @@ const versionMap: { [key: string]: new (scope: Construct, id: string) => lambda.
   '1.33': KubectlV33Layer,
   '1.34': KubectlV34Layer,
   '1.35': KubectlV35Layer,
+  '1.36': KubectlV36Layer,
 };
 
 const sortedVersions = Object.keys(versionMap).sort((a, b) => parseFloat(a) - parseFloat(b));

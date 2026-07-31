@@ -13,9 +13,7 @@
       "Name": "network-1"
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "IngressBridge39ECBE25": {
    "Type": "AWS::MediaConnect::Bridge",
@@ -47,9 +45,7 @@
       }
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "IngressAdditionalSourceF4CE0178": {
    "Type": "AWS::MediaConnect::BridgeSource",
@@ -80,9 +76,7 @@
      "Protocol": "rtp",
      "WhitelistCidr": "203.0.113.0/24"
     }
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "EgressBridge777128C1": {
    "Type": "AWS::MediaConnect::Bridge",
@@ -126,9 +120,7 @@
       }
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "EgressAdditionalSource0F3A274F": {
    "Type": "AWS::MediaConnect::BridgeSource",

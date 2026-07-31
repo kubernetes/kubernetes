@@ -9,7 +9,6 @@ const app = new cdk.App();
 const stack = new cdk.Stack(app, 'aws-cdk-mediaconnect-flow');
 
 new Flow(stack, 'flow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   source: SourceConfiguration.rtpFec({
     flowSourceName: 'my-flow',
     network: NetworkConfiguration.publicNetwork('10.1.0.0/16'),

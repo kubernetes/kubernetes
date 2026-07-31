@@ -11,7 +11,6 @@ function makeStackAndUser() {
   const stack = new Stack();
   Validations.of(stack).acknowledge(
     { id: 'CloudFormation-Validate::F3002', reason: "For these tests, we don't care about property names being valid" },
-    { id: 'CloudFormation-Validate::F3003', reason: "For these tests, we don't care about property names being valid" },
   );
   const user = new iam.User(stack, 'user', { userName: 'MyUserName' });
   return { stack, user };

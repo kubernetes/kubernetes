@@ -1,16 +1,16 @@
 {
   "version": "54.0.0",
   "files": {
-    "a28a8c0fc2377ef792e55e228e581f50a24e11d31303f10ac47a9dbae66da4c8": {
+    "d44aff87d35777a901bbfcab18c60d967de2e12376065c726e5849e82cc94637": {
       "displayName": "aws-cdk-mediaconnect-router-output-encryption Template",
       "source": {
         "path": "aws-cdk-mediaconnect-router-output-encryption.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "current_account-current_region-1e33566f": {
+        "current_account-current_region-7e134f0a": {
           "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
-          "objectKey": "a28a8c0fc2377ef792e55e228e581f50a24e11d31303f10ac47a9dbae66da4c8.json",
+          "objectKey": "d44aff87d35777a901bbfcab18c60d967de2e12376065c726e5849e82cc94637.json",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
         }
       }

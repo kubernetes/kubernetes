@@ -16,7 +16,7 @@
  */
 
 import { IntegTest } from '@aws-cdk/integ-tests-alpha';
-import { App, Duration, RemovalPolicy, Stack } from 'aws-cdk-lib';
+import { App, Duration, Stack } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
@@ -76,7 +76,6 @@ const encryptionRole = new iam.Role(stack, 'EncryptionRole', {
 
 // LARGE Flow with RTP source, NDI config + discovery server, full monitoring
 const flow = new mediaconnect.Flow(stack, 'KitchenSinkFlow', {
-  removalPolicy: RemovalPolicy.DESTROY,
   flowName: 'kitchen-sink-flow',
   availabilityZone: stack.availabilityZones[0],
   flowSize: mediaconnect.FlowSize.LARGE,

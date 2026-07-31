@@ -63,7 +63,6 @@ const vpcInterface = VpcInterface.define({
 });
 
 const flow = new Flow(stack, 'Flow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'outputs-integ-flow',
   vpcInterfaces: [vpcInterface],
   source: SourceConfiguration.rtp({

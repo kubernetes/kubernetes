@@ -1,0 +1,100 @@
+{
+  "/eks-provisioned-control-plane-integ/DefaultTest/DeployAssert/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/eks-provisioned-control-plane-integ/DefaultTest/DeployAssert/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/eks-provisioned-control-plane-integ/DefaultTest/DeployAssert/AwsApiCalleksdescribeCluster0a265f6967dba9c5b7d6856418410a53/Default": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    }
+  ],
+  "/eks-provisioned-control-plane-integ/DefaultTest/DeployAssert/AwsApiCalleksdescribeCluster0a265f6967dba9c5b7d6856418410a53/AssertionResults": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AssertionResultsAwsApiCalleksdescribeCluster0a265f6967dba9c5b7d6856418410a53"
+    }
+  ],
+  "/eks-provisioned-control-plane-integ/DefaultTest/DeployAssert/SingletonFunction1488541a7b23466481b69b4408076b81/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction1488541a7b23466481b69b4408076b81Role37ABCE73"
+    }
+  ],
+  "/eks-provisioned-control-plane-integ/DefaultTest/DeployAssert/SingletonFunction1488541a7b23466481b69b4408076b81/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction1488541a7b23466481b69b4408076b81HandlerCD40AE9F"
+    }
+  ],
+  "/eks-provisioned-control-plane-integ/DefaultTest/DeployAssert/SingletonFunction76b3e830a873425f8453eddd85c86925/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction76b3e830a873425f8453eddd85c86925Role918961BB"
+    }
+  ],
+  "/eks-provisioned-control-plane-integ/DefaultTest/DeployAssert/SingletonFunction76b3e830a873425f8453eddd85c86925/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction76b3e830a873425f8453eddd85c86925Handler81461ECE"
+    }
+  ],
+  "/eks-provisioned-control-plane-integ/DefaultTest/DeployAssert/SingletonFunction5c1898e096fb4e3e95d5f6c67f3ce41a/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction5c1898e096fb4e3e95d5f6c67f3ce41aRoleB84BD8CE"
+    }
+  ],
+  "/eks-provisioned-control-plane-integ/DefaultTest/DeployAssert/SingletonFunction5c1898e096fb4e3e95d5f6c67f3ce41a/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction5c1898e096fb4e3e95d5f6c67f3ce41aHandlerADF3E6EA"
+    }
+  ],
+  "/eks-provisioned-control-plane-integ/DefaultTest/DeployAssert/AwsApiCalleksdescribeCluster0a265f6967dba9c5b7d6856418410a53/Default/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCalleksdescribeCluster0a265f6967dba9c5b7d6856418410a53"
+    }
+  ],
+  "/eks-provisioned-control-plane-integ/DefaultTest/DeployAssert/AwsApiCalleksdescribeCluster0a265f6967dba9c5b7d6856418410a53/WaitFor/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCalleksdescribeCluster0a265f6967dba9c5b7d6856418410a53WaitForRoleF311910C"
+    }
+  ],
+  "/eks-provisioned-control-plane-integ/DefaultTest/DeployAssert/AwsApiCalleksdescribeCluster0a265f6967dba9c5b7d6856418410a53/WaitFor/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCalleksdescribeCluster0a265f6967dba9c5b7d6856418410a53WaitFor5E0E966B"
+    }
+  ],
+  "/eks-provisioned-control-plane-integ/DefaultTest/DeployAssert/AwsApiCalleksdescribeCluster0a265f6967dba9c5b7d6856418410a53/WaitFor/IsCompleteProvider/Invoke": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCalleksdescribeCluster0a265f6967dba9c5b7d6856418410a53WaitForIsCompleteProviderInvoke6573374C"
+    }
+  ],
+  "/eks-provisioned-control-plane-integ/DefaultTest/DeployAssert/AwsApiCalleksdescribeCluster0a265f6967dba9c5b7d6856418410a53/WaitFor/TimeoutProvider/Invoke": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCalleksdescribeCluster0a265f6967dba9c5b7d6856418410a53WaitForTimeoutProviderInvoke316D1BD6"
+    }
+  ]
+}

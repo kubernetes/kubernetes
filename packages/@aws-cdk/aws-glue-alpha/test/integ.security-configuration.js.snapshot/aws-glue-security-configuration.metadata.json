@@ -1,0 +1,74 @@
+{
+  "/aws-glue-security-configuration/Key": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-glue-security-configuration/KeyedSC": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-glue-security-configuration/KeylessSC": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-glue-security-configuration/S3SC": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-glue-security-configuration/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-glue-security-configuration/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-glue-security-configuration/Key/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Key961B73FD"
+    }
+  ],
+  "/aws-glue-security-configuration/KeyedSC/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "KeyedSC862A23F3"
+    }
+  ],
+  "/aws-glue-security-configuration/KeylessSC/Key": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-glue-security-configuration/KeylessSC/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "KeylessSC42E312EC"
+    }
+  ],
+  "/aws-glue-security-configuration/S3SC/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "S3SCE31C83BE"
+    }
+  ],
+  "/aws-glue-security-configuration/KeylessSC/Key/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "KeylessSCKey4D3DE803"
+    }
+  ]
+}

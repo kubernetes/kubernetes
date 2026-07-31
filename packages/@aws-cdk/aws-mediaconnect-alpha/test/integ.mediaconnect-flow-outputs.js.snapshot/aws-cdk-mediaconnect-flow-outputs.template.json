@@ -381,9 +381,7 @@
       }
      }
     ]
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "RtpOutputBE23B6A0": {
    "Type": "AWS::MediaConnect::FlowOutput",

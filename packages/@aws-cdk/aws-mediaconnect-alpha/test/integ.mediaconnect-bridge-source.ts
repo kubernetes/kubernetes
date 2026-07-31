@@ -26,7 +26,6 @@ const network = GatewayNetwork.define({
 });
 
 const gateway = new Gateway(stack, 'Gateway', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   egressCidrBlocks: ['10.0.0.0/23'],
   networks: [network],
 });
@@ -34,7 +33,6 @@ const gateway = new Gateway(stack, 'Gateway', {
 // Ingress bridge with failover, started with one network source; we add a second
 // via BridgeSource below.
 const ingressBridge = new Bridge(stack, 'IngressBridge', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   bridgeName: 'bridge-source-ingress',
   config: BridgeConfiguration.ingress({
     maxBitrate: cdk.Bitrate.mbps(5),
@@ -66,7 +64,6 @@ new BridgeSource(stack, 'IngressAdditionalSource', {
 
 // Feeder flow for the egress bridge below.
 const feederFlow = new Flow(stack, 'FeederFlow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowName: 'bridge-source-feeder',
   source: SourceConfiguration.rtp({
     flowSourceName: 'feeder-source',
@@ -78,7 +75,6 @@ const feederFlow = new Flow(stack, 'FeederFlow', {
 // Egress bridge with failover enabled; starts with one flow source and we add a
 // second via BridgeSource.
 const egressBridge = new Bridge(stack, 'EgressBridge', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   bridgeName: 'bridge-source-egress',
   config: BridgeConfiguration.egress({
     maxBitrate: cdk.Bitrate.mbps(5),

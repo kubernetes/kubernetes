@@ -79,7 +79,6 @@ const videoMediaStream = MediaStream.video({
 });
 
 new Flow(stack, 'flow', {
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
   flowSize: FlowSize.LARGE_4X,
   vpcInterfaces: [interface1, interface2],
   mediaStreams: [videoMediaStream],

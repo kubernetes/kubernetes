@@ -779,7 +779,7 @@ export class Role extends Resource implements IRole {
 
   private validateRole(): string[] {
     const errors = new Array<string>();
-    errors.push(...this.assumeRolePolicy?.validateForResourcePolicy() ?? []);
+    errors.push(...this.assumeRolePolicy?.validateForTrustPolicy() ?? []);
     for (const policy of Object.values(this.inlinePolicies)) {
       errors.push(...policy.validateForIdentityPolicy());
     }

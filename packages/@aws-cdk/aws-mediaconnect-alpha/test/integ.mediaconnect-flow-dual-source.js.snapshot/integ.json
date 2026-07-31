@@ -9,5 +9,6 @@
       "assertionStackName": "cdkintegmediaconnectdualsourceDefaultTestDeployAssert24350D2A"
     }
   },
-  "minimumCliVersion": "2.1126.0"
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
 }

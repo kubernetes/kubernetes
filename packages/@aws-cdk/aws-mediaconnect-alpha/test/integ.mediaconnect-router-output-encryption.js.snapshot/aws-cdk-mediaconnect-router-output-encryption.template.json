@@ -90,9 +90,7 @@
       "EncryptionKeyType": "SECRETS_MANAGER"
      }
     }
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+   }
   },
   "MediaLiveInput": {
    "Type": "AWS::MediaLive::Input",

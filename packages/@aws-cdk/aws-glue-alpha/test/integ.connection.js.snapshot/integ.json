@@ -1,5 +1,5 @@
 {
-  "version": "22.0.0",
+  "version": "54.0.0",
   "testCases": {
     "integ.connection": {
       "stacks": [
@@ -10,5 +10,6 @@
     }
   },
   "synthContext": {},
-  "enableLookups": false
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
 }
