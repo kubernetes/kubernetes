@@ -7992,11 +7992,11 @@ func TestAddPodGroup(t *testing.T) {
 					Type:      fwk.PodGroupKeyType,
 				},
 			}
-			gotPodGroup, ok := q.workloadForest.getPodGroup(podGroup)
+			gotAPG, ok := q.workloadForest.podGroups[fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)]
 			if !ok {
 				t.Fatalf("Expected pod group to be in workloadForest")
 			}
-			if diff := cmp.Diff(podGroup, gotPodGroup); diff != "" {
+			if diff := cmp.Diff(podGroup, gotAPG.PodGroup); diff != "" {
 				t.Errorf("Unexpected pod group object (-want +got):\n%s", diff)
 			}
 
@@ -8115,11 +8115,11 @@ func TestUpdatePodGroup(t *testing.T) {
 
 			q.UpdatePodGroup(logger, updatedPodGroup)
 
-			gotPodGroup, ok := q.workloadForest.getPodGroup(podGroup)
+			gotAPG, ok := q.workloadForest.podGroups[fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)]
 			if !ok {
 				t.Fatalf("Expected pod group to be in workloadForest")
 			}
-			if diff := cmp.Diff(updatedPodGroup, gotPodGroup); diff != "" {
+			if diff := cmp.Diff(updatedPodGroup, gotAPG.PodGroup); diff != "" {
 				t.Errorf("Unexpected pod group object (-want +got):\n%s", diff)
 			}
 
@@ -8249,7 +8249,7 @@ func TestDeletePodGroup(t *testing.T) {
 
 			q.DeletePodGroup(logger, podGroup)
 
-			_, ok := q.workloadForest.getPodGroup(podGroup)
+			_, ok := q.workloadForest.podGroups[fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)]
 			if ok {
 				t.Errorf("Expected pod group not to be present in workloadForest")
 			}

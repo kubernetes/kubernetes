@@ -1558,15 +1558,15 @@ func (p *PriorityQueue) deletePod(pod *v1.Pod) {
 	}
 }
 
-// AddPodGroup adds a new PodGroup object to the queue,
-// requeuing all pods associated with the pod group.
-func (p *PriorityQueue) AddPodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup) {
+// addAbstractPodGroup adds a PodGroup or CompositePodGroup object to the queue,
+// requeuing all pods associated with the group.
+func (p *PriorityQueue) addAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.workloadForest.addPodGroup(podGroup)
+	p.workloadForest.addAbstractPodGroup(apg)
 
-	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfoForPodGroup(podGroup)
+	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfo(apg)
 	if !hasRoot {
 		// If the root does not exist, then pods should stay in the incompletePodGroupPods.
 		return
@@ -1579,8 +1579,9 @@ func (p *PriorityQueue) AddPodGroup(logger klog.Logger, podGroup *schedulingv1be
 		}
 
 		rootInfo := entity.(*framework.QueuedPodGroupInfo)
-		rootInfo.AddPodGroup(podGroup)
-		logger.V(5).Info("Pod Group added to the existing root group", "rootType", rootInfo.Type(), "root", klog.KObj(rootInfo), "podGroup", klog.KObj(podGroup))
+		subtree := p.workloadForest.buildPodGroupInfo(logger, apg, sets.New[fwk.EntityKey]())
+		rootInfo.AddAbstractPodGroup(apg, subtree)
+		logger.V(5).Info("New group added to the existing root group", "rootType", rootInfo.Type(), "root", klog.KObj(rootInfo), "groupType", apg.GetType(), "group", klog.KObj(apg))
 	})
 
 	pgs := p.workloadForest.getLeafPodGroups(logger, rootInfoLookup)
@@ -1594,16 +1595,16 @@ func (p *PriorityQueue) AddPodGroup(logger klog.Logger, podGroup *schedulingv1be
 		// through the addPodGroupMember method.
 		p.addPodGroupMember(logger, pInfo)
 	}
-	logger.V(5).Info("Pod Group was added to the root group and its pods were attempted to be moved from incompletePodGroupPods to the queue", "rootType", rootInfoLookup.Type(), "root", klog.KObj(rootInfoLookup), "podGroup", klog.KObj(podGroup), "podsLen", len(pInfos))
+	logger.V(5).Info("New group was added to the root group and its pods were attempted to be moved from incompletePodGroupPods to the queue", "rootType", rootInfoLookup.Type(), "root", klog.KObj(rootInfoLookup), "groupType", apg.GetType(), "group", klog.KObj(apg), "podsLen", len(pInfos))
 }
 
-// UpdatePodGroup updates an existing PodGroup object in the queue.
-func (p *PriorityQueue) UpdatePodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup) {
+// updateAbstractPodGroup updates an existing PodGroup or CompositePodGroup object in the queue.
+func (p *PriorityQueue) updateAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.workloadForest.updatePodGroup(podGroup)
-	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfoForPodGroup(podGroup)
+	p.workloadForest.updateAbstractPodGroup(apg)
+	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfo(apg)
 	if !hasRoot {
 		return
 	}
@@ -1614,145 +1615,23 @@ func (p *PriorityQueue) UpdatePodGroup(logger klog.Logger, podGroup *schedulingv
 			return
 		}
 		rootInfo := entity.(*framework.QueuedPodGroupInfo)
-		rootInfo.UpdatePodGroup(podGroup)
-		logger.V(5).Info("Pod Group in the scheduling queue was updated for the root group", "rootType", rootInfo.Type(), "root", klog.KObj(rootInfo), "podGroup", klog.KObj(podGroup))
+		rootInfo.UpdateAbstractPodGroup(apg)
+		logger.V(5).Info("Group in the scheduling queue was updated for the root group", "rootType", rootInfo.Type(), "root", klog.KObj(rootInfo), "groupType", apg.GetType(), "group", klog.KObj(apg))
 	})
 }
 
-// DeletePodGroup removes a PodGroup object from the queue,
-// moving all pods associated with the pod group to the incompletePodGroupPods.
-func (p *PriorityQueue) DeletePodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup) {
+// deleteAbstractPodGroup removes a PodGroup or CompositePodGroup object from the queue.
+func (p *PriorityQueue) deleteAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	rootInfoLookup, hadRoot := p.workloadForest.getRootLookupInfoForPodGroup(podGroup)
-	p.workloadForest.deletePodGroup(podGroup)
+	rootInfoLookup, hadRoot := p.workloadForest.getRootLookupInfo(apg)
 	if !hadRoot {
-		return
-	}
-
-	entity, strategy := p.deleteFromAnyQueue(rootInfoLookup)
-	if entity == nil {
-		if !p.activeQ.isLastPoppedEntity(rootInfoLookup) {
-			// Root PodGroup/CompositePodGroup isn't pending or enqueued.
-			// No pods are tracked for that group in the queue,
-			// because in such case they are either scheduled or the group has no pods left.
-			return
-		}
-		// Get the pending pods and move them to incompletePodGroupPods.
-		pendingPods := p.pendingPodGroupPods.clear(podGroup.Namespace, podGroup.Name)
-		if len(pendingPods) == 0 {
-			// No pending pods, nothing to move.
-			return
-		}
-		for _, pInfo := range pendingPods {
-			p.incompletePodGroupPods.add(pInfo)
-		}
-		logger.V(5).Info("Pod group deleted, decomposed and enqueued pending pods for the pod group to incompletePodGroupPods", "podGroup", klog.KObj(podGroup), "pods", len(pendingPods))
-		return
-	}
-
-	rootInfo := entity.(*framework.QueuedPodGroupInfo)
-	removedPods := rootInfo.RemovePodGroup(podGroup)
-	for _, pInfo := range removedPods {
-		p.incompletePodGroupPods.add(pInfo)
-	}
-
-	if !rootInfo.HasQueuedPodInfos() {
-		logger.V(5).Info("Pod group deleted from root group, decomposed and enqueued pods to incompletePodGroupPods", "rootType", rootInfo.Type(), "root", klog.KObj(rootInfo), "podGroup", klog.KObj(podGroup), "pods", len(removedPods))
-		return
-	}
-
-	queue := p.requeueEntityWithQueueingStrategy(logger, rootInfo, strategy, framework.EventUnscheduledPodUpdate.Label())
-	if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
-		p.activeQ.broadcast()
-	}
-	logger.V(5).Info("Pod group deleted from root group, decomposed and enqueued pods to incompletePodGroupPods", "rootType", rootInfo.Type(), "root", klog.KObj(rootInfo), "podGroup", klog.KObj(podGroup), "pods", len(removedPods))
-}
-
-// AddCompositePodGroup adds a new CompositePodGroup object to the queue.
-// It requeues all pods associated with the composite pod group.
-func (p *PriorityQueue) AddCompositePodGroup(logger klog.Logger, cpg *schedulingv1alpha3.CompositePodGroup) {
-	if !p.isCompositePodGroupEnabled {
-		return
-	}
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	p.workloadForest.addCompositePodGroup(cpg)
-	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfoForCPG(cpg)
-	if !hasRoot {
-		// If the root does not exist, then pods should stay in the incompletePodGroupPods.
-		return
-	}
-
-	p.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
-		entity := p.getEntityFromAnyQueue(unlockedActiveQ, rootInfoLookup)
-		if entity == nil {
-			return
-		}
-
-		rootInfo := entity.(*framework.QueuedPodGroupInfo)
-		subtree := p.workloadForest.buildPodGroupInfoForCPG(logger, cpg, sets.New[fwk.EntityKey]())
-		rootInfo.AddCompositePodGroup(cpg, subtree)
-		logger.V(5).Info("Composite Pod Group added to the existing root group", "rootType", rootInfo.Type(), "root", klog.KObj(rootInfo), "podGroup", klog.KObj(cpg))
-	})
-
-	pgs := p.workloadForest.getLeafPodGroups(logger, rootInfoLookup)
-	var pInfos []*framework.QueuedPodInfo
-	for _, pg := range pgs {
-		pInfos = append(pInfos, p.incompletePodGroupPods.clear(pg.Namespace, pg.Name)...)
-	}
-
-	for _, pInfo := range pInfos {
-		// To handle all cases reliably, pods removed from incompletePodGroupPods are added to the queue
-		// through the addPodGroupMember method.
-		p.addPodGroupMember(logger, pInfo)
-	}
-	logger.V(5).Info("Composite Pod Group was added to the root group and its pods were attempted to be moved from incompletePodGroupPods to the queue", "rootType", rootInfoLookup.Type(), "root", klog.KObj(rootInfoLookup), "compositePodGroup", klog.KObj(cpg), "podsLen", len(pInfos))
-}
-
-// UpdateCompositePodGroup updates an existing CompositePodGroup object in the queue.
-func (p *PriorityQueue) UpdateCompositePodGroup(logger klog.Logger, newCPG *schedulingv1alpha3.CompositePodGroup) {
-	if !p.isCompositePodGroupEnabled {
-		return
-	}
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	p.workloadForest.updateCompositePodGroup(newCPG)
-	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfoForCPG(newCPG)
-	if !hasRoot {
-		return
-	}
-
-	p.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
-		entity := p.getEntityFromAnyQueue(unlockedActiveQ, rootInfoLookup)
-		if entity == nil {
-			return
-		}
-		rootInfo := entity.(*framework.QueuedPodGroupInfo)
-		rootInfo.UpdateCompositePodGroup(newCPG)
-		logger.V(5).Info("Composite Pod Group in the scheduling queue was updated for the root group", "rootType", rootInfo.Type(), "root", klog.KObj(rootInfo), "compositePodGroup", klog.KObj(newCPG))
-	})
-}
-
-// DeleteCompositePodGroup removes a CompositePodGroup object from the queue.
-// It moves all pods in the hierarchy of the composite pod group to the incompletePodGroupPods.
-func (p *PriorityQueue) DeleteCompositePodGroup(logger klog.Logger, cpg *schedulingv1alpha3.CompositePodGroup) {
-	if !p.isCompositePodGroupEnabled {
-		return
-	}
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	rootInfoLookup, hadRoot := p.workloadForest.getRootLookupInfoForCPG(cpg)
-	if !hadRoot {
-		p.workloadForest.deleteCompositePodGroup(cpg)
+		p.workloadForest.deleteAbstractPodGroup(apg)
 		return
 	}
 	leafPGs := p.workloadForest.getLeafPodGroups(logger, rootInfoLookup)
-	p.workloadForest.deleteCompositePodGroup(cpg)
+	p.workloadForest.deleteAbstractPodGroup(apg)
 
 	entity, strategy := p.deleteFromAnyQueue(rootInfoLookup)
 	if entity == nil {
@@ -1762,7 +1641,7 @@ func (p *PriorityQueue) DeleteCompositePodGroup(logger klog.Logger, cpg *schedul
 			// because in such case they are either scheduled or the group has no pods left.
 			return
 		}
-		// Get the pending pods and move them to incompletePodGroupPods.
+		// Get the pending pods and move them to incompletePodGroupPods, if no root exists.
 		var pendingPods []*framework.QueuedPodInfo
 		for _, pg := range leafPGs {
 			pendingPods = append(pendingPods, p.pendingPodGroupPods.clear(pg.Namespace, pg.Name)...)
@@ -1779,18 +1658,18 @@ func (p *PriorityQueue) DeleteCompositePodGroup(logger klog.Logger, cpg *schedul
 				p.incompletePodGroupPods.add(pInfo)
 			}
 		}
-		logger.V(5).Info("Composite pod group deleted from the root group, enqueued pending pods in the composite pod group subtree to incompletePodGroupPods", "rootType", rootInfoLookup.Type(), "root", klog.KObj(rootInfoLookup), "compositePodGroup", klog.KObj(cpg), "pods", len(pendingPods))
+		logger.V(5).Info("Group deleted from the root group, enqueued pending pods to incompletePodGroupPods", "rootType", rootInfoLookup.Type(), "root", klog.KObj(rootInfoLookup), "groupType", apg.GetType(), "group", klog.KObj(apg), "pods", len(pendingPods))
 		return
 	}
 
 	rootInfo := entity.(*framework.QueuedPodGroupInfo)
-	removedPods := rootInfo.RemoveCompositePodGroup(cpg)
+	removedPods := rootInfo.RemoveAbstractPodGroup(apg)
 	for _, pInfo := range removedPods {
 		p.incompletePodGroupPods.add(pInfo)
 	}
 
-	logger.V(5).Info("Composite pod group deleted from the root group, decomposed and enqueued pods in the composite pod group subtree to incompletePodGroupPods", "rootType", rootInfo.Type(), "root", klog.KObj(rootInfo), "compositePodGroup", klog.KObj(cpg), "pods", len(removedPods))
 	if !rootInfo.HasQueuedPodInfos() {
+		logger.V(5).Info("Group deleted from root group, decomposed and enqueued pods to incompletePodGroupPods", "rootType", rootInfo.Type(), "root", klog.KObj(rootInfo), "groupType", apg.GetType(), "group", klog.KObj(apg), "pods", len(removedPods))
 		return
 	}
 
@@ -1798,6 +1677,50 @@ func (p *PriorityQueue) DeleteCompositePodGroup(logger klog.Logger, cpg *schedul
 	if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
 		p.activeQ.broadcast()
 	}
+	logger.V(5).Info("Group deleted from root group, decomposed and enqueued pods to incompletePodGroupPods", "rootType", rootInfo.Type(), "root", klog.KObj(rootInfo), "groupType", apg.GetType(), "group", klog.KObj(apg), "pods", len(removedPods))
+}
+
+// AddPodGroup adds a new PodGroup object to the queue,
+// requeuing all pods associated with the pod group.
+func (p *PriorityQueue) AddPodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup) {
+	p.addAbstractPodGroup(logger, framework.NewAbstractPodGroup(podGroup))
+}
+
+// UpdatePodGroup updates an existing PodGroup object in the queue.
+func (p *PriorityQueue) UpdatePodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup) {
+	p.updateAbstractPodGroup(logger, framework.NewAbstractPodGroup(podGroup))
+}
+
+// DeletePodGroup removes a PodGroup object from the queue,
+// moving all pods associated with the pod group to the incompletePodGroupPods.
+func (p *PriorityQueue) DeletePodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup) {
+	p.deleteAbstractPodGroup(logger, framework.NewAbstractPodGroup(podGroup))
+}
+
+// AddCompositePodGroup adds a new CompositePodGroup object to the queue.
+// It requeues all pods associated with the composite pod group.
+func (p *PriorityQueue) AddCompositePodGroup(logger klog.Logger, cpg *schedulingv1alpha3.CompositePodGroup) {
+	if !p.isCompositePodGroupEnabled {
+		return
+	}
+	p.addAbstractPodGroup(logger, framework.NewAbstractCompositePodGroup(cpg))
+}
+
+// UpdateCompositePodGroup updates an existing CompositePodGroup object in the queue.
+func (p *PriorityQueue) UpdateCompositePodGroup(logger klog.Logger, newCPG *schedulingv1alpha3.CompositePodGroup) {
+	if !p.isCompositePodGroupEnabled {
+		return
+	}
+	p.updateAbstractPodGroup(logger, framework.NewAbstractCompositePodGroup(newCPG))
+}
+
+// DeleteCompositePodGroup removes a CompositePodGroup object from the queue.
+// It moves all pods in the hierarchy of the composite pod group to the incompletePodGroupPods.
+func (p *PriorityQueue) DeleteCompositePodGroup(logger klog.Logger, cpg *schedulingv1alpha3.CompositePodGroup) {
+	if !p.isCompositePodGroupEnabled {
+		return
+	}
+	p.deleteAbstractPodGroup(logger, framework.NewAbstractCompositePodGroup(cpg))
 }
 
 // NOTE: this function assumes a lock has been acquired in the caller.
@@ -2256,14 +2179,6 @@ func podKey(pod *v1.Pod) fwk.EntityKey {
 
 func podGroupKeyForPod(pod *v1.Pod) fwk.EntityKey {
 	return fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
-}
-
-func podGroupKey(podGroup *schedulingv1beta1.PodGroup) fwk.EntityKey {
-	return fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)
-}
-
-func compositePodGroupKey(cpg *schedulingv1alpha3.CompositePodGroup) fwk.EntityKey {
-	return fwk.CompositePodGroupKey(cpg.Namespace, cpg.Name)
 }
 
 // preQueueingHintPodKeys holds the result of running PreQueueingHintFns for an event.

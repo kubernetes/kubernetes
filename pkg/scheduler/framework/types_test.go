@@ -18,10 +18,11 @@ package framework
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -3691,7 +3692,7 @@ func TestQueuedPodGroupInfo_AddCompositePodGroup(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(qpgi)
 			}
-			qpgi.AddCompositePodGroup(tt.cpgToAdd, tt.subtree)
+			qpgi.AddAbstractPodGroup(NewAbstractCompositePodGroup(tt.cpgToAdd), tt.subtree)
 			tt.verify(t, qpgi)
 		})
 	}
@@ -3756,7 +3757,7 @@ func TestQueuedPodGroupInfo_UpdateCompositePodGroup(t *testing.T) {
 				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
 			}
 			tt.setup(qpgi)
-			qpgi.UpdateCompositePodGroup(tt.updateCPG)
+			qpgi.UpdateAbstractPodGroup(NewAbstractCompositePodGroup(tt.updateCPG))
 			tt.verify(t, qpgi)
 		})
 	}
@@ -3883,7 +3884,7 @@ func TestQueuedPodGroupInfo_RemoveCompositePodGroup(t *testing.T) {
 				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
 			}
 			tt.setup(qpgi)
-			removed := qpgi.RemoveCompositePodGroup(tt.removeCPG)
+			removed := qpgi.RemoveAbstractPodGroup(NewAbstractCompositePodGroup(tt.removeCPG))
 			tt.verify(t, qpgi, removed)
 		})
 	}
@@ -3952,7 +3953,13 @@ func TestQueuedPodGroupInfo_AddPodGroup(t *testing.T) {
 				},
 				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
 			}
-			qpgi.AddPodGroup(tt.pgToAdd)
+			qpgi.AddAbstractPodGroup(NewAbstractPodGroup(tt.pgToAdd), &PodGroupInfo{
+				Namespace: tt.pgToAdd.Namespace,
+				Name:      tt.pgToAdd.Name,
+				Type:      fwk.PodGroupKeyType,
+				PodGroup:  tt.pgToAdd,
+				Children:  make([]*PodGroupInfo, 0),
+			})
 			tt.verify(t, qpgi)
 		})
 	}
@@ -4035,7 +4042,7 @@ func TestQueuedPodGroupInfo_UpdatePodGroup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			qpgi := tt.setup()
-			qpgi.UpdatePodGroup(tt.updatePG)
+			qpgi.UpdateAbstractPodGroup(NewAbstractPodGroup(tt.updatePG))
 			tt.verify(t, qpgi)
 		})
 	}
@@ -4115,7 +4122,7 @@ func TestQueuedPodGroupInfo_RemovePodGroup(t *testing.T) {
 				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
 			}
 			tt.setup(qpgi)
-			removed := qpgi.RemovePodGroup(tt.removePG)
+			removed := qpgi.RemoveAbstractPodGroup(NewAbstractPodGroup(tt.removePG))
 			tt.verify(t, qpgi, removed)
 		})
 	}
