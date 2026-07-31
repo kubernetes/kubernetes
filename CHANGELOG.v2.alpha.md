@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.263.0-alpha.0](https://github.com/aws/aws-cdk/compare/v2.262.2-alpha.0...v2.263.0-alpha.0) (2026-07-31)
+
+
+### Bug Fixes
+
+* **glue-alpha:** race condition when creating mutiple indices ([#38016](https://github.com/aws/aws-cdk/issues/38016)) ([18b1947](https://github.com/aws/aws-cdk/commit/18b1947a9db0e695ec85888faf24939261ffbe30)), closes [#24813](https://github.com/aws/aws-cdk/issues/24813) [#34](https://github.com/aws/aws-cdk/issues/34) [#34](https://github.com/aws/aws-cdk/issues/34)
+
 ## [2.262.2-alpha.0](https://github.com/aws/aws-cdk/compare/v2.262.1-alpha.0...v2.262.2-alpha.0) (2026-07-29)
 
 ## [2.262.1-alpha.0](https://github.com/aws/aws-cdk/compare/v2.262.0-alpha.0...v2.262.1-alpha.0) (2026-07-23)
