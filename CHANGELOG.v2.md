@@ -4,27 +4,6 @@ All notable changes to this project will be documented in this file. See [standa
 
 ## [2.263.0](https://github.com/aws/aws-cdk/compare/v2.262.2...v2.263.0) (2026-07-31)
 
-
-### ⚠ BREAKING CHANGES
-
-* **mediaconnect:** `removalPolicy` prop removed from `FlowProps`, `GatewayProps`, and `BridgeProps`. These resources now follow CloudFormation's default deletion behaviour (Delete).
-
-### Description of changes
-
-
-
-### Describe any new or updated permissions being added
-
-
-
-
-### Description of how you validated changes
-
-
-
-### Checklist
-- [x] My code adheres to the [CONTRIBUTING GUIDE](https://github.com/aws/aws-cdk/blob/main/CONTRIBUTING.md) and [DESIGN GUIDELINES](https://github.com/aws/aws-cdk/blob/main/docs/DESIGN_GUIDELINES.md)
-
 ### Features
 
 * **autoscaling:** add support for AutoScalingInstanceRefresh UpdatePolicy ([#38277](https://github.com/aws/aws-cdk/issues/38277)) ([434157f](https://github.com/aws/aws-cdk/commit/434157f1259bfec093996829b0e5e0a1aa47721b)), closes [#38276](https://github.com/aws/aws-cdk/issues/38276)
@@ -39,13 +18,8 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### Bug Fixes
 
-* **core:** bump `@aws/cloudformation-validate` to 1.5.1-beta to fix install on Node != 22.x ([#38382](https://github.com/aws/aws-cdk/issues/38382)) ([3882610](https://github.com/aws/aws-cdk/commit/388261032df150c5b97c54e9b1f0a732a342d16b)), closes [#38380](https://github.com/aws/aws-cdk/issues/38380)
-* **core:** env CDK_VALIDATION=false does not disable built-in template validation ([#38379](https://github.com/aws/aws-cdk/issues/38379)) ([737b807](https://github.com/aws/aws-cdk/commit/737b8073367776741a73138bae8518083fc8322c)), closes [#38378](https://github.com/aws/aws-cdk/issues/38378)
 * **core:** upgrade cloudformation-validate library ([#38444](https://github.com/aws/aws-cdk/issues/38444)) ([d26e507](https://github.com/aws/aws-cdk/commit/d26e5075987e2054bc014048efa36cb1bc07a9c6)), closes [#38412](https://github.com/aws/aws-cdk/issues/38412)
-* **mediaconnect:** jsdoc typo ([#38434](https://github.com/aws/aws-cdk/issues/38434)) ([7fe6d3d](https://github.com/aws/aws-cdk/commit/7fe6d3df03720b381bb989f289855557f2cd47ac))
-* **mediaconnect:** remove default removal policy ([#38437](https://github.com/aws/aws-cdk/issues/38437)) ([238193d](https://github.com/aws/aws-cdk/commit/238193de50910ac1da8fb9f31f01776863998989))
 * bump brace-expansion to 5.0.8 to address CVE-2026-14257 ([#38410](https://github.com/aws/aws-cdk/issues/38410)) ([5aaa395](https://github.com/aws/aws-cdk/commit/5aaa3950a2c69dfbd46e7eecc130b5ce5cc72df7)), closes [#38409](https://github.com/aws/aws-cdk/issues/38409) [#38063](https://github.com/aws/aws-cdk/issues/38063)
-* revert "fix(core): stack.node.addDependency gets slower as stacks grow ([#38314](https://github.com/aws/aws-cdk/issues/38314))" ([#38417](https://github.com/aws/aws-cdk/issues/38417)) ([3b1df74](https://github.com/aws/aws-cdk/commit/3b1df7422f1e922849e94ec2a90928e6f2a05163)), closes [#38406](https://github.com/aws/aws-cdk/issues/38406) [#38406](https://github.com/aws/aws-cdk/issues/38406)
 
 ## [2.262.2](https://github.com/aws/aws-cdk/compare/v2.262.1...v2.262.2) (2026-07-29)
 
