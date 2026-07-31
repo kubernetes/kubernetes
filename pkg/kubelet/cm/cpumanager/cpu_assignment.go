@@ -1088,6 +1088,67 @@ func (a *cpuAccumulator) takeFullUncoreForResize() {
 	}
 }
 
+func (a *cpuAccumulator) takePartialUncoreForResize(uncoreID int) {
+	// First to take the cores with allocated CPUs in this uncore when SMT/hyperthread is enabled
+	if a.topo.CPUsPerCore() != 1 {
+		// find cores in this uncore cache that already have one allocated CPU
+		allocatedCoresInUncoreCache := a.resultDetails.CoresInUncoreCache(uncoreID)
+		availableCoresInUncoreCache := a.details.CoresInUncoreCache(uncoreID)
+		allocatedCores := availableCoresInUncoreCache.Intersection(allocatedCoresInUncoreCache).List()
+		// Take full cores that already have allocated CPUs.
+		for _, core := range allocatedCores {
+			if a.isFullCoreForResize(core) {
+				cpusInCore := a.details.CPUsInCores(core)
+				if !a.needsAtLeast(cpusInCore.Size()) {
+					break
+				}
+				a.logger.V(4).Info("takePartialUncoreForResize: claiming Core", "core", core, "cpusInCore", cpusInCore)
+				a.take(cpusInCore)
+			}
+		}
+	}
+
+	// Second to take the other cores or CPUs in this uncore
+	// determine the number of cores needed whether SMT/hyperthread is enabled or disabled
+	numCoresNeeded := (a.numCPUsNeeded + a.topo.CPUsPerCore() - 1) / a.topo.CPUsPerCore()
+
+	// determine the N number of free cores (physical cpus) within the UncoreCache, then
+	// determine the M number of free cpus (virtual cpus) that correspond with the free cores
+	freeCores := a.details.CoresNeededInUncoreCache(numCoresNeeded, uncoreID)
+	freeCPUs := a.details.CPUsInCores(freeCores.UnsortedList()...)
+
+	// when SMT/hyperthread is enabled and remaining cpu requirement is an odd integer value:
+	// sort the free CPUs that were determined based on the cores that have available cpus.
+	// if the amount of free cpus is greather than the cpus needed, we can drop the last cpu
+	// since the odd integer request will only require one out of the two free cpus that
+	// correspond to the last core
+	if a.numCPUsNeeded%2 != 0 && a.topo.CPUsPerCore() > 1 {
+		// we sort freeCPUs to ensure we pack virtual cpu allocations, meaning we allocate
+		// whole core's worth of cpus as much as possible to reduce smt-misalignment
+		sortFreeCPUs := freeCPUs.List()
+		if len(sortFreeCPUs) > a.numCPUsNeeded {
+			// if we are in takePartialUncore, the accumulator is not satisfied after
+			// takeFullUncore, so freeCPUs.Size() can't be < 1
+			sortFreeCPUs = sortFreeCPUs[:freeCPUs.Size()-1]
+		}
+		freeCPUs = cpuset.New(sortFreeCPUs...)
+	}
+
+	// claim the cpus if the free cpus within the UncoreCache can satisfy the needed cpus
+	claimed := (a.numCPUsNeeded == freeCPUs.Size())
+	a.logger.V(4).Info("takePartialUncore: trying to claim partial uncore",
+		"uncore", uncoreID,
+		"claimed", claimed,
+		"needed", a.numCPUsNeeded,
+		"cores", freeCores.String(),
+		"cpus", freeCPUs.String())
+	if !claimed {
+		return
+
+	}
+	a.take(freeCPUs)
+}
+
 func (a *cpuAccumulator) takeUncoreCacheForResize() {
 	// take full UncoreCache if the CPUs needed is greater than free UncoreCache size
 	a.takeFullUncoreForResize()
@@ -1097,7 +1158,7 @@ func (a *cpuAccumulator) takeUncoreCacheForResize() {
 
 	// take partial UncoreCache if the CPUs needed is less than free UncoreCache size
 	for _, uncore := range a.sortAvailableUncoreCachesForResize() {
-		a.takePartialUncore(uncore)
+		a.takePartialUncoreForResize(uncore)
 		if a.isSatisfied() {
 			return
 		}
@@ -1913,8 +1974,16 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 
 			if isBetter {
 				bestBalance = bestLocalBalance
-				bestRemainder = bestLocalRemainder
-				bestCombo = combo
+				// Deep copy combo to avoid slice reference bug.
+				// The iterateCombinations function reuses the same underlying array for different combinations.
+				// Without deep copy, bestCombo would reference the same array as combo, causing bestCombo
+				// to be overwritten in subsequent iterations.
+				// Reproduced in: TestTakeByTopologyNUMADistributedForResize
+				//   "Scale-up: 1 to 128 CPUs, distribute CPUs across 4 NUMA nodes within a socket with allocatedCPUs from dual socket with multi-numa-per-socket with HT (large)"
+				//   topoDualSocketMultiNumaPerSocketHTLarge topology with allocatedCPUs on NUMA 7.
+				//   Expected bestCombo: [7, 4, 5, 6] (all in same socket), but got [7, 4, 5, 3] without deep copy.
+				bestRemainder = append([]int(nil), bestLocalRemainder...)
+				bestCombo = append([]int(nil), combo...)
 				bestAllocatedRemainder = allocatedRemainder
 				if alignBySocket {
 					bestBalanceInOneSocket = inSameSocket
