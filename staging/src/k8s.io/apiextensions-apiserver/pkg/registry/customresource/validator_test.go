@@ -227,7 +227,7 @@ func TestGetObjectMeta(t *testing.T) {
 						APIVersion: "example.com/v1",
 						Time:       &metav1.Time{Time: time.Date(2026, 7, 8, 12, 0, 0, 0, time.UTC).Local()},
 						FieldsType: "FieldsV1",
-						FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:metadata":{"f:labels":{".":{},"f:app.kubernetes.io/name":{}}}}`)},
+						FieldsV1:   metav1.NewFieldsV1(`{"f:metadata":{"f:labels":{".":{},"f:app.kubernetes.io/name":{}}}}`),
 					},
 				},
 			},
