@@ -80,6 +80,7 @@ func clearMetrics() {
 func TestPrometheusCompliantCounterVecMetrics(t *testing.T) {
 	Register()
 
+	defer ContainerAlignedComputeResourcesTotal.Reset()
 	defer ContainerAlignedComputeResourcesFailureTotal.Reset()
 	defer EventedPLEGConnErrTotal.Reset()
 	defer EventedPLEGConnTotal.Reset()
@@ -93,6 +94,7 @@ func TestPrometheusCompliantCounterVecMetrics(t *testing.T) {
 	defer PodResourcesEndpointRequestsListCountTotal.Reset()
 	defer PreemptionsTotal.Reset()
 
+	ContainerAlignedComputeResourcesTotal.WithLabelValues(AlignScopeContainer, AlignedPhysicalCPU).Inc()
 	ContainerAlignedComputeResourcesFailureTotal.WithLabelValues(AlignScopeContainer, AlignedPhysicalCPU).Inc()
 	EventedPLEGConnErrTotal.Inc()
 	EventedPLEGConnTotal.Inc()
@@ -109,6 +111,9 @@ func TestPrometheusCompliantCounterVecMetrics(t *testing.T) {
 	expected := `# HELP kubelet_container_aligned_compute_resources_failure_total [ALPHA] Cumulative number of failures to allocate aligned compute resources to containers by alignment type.
 # TYPE kubelet_container_aligned_compute_resources_failure_total counter
 kubelet_container_aligned_compute_resources_failure_total{boundary="physical_cpu",scope="container"} 1
+# HELP kubelet_container_aligned_compute_resources_total [ALPHA] Cumulative number of aligned compute resources allocated to containers by alignment type.
+# TYPE kubelet_container_aligned_compute_resources_total counter
+kubelet_container_aligned_compute_resources_total{boundary="physical_cpu",scope="container"} 1
 # HELP kubelet_evented_pleg_connection_error_total [ALPHA] The number of errors encountered during the establishment of streaming connection with the CRI runtime.
 # TYPE kubelet_evented_pleg_connection_error_total counter
 kubelet_evented_pleg_connection_error_total 1
@@ -146,6 +151,7 @@ kubelet_preemptions_total{preemption_signal="memory"} 1
 
 	metricNames := []string{
 		"kubelet_container_aligned_compute_resources_failure_total",
+		"kubelet_container_aligned_compute_resources_total",
 		"kubelet_evented_pleg_connection_error_total",
 		"kubelet_evented_pleg_connection_success_total",
 		"kubelet_evictions_total",
