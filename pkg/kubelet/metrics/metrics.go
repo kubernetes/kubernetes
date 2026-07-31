@@ -172,6 +172,7 @@ const (
 
 	// Metric for tracking alignment of compute resources
 	ContainerAlignedComputeResourcesNameKey             = "container_aligned_compute_resources_count"
+	ContainerAlignedComputeResourcesTotalNameKey        = "container_aligned_compute_resources_total"
 	ContainerAlignedComputeResourcesFailureNameKey      = "container_aligned_compute_resources_failure_count"
 	ContainerAlignedComputeResourcesFailureTotalNameKey = "container_aligned_compute_resources_failure_total"
 	ContainerAlignedComputeResourcesScopeLabelKey       = "scope"
@@ -1120,8 +1121,20 @@ var (
 	// ContainerAlignedComputeResources reports the count of resources allocation which granted aligned resources, per alignment boundary
 	ContainerAlignedComputeResources = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         KubeletSubsystem,
+			Name:              ContainerAlignedComputeResourcesNameKey,
+			Help:              "Cumulative number of aligned compute resources allocated to containers by alignment type. Deprecated in favor of kubelet_container_aligned_compute_resources_total",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.40.0",
+		},
+		[]string{ContainerAlignedComputeResourcesScopeLabelKey, ContainerAlignedComputeResourcesBoundaryLabelKey},
+	)
+
+	// ContainerAlignedComputeResourcesTotal reports the count of resources allocation which granted aligned resources, per alignment boundary
+	ContainerAlignedComputeResourcesTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           ContainerAlignedComputeResourcesNameKey,
+			Name:           ContainerAlignedComputeResourcesTotalNameKey,
 			Help:           "Cumulative number of aligned compute resources allocated to containers by alignment type.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -1719,6 +1732,7 @@ func Register() {
 		legacyregistry.MustRegister(CPUManagerExclusiveCPUsAllocation)
 		legacyregistry.MustRegister(CPUManagerAllocationPerNUMA)
 		legacyregistry.MustRegister(ContainerAlignedComputeResources)
+		legacyregistry.MustRegister(ContainerAlignedComputeResourcesTotal)
 		legacyregistry.MustRegister(ContainerAlignedComputeResourcesFailure)
 		legacyregistry.MustRegister(ContainerAlignedComputeResourcesFailureTotal)
 		legacyregistry.MustRegister(MemoryManagerPinningRequestTotal)

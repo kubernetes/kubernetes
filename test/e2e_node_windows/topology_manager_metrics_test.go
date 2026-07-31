@@ -162,6 +162,9 @@ var _ = SIGWindowsDescribe(feature.TopologyManager, feature.Windows, framework.W
 				"kubelet_container_aligned_compute_resources_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"pod::numa_node": timelessSample(1),
 				}),
+				"kubelet_container_aligned_compute_resources_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"pod::numa_node": timelessSample(1),
+				}),
 				"kubelet_topology_manager_admission_duration_ms_count": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
 					"": checkMetricValueGreaterThan(0),
 				}),

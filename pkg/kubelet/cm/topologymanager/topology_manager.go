@@ -241,7 +241,9 @@ func NewManager(logger klog.Logger, topology []cadvisorapi.Node, topologyPolicyN
 func (m *manager) initializeMetrics() {
 	// ensure the values exist
 	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Add(0)
+	metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Add(0)
 	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Add(0)
+	metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Add(0)
 	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Add(0)
 	metrics.ContainerAlignedComputeResourcesFailureTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Add(0)
 	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Add(0)
@@ -278,9 +280,9 @@ func (m *manager) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes
 	metrics.TopologyManagerAdmissionRequestsTotal.Inc()
 
 	startTime := time.Now()
-	duration := time.Since(startTime)
 
 	podAdmitResult := m.scope.Admit(ctx, attrs.Pod, attrs.Operation)
+	duration := time.Since(startTime)
 	metrics.TopologyManagerAdmissionDuration.Observe(float64(duration.Milliseconds()))
 	metrics.TopologyManagerAdmissionDurationSeconds.Observe(duration.Seconds())
 

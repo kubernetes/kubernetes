@@ -3528,8 +3528,9 @@
 - name: container_aligned_compute_resources_count
   subsystem: kubelet
   help: Cumulative number of aligned compute resources allocated to containers by
-    alignment type.
+    alignment type. Deprecated in favor of kubelet_container_aligned_compute_resources_total
   type: Counter
+  deprecatedVersion: 1.40.0
   stabilityLevel: ALPHA
   labels:
   - boundary
@@ -3554,6 +3555,18 @@
   subsystem: kubelet
   help: Cumulative number of failures to allocate aligned compute resources to containers
     by alignment type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - boundary
+  - scope
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: container_aligned_compute_resources_total
+  subsystem: kubelet
+  help: Cumulative number of aligned compute resources allocated to containers by
+    alignment type.
   type: Counter
   stabilityLevel: ALPHA
   labels:

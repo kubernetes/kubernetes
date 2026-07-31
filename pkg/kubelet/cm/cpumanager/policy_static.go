@@ -605,6 +605,7 @@ func (p *staticPolicy) allocateForAdd(logger klog.Logger, s state.State, pod *v1
 		if p.options.FullPhysicalCPUsOnly {
 			// increment only if we know we allocate aligned resources
 			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
+			metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
 		}
 	}()
 
@@ -1103,7 +1104,9 @@ func (p *staticPolicy) initializeMetrics(logger klog.Logger, s state.State) {
 	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0)      // ensure the value exists
 	metrics.ContainerAlignedComputeResourcesFailureTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0) // ensure the value exists
 	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0)             // ensure the value exists
+	metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0)        // ensure the value exists
 	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Add(0)             // ensure the value exists
+	metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Add(0)        // ensure the value exists
 	totalAssignedCPUs := getTotalAssignedExclusiveCPUs(s)
 	metrics.CPUManagerExclusiveCPUsAllocationCount.Set(float64(totalAssignedCPUs.Size()))
 	metrics.CPUManagerExclusiveCPUsAllocation.Set(float64(totalAssignedCPUs.Size()))
@@ -1117,6 +1120,7 @@ func (p *staticPolicy) updateMetricsOnAllocate(logger klog.Logger, s state.State
 	metrics.CPUManagerSharedPoolSizeMilliCores.Add(float64(-ncpus * 1000))
 	if cpuAlloc.Aligned.UncoreCache {
 		metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Inc()
+		metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Inc()
 	}
 	totalAssignedCPUs := getTotalAssignedExclusiveCPUs(s)
 	updateAllocationPerNUMAMetric(logger, p.topology, totalAssignedCPUs)

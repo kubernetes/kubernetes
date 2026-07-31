@@ -209,9 +209,6 @@ type Config struct {
 	// when attempting to generate a CSR. For RSA the minimum bits must be 2048,
 	// for ECDSA the minimum curve size must be 256 bits.
 	GenerateKey func() (crypto.Signer, error)
-	// CertificateRenewFailureTotal will record a metric that keeps track of
-	// certificate renewal failures.
-	CertificateRenewFailureTotal Counter
 	// Name is an optional string that will be used when writing log output
 	// via logger.WithName or returning errors from manager methods.
 	//
@@ -284,9 +281,8 @@ type manager struct {
 
 	certStore Store
 
-	certificateRotation          Histogram
-	certificateRenewFailure      Counter
-	certificateRenewFailureTotal Counter
+	certificateRotation     Histogram
+	certificateRenewFailure Counter
 
 	// the following variables must only be accessed under certAccessLock
 	certAccessLock sync.RWMutex
@@ -338,7 +334,6 @@ func NewManager(config *Config) (Manager, error) {
 		certStore:                    config.CertificateStore,
 		certificateRotation:          config.CertificateRotation,
 		certificateRenewFailure:      config.CertificateRenewFailure,
-		certificateRenewFailureTotal: config.CertificateRenewFailureTotal,
 		now:                          time.Now,
 	}
 
@@ -585,9 +580,6 @@ func (m *manager) rotateCerts(ctx context.Context) (bool, error) {
 		if m.certificateRenewFailure != nil {
 			m.certificateRenewFailure.Inc()
 		}
-		if m.certificateRenewFailureTotal != nil {
-			m.certificateRenewFailureTotal.Inc()
-		}
 		return false, nil
 	}
 
@@ -597,9 +589,6 @@ func (m *manager) rotateCerts(ctx context.Context) (bool, error) {
 		utilruntime.HandleErrorWithContext(ctx, err, "Unable to load a client to request certificates")
 		if m.certificateRenewFailure != nil {
 			m.certificateRenewFailure.Inc()
-		}
-		if m.certificateRenewFailureTotal != nil {
-			m.certificateRenewFailureTotal.Inc()
 		}
 		return false, nil
 	}
@@ -616,9 +605,6 @@ func (m *manager) rotateCerts(ctx context.Context) (bool, error) {
 		utilruntime.HandleErrorWithContext(ctx, err, "Failed while requesting a signed certificate from the control plane")
 		if m.certificateRenewFailure != nil {
 			m.certificateRenewFailure.Inc()
-		}
-		if m.certificateRenewFailureTotal != nil {
-			m.certificateRenewFailureTotal.Inc()
 		}
 		return false, m.updateServerError(err)
 	}
@@ -637,9 +623,6 @@ func (m *manager) rotateCerts(ctx context.Context) (bool, error) {
 		if m.certificateRenewFailure != nil {
 			m.certificateRenewFailure.Inc()
 		}
-		if m.certificateRenewFailureTotal != nil {
-			m.certificateRenewFailureTotal.Inc()
-		}
 		return false, nil
 	}
 
@@ -648,9 +631,6 @@ func (m *manager) rotateCerts(ctx context.Context) (bool, error) {
 		utilruntime.HandleErrorWithContext(ctx, err, "Unable to store the new cert/key pair")
 		if m.certificateRenewFailure != nil {
 			m.certificateRenewFailure.Inc()
-		}
-		if m.certificateRenewFailureTotal != nil {
-			m.certificateRenewFailureTotal.Inc()
 		}
 		return false, nil
 	}

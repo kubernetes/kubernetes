@@ -193,6 +193,10 @@ var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.
 					"container::numa_node": timelessSample(0),
 					"pod::numa_node":       timelessSample(1),
 				}),
+				"kubelet_container_aligned_compute_resources_total": gstruct.MatchAllElements(idFn, gstruct.Elements{
+					"container::numa_node": timelessSample(0),
+					"pod::numa_node":       timelessSample(1),
+				}),
 				"kubelet_container_aligned_compute_resources_failure_total": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::numa_node": timelessSample(0),
 					"pod::numa_node":       timelessSample(0),
