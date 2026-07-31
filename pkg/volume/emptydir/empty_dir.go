@@ -353,7 +353,8 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 		return nil
 	}
 
-	options := ed.generateTmpfsMountOptions(swap.IsTmpfsNoswapOptionSupported(ed.mounter, ed.plugin.host.GetPluginDir(EmptyDirPluginName)))
+	// The volume.Mounter interface does not provide a logger at this boundary.
+	options := ed.generateTmpfsMountOptions(swap.IsTmpfsNoswapOptionSupported(klog.TODO(), ed.mounter, ed.plugin.host.GetPluginDir(EmptyDirPluginName)))
 
 	klog.V(3).Infof("pod %v: mounting tmpfs for volume %v", ed.pod.UID, ed.volName)
 	return ed.mounter.MountSensitiveWithoutSystemd("tmpfs", dir, "tmpfs", options, nil)
