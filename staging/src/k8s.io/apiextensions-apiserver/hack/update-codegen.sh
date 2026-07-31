@@ -55,6 +55,6 @@ kube::codegen::gen_client \
     --output-pkg "${THIS_PKG}/pkg/client" \
     --versioned-name "clientset" \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
-    --prefers-protobuf \
+    --prefers-protobuf="${KUBE_PREFERS_PROTOBUF:-true}" \
     --lint-rules known-tags-only,require-explicit-disablement \
     "${SCRIPT_ROOT}/pkg/apis"

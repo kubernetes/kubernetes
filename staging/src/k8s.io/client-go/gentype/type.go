@@ -19,6 +19,8 @@ package gentype
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,8 +85,19 @@ type alsoApplier[T objectWithMeta, C namedObject] struct {
 
 type Option[T objectWithMeta] func(*Client[T])
 
+const prefersProtobufEnvVar = "KUBE_CLIENT_PREFERS_PROTOBUF"
+
+func prefersProtobufDefault() bool {
+	if v, ok := os.LookupEnv(prefersProtobufEnvVar); ok {
+		if parsed, err := strconv.ParseBool(v); err == nil {
+			return parsed
+		}
+	}
+	return true
+}
+
 func PrefersProtobuf[T objectWithMeta]() Option[T] {
-	return func(c *Client[T]) { c.prefersProtobuf = true }
+	return func(c *Client[T]) { c.prefersProtobuf = prefersProtobufDefault() }
 }
 
 // NewClient constructs a client, namespaced or not, with no support for lists or apply.
