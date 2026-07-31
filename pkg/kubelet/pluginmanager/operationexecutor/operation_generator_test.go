@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,9 +19,9 @@ package operationexecutor
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
@@ -48,12 +48,7 @@ func (f *fakeRegistrationClient) NotifyRegistrationStatus(ctx context.Context, i
 }
 
 func hasWaitForReady(opts []grpc.CallOption) bool {
-	for _, opt := range opts {
-		if opt == grpc.WaitForReady(true) {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(opts, grpc.WaitForReady(true))
 }
 
 func TestNotifyPlugin(t *testing.T) {
@@ -93,9 +88,9 @@ func TestNotifyPlugin(t *testing.T) {
 			err := og.notifyPlugin(context.Background(), client, tc.registered, tc.errStr)
 
 			if tc.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			// Regardless of outcome, the call must opt in to WaitForReady so
