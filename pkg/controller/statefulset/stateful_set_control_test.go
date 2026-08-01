@@ -1846,6 +1846,143 @@ func TestStatefulSetControlRollingUpdate(t *testing.T) {
 	}
 }
 
+// TestStatefulSetControlRollingUpdateRecreatesStaleUnavailablePod reproduces
+// https://github.com/kubernetes/kubernetes/issues/141095: when a Pod is stuck on a
+// previous, failed revision (for example in ImagePullBackOff from a bad image) and the
+// StatefulSet spec is later updated to a valid revision, the OrderedReady controller must
+// delete the stale Pod so the rollout can proceed instead of blocking on it forever.
+func TestStatefulSetControlRollingUpdateRecreatesStaleUnavailablePod(t *testing.T) {
+	const (
+		badImage  = "nginx:1.7.9-a"
+		goodImage = "nginx:1.8.1"
+	)
+	set := newStatefulSet(3)
+	client := fake.NewSimpleClientset()
+	om, _, ssc := setupController(client)
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Scale up to 3 ready replicas on the initial revision (rev-A).
+	if err := scaleUpStatefulSetControl(set, ssc, om, assertMonotonicInvariants, nil); err != nil {
+		t.Fatal(err)
+	}
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialRevision := set.Status.CurrentRevision
+
+	// Roll out a bad image (rev-B). The controller deletes pod 2 (highest ordinal); on
+	// the next sync it recreates pod 2 at rev-B. Simulate the bad image failing to pull
+	// by leaving pod 2 Pending (not Running and Ready).
+	set.Spec.Template.Spec.Containers[0].Image = badImage
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods, time.Now()); err != nil {
+		t.Fatalf("rollout of bad image: %v", err)
+	}
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	badRevision := set.Status.UpdateRevision
+	if badRevision == initialRevision {
+		t.Fatalf("expected a new revision for the bad image, got %q", badRevision)
+	}
+
+	// Recreate pod 2 at the bad revision, then leave it stuck (Pending).
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods, time.Now()); err != nil {
+		t.Fatalf("recreate pod at bad revision: %v", err)
+	}
+	if _, err := om.setPodPending(set, 2); err != nil {
+		t.Fatalf("set pod 2 pending: %v", err)
+	}
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stalePod := findPodByOrdinal(pods, 2)
+	if stalePod == nil {
+		t.Fatal("expected pod 2 to exist on the bad revision")
+	}
+	if got := getPodRevision(stalePod); got != badRevision {
+		t.Fatalf("expected pod 2 on bad revision %q, got %q", badRevision, got)
+	}
+
+	// Update to a good image (rev-C). Pod 2 is now on a stale revision (rev-B), neither
+	// current (rev-A) nor update (rev-C), and is unavailable.
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	set.Spec.Template.Spec.Containers[0].Image = goodImage
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deletesBefore := om.deletePodTracker.requests
+	if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods, time.Now()); err != nil {
+		t.Fatalf("rollout of good image: %v", err)
+	}
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	goodRevision := set.Status.UpdateRevision
+	if goodRevision == badRevision || goodRevision == initialRevision {
+		t.Fatalf("expected a new revision for the good image, got %q", goodRevision)
+	}
+
+	// The controller must have deleted the stale, unavailable pod 2 instead of blocking
+	// on it (which is the bug from issue #141095).
+	if got := om.deletePodTracker.requests; got != deletesBefore+1 {
+		t.Fatalf("expected the stale unavailable pod 2 to be deleted, delete requests got %d want %d", got, deletesBefore+1)
+	}
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if findPodByOrdinal(pods, 2) != nil {
+		t.Errorf("expected stale pod 2 to be deleted, but it still exists")
+	}
+
+	// The rollout of the good image must now complete, with every pod on rev-C.
+	if err := updateStatefulSetControl(set, ssc, om, assertUpdateInvariants); err != nil {
+		t.Fatalf("rollout of good image did not complete: %v", err)
+	}
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Sort(ascendingOrdinal(pods))
+	if len(pods) != 3 {
+		t.Fatalf("expected 3 pods, got %d", len(pods))
+	}
+	for i, pod := range pods {
+		if got := getPodRevision(pod); got != goodRevision {
+			t.Errorf("pod %d: expected revision %q, got %q", i, goodRevision, got)
+		}
+		if pod.Spec.Containers[0].Image != goodImage {
+			t.Errorf("pod %d: expected image %q, got %q", i, goodImage, pod.Spec.Containers[0].Image)
+		}
+	}
+	if set.Status.CurrentRevision != goodRevision {
+		t.Errorf("expected current revision %q, got %q", goodRevision, set.Status.CurrentRevision)
+	}
+}
+
 func TestStatefulSetControlOnDeleteUpdate(t *testing.T) {
 	originalImage := newStatefulSet(3).Spec.Template.Spec.Containers[0].Image
 
