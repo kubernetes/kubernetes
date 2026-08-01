@@ -1104,7 +1104,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podGroup *sc
 			// Create the ResourceClaim with pod as owner, with a generated name that uses
 			// <pod>-<claim name> as base.
 			isTrue := true
-			annotations := template.Spec.ObjectMeta.Annotations
+			annotations := maps.Clone(template.Spec.ObjectMeta.Annotations)
 			if annotations == nil {
 				annotations = make(map[string]string)
 			}
@@ -1346,7 +1346,7 @@ func (ec *Controller) handlePodGroupClaim(ctx context.Context, podGroup *schedul
 		// Create the ResourceClaim with PodGroup as owner, with a generated name that uses
 		// <podgroup>-<claim name> as base.
 		isTrue := true
-		annotations := template.Spec.ObjectMeta.Annotations
+		annotations := maps.Clone(template.Spec.ObjectMeta.Annotations)
 		if annotations == nil {
 			annotations = make(map[string]string)
 		}
