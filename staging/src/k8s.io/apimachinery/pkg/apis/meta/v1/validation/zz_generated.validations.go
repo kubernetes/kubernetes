@@ -362,10 +362,17 @@ func Validate_ObjectMeta(
 			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.Monotonic(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

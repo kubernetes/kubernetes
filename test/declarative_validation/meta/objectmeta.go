@@ -491,7 +491,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetGeneration(4)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("generation"), "", "must not be decremented").MarkFromImperative(),
+				field.Invalid(fldPath.Child("generation"), "", "must not be decremented").WithOrigin("monotonic").MarkAlpha(),
 			},
 		},
 		{
@@ -509,7 +509,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetGeneration(0)
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("generation"), "", "must not be decremented").MarkFromImperative(),
+				field.Invalid(fldPath.Child("generation"), "", "field cannot be cleared once set").WithOrigin("update").MarkAlpha(),
 			},
 		},
 		{
@@ -520,7 +520,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 			},
 			ExpectedErrs: field.ErrorList{
 				field.Invalid(fldPath.Child("generation"), "", "").WithOrigin("minimum").MarkAlpha(),
-				field.Invalid(fldPath.Child("generation"), "", "must not be decremented").MarkFromImperative(),
+				field.Invalid(fldPath.Child("generation"), "", "must not be decremented").WithOrigin("monotonic").MarkAlpha(),
 			},
 		},
 		{
