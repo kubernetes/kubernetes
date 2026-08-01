@@ -383,7 +383,7 @@ var _ = SIGDescribe("kubelet", func() {
 		//       If the nfs-server pod is deleted the client pod's mount can not be unmounted.
 		//       If the nfs-server pod is deleted and re-created, due to having a different ip
 		//       addr, the client pod's mount still cannot be unmounted.
-		f.Context("Host cleanup after disrupting NFS volume [NFS]", f.WithProvider(framework.ProvidersWithSSH...), func() {
+		f.Context("Host cleanup after disrupting NFS volume [NFS]", f.WithSlow(), f.WithProvider(framework.ProvidersWithSSH...), func() {
 			// issue #31272
 			var (
 				nfsServerPod *v1.Pod
