@@ -5498,6 +5498,18 @@ func TestValidatePodResizeAction(t *testing.T) {
 			expectedError:        true,
 		},
 		{
+			testName: "Decrease container limits, high usage, missing pod usage",
+			currentResources: resourceRequirements{
+				memoryRequest: 100, memoryLimit: 200,
+			},
+			desiredResources: resourceRequirements{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			containerMemoryUsage: ptr.To[uint64](150),
+			podMemoryUsage:       nil,
+			expectedError:        true,
+		},
+		{
 			testName: "Add pod limit, low usage",
 			currentResources: resourceRequirements{
 				memoryRequest: 100, memoryLimit: 100,
