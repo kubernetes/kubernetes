@@ -1472,6 +1472,50 @@ func TestAllocator(t *testing.T,
 
 			expectResults: []any{},
 		},
+		"optional-node-operations-other-device-available": {
+			features: Features{OptionalNodeOperations: true},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil),
+				).withSkipNodeOperations(resourceapi.SkipNodeOperationAll),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 2), driverA,
+					device(device2, nil, nil),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		"optional-node-operations-allocation-mode-all-skips-unusable": {
+			features: Features{OptionalNodeOperations: true},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					allDeviceRequest(req0, classA),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil),
+				).withSkipNodeOperations(resourceapi.SkipNodeOperationAll),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 2), driverA,
+					device(device2, nil, nil),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
 		"other-node": {
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
@@ -4412,6 +4456,41 @@ func TestAllocator(t *testing.T,
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
 					request(req0, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("4Gi"),
+							},
+						),
+					),
+					device(device2, nil, nil),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("18Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		"partitionable-devices-disabled-allocation-mode-all-skips-counter-devices": {
+			features: Features{
+				PartitionableDevices: false,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					allDeviceRequest(req0, classA),
 				),
 			),
 			classes: objects(class(classA, driverA)),
