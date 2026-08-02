@@ -37,6 +37,8 @@ import (
 	"google.golang.org/grpc/resolver"
 )
 
+var randIntN = rand.IntN
+
 // ChildState is the balancer state of a child along with the endpoint which
 // identifies the child balancer.
 type ChildState struct {
@@ -45,7 +47,15 @@ type ChildState struct {
 
 	// Balancer exposes only the ExitIdler interface of the child LB policy.
 	// Other methods of the child policy are called only by endpointsharding.
-	Balancer balancer.ExitIdler
+	Balancer ExitIdler
+}
+
+// ExitIdler provides access to only the ExitIdle method of the child balancer.
+type ExitIdler interface {
+	// ExitIdle instructs the LB policy to reconnect to backends / exit the
+	// IDLE state, if appropriate and possible.  Note that SubConns that enter
+	// the IDLE state will not reconnect until SubConn.Connect is called.
+	ExitIdle()
 }
 
 // Options are the options to configure the behaviour of the
@@ -104,6 +114,21 @@ type endpointSharding struct {
 	mu sync.Mutex
 }
 
+// rotateEndpoints returns a slice of all the input endpoints rotated a random
+// amount.
+func rotateEndpoints(es []resolver.Endpoint) []resolver.Endpoint {
+	les := len(es)
+	if les == 0 {
+		return es
+	}
+	r := randIntN(les)
+	// Make a copy to avoid mutating data beyond the end of es.
+	ret := make([]resolver.Endpoint, les)
+	copy(ret, es[r:])
+	copy(ret[les-r:], es[:r])
+	return ret
+}
+
 // UpdateClientConnState creates a child for new endpoints and deletes children
 // for endpoints that are no longer present. It also updates all the children,
 // and sends a single synchronous update of the childrens' aggregated state at
@@ -125,7 +150,7 @@ func (es *endpointSharding) UpdateClientConnState(state balancer.ClientConnState
 	newChildren := resolver.NewEndpointMap[*balancerWrapper]()
 
 	// Update/Create new children.
-	for _, endpoint := range state.ResolverState.Endpoints {
+	for _, endpoint := range rotateEndpoints(state.ResolverState.Endpoints) {
 		if _, ok := newChildren.Get(endpoint); ok {
 			// Endpoint child was already created, continue to avoid duplicate
 			// update.
@@ -205,6 +230,16 @@ func (es *endpointSharding) Close() {
 	}
 }
 
+func (es *endpointSharding) ExitIdle() {
+	es.childMu.Lock()
+	defer es.childMu.Unlock()
+	for _, bw := range es.children.Load().Values() {
+		if !bw.isClosed {
+			bw.child.ExitIdle()
+		}
+	}
+}
+
 // updateState updates this component's state. It sends the aggregated state,
 // and a picker with round robin behavior with all the child states present if
 // needed.
@@ -261,7 +296,7 @@ func (es *endpointSharding) updateState() {
 	p := &pickerWithChildStates{
 		pickers:     pickers,
 		childStates: childStates,
-		next:        uint32(rand.IntN(len(pickers))),
+		next:        uint32(randIntN(len(pickers))),
 	}
 	es.cc.UpdateState(balancer.State{
 		ConnectivityState: aggState,
@@ -326,15 +361,13 @@ func (bw *balancerWrapper) UpdateState(state balancer.State) {
 // ExitIdle pings an IDLE child balancer to exit idle in a new goroutine to
 // avoid deadlocks due to synchronous balancer state updates.
 func (bw *balancerWrapper) ExitIdle() {
-	if ei, ok := bw.child.(balancer.ExitIdler); ok {
-		go func() {
-			bw.es.childMu.Lock()
-			if !bw.isClosed {
-				ei.ExitIdle()
-			}
-			bw.es.childMu.Unlock()
-		}()
-	}
+	go func() {
+		bw.es.childMu.Lock()
+		if !bw.isClosed {
+			bw.child.ExitIdle()
+		}
+		bw.es.childMu.Unlock()
+	}()
 }
 
 // updateClientConnStateLocked delivers the ClientConnState to the child

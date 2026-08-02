@@ -110,14 +110,14 @@ func TraceIDRatioBased(fraction float64) Sampler {
 
 type alwaysOnSampler struct{}
 
-func (as alwaysOnSampler) ShouldSample(p SamplingParameters) SamplingResult {
+func (alwaysOnSampler) ShouldSample(p SamplingParameters) SamplingResult {
 	return SamplingResult{
 		Decision:   RecordAndSample,
 		Tracestate: trace.SpanContextFromContext(p.ParentContext).TraceState(),
 	}
 }
 
-func (as alwaysOnSampler) Description() string {
+func (alwaysOnSampler) Description() string {
 	return "AlwaysOnSampler"
 }
 
@@ -131,14 +131,14 @@ func AlwaysSample() Sampler {
 
 type alwaysOffSampler struct{}
 
-func (as alwaysOffSampler) ShouldSample(p SamplingParameters) SamplingResult {
+func (alwaysOffSampler) ShouldSample(p SamplingParameters) SamplingResult {
 	return SamplingResult{
 		Decision:   Drop,
 		Tracestate: trace.SpanContextFromContext(p.ParentContext).TraceState(),
 	}
 }
 
-func (as alwaysOffSampler) Description() string {
+func (alwaysOffSampler) Description() string {
 	return "AlwaysOffSampler"
 }
 

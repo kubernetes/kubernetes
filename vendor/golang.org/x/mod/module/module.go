@@ -261,7 +261,7 @@ func modPathOK(r rune) bool {
 
 // importPathOK reports whether r can appear in a package import path element.
 //
-// Import paths are intermediate between module paths and file paths: we allow
+// Import paths are intermediate between module paths and file paths: we
 // disallow characters that would be confusing or ambiguous as arguments to
 // 'go get' (such as '@' and ' ' ), but allow certain characters that are
 // otherwise-unambiguous on the command line and historically used for some
