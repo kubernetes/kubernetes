@@ -1780,6 +1780,65 @@ func TestControllerUpdateReconcilePoolWithNameValidation(t *testing.T) {
 	}
 }
 
+// TestControllerUpdateErrorHandlerCanReplaceResources verifies that an
+// ErrorHandler which reacts to a rejected update by supplying corrected
+// resources through Update does not deadlock. Update must not hold c.mutex
+// while invoking the caller-provided error handler, because Go mutexes are not
+// reentrant and Update is the only public API for replacing the desired state.
+func TestControllerUpdateErrorHandlerCanReplaceResources(t *testing.T) {
+	const poolName = "pool"
+
+	validResources := func() *DriverResources {
+		return &DriverResources{
+			Pools: map[string]Pool{
+				poolName: {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+			},
+		}
+	}
+	invalidResources := &DriverResources{
+		Pools: map[string]Pool{
+			poolName:     {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+			"other-pool": {Slices: []Slice{{Devices: []resourceapi.Device{}}}},
+		},
+	}
+
+	ctrl := &Controller{
+		reconcilePoolWithName: poolName,
+		queue:                 ptr.To(workqueue.Mock[string]{}),
+	}
+
+	// The handler reacts to the rejected input by replacing it with a valid
+	// single-pool set via Update, exactly as the ErrorHandler contract allows.
+	// Before the fix this re-entered c.mutex and deadlocked.
+	var handlerErr error
+	completed := make(chan struct{})
+	ctrl.errorHandler = func(_ context.Context, err error, _ string) {
+		handlerErr = err
+		ctrl.Update(validResources())
+		close(completed)
+	}
+
+	go ctrl.Update(invalidResources)
+
+	select {
+	case <-completed:
+	case <-time.After(time.Second):
+		t.Fatal("ErrorHandler deadlocked while replacing resources")
+	}
+
+	require.Error(t, handlerErr)
+
+	// The corrected pool must be installed as the desired state, and the
+	// rejected input must not have replaced it.
+	ctrl.mutex.Lock()
+	defer ctrl.mutex.Unlock()
+	require.NotNil(t, ctrl.resources)
+	_, hasCorrected := ctrl.resources.Pools[poolName]
+	assert.True(t, hasCorrected, "expected corrected pool %q to be installed, got pools: %v", poolName, ctrl.resources.Pools)
+	_, hasRejected := ctrl.resources.Pools["other-pool"]
+	assert.False(t, hasRejected, "rejected pool set must not be installed as desired state")
+}
+
 func TestControllerPoolNameFieldSelector(t *testing.T) {
 	const (
 		driverName = "test-driver"
