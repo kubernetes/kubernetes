@@ -67,8 +67,7 @@ import (
 
 const (
 	cockroachDBManifestPath = "test/e2e/testing-manifests/statefulset/cockroachdb"
-	// We don't restart MySQL cluster regardless of restartCluster, since MySQL doesn't handle restart well
-	restartCluster = true
+	restartCluster          = true
 
 	// Timeout for reads from databases running on stateful pods.
 	readTimeout = 60 * time.Second

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: discovery-fixture
+  labels:
+    app: discovery-fixture
+spec:
+  clusterIP: None
+  ports:
+  - port: 8080
+  selector:
+    app: discovery-fixture
