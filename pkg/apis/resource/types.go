@@ -1015,7 +1015,7 @@ const (
 	DeviceConfigMaxSize            = 32
 	DeviceDerivedAttributesMaxSize = 32
 	// MaxCapacityRequirements is the maximum number of entries allowed in
-	//CapacityRequirements.Requests .
+	// CapacityRequirements.Requests.
 	MaxCapacityRequirements = 32
 )
 

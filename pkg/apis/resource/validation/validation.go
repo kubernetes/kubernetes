@@ -149,7 +149,7 @@ func validateResourceClaimSpec(spec, oldSpec *resource.ResourceClaimSpec, fldPat
 	allErrs := field.ErrorList{}
 	var oldDeviceClaim *resource.DeviceClaim
 	if oldSpec != nil {
-		oldDeviceClaim = &oldSpec.Devices
+		oldDeviceClaim = &oldSpec.Devices // +k8s:verify-mutation:reason=clone
 	}
 	var totalDerivedAttrCost uint64
 	opts := deviceValidationOptions{
@@ -224,7 +224,7 @@ func validateDeviceClaim(deviceClaim, oldDeviceClaim *resource.DeviceClaim, fldP
 	oldRequests := make(map[string]*resource.DeviceRequest)
 	if oldDeviceClaim != nil {
 		for i := range oldDeviceClaim.Requests {
-			oldRequests[oldDeviceClaim.Requests[i].Name] = &oldDeviceClaim.Requests[i]
+			oldRequests[oldDeviceClaim.Requests[i].Name] = &oldDeviceClaim.Requests[i] // +k8s:verify-mutation:reason=clone
 		}
 	}
 	allErrs = append(allErrs, validateSet(deviceClaim.Requests, resource.DeviceRequestsMaxSize,
@@ -323,14 +323,14 @@ func validateDeviceRequest(request resource.DeviceRequest, oldRequest *resource.
 		oldSubRequests := make(map[string]*resource.DeviceSubRequest)
 		if oldRequest != nil {
 			for i := range oldRequest.FirstAvailable {
-				oldSubRequests[oldRequest.FirstAvailable[i].Name] = &oldRequest.FirstAvailable[i]
+				oldSubRequests[oldRequest.FirstAvailable[i].Name] = &oldRequest.FirstAvailable[i] // +k8s:verify-mutation:reason=clone
 			}
 		}
 		allErrs = append(allErrs, validateSet(request.FirstAvailable, resource.FirstAvailableDeviceRequestMaxSize,
 			func(subRequest resource.DeviceSubRequest, fldPath *field.Path) field.ErrorList {
 				var oldCapacity *resource.CapacityRequirements
 				if old, ok := oldSubRequests[subRequest.Name]; ok {
-					oldCapacity = old.Capacity
+					oldCapacity = old.Capacity // +k8s:verify-mutation:reason=clone
 				}
 				return validateDeviceSubRequest(subRequest, oldCapacity, fldPath, opts, request.Name)
 			},
@@ -341,7 +341,7 @@ func validateDeviceRequest(request resource.DeviceRequest, oldRequest *resource.
 	case hasExactly:
 		var oldCapacity *resource.CapacityRequirements
 		if oldRequest != nil && oldRequest.Exactly != nil {
-			oldCapacity = oldRequest.Exactly.Capacity
+			oldCapacity = oldRequest.Exactly.Capacity // +k8s:verify-mutation:reason=clone
 		}
 		allErrs = append(allErrs, validateExactDeviceRequest(*request.Exactly, oldCapacity, fldPath.Child("exactly"), opts, request.Name)...)
 	}
@@ -817,7 +817,7 @@ func validateResourceClaimTemplateSpec(spec, oldSpec *resource.ResourceClaimTemp
 	allErrs := corevalidation.ValidateTemplateObjectMeta(&spec.ObjectMeta, fldPath.Child("metadata"))
 	var oldClaimSpec *resource.ResourceClaimSpec
 	if oldSpec != nil {
-		oldClaimSpec = &oldSpec.Spec
+		oldClaimSpec = &oldSpec.Spec // +k8s:verify-mutation:reason=clone
 	}
 	allErrs = append(allErrs, validateResourceClaimSpec(&spec.Spec, oldClaimSpec, fldPath.Child("spec"), stored)...)
 	return allErrs
