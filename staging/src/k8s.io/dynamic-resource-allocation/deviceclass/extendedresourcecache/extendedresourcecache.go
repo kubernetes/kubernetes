@@ -144,17 +144,26 @@ func (c *ExtendedResourceCache) OnUpdate(oldObj, newObj interface{}) {
 
 // OnDelete handles deletion of a device class.
 func (c *ExtendedResourceCache) OnDelete(obj interface{}) {
+	className := ""
 	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-		obj = tombstone.Obj
-	}
-	deviceClass, ok := obj.(*resourceapi.DeviceClass)
-	if !ok {
+		if deviceClass, ok := tombstone.Obj.(*resourceapi.DeviceClass); ok {
+			className = deviceClass.Name
+		} else {
+			// DeltaFIFO.Replace can emit a key-only tombstone with a nil
+			// Obj when the key is no longer available from knownObjects.
+			// DeviceClass is cluster-scoped and all mappings are keyed by
+			// class name, so the key alone is enough to remove them all.
+			className = tombstone.Key
+		}
+	} else if deviceClass, ok := obj.(*resourceapi.DeviceClass); ok {
+		className = deviceClass.Name
+	} else {
 		utilruntime.HandleErrorWithLogger(c.logger, nil, "Expected DeviceClass", "actual", fmt.Sprintf("%T", obj))
 		return
 	}
-	c.logger.V(5).Info("DeviceClass deleted", "deviceClass", klog.KObj(deviceClass))
-	c.removeResourceName2class(deviceClass)
-	c.removeClass2ResourceName(deviceClass)
+	c.logger.V(5).Info("DeviceClass deleted", "deviceClass", className)
+	c.removeResourceName2class(className)
+	c.removeClass2ResourceName(className)
 
 	for _, handler := range c.handlers {
 		handler.OnDelete(obj)
@@ -268,36 +277,36 @@ func (c *ExtendedResourceCache) updateClass2ResourceName(deviceClass *resourceap
 // The class is dropped from the candidates of all explicit names, because the
 // ExtendedResourceName in the deleted object may be stale, and the next best
 // candidate is promoted, if any.
-func (c *ExtendedResourceCache) removeResourceName2class(deviceClass *resourceapi.DeviceClass) {
+func (c *ExtendedResourceCache) removeResourceName2class(className string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
 	// The default mapping is unique to the class and cannot be shared.
-	delete(c.resourceName2class, v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+deviceClass.Name))
+	delete(c.resourceName2class, v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+className))
 
 	// Drop the class from the candidates of all explicit names. This only
 	// affects mappings owned by the deleted class; the winner of a name
 	// claimed by other classes stays in place or is replaced by the next
 	// best candidate.
 	for explicitName, classes := range c.explicitResourceName2classes {
-		if _, ok := classes[deviceClass.Name]; !ok {
+		if _, ok := classes[className]; !ok {
 			continue
 		}
-		delete(classes, deviceClass.Name)
+		delete(classes, className)
 		if len(classes) == 0 {
 			delete(c.explicitResourceName2classes, explicitName)
 		}
 		c.recomputeWinner(explicitName)
 	}
 	c.logger.V(5).Info("Removed extended resource from cache",
-		"deviceClass", deviceClass.Name)
+		"deviceClass", className)
 }
 
 // removeClass2ResourceName removes the device class mapping from the cache.
-func (c *ExtendedResourceCache) removeClass2ResourceName(deviceClass *resourceapi.DeviceClass) {
+func (c *ExtendedResourceCache) removeClass2ResourceName(className string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	delete(c.class2ResourceName, deviceClass.Name)
-	c.logger.V(5).Info("Removed device class", "deviceClass", deviceClass.Name)
+	delete(c.class2ResourceName, className)
+	c.logger.V(5).Info("Removed device class", "deviceClass", className)
 }
