@@ -289,8 +289,9 @@ func testExtendedResourceCache(t *testing.T) {
 		t.Errorf("Expected to find device class 'gpu-class-0' for 'test.com/gpu' after modification, got %v", deviceClass)
 	}
 	// Should not have the old mapping for example.com/gpu
-	if cache.GetDeviceClass("example.com/gpu") != nil {
-		t.Errorf("Expected 'example.com/gpu' to be removed after modification, got %s", cache.GetDeviceClass("example.com/gpu"))
+	deviceClass = cache.GetDeviceClass("example.com/gpu")
+	if deviceClass == nil || deviceClass.Name != "gpu-class-4" {
+		t.Errorf("Expected 'example.com/gpu' to be promoted to 'gpu-class-4' after modification, got %v", deviceClass)
 	}
 
 	// Test deleting a device class
@@ -374,6 +375,186 @@ func testDeviceClassMapping(t *testing.T) {
 	name = cache.GetExtendedResource("gpu-class")
 	if name != "" {
 		t.Error("Expected 'gpu-class' not found after deletion")
+	}
+}
+
+func newDeviceClass(name, explicitName string, created time.Time) *resourceapi.DeviceClass {
+	class := &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              name,
+			CreationTimestamp: metav1.Time{Time: created},
+		},
+	}
+	if explicitName != "" {
+		class.Spec.ExtendedResourceName = ptr.To(explicitName)
+	}
+	return class
+}
+
+func TestSameClassUpdateReplacesStaleObject(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	class := newDeviceClass("class-a", "example.com/gpu", time.Unix(100, 0))
+	cache.OnAdd(class, false)
+
+	// Update the class while keeping the same extended resource name and
+	// creation timestamp. The cache must serve the freshly updated object,
+	// not the stale one.
+	updated := class.DeepCopy()
+	updated.Spec.Config = []resourceapi.DeviceClassConfiguration{{}}
+	cache.OnUpdate(class, updated)
+
+	if got := cache.GetDeviceClass("example.com/gpu"); got != updated {
+		t.Errorf("expected explicit mapping to point at the updated object, got %v", got)
+	}
+	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-a"); got != updated {
+		t.Errorf("expected default mapping to point at the updated object, got %v", got)
+	}
+}
+
+func TestCollisionLoserKeepsImplicitMapping(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	winner := newDeviceClass("class-winner", "example.com/gpu", time.Unix(200, 0))
+	loser := newDeviceClass("class-loser", "example.com/gpu", time.Unix(100, 0))
+	cache.OnAdd(winner, false)
+	cache.OnAdd(loser, false)
+
+	if got := cache.GetDeviceClass("example.com/gpu"); got != winner {
+		t.Errorf("expected the newer class to win the explicit mapping, got %v", got)
+	}
+	// The loser stays reachable via its own unique implicit name, which
+	// cannot collide with the explicit name of another class.
+	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-loser"); got != loser {
+		t.Errorf("expected the loser's default mapping to be registered, got %v", got)
+	}
+	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-winner"); got != winner {
+		t.Errorf("expected the winner's default mapping to be registered, got %v", got)
+	}
+}
+
+func TestCollisionLoserDeleteKeepsWinner(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	winner := newDeviceClass("class-winner", "example.com/gpu", time.Unix(200, 0))
+	loser := newDeviceClass("class-loser", "example.com/gpu", time.Unix(100, 0))
+	cache.OnAdd(winner, false)
+	cache.OnAdd(loser, false)
+
+	cache.OnDelete(loser)
+
+	// Deleting the loser must not take down the winner's mapping for the
+	// shared explicit name.
+	if got := cache.GetDeviceClass("example.com/gpu"); got != winner {
+		t.Errorf("expected the winner to keep the explicit mapping, got %v", got)
+	}
+	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-loser"); got != nil {
+		t.Errorf("expected the loser's default mapping to be removed, got %v", got)
+	}
+}
+
+func TestCollisionWinnerDeletePromotesRunnerUp(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	older := newDeviceClass("class-older", "example.com/gpu", time.Unix(100, 0))
+	newer := newDeviceClass("class-newer", "example.com/gpu", time.Unix(200, 0))
+	cache.OnAdd(older, false)
+	cache.OnAdd(newer, false)
+
+	// Deleting the winner must promote the runner-up.
+	cache.OnDelete(newer)
+	if got := cache.GetDeviceClass("example.com/gpu"); got != older {
+		t.Errorf("expected the runner-up to be promoted, got %v", got)
+	}
+
+	cache.OnDelete(older)
+	if got := cache.GetDeviceClass("example.com/gpu"); got != nil {
+		t.Errorf("expected the explicit mapping to be removed once all candidates are gone, got %v", got)
+	}
+	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-newer"); got != nil {
+		t.Errorf("expected the winner's default mapping to be removed, got %v", got)
+	}
+}
+
+func TestCollisionWinnerRenamePromotesRunnerUp(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	older := newDeviceClass("class-older", "example.com/gpu", time.Unix(100, 0))
+	newer := newDeviceClass("class-newer", "example.com/gpu", time.Unix(200, 0))
+	cache.OnAdd(older, false)
+	cache.OnAdd(newer, false)
+
+	renamed := newer.DeepCopy()
+	renamed.Spec.ExtendedResourceName = ptr.To("new.example.com/gpu")
+	cache.OnUpdate(newer, renamed)
+
+	// Renaming the winner must promote the runner-up for the old name.
+	if got := cache.GetDeviceClass("example.com/gpu"); got != older {
+		t.Errorf("expected the runner-up to be promoted after winner rename, got %v", got)
+	}
+	if got := cache.GetDeviceClass("new.example.com/gpu"); got != renamed {
+		t.Errorf("expected the renamed class to own its new name, got %v", got)
+	}
+	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-newer"); got != renamed {
+		t.Errorf("expected the renamed class's default mapping to be updated, got %v", got)
+	}
+}
+
+func TestCollisionLoserRenameKeepsWinner(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	winner := newDeviceClass("class-winner", "example.com/gpu", time.Unix(200, 0))
+	loser := newDeviceClass("class-loser", "example.com/gpu", time.Unix(100, 0))
+	cache.OnAdd(winner, false)
+	cache.OnAdd(loser, false)
+
+	renamed := loser.DeepCopy()
+	renamed.Spec.ExtendedResourceName = ptr.To("new.example.com/gpu")
+	cache.OnUpdate(loser, renamed)
+
+	// Renaming the loser must not take down the winner's mapping for the
+	// old name, even though the loser used to declare it.
+	if got := cache.GetDeviceClass("example.com/gpu"); got != winner {
+		t.Errorf("expected the winner to keep the explicit mapping, got %v", got)
+	}
+	if got := cache.GetDeviceClass("new.example.com/gpu"); got != renamed {
+		t.Errorf("expected the renamed class to own its new name, got %v", got)
+	}
+	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-loser"); got != renamed {
+		t.Errorf("expected the renamed class's default mapping to be updated, got %v", got)
+	}
+}
+
+func TestCollisionEqualTimestampTieBreak(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	classA := newDeviceClass("class-a", "example.com/gpu", time.Unix(100, 0))
+	classB := newDeviceClass("class-b", "example.com/gpu", time.Unix(100, 0))
+	cache.OnAdd(classA, false)
+	cache.OnAdd(classB, false)
+
+	// Equal creation timestamps: the lexicographically first name wins.
+	if got := cache.GetDeviceClass("example.com/gpu"); got != classA {
+		t.Errorf("expected the lexicographically first name to win the tie, got %v", got)
+	}
+
+	renamed := classA.DeepCopy()
+	renamed.Spec.ExtendedResourceName = ptr.To("new.example.com/gpu")
+	cache.OnUpdate(classA, renamed)
+
+	// Renaming the tie winner promotes the runner-up.
+	if got := cache.GetDeviceClass("example.com/gpu"); got != classB {
+		t.Errorf("expected the runner-up to be promoted after tie winner rename, got %v", got)
+	}
+	if got := cache.GetDeviceClass("new.example.com/gpu"); got != renamed {
+		t.Errorf("expected the renamed class to own its new name, got %v", got)
 	}
 }
 

@@ -35,7 +35,16 @@ type ExtendedResourceCache struct {
 	handlers []cache.ResourceEventHandler
 
 	mutex sync.RWMutex
-	// resourceName2class maps extended resource name to device class
+	// explicitResourceName2classes maps an explicit extended resource name to
+	// the set of device classes which declare it. Several classes may declare
+	// the same name, for example while migrating from one class to another;
+	// the winner is the "best" class according to betterDeviceClass.
+	explicitResourceName2classes map[string]map[string]*resourceapi.DeviceClass
+	// resourceName2class maps extended resource name to device class. For
+	// explicit names it holds the current winner of
+	// explicitResourceName2classes, for implicit
+	// deviceclass.resource.kubernetes.io/<class name> names it holds the
+	// class itself.
 	resourceName2class map[v1.ResourceName]*resourceapi.DeviceClass
 	// class2ResourceName maps device class name to extended resource name
 	class2ResourceName map[string]string
@@ -49,10 +58,11 @@ var _ cache.ResourceEventHandler = &ExtendedResourceCache{}
 // Additional event handlers may be registered here or via AddEventHandler.
 func NewExtendedResourceCache(logger klog.Logger, handlers ...cache.ResourceEventHandler) *ExtendedResourceCache {
 	cache := &ExtendedResourceCache{
-		logger:             logger,
-		handlers:           handlers,
-		resourceName2class: make(map[v1.ResourceName]*resourceapi.DeviceClass),
-		class2ResourceName: make(map[string]string),
+		logger:                       logger,
+		handlers:                     handlers,
+		explicitResourceName2classes: make(map[string]map[string]*resourceapi.DeviceClass),
+		resourceName2class:           make(map[v1.ResourceName]*resourceapi.DeviceClass),
+		class2ResourceName:           make(map[string]string),
 	}
 
 	return cache
@@ -151,62 +161,93 @@ func (c *ExtendedResourceCache) OnDelete(obj interface{}) {
 	}
 }
 
+// betterDeviceClass returns true if class a should win the explicit extended
+// resource name over class b: the newer class wins, with the alphabetically
+// lower name as tie-breaker. This matches the arbitration documented in
+// DeviceClassSpec.ExtendedResourceName.
+func betterDeviceClass(a, b *resourceapi.DeviceClass) bool {
+	if b == nil {
+		return true
+	}
+	if cmp := cmp.Compare(a.CreationTimestamp.UnixNano(), b.CreationTimestamp.UnixNano()); cmp != 0 {
+		return cmp > 0
+	}
+	return a.Name < b.Name
+}
+
 // updateResourceName2class updates the cache with the device class mapping.
 // It first removes any existing mappings for this device class to handle
 // ExtendedResourceName changes, then adds the new mappings.
+//
+// Different DeviceClasses may specify the same ExtendedResourceName, for
+// example while migrating from one DeviceClass to another. All candidates are
+// kept and the winner is derived from them on each event, so that a rename or
+// deletion of the current winner promotes the next candidate instead of
+// leaving the mapping dangling. The implicit
+// deviceclass.resource.kubernetes.io/<class name> mapping is always unique
+// (it cannot appear in a different class as ExtendedResourceName, prevented
+// by validation), so it is registered independently of the explicit name
+// arbitration.
 func (c *ExtendedResourceCache) updateResourceName2class(newDeviceClass, oldDeviceClass *resourceapi.DeviceClass) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	// Different DeviceClasses could specify the same ExtendedResourceName.
-	// If we find such a clash, we need to pick one of them.
-	//
-	// Such a clash should be rare, but can occur while migrating from one
-	// DeviceClass to another. To support such a migration, we prefer the
-	// newer DeviceClass. The name serves as tie-breaker.
-	//
-	// The implicit deviceclass.resource.kubernetes.io/<class name> is always
-	// unique and also cannot appear in a different class as ExtendedResourceName
-	// (prevented by validation), so we don't need to do the same check for
-	// implicit mappings.
-	var classWithSameExtendedResourceName *resourceapi.DeviceClass
-	if newDeviceClass.Spec.ExtendedResourceName != nil {
-		classWithSameExtendedResourceName = c.resourceName2class[v1.ResourceName(*newDeviceClass.Spec.ExtendedResourceName)]
-	}
-	if classWithSameExtendedResourceName != nil {
-		switch cmp.Compare(newDeviceClass.CreationTimestamp.UnixNano(), classWithSameExtendedResourceName.CreationTimestamp.UnixNano()) {
-		case -1:
-			// New class is older, keep the current more recent one.
-			return
-		case 0:
-			// Equal, arbitrarily prefer "lower" name.
-			if newDeviceClass.Name >= classWithSameExtendedResourceName.Name {
-				return
-			}
-		}
-	}
-
-	// Remove old mappings first to handle ExtendedResourceName changes
+	// Drop this class from the candidates of all explicit names, not just
+	// the one in the old object, because the old object's
+	// ExtendedResourceName may be stale.
 	if oldDeviceClass != nil {
-		delete(c.resourceName2class, v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+oldDeviceClass.Name))
-		if oldDeviceClass.Spec.ExtendedResourceName != nil {
-			delete(c.resourceName2class, v1.ResourceName(*oldDeviceClass.Spec.ExtendedResourceName))
+		for explicitName, classes := range c.explicitResourceName2classes {
+			if _, ok := classes[oldDeviceClass.Name]; !ok {
+				continue
+			}
+			delete(classes, oldDeviceClass.Name)
+			if len(classes) == 0 {
+				delete(c.explicitResourceName2classes, explicitName)
+			}
+			c.recomputeWinner(explicitName)
 		}
 	}
 
-	// Add new mappings
+	// Add this class to the candidates of its new explicit name, if any. The
+	// freshly updated object replaces a stale cached one.
 	if newDeviceClass.Spec.ExtendedResourceName != nil {
-		c.resourceName2class[v1.ResourceName(*newDeviceClass.Spec.ExtendedResourceName)] = newDeviceClass
-		c.logger.V(5).Info("Updated extended resource cache for explicit mapping",
-			"extendedResource", *newDeviceClass.Spec.ExtendedResourceName,
-			"deviceClass", newDeviceClass.Name)
+		explicitName := *newDeviceClass.Spec.ExtendedResourceName
+		classes := c.explicitResourceName2classes[explicitName]
+		if classes == nil {
+			classes = make(map[string]*resourceapi.DeviceClass)
+			c.explicitResourceName2classes[explicitName] = classes
+		}
+		classes[newDeviceClass.Name] = newDeviceClass
+		c.recomputeWinner(explicitName)
 	}
-	// Always add the default mapping
+
+	// Always add the default mapping; it is unique to this class and
+	// independent of any explicit name arbitration.
 	defaultResourceName := v1.ResourceName(resourceapi.ResourceDeviceClassPrefix + newDeviceClass.Name)
 	c.resourceName2class[defaultResourceName] = newDeviceClass
 	c.logger.V(5).Info("Updated extended resource cache for default mapping",
 		"extendedResource", defaultResourceName,
 		"deviceClass", newDeviceClass.Name)
+}
+
+// recomputeWinner makes explicitName map to the best candidate device class,
+// removing the mapping if no candidate remains.
+func (c *ExtendedResourceCache) recomputeWinner(explicitName string) {
+	classes := c.explicitResourceName2classes[explicitName]
+	var winner *resourceapi.DeviceClass
+	for _, class := range classes {
+		if betterDeviceClass(class, winner) {
+			winner = class
+		}
+	}
+	if winner == nil {
+		delete(c.resourceName2class, v1.ResourceName(explicitName))
+		return
+	}
+	c.resourceName2class[v1.ResourceName(explicitName)] = winner
+	c.logger.V(5).Info("Updated extended resource cache for explicit mapping",
+		"extendedResource", explicitName,
+		"deviceClass", winner.Name)
 }
 
 // updateClass2ResourceName updates the cache with the device class mapping.
@@ -224,17 +265,29 @@ func (c *ExtendedResourceCache) updateClass2ResourceName(deviceClass *resourceap
 }
 
 // removeResourceName2class removes the device class mapping from the cache.
-// It searches for all mappings to the given device class name and removes them,
-// because the ExtendedResourceName in the deviceClass object may be stale.
+// The class is dropped from the candidates of all explicit names, because the
+// ExtendedResourceName in the deleted object may be stale, and the next best
+// candidate is promoted, if any.
 func (c *ExtendedResourceCache) removeResourceName2class(deviceClass *resourceapi.DeviceClass) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	// Remove the default mapping
+	// The default mapping is unique to the class and cannot be shared.
 	delete(c.resourceName2class, v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+deviceClass.Name))
-	// Remove the explicit mapping
-	if deviceClass.Spec.ExtendedResourceName != nil {
-		delete(c.resourceName2class, v1.ResourceName(*deviceClass.Spec.ExtendedResourceName))
+
+	// Drop the class from the candidates of all explicit names. This only
+	// affects mappings owned by the deleted class; the winner of a name
+	// claimed by other classes stays in place or is replaced by the next
+	// best candidate.
+	for explicitName, classes := range c.explicitResourceName2classes {
+		if _, ok := classes[deviceClass.Name]; !ok {
+			continue
+		}
+		delete(classes, deviceClass.Name)
+		if len(classes) == 0 {
+			delete(c.explicitResourceName2classes, explicitName)
+		}
+		c.recomputeWinner(explicitName)
 	}
 	c.logger.V(5).Info("Removed extended resource from cache",
 		"deviceClass", deviceClass.Name)
