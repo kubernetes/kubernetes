@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -27,8 +28,10 @@ import (
 	"gopkg.in/go-jose/go-jose.v2/jwt"
 
 	admissionregistration "k8s.io/api/admissionregistration/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/audit"
@@ -930,3 +933,581 @@ func TestTokenRESTCreateWebhookDeletionTimestamp(t *testing.T) {
 		}
 	})
 }
+
+func TestTokenRESTTrivialMethods(t *testing.T) {
+	r := &TokenREST{}
+	if obj := r.New(); obj == nil {
+		t.Fatal("New() returned nil")
+	}
+	if _, ok := r.New().(*authenticationapi.TokenRequest); !ok {
+		t.Fatalf("New() returned unexpected type %T", r.New())
+	}
+	r.Destroy() // no-op, must not panic
+	if gvk := r.GroupVersionKind(schema.GroupVersion{}); gvk.Kind != "TokenRequest" {
+		t.Fatalf("unexpected GVK: %#v", gvk)
+	}
+	if !r.PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate() {
+		t.Fatal("expected PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate to be true")
+	}
+}
+
+// TestTokenRESTCreateCorePaths covers the main non-webhook Create() branches:
+// request validation, pod/secret/node binding, and related error paths.
+func TestTokenRESTCreateCorePaths(t *testing.T) {
+	sa := validNewServiceAccount("foo")
+	sa.UID = "sa-uid"
+
+	pod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: sa.Namespace, UID: "pod-uid"},
+		Spec: api.PodSpec{
+			ServiceAccountName: sa.Name,
+			NodeName:           "node-1",
+		},
+	}
+	podWrongSA := pod.DeepCopy()
+	podWrongSA.Spec.ServiceAccountName = "other-sa"
+
+	secret := &api.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "secret-1", Namespace: sa.Namespace, UID: "secret-uid"},
+	}
+	node := &api.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "node-uid"},
+	}
+
+	aud := authenticator.Audiences{"aud-1"}
+	baseReq := func() *authenticationapi.TokenRequest {
+		return &authenticationapi.TokenRequest{
+			ObjectMeta: metav1.ObjectMeta{Name: sa.Name, Namespace: sa.Namespace},
+			Spec: authenticationapi.TokenRequestSpec{
+				Audiences:         aud,
+				ExpirationSeconds: 600,
+			},
+		}
+	}
+
+	type getters struct {
+		pod, secret, node rest.Getter
+	}
+
+	cases := []struct {
+		name          string
+		setup         func(t *testing.T, storage *REST)
+		getters       getters
+		ctx           func() context.Context
+		req           func() *authenticationapi.TokenRequest
+		nameArg       string
+		validation    rest.ValidateObjectFunc
+		wantErrSubstr string
+		wantToken     bool
+		check         func(t *testing.T, out *authenticationapi.TokenRequest, dc *dummyRecorder)
+	}{
+		{
+			name: "namespace missing from context",
+			getters: getters{
+				pod: panicGetter{}, secret: panicGetter{}, node: panicGetter{},
+			},
+			ctx: func() context.Context {
+				return audit.WithAuditContext(context.Background())
+			},
+			req:           baseReq,
+			nameArg:       sa.Name,
+			wantErrSubstr: "namespace is required",
+		},
+		{
+			name: "body name must match URL name",
+			getters: getters{
+				pod: panicGetter{}, secret: panicGetter{}, node: panicGetter{},
+			},
+			ctx: func() context.Context {
+				return audit.WithAuditContext(request.WithNamespace(context.Background(), sa.Namespace))
+			},
+			req: func() *authenticationapi.TokenRequest {
+				r := baseReq()
+				r.Name = "other-name"
+				return r
+			},
+			nameArg:       sa.Name,
+			wantErrSubstr: "must match the service account name if specified",
+		},
+		{
+			name: "body namespace must match URL namespace",
+			getters: getters{
+				pod: panicGetter{}, secret: panicGetter{}, node: panicGetter{},
+			},
+			ctx: func() context.Context {
+				return audit.WithAuditContext(request.WithNamespace(context.Background(), sa.Namespace))
+			},
+			req: func() *authenticationapi.TokenRequest {
+				r := baseReq()
+				r.Namespace = "other-ns"
+				return r
+			},
+			nameArg:       sa.Name,
+			wantErrSubstr: "must match the service account namespace if specified",
+		},
+		{
+			name: "service account not found",
+			getters: getters{
+				pod: panicGetter{}, secret: panicGetter{}, node: panicGetter{},
+			},
+			ctx: func() context.Context {
+				return audit.WithAuditContext(request.WithNamespace(context.Background(), sa.Namespace))
+			},
+			req: func() *authenticationapi.TokenRequest {
+				// Leave Name empty so URL-name matching does not fail first.
+				return &authenticationapi.TokenRequest{
+					Spec: authenticationapi.TokenRequestSpec{
+						Audiences:         aud,
+						ExpirationSeconds: 600,
+					},
+				}
+			},
+			nameArg:       "missing-sa",
+			wantErrSubstr: "not found",
+		},
+		{
+			name: "static validation rejects short expiration",
+			setup: func(t *testing.T, storage *REST) {
+				t.Helper()
+				ctx := request.WithNamespace(genericregistrytest.NewNamespaceScopeContext(storage.Store, sa.Namespace), sa.Namespace)
+				if _, err := storage.Store.Create(ctx, sa.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+					t.Fatalf("create sa: %v", err)
+				}
+			},
+			getters: getters{
+				pod: panicGetter{}, secret: panicGetter{}, node: panicGetter{},
+			},
+			ctx: func() context.Context {
+				return audit.WithAuditContext(request.WithNamespace(context.Background(), sa.Namespace))
+			},
+			req: func() *authenticationapi.TokenRequest {
+				r := baseReq()
+				r.Spec.ExpirationSeconds = 60 // below MinTokenAgeSec
+				return r
+			},
+			nameArg:       sa.Name,
+			wantErrSubstr: "may not specify a duration less than 10 minutes",
+		},
+		{
+			name: "createValidation failure",
+			setup: func(t *testing.T, storage *REST) {
+				t.Helper()
+				ctx := request.WithNamespace(genericregistrytest.NewNamespaceScopeContext(storage.Store, sa.Namespace), sa.Namespace)
+				if _, err := storage.Store.Create(ctx, sa.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+					t.Fatalf("create sa: %v", err)
+				}
+			},
+			getters: getters{
+				pod: panicGetter{}, secret: panicGetter{}, node: panicGetter{},
+			},
+			ctx: func() context.Context {
+				return audit.WithAuditContext(request.WithNamespace(context.Background(), sa.Namespace))
+			},
+			req:     baseReq,
+			nameArg: sa.Name,
+			validation: func(ctx context.Context, obj runtime.Object) error {
+				return fmt.Errorf("admission denied")
+			},
+			wantErrSubstr: "admission denied",
+		},
+		{
+			name: "unbound token success defaults empty metadata and audiences",
+			setup: func(t *testing.T, storage *REST) {
+				t.Helper()
+				ctx := request.WithNamespace(genericregistrytest.NewNamespaceScopeContext(storage.Store, sa.Namespace), sa.Namespace)
+				if _, err := storage.Store.Create(ctx, sa.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+					t.Fatalf("create sa: %v", err)
+				}
+			},
+			getters: getters{
+				pod: panicGetter{}, secret: panicGetter{}, node: panicGetter{},
+			},
+			ctx: func() context.Context {
+				return audit.WithAuditContext(request.WithNamespace(context.Background(), sa.Namespace))
+			},
+			req: func() *authenticationapi.TokenRequest {
+				return &authenticationapi.TokenRequest{
+					Spec: authenticationapi.TokenRequestSpec{
+						ExpirationSeconds: 600,
+						// Audiences intentionally empty → defaulted to server auds
+					},
+				}
+			},
+			nameArg:   sa.Name,
+			wantToken: true,
+			check: func(t *testing.T, out *authenticationapi.TokenRequest, _ *dummyRecorder) {
+				t.Helper()
+				if out.Name != sa.Name || out.Namespace != sa.Namespace {
+					t.Fatalf("expected name/namespace defaulted from SA, got %s/%s", out.Namespace, out.Name)
+				}
+				if out.Status.Token == "" {
+					t.Fatal("expected token in status")
+				}
+				if len(out.Spec.Audiences) == 0 {
+					t.Fatal("expected audiences defaulted from server config")
+				}
+			},
+		},
+		{
+			name: "pod bind success",
+			setup: func(t *testing.T, storage *REST) {
+				t.Helper()
+				ctx := request.WithNamespace(genericregistrytest.NewNamespaceScopeContext(storage.Store, sa.Namespace), sa.Namespace)
+				if _, err := storage.Store.Create(ctx, sa.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+					t.Fatalf("create sa: %v", err)
+				}
+			},
+			getters: getters{
+				pod:    objectGetter{obj: pod},
+				secret: panicGetter{},
+				node:   objectGetter{obj: node},
+			},
+			ctx: func() context.Context {
+				return audit.WithAuditContext(request.WithNamespace(context.Background(), sa.Namespace))
+			},
+			req: func() *authenticationapi.TokenRequest {
+				r := baseReq()
+				r.Spec.BoundObjectRef = &authenticationapi.BoundObjectReference{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       pod.Name,
+					UID:        pod.UID,
+				}
+				return r
+			},
+			nameArg:   sa.Name,
+			wantToken: true,
+		},
+		{
+			name: "pod bind wrong service account",
+			setup: func(t *testing.T, storage *REST) {
+				t.Helper()
+				ctx := request.WithNamespace(genericregistrytest.NewNamespaceScopeContext(storage.Store, sa.Namespace), sa.Namespace)
+				if _, err := storage.Store.Create(ctx, sa.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+					t.Fatalf("create sa: %v", err)
+				}
+			},
+			getters: getters{
+				pod:    objectGetter{obj: podWrongSA},
+				secret: panicGetter{},
+				node:   panicGetter{},
+			},
+			ctx: func() context.Context {
+				return audit.WithAuditContext(request.WithNamespace(context.Background(), sa.Namespace))
+			},
+			req: func() *authenticationapi.TokenRequest {
+				r := baseReq()
+				r.Spec.BoundObjectRef = &authenticationapi.BoundObjectReference{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       podWrongSA.Name,
+				}
+				return r
+			},
+			nameArg:       sa.Name,
+			wantErrSubstr: "different serviceaccount name",
+		},
+		{
+			name: "pod bind UID mismatch",
+			setup: func(t *testing.T, storage *REST) {
+				t.Helper()
+				ctx := request.WithNamespace(genericregistrytest.NewNamespaceScopeContext(storage.Store, sa.Namespace), sa.Namespace)
+				if _, err := storage.Store.Create(ctx, sa.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+					t.Fatalf("create sa: %v", err)
+				}
+			},
+			getters: getters{
+				pod:    objectGetter{obj: pod},
+				secret: panicGetter{},
+				node:   objectGetter{obj: node},
+			},
+			ctx: func() context.Context {
+				return audit.WithAuditContext(request.WithNamespace(context.Background(), sa.Namespace))
+			},
+			req: func() *authenticationapi.TokenRequest {
+				r := baseReq()
+				r.Spec.BoundObjectRef = &authenticationapi.BoundObjectReference{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       pod.Name,
+					UID:        "stale-uid",
+				}
+				return r
+			},
+			nameArg:       sa.Name,
+			wantErrSubstr: "does not match the UID in record",
+		},
+		{
+			name: "pod bind node not found still succeeds with node name claim",
+			setup: func(t *testing.T, storage *REST) {
+				t.Helper()
+				ctx := request.WithNamespace(genericregistrytest.NewNamespaceScopeContext(storage.Store, sa.Namespace), sa.Namespace)
+				if _, err := storage.Store.Create(ctx, sa.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+					t.Fatalf("create sa: %v", err)
+				}
+			},
+			getters: getters{
+				pod:    objectGetter{obj: pod},
+				secret: panicGetter{},
+				node: objectGetter{
+					err: apierrors.NewNotFound(schema.GroupResource{Resource: "nodes"}, "node-1"),
+				},
+			},
+			ctx: func() context.Context {
+				return audit.WithAuditContext(request.WithNamespace(context.Background(), sa.Namespace))
+			},
+			req: func() *authenticationapi.TokenRequest {
+				r := baseReq()
+				r.Spec.BoundObjectRef = &authenticationapi.BoundObjectReference{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       pod.Name,
+				}
+				return r
+			},
+			nameArg:   sa.Name,
+			wantToken: true,
+		},
+		{
+			name: "secret bind success",
+			setup: func(t *testing.T, storage *REST) {
+				t.Helper()
+				ctx := request.WithNamespace(genericregistrytest.NewNamespaceScopeContext(storage.Store, sa.Namespace), sa.Namespace)
+				if _, err := storage.Store.Create(ctx, sa.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+					t.Fatalf("create sa: %v", err)
+				}
+			},
+			getters: getters{
+				pod:    panicGetter{},
+				secret: objectGetter{obj: secret},
+				node:   panicGetter{},
+			},
+			ctx: func() context.Context {
+				return audit.WithAuditContext(request.WithNamespace(context.Background(), sa.Namespace))
+			},
+			req: func() *authenticationapi.TokenRequest {
+				r := baseReq()
+				r.Spec.BoundObjectRef = &authenticationapi.BoundObjectReference{
+					APIVersion: "v1",
+					Kind:       "Secret",
+					Name:       secret.Name,
+					UID:        secret.UID,
+				}
+				return r
+			},
+			nameArg:   sa.Name,
+			wantToken: true,
+		},
+		{
+			name: "node bind success",
+			setup: func(t *testing.T, storage *REST) {
+				t.Helper()
+				ctx := request.WithNamespace(genericregistrytest.NewNamespaceScopeContext(storage.Store, sa.Namespace), sa.Namespace)
+				if _, err := storage.Store.Create(ctx, sa.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+					t.Fatalf("create sa: %v", err)
+				}
+			},
+			getters: getters{
+				pod:    panicGetter{},
+				secret: panicGetter{},
+				node:   objectGetter{obj: node},
+			},
+			ctx: func() context.Context {
+				return audit.WithAuditContext(request.WithNamespace(context.Background(), sa.Namespace))
+			},
+			req: func() *authenticationapi.TokenRequest {
+				r := baseReq()
+				r.Spec.BoundObjectRef = &authenticationapi.BoundObjectReference{
+					APIVersion: "v1",
+					Kind:       "Node",
+					Name:       node.Name,
+					UID:        node.UID,
+				}
+				return r
+			},
+			nameArg:   sa.Name,
+			wantToken: true,
+		},
+		{
+			name: "unsupported bound object kind",
+			setup: func(t *testing.T, storage *REST) {
+				t.Helper()
+				ctx := request.WithNamespace(genericregistrytest.NewNamespaceScopeContext(storage.Store, sa.Namespace), sa.Namespace)
+				if _, err := storage.Store.Create(ctx, sa.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+					t.Fatalf("create sa: %v", err)
+				}
+			},
+			getters: getters{
+				pod: panicGetter{}, secret: panicGetter{}, node: panicGetter{},
+			},
+			ctx: func() context.Context {
+				return audit.WithAuditContext(request.WithNamespace(context.Background(), sa.Namespace))
+			},
+			req: func() *authenticationapi.TokenRequest {
+				r := baseReq()
+				r.Spec.BoundObjectRef = &authenticationapi.BoundObjectReference{
+					APIVersion: "v1",
+					Kind:       "ConfigMap",
+					Name:       "cm",
+				}
+				return r
+			},
+			nameArg:       sa.Name,
+			wantErrSubstr: "cannot bind token to object of type",
+		},
+		{
+			name: "maxExpirationSeconds shortens requested expiration with warning",
+			setup: func(t *testing.T, storage *REST) {
+				t.Helper()
+				ctx := request.WithNamespace(genericregistrytest.NewNamespaceScopeContext(storage.Store, sa.Namespace), sa.Namespace)
+				if _, err := storage.Store.Create(ctx, sa.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+					t.Fatalf("create sa: %v", err)
+				}
+				storage.Token.maxExpirationSeconds = 900
+			},
+			getters: getters{
+				pod: panicGetter{}, secret: panicGetter{}, node: panicGetter{},
+			},
+			ctx: func() context.Context {
+				return audit.WithAuditContext(request.WithNamespace(context.Background(), sa.Namespace))
+			},
+			req: func() *authenticationapi.TokenRequest {
+				r := baseReq()
+				r.Spec.ExpirationSeconds = 3600
+				return r
+			},
+			nameArg:   sa.Name,
+			wantToken: true,
+			check: func(t *testing.T, out *authenticationapi.TokenRequest, dc *dummyRecorder) {
+				t.Helper()
+				if out.Spec.ExpirationSeconds != 900 {
+					t.Fatalf("expected expiration shortened to 900, got %d", out.Spec.ExpirationSeconds)
+				}
+				if !strings.Contains(dc.getWarning(), "shortened to 900 seconds") {
+					t.Fatalf("expected shortening warning, got %q", dc.getWarning())
+				}
+			},
+		},
+		{
+			name: "token generator failure",
+			setup: func(t *testing.T, storage *REST) {
+				t.Helper()
+				ctx := request.WithNamespace(genericregistrytest.NewNamespaceScopeContext(storage.Store, sa.Namespace), sa.Namespace)
+				if _, err := storage.Store.Create(ctx, sa.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+					t.Fatalf("create sa: %v", err)
+				}
+				storage.Token.issuer = failingTokenGenerator{}
+			},
+			getters: getters{
+				pod: panicGetter{}, secret: panicGetter{}, node: panicGetter{},
+			},
+			ctx: func() context.Context {
+				return audit.WithAuditContext(request.WithNamespace(context.Background(), sa.Namespace))
+			},
+			req:           baseReq,
+			nameArg:       sa.Name,
+			wantErrSubstr: "failed to generate token",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			storage, server := newTokenStorage(t, testTokenGenerator{"fake"}, aud, tc.getters.pod, tc.getters.secret, tc.getters.node)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+
+			if tc.setup != nil {
+				tc.setup(t, storage)
+			}
+
+			dc := &dummyRecorder{}
+			ctx := tc.ctx()
+			ctx = warning.WithWarningRecorder(ctx, dc)
+
+			validation := rest.ValidateAllObjectFunc
+			if tc.validation != nil {
+				validation = tc.validation
+			}
+
+			out, err := storage.Token.Create(ctx, tc.nameArg, tc.req(), validation, &metav1.CreateOptions{})
+			if len(tc.wantErrSubstr) > 0 {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tc.wantErrSubstr)
+				}
+				if !strings.Contains(err.Error(), tc.wantErrSubstr) {
+					t.Fatalf("expected error containing %q, got %q", tc.wantErrSubstr, err.Error())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !tc.wantToken {
+				return
+			}
+			tokenReq, ok := out.(*authenticationapi.TokenRequest)
+			if !ok {
+				t.Fatalf("unexpected type %T", out)
+			}
+			if tokenReq.Status.Token == "" {
+				t.Fatal("expected non-empty token")
+			}
+			if tc.check != nil {
+				tc.check(t, tokenReq, dc)
+			}
+		})
+	}
+}
+
+func TestTokenRESTCreateMutatingWebhookSuccess(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIServerWebhookAuthenticationToken, true)
+
+	webhookCfg := &admissionregistration.MutatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-mutating-webhook", UID: "mutating-uid"},
+		Webhooks: []admissionregistration.MutatingWebhook{{
+			ClientConfig: admissionregistration.WebhookClientConfig{URL: new("https://mutating.example.com")},
+			Rules: []admissionregistration.RuleWithOperations{{
+				Rule: admissionregistration.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}},
+			}},
+		}},
+	}
+
+	authz := &recordingAuthorizer{decision: authorizer.DecisionAllow}
+	fakeClient := fake.NewClientset(webhookCfg)
+	r := newTestTokenREST(t, authz, fakeClient)
+
+	req := &authenticationapi.TokenRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-sa", Namespace: "test-ns"},
+		Spec: authenticationapi.TokenRequestSpec{
+			Audiences:         []string{"https://mutating.example.com"},
+			ExpirationSeconds: 600,
+			BoundObjectRef: &authenticationapi.BoundObjectReference{
+				Kind:       "MutatingWebhookConfiguration",
+				APIVersion: "admissionregistration.k8s.io/v1",
+				Name:       "my-mutating-webhook",
+			},
+			Attestations: map[string]authenticationapi.AttestationValue{
+				"admissionReviewAPIGroups": {"apps"},
+			},
+		},
+	}
+
+	out, err := r.Create(testWebhookCreateContext(), "test-sa", req, nil, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.(*authenticationapi.TokenRequest).Status.Token == "" {
+		t.Fatal("expected token")
+	}
+	if len(authz.calls) != 1 {
+		t.Fatalf("expected 1 authorizer call, got %d", len(authz.calls))
+	}
+}
+
+type failingTokenGenerator struct{}
+
+func (failingTokenGenerator) GenerateToken(ctx context.Context, claims *jwt.Claims, privateClaims interface{}) (string, error) {
+	return "", fmt.Errorf("issuer unavailable")
+}
+
+var _ token.TokenGenerator = failingTokenGenerator{}
