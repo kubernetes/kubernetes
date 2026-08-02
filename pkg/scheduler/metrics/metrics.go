@@ -122,11 +122,14 @@ const (
 	BatchFlushPodSkipped      = "pod_skipped"
 	BatchFlushPodNominated    = "pod_nominated"
 	BatchFlushNodeMissing     = "node_missing"
-	BatchFlushNodeNotFull     = "node_not_full"
 	BatchFlushEmptyList       = "empty_list"
 	BatchFlushExpired         = "expired"
 	BatchFlushPodIncompatible = "pod_incompatible"
 	BatchFlushPodNotBatchable = "pod_not_batchable"
+	BatchFlushFilterError     = "filter_error"
+	BatchFlushPreScoreError   = "prescore_error"
+	BatchFlushRescoreError    = "rescore_error"
+	BatchFlushNormalizeError  = "normalize_error"
 )
 
 // DRADeviceBindingConditions status labels
@@ -151,12 +154,15 @@ var (
 	Goroutines                   *metrics.GaugeVec
 	BatchAttemptStats            *metrics.CounterVec
 	BatchCacheFlushed            *metrics.CounterVec
+	BatchRescoreAttempts         *metrics.CounterVec
+	BatchRescoreDuration         *metrics.HistogramVec
 	GetNodeHintDuration          *metrics.HistogramVec
 	StoreScheduleResultsDuration *metrics.HistogramVec
 
 	PodSchedulingSLIDuration        *metrics.HistogramVec
 	PodSchedulingAttempts           *metrics.Histogram
 	PodScheduledAfterFlush          *metrics.Counter
+	PreQueueingHintEvaluations      *metrics.CounterVec
 	FrameworkExtensionPointDuration *metrics.HistogramVec
 	PluginExecutionDuration         *metrics.HistogramVec
 
@@ -352,6 +358,13 @@ func InitMetrics() {
 			Help:           "Counts of cache flushes by reason.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"profile", "reason"})
+	BatchRescoreAttempts = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "batch_rescore_attempts_total",
+			Help:           "Counts of rescore attempts during opportunistic batching.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"profile"})
 
 	PodSchedulingSLIDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -380,6 +393,15 @@ func InitMetrics() {
 			Help:           "Number of pods that were successfully scheduled after being flushed from unschedulableEntities due to timeout. This metric helps detect potential queueing hint misconfigurations or event handling issues.",
 			StabilityLevel: metrics.ALPHA,
 		})
+
+	PreQueueingHintEvaluations = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "pre_queueing_hint_evaluations_total",
+			Help:           "Number of PreQueueingHint evaluations, labeled by plugin and result (all_pods or narrowed).",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"plugin", "result"})
 
 	FrameworkExtensionPointDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -541,7 +563,7 @@ func InitMetrics() {
 			Subsystem: SchedulerSubsystem,
 			Name:      "get_node_hint_duration_seconds",
 			Help:      "Latency for getting a node hint.",
-			// Start with 0.01ms with the last bucket being [~200ms, Inf)
+			// Start with 0.01ms with the last bucket being [~20ms, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.00001, 2, 12),
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -551,8 +573,19 @@ func InitMetrics() {
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "store_schedule_results_duration_seconds",
-			Help:      "Latency for getting a no.",
-			// Start with 0.01ms with the last bucket being [~200ms, Inf)
+			Help:      "Latency for storing scheduling results.",
+			// Start with 0.01ms with the last bucket being [~20ms, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.00001, 2, 12),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"profile"})
+
+	BatchRescoreDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "batch_rescore_duration_seconds",
+			Help:      "Latency for rescoring a node during opportunistic batching.",
+			// Start with 0.01ms with the last bucket being [~20ms, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.00001, 2, 12),
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -683,10 +716,13 @@ func InitMetrics() {
 		PluginEvaluationTotal,
 		BatchAttemptStats,
 		BatchCacheFlushed,
+		BatchRescoreAttempts,
+		BatchRescoreDuration,
 		GetNodeHintDuration,
 		StoreScheduleResultsDuration,
 		queueingHintExecutionDuration,
 		InFlightEvents,
+		PreQueueingHintEvaluations,
 	}
 }
 

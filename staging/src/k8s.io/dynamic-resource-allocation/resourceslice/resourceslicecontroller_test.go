@@ -428,6 +428,87 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedErrors: []string{`update ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRAOptionalNodeOperations`},
 		},
+		"drop-compatibility-groups-field": {
+			features: features{disableCompatibilityGroups: true},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{
+							{
+								PerDeviceNodeSelection: new(true),
+								SharedCounters: []resourceapi.CounterSet{{
+									Name: "gpu-0",
+									Counters: map[string]resourceapi.Counter{
+										"mem": {Value: resource.MustParse("1")},
+									},
+								}},
+							},
+							{
+								PerDeviceNodeSelection: new(true),
+								Devices: []resourceapi.Device{
+									newDevice(
+										deviceName,
+										nodeNameField(ownerName),
+										[]resourceapi.DeviceCounterConsumption{{
+											CounterSet: "gpu-0",
+											Counters: map[string]resourceapi.Counter{
+												"mem": {Value: resource.MustParse("1")},
+											},
+											CompatibilityGroups: []string{"group1", "group2"},
+										}},
+									),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 2,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					ResourceVersion("1").
+					AppOwnerReferences(ownerName).
+					AllNodes(false).
+					NodeName("").
+					NodeSelector(nil).
+					PerDeviceNodeSelection(true).
+					SharedCounters([]resourceapi.CounterSet{{
+						Name: "gpu-0",
+						Counters: map[string]resourceapi.Counter{
+							"mem": {Value: resource.MustParse("1")},
+						},
+					}}).
+					Driver(driverName).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 2}).
+					Obj(),
+				*MakeResourceSlice().Name(resourceSlice2).GenerateName(generateName2).
+					ResourceVersion("1").
+					AppOwnerReferences(ownerName).
+					AllNodes(false).
+					NodeName("").
+					NodeSelector(nil).
+					PerDeviceNodeSelection(true).
+					Driver(driverName).
+					Devices([]resourceapi.Device{
+						newDevice(
+							deviceName,
+							nodeNameField(ownerName),
+							resourceapi.DeviceCounterConsumption{
+								CounterSet: "gpu-0",
+								Counters: map[string]resourceapi.Counter{
+									"mem": {Value: resource.MustParse("1")},
+								},
+							},
+						),
+					}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 2}).
+					Obj(),
+			},
+			expectedErrors: []string{`create ResourceSlice: pool "pool", slice #1: some fields were dropped by the apiserver, probably because these features are disabled: DRADeviceCompatibilityGroups`},
+		},
 		"remove-pool": {
 			nodeUID:   nodeUID,
 			syncDelay: ptr.To(time.Duration(0)), // Ensure that the initial object causes an immediate sync of the pool.
@@ -1867,6 +1948,7 @@ type features struct {
 	disablePartitionableDevices   bool
 	disableConsumableCapacity     bool
 	disableOptionalNodeOperations bool
+	disableCompatibilityGroups    bool
 }
 
 func createTestClient(features features, timeAdded metav1.Time, objects ...runtime.Object) *fake.Clientset {
@@ -1950,6 +2032,13 @@ func dropDisabledFields(features features, resourceslice *resourceapi.ResourceSl
 	}
 	if features.disableOptionalNodeOperations {
 		resourceslice.Spec.SkipNodeOperations = nil
+	}
+	if features.disableCompatibilityGroups {
+		for i := range resourceslice.Spec.Devices {
+			for j := range resourceslice.Spec.Devices[i].ConsumesCounters {
+				resourceslice.Spec.Devices[i].ConsumesCounters[j].CompatibilityGroups = nil
+			}
+		}
 	}
 }
 

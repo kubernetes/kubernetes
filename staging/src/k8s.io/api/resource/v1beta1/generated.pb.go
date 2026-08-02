@@ -84,6 +84,8 @@ func (m *DeviceConstraint) Reset() { *m = DeviceConstraint{} }
 
 func (m *DeviceCounterConsumption) Reset() { *m = DeviceCounterConsumption{} }
 
+func (m *DeviceDerivedAttribute) Reset() { *m = DeviceDerivedAttribute{} }
+
 func (m *DeviceRequest) Reset() { *m = DeviceRequest{} }
 
 func (m *DeviceRequestAllocationResult) Reset() { *m = DeviceRequestAllocationResult{} }
@@ -1426,6 +1428,15 @@ func (m *DeviceCounterConsumption) MarshalToSizedBuffer(dAtA []byte) (int, error
 	_ = i
 	var l int
 	_ = l
+	if len(m.CompatibilityGroups) > 0 {
+		for iNdEx := len(m.CompatibilityGroups) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.CompatibilityGroups[iNdEx])
+			copy(dAtA[i:], m.CompatibilityGroups[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(m.CompatibilityGroups[iNdEx])))
+			i--
+			dAtA[i] = 0x1a
+		}
+	}
 	if len(m.Counters) > 0 {
 		keysForCounters := make([]string, 0, len(m.Counters))
 		for k := range m.Counters {
@@ -1463,6 +1474,39 @@ func (m *DeviceCounterConsumption) MarshalToSizedBuffer(dAtA []byte) (int, error
 	return len(dAtA) - i, nil
 }
 
+func (m *DeviceDerivedAttribute) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeviceDerivedAttribute) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *DeviceDerivedAttribute) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.Expression)
+	copy(dAtA[i:], m.Expression)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Expression)))
+	i--
+	dAtA[i] = 0x12
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
 func (m *DeviceRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -1483,6 +1527,20 @@ func (m *DeviceRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.DerivedAttributes) > 0 {
+		for iNdEx := len(m.DerivedAttributes) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.DerivedAttributes[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x52
+		}
+	}
 	if m.Capacity != nil {
 		{
 			size, err := m.Capacity.MarshalToSizedBuffer(dAtA[:i])
@@ -1753,6 +1811,20 @@ func (m *DeviceSubRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.DerivedAttributes) > 0 {
+		for iNdEx := len(m.DerivedAttributes) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.DerivedAttributes[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x4a
+		}
+	}
 	if m.Capacity != nil {
 		{
 			size, err := m.Capacity.MarshalToSizedBuffer(dAtA[:i])
@@ -3273,6 +3345,25 @@ func (m *DeviceCounterConsumption) Size() (n int) {
 			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
 		}
 	}
+	if len(m.CompatibilityGroups) > 0 {
+		for _, s := range m.CompatibilityGroups {
+			l = len(s)
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *DeviceDerivedAttribute) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Expression)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -3313,6 +3404,12 @@ func (m *DeviceRequest) Size() (n int) {
 	if m.Capacity != nil {
 		l = m.Capacity.Size()
 		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if len(m.DerivedAttributes) > 0 {
+		for _, e := range m.DerivedAttributes {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
 	}
 	return n
 }
@@ -3415,6 +3512,12 @@ func (m *DeviceSubRequest) Size() (n int) {
 	if m.Capacity != nil {
 		l = m.Capacity.Size()
 		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if len(m.DerivedAttributes) > 0 {
+		for _, e := range m.DerivedAttributes {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
 	}
 	return n
 }
@@ -4159,6 +4262,18 @@ func (this *DeviceCounterConsumption) String() string {
 	s := strings.Join([]string{`&DeviceCounterConsumption{`,
 		`CounterSet:` + fmt.Sprintf("%v", this.CounterSet) + `,`,
 		`Counters:` + mapStringForCounters + `,`,
+		`CompatibilityGroups:` + fmt.Sprintf("%v", this.CompatibilityGroups) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *DeviceDerivedAttribute) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&DeviceDerivedAttribute{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`Expression:` + fmt.Sprintf("%v", this.Expression) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -4182,6 +4297,11 @@ func (this *DeviceRequest) String() string {
 		repeatedStringForTolerations += strings.Replace(strings.Replace(f.String(), "DeviceToleration", "DeviceToleration", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForTolerations += "}"
+	repeatedStringForDerivedAttributes := "[]DeviceDerivedAttribute{"
+	for _, f := range this.DerivedAttributes {
+		repeatedStringForDerivedAttributes += strings.Replace(strings.Replace(f.String(), "DeviceDerivedAttribute", "DeviceDerivedAttribute", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForDerivedAttributes += "}"
 	s := strings.Join([]string{`&DeviceRequest{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`DeviceClassName:` + fmt.Sprintf("%v", this.DeviceClassName) + `,`,
@@ -4192,6 +4312,7 @@ func (this *DeviceRequest) String() string {
 		`FirstAvailable:` + repeatedStringForFirstAvailable + `,`,
 		`Tolerations:` + repeatedStringForTolerations + `,`,
 		`Capacity:` + strings.Replace(this.Capacity.String(), "CapacityRequirements", "CapacityRequirements", 1) + `,`,
+		`DerivedAttributes:` + repeatedStringForDerivedAttributes + `,`,
 		`}`,
 	}, "")
 	return s
@@ -4255,6 +4376,11 @@ func (this *DeviceSubRequest) String() string {
 		repeatedStringForTolerations += strings.Replace(strings.Replace(f.String(), "DeviceToleration", "DeviceToleration", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForTolerations += "}"
+	repeatedStringForDerivedAttributes := "[]DeviceDerivedAttribute{"
+	for _, f := range this.DerivedAttributes {
+		repeatedStringForDerivedAttributes += strings.Replace(strings.Replace(f.String(), "DeviceDerivedAttribute", "DeviceDerivedAttribute", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForDerivedAttributes += "}"
 	s := strings.Join([]string{`&DeviceSubRequest{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`DeviceClassName:` + fmt.Sprintf("%v", this.DeviceClassName) + `,`,
@@ -4263,6 +4389,7 @@ func (this *DeviceSubRequest) String() string {
 		`Count:` + fmt.Sprintf("%v", this.Count) + `,`,
 		`Tolerations:` + repeatedStringForTolerations + `,`,
 		`Capacity:` + strings.Replace(this.Capacity.String(), "CapacityRequirements", "CapacityRequirements", 1) + `,`,
+		`DerivedAttributes:` + repeatedStringForDerivedAttributes + `,`,
 		`}`,
 	}, "")
 	return s
@@ -8562,6 +8689,152 @@ func (m *DeviceCounterConsumption) Unmarshal(dAtA []byte) error {
 			}
 			m.Counters[mapkey] = *mapvalue
 			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CompatibilityGroups", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.CompatibilityGroups = append(m.CompatibilityGroups, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeviceDerivedAttribute) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeviceDerivedAttribute: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeviceDerivedAttribute: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = FullyQualifiedName(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Expression", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Expression = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -8883,6 +9156,40 @@ func (m *DeviceRequest) Unmarshal(dAtA []byte) error {
 				m.Capacity = &CapacityRequirements{}
 			}
 			if err := m.Capacity.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 10:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DerivedAttributes", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DerivedAttributes = append(m.DerivedAttributes, DeviceDerivedAttribute{})
+			if err := m.DerivedAttributes[len(m.DerivedAttributes)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -9729,6 +10036,40 @@ func (m *DeviceSubRequest) Unmarshal(dAtA []byte) error {
 				m.Capacity = &CapacityRequirements{}
 			}
 			if err := m.Capacity.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DerivedAttributes", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DerivedAttributes = append(m.DerivedAttributes, DeviceDerivedAttribute{})
+			if err := m.DerivedAttributes[len(m.DerivedAttributes)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

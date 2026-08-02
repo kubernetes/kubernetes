@@ -18,6 +18,7 @@ package framework
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"strings"
 	"testing"
 	"time"
@@ -3359,70 +3360,175 @@ func TestPodInfo_Update(t *testing.T) {
 }
 
 func TestNewPodInfo(t *testing.T) {
-	affinity := &v1.Affinity{
-		PodAffinity: &v1.PodAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-				{
-					LabelSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"foo": "bar"},
+	for _, interPodAffinityHostnameFastPathEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("InterPodAffinityHostnameFastPath=%v", interPodAffinityHostnameFastPathEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
+			affinity := &v1.Affinity{
+				PodAffinity: &v1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{"foo": "bar"},
+							},
+							TopologyKey: "kubernetes.io/hostname",
+						},
 					},
-					TopologyKey: "kubernetes.io/hostname",
 				},
-			},
-		},
-	}
+			}
 
-	tests := []struct {
-		name        string
-		pod         *v1.Pod
-		expectedErr string
-		verify      func(t *testing.T, pi *PodInfo)
-	}{
-		{
-			name:        "nil pod",
-			pod:         nil,
-			expectedErr: "pod cannot be nil",
-		},
-		{
-			name: "pod without affinity",
-			pod:  st.MakePod().Name("pod1").Obj(),
-			verify: func(t *testing.T, pi *PodInfo) {
-				if pi.Pod.Name != "pod1" {
-					t.Errorf("Expected pod name 'pod1', got %v", pi.Pod.Name)
-				}
-			},
-		},
-		{
-			name: "pod with affinity",
-			pod: func() *v1.Pod {
-				p := st.MakePod().Name("pod2").Obj()
-				p.Spec.Affinity = affinity
-				return p
-			}(),
-			verify: func(t *testing.T, pi *PodInfo) {
-				if len(pi.RequiredAffinityTerms) != 1 {
-					t.Errorf("Expected 1 required affinity term, got %v", len(pi.RequiredAffinityTerms))
-				}
-			},
-		},
-	}
+			tests := []struct {
+				name        string
+				pod         *v1.Pod
+				expectedErr string
+				verify      func(t *testing.T, pi *PodInfo)
+			}{
+				{
+					name:        "nil pod",
+					pod:         nil,
+					expectedErr: "pod cannot be nil",
+				},
+				{
+					name: "pod without affinity",
+					pod:  st.MakePod().Name("pod1").Obj(),
+					verify: func(t *testing.T, pi *PodInfo) {
+						if pi.Pod.Name != "pod1" {
+							t.Errorf("Expected pod name 'pod1', got %v", pi.Pod.Name)
+						}
+					},
+				},
+				{
+					name: "pod with affinity",
+					pod: func() *v1.Pod {
+						p := st.MakePod().Name("pod2").Obj()
+						p.Spec.Affinity = affinity
+						return p
+					}(),
+					verify: func(t *testing.T, pi *PodInfo) {
+						if len(pi.RequiredAffinityTerms) != 1 {
+							t.Errorf("Expected 1 required affinity term, got %v", len(pi.RequiredAffinityTerms))
+						}
+					},
+				},
+			}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			pi, err := NewPodInfo(tc.pod)
-			if tc.expectedErr != "" {
-				if err == nil || !strings.Contains(err.Error(), tc.expectedErr) {
-					t.Errorf("Expected error containing '%s', got %v", tc.expectedErr, err)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("Expected no error, got %v", err)
-				}
-				if tc.verify != nil {
-					tc.verify(t, pi)
-				}
+			for _, tc := range tests {
+				t.Run(tc.name, func(t *testing.T) {
+					pi, err := NewPodInfo(tc.pod)
+					if tc.expectedErr != "" {
+						if err == nil || !strings.Contains(err.Error(), tc.expectedErr) {
+							t.Errorf("Expected error containing '%s', got %v", tc.expectedErr, err)
+						}
+					} else {
+						if err != nil {
+							t.Errorf("Expected no error, got %v", err)
+						}
+						if tc.verify != nil {
+							tc.verify(t, pi)
+						}
+					}
+				})
 			}
 		})
+	}
+}
+
+func TestNodeInfo_PodsWithRequiredNonHostScopedAntiAffinity(t *testing.T) {
+	podNonHost1 := st.MakePod().Name("pod-nh-1").UID("uid-nh-1").PodAntiAffinityExists("label", "zone", st.PodAntiAffinityWithRequiredReq).Obj()
+	podNonHost2 := st.MakePod().Name("pod-nh-2").UID("uid-nh-2").PodAntiAffinityExists("label", "zone", st.PodAntiAffinityWithRequiredReq).Obj()
+	podHost1 := st.MakePod().Name("pod-h-1").UID("uid-h-1").PodAntiAffinityExists("label", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj()
+	podNoAA := st.MakePod().Name("pod-no-aa").UID("uid-no-aa").Obj()
+
+	tests := []struct {
+		name                                string
+		podsToAdd                           []*v1.Pod // Pods to add consecutively
+		expectedPodNamesWithFastPathEnabled sets.Set[string]
+	}{
+		{
+			name:                                "2 pods with non-host-scoped AA",
+			podsToAdd:                           []*v1.Pod{podNonHost1, podNonHost2},
+			expectedPodNamesWithFastPathEnabled: sets.New("pod-nh-1", "pod-nh-2"),
+		},
+		{
+			name:                                "2 pods with non-host-scoped AA + 1 pod with host-scoped AA",
+			podsToAdd:                           []*v1.Pod{podNonHost1, podNonHost2, podHost1},
+			expectedPodNamesWithFastPathEnabled: sets.New("pod-nh-1", "pod-nh-2"),
+		},
+		{
+			name:                                "1 pod with host-scoped AA",
+			podsToAdd:                           []*v1.Pod{podHost1},
+			expectedPodNamesWithFastPathEnabled: sets.New[string](),
+		},
+		{
+			name:                                "1 pod with no AA at all",
+			podsToAdd:                           []*v1.Pod{podNoAA},
+			expectedPodNamesWithFastPathEnabled: sets.New[string](),
+		},
+	}
+
+	for _, tt := range tests {
+		for _, interPodAffinityHostnameFastPathEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s (InterPodAffinityHostnameFastPath=%v)", tt.name, interPodAffinityHostnameFastPathEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
+
+				ni := NewNodeInfo()
+				for _, pod := range tt.podsToAdd {
+					ni.AddPod(pod)
+				}
+
+				expected := sets.New[string]() // always empty if FastPath is disabled
+				if interPodAffinityHostnameFastPathEnabled {
+					expected = tt.expectedPodNamesWithFastPathEnabled
+				}
+
+				// Verify AddPod correctly populates the list
+				actual := sets.New[string]()
+				for _, p := range ni.PodsWithRequiredNonHostScopedAntiAffinity {
+					actual.Insert(p.GetPod().Name)
+				}
+				if !expected.Equal(actual) {
+					t.Errorf("AddPod expected %v, got %v", expected, actual)
+				}
+
+				// Verify SnapshotConcrete explicitly copies the slice
+				clone := ni.SnapshotConcrete()
+				cloneActual := sets.New[string]()
+				for _, p := range clone.PodsWithRequiredNonHostScopedAntiAffinity {
+					cloneActual.Insert(p.GetPod().Name)
+				}
+				if !expected.Equal(cloneActual) {
+					t.Errorf("SnapshotConcrete expected %v, got %v", expected, cloneActual)
+				}
+
+				// Modify the cloned NodeInfo's slice to ensure SnapshotConcrete deep-copied the slice
+				if len(clone.PodsWithRequiredNonHostScopedAntiAffinity) > 0 {
+					originalFirst := clone.PodsWithRequiredNonHostScopedAntiAffinity[0]
+					dummyPod, _ := NewPodInfo(st.MakePod().Name("dummy").UID("dummy").Obj())
+					clone.PodsWithRequiredNonHostScopedAntiAffinity[0] = dummyPod
+					if ni.PodsWithRequiredNonHostScopedAntiAffinity[0] == dummyPod {
+						t.Errorf("SnapshotConcrete did not safely copy PodsWithRequiredNonHostScopedAntiAffinity slice, mutation affected original")
+					}
+					// Restore it just in case
+					clone.PodsWithRequiredNonHostScopedAntiAffinity[0] = originalFirst
+				}
+
+				// Verify RemovePod
+				logger, _ := ktesting.NewTestContext(t)
+				for _, pod := range tt.podsToAdd {
+					err := ni.RemovePod(logger, pod)
+					if err != nil {
+						t.Fatalf("unexpected error: %v", err)
+					}
+				}
+
+				if len(ni.PodsWithRequiredNonHostScopedAntiAffinity) != 0 {
+					var remainingPods []string
+					for _, p := range ni.PodsWithRequiredNonHostScopedAntiAffinity {
+						remainingPods = append(remainingPods, p.GetPod().Name)
+					}
+					t.Errorf("expected empty list after RemovePod, got: %v", remainingPods)
+				}
+			})
+		}
 	}
 }
 

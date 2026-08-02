@@ -266,12 +266,15 @@ type PriorityQueue struct {
 	isCompositePodGroupEnabled bool
 	// isInPlacePodVerticalScalingSchedulerPreemptionEnabled indicates whether the feature gate InPlacePodVerticalScalingSchedulerPreemption is enabled.
 	isInPlacePodVerticalScalingSchedulerPreemptionEnabled bool
+	// isPreQueueingHintsEnabled indicates whether the SchedulerPreQueueingHints feature gate is enabled.
+	isPreQueueingHintsEnabled bool
 }
 
 // QueueingHintFunction is the wrapper of QueueingHintFn that has PluginName.
 type QueueingHintFunction struct {
-	PluginName     string
-	QueueingHintFn fwk.QueueingHintFn
+	PluginName        string
+	QueueingHintFn    fwk.QueueingHintFn
+	PreQueueingHintFn fwk.PreQueueingHintFn
 }
 
 // clusterEvent has the event and involved objects.
@@ -442,6 +445,7 @@ func NewPriorityQueue(
 	isOpportunisticBatchingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching)
 	isCompositePodGroupEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup)
 	isInPlacePodVerticalScalingSchedulerPreemptionEnabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption)
+	isPreQueueingHintsEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerPreQueueingHints)
 	lessConverted := convertLessFn(lessFn)
 
 	backoffQ := newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessConverted, isPopFromBackoffQEnabled)
@@ -466,6 +470,7 @@ func NewPriorityQueue(
 		isOpportunisticBatchingEnabled:    isOpportunisticBatchingEnabled,
 		isCompositePodGroupEnabled:        isCompositePodGroupEnabled,
 		isInPlacePodVerticalScalingSchedulerPreemptionEnabled: isInPlacePodVerticalScalingSchedulerPreemptionEnabled,
+		isPreQueueingHintsEnabled:                             isPreQueueingHintsEnabled,
 	}
 	var backoffQPopper backoffQPopper
 	if isPopFromBackoffQEnabled {
@@ -556,12 +561,12 @@ func (p *PriorityQueue) isPodGroupMember(pod *v1.Pod) bool {
 }
 
 // isEntityWorthRequeuing calls isPodWorthRequeuing for all pods belonging to the entity and returns the highest queueing strategy.
-func (p *PriorityQueue) isEntityWorthRequeuing(logger klog.Logger, entity framework.QueuedEntityInfo, event fwk.ClusterEvent, oldObj, newObj interface{}) queueingStrategy {
+func (p *PriorityQueue) isEntityWorthRequeuing(logger klog.Logger, entity framework.QueuedEntityInfo, event fwk.ClusterEvent, oldObj, newObj interface{}, hintKeys *preQueueingHintPodKeys) queueingStrategy {
 	// For pod groups, if any pod is worth requeuing, the whole group is worth it.
 	// But we should prioritize higher strategies.
 	bestStrategy := queueSkip
 	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
-		strategy := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj)
+		strategy := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj, hintKeys)
 		if strategy > bestStrategy {
 			bestStrategy = strategy
 		}
@@ -579,7 +584,7 @@ func (p *PriorityQueue) isEntityWorthRequeuing(logger klog.Logger, entity framew
 // the scheduling queue is supposed to enqueue this Pod to activeQ, skipping backoffQ.
 // If any of pInfo.unschedulablePlugins return Queue,
 // the scheduling queue is supposed to enqueue this Pod to activeQ/backoffQ depending on the remaining backoff time of the Pod.
-func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework.QueuedPodInfo, event fwk.ClusterEvent, oldObj, newObj interface{}) queueingStrategy {
+func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework.QueuedPodInfo, event fwk.ClusterEvent, oldObj, newObj interface{}, hintKeys *preQueueingHintPodKeys) queueingStrategy {
 	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
 	if rejectorPlugins.Len() == 0 {
 		logger.V(6).Info("Worth requeuing because no failed plugins", "pod", klog.KObj(pInfo.Pod))
@@ -614,6 +619,7 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 	}
 
 	pod := pInfo.Pod
+	podNN := types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}
 	queueStrategy := queueSkip
 	for eventToMatch, hintfns := range hintMap {
 		if !framework.MatchClusterEvents(eventToMatch, event) {
@@ -624,6 +630,15 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 			if !rejectorPlugins.Has(hintfn.PluginName) {
 				// skip if it's not hintfn from rejectorPlugins.
 				continue
+			}
+			// Per-plugin PreQueueingHint narrowing: skip this plugin's QueueingHintFn
+			// if the pod wasn't identified by this plugin's PreQueueingHintFn.
+			if hintKeys != nil {
+				if pluginPods, ok := hintKeys.perPlugin[hintfn.PluginName]; ok {
+					if !pluginPods.Has(podNN) {
+						continue
+					}
+				}
 			}
 
 			start := time.Now()
@@ -1033,7 +1048,7 @@ func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger
 	for _, e := range events {
 		logger.V(5).Info("Checking event for in-flight pod", "pod", klog.KObj(pInfo.Pod), "event", e.event.Label())
 
-		switch p.isPodWorthRequeuing(logger, pInfo, e.event, e.oldObj, e.newObj) {
+		switch p.isPodWorthRequeuing(logger, pInfo, e.event, e.oldObj, e.newObj, nil) {
 		case queueSkip:
 			continue
 		case queueImmediately:
@@ -1308,7 +1323,7 @@ func (p *PriorityQueue) flushUnschedulableEntitiesLeftover(logger klog.Logger) {
 	}
 
 	if len(entitiesToMove) > 0 {
-		p.moveEntitiesToActiveOrBackoffQueue(logger, entitiesToMove, framework.EventUnschedulableTimeout, nil, nil)
+		p.moveEntitiesToActiveOrBackoffQueue(logger, entitiesToMove, framework.EventUnschedulableTimeout, nil, nil, nil)
 	}
 }
 
@@ -1416,7 +1431,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 			// where a pod re-queued to activeQ in requeueEntityWithQueueingStrategy is popped and processed quickly enough,
 			// so the write in its failure handler overwrites the pod object in PodInfo, which is accessed for logging.
 			entityRef := klog.KObj(entity)
-			hint := p.isEntityWorthRequeuing(logger, entity, evt, oldPod, newPod)
+			hint := p.isEntityWorthRequeuing(logger, entity, evt, oldPod, newPod, nil)
 			queue := p.requeueEntityWithQueueingStrategy(logger, entity, hint, evt.Label())
 			if queue != unschedulableQ {
 				logger.V(5).Info("Entity moved to an internal scheduling queue because the Pod is updated", "type", entity.Type(), "entity", entityRef, "pod", klog.KObj(newPod), "event", evt.Label(), "queue", queue)
@@ -1797,17 +1812,69 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 		return
 	}
 
-	unschedulableEntities := make([]framework.QueuedEntityInfo, 0, len(p.unschedulableEntities.entityInfoMap))
+	entities, hintKeys := p.collectEntitiesToEvaluate(logger, event, oldObj, newObj, preCheck)
+	p.moveEntitiesToActiveOrBackoffQueue(logger, entities, event, oldObj, newObj, hintKeys)
+}
+
+// collectEntitiesToEvaluate determines which unschedulable entities should be evaluated
+// for requeueing based on the event. If PreQueueingHintFns narrow the set, only targeted
+// entities are returned; otherwise all entities passing preCheck are returned.
+//
+// NOTE: this function assumes lock has been acquired in caller
+func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) ([]framework.QueuedEntityInfo, *preQueueingHintPodKeys) {
+	// Run PreQueueingHintFns to narrow the pod set.
+	hintKeys := p.runPreQueueingHintPlugins(logger, event, oldObj, newObj)
+
+	// TODO: Add PreQueueingHint support for CompositePodGroup entities.
+	// Until then, skip narrowing when CPG is enabled to avoid missing CPG entities.
+	if !p.isCompositePodGroupEnabled && hintKeys != nil {
+		logger.V(5).Info("PreQueueingHint narrowed pod set", "candidates", hintKeys.candidatePods.Len(), "total", len(p.unschedulableEntities.entityInfoMap))
+		// Directly look up entities for pods identified by PreQueueingHint.
+		entities := make([]framework.QueuedEntityInfo, 0, hintKeys.candidatePods.Len())
+		seen := make(map[string]bool)
+		for nn := range hintKeys.candidatePods {
+			entityKey := fwk.PodKey(nn.Namespace, nn.Name).String()
+			if entity, exists := p.unschedulableEntities.entityInfoMap[entityKey]; exists {
+				if preCheck == nil || preCheck(entity.(*framework.QueuedPodInfo).Pod) {
+					entities = append(entities, entity)
+				}
+				continue
+			}
+			// If not found as standalone pod, check if it belongs to a pod group
+			// via the pod's schedulingGroup field.
+			// TODO: Add support for CompositePodGroup (CPG) lookup.
+			if p.isGenericWorkloadEnabled {
+				pod, err := p.podLister.Pods(nn.Namespace).Get(nn.Name)
+				if err != nil {
+					logger.V(5).Info("Failed to get pod for PodGroup lookup", "pod", nn, "err", err)
+				} else if pod.Spec.SchedulingGroup != nil && pod.Spec.SchedulingGroup.PodGroupName != nil {
+					entityKey = fwk.PodGroupKey(nn.Namespace, *pod.Spec.SchedulingGroup.PodGroupName).String()
+					if entity, exists := p.unschedulableEntities.entityInfoMap[entityKey]; exists && !seen[entityKey] {
+						seen[entityKey] = true
+						// Only preCheck the specific pod identified by PreQueueingHint,
+						// not all members of the PodGroup.
+						if preCheck == nil || preCheck(pod) {
+							entities = append(entities, entity)
+						}
+					}
+				}
+			}
+		}
+		return entities, hintKeys
+	}
+
+	// No narrowing — evaluate all unschedulable entities.
+	entities := make([]framework.QueuedEntityInfo, 0, len(p.unschedulableEntities.entityInfoMap))
 	for _, entity := range p.unschedulableEntities.entityInfoMap {
 		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
 			if preCheck == nil || preCheck(pInfo.Pod) {
-				unschedulableEntities = append(unschedulableEntities, entity)
+				entities = append(entities, entity)
 				return false
 			}
 			return true
 		})
 	}
-	p.moveEntitiesToActiveOrBackoffQueue(logger, unschedulableEntities, event, oldObj, newObj)
+	return entities, nil
 }
 
 // MoveAllToActiveOrBackoffQueue moves all pods from unschedulableEntities to activeQ or backoffQ.
@@ -1849,7 +1916,7 @@ func (p *PriorityQueue) requeueEntityWithQueueingStrategy(logger klog.Logger, en
 }
 
 // NOTE: this function assumes lock has been acquired in caller
-func (p *PriorityQueue) moveEntitiesToActiveOrBackoffQueue(logger klog.Logger, entityInfoList []framework.QueuedEntityInfo, event fwk.ClusterEvent, oldObj, newObj interface{}) {
+func (p *PriorityQueue) moveEntitiesToActiveOrBackoffQueue(logger klog.Logger, entityInfoList []framework.QueuedEntityInfo, event fwk.ClusterEvent, oldObj, newObj interface{}, hintKeys *preQueueingHintPodKeys) {
 	if !p.isEventOfInterest(logger, event) {
 		// No plugin is interested in this event.
 		return
@@ -1866,7 +1933,7 @@ func (p *PriorityQueue) moveEntitiesToActiveOrBackoffQueue(logger klog.Logger, e
 			continue
 		}
 
-		schedulingHint := p.isEntityWorthRequeuing(logger, entity, event, oldObj, newObj)
+		schedulingHint := p.isEntityWorthRequeuing(logger, entity, event, oldObj, newObj, hintKeys)
 		if schedulingHint == queueSkip {
 			// QueueingHintFn determined that this entity isn't worth putting to activeQ or backoffQ by this event.
 			logger.V(5).Info("Event is not making entity schedulable", "type", entity.Type(), "entity", entity, "event", event.Label())
@@ -2197,4 +2264,68 @@ func podGroupKey(podGroup *schedulingv1beta1.PodGroup) fwk.EntityKey {
 
 func compositePodGroupKey(cpg *schedulingv1alpha3.CompositePodGroup) fwk.EntityKey {
 	return fwk.CompositePodGroupKey(cpg.Namespace, cpg.Name)
+}
+
+// preQueueingHintPodKeys holds the result of running PreQueueingHintFns for an event.
+// candidatePods is the union of all pods that any plugin wants to re-evaluate.
+type preQueueingHintPodKeys struct {
+	candidatePods sets.Set[types.NamespacedName]
+	perPlugin     map[string]sets.Set[types.NamespacedName]
+}
+
+// runPreQueueingHintPlugins runs all registered PreQueueingHintFns for the given event
+// and returns a narrowed set of pod keys to evaluate, or nil if all pods should be evaluated.
+//
+// NOTE: this function assumes lock has been acquired in caller
+func (p *PriorityQueue) runPreQueueingHintPlugins(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}) *preQueueingHintPodKeys {
+	if !p.isPreQueueingHintsEnabled {
+		return nil
+	}
+	if oldObj == nil && newObj == nil {
+		return nil
+	}
+	if framework.ClusterEventIsWildCard(event) {
+		return nil
+	}
+	result := &preQueueingHintPodKeys{
+		perPlugin: make(map[string]sets.Set[types.NamespacedName]),
+	}
+	for _, hintMap := range p.queueingHintMap {
+		for eventToMatch, hintfns := range hintMap {
+			if !framework.MatchClusterEvents(eventToMatch, event) {
+				continue
+			}
+			for _, hintfn := range hintfns {
+				if hintfn.PreQueueingHintFn == nil {
+					continue
+				}
+				hintResult, err := hintfn.PreQueueingHintFn(logger, oldObj, newObj)
+				if err != nil {
+					logger.Error(err, "PreQueueingHintFn failed, falling back to evaluate all pods", "plugin", hintfn.PluginName)
+					return nil
+				}
+				if hintResult.AllPods {
+					// This plugin wants all pods evaluated; we cannot narrow.
+					p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, "all_pods")
+					return nil
+				}
+				p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, "narrowed")
+				keys := sets.New(hintResult.Pods...)
+				if existing, ok := result.perPlugin[hintfn.PluginName]; ok {
+					result.perPlugin[hintfn.PluginName] = existing.Union(keys)
+				} else {
+					result.perPlugin[hintfn.PluginName] = keys
+				}
+				if result.candidatePods == nil {
+					result.candidatePods = keys
+				} else {
+					result.candidatePods = result.candidatePods.Union(keys)
+				}
+			}
+		}
+	}
+	if result.candidatePods == nil {
+		return nil
+	}
+	return result
 }

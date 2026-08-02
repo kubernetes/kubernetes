@@ -243,6 +243,16 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 	return ex, nil
 }
 
+// PublishResources re-publishes the driver's resources, replacing any set that
+// was published before. This resets the resourceslice controller's desired
+// state: if the apiserver previously dropped fields (e.g. because a feature
+// gate was disabled), the controller latches its desired state to what could be
+// stored to avoid a hot update loop. Re-publishing restores the original
+// resources once the apiserver accepts them again.
+func (ex *ExamplePlugin) PublishResources(ctx context.Context, resources resourceslice.DriverResources) error {
+	return ex.d.PublishResources(ctx, resources)
+}
+
 // Stop ensures that all servers are stopped and resources freed.
 func (ex *ExamplePlugin) Stop() {
 	ex.d.Stop()

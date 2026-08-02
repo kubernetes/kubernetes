@@ -513,6 +513,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
+- name: DRADerivedAttributes
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: DRADeviceBindingConditions
   versionedSpecs:
   - default: false
@@ -523,6 +529,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
+- name: DRADeviceCompatibilityGroups
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: DRADeviceTaintRules
   versionedSpecs:
   - default: false
@@ -665,6 +677,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.36"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: DynamicResourceAllocation
   versionedSpecs:
   - default: false
@@ -961,6 +977,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.37"
+- name: InterPodAffinityHostnameFastPath
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: JobManagedBy
   versionedSpecs:
   - default: false
@@ -1049,6 +1071,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.22"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: KubeletPodResourcesDynamicResources
   versionedSpecs:
   - default: false
@@ -1817,6 +1843,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+- name: SchedulerPreQueueingHints
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: SELinuxChangePolicy
   versionedSpecs:
   - default: false

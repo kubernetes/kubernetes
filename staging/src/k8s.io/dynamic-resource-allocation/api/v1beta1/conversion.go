@@ -59,6 +59,18 @@ func Convert_v1beta1_DeviceRequest_To_v1_DeviceRequest(in *resourcev1beta1.Devic
 		}
 		exactDeviceRequest.Tolerations = tolerations
 		exactDeviceRequest.Capacity = (*resourceapi.CapacityRequirements)(unsafe.Pointer(in.Capacity))
+		if in.DerivedAttributes != nil {
+			derivedAttributes := make([]resourceapi.DeviceDerivedAttribute, 0, len(in.DerivedAttributes))
+			for i := range in.DerivedAttributes {
+				var derivedAttribute resourceapi.DeviceDerivedAttribute
+				err := Convert_v1beta1_DeviceDerivedAttribute_To_v1_DeviceDerivedAttribute(&in.DerivedAttributes[i], &derivedAttribute, s)
+				if err != nil {
+					return err
+				}
+				derivedAttributes = append(derivedAttributes, derivedAttribute)
+			}
+			exactDeviceRequest.DerivedAttributes = derivedAttributes
+		}
 		out.Exactly = &exactDeviceRequest
 	}
 	return nil
@@ -71,7 +83,8 @@ func hasAnyMainRequestFieldsSet(deviceRequest *resourcev1beta1.DeviceRequest) bo
 		deviceRequest.Count != 0 ||
 		deviceRequest.AdminAccess != nil ||
 		deviceRequest.Tolerations != nil ||
-		deviceRequest.Capacity != nil
+		deviceRequest.Capacity != nil ||
+		deviceRequest.DerivedAttributes != nil
 }
 
 func Convert_v1_DeviceRequest_To_v1beta1_DeviceRequest(in *resourceapi.DeviceRequest, out *resourcev1beta1.DeviceRequest, s conversion.Scope) error {
@@ -105,6 +118,18 @@ func Convert_v1_DeviceRequest_To_v1beta1_DeviceRequest(in *resourceapi.DeviceReq
 		}
 		out.Tolerations = tolerations
 		out.Capacity = (*resourcev1beta1.CapacityRequirements)(unsafe.Pointer(in.Exactly.Capacity))
+		if in.Exactly.DerivedAttributes != nil {
+			derivedAttributes := make([]resourcev1beta1.DeviceDerivedAttribute, 0, len(in.Exactly.DerivedAttributes))
+			for i := range in.Exactly.DerivedAttributes {
+				var derivedAttribute resourcev1beta1.DeviceDerivedAttribute
+				err := Convert_v1_DeviceDerivedAttribute_To_v1beta1_DeviceDerivedAttribute(&in.Exactly.DerivedAttributes[i], &derivedAttribute, s)
+				if err != nil {
+					return err
+				}
+				derivedAttributes = append(derivedAttributes, derivedAttribute)
+			}
+			out.DerivedAttributes = derivedAttributes
+		}
 	}
 	return nil
 }

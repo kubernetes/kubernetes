@@ -203,6 +203,61 @@ var baseRules = dedent.Dedent(`
 	add rule ip kube-proxy service-endpoints-check ip daddr . meta l4proto . th dport vmap @no-endpoint-services
 	`)
 
+var baseRulesV6 = dedent.Dedent(`
+	add table ip6 kube-proxy { comment "rules for kube-proxy" ; }
+
+	add set ip6 kube-proxy cluster-ips { type ipv6_addr ; comment "Active ClusterIPs" ; }
+	add set ip6 kube-proxy nodeport-ips { type ipv6_addr ; comment "IPs that accept NodePort traffic" ; }
+	add set ip6 kube-proxy hairpin-connections { type ipv6_addr . ipv6_addr . inet_proto . inet_service ; comment "service hairpin connections" ; }
+
+	add map ip6 kube-proxy firewall-ips { type ipv6_addr . inet_proto . inet_service : verdict ; comment "destinations that are subject to LoadBalancerSourceRanges" ; }
+	add map ip6 kube-proxy no-endpoint-nodeports { type inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to service nodeports with no endpoints" ; }
+	add map ip6 kube-proxy no-endpoint-services { type ipv6_addr . inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to services with no endpoints" ; }
+	add map ip6 kube-proxy service-ips { type ipv6_addr . inet_proto . inet_service : verdict ; comment "ClusterIP, ExternalIP and LoadBalancer IP traffic" ; }
+	add map ip6 kube-proxy service-nodeports { type inet_proto . inet_service : verdict ; comment "NodePort traffic" ; }
+
+	add chain ip6 kube-proxy cluster-ips-check
+	add chain ip6 kube-proxy filter-prerouting-pre-dnat { type filter hook prerouting priority -110 ; }
+	add chain ip6 kube-proxy filter-output-pre-dnat { type filter hook output priority -110 ; }
+	add chain ip6 kube-proxy filter-forward { type filter hook forward priority 0 ; }
+	add chain ip6 kube-proxy filter-input { type filter hook input priority 0 ; }
+	add chain ip6 kube-proxy filter-output { type filter hook output priority 0 ; }
+	add chain ip6 kube-proxy firewall-check
+	add chain ip6 kube-proxy masquerading
+	add chain ip6 kube-proxy nat-output { type nat hook output priority -100 ; }
+	add chain ip6 kube-proxy nat-postrouting { type nat hook postrouting priority 100 ; }
+	add chain ip6 kube-proxy nat-prerouting { type nat hook prerouting priority -100 ; }
+	add chain ip6 kube-proxy nodeport-endpoints-check
+	add chain ip6 kube-proxy reject-chain { comment "helper for @no-endpoint-services / @no-endpoint-nodeports" ; }
+	add chain ip6 kube-proxy services
+	add chain ip6 kube-proxy service-endpoints-check
+
+	add rule ip6 kube-proxy cluster-ips-check ip6 daddr @cluster-ips reject comment "Reject traffic to invalid ports of ClusterIPs"
+	add rule ip6 kube-proxy cluster-ips-check ip6 daddr { fd00:10:96::/112 } drop comment "Drop traffic to unallocated ClusterIPs"
+	add rule ip6 kube-proxy filter-prerouting-pre-dnat ct state new jump firewall-check
+	add rule ip6 kube-proxy filter-forward ct state new jump service-endpoints-check
+	add rule ip6 kube-proxy filter-forward ct state new jump cluster-ips-check
+	add rule ip6 kube-proxy filter-input ct state new jump nodeport-endpoints-check
+	add rule ip6 kube-proxy filter-input ct state new jump service-endpoints-check
+	add rule ip6 kube-proxy filter-output ct state new jump service-endpoints-check
+	add rule ip6 kube-proxy filter-output-pre-dnat ct state new jump firewall-check
+	add rule ip6 kube-proxy filter-output ct state new jump cluster-ips-check
+	add rule ip6 kube-proxy firewall-check ip6 daddr . meta l4proto . th dport vmap @firewall-ips
+	add rule ip6 kube-proxy masquerading mark and 0x4000 != 0 mark set mark xor 0x4000 masquerade fully-random
+	add rule ip6 kube-proxy masquerading ct status dnat ip6 saddr . ip6 daddr . meta l4proto . th dport @hairpin-connections masquerade fully-random
+	add rule ip6 kube-proxy nat-output jump services
+	add rule ip6 kube-proxy nat-postrouting jump masquerading
+	add rule ip6 kube-proxy nat-prerouting jump services
+	add rule ip6 kube-proxy nodeport-endpoints-check ip6 daddr @nodeport-ips meta l4proto . th dport vmap @no-endpoint-nodeports
+	add rule ip6 kube-proxy reject-chain reject
+	add rule ip6 kube-proxy services ip6 daddr @cluster-ips ip6 saddr != fd00:10::/64 mark set mark or 0x4000 comment "masquerade clusterIP traffic from outside cluster"
+	add rule ip6 kube-proxy services ip6 daddr . meta l4proto . th dport vmap @service-ips
+	add rule ip6 kube-proxy services ip6 daddr @nodeport-ips meta l4proto . th dport vmap @service-nodeports
+
+	add element ip6 kube-proxy nodeport-ips { 2001:db8::1 }
+	add rule ip6 kube-proxy service-endpoints-check ip6 daddr . meta l4proto . th dport vmap @no-endpoint-services
+	`)
+
 // TestOverallNFTablesRules creates a variety of services and verifies that the generated
 // rules are exactly as expected.
 func TestOverallNFTablesRules(t *testing.T) {
@@ -381,7 +436,7 @@ func TestOverallNFTablesRules(t *testing.T) {
 	expected := baseRules + dedent.Dedent(`
 		# svc1
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.180.0.1 . 80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat to 10.180.0.1:80
 
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
@@ -389,7 +444,7 @@ func TestOverallNFTablesRules(t *testing.T) {
 
 		# svc2
 		add chain ip kube-proxy service-42NFTM6N-ns2/svc2/tcp/p80
-		add rule ip kube-proxy service-42NFTM6N-ns2/svc2/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.180.0.2 . 80
+		add rule ip kube-proxy service-42NFTM6N-ns2/svc2/tcp/p80 meta l4proto tcp dnat to 10.180.0.2:80
 		add chain ip kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80
 		add rule ip kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80 ip saddr 10.0.0.0/8 goto service-42NFTM6N-ns2/svc2/tcp/p80 comment "short-circuit pod traffic"
 		add rule ip kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80 fib saddr type local mark set mark or 0x4000 comment "masquerade local traffic"
@@ -407,7 +462,7 @@ func TestOverallNFTablesRules(t *testing.T) {
 
 		# svc3
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.180.0.3 . 80
+		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat to 10.180.0.3:80
 		add chain ip kube-proxy external-4AT6LBPK-ns3/svc3/tcp/p80
 		add rule ip kube-proxy external-4AT6LBPK-ns3/svc3/tcp/p80 mark set mark or 0x4000 comment "masquerade"
 		add rule ip kube-proxy external-4AT6LBPK-ns3/svc3/tcp/p80 goto service-4AT6LBPK-ns3/svc3/tcp/p80
@@ -474,6 +529,378 @@ func TestOverallNFTablesRules(t *testing.T) {
 		`)
 
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
+}
+
+// TestOverallNFTablesRulesIPv6 is the IPv6 counterpart of TestOverallNFTablesRules.
+func TestOverallNFTablesRulesIPv6(t *testing.T) {
+	nft, fp := NewFakeProxier(v1.IPv6Protocol)
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
+
+	// The localhost NodePort feature is enabled but loopback is not in
+	// nodePortAddresses, so kube-proxy rejects and counts localhost NodePort
+	// traffic for every protocol.
+	fp.localhostNodePortsEnabled = true
+
+	makeServiceMap(fp,
+		// create ClusterIP service
+		makeTestService("ns1", "svc1", func(svc *v1.Service) {
+			svc.Spec.ClusterIP = "fd00:172:30::41"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+			}}
+		}),
+		// create LoadBalancer service with Local traffic policy
+		makeTestService("ns2", "svc2", func(svc *v1.Service) {
+			svc.Spec.Type = "LoadBalancer"
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+			svc.Spec.ClusterIP = "fd00:172:30::42"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+				NodePort: 3001,
+			}}
+			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+				IP: "5555::1",
+			}}
+			svc.Spec.ExternalIPs = []string{"2001:db8:99::22"}
+			svc.Spec.HealthCheckNodePort = 30000
+		}),
+		// create NodePort service
+		makeTestService("ns3", "svc3", func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = "fd00:172:30::43"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+				NodePort: 3003,
+			}}
+		}),
+		// create ExternalIP service
+		makeTestService("ns4", "svc4", func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = "fd00:172:30::44"
+			svc.Spec.ExternalIPs = []string{"2001:db8:99::33"}
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:       "p80",
+				Port:       80,
+				Protocol:   v1.ProtocolTCP,
+				TargetPort: intstr.FromInt32(80),
+			}}
+		}),
+		// create LoadBalancer service with Cluster traffic policy, source ranges,
+		// and session affinity
+		makeTestService("ns5", "svc5", func(svc *v1.Service) {
+			svc.Spec.Type = "LoadBalancer"
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyCluster
+			svc.Spec.ClusterIP = "fd00:172:30::45"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+				NodePort: 3002,
+			}}
+			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+				IP: "5555::2",
+			}}
+			svc.Spec.HealthCheckNodePort = 30000
+			// Extra whitespace to ensure that invalid value will not result
+			// in a crash, for backward compatibility.
+			svc.Spec.LoadBalancerSourceRanges = []string{" 2001:db8:203::/64"}
+
+			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
+			svc.Spec.SessionAffinityConfig = &v1.SessionAffinityConfig{
+				ClientIP: &v1.ClientIPConfig{
+					TimeoutSeconds: new(int32(10800)),
+				},
+			}
+		}),
+		// create ClusterIP service with no endpoints
+		makeTestService("ns6", "svc6", func(svc *v1.Service) {
+			svc.Spec.Type = "ClusterIP"
+			svc.Spec.ClusterIP = "fd00:172:30::46"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:       "p80",
+				Port:       80,
+				Protocol:   v1.ProtocolTCP,
+				TargetPort: intstr.FromInt32(80),
+			}}
+		}),
+	)
+	populateEndpointSlices(fp,
+		// create ClusterIP service endpoints
+		makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv6
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"fd00:10:180::1"},
+				NodeName:  new(testNodeName),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     new("p80"),
+				Port:     new(int32(80)),
+				Protocol: new(v1.ProtocolTCP),
+			}}
+		}),
+		// create Local LoadBalancer endpoints. Note that we set NodeName to the
+		// "wrong" value, so this endpoint will be considered non-local and
+		// ignored.
+		makeTestEndpointSlice("ns2", "svc2", 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv6
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"fd00:10:180::2"},
+				NodeName:  new("other-node"),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     new("p80"),
+				Port:     new(int32(80)),
+				Protocol: new(v1.ProtocolTCP),
+			}}
+		}),
+		// create NodePort service endpoints
+		makeTestEndpointSlice("ns3", "svc3", 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv6
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"fd00:10:180::3"},
+				NodeName:  new(testNodeName),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     new("p80"),
+				Port:     new(int32(80)),
+				Protocol: new(v1.ProtocolTCP),
+			}}
+		}),
+		// create ExternalIP service endpoints
+		makeTestEndpointSlice("ns4", "svc4", 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv6
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"fd00:10:180::4"},
+				NodeName:  new("other-node"),
+			}, {
+				Addresses: []string{"fd00:10:180::5"},
+				NodeName:  new(testNodeName),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     new("p80"),
+				Port:     new(int32(80)),
+				Protocol: new(v1.ProtocolTCP),
+			}}
+		}),
+		// create Cluster LoadBalancer endpoints
+		makeTestEndpointSlice("ns5", "svc5", 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv6
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"fd00:10:180::3"},
+				NodeName:  new(testNodeName),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     new("p80"),
+				Port:     new(int32(80)),
+				Protocol: new(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	if err := fp.syncProxyRules(); err != nil {
+		t.Fatalf("syncProxyRules failed: %v", err)
+	}
+
+	expected := baseRulesV6 + dedent.Dedent(`
+		# svc1
+		add chain ip6 kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
+		add rule ip6 kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat to [fd00:10:180::1]:80
+
+		add element ip6 kube-proxy cluster-ips { fd00:172:30::41 }
+		add element ip6 kube-proxy service-ips { fd00:172:30::41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
+		add element ip6 kube-proxy hairpin-connections { fd00:10:180::1 . fd00:10:180::1 . tcp . 80 }
+
+		# svc2
+		add chain ip6 kube-proxy service-42NFTM6N-ns2/svc2/tcp/p80
+		add rule ip6 kube-proxy service-42NFTM6N-ns2/svc2/tcp/p80 meta l4proto tcp dnat to [fd00:10:180::2]:80
+		add chain ip6 kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80
+		add rule ip6 kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80 ip6 saddr fd00:10::/64 goto service-42NFTM6N-ns2/svc2/tcp/p80 comment "short-circuit pod traffic"
+		add rule ip6 kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80 fib saddr type local mark set mark or 0x4000 comment "masquerade local traffic"
+		add rule ip6 kube-proxy external-42NFTM6N-ns2/svc2/tcp/p80 fib saddr type local goto service-42NFTM6N-ns2/svc2/tcp/p80 comment "short-circuit local traffic"
+
+		add element ip6 kube-proxy cluster-ips { fd00:172:30::42 }
+		add element ip6 kube-proxy service-ips { fd00:172:30::42 . tcp . 80 : goto service-42NFTM6N-ns2/svc2/tcp/p80 }
+		add element ip6 kube-proxy service-ips { 2001:db8:99::22 . tcp . 80 : goto external-42NFTM6N-ns2/svc2/tcp/p80 }
+		add element ip6 kube-proxy service-ips { 5555::1 . tcp . 80 : goto external-42NFTM6N-ns2/svc2/tcp/p80 }
+		add element ip6 kube-proxy service-nodeports { tcp . 3001 : goto external-42NFTM6N-ns2/svc2/tcp/p80 }
+
+		add element ip6 kube-proxy no-endpoint-nodeports { tcp . 3001 comment "ns2/svc2:p80" : drop }
+		add element ip6 kube-proxy no-endpoint-services { 5555::1 . tcp . 80 comment "ns2/svc2:p80" : drop }
+		add element ip6 kube-proxy no-endpoint-services { 2001:db8:99::22 . tcp . 80 comment "ns2/svc2:p80" : drop }
+
+		# svc3
+		add chain ip6 kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
+		add rule ip6 kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat to [fd00:10:180::3]:80
+		add chain ip6 kube-proxy external-4AT6LBPK-ns3/svc3/tcp/p80
+		add rule ip6 kube-proxy external-4AT6LBPK-ns3/svc3/tcp/p80 mark set mark or 0x4000 comment "masquerade"
+		add rule ip6 kube-proxy external-4AT6LBPK-ns3/svc3/tcp/p80 goto service-4AT6LBPK-ns3/svc3/tcp/p80
+
+		add element ip6 kube-proxy cluster-ips { fd00:172:30::43 }
+		add element ip6 kube-proxy service-ips { fd00:172:30::43 . tcp . 80 : goto service-4AT6LBPK-ns3/svc3/tcp/p80 }
+		add element ip6 kube-proxy service-nodeports { tcp . 3003 : goto external-4AT6LBPK-ns3/svc3/tcp/p80 }
+		add element ip6 kube-proxy hairpin-connections { fd00:10:180::3 . fd00:10:180::3 . tcp . 80 }
+
+		# svc4
+		add chain ip6 kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
+		add rule ip6 kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat ip6 addr . port to numgen random mod 2 map { 0 : fd00:10:180::4 . 80 , 1 : fd00:10:180::5 . 80 }
+		add chain ip6 kube-proxy external-LAUZTJTB-ns4/svc4/tcp/p80
+		add rule ip6 kube-proxy external-LAUZTJTB-ns4/svc4/tcp/p80 mark set mark or 0x4000 comment "masquerade"
+		add rule ip6 kube-proxy external-LAUZTJTB-ns4/svc4/tcp/p80 goto service-LAUZTJTB-ns4/svc4/tcp/p80
+
+		add element ip6 kube-proxy cluster-ips { fd00:172:30::44 }
+		add element ip6 kube-proxy service-ips { fd00:172:30::44 . tcp . 80 : goto service-LAUZTJTB-ns4/svc4/tcp/p80 }
+		add element ip6 kube-proxy service-ips { 2001:db8:99::33 . tcp . 80 : goto external-LAUZTJTB-ns4/svc4/tcp/p80 }
+		add element ip6 kube-proxy hairpin-connections { fd00:10:180::5 . fd00:10:180::5 . tcp . 80 }
+
+		# svc5
+		add set ip6 kube-proxy affinity-5HFFSBBM-ns5/svc5/tcp/p80__fd00.10.180..3/80 { type ipv6_addr ; flags dynamic,timeout ; timeout 10800s ; }
+		add chain ip6 kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80
+		add rule ip6 kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80 ip6 saddr @affinity-5HFFSBBM-ns5/svc5/tcp/p80__fd00.10.180..3/80 goto endpoint-5HFFSBBM-ns5/svc5/tcp/p80__fd00.10.180..3/80
+		add rule ip6 kube-proxy service-HVFWP5L3-ns5/svc5/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5HFFSBBM-ns5/svc5/tcp/p80__fd00.10.180..3/80 }
+		add chain ip6 kube-proxy external-HVFWP5L3-ns5/svc5/tcp/p80
+		add rule ip6 kube-proxy external-HVFWP5L3-ns5/svc5/tcp/p80 mark set mark or 0x4000 comment "masquerade"
+		add rule ip6 kube-proxy external-HVFWP5L3-ns5/svc5/tcp/p80 goto service-HVFWP5L3-ns5/svc5/tcp/p80
+
+		add chain ip6 kube-proxy endpoint-5HFFSBBM-ns5/svc5/tcp/p80__fd00.10.180..3/80
+		add rule ip6 kube-proxy endpoint-5HFFSBBM-ns5/svc5/tcp/p80__fd00.10.180..3/80 update @affinity-5HFFSBBM-ns5/svc5/tcp/p80__fd00.10.180..3/80 { ip6 saddr }
+		add rule ip6 kube-proxy endpoint-5HFFSBBM-ns5/svc5/tcp/p80__fd00.10.180..3/80 meta l4proto tcp dnat to [fd00:10:180::3]:80
+
+		add chain ip6 kube-proxy firewall-HVFWP5L3-ns5/svc5/tcp/p80
+		add rule ip6 kube-proxy firewall-HVFWP5L3-ns5/svc5/tcp/p80 ip6 saddr != { 2001:db8:203::/64 } drop
+
+		add element ip6 kube-proxy cluster-ips { fd00:172:30::45 }
+		add element ip6 kube-proxy service-ips { fd00:172:30::45 . tcp . 80 : goto service-HVFWP5L3-ns5/svc5/tcp/p80 }
+		add element ip6 kube-proxy service-ips { 5555::2 . tcp . 80 : goto external-HVFWP5L3-ns5/svc5/tcp/p80 }
+		add element ip6 kube-proxy service-nodeports { tcp . 3002 : goto external-HVFWP5L3-ns5/svc5/tcp/p80 }
+		add element ip6 kube-proxy firewall-ips { 5555::2 . tcp . 80 : goto firewall-HVFWP5L3-ns5/svc5/tcp/p80 }
+		# [fd00:10:180::3]:80 is already in hairpin-connections, so we don't want another "add element" line...
+
+		# svc6
+		add element ip6 kube-proxy cluster-ips { fd00:172:30::46 }
+		add element ip6 kube-proxy no-endpoint-services { fd00:172:30::46 . tcp . 80 comment "ns6/svc6:p80" : goto reject-chain }
+
+		# localhost NodePort rejects
+		add map ip6 kube-proxy localhost-nodeport-reject-ports { type inet_proto . inet_service : verdict ; comment "localhost NodePorts rejected by kube-proxy" ; }
+		add counter ip6 kube-proxy localhost-nodeport-rejected-tcp
+		add counter ip6 kube-proxy localhost-nodeport-rejected-udp
+		add counter ip6 kube-proxy localhost-nodeport-rejected-sctp
+		add chain ip6 kube-proxy localhost-nodeport-reject-tcp
+		add chain ip6 kube-proxy localhost-nodeport-reject-udp
+		add chain ip6 kube-proxy localhost-nodeport-reject-sctp
+		add rule ip6 kube-proxy localhost-nodeport-reject-tcp counter name "localhost-nodeport-rejected-tcp" reject
+		add rule ip6 kube-proxy localhost-nodeport-reject-udp counter name "localhost-nodeport-rejected-udp" reject
+		add rule ip6 kube-proxy localhost-nodeport-reject-sctp counter name "localhost-nodeport-rejected-sctp" reject
+		add rule ip6 kube-proxy nodeport-endpoints-check ip6 daddr ::1 meta l4proto . th dport vmap @localhost-nodeport-reject-ports
+		add element ip6 kube-proxy localhost-nodeport-reject-ports { tcp . 3001 : goto localhost-nodeport-reject-tcp }
+		add element ip6 kube-proxy localhost-nodeport-reject-ports { tcp . 3002 : goto localhost-nodeport-reject-tcp }
+		add element ip6 kube-proxy localhost-nodeport-reject-ports { tcp . 3003 : goto localhost-nodeport-reject-tcp }
+		`)
+
+	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
+}
+
+// TestEndpointDNATRules tests the rules written to the per-service chains for
+// both IP families. In particular, the single-endpoint rule must use the
+// "dnat to addr:port" form, because the "dnat ip6 addr . port to addr . port"
+// form makes nft crash (https://issues.k8s.io/131605).
+func TestEndpointDNATRules(t *testing.T) {
+	testCases := []struct {
+		name         string
+		family       v1.IPFamily
+		svcIP        string
+		epIPs        []string
+		expectedRule string
+	}{
+		{
+			name:         "ipv4 single endpoint",
+			family:       v1.IPv4Protocol,
+			svcIP:        "172.30.0.41",
+			epIPs:        []string{"10.180.0.1"},
+			expectedRule: "meta l4proto tcp dnat to 10.180.0.1:80",
+		},
+		{
+			name:         "ipv6 single endpoint",
+			family:       v1.IPv6Protocol,
+			svcIP:        "fd00:172:30::41",
+			epIPs:        []string{"fd00:10:180::1"},
+			expectedRule: "meta l4proto tcp dnat to [fd00:10:180::1]:80",
+		},
+		{
+			name:         "ipv4 multiple endpoints",
+			family:       v1.IPv4Protocol,
+			svcIP:        "172.30.0.41",
+			epIPs:        []string{"10.180.0.1", "10.180.0.2"},
+			expectedRule: "meta l4proto tcp dnat ip addr . port to numgen random mod 2 map { 0 : 10.180.0.1 . 80 , 1 : 10.180.0.2 . 80 }",
+		},
+		{
+			name:         "ipv6 multiple endpoints",
+			family:       v1.IPv6Protocol,
+			svcIP:        "fd00:172:30::41",
+			epIPs:        []string{"fd00:10:180::1", "fd00:10:180::2"},
+			expectedRule: "meta l4proto tcp dnat ip6 addr . port to numgen random mod 2 map { 0 : fd00:10:180::1 . 80 , 1 : fd00:10:180::2 . 80 }",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			nft, fp := NewFakeProxier(tc.family)
+
+			makeServiceMap(fp,
+				makeTestService("ns1", "svc1", func(svc *v1.Service) {
+					svc.Spec.Type = v1.ServiceTypeClusterIP
+					svc.Spec.ClusterIP = tc.svcIP
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p80",
+						Port:     80,
+						Protocol: v1.ProtocolTCP,
+					}}
+				}),
+			)
+
+			populateEndpointSlices(fp,
+				makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
+					if tc.family == v1.IPv4Protocol {
+						eps.AddressType = discovery.AddressTypeIPv4
+					} else {
+						eps.AddressType = discovery.AddressTypeIPv6
+					}
+					for _, ip := range tc.epIPs {
+						eps.Endpoints = append(eps.Endpoints, discovery.Endpoint{
+							Addresses: []string{ip},
+							NodeName:  new(testNodeName),
+						})
+					}
+					eps.Ports = []discovery.EndpointPort{{
+						Name:     new("p80"),
+						Port:     new(int32(80)),
+						Protocol: new(v1.ProtocolTCP),
+					}}
+				}),
+			)
+
+			if err := fp.syncProxyRules(); err != nil {
+				t.Fatalf("syncProxyRules failed: %v", err)
+			}
+
+			svcChain := "service-ULMVA6XW-ns1/svc1/tcp/p80"
+			rules, err := nft.ListRules(context.Background(), svcChain)
+			if err != nil {
+				t.Fatalf("could not list rules in %s: %v", svcChain, err)
+			}
+			if len(rules) != 1 {
+				t.Fatalf("expected exactly 1 rule in %s, got %d", svcChain, len(rules))
+			}
+			if rules[0].Rule != tc.expectedRule {
+				t.Errorf("wrong DNAT rule:\nexpected %q\ngot      %q", tc.expectedRule, rules[0].Rule)
+			}
+		})
+	}
 }
 
 func TestTruncateNFTablesComment(t *testing.T) {
@@ -4007,10 +4434,10 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy hairpin-connections { 10.0.2.1 . 10.0.2.1 . tcp . 8080 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.1.1 . 80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
-		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 meta l4proto tcp dnat ip addr . port to 10.0.2.1 . 8080
+		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 meta l4proto tcp dnat to 10.0.2.1:8080
                 `)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 
@@ -4056,13 +4483,13 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy hairpin-connections { 10.0.3.1 . 10.0.3.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.1.1 . 80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
-		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 meta l4proto tcp dnat ip addr . port to 10.0.2.1 . 8080
+		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 meta l4proto tcp dnat to 10.0.2.1:8080
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.3.1 . 80
+		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat to 10.0.3.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 	assertNumOperations(t, nft,
@@ -4082,12 +4509,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy hairpin-connections { 10.0.3.1 . 10.0.3.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.1.1 . 80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.3.1 . 80
+		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat to 10.0.3.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 	assertNumOperations(t, nft,
@@ -4107,10 +4534,10 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy hairpin-connections { 10.0.3.1 . 10.0.3.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.1.1 . 80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.3.1 . 80
+		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat to 10.0.3.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 	// delete stale chains happens in a separate transaction, nothing else changed
@@ -4139,10 +4566,10 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy hairpin-connections { 10.0.3.1 . 10.0.3.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.1.1 . 80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.3.1 . 80
+		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat to 10.0.3.1:80
 
 		add element ip kube-proxy no-endpoint-services { 172.30.0.44 . tcp . 80 comment "ns4/svc4:p80" : goto reject-chain }
 		`)
@@ -4178,13 +4605,13 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy hairpin-connections { 10.0.4.1 . 10.0.4.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.1.1 . 80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.3.1 . 80
+		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat to 10.0.3.1:80
 
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.4.1 . 80
+		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat to 10.0.4.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 	assertNumOperations(t, nft,
@@ -4212,13 +4639,13 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy hairpin-connections { 10.0.4.1 . 10.0.4.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.1.1 . 80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
-		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.3.2 . 80
+		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat to 10.0.3.2:80
 
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.4.1 . 80
+		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat to 10.0.4.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 	assertNumOperations(t, nft,
@@ -4251,13 +4678,13 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy hairpin-connections { 10.0.4.1 . 10.0.4.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.1.1 . 80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
 		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 2 map { 0 : 10.0.3.2 . 80 , 1 : 10.0.3.3 . 80 }
 
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.4.1 . 80
+		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat to 10.0.4.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 	// (The first endpoint chain is unchanged, but the code recreates it anyway.)
@@ -4282,12 +4709,12 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy hairpin-connections { 10.0.4.1 . 10.0.4.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.1.1 . 80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
 
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.4.1 . 80
+		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat to 10.0.4.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 	assertNumOperations(t, nft,
@@ -4317,13 +4744,13 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add element ip kube-proxy hairpin-connections { 10.0.4.1 . 10.0.4.1 . tcp . 80 }
 
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.1.1 . 80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat to 10.0.1.1:80
 
 		add chain ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80
 		add rule ip kube-proxy service-4AT6LBPK-ns3/svc3/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 2 map { 0 : 10.0.3.2 . 80 , 1 : 10.0.3.3 . 80 }
 
 		add chain ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80
-		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.4.1 . 80
+		add rule ip kube-proxy service-LAUZTJTB-ns4/svc4/tcp/p80 meta l4proto tcp dnat to 10.0.4.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 	assertNumOperations(t, nft,
@@ -4367,9 +4794,9 @@ func TestSyncProxyRulesStartup(t *testing.T) {
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
 		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
 		
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.0.1.1 . 80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat to 10.0.1.1:80
 
-		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 meta l4proto tcp dnat ip addr . port to 10.0.2.1 . 8080
+		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 meta l4proto tcp dnat to 10.0.2.1:8080
 
 		add element ip kube-proxy cluster-ips { 172.30.0.41 }
 		add element ip kube-proxy cluster-ips { 172.30.0.42 }
@@ -4466,7 +4893,7 @@ func TestSyncProxyRulesStartup(t *testing.T) {
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to numgen random mod 2 map { 0 : 10.0.1.1 . 80 , 1 : 10.0.1.2 . 80 }
 
 		add chain ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080
-		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 meta l4proto tcp dnat ip addr . port to 10.0.2.1 . 8080
+		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 meta l4proto tcp dnat to 10.0.2.1:8080
 	`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 	assertNumOperations(t, nft,
@@ -4932,7 +5359,7 @@ func TestBadIPs(t *testing.T) {
 	expected := baseRules + dedent.Dedent(`
 		# svc1
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
-		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat ip addr . port to 10.180.0.1 . 80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 meta l4proto tcp dnat to 10.180.0.1:80
 
 		add chain ip kube-proxy external-ULMVA6XW-ns1/svc1/tcp/p80
 		add rule ip kube-proxy external-ULMVA6XW-ns1/svc1/tcp/p80 mark set mark or 0x4000 comment "masquerade"

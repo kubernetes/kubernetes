@@ -29,7 +29,9 @@ type Features struct {
 	EnableDRAPrioritizedList                           bool
 	EnableDRAAdminAccess                               bool
 	EnableDRAConsumableCapacity                        bool
+	EnableDRADeviceCompatibilityGroups                 bool
 	EnableDRAFractionalCapacityRange                   bool
+	EnableDRADerivedAttributes                         bool
 	EnableDRADeviceTaints                              bool
 	EnableDRADeviceBindingConditions                   bool
 	EnableDRAListTypeAttributes                        bool
@@ -54,6 +56,7 @@ type Features struct {
 	EnableInPlacePodLevelResourcesVerticalScaling      bool
 	EnableInPlacePodVerticalScalingSchedulerPreemption bool
 	EnableTopologyAwareWorkloadScheduling              bool
+	EnableInterPodAffinityHostnameFastPath             bool
 	EnablePodGroupPreemptionPolicy                     bool
 	EnableCompositePodGroup                            bool
 }
@@ -65,7 +68,9 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableDRAPrioritizedList:                           featureGate.Enabled(features.DRAPrioritizedList),
 		EnableDRAAdminAccess:                               featureGate.Enabled(features.DRAAdminAccess),
 		EnableDRAConsumableCapacity:                        featureGate.Enabled(features.DRAConsumableCapacity),
+		EnableDRADeviceCompatibilityGroups:                 featureGate.Enabled(features.DRADeviceCompatibilityGroups),
 		EnableDRAFractionalCapacityRange:                   featureGate.Enabled(features.DRAFractionalCapacityRange),
+		EnableDRADerivedAttributes:                         featureGate.Enabled(features.DRADerivedAttributes),
 		EnableDRADeviceTaints:                              featureGate.Enabled(features.DRADeviceTaints),
 		EnableDRAListTypeAttributes:                        featureGate.Enabled(features.DRAListTypeAttributes),
 		EnableDRAOptionalNodeOperations:                    featureGate.Enabled(features.DRAOptionalNodeOperations),
@@ -92,5 +97,6 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnablePodGroupPreemptionPolicy:                     featureGate.Enabled(features.PodGroupPreemptionPolicy),
 		EnableDRANodeAllocatableResources:                  featureGate.Enabled(features.DRANodeAllocatableResources),
 		EnableCompositePodGroup:                            featureGate.Enabled(features.CompositePodGroup),
+		EnableInterPodAffinityHostnameFastPath:             featureGate.Enabled(features.InterPodAffinityHostnameFastPath),
 	}
 }

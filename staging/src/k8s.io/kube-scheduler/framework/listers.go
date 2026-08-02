@@ -32,10 +32,14 @@ import (
 type NodeInfoLister interface {
 	// List returns the list of NodeInfos.
 	List() ([]NodeInfo, error)
-	// HavePodsWithAffinityList returns the list of NodeInfos of nodes with pods with affinity terms.
+	// HavePodsWithAffinityList returns the list of NodeInfos of nodes with pods with inter-pod (anti-)affinity terms.
 	HavePodsWithAffinityList() ([]NodeInfo, error)
-	// HavePodsWithRequiredAntiAffinityList returns the list of NodeInfos of nodes with pods with required anti-affinity terms.
+	// HavePodsWithRequiredAntiAffinityList returns the list of NodeInfos of nodes with pods with required inter-pod anti-affinity terms.
 	HavePodsWithRequiredAntiAffinityList() ([]NodeInfo, error)
+	// HavePodsWithRequiredNonHostScopedAntiAffinityList returns nodes containing pods that require a wider topology scan (topologyKey other than hostname).
+	// PreFilter uses this to identify existing pods whose non-hostname scoped anti-affinity rules might conflict with the incoming pod, allowing it to skip scanning nodes that cannot possibly conflict.
+	// It returns an empty list and no error if the InterPodAffinityHostnameFastPath feature gate is disabled.
+	HavePodsWithRequiredNonHostScopedAntiAffinityList() ([]NodeInfo, error)
 	// Get returns the NodeInfo of the given node name.
 	Get(nodeName string) (NodeInfo, error)
 }

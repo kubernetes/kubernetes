@@ -214,6 +214,7 @@ func autoConvert_api_DeviceCounterConsumption_To_v1_DeviceCounterConsumption(in 
 		return err
 	}
 	out.Counters = *(*map[string]v1.Counter)(unsafe.Pointer(&in.Counters))
+	out.CompatibilityGroups = *(*[]string)(unsafe.Pointer(&in.CompatibilityGroups))
 	return nil
 }
 
@@ -227,6 +228,7 @@ func autoConvert_v1_DeviceCounterConsumption_To_api_DeviceCounterConsumption(in 
 		return err
 	}
 	out.Counters = *(*map[string]v1.Counter)(unsafe.Pointer(&in.Counters))
+	out.CompatibilityGroups = *(*[]string)(unsafe.Pointer(&in.CompatibilityGroups))
 	return nil
 }
 

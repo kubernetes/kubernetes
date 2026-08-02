@@ -336,6 +336,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 									Counters: map[string]resourceapi.Counter{
 										"mem": {Value: resource.MustParse("1")},
 									},
+									CompatibilityGroups: []string{"compat-group-1", "compat-group-2"},
 								}},
 							},
 							{
@@ -413,6 +414,15 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 				if expectedSliceSpecs[i].SkipNodeOperations != nil {
 					expectedSliceSpecs[i].SkipNodeOperations = nil
 					disabledFeaturesForSlice.Insert(disabled)
+				}
+			case features.DRADeviceCompatibilityGroups:
+				for e := range expectedSliceSpecs[i].Devices {
+					for c := range expectedSliceSpecs[i].Devices[e].ConsumesCounters {
+						if expectedSliceSpecs[i].Devices[e].ConsumesCounters[c].CompatibilityGroups != nil {
+							expectedSliceSpecs[i].Devices[e].ConsumesCounters[c].CompatibilityGroups = nil
+							disabledFeaturesForSlice.Insert(disabled)
+						}
+					}
 				}
 			default:
 				tCtx.Fatalf("faulty test, case for %s missing", disabled)

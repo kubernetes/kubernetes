@@ -203,6 +203,12 @@ const (
 	// DRAConsumableCapacity
 	DRAConsumableCapacity featuregate.Feature = "DRAConsumableCapacity"
 
+	// owner: @gauravkghildiyal
+	// kep: http://kep.k8s.io/6080
+	//
+	// Enables support for derived attributes in Dynamic Resource Allocation (DRA).
+	DRADerivedAttributes featuregate.Feature = "DRADerivedAttributes"
+
 	// owner: @KobayashiD27
 	// kep: http://kep.k8s.io/5007
 	// alpha: v1.34
@@ -213,6 +219,20 @@ const (
 	// DRAResourceClaimDeviceStatus also needs to be
 	// enabled.
 	DRADeviceBindingConditions featuregate.Feature = "DRADeviceBindingConditions"
+
+	// owner: @omeryahud
+	// kep: https://kep.k8s.io/5963
+	//
+	// Enables drivers to declare opaque compatibility groups on each
+	// device.consumesCounters[] entry of a ResourceSlice. The scheduler then
+	// only co-allocates devices drawing from the same counter set when their
+	// declared groups intersect, moving detection of incompatible co-allocation
+	// (e.g. GPU MIG vs vGPU on one physical device) from preparation-time
+	// failure to scheduling-time rejection.
+	//
+	// DRAPartitionableDevices also needs to be enabled, since the field lives
+	// on consumesCounters[] entries which only exist for partitionable devices.
+	DRADeviceCompatibilityGroups featuregate.Feature = "DRADeviceCompatibilityGroups"
 
 	// owner: @pohly
 	// kep: http://kep.k8s.io/5055
@@ -552,6 +572,11 @@ const (
 	// Enables scheduler-triggered preemption for deferred in-place pod vertical scaling pods.
 	InPlacePodVerticalScalingSchedulerPreemption featuregate.Feature = "InPlacePodVerticalScalingSchedulerPreemption"
 
+	// owner: @tetianakh
+	//
+	// Enables the fast path for inter-pod affinity calculations when the topology key is kubernetes.io/hostname.
+	InterPodAffinityHostnameFastPath featuregate.Feature = "InterPodAffinityHostnameFastPath"
+
 	// owner: @mimowo
 	// kep: https://kep.k8s.io/4368
 	//
@@ -608,6 +633,7 @@ const (
 	KubeletFineGrainedAuthz featuregate.Feature = "KubeletFineGrainedAuthz"
 
 	// owner: @AkihiroSuda
+	// kep: https://kep.k8s.io/2033
 	//
 	// Enables support for running kubelet in a user namespace.
 	// The user namespace has to be created before running kubelet.
@@ -1054,6 +1080,12 @@ const (
 	// This allows to process potentially schedulable pods ASAP, eliminating a penalty effect of the backoff queue.
 	SchedulerPopFromBackoffQ featuregate.Feature = "SchedulerPopFromBackoffQ"
 
+	// owner: @geetasg
+	// kep: https://kep.k8s.io/6132
+	//
+	// Enables PreQueueingHint extension point to narrow pod evaluation on events.
+	SchedulerPreQueueingHints featuregate.Feature = "SchedulerPreQueueingHints"
+
 	// owner: @atosatto @yuanchen8911
 	// kep: http://kep.k8s.io/3902
 	//
@@ -1427,9 +1459,17 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	DRADerivedAttributes: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DRADeviceBindingConditions: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	DRADeviceCompatibilityGroups: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	DRADeviceTaintRules: {
@@ -1504,6 +1544,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	DRAWorkloadResourceClaims: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	DefaultPodSysctls: {
@@ -1681,6 +1722,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	InterPodAffinityHostnameFastPath: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	JobManagedBy: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
@@ -1724,6 +1769,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	KubeletInUserNamespace: {
 		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	KubeletPSI: {
@@ -2072,6 +2118,9 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	SchedulerPopFromBackoffQ: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+	SchedulerPreQueueingHints: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	SeparateTaintEvictionController: {
@@ -2535,7 +2584,11 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	DRAConsumableCapacity: {DynamicResourceAllocation},
 
+	DRADerivedAttributes: {DynamicResourceAllocation},
+
 	DRADeviceBindingConditions: {DynamicResourceAllocation, DRAResourceClaimDeviceStatus},
+
+	DRADeviceCompatibilityGroups: {DynamicResourceAllocation, DRAPartitionableDevices},
 
 	DRADeviceTaintRules: {DRADeviceTaints}, // DynamicResourceAllocation is indirect.
 
@@ -2636,6 +2689,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	InPlacePodVerticalScalingMemoryBackedVolumes: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
 
 	InPlacePodVerticalScalingSchedulerPreemption: {InPlacePodVerticalScaling},
+
+	InterPodAffinityHostnameFastPath: {},
 
 	JobManagedBy: {},
 
@@ -2789,7 +2844,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	SchedulerAsyncPreemption: {},
 
-	SchedulerPopFromBackoffQ: {},
+	SchedulerPopFromBackoffQ:  {},
+	SchedulerPreQueueingHints: {},
 
 	SeparateTaintEvictionController: {},
 

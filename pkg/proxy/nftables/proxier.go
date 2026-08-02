@@ -1939,8 +1939,7 @@ func (proxier *Proxier) writeServiceToEndpointDNATs(tx *knftables.Transaction, s
 			Chain: svcChain,
 			Rule: knftables.Concat(
 				"meta l4proto", strings.ToLower(string(svcInfo.Protocol())),
-				"dnat", ipX, "addr . port to",
-				epInfo.IP(), ".", strconv.Itoa(epInfo.Port()),
+				"dnat to", net.JoinHostPort(epInfo.IP(), strconv.Itoa(epInfo.Port())),
 			),
 		})
 

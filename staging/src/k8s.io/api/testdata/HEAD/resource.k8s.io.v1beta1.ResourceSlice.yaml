@@ -69,7 +69,9 @@ spec:
             - "0"
           value: "0"
       consumesCounters:
-      - counterSet: counterSetValue
+      - compatibilityGroups:
+        - compatibilityGroupsValue
+        counterSet: counterSetValue
         counters:
           countersKey:
             value: "0"

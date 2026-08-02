@@ -938,9 +938,12 @@ func TestMachineInfo(t *testing.T) {
 					message:   message,
 				})
 			}
+			runningInUserNSFunc := func() *bool {
+				return nil
+			}
 			// construct setter
 			setter := MachineInfo(nodeName, tc.maxPods, tc.podsPerCore, machineInfoFunc, capacityFunc,
-				devicePluginResourceCapacityFunc, nodeAllocatableReservationFunc, recordEventFunc, tc.disableLocalStorageCapacityIsolation)
+				devicePluginResourceCapacityFunc, nodeAllocatableReservationFunc, recordEventFunc, runningInUserNSFunc, tc.disableLocalStorageCapacityIsolation)
 			// call setter on node
 			if err := setter(ctx, tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)

@@ -203,7 +203,7 @@ func TestBatchScenarios(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple pods per node means no batching",
+			name: "rescoring enables batching for multiple pods per node",
 			pods: []podDef{
 				{
 					name:         "mppn-batchp1",
@@ -211,9 +211,10 @@ func TestBatchScenarios(t *testing.T) {
 					nodeAffinity: []string{"mppn-batchn1", "mppn-batchn2"},
 				},
 				{
-					name:         "mppn-batchp2",
-					expectedNode: "mppn-batchn1",
-					nodeAffinity: []string{"mppn-batchn1", "mppn-batchn2"},
+					name:          "mppn-batchp2",
+					expectedNode:  "mppn-batchn1",
+					nodeAffinity:  []string{"mppn-batchn1", "mppn-batchn2"},
+					expectBatched: true,
 				},
 				{
 					name:         "mppn-batchp3",
@@ -221,9 +222,10 @@ func TestBatchScenarios(t *testing.T) {
 					nodeAffinity: []string{"mppn-batchn4", "mppn-batchn3"},
 				},
 				{
-					name:         "mppn-batchp4",
-					expectedNode: "mppn-batchn4",
-					nodeAffinity: []string{"mppn-batchn4", "mppn-batchn3"},
+					name:          "mppn-batchp4",
+					expectedNode:  "mppn-batchn4",
+					nodeAffinity:  []string{"mppn-batchn4", "mppn-batchn3"},
+					expectBatched: true,
 				},
 			},
 			nodes: []nodeDef{
@@ -241,6 +243,38 @@ func TestBatchScenarios(t *testing.T) {
 				},
 				{
 					name:    "mppn-batchn1",
+					maxPods: 2,
+				},
+			},
+		},
+		{
+			name: "rescoring falls back to next cached node when last chosen node is not feasible",
+			pods: []podDef{
+				{
+					name:         "nfmb-batchp1",
+					expectedNode: "nfmb-batchn1",
+					nodeAffinity: []string{"nfmb-batchn1", "nfmb-batchn2"},
+				},
+				{
+					name:          "nfmb-batchp2",
+					expectedNode:  "nfmb-batchn1",
+					nodeAffinity:  []string{"nfmb-batchn1", "nfmb-batchn2"},
+					expectBatched: true,
+				},
+				{
+					name:          "nfmb-batchp3",
+					expectedNode:  "nfmb-batchn2",
+					nodeAffinity:  []string{"nfmb-batchn1", "nfmb-batchn2"},
+					expectBatched: true,
+				},
+			},
+			nodes: []nodeDef{
+				{
+					name:    "nfmb-batchn1",
+					maxPods: 2,
+				},
+				{
+					name:    "nfmb-batchn2",
 					maxPods: 2,
 				},
 			},

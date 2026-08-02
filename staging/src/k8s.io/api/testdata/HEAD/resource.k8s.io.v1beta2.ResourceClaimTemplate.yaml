@@ -92,6 +92,9 @@ spec:
             requests:
               requestsKey: "0"
           count: 4
+          derivedAttributes:
+          - expression: expressionValue
+            name: nameValue
           deviceClassName: deviceClassNameValue
           selectors:
           - cel:
@@ -108,6 +111,9 @@ spec:
             requests:
               requestsKey: "0"
           count: 5
+          derivedAttributes:
+          - expression: expressionValue
+            name: nameValue
           deviceClassName: deviceClassNameValue
           name: nameValue
           selectors:

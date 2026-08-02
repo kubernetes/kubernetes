@@ -17,6 +17,7 @@ limitations under the License.
 package prober
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"testing"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -769,5 +771,60 @@ func cleanup(t ktesting.TB, m *manager) {
 	}
 	if err := wait.Poll(interval, wait.ForeverTestTimeout, condition); err != nil {
 		t.Fatalf("Error during cleanup: %v", err)
+	}
+}
+
+// ctxAwareRunner implements kubecontainer.CommandRunner and fails once the
+// probe context is canceled, like a real CRI runtime client.
+type ctxAwareRunner struct{}
+
+func (r ctxAwareRunner) RunInContainer(ctx context.Context, id kubecontainer.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return []byte("ok"), nil
+}
+
+// TestProbeWorkersSurviveSyncContextCancellation verifies that probe workers
+// keep probing after the context passed to AddPod is canceled. The pod worker
+// cancels its sync context when a pod begins terminating, and readiness probes
+// must keep executing through termination so a failing probe can mark the pod
+// NotReady. Regression test for https://github.com/kubernetes/kubernetes/issues/140881.
+func TestProbeWorkersSurviveSyncContextCancellation(t *testing.T) {
+	ktesting.Init(t).SyncTest("", testProbeWorkersSurviveSyncContextCancellation)
+}
+
+func testProbeWorkersSurviveSyncContextCancellation(tCtx ktesting.TContext) {
+	t := tCtx.TB()
+	logger := tCtx.Logger()
+	testPod := getTestPod()
+	setTestProbe(testPod, readiness, v1.Probe{})
+	m := newTestManager()
+	defer cleanup(t, m)
+
+	// Probe through the real exec prober backed by a runner that honors
+	// context cancellation, mirroring how CRI ExecSync fails once its
+	// context is canceled.
+	m.prober = newProber(ctxAwareRunner{}, &record.FakeRecorder{})
+
+	m.statusManager.SetPodStatus(logger, testPod, getTestRunningStatus())
+
+	ctx, cancel := context.WithCancel(tCtx)
+	m.AddPod(ctx, testPod)
+	// Simulate the pod worker canceling the sync context at the start of
+	// pod termination.
+	cancel()
+
+	// The readiness worker seeds the result cache with Failure for a new
+	// container, then must record Success from an actual probe execution.
+	for {
+		select {
+		case update := <-m.readinessManager.Updates():
+			if update.Result == results.Success {
+				return
+			}
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatal("Probe worker recorded no probe result after the sync context was canceled; probes are likely being canceled by pod termination")
+		}
 	}
 }
