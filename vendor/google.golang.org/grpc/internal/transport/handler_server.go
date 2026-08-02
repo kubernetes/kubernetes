@@ -50,7 +50,7 @@ import (
 // NewServerHandlerTransport returns a ServerTransport handling gRPC from
 // inside an http.Handler, or writes an HTTP error to w and returns an error.
 // It requires that the http Server supports HTTP/2.
-func NewServerHandlerTransport(w http.ResponseWriter, r *http.Request, stats []stats.Handler, bufferPool mem.BufferPool) (ServerTransport, error) {
+func NewServerHandlerTransport(w http.ResponseWriter, r *http.Request, stats stats.Handler, bufferPool mem.BufferPool) (ServerTransport, error) {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
 		msg := fmt.Sprintf("invalid gRPC request method %q", r.Method)
@@ -170,7 +170,7 @@ type serverHandlerTransport struct {
 	// TODO make sure this is consistent across handler_server and http2_server
 	contentSubtype string
 
-	stats  []stats.Handler
+	stats  stats.Handler
 	logger *grpclog.PrefixLogger
 
 	bufferPool mem.BufferPool
@@ -274,14 +274,14 @@ func (ht *serverHandlerTransport) writeStatus(s *ServerStream, st *status.Status
 		}
 	})
 
-	if err == nil { // transport has not been closed
+	if err == nil && ht.stats != nil { // transport has not been closed
 		// Note: The trailer fields are compressed with hpack after this call returns.
 		// No WireLength field is set here.
-		for _, sh := range ht.stats {
-			sh.HandleRPC(s.Context(), &stats.OutTrailer{
-				Trailer: s.trailer.Copy(),
-			})
-		}
+		s.hdrMu.Lock()
+		ht.stats.HandleRPC(s.Context(), &stats.OutTrailer{
+			Trailer: s.trailer.Copy(),
+		})
+		s.hdrMu.Unlock()
 	}
 	ht.Close(errors.New("finished writing status"))
 	return err
@@ -372,17 +372,21 @@ func (ht *serverHandlerTransport) writeHeader(s *ServerStream, md metadata.MD) e
 		ht.rw.(http.Flusher).Flush()
 	})
 
-	if err == nil {
-		for _, sh := range ht.stats {
-			// Note: The header fields are compressed with hpack after this call returns.
-			// No WireLength field is set here.
-			sh.HandleRPC(s.Context(), &stats.OutHeader{
-				Header:      md.Copy(),
-				Compression: s.sendCompress,
-			})
-		}
+	if err == nil && ht.stats != nil {
+		// Note: The header fields are compressed with hpack after this call returns.
+		// No WireLength field is set here.
+		ht.stats.HandleRPC(s.Context(), &stats.OutHeader{
+			Header:      md.Copy(),
+			Compression: s.sendCompress,
+		})
 	}
 	return err
+}
+
+func (ht *serverHandlerTransport) adjustWindow(*ServerStream, uint32) {
+}
+
+func (ht *serverHandlerTransport) updateWindow(*ServerStream, uint32) {
 }
 
 func (ht *serverHandlerTransport) HandleStreams(ctx context.Context, startStream func(*ServerStream)) {
@@ -409,11 +413,9 @@ func (ht *serverHandlerTransport) HandleStreams(ctx context.Context, startStream
 	ctx = metadata.NewIncomingContext(ctx, ht.headerMD)
 	req := ht.req
 	s := &ServerStream{
-		Stream: &Stream{
+		Stream: Stream{
 			id:             0, // irrelevant
 			ctx:            ctx,
-			requestRead:    func(int) {},
-			buf:            newRecvBuffer(),
 			method:         req.URL.Path,
 			recvCompress:   req.Header.Get("grpc-encoding"),
 			contentSubtype: ht.contentSubtype,
@@ -422,9 +424,11 @@ func (ht *serverHandlerTransport) HandleStreams(ctx context.Context, startStream
 		st:               ht,
 		headerWireLength: 0, // won't have access to header wire length until golang/go#18997.
 	}
-	s.trReader = &transportReader{
-		reader:        &recvBufferReader{ctx: s.ctx, ctxDone: s.ctx.Done(), recv: s.buf},
-		windowHandler: func(int) {},
+	s.Stream.buf.init()
+	s.readRequester = s
+	s.trReader = transportReader{
+		reader:        recvBufferReader{ctx: s.ctx, ctxDone: s.ctx.Done(), recv: &s.buf},
+		windowHandler: s,
 	}
 
 	// readerDone is closed when the Body.Read-ing goroutine exits.

@@ -47,9 +47,6 @@ func (p *PreparedMsg) Encode(s Stream, msg any) error {
 	}
 
 	// check if the context has the relevant information to prepareMsg
-	if rpcInfo.preloaderInfo == nil {
-		return status.Errorf(codes.Internal, "grpc: rpcInfo.preloaderInfo is nil")
-	}
 	if rpcInfo.preloaderInfo.codec == nil {
 		return status.Errorf(codes.Internal, "grpc: rpcInfo.preloaderInfo.codec is nil")
 	}

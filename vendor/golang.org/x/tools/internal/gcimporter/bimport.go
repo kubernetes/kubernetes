@@ -14,7 +14,7 @@ import (
 	"sync"
 )
 
-func errorf(format string, args ...interface{}) {
+func errorf(format string, args ...any) {
 	panic(fmt.Sprintf(format, args...))
 }
 
@@ -34,7 +34,7 @@ type fileInfo struct {
 const maxlines = 64 * 1024
 
 func (s *fakeFileSet) pos(file string, line, column int) token.Pos {
-	// TODO(mdempsky): Make use of column.
+	_ = column // TODO(mdempsky): Make use of column.
 
 	// Since we don't know the set of needed file positions, we reserve maxlines
 	// positions per file. We delay calling token.File.SetLines until all

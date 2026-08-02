@@ -83,6 +83,7 @@ func (b *Unbounded) Load() {
 		default:
 		}
 	} else if b.closing && !b.closed {
+		b.closed = true
 		close(b.c)
 	}
 }

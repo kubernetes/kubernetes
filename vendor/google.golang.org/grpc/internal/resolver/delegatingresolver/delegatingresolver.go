@@ -22,11 +22,13 @@ package delegatingresolver
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"sync"
 
 	"google.golang.org/grpc/grpclog"
+	"google.golang.org/grpc/internal/envconfig"
 	"google.golang.org/grpc/internal/proxyattributes"
 	"google.golang.org/grpc/internal/transport"
 	"google.golang.org/grpc/internal/transport/networktype"
@@ -39,6 +41,8 @@ var (
 	// HTTPSProxyFromEnvironment will be overwritten in the tests
 	HTTPSProxyFromEnvironment = http.ProxyFromEnvironment
 )
+
+const defaultPort = "443"
 
 // delegatingResolver manages both target URI and proxy address resolution by
 // delegating these tasks to separate child resolvers. Essentially, it acts as
@@ -107,10 +111,18 @@ func New(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOpti
 		targetResolver: nopResolver{},
 	}
 
+	addr := target.Endpoint()
 	var err error
-	r.proxyURL, err = proxyURLForTarget(target.Endpoint())
+	if target.URL.Scheme == "dns" && !targetResolutionEnabled && envconfig.EnableDefaultPortForProxyTarget {
+		addr, err = parseTarget(addr)
+		if err != nil {
+			return nil, fmt.Errorf("delegating_resolver: invalid target address %q: %v", target.Endpoint(), err)
+		}
+	}
+
+	r.proxyURL, err = proxyURLForTarget(addr)
 	if err != nil {
-		return nil, fmt.Errorf("delegating_resolver: failed to determine proxy URL for target %s: %v", target, err)
+		return nil, fmt.Errorf("delegating_resolver: failed to determine proxy URL for target %q: %v", target, err)
 	}
 
 	// proxy is not configured or proxy address excluded using `NO_PROXY` env
@@ -132,8 +144,8 @@ func New(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOpti
 	// bypass the target resolver and store the unresolved target address.
 	if target.URL.Scheme == "dns" && !targetResolutionEnabled {
 		r.targetResolverState = &resolver.State{
-			Addresses: []resolver.Address{{Addr: target.Endpoint()}},
-			Endpoints: []resolver.Endpoint{{Addresses: []resolver.Address{{Addr: target.Endpoint()}}}},
+			Addresses: []resolver.Address{{Addr: addr}},
+			Endpoints: []resolver.Endpoint{{Addresses: []resolver.Address{{Addr: addr}}}},
 		}
 		r.updateTargetResolverState(*r.targetResolverState)
 		return r, nil
@@ -186,26 +198,79 @@ func (r *delegatingResolver) Close() {
 	r.proxyResolver = nil
 }
 
-func networkTypeFromAddr(addr resolver.Address) string {
-	networkType, ok := networktype.Get(addr)
-	if !ok {
-		networkType, _ = transport.ParseDialTarget(addr.Addr)
-	}
-	return networkType
-}
-
-func isTCPAddressPresent(state *resolver.State) bool {
+func needsProxyResolver(state *resolver.State) bool {
 	for _, addr := range state.Addresses {
-		if networkType := networkTypeFromAddr(addr); networkType == "tcp" {
+		if !skipProxy(addr) {
 			return true
 		}
 	}
 	for _, endpoint := range state.Endpoints {
 		for _, addr := range endpoint.Addresses {
-			if networktype := networkTypeFromAddr(addr); networktype == "tcp" {
+			if !skipProxy(addr) {
 				return true
 			}
 		}
+	}
+	return false
+}
+
+// parseTarget takes a target string and ensures it is a valid "host:port" target.
+//
+// It does the following:
+//  1. If the target already has a port (e.g., "host:port", "[ipv6]:port"),
+//     it is returned as is.
+//  2. If the host part is empty (e.g., ":80"), it defaults to "localhost",
+//     returning "localhost:80".
+//  3. If the target is missing a port (e.g., "host", "ipv6"), the defaultPort
+//     is added.
+//
+// An error is returned for empty targets or targets with a trailing colon
+// but no port (e.g., "host:").
+func parseTarget(target string) (string, error) {
+	if target == "" {
+		return "", fmt.Errorf("missing address")
+	}
+
+	host, port, err := net.SplitHostPort(target)
+	if err != nil {
+		// If SplitHostPort fails, it's likely because the port is missing.
+		// We append the default port and return the result.
+		return net.JoinHostPort(target, defaultPort), nil
+	}
+
+	// If SplitHostPort succeeds, we check for edge cases.
+	if port == "" {
+		// A success with an empty port means the target had a trailing colon,
+		// e.g., "host:", which is an error.
+		return "", fmt.Errorf("missing port after port-separator colon")
+	}
+	if host == "" {
+		// A success with an empty host means the target was like ":80".
+		// We default the host to "localhost".
+		host = "localhost"
+	}
+	return net.JoinHostPort(host, port), nil
+}
+
+func skipProxy(address resolver.Address) bool {
+	// Avoid proxy when network is not tcp.
+	networkType, ok := networktype.Get(address)
+	if !ok {
+		networkType, _ = transport.ParseDialTarget(address.Addr)
+	}
+	if networkType != "tcp" {
+		return true
+	}
+
+	req := &http.Request{URL: &url.URL{
+		Scheme: "https",
+		Host:   address.Addr,
+	}}
+	// Avoid proxy when address included in `NO_PROXY` environment variable or
+	// fails to get the proxy address.
+	url, err := HTTPSProxyFromEnvironment(req)
+	if err != nil || url == nil {
+		return true
 	}
 	return false
 }
@@ -240,8 +305,7 @@ func (r *delegatingResolver) updateClientConnStateLocked() error {
 	}
 	var addresses []resolver.Address
 	for _, targetAddr := range (*r.targetResolverState).Addresses {
-		// Avoid proxy when network is not tcp.
-		if networkType := networkTypeFromAddr(targetAddr); networkType != "tcp" {
+		if skipProxy(targetAddr) {
 			addresses = append(addresses, targetAddr)
 			continue
 		}
@@ -259,7 +323,7 @@ func (r *delegatingResolver) updateClientConnStateLocked() error {
 		var addrs []resolver.Address
 		for _, targetAddr := range endpt.Addresses {
 			// Avoid proxy when network is not tcp.
-			if networkType := networkTypeFromAddr(targetAddr); networkType != "tcp" {
+			if skipProxy(targetAddr) {
 				addrs = append(addrs, targetAddr)
 				continue
 			}
@@ -340,9 +404,10 @@ func (r *delegatingResolver) updateTargetResolverState(state resolver.State) err
 		logger.Infof("Addresses received from target resolver: %v", state.Addresses)
 	}
 	r.targetResolverState = &state
-	// If no addresses returned by resolver have network type as tcp , do not
-	// wait for proxy update.
-	if !isTCPAddressPresent(r.targetResolverState) {
+	// If all addresses returned by the target resolver have a non-TCP network
+	// type, or are listed in the `NO_PROXY` environment variable, do not wait
+	// for proxy update.
+	if !needsProxyResolver(r.targetResolverState) {
 		return r.cc.UpdateState(*r.targetResolverState)
 	}
 

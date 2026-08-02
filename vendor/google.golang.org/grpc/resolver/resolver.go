@@ -182,6 +182,7 @@ type BuildOptions struct {
 
 // An Endpoint is one network endpoint, or server, which may have multiple
 // addresses with which it can be accessed.
+// TODO(i/8773) : make resolver.Endpoint and resolver.Address immutable
 type Endpoint struct {
 	// Addresses contains a list of addresses used to access this endpoint.
 	Addresses []Address
@@ -332,6 +333,11 @@ type AuthorityOverrider interface {
 	// OverrideAuthority returns the authority to use for a ClientConn with the
 	// given target. The implementation must generate it without blocking,
 	// typically in line, and must keep it unchanged.
+	//
+	// The returned string must be a valid ":authority" header value, i.e. be
+	// encoded according to
+	// [RFC3986](https://datatracker.ietf.org/doc/html/rfc3986#section-3.2) as
+	// necessary.
 	OverrideAuthority(Target) string
 }
 
