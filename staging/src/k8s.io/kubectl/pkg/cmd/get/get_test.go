@@ -34,12 +34,14 @@ import (
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
@@ -3210,4 +3212,52 @@ func replicationControllersScaleSubresourceTableObjBody(codec runtime.Codec, rep
 		})
 	}
 	return cmdtesting.ObjBody(codec, table)
+}
+
+// errWriter always returns an error on Write, simulating a broken pipe or closed writer.
+type errWriter struct{ err error }
+
+func (e *errWriter) Write(_ []byte) (int, error) { return 0, e.err }
+
+// TestGetPropagatesPrintObjError verifies that an IO error returned by PrintObj
+// in the human-readable output loop is collected into allErrs and surfaced to
+// the caller. Regression test for the silent-discard bug at get.go#L569.
+func TestGetPropagatesPrintObjError(t *testing.T) {
+	pods, _, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])},
+	}
+
+	streams, _, _, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	o := NewGetOptions("kubectl", streams)
+
+	if err := o.Complete(tf, cmd, []string{"pods", "foo"}); err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+
+	// Override ToPrinter after Complete (which sets it) so the ResourcePrinterFunc
+	// always errors, simulating a broken-pipe or closed-writer condition.
+	wantErr := fmt.Errorf("simulated write error")
+	o.ToPrinter = func(_ *meta.RESTMapping, _ *bool, _, _ bool) (printers.ResourcePrinterFunc, error) {
+		return func(_ runtime.Object, _ io.Writer) error {
+			return wantErr
+		}, nil
+	}
+	o.IsHumanReadablePrinter = true
+	o.ServerPrint = false
+
+	err := o.Run(tf, []string{"pods", "foo"})
+	if err == nil {
+		t.Fatal("expected an error from Run, got nil")
+	}
+	if !strings.Contains(err.Error(), wantErr.Error()) {
+		t.Errorf("expected error to contain %q, got %q", wantErr.Error(), err.Error())
+	}
 }
