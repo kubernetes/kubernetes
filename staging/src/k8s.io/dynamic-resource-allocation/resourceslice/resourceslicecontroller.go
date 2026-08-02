@@ -306,6 +306,9 @@ type Options struct {
 	// This enables node-owned slices that remain cluster-visible via
 	// NodeSelector or AllNodes.
 	//
+	// Other pools in the desired resources are reported through ErrorHandler
+	// and are not published.
+	//
 	// Beware that this has a performance impact on the cluster
 	// because all nodes have to receive all ResourceSlices of
 	// the driver. Without this option, each node only receives
@@ -428,26 +431,17 @@ func (c *Controller) Update(resources *DriverResources) {
 	if c.resources != nil {
 		for poolName := range c.resources.Pools {
 			c.queue.Add(poolName)
+			// Another pool may have failed validation and blocked the
+			// sync of the ReconcilePoolWithName pool, so sync it again.
+			if c.reconcilePoolWithName != "" && poolName != c.reconcilePoolWithName {
+				c.queue.Add(c.reconcilePoolWithName)
+			}
 		}
 	}
 
 	if resources == nil {
 		c.resources = &DriverResources{}
 	} else {
-		// If reconcilePoolWithName is set, we expect to reconcile only a single pool.
-		// Having additional pools is considered an error. However, an empty pool list
-		// is intentionally allowed and treated as "no slices to publish", which matches
-		// the default controller behavior.
-		if c.reconcilePoolWithName != "" {
-			_, ok := resources.Pools[c.reconcilePoolWithName]
-			if (ok && len(resources.Pools) > 1) || !ok && len(resources.Pools) > 0 {
-				c.errorHandler(context.Background(),
-					fmt.Errorf("ReconcilePoolWithName=%q, but found %d pools; expected exactly one pool with this name", c.reconcilePoolWithName, len(resources.Pools)),
-					"processing update DriverResources")
-				return
-			}
-		}
-
 		c.resources = resources.DeepCopy()
 		roundTaintTimeAdded(c.resources)
 	}
@@ -740,6 +734,16 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	c.mutex.RLock()
 	resources = c.resources
 	c.mutex.RUnlock()
+
+	// The informer only sees slices of the ReconcilePoolWithName pool, so
+	// slices of other pools can neither be synced nor removed here.
+	if c.reconcilePoolWithName != "" && poolName != c.reconcilePoolWithName {
+		if _, ok := resources.Pools[poolName]; ok {
+			c.errorHandler(ctx, fmt.Errorf("found pool %q, but ReconcilePoolWithName only allows pool %q", poolName, c.reconcilePoolWithName), "pool validation failed")
+		}
+		return nil
+	}
+
 	if err := validateDriverResources(resources); err != nil {
 		c.errorHandler(ctx, err, "pool validation failed")
 		// We only report the error through the error handler to prevent
