@@ -5687,137 +5687,70 @@ func TestAvoidUnnecessaryUpdates(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAGeneration, true)
 
 	now := metav1.Time{Time: time.Now().Add(-time.Hour)}
-	tc := testCase{
-		minReplicas:             2,
-		maxReplicas:             6,
-		specReplicas:            2,
-		statusReplicas:          2,
-		expectedDesiredReplicas: 2,
-		CPUTarget:               30,
-		CPUCurrent:              40,
-		verifyCPUCurrent:        true,
-		reportedLevels:          []uint64{400, 500, 700},
-		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		reportedPodStartTime:    []metav1.Time{coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
-		useMetricsAPI:           true,
-		lastScaleTime:           &now,
-		recommendations:         []timestampedRecommendation{},
-		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
-		},
-		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
-		},
+	fixture := horizontalScenario{
+		minReplicas:          2,
+		maxReplicas:          6,
+		specReplicas:         2,
+		statusReplicas:       2,
+		CPUTarget:            80,
+		reportedLevels:       []uint64{400, 500, 700},
+		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		reportedPodStartTime: []metav1.Time{coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
+		lastScaleTime:        &now,
+		recommendations:      []timestampedRecommendation{},
+		resource:             &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
 	}
-	testClient, _, _, _, _ := tc.prepareTestClient(t)
-	tc.testClient = testClient
-	testClient.PrependReactor("list", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		tc.Lock()
-		defer tc.Unlock()
-		// fake out the verification logic and mark that we're done processing
-		go func() {
-			// wait a tick and then mark that we're finished (otherwise, we have no
-			// way to indicate that we're finished, because the function decides not to do anything)
-			time.Sleep(1 * time.Second)
-			tc.Lock()
-			tc.statusUpdated = true
-			tc.Unlock()
-			tc.processed <- "test-hpa"
-		}()
 
-		var eighty int32 = 80
+	logger, _ := ktesting.NewTestContext(t)
+	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
+	testClient := &fake.Clientset{}
+	testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
+	AddListHPAReactor(testClient, &fixture, t)
+	AddListPodsReactor(testClient, &fixture)
+	AddUpdateAutoscalingReactor(testClient)
 
-		quantity := resource.MustParse("400m")
-		obj := &autoscalingv2.HorizontalPodAutoscalerList{
-			Items: []autoscalingv2.HorizontalPodAutoscaler{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:       "test-hpa",
-						Namespace:  "test-namespace",
-						Generation: 1,
-					},
-					Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
-						ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
-							Kind:       "ReplicationController",
-							Name:       "test-rc",
-							APIVersion: "v1",
-						},
-						Metrics: []autoscalingv2.MetricSpec{{
-							Type: autoscalingv2.ResourceMetricSourceType,
-							Resource: &autoscalingv2.ResourceMetricSource{
-								Name: v1.ResourceCPU,
-								Target: autoscalingv2.MetricTarget{
-									Type: autoscalingv2.UtilizationMetricType,
-									// TODO: Change this to &tc.CPUTarget and the expected ScaleLimited
-									//       condition to False. This test incorrectly leaves the v1
-									//       HPA field TargetCPUUtilizization field blank and the
-									//       controller defaults to a target of 80. So the test relies
-									//       on downscale stabilization to prevent a scale change.
-									AverageUtilization: &eighty,
-								},
-							},
-						}},
-						MinReplicas: &tc.minReplicas,
-						MaxReplicas: tc.maxReplicas,
-					},
-					Status: autoscalingv2.HorizontalPodAutoscalerStatus{
-						ObservedGeneration: ptr.To[int64](1),
-						CurrentReplicas:    tc.specReplicas,
-						DesiredReplicas:    tc.specReplicas,
-						LastScaleTime:      tc.lastScaleTime,
-						CurrentMetrics: []autoscalingv2.MetricStatus{
-							{
-								Type: autoscalingv2.ResourceMetricSourceType,
-								Resource: &autoscalingv2.ResourceMetricStatus{
-									Name: v1.ResourceCPU,
-									Current: autoscalingv2.MetricValueStatus{
-										AverageValue:       &quantity,
-										AverageUtilization: &tc.CPUCurrent,
-									},
-								},
-							},
-						},
-						Conditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-							{
-								Type:               autoscalingv2.AbleToScale,
-								Status:             v1.ConditionTrue,
-								LastTransitionTime: *tc.lastScaleTime,
-								Reason:             "ReadyForNewScale",
-								Message:            "recommended size matches current size",
-							},
-							{
-								Type:               autoscalingv2.ScalingActive,
-								Status:             v1.ConditionTrue,
-								LastTransitionTime: *tc.lastScaleTime,
-								Reason:             "ValidMetricFound",
-								Message:            "the HPA was able to successfully calculate a replica count from cpu resource utilization (percentage of request)",
-							},
-							{
-								Type:               autoscalingv2.ScalingLimited,
-								Status:             v1.ConditionTrue,
-								LastTransitionTime: *tc.lastScaleTime,
-								Reason:             "TooFewReplicas",
-								Message:            "the desired replica count is less than the minimum replica count",
-							},
-						},
-					},
-				},
-			},
+	fakeScaleClient := &scalefake.FakeScaleClient{}
+	AddGetScaleReactor(fakeScaleClient, "replicationcontrollers", &fixture)
+	AddUpdateScaleReactor(fakeScaleClient, "replicationcontrollers")
+
+	fakeMetricsClient := &metricsfake.Clientset{}
+	AddListPodMetricsReactor(fakeMetricsClient, &fixture)
+
+	eventClient := &fake.Clientset{}
+	AddCreateEventReactor(eventClient)
+
+	setup := newHorizontalSetup(t, &fixture, testClient, eventClient, fakeMetricsClient, nil, nil, fakeScaleClient)
+
+	hpa := buildHPA(t, &fixture)
+	hpa.Generation = 1
+	key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
+
+	hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
+	setup.controller.selectorTracker.PutIfAbsent(hpa.Namespace, hpaKey, labels.Nothing())
+
+	// First reconciliation establishes the baseline status.
+	err := setup.controller.reconcileAutoscaler(setup.ctx, hpa, key)
+	require.NoError(t, err)
+
+	var updatedHPA *autoscalingv2.HorizontalPodAutoscaler
+	for _, action := range setup.testClient.Actions() {
+		if action.GetVerb() == "update" && action.GetResource().Resource == "horizontalpodautoscalers" {
+			updatedHPA = action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
 		}
+	}
+	require.NotNil(t, updatedHPA, "first reconciliation should have updated the HPA status")
 
-		return true, obj, nil
-	})
-	testClient.PrependReactor("update", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		assert.Fail(t, "should not have attempted to update the HPA when nothing changed")
-		// mark that we've processed this HPA
-		tc.processed <- ""
-		return true, nil, fmt.Errorf("unexpected call")
-	})
+	setup.testClient.ClearActions()
 
-	controller, informerFactory := tc.setupController(t)
-	tc.runTestWithController(t, controller, informerFactory)
+	// Second reconciliation with the same state should not trigger another update.
+	err = setup.controller.reconcileAutoscaler(setup.ctx, updatedHPA, key)
+	require.NoError(t, err)
+
+	for _, action := range setup.testClient.Actions() {
+		if action.GetVerb() == "update" && action.GetResource().Resource == "horizontalpodautoscalers" {
+			t.Fatal("should not have attempted to update the HPA when nothing changed")
+		}
+	}
 }
 
 func TestConvertDesiredReplicasWithRules(t *testing.T) {
