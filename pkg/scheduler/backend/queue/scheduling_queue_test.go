@@ -221,7 +221,7 @@ func TestPriorityQueue_Add(t *testing.T) {
 					st.MakePodGroup().Name("pg-high").Namespace(highPod.Namespace).Priority(highPriority).Obj(),
 				}
 				for _, podGroup := range podGroups {
-					q.AddPodGroup(logger, podGroup)
+					q.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(podGroup))
 				}
 			}
 			q.Add(ctx, medPod)
@@ -1104,7 +1104,7 @@ func Test_InFlightPods(t *testing.T) {
 				sortOpt := cmpopts.SortSlices(func(a, b string) bool { return a < b })
 				if genericWorkloadEnabled {
 					for _, pg := range podGroupsToAdd {
-						q.AddPodGroup(logger, pg)
+						q.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(pg))
 					}
 				}
 
@@ -1140,7 +1140,7 @@ func Test_InFlightPods(t *testing.T) {
 							t.Fatalf("unexpected error from AddAttemptedPodGroupIfNeeded: %v", err)
 						}
 					case action.podGroupAdded != nil:
-						q.AddPodGroup(logger, action.podGroupAdded)
+						q.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(action.podGroupAdded))
 					case action.callback != nil:
 						action.callback(t, q)
 					}
@@ -3939,7 +3939,7 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 			q := NewTestQueue(tCtx, newDefaultQueueSort(), opts...)
 			podGroup := st.MakePodGroup().Name(pgName).Namespace("ns1").Obj()
 			if !test.skipAddPodGroup {
-				q.AddPodGroup(tCtx.Logger(), podGroup)
+				q.AddAbstractPodGroup(tCtx.Logger(), framework.NewAbstractPodGroup(podGroup))
 			}
 
 			pgInfo := newSingleLevelPodGroupInfo(q.newQueuedPodInfo(tCtx, pod1), podGroup)
@@ -4193,7 +4193,7 @@ var (
 	addPodGroupForPod = func(tCtx ktesting.TContext, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		pgName := *pInfo.Pod.Spec.SchedulingGroup.PodGroupName
 		pg := st.MakePodGroup().Name(pgName).Namespace(pInfo.Pod.Namespace).Obj()
-		queue.AddPodGroup(klog.FromContext(tCtx), pg)
+		queue.AddAbstractPodGroup(klog.FromContext(tCtx), framework.NewAbstractPodGroup(pg))
 	}
 )
 
@@ -5125,7 +5125,7 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			metrics.SchedulerQueueIncomingEntities.Reset()
 			queue := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
-			queue.AddPodGroup(logger, st.MakePodGroup().Name("pg-1").Namespace("ns-pg").Obj())
+			queue.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(st.MakePodGroup().Name("pg-1").Namespace("ns-pg").Obj()))
 			test.run(tCtx, queue)
 			if err := testutil.CollectAndCompare(metrics.SchedulerQueueIncomingEntities, strings.NewReader(queueIncomingEntitiesMetricMetadata+test.want), metricName); err != nil {
 				t.Errorf("unexpected collecting result:\n%s", err)
@@ -5290,8 +5290,7 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			metrics.QueuedEntities.Reset()
 			queue := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
-			queue.AddPodGroup(logger, st.MakePodGroup().Name("pg-1").Namespace("ns-pg").Obj())
-
+			queue.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(st.MakePodGroup().Name("pg-1").Namespace("ns-pg").Obj()))
 			test.run(tCtx, queue)
 
 			if err := testutil.CollectAndCompare(metrics.QueuedEntities, strings.NewReader(queuedEntitiesMetricMetadata+test.want), metricName); err != nil {
@@ -6416,7 +6415,7 @@ func setupInitialPodGroupState(t *testing.T, ctx context.Context, q *PriorityQue
 
 	if initialState != stateIncomplete {
 		logger := klog.FromContext(ctx)
-		q.AddPodGroup(logger, initialPodGroup)
+		q.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(initialPodGroup))
 	}
 
 	if len(initialPods) == 0 {
@@ -7862,7 +7861,7 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 			}
 
 			if tt.deletePodGroup {
-				q.DeletePodGroup(logger, podGroup)
+				q.DeleteAbstractPodGroup(logger, framework.NewAbstractPodGroup(podGroup))
 			}
 
 			// Add unschedulable pods
@@ -7983,7 +7982,7 @@ func TestAddPodGroup(t *testing.T) {
 
 			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState, podGroup)
 
-			q.AddPodGroup(logger, podGroup)
+			q.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(podGroup))
 
 			pgLookup := &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
@@ -8113,7 +8112,7 @@ func TestUpdatePodGroup(t *testing.T) {
 
 			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState, podGroup)
 
-			q.UpdatePodGroup(logger, updatedPodGroup)
+			q.UpdateAbstractPodGroup(logger, framework.NewAbstractPodGroup(updatedPodGroup))
 
 			gotAPG, ok := q.workloadForest.podGroups[fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)]
 			if !ok {
@@ -8247,7 +8246,7 @@ func TestDeletePodGroup(t *testing.T) {
 				q.Add(ctx, pod)
 			}
 
-			q.DeletePodGroup(logger, podGroup)
+			q.DeleteAbstractPodGroup(logger, framework.NewAbstractPodGroup(podGroup))
 
 			_, ok := q.workloadForest.podGroups[fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)]
 			if ok {
@@ -8455,10 +8454,10 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 			defer q.Close()
 
 			for _, pg := range tt.initialPodGroups {
-				q.AddPodGroup(logger, pg)
+				q.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(pg))
 			}
 			for _, cpg := range tt.initialCPGs {
-				q.AddCompositePodGroup(logger, cpg)
+				q.AddAbstractPodGroup(logger, framework.NewAbstractCompositePodGroup(cpg))
 			}
 			for _, pod := range tt.initialPods {
 				q.Add(ctx, pod)
@@ -8467,7 +8466,7 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 				tt.beforeAdd(ctx, q)
 			}
 
-			q.AddCompositePodGroup(logger, tt.cpgToAdd)
+			q.AddAbstractPodGroup(logger, framework.NewAbstractCompositePodGroup(tt.cpgToAdd))
 
 			cmpOpts := []cmp.Option{cmpopts.EquateEmpty(), cmpopts.SortSlices(func(a, b string) bool { return a < b })}
 			if diff := cmp.Diff(tt.expectedActiveQ, getActivePodGroups(q), cmpOpts...); diff != "" {
@@ -8554,16 +8553,16 @@ func TestPriorityQueue_UpdateCompositePodGroup(t *testing.T) {
 			defer q.Close()
 
 			for _, cpg := range tt.initialCPGs {
-				q.AddCompositePodGroup(logger, cpg)
+				q.AddAbstractPodGroup(logger, framework.NewAbstractCompositePodGroup(cpg))
 			}
 			for _, pg := range tt.initialPodGroups {
-				q.AddPodGroup(logger, pg)
+				q.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(pg))
 			}
 			for _, pod := range tt.initialPods {
 				q.Add(ctx, pod)
 			}
 
-			q.UpdateCompositePodGroup(logger, tt.cpgToUpdate)
+			q.UpdateAbstractPodGroup(logger, framework.NewAbstractCompositePodGroup(tt.cpgToUpdate))
 
 			cmpOpts := []cmp.Option{cmpopts.EquateEmpty(), cmpopts.SortSlices(func(a, b string) bool { return a < b })}
 			if diff := cmp.Diff(tt.expectedActiveQ, getActivePodGroups(q), cmpOpts...); diff != "" {
@@ -8782,10 +8781,10 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 			defer q.Close()
 
 			for _, cpg := range tt.initialCPGs {
-				q.AddCompositePodGroup(logger, cpg)
+				q.AddAbstractPodGroup(logger, framework.NewAbstractCompositePodGroup(cpg))
 			}
 			for _, pg := range tt.initialPodGroups {
-				q.AddPodGroup(logger, pg)
+				q.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(pg))
 			}
 			for _, pod := range tt.initialPods {
 				q.Add(ctx, pod)
@@ -8794,7 +8793,7 @@ func TestPriorityQueue_DeleteCompositePodGroup(t *testing.T) {
 				tt.beforeDelete(ctx, q)
 			}
 
-			q.DeleteCompositePodGroup(logger, tt.cpgToDelete)
+			q.DeleteAbstractPodGroup(logger, framework.NewAbstractCompositePodGroup(tt.cpgToDelete))
 
 			cmpOpts := []cmp.Option{cmpopts.EquateEmpty(), cmpopts.SortSlices(func(a, b string) bool { return a < b })}
 			if diff := cmp.Diff(tt.expectedActiveQ, getActivePodGroups(q), cmpOpts...); diff != "" {
@@ -9008,10 +9007,10 @@ func TestPriorityQueue_AddPodGroup_Hierarchical(t *testing.T) {
 			defer q.Close()
 
 			for _, cpg := range tt.initialCPGs {
-				q.AddCompositePodGroup(logger, cpg)
+				q.AddAbstractPodGroup(logger, framework.NewAbstractCompositePodGroup(cpg))
 			}
 			for _, pg := range tt.initialPodGroups {
-				q.AddPodGroup(logger, pg)
+				q.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(pg))
 			}
 			for _, pod := range tt.initialPods {
 				q.Add(ctx, pod)
@@ -9020,7 +9019,7 @@ func TestPriorityQueue_AddPodGroup_Hierarchical(t *testing.T) {
 				tt.beforeAdd(ctx, q)
 			}
 
-			q.AddPodGroup(logger, tt.pgToAdd)
+			q.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(tt.pgToAdd))
 
 			cmpOpts := []cmp.Option{cmpopts.EquateEmpty(), cmpopts.SortSlices(func(a, b string) bool { return a < b })}
 			if diff := cmp.Diff(tt.expectedActiveQ, getActivePodGroups(q), cmpOpts...); diff != "" {
@@ -9118,16 +9117,16 @@ func TestPriorityQueue_UpdatePodGroup_Hierarchical(t *testing.T) {
 			defer q.Close()
 
 			for _, cpg := range tt.initialCPGs {
-				q.AddCompositePodGroup(logger, cpg)
+				q.AddAbstractPodGroup(logger, framework.NewAbstractCompositePodGroup(cpg))
 			}
 			for _, pg := range tt.initialPodGroups {
-				q.AddPodGroup(logger, pg)
+				q.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(pg))
 			}
 			for _, pod := range tt.initialPods {
 				q.Add(ctx, pod)
 			}
 
-			q.UpdatePodGroup(logger, tt.pgToUpdate)
+			q.UpdateAbstractPodGroup(logger, framework.NewAbstractPodGroup(tt.pgToUpdate))
 
 			cmpOpts := []cmp.Option{cmpopts.EquateEmpty(), cmpopts.SortSlices(func(a, b string) bool { return a < b })}
 			if diff := cmp.Diff(tt.expectedActiveQ, getActivePodGroups(q), cmpOpts...); diff != "" {
@@ -9323,10 +9322,10 @@ func TestPriorityQueue_DeletePodGroup_Hierarchical(t *testing.T) {
 			defer q.Close()
 
 			for _, cpg := range tt.initialCPGs {
-				q.AddCompositePodGroup(logger, cpg)
+				q.AddAbstractPodGroup(logger, framework.NewAbstractCompositePodGroup(cpg))
 			}
 			for _, pg := range tt.initialPodGroups {
-				q.AddPodGroup(logger, pg)
+				q.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(pg))
 			}
 			for _, pod := range tt.initialPods {
 				q.Add(ctx, pod)
@@ -9335,7 +9334,7 @@ func TestPriorityQueue_DeletePodGroup_Hierarchical(t *testing.T) {
 				tt.beforeDelete(ctx, q)
 			}
 
-			q.DeletePodGroup(logger, tt.pgToDelete)
+			q.DeleteAbstractPodGroup(logger, framework.NewAbstractPodGroup(tt.pgToDelete))
 
 			cmpOpts := []cmp.Option{cmpopts.EquateEmpty(), cmpopts.SortSlices(func(a, b string) bool { return a < b })}
 			if diff := cmp.Diff(tt.expectedActiveQ, getActivePodGroups(q), cmpOpts...); diff != "" {
@@ -9487,7 +9486,7 @@ func TestPriorityQueue_DeferredPodGroupCompatibility(t *testing.T) {
 
 			if tt.pod.Spec.SchedulingGroup != nil && tt.pod.Spec.SchedulingGroup.PodGroupName != nil {
 				pg := st.MakePodGroup().Name(*tt.pod.Spec.SchedulingGroup.PodGroupName).Namespace(tt.pod.Namespace).Obj()
-				q.AddPodGroup(logger, pg)
+				q.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(pg))
 			}
 
 			q.Add(ctx, tt.pod)

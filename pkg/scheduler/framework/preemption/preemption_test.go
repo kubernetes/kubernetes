@@ -983,10 +983,10 @@ func TestGetVictimsOnNode(t *testing.T) {
 
 			cache := internalcache.New(ctx, nil, tt.enableGenericWorkload, tt.enableCompositePodGroup)
 			for _, pg := range tt.podGroups {
-				cache.AddPodGroup(pg)
+				cache.AddAbstractPodGroup(framework.NewAbstractPodGroup(pg))
 			}
 			for _, cpg := range tt.compositePodGroups {
-				cache.AddCompositePodGroup(logger, cpg)
+				cache.AddAbstractPodGroup(framework.NewAbstractCompositePodGroup(cpg))
 			}
 			snapshot := internalcache.NewTestSnapshotWithCompositePodGroups(tt.pods, tt.nodes, tt.podGroups, tt.compositePodGroups)
 

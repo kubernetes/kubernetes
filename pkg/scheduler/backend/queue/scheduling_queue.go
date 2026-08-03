@@ -34,8 +34,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -132,14 +130,13 @@ type SchedulingQueue interface {
 	// Important Note: preCheck shouldn't include anything that depends on the in-tree plugins' logic.
 	// (e.g., filter Pods based on added/updated Node's capacity, etc.)
 	MoveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck)
-	// AddPodGroup adds a new PodGroup object to the queue,
-	// requeuing all pods associated with the pod group.
-	AddPodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup)
-	// UpdatePodGroup updates an existing PodGroup object in the queue.
-	UpdatePodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup)
-	// DeletePodGroup removes a PodGroup object from the queue,
-	// moving all pods associated with the pod group to the incompletePodGroupPods.
-	DeletePodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup)
+	// AddAbstractPodGroup adds a PodGroup or CompositePodGroup object to the queue,
+	// requeuing all pods associated with the group.
+	AddAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup)
+	// UpdateAbstractPodGroup updates an existing PodGroup or CompositePodGroup object in the queue.
+	UpdateAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup)
+	// DeleteAbstractPodGroup removes a PodGroup or CompositePodGroup object from the queue.
+	DeleteAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup)
 
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
@@ -166,13 +163,6 @@ type SchedulingQueue interface {
 	// IncompletePodGroupPodsPods returns all the pods belonging to pod groups
 	// waiting for their API objects (PodGroups) to be observed.
 	IncompletePodGroupPodsPods() []*v1.Pod
-
-	// AddCompositePodGroup adds a composite pod group to the queue.
-	AddCompositePodGroup(logger klog.Logger, cpg *schedulingv1alpha3.CompositePodGroup)
-	// UpdateCompositePodGroup updates a composite pod group in the queue.
-	UpdateCompositePodGroup(logger klog.Logger, newCPG *schedulingv1alpha3.CompositePodGroup)
-	// DeleteCompositePodGroup removes a composite pod group from the queue.
-	DeleteCompositePodGroup(logger klog.Logger, cpg *schedulingv1alpha3.CompositePodGroup)
 }
 
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
@@ -1558,9 +1548,9 @@ func (p *PriorityQueue) deletePod(pod *v1.Pod) {
 	}
 }
 
-// addAbstractPodGroup adds a PodGroup or CompositePodGroup object to the queue,
+// AddAbstractPodGroup adds a PodGroup or CompositePodGroup object to the queue,
 // requeuing all pods associated with the group.
-func (p *PriorityQueue) addAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup) {
+func (p *PriorityQueue) AddAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -1598,8 +1588,8 @@ func (p *PriorityQueue) addAbstractPodGroup(logger klog.Logger, apg *framework.A
 	logger.V(5).Info("New group was added to the root group and its pods were attempted to be moved from incompletePodGroupPods to the queue", "rootType", rootInfoLookup.Type(), "root", klog.KObj(rootInfoLookup), "groupType", apg.GetType(), "group", klog.KObj(apg), "podsLen", len(pInfos))
 }
 
-// updateAbstractPodGroup updates an existing PodGroup or CompositePodGroup object in the queue.
-func (p *PriorityQueue) updateAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup) {
+// UpdateAbstractPodGroup updates an existing PodGroup or CompositePodGroup object in the queue.
+func (p *PriorityQueue) UpdateAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -1620,8 +1610,8 @@ func (p *PriorityQueue) updateAbstractPodGroup(logger klog.Logger, apg *framewor
 	})
 }
 
-// deleteAbstractPodGroup removes a PodGroup or CompositePodGroup object from the queue.
-func (p *PriorityQueue) deleteAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup) {
+// DeleteAbstractPodGroup removes a PodGroup or CompositePodGroup object from the queue.
+func (p *PriorityQueue) DeleteAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -1678,49 +1668,6 @@ func (p *PriorityQueue) deleteAbstractPodGroup(logger klog.Logger, apg *framewor
 		p.activeQ.broadcast()
 	}
 	logger.V(5).Info("Group deleted from root group, decomposed and enqueued pods to incompletePodGroupPods", "rootType", rootInfo.Type(), "root", klog.KObj(rootInfo), "groupType", apg.GetType(), "group", klog.KObj(apg), "pods", len(removedPods))
-}
-
-// AddPodGroup adds a new PodGroup object to the queue,
-// requeuing all pods associated with the pod group.
-func (p *PriorityQueue) AddPodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup) {
-	p.addAbstractPodGroup(logger, framework.NewAbstractPodGroup(podGroup))
-}
-
-// UpdatePodGroup updates an existing PodGroup object in the queue.
-func (p *PriorityQueue) UpdatePodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup) {
-	p.updateAbstractPodGroup(logger, framework.NewAbstractPodGroup(podGroup))
-}
-
-// DeletePodGroup removes a PodGroup object from the queue,
-// moving all pods associated with the pod group to the incompletePodGroupPods.
-func (p *PriorityQueue) DeletePodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup) {
-	p.deleteAbstractPodGroup(logger, framework.NewAbstractPodGroup(podGroup))
-}
-
-// AddCompositePodGroup adds a new CompositePodGroup object to the queue.
-// It requeues all pods associated with the composite pod group.
-func (p *PriorityQueue) AddCompositePodGroup(logger klog.Logger, cpg *schedulingv1alpha3.CompositePodGroup) {
-	if !p.isCompositePodGroupEnabled {
-		return
-	}
-	p.addAbstractPodGroup(logger, framework.NewAbstractCompositePodGroup(cpg))
-}
-
-// UpdateCompositePodGroup updates an existing CompositePodGroup object in the queue.
-func (p *PriorityQueue) UpdateCompositePodGroup(logger klog.Logger, newCPG *schedulingv1alpha3.CompositePodGroup) {
-	if !p.isCompositePodGroupEnabled {
-		return
-	}
-	p.updateAbstractPodGroup(logger, framework.NewAbstractCompositePodGroup(newCPG))
-}
-
-// DeleteCompositePodGroup removes a CompositePodGroup object from the queue.
-// It moves all pods in the hierarchy of the composite pod group to the incompletePodGroupPods.
-func (p *PriorityQueue) DeleteCompositePodGroup(logger klog.Logger, cpg *schedulingv1alpha3.CompositePodGroup) {
-	if !p.isCompositePodGroupEnabled {
-		return
-	}
-	p.deleteAbstractPodGroup(logger, framework.NewAbstractCompositePodGroup(cpg))
 }
 
 // NOTE: this function assumes a lock has been acquired in the caller.

@@ -894,11 +894,11 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 			}
 
 			for _, pg := range pgs {
-				cache.AddPodGroup(pg)
+				cache.AddAbstractPodGroup(framework.NewAbstractPodGroup(pg))
 			}
 			if tt.enableCompositePodGroup {
 				for _, cpg := range cpgs {
-					cache.AddCompositePodGroup(logger, cpg)
+					cache.AddAbstractPodGroup(framework.NewAbstractCompositePodGroup(cpg))
 				}
 			}
 

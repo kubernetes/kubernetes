@@ -4644,7 +4644,7 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 		}
 	}
 	for _, podGroup := range podGroups {
-		tc.podGroupManager.AddPodGroup(podGroup)
+		tc.podGroupManager.AddAbstractPodGroup(framework.NewAbstractPodGroup(podGroup))
 	}
 	snapshot := internalcache.NewTestSnapshotWithPodGroups(nil, nil, podGroups)
 
