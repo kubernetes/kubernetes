@@ -203,7 +203,7 @@ func (p *staticPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Po
 		return nil
 	}
 	if blocks := s.GetPodMemoryBlocks(podUID); blocks != nil {
-		logger.Info("Pod already present in state, skipping")
+		logger.V(4).Info("Pod already present in state, skipping")
 		return nil
 	}
 

@@ -51,7 +51,6 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 		podMemoryRequest                string
 		containers                      []containerSpec
 		expectPodBlocks                 bool
-		verifyAllocationIdempotency     bool
 	}{
 		{
 			description:                     "PodLevelResources and PodLevelResourceManagers enabled",
@@ -61,8 +60,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			containers: []containerSpec{
 				{name: "container1", memRequest: "100Mi", memLimit: "100Mi"},
 			},
-			expectPodBlocks:             true,
-			verifyAllocationIdempotency: true,
+			expectPodBlocks: true,
 		},
 		{
 			description:                     "PodLevelResources enabled, PodLevelResourceManagers disabled",
@@ -208,7 +206,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				}
 			}
 
-			if tc.verifyAllocationIdempotency {
+			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod) {
 				if err := mgr2.AllocatePod(logger, pod, lifecycle.AddOperation); err != nil {
 					t.Fatalf("could not allocate restored pod: %v", err)
 				}
