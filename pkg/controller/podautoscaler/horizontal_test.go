@@ -4292,6 +4292,12 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 			hpa := buildHPA(t, &tt.fixture)
 			key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
 
+			// Register the HPA in the selector tracker. In production this is done by
+			// enqueueHPA before the worker calls reconcileAutoscaler, but this test
+			// calls reconcileAutoscaler directly, bypassing the queue.
+			hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
+			setup.controller.selectorTracker.PutIfAbsent(hpa.Namespace, hpaKey, labels.Nothing())
+
 			_ = setup.controller.reconcileAutoscaler(setup.ctx, hpa, key)
 
 			for _, action := range setup.scaleClient.Actions() {
@@ -4412,6 +4418,12 @@ func TestInvalidMetricSourceType(t *testing.T) {
 			hpa := buildHPA(t, &tt.fixture)
 			key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
 
+			// Register the HPA in the selector tracker. In production this is done by
+			// enqueueHPA before the worker calls reconcileAutoscaler, but this test
+			// calls reconcileAutoscaler directly, bypassing the queue.
+			hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
+			setup.controller.selectorTracker.PutIfAbsent(hpa.Namespace, hpaKey, labels.Nothing())
+
 			err := setup.controller.reconcileAutoscaler(setup.ctx, hpa, key)
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -4517,6 +4529,12 @@ func TestConditionFailedScale(t *testing.T) {
 
 			hpa := buildHPA(t, &tt.fixture)
 			key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
+
+			// Register the HPA in the selector tracker. In production this is done by
+			// enqueueHPA before the worker calls reconcileAutoscaler, but this test
+			// calls reconcileAutoscaler directly, bypassing the queue.
+			hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
+			setup.controller.selectorTracker.PutIfAbsent(hpa.Namespace, hpaKey, labels.Nothing())
 
 			err := setup.controller.reconcileAutoscaler(setup.ctx, hpa, key)
 			require.Error(t, err)
