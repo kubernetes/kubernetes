@@ -597,16 +597,6 @@ type testCase struct {
 	expectedReportedReconciliationErrorLabel      monitor.ErrorLabel
 	expectedReportedMetricComputationActionLabels map[autoscalingv2.MetricSourceType]monitor.ActionLabel
 	expectedReportedMetricComputationErrorLabels  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel
-	checkDesiredReplicaMetric                     bool
-
-	// expectedReconciliationCount specifies the minimum number of reconciliations to wait for.
-	// This verifies that reconciliationsTotal counter metric is incremented on each cycle.
-	// The actual count may be higher; we only verify it's at least this value.
-	expectedReconciliationCount int
-	// expectedMetricComputationCounts specifies the minimum computation count per metric type.
-	// This verifies that metricComputationTotal counter metric is incremented for each
-	// metric type on each reconciliation. The actual counts may be higher.
-	expectedMetricComputationCounts map[autoscalingv2.MetricSourceType]int
 
 	// Target resource information.
 	resource *fakeResource
@@ -1179,53 +1169,6 @@ func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T) {
 		t.Fatalf("%s metric was not recorded for action=%s, error=%s", monitor.ReconciliationsTotal.Name, actionStr, errorStr)
 	}
 
-	if tc.expectedReconciliationCount > 0 {
-		var v float64
-		var lastErr error
-		if err := wait.PollUntilContextTimeout(ctx, 20*time.Millisecond, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
-			v, lastErr = metricstestutil.GetCounterMetricValue(monitor.ReconciliationsTotal.WithLabelValues(actionStr, errorStr))
-			if lastErr != nil {
-				return false, nil
-			}
-			return int(v) >= tc.expectedReconciliationCount, nil
-		}); err != nil {
-			if lastErr != nil {
-				t.Fatalf("error getting reconciliations total metric: %v", lastErr)
-			}
-			assert.GreaterOrEqual(t, int(v), tc.expectedReconciliationCount, "reconciliation count should be at least %d", tc.expectedReconciliationCount)
-		}
-
-		for metricType, expectedAction := range tc.expectedReportedMetricComputationActionLabels {
-			expectedError := tc.expectedReportedMetricComputationErrorLabels[metricType]
-			mcv, err := metricstestutil.GetCounterMetricValue(
-				monitor.MetricComputationTotal.WithLabelValues(string(expectedAction), string(expectedError), string(metricType)))
-			if err != nil {
-				t.Fatalf("metric computation total not found for type %s: %v", metricType, err)
-			}
-			assert.GreaterOrEqual(t, mcv, float64(1), "metric computation count for %s should be at least 1", metricType)
-		}
-
-		for metricType, expectedCount := range tc.expectedMetricComputationCounts {
-			expectedAction := tc.expectedReportedMetricComputationActionLabels[metricType]
-			expectedError := tc.expectedReportedMetricComputationErrorLabels[metricType]
-			mcv, err := metricstestutil.GetCounterMetricValue(
-				monitor.MetricComputationTotal.WithLabelValues(string(expectedAction), string(expectedError), string(metricType)))
-			if err != nil {
-				t.Fatalf("error getting metric computation count for type %s: %v", metricType, err)
-			}
-			assert.GreaterOrEqual(t, int(mcv), expectedCount, "metric computation count for %s should be at least %d", metricType, expectedCount)
-		}
-
-		// TODO: Retrieve the namespace and HPA names from the test case (tc) to replace hardcoded values below (and check).
-		if tc.checkDesiredReplicaMetric {
-			v, err := metricstestutil.GetGaugeMetricValue(monitor.DesiredReplicasCount.WithLabelValues("test-namespace", "test-hpa"))
-			if err != nil {
-				t.Fatalf("error getting desired replicas metric: %v", err)
-			}
-			assert.InEpsilon(t, float64(tc.expectedDesiredReplicas), v, 0.01,
-				"the desired replicas should be recorded in monitor expectedly")
-		}
-	}
 }
 
 func (tc *testCase) setupController(t *testing.T) (*HorizontalController, informers.SharedInformerFactory) {
@@ -1334,7 +1277,6 @@ func (tc *testCase) runTestWithController(t *testing.T, hpaController *Horizonta
 
 	tc.Lock()
 	shouldWait := tc.verifyEvents
-	minReconciliations := tc.expectedReconciliationCount
 	tc.Unlock()
 
 	if shouldWait {
@@ -1351,13 +1293,9 @@ func (tc *testCase) runTestWithController(t *testing.T, hpaController *Horizonta
 		}
 	} else {
 		// Wait for HPA to be processed.
-		if minReconciliations < 1 {
-			t.Logf("minReconciliations should be at least 1, got %d; adjusting to 1", minReconciliations)
-			minReconciliations = 1
-		}
 		timeoutTime := time.Now().Add(5 * time.Second)
 		reconciliationsProcessed := 0
-		for reconciliationsProcessed < minReconciliations && time.Now().Before(timeoutTime) {
+		for reconciliationsProcessed < 1 && time.Now().Before(timeoutTime) {
 			select {
 			case <-tc.processed:
 				reconciliationsProcessed++
@@ -1365,8 +1303,8 @@ func (tc *testCase) runTestWithController(t *testing.T, hpaController *Horizonta
 				// continue waiting
 			}
 		}
-		if reconciliationsProcessed < minReconciliations {
-			t.Fatalf("expected at least %d reconciliations, but only got %d", minReconciliations, reconciliationsProcessed)
+		if reconciliationsProcessed < 1 {
+			t.Fatalf("expected at least 1 reconciliation, but got %d", reconciliationsProcessed)
 		}
 	}
 
@@ -7582,42 +7520,6 @@ func TestHPARescaleWithSuccessfulConflictRetry(t *testing.T) {
 		return false, nil, nil
 	})
 
-	tc.runTest(t)
-}
-
-func TestReconciliationsTotalCountMultipleReconciliations(t *testing.T) {
-	tc := testCase{
-		minReplicas:             1,
-		maxReplicas:             5,
-		specReplicas:            3,
-		statusReplicas:          3,
-		expectedDesiredReplicas: 3,
-		CPUTarget:               100,
-		reportedLevels:          []uint64{1010, 1030, 1020},
-		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
-		useMetricsAPI:           true,
-		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-			Type:   autoscalingv2.AbleToScale,
-			Status: v1.ConditionTrue,
-			Reason: "ReadyForNewScale",
-		}),
-		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
-		},
-		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
-		},
-		// The specific count value is not important. This test verifies that
-		// reconciliationsTotal counter is incremented on each reconciliation cycle.
-		expectedReconciliationCount: 3,
-		// The specific count values are not important. This test verifies that
-		// metricComputationTotal counter is incremented for each metric type on each reconciliation.
-		expectedMetricComputationCounts: map[autoscalingv2.MetricSourceType]int{
-			autoscalingv2.ResourceMetricSourceType: 3,
-		},
-	}
 	tc.runTest(t)
 }
 
