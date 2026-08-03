@@ -65,7 +65,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			nodeCapacityCPU: "300m",
 			nodeCapacityMem: "300",
 			existingPods: []*v1.Pod{
-				InitPausePod(&testutils.PausePodConfig{
+				initPausePod(&testutils.PausePodConfig{
 					Name:     "victim-1",
 					Priority: &LowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
@@ -89,7 +89,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			nodeCapacityCPU: "300m",
 			nodeCapacityMem: "300",
 			existingPods: []*v1.Pod{
-				InitPausePod(&testutils.PausePodConfig{
+				initPausePod(&testutils.PausePodConfig{
 					Name:     "victim-1",
 					Priority: &LowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
@@ -97,7 +97,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 						v1.ResourceMemory: *resource.NewQuantity(50, resource.DecimalSI)},
 					},
 				}),
-				InitPausePod(&testutils.PausePodConfig{
+				initPausePod(&testutils.PausePodConfig{
 					Name:     "victim-2",
 					Priority: &LowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
@@ -121,7 +121,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			nodeCapacityCPU: "300m",
 			nodeCapacityMem: "300",
 			existingPods: []*v1.Pod{
-				InitPausePod(&testutils.PausePodConfig{
+				initPausePod(&testutils.PausePodConfig{
 					Name:     "victim-1",
 					Priority: &LowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
@@ -164,7 +164,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 				DisableResizePreemption: []string{"test-operator"},
 			},
 			existingPods: []*v1.Pod{
-				InitPausePod(&testutils.PausePodConfig{
+				initPausePod(&testutils.PausePodConfig{
 					Name:     "victim-1",
 					Priority: &LowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
@@ -223,7 +223,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			for _, p := range tt.existingPods {
 				p.Namespace = testCtx.NS.Name
 				p.Spec.NodeName = nodeName
-				runningPod, err := RunPausePod(cs, p)
+				runningPod, err := runPausePod(cs, p)
 				if err != nil {
 					t.Fatalf("Failed running pause pod %v: %v", p.Name, err)
 				}
@@ -233,7 +233,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			// Create preemptor/resizing pod already scheduled to nodeName
 			tt.preemptorConfig.NodeName = nodeName
 			tt.preemptorConfig.Namespace = testCtx.NS.Name
-			preemptorPod := InitPausePod(tt.preemptorConfig)
+			preemptorPod := initPausePod(tt.preemptorConfig)
 			preemptorPod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, preemptorPod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create preemptor pod: %v", err)
@@ -277,7 +277,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			if len(tt.expectEvictedNames) > 0 {
 				for _, name := range tt.expectEvictedNames {
 					err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
-						PodIsGettingEvicted(cs, testCtx.NS.Name, name))
+						podIsGettingEvicted(cs, testCtx.NS.Name, name))
 					if err != nil {
 						t.Errorf("Expected pod %q to be evicted/deleted, but it was not", name)
 					}
@@ -356,7 +356,7 @@ func setUpPreemptionTestWithContext(t *testing.T, testCtx *testutils.TestContext
 	}
 
 	// Create 'other-pod' utilizing node1
-	other := InitPausePod(&testutils.PausePodConfig{
+	other := initPausePod(&testutils.PausePodConfig{
 		Name:     fmt.Sprintf("other-pod-%d", idx),
 		NodeName: nodeName1,
 		Priority: &HighPriority,
@@ -365,13 +365,13 @@ func setUpPreemptionTestWithContext(t *testing.T, testCtx *testutils.TestContext
 		},
 	})
 	other.Namespace = testCtx.NS.Name
-	other, err := RunPausePod(cs, other)
+	other, err := runPausePod(cs, other)
 	if err != nil {
 		t.Fatalf("Failed to run other pod: %v", err)
 	}
 
 	// Create 'irrelevant-pod' utilizing node2
-	irrelevant := InitPausePod(&testutils.PausePodConfig{
+	irrelevant := initPausePod(&testutils.PausePodConfig{
 		Name:     fmt.Sprintf("irrelevant-pod-%d", idx),
 		NodeName: nodeName2,
 		Priority: &HighPriority,
@@ -380,13 +380,13 @@ func setUpPreemptionTestWithContext(t *testing.T, testCtx *testutils.TestContext
 		},
 	})
 	irrelevant.Namespace = testCtx.NS.Name
-	irrelevant, err = RunPausePod(cs, irrelevant)
+	irrelevant, err = runPausePod(cs, irrelevant)
 	if err != nil {
 		t.Fatalf("Failed to run irrelevant pod: %v", err)
 	}
 
 	// Create deferred pod
-	pod := InitPausePod(&testutils.PausePodConfig{
+	pod := initPausePod(&testutils.PausePodConfig{
 		Name:     fmt.Sprintf("deferred-pod-%d", idx),
 		NodeName: nodeName1,
 		Priority: &LowPriority,
@@ -767,7 +767,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		}
 
 		// Create and status-update pod to be deferred resize
-		pod := InitPausePod(&testutils.PausePodConfig{
+		pod := initPausePod(&testutils.PausePodConfig{
 			Name:     "deferred-pod",
 			NodeName: "node1",
 			Priority: &LowPriority,
@@ -864,7 +864,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		}
 
 		// Create a normal running pod assigned to node1 (no deferred condition)
-		pod := InitPausePod(&testutils.PausePodConfig{
+		pod := initPausePod(&testutils.PausePodConfig{
 			Name:     "deferred-pod",
 			NodeName: "node1",
 			Priority: &LowPriority,
@@ -968,7 +968,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 			t.Fatalf("Failed to create node: %v", err)
 		}
 
-		pod := InitPausePod(&testutils.PausePodConfig{
+		pod := initPausePod(&testutils.PausePodConfig{
 			Name:     "deferred-pod",
 			NodeName: "node1",
 			Priority: &LowPriority,
@@ -1066,7 +1066,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		}
 
 		// Create a deferred resize pod assigned to node1
-		pod := InitPausePod(&testutils.PausePodConfig{
+		pod := initPausePod(&testutils.PausePodConfig{
 			Name:     "deferred-pod-del",
 			NodeName: "node1",
 			Priority: &LowPriority,
