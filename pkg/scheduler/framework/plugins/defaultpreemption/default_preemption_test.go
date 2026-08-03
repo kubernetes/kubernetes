@@ -4061,18 +4061,13 @@ func TestDefaultPreemption_PodGroupPostFilter_InvalidSnapshot(t *testing.T) {
 			var pgInfo *framework.PodGroupInfo
 			if !tt.isCPG {
 				pgInfo = &framework.PodGroupInfo{
-					Name:            pg.Name,
-					Namespace:       pg.Namespace,
-					UnscheduledPods: preemptorPods,
-					PodGroup:        pg,
+					AbstractPodGroup: framework.NewAbstractPodGroup(pg),
+					UnscheduledPods:  preemptorPods,
 				}
 			} else {
 				pgInfo = &framework.PodGroupInfo{
-					Name:              cpg.Name,
-					Namespace:         cpg.Namespace,
-					Type:              fwk.CompositePodGroupKeyType,
-					UnscheduledPods:   preemptorPods,
-					CompositePodGroup: cpg,
+					AbstractPodGroup: framework.NewAbstractCompositePodGroup(cpg),
+					UnscheduledPods:  preemptorPods,
 				}
 			}
 			state := framework.NewCycleState()
@@ -4138,11 +4133,8 @@ func TestDefaultPreemption_PodGroupPostFilter_CompositePodGroup(t *testing.T) {
 		},
 	}
 	pgInfo := &framework.PodGroupInfo{
-		Name:              cpg.Name,
-		Namespace:         cpg.Namespace,
-		Type:              fwk.CompositePodGroupKeyType,
-		UnscheduledPods:   preemptorPods,
-		CompositePodGroup: cpg,
+		AbstractPodGroup: framework.NewAbstractCompositePodGroup(cpg),
+		UnscheduledPods:  preemptorPods,
 	}
 
 	_, gotStatus := pl.PodGroupPostFilter(ctx, framework.NewCycleState(), pgInfo, mockSchedulingFunc)
@@ -4226,7 +4218,7 @@ func TestDefaultPreemption_PodGroupPostFilter_WorkloadPreemptionAttempts(t *test
 			expectedStatus := tt.status.Code().String()
 			stateBefore := captureWorkloadPreemptionAttempts(testRegistry, expectedStatus)
 
-			pgInfo := &framework.PodGroupInfo{PodGroup: st.MakePodGroup().Obj()}
+			pgInfo := &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(st.MakePodGroup().Obj())}
 			pl.PodGroupPostFilter(ctx, nil, pgInfo, nil)
 
 			stateAfter := captureWorkloadPreemptionAttempts(testRegistry, expectedStatus)
@@ -4259,26 +4251,19 @@ func getCounterFromGatherer(g componentmetrics.Gatherer, name string, resultLabe
 	return uint64(vals[resultLabelValue]), nil
 }
 
-// newPGInfo creates a PodGroupInfo representing a standalone PodGroup.
 func newPGInfo(pg *v1beta1.PodGroup, pods ...*v1.Pod) *framework.PodGroupInfo {
 	return &framework.PodGroupInfo{
-		Name:            pg.Name,
-		Namespace:       pg.Namespace,
-		Type:            fwk.PodGroupKeyType,
-		UnscheduledPods: pods,
-		PodGroup:        pg,
+		AbstractPodGroup: framework.NewAbstractPodGroup(pg),
+		UnscheduledPods:  pods,
 	}
 }
 
 // newCPGInfo creates a PodGroupInfo representing a CompositePodGroup hierarchy.
 func newCPGInfo(cpg *v1alpha3.CompositePodGroup, children []*framework.PodGroupInfo, pods ...*v1.Pod) *framework.PodGroupInfo {
 	return &framework.PodGroupInfo{
-		Name:              cpg.Name,
-		Namespace:         cpg.Namespace,
-		Type:              fwk.CompositePodGroupKeyType,
-		UnscheduledPods:   pods,
-		CompositePodGroup: cpg,
-		Children:          children,
+		AbstractPodGroup: framework.NewAbstractCompositePodGroup(cpg),
+		UnscheduledPods:  pods,
+		Children:         children,
 	}
 }
 

@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
@@ -2717,8 +2718,8 @@ func TestScorePlacement_Resources(t *testing.T) {
 				}
 			}
 			podGroupInfo := &framework.PodGroupInfo{
-				Type:            fwk.PodGroupKeyType,
-				UnscheduledPods: tc.podGroupPods,
+				AbstractPodGroup: framework.NewAbstractPodGroup(&schedulingv1beta1.PodGroup{}),
+				UnscheduledPods:  tc.podGroupPods,
 			}
 			podGroupAssignments := &fwk.PodGroupAssignments{
 				Placement: &fwk.Placement{

@@ -3699,7 +3699,15 @@ func TestGatedPodFlushFrequency(t *testing.T) {
 		{
 			name: "queued pod group",
 			entityInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{Namespace: gatedPod.GetNamespace(), Name: "pg", UnscheduledPods: []*v1.Pod{gatedPod.Pod}},
+				PodGroupInfo: &framework.PodGroupInfo{
+					AbstractPodGroup: framework.NewAbstractPodGroup(&schedulingv1beta1.PodGroup{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: gatedPod.GetNamespace(),
+							Name:      "pg",
+						},
+					}),
+					UnscheduledPods: []*v1.Pod{gatedPod.Pod},
+				},
 				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
 					fwk.PodGroupKey("test", "pg"): {{PodInfo: gatedPod, QueueingParams: framework.QueueingParams{UnschedulablePlugins: sets.New("foo")}}},
 				},
@@ -7984,13 +7992,7 @@ func TestAddPodGroup(t *testing.T) {
 
 			q.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(podGroup))
 
-			pgLookup := &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: podGroup.Namespace,
-					Name:      podGroup.Name,
-					Type:      fwk.PodGroupKeyType,
-				},
-			}
+			pgLookup := newPodGroupInfoForLookup(podGroup.Namespace, podGroup.Name)
 			gotAPG, ok := q.workloadForest.podGroups[fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)]
 			if !ok {
 				t.Fatalf("Expected pod group to be in workloadForest")
@@ -8122,13 +8124,7 @@ func TestUpdatePodGroup(t *testing.T) {
 				t.Errorf("Unexpected pod group object (-want +got):\n%s", diff)
 			}
 
-			pgLookup := &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: podGroup.Namespace,
-					Name:      podGroup.Name,
-					Type:      fwk.PodGroupKeyType,
-				},
-			}
+			pgLookup := newPodGroupInfoForLookup(podGroup.Namespace, podGroup.Name)
 			if inActive := q.activeQ.has(pgLookup); inActive != tt.expectedInActiveQ {
 				t.Errorf("Expected target pod group in activeQ: %v, got %v", tt.expectedInActiveQ, inActive)
 			}
@@ -9401,7 +9397,7 @@ func findPodGroupInfoInActiveQ(q *PriorityQueue, namespace, name string, entityT
 		if pgi == nil {
 			return nil
 		}
-		if pgi.Namespace == namespace && pgi.Name == name && pgi.GetType() == entityType {
+		if pgi.GetNamespace() == namespace && pgi.GetName() == name && pgi.GetType() == entityType {
 			return pgi
 		}
 		for _, child := range pgi.Children {
@@ -9423,27 +9419,30 @@ func findPodGroupInfoInActiveQ(q *PriorityQueue, namespace, name string, entityT
 
 // newQueuedPodGroupInfoForLookup builds a QueuedPodGroupInfo object for a lookup in the queue.
 func newQueuedPodGroupInfoForLookup(namespace, name string, entityType fwk.EntityKeyType) *framework.QueuedPodGroupInfo {
-	// Since this is only used for a lookup in the queue, we only need to set the PodGroupInfo namespace and name,
-	// and so we avoid creating a full QueuedPodGroupInfo, which is expensive to instantiate frequently.
-	return &framework.QueuedPodGroupInfo{
-		PodGroupInfo: &framework.PodGroupInfo{
-			Namespace: namespace,
-			Name:      name,
-			Type:      entityType,
-		},
+	if entityType == fwk.CompositePodGroupKeyType {
+		return newCompositePodGroupInfoForLookup(namespace, name)
 	}
+	return newPodGroupInfoForLookup(namespace, name)
 }
 
 func newSingleLevelPodGroupInfo(podInfo *framework.QueuedPodInfo, podGroup *schedulingv1beta1.PodGroup) *framework.QueuedPodGroupInfo {
 	pgName := *podInfo.Pod.Spec.SchedulingGroup.PodGroupName
 	key := fwk.PodGroupKey(podInfo.Pod.Namespace, pgName)
+	var pgObj *schedulingv1beta1.PodGroup
+	if podGroup != nil {
+		pgObj = podGroup
+	} else {
+		pgObj = &schedulingv1beta1.PodGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: podInfo.Pod.Namespace,
+				Name:      pgName,
+			},
+		}
+	}
 	return &framework.QueuedPodGroupInfo{
 		PodGroupInfo: &framework.PodGroupInfo{
-			Namespace:       podInfo.Pod.Namespace,
-			Name:            pgName,
-			Type:            fwk.PodGroupKeyType,
-			UnscheduledPods: []*v1.Pod{podInfo.Pod},
-			PodGroup:        podGroup,
+			AbstractPodGroup: framework.NewAbstractPodGroup(pgObj),
+			UnscheduledPods:  []*v1.Pod{podInfo.Pod},
 		},
 		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{key: {podInfo}},
 		QueueingParams: framework.QueueingParams{

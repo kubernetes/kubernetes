@@ -34,6 +34,8 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -1570,7 +1572,7 @@ func (p *PriorityQueue) AddAbstractPodGroup(logger klog.Logger, apg *framework.A
 
 		rootInfo := entity.(*framework.QueuedPodGroupInfo)
 		subtree := p.workloadForest.buildPodGroupInfo(logger, apg, sets.New[fwk.EntityKey]())
-		rootInfo.AddAbstractPodGroup(apg, subtree)
+		rootInfo.AddSubtree(subtree)
 		logger.V(5).Info("New group added to the existing root group", "rootType", rootInfo.Type(), "root", klog.KObj(rootInfo), "groupType", apg.GetType(), "group", klog.KObj(apg))
 	})
 
@@ -1895,13 +1897,7 @@ func (p *PriorityQueue) GetPodGroup(name, namespace string, entityKeyType fwk.En
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	pgInfo := &framework.QueuedPodGroupInfo{
-		PodGroupInfo: &framework.PodGroupInfo{
-			Name:      name,
-			Namespace: namespace,
-			Type:      entityKeyType,
-		},
-	}
+	pgInfo := newPodGroupInfoForLookup(namespace, name)
 	var foundPGInfo *framework.QueuedPodGroupInfo
 	p.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
 		entity := p.getEntityFromAnyQueue(unlockedActiveQ, pgInfo)
@@ -2190,4 +2186,30 @@ func (p *PriorityQueue) runPreQueueingHintPlugins(logger klog.Logger, event fwk.
 		return nil
 	}
 	return result
+}
+
+func newPodGroupInfoForLookup(namespace, name string) *framework.QueuedPodGroupInfo {
+	return &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{
+			AbstractPodGroup: framework.NewAbstractPodGroup(&schedulingv1beta1.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      name,
+				},
+			}),
+		},
+	}
+}
+
+func newCompositePodGroupInfoForLookup(namespace, name string) *framework.QueuedPodGroupInfo {
+	return &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{
+			AbstractPodGroup: framework.NewAbstractCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      name,
+				},
+			}),
+		},
+	}
 }

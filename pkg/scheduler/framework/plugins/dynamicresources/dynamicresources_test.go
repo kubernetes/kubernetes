@@ -4302,10 +4302,8 @@ func testPlugin(tCtx ktesting.TContext) {
 				initialObjects = testCtx.updateAPIServer(tCtx, initialObjects, tc.prepare.postfilter)
 				if len(tc.podGroups) > 0 {
 					pgInfo := &framework.PodGroupInfo{
-						Name:            tc.podGroups[0].Name,
-						Namespace:       tc.podGroups[0].Namespace,
-						UnscheduledPods: []*v1.Pod{tc.pod},
-						PodGroup:        tc.podGroups[0],
+						AbstractPodGroup: framework.NewAbstractPodGroup(tc.podGroups[0]),
+						UnscheduledPods:  []*v1.Pod{tc.pod},
 					}
 					mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 						return nil, fwk.NewStatus(fwk.Unschedulable)
@@ -6171,10 +6169,8 @@ func TestPodGroupPostFilter(t *testing.T) {
 			}
 
 			pgInfo := &framework.PodGroupInfo{
-				Name:            tc.podGroups[0].Name,
-				Namespace:       tc.podGroups[0].Namespace,
-				UnscheduledPods: tc.unscheduledPods,
-				PodGroup:        tc.podGroups[0],
+				AbstractPodGroup: framework.NewAbstractPodGroup(tc.podGroups[0]),
+				UnscheduledPods:  tc.unscheduledPods,
 			}
 
 			mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {

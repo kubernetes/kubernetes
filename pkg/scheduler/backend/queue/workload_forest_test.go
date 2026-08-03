@@ -730,9 +730,7 @@ func TestWorkloadForest_GetRootLookupInfoForPod(t *testing.T) {
 			pod:              podWithPG1,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "pg1",
-					Type:      fwk.PodGroupKeyType,
+					AbstractPodGroup: framework.NewAbstractPodGroup(pg1),
 				},
 			},
 			isCompositePodGroupEnabled: true,
@@ -744,9 +742,7 @@ func TestWorkloadForest_GetRootLookupInfoForPod(t *testing.T) {
 			pod:              podWithPG2,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "cpg1",
-					Type:      fwk.CompositePodGroupKeyType,
+					AbstractPodGroup: framework.NewAbstractCompositePodGroup(cpg1),
 				},
 			},
 			isCompositePodGroupEnabled: true,
@@ -764,9 +760,7 @@ func TestWorkloadForest_GetRootLookupInfoForPod(t *testing.T) {
 			pod:              podWithPG1,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "pg1",
-					Type:      fwk.PodGroupKeyType,
+					AbstractPodGroup: framework.NewAbstractPodGroup(pg1),
 				},
 			},
 			isCompositePodGroupEnabled: false,
@@ -778,9 +772,7 @@ func TestWorkloadForest_GetRootLookupInfoForPod(t *testing.T) {
 			pod:              podWithPG2,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "pg2",
-					Type:      fwk.PodGroupKeyType,
+					AbstractPodGroup: framework.NewAbstractPodGroup(pg2WithParent),
 				},
 			},
 			isCompositePodGroupEnabled: false,
@@ -836,9 +828,7 @@ func TestWorkloadForest_GetRootLookupInfoForPodGroup(t *testing.T) {
 			podGroup:         pg1,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "pg1",
-					Type:      fwk.PodGroupKeyType,
+					AbstractPodGroup: framework.NewAbstractPodGroup(pg1),
 				},
 			},
 			isCompositePodGroupEnabled: true,
@@ -850,9 +840,7 @@ func TestWorkloadForest_GetRootLookupInfoForPodGroup(t *testing.T) {
 			podGroup:         pg2WithParent,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "cpg1",
-					Type:      fwk.CompositePodGroupKeyType,
+					AbstractPodGroup: framework.NewAbstractCompositePodGroup(cpg1),
 				},
 			},
 			isCompositePodGroupEnabled: true,
@@ -877,9 +865,7 @@ func TestWorkloadForest_GetRootLookupInfoForPodGroup(t *testing.T) {
 			podGroup:         pg1,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "pg1",
-					Type:      fwk.PodGroupKeyType,
+					AbstractPodGroup: framework.NewAbstractPodGroup(pg1),
 				},
 			},
 			isCompositePodGroupEnabled: false,
@@ -891,9 +877,7 @@ func TestWorkloadForest_GetRootLookupInfoForPodGroup(t *testing.T) {
 			podGroup:         pg2WithParent,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "pg2",
-					Type:      fwk.PodGroupKeyType,
+					AbstractPodGroup: framework.NewAbstractPodGroup(pg2WithParent),
 				},
 			},
 			isCompositePodGroupEnabled: false,
@@ -904,9 +888,7 @@ func TestWorkloadForest_GetRootLookupInfoForPodGroup(t *testing.T) {
 			podGroup:         pg3WithNonExistentParent,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "pg3",
-					Type:      fwk.PodGroupKeyType,
+					AbstractPodGroup: framework.NewAbstractPodGroup(pg3WithNonExistentParent),
 				},
 			},
 			isCompositePodGroupEnabled: false,
@@ -959,9 +941,7 @@ func TestWorkloadForest_GetRootLookupInfoForCPG(t *testing.T) {
 			cpg:         cpg1,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "cpg1",
-					Type:      fwk.CompositePodGroupKeyType,
+					AbstractPodGroup: framework.NewAbstractCompositePodGroup(cpg1),
 				},
 			},
 		},
@@ -971,9 +951,7 @@ func TestWorkloadForest_GetRootLookupInfoForCPG(t *testing.T) {
 			cpg:         cpg2WithParent,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "cpg1",
-					Type:      fwk.CompositePodGroupKeyType,
+					AbstractPodGroup: framework.NewAbstractCompositePodGroup(cpg1),
 				},
 			},
 		},
@@ -1026,68 +1004,54 @@ func TestWorkloadForest_GetLeafPodGroups(t *testing.T) {
 		isCompositePodGroupEnabled bool
 	}{
 		{
-			name:             "single pod group lookup",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
-			rootLookupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{Namespace: "ns1", Name: "pg1", Type: fwk.PodGroupKeyType},
-			},
+			name:                       "single pod group lookup",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "pg1", fwk.PodGroupKeyType),
 			wantLeaves:                 []*schedulingv1beta1.PodGroup{pg1},
 			isCompositePodGroupEnabled: true,
 		},
 		{
-			name:             "cpg with direct pod group child",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg2WithParent},
-			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1},
-			rootLookupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{Namespace: "ns1", Name: "cpg1", Type: fwk.CompositePodGroupKeyType},
-			},
+			name:                       "cpg with direct pod group child",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg2WithParent},
+			initialCPGs:                []*schedulingv1alpha3.CompositePodGroup{cpg1},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "cpg1", fwk.CompositePodGroupKeyType),
 			wantLeaves:                 []*schedulingv1beta1.PodGroup{pg2WithParent},
 			isCompositePodGroupEnabled: true,
 		},
 		{
-			name:             "cpg with nested pod group child",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg2WithParent, pg3WithParent},
-			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1, cpg2WithParent},
-			rootLookupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{Namespace: "ns1", Name: "cpg1", Type: fwk.CompositePodGroupKeyType},
-			},
+			name:                       "cpg with nested pod group child",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg2WithParent, pg3WithParent},
+			initialCPGs:                []*schedulingv1alpha3.CompositePodGroup{cpg1, cpg2WithParent},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "cpg1", fwk.CompositePodGroupKeyType),
 			wantLeaves:                 []*schedulingv1beta1.PodGroup{pg2WithParent, pg3WithParent},
 			isCompositePodGroupEnabled: true,
 		},
 		{
-			name:             "missing root",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{},
-			rootLookupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{Namespace: "ns1", Name: "missing", Type: fwk.CompositePodGroupKeyType},
-			},
+			name:                       "missing root",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "missing", fwk.CompositePodGroupKeyType),
 			wantLeaves:                 nil,
 			isCompositePodGroupEnabled: true,
 		},
 		{
-			name:             "single pod group lookup (CPG=false)",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
-			rootLookupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{Namespace: "ns1", Name: "pg1", Type: fwk.PodGroupKeyType},
-			},
+			name:                       "single pod group lookup (CPG=false)",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "pg1", fwk.PodGroupKeyType),
 			wantLeaves:                 []*schedulingv1beta1.PodGroup{pg1},
 			isCompositePodGroupEnabled: false,
 		},
 		{
-			name:             "pg with direct pod group child lookup (CPG=false)",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg2WithParent},
-			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1},
-			rootLookupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{Namespace: "ns1", Name: "pg2", Type: fwk.PodGroupKeyType},
-			},
+			name:                       "pg with direct pod group child lookup (CPG=false)",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg2WithParent},
+			initialCPGs:                []*schedulingv1alpha3.CompositePodGroup{cpg1},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "pg2", fwk.PodGroupKeyType),
 			wantLeaves:                 []*schedulingv1beta1.PodGroup{pg2WithParent},
 			isCompositePodGroupEnabled: false,
 		},
 		{
-			name:             "missing root (CPG=false)",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{},
-			rootLookupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{Namespace: "ns1", Name: "missing", Type: fwk.CompositePodGroupKeyType},
-			},
+			name:                       "missing root (CPG=false)",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "missing", fwk.CompositePodGroupKeyType),
 			wantLeaves:                 nil,
 			isCompositePodGroupEnabled: false,
 		},
@@ -1137,11 +1101,8 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
 			pg:               pg1,
 			wantInfo: &framework.PodGroupInfo{
-				Namespace: "ns1",
-				Name:      "pg1",
-				Type:      fwk.PodGroupKeyType,
-				PodGroup:  pg1,
-				Children:  []*framework.PodGroupInfo{},
+				AbstractPodGroup: framework.NewAbstractPodGroup(pg1),
+				Children:         []*framework.PodGroupInfo{},
 			},
 			isCompositePodGroupEnabled: true,
 		},
@@ -1150,11 +1111,8 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
 			pg:               pg1,
 			wantInfo: &framework.PodGroupInfo{
-				Namespace: "ns1",
-				Name:      "pg1",
-				Type:      fwk.PodGroupKeyType,
-				PodGroup:  pg1,
-				Children:  []*framework.PodGroupInfo{},
+				AbstractPodGroup: framework.NewAbstractPodGroup(pg1),
+				Children:         []*framework.PodGroupInfo{},
 			},
 			isCompositePodGroupEnabled: false,
 		},
@@ -1196,17 +1154,11 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1},
 			cpg:              cpg1,
 			wantInfo: &framework.PodGroupInfo{
-				Namespace:         "ns1",
-				Name:              "cpg1",
-				Type:              fwk.CompositePodGroupKeyType,
-				CompositePodGroup: cpg1,
+				AbstractPodGroup: framework.NewAbstractCompositePodGroup(cpg1),
 				Children: []*framework.PodGroupInfo{
 					{
-						Namespace: "ns1",
-						Name:      "pg1",
-						Type:      fwk.PodGroupKeyType,
-						PodGroup:  pg1WithParent,
-						Children:  []*framework.PodGroupInfo{},
+						AbstractPodGroup: framework.NewAbstractPodGroup(pg1WithParent),
+						Children:         []*framework.PodGroupInfo{},
 					},
 				},
 			},
@@ -1218,11 +1170,8 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1},
 			cpg:              cpg1,
 			wantInfo: &framework.PodGroupInfo{
-				Namespace:         "ns1",
-				Name:              "cpg1",
-				Type:              fwk.CompositePodGroupKeyType,
-				CompositePodGroup: cpg1,
-				Children:          []*framework.PodGroupInfo{},
+				AbstractPodGroup: framework.NewAbstractCompositePodGroup(cpg1),
+				Children:         []*framework.PodGroupInfo{},
 			},
 			isCompositePodGroupEnabled: false,
 		},

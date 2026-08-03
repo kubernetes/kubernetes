@@ -118,9 +118,7 @@ func (wf *workloadForest) getRootLookupInfo(apg *framework.AbstractPodGroup) (*f
 	if !wf.isCompositePodGroupEnabled || !storedAPG.HasParent() {
 		return &framework.QueuedPodGroupInfo{
 			PodGroupInfo: &framework.PodGroupInfo{
-				Namespace: storedAPG.GetNamespace(),
-				Name:      storedAPG.GetName(),
-				Type:      storedAPG.GetType(),
+				AbstractPodGroup: storedAPG,
 			},
 		}, true
 	}
@@ -146,13 +144,7 @@ func (wf *workloadForest) getRootLookupInfoForParentCPG(parentName, namespace st
 		}
 
 		if !cpg.HasParent() {
-			return &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: cpg.GetNamespace(),
-					Name:      cpg.GetName(),
-					Type:      fwk.CompositePodGroupKeyType,
-				},
-			}, true
+			return newCompositePodGroupInfoForLookup(cpg.GetNamespace(), cpg.GetName()), true
 		}
 		currParentName = *cpg.GetParentCompositePodGroupName()
 	}
@@ -217,12 +209,8 @@ func (wf *workloadForest) buildPodGroupInfo(logger klog.Logger, apg *framework.A
 	visited.Insert(key)
 
 	pgi := &framework.PodGroupInfo{
-		Namespace:         apg.GetNamespace(),
-		Name:              apg.GetName(),
-		Type:              apg.GetType(),
-		PodGroup:          apg.PodGroup,
-		CompositePodGroup: apg.CompositePodGroup,
-		Children:          make([]*framework.PodGroupInfo, 0),
+		AbstractPodGroup: apg,
+		Children:         make([]*framework.PodGroupInfo, 0),
 	}
 
 	childrenSet, ok := wf.children[key]

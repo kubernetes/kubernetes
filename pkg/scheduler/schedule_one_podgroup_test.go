@@ -157,7 +157,7 @@ func (mp *fakePlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, pl
 	}
 
 	total := len(podGroupInfo.GetUnscheduledPods())
-	if pgInfo, ok := podGroupInfo.(*framework.PodGroupInfo); ok && pgInfo.Type == fwk.CompositePodGroupKeyType {
+	if pgInfo, ok := podGroupInfo.(*framework.PodGroupInfo); ok && pgInfo.GetType() == fwk.CompositePodGroupKeyType {
 		total = len(pgInfo.Children)
 	}
 	evaluated := total - args.Remaining
@@ -579,12 +579,7 @@ func TestValidatePodGroup(t *testing.T) {
 			} else {
 				snapshot = internalcache.NewTestSnapshotWithPodGroups(tt.scheduledPods, nil, []*schedulingv1beta1.PodGroup{tt.podGroup})
 				podGroupInfo = &framework.QueuedPodGroupInfo{
-					PodGroupInfo: &framework.PodGroupInfo{
-						Name:      tt.podGroup.Name,
-						Namespace: tt.podGroup.Namespace,
-						Type:      fwk.PodGroupKeyType,
-						PodGroup:  tt.podGroup,
-					},
+					PodGroupInfo:   &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(tt.podGroup)},
 					QueuedPodInfos: make(map[fwk.EntityKey][]*framework.QueuedPodInfo),
 				}
 				for _, pod := range tt.pods {
@@ -635,13 +630,7 @@ func TestSkipPodGroupPodSchedule(t *testing.T) {
 
 	podGroupInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{fwk.MustParseEntityKey("podgroup/default/pg"): {qInfo1, qInfo2, qInfo3}},
-		PodGroupInfo: &framework.PodGroupInfo{
-			Name:            "pg",
-			Namespace:       "default",
-			Type:            fwk.PodGroupKeyType,
-			UnscheduledPods: []*v1.Pod{p1, p2, p3},
-			PodGroup:        testPodGroup,
-		},
+		PodGroupInfo:   &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(testPodGroup), UnscheduledPods: []*v1.Pod{p1, p2, p3}},
 	}
 
 	logger, ctx := ktesting.NewTestContext(t)
@@ -809,13 +798,7 @@ func TestPodGroupCycle_UpdateSnapshotError(t *testing.T) {
 
 	podGroupInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{fwk.MustParseEntityKey("podgroup/default/pg"): {qInfo1, qInfo2}},
-		PodGroupInfo: &framework.PodGroupInfo{
-			Name:            "pg",
-			Namespace:       "default",
-			Type:            fwk.PodGroupKeyType,
-			UnscheduledPods: []*v1.Pod{p1, p2},
-			PodGroup:        testPodGroup,
-		},
+		PodGroupInfo:   &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(testPodGroup), UnscheduledPods: []*v1.Pod{p1, p2}},
 	}
 
 	_, ctx := ktesting.NewTestContext(t)
@@ -893,13 +876,7 @@ func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
 
 	podGroupInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{fwk.MustParseEntityKey("podgroup/default/pg"): queuedPodInfos},
-		PodGroupInfo: &framework.PodGroupInfo{
-			Name:            "pg",
-			Namespace:       "default",
-			Type:            fwk.PodGroupKeyType,
-			UnscheduledPods: []*v1.Pod{p1, p2, p3},
-			PodGroup:        testPodGroup,
-		},
+		PodGroupInfo:   &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(testPodGroup), UnscheduledPods: []*v1.Pod{p1, p2, p3}},
 	}
 
 	_, ctx := ktesting.NewTestContext(t)
@@ -1055,13 +1032,7 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 
 			podGroupInfo := &framework.QueuedPodGroupInfo{
 				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{fwk.MustParseEntityKey("podgroup/default/pg"): {qInfo1, qInfo2}},
-				PodGroupInfo: &framework.PodGroupInfo{
-					Name:            "pg",
-					Namespace:       "default",
-					Type:            fwk.PodGroupKeyType,
-					UnscheduledPods: []*v1.Pod{p1, p2},
-					PodGroup:        testPodGroup,
-				},
+				PodGroupInfo:   &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(testPodGroup), UnscheduledPods: []*v1.Pod{p1, p2}},
 			}
 
 			_, ctx := ktesting.NewTestContext(t)
@@ -1183,13 +1154,7 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 
 	podGroupInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{fwk.MustParseEntityKey("podgroup/default/pg"): queuedPodInfos},
-		PodGroupInfo: &framework.PodGroupInfo{
-			Name:            "pg",
-			Namespace:       "default",
-			Type:            fwk.PodGroupKeyType,
-			UnscheduledPods: []*v1.Pod{p1, p2, p3},
-			PodGroup:        testPodGroup,
-		},
+		PodGroupInfo:   &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(testPodGroup), UnscheduledPods: []*v1.Pod{p1, p2, p3}},
 	}
 
 	tests := []struct {
@@ -1878,6 +1843,8 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 
 			cache := internalcache.New(ctx, nil, true, true /* CompositePodGroup */)
 			cache.AddNode(klog.FromContext(ctx), testNode)
+			apg := framework.NewAbstractPodGroup(pg)
+			cache.AddAbstractPodGroup(apg)
 
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			informerFactory.Start(ctx.Done())
@@ -1905,7 +1872,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			}
 
 			// Create the pod group and add the pods to queue and pop the group to set up internal queue state correctly.
-			schedulingQueue.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(pg))
+			schedulingQueue.AddAbstractPodGroup(logger, apg)
 			// Advance the clock between additions to keep pod ordering deterministic.
 			schedulingQueue.Add(ctx, p1)
 			fakeClock.Step(time.Second)
@@ -2319,10 +2286,14 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 				objects = append(objects, tt.existingPodGroup)
 			}
 			client := clientsetfake.NewClientset(objects...)
+			cache := internalcache.New(ctx, nil, true, true)
+			apg := framework.NewAbstractPodGroup(tt.existingPodGroup)
+			cache.AddAbstractPodGroup(apg)
+
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
-			sched := &Scheduler{client: client}
+			sched := &Scheduler{client: client, Cache: cache}
 
 			var existingLTT metav1.Time
 			if existing := apimeta.FindStatusCondition(tt.existingPodGroup.Status.Conditions, schedulingapi.PodGroupInitiallyScheduled); existing != nil {
@@ -2330,12 +2301,7 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 			}
 
 			podGroupInfo := &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: tt.namespace,
-					Name:      tt.podGroupName,
-					PodGroup:  tt.existingPodGroup,
-					Type:      fwk.PodGroupKeyType,
-				},
+				PodGroupInfo: &framework.PodGroupInfo{AbstractPodGroup: apg},
 			}
 			sched.updatePodGroupCondition(ctx, podGroupInfo.PodGroupInfo, tt.condition)
 
@@ -2488,13 +2454,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 	queuedPodInfos := []*framework.QueuedPodInfo{{PodInfo: &framework.PodInfo{Pod: podGroupPod}}}
 	pgInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{fwk.MustParseEntityKey("podgroup/default/pg"): queuedPodInfos},
-		PodGroupInfo: &framework.PodGroupInfo{
-			Name:            "pg",
-			Namespace:       "default",
-			Type:            fwk.PodGroupKeyType,
-			PodGroup:        testPodGroup,
-			UnscheduledPods: []*v1.Pod{podGroupPod},
-		},
+		PodGroupInfo:   &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(testPodGroup), UnscheduledPods: []*v1.Pod{podGroupPod}},
 	}
 
 	tests := map[string]struct {
@@ -2997,12 +2957,7 @@ func TestPodGroupSchedulingPlacementAlgorithm_Scoring(t *testing.T) {
 				queuedPodInfos := []*framework.QueuedPodInfo{{PodInfo: &framework.PodInfo{Pod: podGroupPod}}}
 				pgInfo := &framework.QueuedPodGroupInfo{
 					QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{fwk.MustParseEntityKey("podgroup/default/pg"): queuedPodInfos},
-					PodGroupInfo: &framework.PodGroupInfo{
-						Name:            "pg",
-						Namespace:       "default",
-						Type:            fwk.PodGroupKeyType,
-						UnscheduledPods: []*v1.Pod{podGroupPod},
-					},
+					PodGroupInfo:   &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(&schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pg"}}), UnscheduledPods: []*v1.Pod{podGroupPod}},
 				}
 
 				placementPlugin := fakePlacementPlugin{
@@ -3247,12 +3202,7 @@ func TestPlacementCycleStateLifecycle(t *testing.T) {
 			queuedPodInfos := []*framework.QueuedPodInfo{{PodInfo: &framework.PodInfo{Pod: podGroupPod}}}
 			pgInfo := &framework.QueuedPodGroupInfo{
 				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{fwk.MustParseEntityKey("podgroup/default/pg"): queuedPodInfos},
-				PodGroupInfo: &framework.PodGroupInfo{
-					Name:            "pg",
-					Namespace:       "default",
-					Type:            fwk.PodGroupKeyType,
-					UnscheduledPods: []*v1.Pod{podGroupPod},
-				},
+				PodGroupInfo:   &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(&schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pg"}}), UnscheduledPods: []*v1.Pod{podGroupPod}},
 			}
 
 			result, _ := sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo.PodGroupInfo, pgInfo)
@@ -3419,27 +3369,9 @@ func TestPlacementCycleStateLifecycle_MultiLevel(t *testing.T) {
 	}
 	queuedPodInfo1 := &framework.QueuedPodInfo{PodInfo: podInfo1}
 
-	leafPGInfo := &framework.PodGroupInfo{
-		Name:            pg.Name,
-		Namespace:       pg.Namespace,
-		Type:            fwk.PodGroupKeyType,
-		PodGroup:        pg,
-		UnscheduledPods: []*v1.Pod{p1},
-	}
-	midPGInfo := &framework.PodGroupInfo{
-		Name:              midcpg.Name,
-		Namespace:         midcpg.Namespace,
-		Type:              fwk.CompositePodGroupKeyType,
-		CompositePodGroup: midcpg,
-		Children:          []*framework.PodGroupInfo{leafPGInfo},
-	}
-	rootPGInfo := &framework.PodGroupInfo{
-		Name:              rootcpg.Name,
-		Namespace:         rootcpg.Namespace,
-		Type:              fwk.CompositePodGroupKeyType,
-		CompositePodGroup: rootcpg,
-		Children:          []*framework.PodGroupInfo{midPGInfo},
-	}
+	leafPGInfo := &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(pg), UnscheduledPods: []*v1.Pod{p1}}
+	midPGInfo := &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractCompositePodGroup(midcpg), Children: []*framework.PodGroupInfo{leafPGInfo}}
+	rootPGInfo := &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractCompositePodGroup(rootcpg), Children: []*framework.PodGroupInfo{midPGInfo}}
 
 	logger, ctx := ktesting.NewTestContext(t)
 
@@ -3604,28 +3536,10 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 	queuedPodInfo1 := &framework.QueuedPodInfo{PodInfo: podInfo1}
 	queuedPodInfo2 := &framework.QueuedPodInfo{PodInfo: podInfo2}
 
-	childPGInfo1 := &framework.PodGroupInfo{
-		Name:            pg1.Name,
-		Namespace:       pg1.Namespace,
-		Type:            fwk.PodGroupKeyType,
-		PodGroup:        pg1,
-		UnscheduledPods: []*v1.Pod{p1},
-	}
-	childPGInfo2 := &framework.PodGroupInfo{
-		Name:            pg2.Name,
-		Namespace:       pg2.Namespace,
-		Type:            fwk.PodGroupKeyType,
-		PodGroup:        pg2,
-		UnscheduledPods: []*v1.Pod{p2},
-	}
+	childPGInfo1 := &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(pg1), UnscheduledPods: []*v1.Pod{p1}}
+	childPGInfo2 := &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(pg2), UnscheduledPods: []*v1.Pod{p2}}
 
-	rootPGInfo := &framework.PodGroupInfo{
-		Name:              cpg.Name,
-		Namespace:         cpg.Namespace,
-		Type:              fwk.CompositePodGroupKeyType,
-		CompositePodGroup: cpg,
-		Children:          []*framework.PodGroupInfo{childPGInfo1, childPGInfo2},
-	}
+	rootPGInfo := &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractCompositePodGroup(cpg), Children: []*framework.PodGroupInfo{childPGInfo1, childPGInfo2}}
 
 	defaultPlacementResults := map[string]map[string][]string{
 		rootPGInfo.GetKey(): {
@@ -4024,28 +3938,10 @@ func TestCPGSchedulingPlacementAlgorithm_Scoring(t *testing.T) {
 	queuedPodInfo1 := &framework.QueuedPodInfo{PodInfo: podInfo1}
 	queuedPodInfo2 := &framework.QueuedPodInfo{PodInfo: podInfo2}
 
-	childPGInfo1 := &framework.PodGroupInfo{
-		Name:            pg1.Name,
-		Namespace:       pg1.Namespace,
-		Type:            fwk.PodGroupKeyType,
-		PodGroup:        pg1,
-		UnscheduledPods: []*v1.Pod{p1},
-	}
-	childPGInfo2 := &framework.PodGroupInfo{
-		Name:            pg2.Name,
-		Namespace:       pg2.Namespace,
-		Type:            fwk.PodGroupKeyType,
-		PodGroup:        pg2,
-		UnscheduledPods: []*v1.Pod{p2},
-	}
+	childPGInfo1 := &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(pg1), UnscheduledPods: []*v1.Pod{p1}}
+	childPGInfo2 := &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(pg2), UnscheduledPods: []*v1.Pod{p2}}
 
-	rootPGInfo := &framework.PodGroupInfo{
-		Name:              cpg.Name,
-		Namespace:         cpg.Namespace,
-		Type:              fwk.CompositePodGroupKeyType,
-		CompositePodGroup: cpg,
-		Children:          []*framework.PodGroupInfo{childPGInfo1, childPGInfo2},
-	}
+	rootPGInfo := &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractCompositePodGroup(cpg), Children: []*framework.PodGroupInfo{childPGInfo1, childPGInfo2}}
 
 	placements := map[string]map[string][]string{
 		rootPGInfo.GetKey(): {
@@ -4299,13 +4195,7 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 
 	podGroupInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{fwk.MustParseEntityKey("podgroup/default/pg"): {qInfo1, qInfo2}},
-		PodGroupInfo: &framework.PodGroupInfo{
-			Name:            "pg",
-			Namespace:       "default",
-			Type:            fwk.PodGroupKeyType,
-			UnscheduledPods: []*v1.Pod{p1, p2},
-			PodGroup:        testPodGroup,
-		},
+		PodGroupInfo:   &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(testPodGroup), UnscheduledPods: []*v1.Pod{p1, p2}},
 	}
 
 	_, ctx := ktesting.NewTestContext(t)
@@ -4424,13 +4314,7 @@ func TestScheduleOnePodGroup_PodGroupNotFound(t *testing.T) {
 
 	podGroupInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{fwk.MustParseEntityKey("podgroup/default/pg"): {qInfo1, qInfo2}},
-		PodGroupInfo: &framework.PodGroupInfo{
-			Name:            "pg",
-			Namespace:       "default",
-			Type:            fwk.PodGroupKeyType,
-			PodGroup:        testPodGroup,
-			UnscheduledPods: []*v1.Pod{p1, p2},
-		},
+		PodGroupInfo:   &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(testPodGroup), UnscheduledPods: []*v1.Pod{p1, p2}},
 	}
 
 	_, ctx := ktesting.NewTestContext(t)
@@ -4501,14 +4385,10 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
 	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
 	testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
+	apg := framework.NewAbstractPodGroup(testPodGroup)
 	podGroupInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{fwk.MustParseEntityKey("podgroup/default/pg"): {qInfo1, qInfo2}},
-		PodGroupInfo: &framework.PodGroupInfo{
-			Name:      "pg",
-			Namespace: "default",
-			Type:      fwk.PodGroupKeyType,
-			PodGroup:  testPodGroup,
-		},
+		PodGroupInfo:   &framework.PodGroupInfo{AbstractPodGroup: apg},
 	}
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
@@ -4546,6 +4426,9 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 	}
 
 	client := clientsetfake.NewClientset(testPodGroup)
+	cache := internalcache.New(ctx, nil, true, false /* CompositePodGroup */)
+	cache.AddAbstractPodGroup(apg)
+
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
@@ -4553,7 +4436,7 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 		Profiles:        profile.Map{"sched1": schedFwk1, "sched2": schedFwk2},
 		SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 		Cache: &fakecache.Cache{
-			Cache: internalcache.New(ctx, nil, true, false /* CompositePodGroup */),
+			Cache: cache,
 			UpdateSnapshotFunc: func(nodeSnapshot *internalcache.Snapshot) error {
 				return nil
 			},
@@ -4633,35 +4516,11 @@ func TestCPGHierarchicalScheduling_ScheduleOnePodGroup(t *testing.T) {
 
 	cpgRootInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: queuedPodInfosMap,
-		PodGroupInfo: &framework.PodGroupInfo{
-			Namespace:         namespace,
-			Name:              "cpg-root",
-			Type:              fwk.CompositePodGroupKeyType,
-			CompositePodGroup: cpgRoot,
-			UnscheduledPods:   []*v1.Pod{p1, p2, p3},
-			Children: []*framework.PodGroupInfo{
-				{
-					Name:            "pg1",
-					Namespace:       "default",
-					Type:            fwk.PodGroupKeyType,
-					PodGroup:        pg1,
-					UnscheduledPods: []*v1.Pod{p1},
-				},
-				{
-					Name:            "pg2",
-					Namespace:       "default",
-					Type:            fwk.PodGroupKeyType,
-					PodGroup:        pg2,
-					UnscheduledPods: []*v1.Pod{p2},
-				},
-				{
-					Name:            "pg3",
-					Namespace:       "default",
-					Type:            fwk.PodGroupKeyType,
-					PodGroup:        pg3,
-					UnscheduledPods: []*v1.Pod{p3},
-				},
-			},
+		PodGroupInfo: &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractCompositePodGroup(cpgRoot), UnscheduledPods: []*v1.Pod{p1, p2, p3}, Children: []*framework.PodGroupInfo{
+			{AbstractPodGroup: framework.NewAbstractPodGroup(pg1), UnscheduledPods: []*v1.Pod{p1}},
+			{AbstractPodGroup: framework.NewAbstractPodGroup(pg2), UnscheduledPods: []*v1.Pod{p2}},
+			{AbstractPodGroup: framework.NewAbstractPodGroup(pg3), UnscheduledPods: []*v1.Pod{p3}},
+		},
 		},
 		QueueingParams: framework.QueueingParams{
 			Timestamp: time.Now(),
@@ -4913,45 +4772,24 @@ func TestCPGHierarchicalScheduling_Internal(t *testing.T) {
 
 	podGroupInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: queuedPodInfos,
-		PodGroupInfo: &framework.PodGroupInfo{
-			Namespace:         ns,
-			Name:              "cpg-root",
-			Type:              fwk.CompositePodGroupKeyType,
-			UnscheduledPods:   allPods,
-			CompositePodGroup: rootCPG,
-			Children: []*framework.PodGroupInfo{
-				{
-					Namespace:         ns,
-					Name:              "cpg-sub1",
-					Type:              fwk.CompositePodGroupKeyType,
-					CompositePodGroup: cpgSub1,
-					Children: []*framework.PodGroupInfo{
-						{Namespace: ns, Name: "pg1", Type: fwk.PodGroupKeyType, PodGroup: pg1, UnscheduledPods: pgPods["pg1"]},
-						{Namespace: ns, Name: "pg2", Type: fwk.PodGroupKeyType, PodGroup: pg2, UnscheduledPods: pgPods["pg2"]},
-						{Namespace: ns, Name: "pg3", Type: fwk.PodGroupKeyType, PodGroup: pg3, UnscheduledPods: pgPods["pg3"]},
-					},
-				},
-				{
-					Namespace:         ns,
-					Name:              "cpg-sub2",
-					Type:              fwk.CompositePodGroupKeyType,
-					CompositePodGroup: cpgSub2,
-					Children: []*framework.PodGroupInfo{
-						{Namespace: ns, Name: "pg4", Type: fwk.PodGroupKeyType, PodGroup: pg4, UnscheduledPods: pgPods["pg4"]},
-						{Namespace: ns, Name: "pg5", Type: fwk.PodGroupKeyType, PodGroup: pg5, UnscheduledPods: pgPods["pg5"]},
-					},
-				},
-				{
-					Namespace:         ns,
-					Name:              "cpg-sub3",
-					Type:              fwk.CompositePodGroupKeyType,
-					CompositePodGroup: cpgSub3,
-					Children: []*framework.PodGroupInfo{
-						{Namespace: ns, Name: "pg6", Type: fwk.PodGroupKeyType, PodGroup: pg6, UnscheduledPods: pgPods["pg6"]},
-						{Namespace: ns, Name: "pg7", Type: fwk.PodGroupKeyType, PodGroup: pg7, UnscheduledPods: pgPods["pg7"]},
-					},
-				},
+		PodGroupInfo: &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractCompositePodGroup(rootCPG), UnscheduledPods: allPods, Children: []*framework.PodGroupInfo{
+			{AbstractPodGroup: framework.NewAbstractCompositePodGroup(cpgSub1), Children: []*framework.PodGroupInfo{
+				{AbstractPodGroup: framework.NewAbstractPodGroup(pg1), UnscheduledPods: pgPods["pg1"]},
+				{AbstractPodGroup: framework.NewAbstractPodGroup(pg2), UnscheduledPods: pgPods["pg2"]},
+				{AbstractPodGroup: framework.NewAbstractPodGroup(pg3), UnscheduledPods: pgPods["pg3"]},
 			},
+			},
+			{AbstractPodGroup: framework.NewAbstractCompositePodGroup(cpgSub2), Children: []*framework.PodGroupInfo{
+				{AbstractPodGroup: framework.NewAbstractPodGroup(pg4), UnscheduledPods: pgPods["pg4"]},
+				{AbstractPodGroup: framework.NewAbstractPodGroup(pg5), UnscheduledPods: pgPods["pg5"]},
+			},
+			},
+			{AbstractPodGroup: framework.NewAbstractCompositePodGroup(cpgSub3), Children: []*framework.PodGroupInfo{
+				{AbstractPodGroup: framework.NewAbstractPodGroup(pg6), UnscheduledPods: pgPods["pg6"]},
+				{AbstractPodGroup: framework.NewAbstractPodGroup(pg7), UnscheduledPods: pgPods["pg7"]},
+			},
+			},
+		},
 		},
 	}
 
@@ -5269,17 +5107,11 @@ func TestCPGMinGroupCount_Internal(t *testing.T) {
 
 	podGroupInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: queuedPodInfos,
-		PodGroupInfo: &framework.PodGroupInfo{
-			Namespace:         ns,
-			Name:              "cpg-root",
-			Type:              fwk.CompositePodGroupKeyType,
-			UnscheduledPods:   allPods,
-			CompositePodGroup: rootCPG,
-			Children: []*framework.PodGroupInfo{
-				{Namespace: ns, Name: "pg1", Type: fwk.PodGroupKeyType, PodGroup: pg1, UnscheduledPods: pgPods["pg1"]},
-				{Namespace: ns, Name: "pg2", Type: fwk.PodGroupKeyType, PodGroup: pg2, UnscheduledPods: pgPods["pg2"]},
-				{Namespace: ns, Name: "pg3", Type: fwk.PodGroupKeyType, PodGroup: pg3, UnscheduledPods: pgPods["pg3"]},
-			},
+		PodGroupInfo: &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractCompositePodGroup(rootCPG), UnscheduledPods: allPods, Children: []*framework.PodGroupInfo{
+			{AbstractPodGroup: framework.NewAbstractPodGroup(pg1), UnscheduledPods: pgPods["pg1"]},
+			{AbstractPodGroup: framework.NewAbstractPodGroup(pg2), UnscheduledPods: pgPods["pg2"]},
+			{AbstractPodGroup: framework.NewAbstractPodGroup(pg3), UnscheduledPods: pgPods["pg3"]},
+		},
 		},
 	}
 
@@ -5496,16 +5328,10 @@ func TestCPGBasicWithGangChildren_Internal(t *testing.T) {
 
 	podGroupInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: queuedPodInfos,
-		PodGroupInfo: &framework.PodGroupInfo{
-			Namespace:         ns,
-			Name:              "cpg-root",
-			Type:              fwk.CompositePodGroupKeyType,
-			UnscheduledPods:   allPods,
-			CompositePodGroup: rootCPG,
-			Children: []*framework.PodGroupInfo{
-				{Namespace: ns, Name: "pg1", Type: fwk.PodGroupKeyType, PodGroup: pg1, UnscheduledPods: pgPods["pg1"]},
-				{Namespace: ns, Name: "pg2", Type: fwk.PodGroupKeyType, PodGroup: pg2, UnscheduledPods: pgPods["pg2"]},
-			},
+		PodGroupInfo: &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractCompositePodGroup(rootCPG), UnscheduledPods: allPods, Children: []*framework.PodGroupInfo{
+			{AbstractPodGroup: framework.NewAbstractPodGroup(pg1), UnscheduledPods: pgPods["pg1"]},
+			{AbstractPodGroup: framework.NewAbstractPodGroup(pg2), UnscheduledPods: pgPods["pg2"]},
+		},
 		},
 	}
 
@@ -5847,18 +5673,19 @@ func TestScorePlacementPodGroupAssignments(t *testing.T) {
 				for _, ch := range node.children {
 					children = append(children, buildTree(ch))
 				}
-				pgi := &framework.PodGroupInfo{
-					Name:      node.name,
-					Namespace: "default",
-					Children:  children,
-				}
+				pgi := &framework.PodGroupInfo{Children: children}
 				if len(children) > 0 {
-					pgi.Type = fwk.CompositePodGroupKeyType
-					pgi.CompositePodGroup = st.MakeCompositePodGroup().Name(node.name).Namespace("default").Obj()
+					cpg := st.MakeCompositePodGroup().Name(node.name).Namespace("default").Obj()
+					pgi.AbstractPodGroup = framework.
+						NewAbstractCompositePodGroup(cpg)
+
 				} else {
-					pgi.Type = fwk.PodGroupKeyType
-					pgi.PodGroup = st.MakePodGroup().Name(node.name).Namespace("default").Obj()
+					pg := st.MakePodGroup().Name(node.
+						name).Namespace("default").Obj()
+					pgi.AbstractPodGroup = framework.
+						NewAbstractPodGroup(pg)
 				}
+
 				nameToKey[node.name] = pgKey(pgi)
 				return pgi
 			}
@@ -5934,24 +5761,13 @@ func buildHierarchicalQueuedPodGroupInfo(
 
 	var buildTree func(cpg *schedulingv1alpha3.CompositePodGroup) *framework.PodGroupInfo
 	buildTree = func(cpg *schedulingv1alpha3.CompositePodGroup) *framework.PodGroupInfo {
-		info := &framework.PodGroupInfo{
-			Namespace:         cpg.Namespace,
-			Name:              cpg.Name,
-			Type:              fwk.CompositePodGroupKeyType,
-			CompositePodGroup: cpg,
-		}
+		info := &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractCompositePodGroup(cpg)}
 		for _, childCPG := range cpgChildren[cpg.Name] {
 			info.Children = append(info.Children, buildTree(childCPG))
 		}
 		for _, childPG := range pgChildren[cpg.Name] {
 			pgKey := fwk.PodGroupKey(childPG.Namespace, childPG.Name)
-			pgInfo := &framework.PodGroupInfo{
-				Namespace:       childPG.Namespace,
-				Name:            childPG.Name,
-				Type:            fwk.PodGroupKeyType,
-				PodGroup:        childPG,
-				UnscheduledPods: podsByPG[pgKey],
-			}
+			pgInfo := &framework.PodGroupInfo{AbstractPodGroup: framework.NewAbstractPodGroup(childPG), UnscheduledPods: podsByPG[pgKey]}
 			info.Children = append(info.Children, pgInfo)
 		}
 		return info
@@ -5963,8 +5779,8 @@ func buildHierarchicalQueuedPodGroupInfo(
 	var allUnscheduled []*v1.Pod
 	var collectPods func(info *framework.PodGroupInfo)
 	collectPods = func(info *framework.PodGroupInfo) {
-		if info.Type == fwk.PodGroupKeyType {
-			pgKey := fwk.PodGroupKey(info.Namespace, info.Name)
+		if info.GetType() == fwk.PodGroupKeyType {
+			pgKey := fwk.PodGroupKey(info.GetNamespace(), info.GetName())
 			for _, p := range info.UnscheduledPods {
 				queuedPodInfos[pgKey] = append(queuedPodInfos[pgKey], &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p}})
 				allUnscheduled = append(allUnscheduled, p)

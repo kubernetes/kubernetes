@@ -982,7 +982,6 @@ func Test_AddPodGroup(t *testing.T) {
 
 	tests := []struct {
 		name                     string
-		genericWorkloadEnabled   bool
 		compositePodGroupEnabled bool
 		initPod                  *v1.Pod // From old tests
 		initialCPGs              []*schedulingv1alpha3.CompositePodGroup
@@ -991,15 +990,8 @@ func Test_AddPodGroup(t *testing.T) {
 		wantChildren             map[fwk.EntityKey]sets.Set[fwk.EntityKey]
 	}{
 		{
-			name:                     "add pod group with GenericWorkload disabled should be no-op",
-			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{podGroup},
-			genericWorkloadEnabled:   false,
-			compositePodGroupEnabled: true,
-		},
-		{
 			name:                     "add pod group",
 			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{podGroup},
-			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
 			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
 				fwk.PodGroupKey("ns", "pg"): podGroup,
@@ -1010,7 +1002,6 @@ func Test_AddPodGroup(t *testing.T) {
 			name:                     "add pod group when state already exists (from pod group members)",
 			initPod:                  pod,
 			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{podGroup},
-			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
 			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
 				fwk.PodGroupKey("ns", "pg"): podGroup,
@@ -1019,7 +1010,6 @@ func Test_AddPodGroup(t *testing.T) {
 		},
 		{
 			name:                     "add single pod group (hierarchical)",
-			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
 			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{pg1},
 			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
@@ -1029,7 +1019,6 @@ func Test_AddPodGroup(t *testing.T) {
 		},
 		{
 			name:                     "add multiple pod groups (hierarchical)",
-			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
 			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{pg1, pg2},
 			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
@@ -1040,7 +1029,6 @@ func Test_AddPodGroup(t *testing.T) {
 		},
 		{
 			name:                     "add pod group with parent",
-			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
 			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{pg3WithParent},
 			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
@@ -1052,7 +1040,6 @@ func Test_AddPodGroup(t *testing.T) {
 		},
 		{
 			name:                     "add pod group with parent, parent already in children",
-			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
 			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{pg3WithParent, pg4WithParent},
 			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
@@ -1068,7 +1055,6 @@ func Test_AddPodGroup(t *testing.T) {
 		},
 		{
 			name:                     "add pod group with parent, parent already has composite pod group child",
-			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
 			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpgChild},
 			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{pg3WithParent},
@@ -1084,7 +1070,6 @@ func Test_AddPodGroup(t *testing.T) {
 		},
 		{
 			name:                     "add pod group with parent when CompositePodGroup disabled",
-			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: false,
 			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{pg3WithParent},
 			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
@@ -1097,7 +1082,7 @@ func Test_AddPodGroup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled, tt.compositePodGroupEnabled)
+			cache := newCache(ctx, time.Second, nil, true, tt.compositePodGroupEnabled)
 			if tt.initPod != nil {
 				cache.AddPodGroupMember(tt.initPod)
 			}
@@ -1106,13 +1091,6 @@ func Test_AddPodGroup(t *testing.T) {
 			}
 			for _, pg := range tt.podGroupsToAdd {
 				cache.AddAbstractPodGroup(framework.NewAbstractPodGroup(pg))
-			}
-
-			if !tt.genericWorkloadEnabled {
-				if len(cache.podGroupStates) > 0 {
-					t.Errorf("Expected pod group state to be empty, got %d", len(cache.podGroupStates))
-				}
-				return
 			}
 
 			gotPodGroups := make(map[fwk.EntityKey]*schedulingv1beta1.PodGroup)
@@ -1144,26 +1122,17 @@ func Test_UpdatePodGroup(t *testing.T) {
 	newPodGroup := st.MakePodGroup().Namespace("ns").Name("pg").MinCount(2).Obj()
 
 	tests := []struct {
-		name                   string
-		initPodGroup           *schedulingv1beta1.PodGroup
-		oldPodGroup            *schedulingv1beta1.PodGroup
-		newPodGroup            *schedulingv1beta1.PodGroup
-		genericWorkloadEnabled bool
-		expectPodGroup         *schedulingv1beta1.PodGroup
+		name           string
+		initPodGroup   *schedulingv1beta1.PodGroup
+		oldPodGroup    *schedulingv1beta1.PodGroup
+		newPodGroup    *schedulingv1beta1.PodGroup
+		expectPodGroup *schedulingv1beta1.PodGroup
 	}{
 		{
-			name:                   "update pod group with GenericWorkload disabled should be no-op",
-			oldPodGroup:            oldPodGroup,
-			newPodGroup:            newPodGroup,
-			genericWorkloadEnabled: false,
-			expectPodGroup:         nil,
-		},
-		{
-			name:                   "update pod group with GenericWorkload enabled",
-			oldPodGroup:            oldPodGroup,
-			newPodGroup:            newPodGroup,
-			genericWorkloadEnabled: true,
-			expectPodGroup:         newPodGroup,
+			name:           "update pod group with GenericWorkload enabled",
+			oldPodGroup:    oldPodGroup,
+			newPodGroup:    newPodGroup,
+			expectPodGroup: newPodGroup,
 		},
 	}
 
@@ -1171,7 +1140,7 @@ func Test_UpdatePodGroup(t *testing.T) {
 		for _, cpgEnabled := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%v, cpgEnabled=%v", tt.name, cpgEnabled), func(t *testing.T) {
 				logger, ctx := ktesting.NewTestContext(t)
-				cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled, cpgEnabled)
+				cache := newCache(ctx, time.Second, nil, true, cpgEnabled)
 				cache.AddAbstractPodGroup(framework.NewAbstractPodGroup(tt.oldPodGroup))
 
 				cache.UpdateAbstractPodGroup(logger, framework.NewAbstractPodGroup(tt.newPodGroup))
@@ -1203,7 +1172,6 @@ func Test_RemovePodGroup(t *testing.T) {
 
 	tests := []struct {
 		name                     string
-		genericWorkloadEnabled   bool
 		compositePodGroupEnabled bool
 		initPod                  *v1.Pod // From old tests
 		initialPodGroups         []*schedulingv1beta1.PodGroup
@@ -1215,16 +1183,9 @@ func Test_RemovePodGroup(t *testing.T) {
 		wantChildren             map[fwk.EntityKey]sets.Set[fwk.EntityKey]
 	}{
 		{
-			name:                     "remove pod group with GenericWorkload disabled should be no-op",
-			podGroupToDelete:         podGroup,
-			genericWorkloadEnabled:   false,
-			compositePodGroupEnabled: true,
-		},
-		{
 			name:                     "remove pod group with GenericWorkload enabled",
 			podGroupToDelete:         podGroup,
 			initialPodGroups:         []*schedulingv1beta1.PodGroup{podGroup},
-			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
 			expectStateExists:        "false",
 		},
@@ -1233,14 +1194,12 @@ func Test_RemovePodGroup(t *testing.T) {
 			initPod:                  pod,
 			initialPodGroups:         []*schedulingv1beta1.PodGroup{podGroup},
 			podGroupToDelete:         podGroup,
-			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
 			expectStateExists:        "true",
 			expectPodsCount:          1,
 		},
 		{
 			name:                     "delete pod group with parent, parent has other pod group children",
-			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
 			initialPodGroups:         []*schedulingv1beta1.PodGroup{pg3WithParent, pg4WithParent},
 			podGroupToDelete:         pg3WithParent,
@@ -1253,7 +1212,6 @@ func Test_RemovePodGroup(t *testing.T) {
 		},
 		{
 			name:                     "delete pod group with parent, parent has other composite pod group children",
-			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
 			initialPodGroups:         []*schedulingv1beta1.PodGroup{pg3WithParent},
 			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpgChild},
@@ -1268,7 +1226,7 @@ func Test_RemovePodGroup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled, tt.compositePodGroupEnabled)
+			cache := newCache(ctx, time.Second, nil, true, tt.compositePodGroupEnabled)
 			if tt.initPod != nil {
 				cache.AddPodGroupMember(tt.initPod)
 			}
