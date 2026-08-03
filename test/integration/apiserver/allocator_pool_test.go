@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -81,14 +81,20 @@ func TestAllocatorPoolBufferCapacityBounded(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	const (
+		maxRounds         = 10
+		requestsPerRound  = 5
+		allocatorsToDrain = 64
+	)
+
 	// sync.Pool contents are cleared by GC. Disable GC so allocators returned
 	// to the pool by the serving path reliably survive until we drain and
 	// inspect them.
 	defer debug.SetGCPercent(debug.SetGCPercent(-1))
 
 	sawPooledSmallBuffer := false
-	for round := 0; round < 10 && !sawPooledSmallBuffer; round++ {
-		for i := 0; i < 5; i++ {
+	for round := 0; round < maxRounds && !sawPooledSmallBuffer; round++ {
+		for range requestsPerRound {
 			for _, name := range []string{"big", "small"} {
 				if _, err := pbClient.CoreV1().ConfigMaps("default").Get(tCtx, name, metav1.GetOptions{}); err != nil {
 					t.Fatalf("failed to get ConfigMap %q: %v", name, err)
@@ -99,8 +105,8 @@ func TestAllocatorPoolBufferCapacityBounded(t *testing.T) {
 		// Drain the pool. Allocators the serving path returned are eligible to
 		// be handed back to us; Get also returns fresh zero-capacity allocators
 		// once the pool is empty, which are harmless to inspect.
-		drained := make([]*k8sruntime.Allocator, 0, 64)
-		for i := 0; i < 64; i++ {
+		drained := make([]*k8sruntime.Allocator, 0, allocatorsToDrain)
+		for range allocatorsToDrain {
 			drained = append(drained, k8sruntime.AllocatorPool.Get().(*k8sruntime.Allocator))
 		}
 		for _, a := range drained {
