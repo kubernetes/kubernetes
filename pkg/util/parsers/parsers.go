@@ -32,7 +32,7 @@ import (
 func ParseImageName(image string) (string, string, string, error) {
 	named, err := dockerref.ParseNormalizedNamed(image)
 	if err != nil {
-		return "", "", "", fmt.Errorf("couldn't parse image name %q: %v", image, err)
+		return "", "", "", fmt.Errorf("couldn't parse image name %q: %w", image, err)
 	}
 
 	repoToPull := named.Name()
@@ -60,7 +60,12 @@ func ParseCronScheduleWithPanicRecovery(schedule string) (sched cron.Schedule, e
 	defer func() {
 		if r := recover(); r != nil {
 			sched = nil
-			err = fmt.Errorf("invalid schedule format: %v", r)
+			// A recovered value is only wrap-able when it is itself an error.
+			if e, ok := r.(error); ok {
+				err = fmt.Errorf("invalid schedule format: %w", e)
+			} else {
+				err = fmt.Errorf("invalid schedule format: %v", r)
+			}
 		}
 	}()
 

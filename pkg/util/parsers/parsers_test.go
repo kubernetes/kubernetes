@@ -17,6 +17,7 @@ limitations under the License.
 package parsers
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -56,6 +57,9 @@ func TestParseImageName(t *testing.T) {
 		case repo != testCase.Repo || tag != testCase.Tag || digest != testCase.Digest:
 			t.Errorf("Expected repo: %q, tag: %q and digest: %q, got %q, %q and %q", testCase.Repo, testCase.Tag, testCase.Digest,
 				repo, tag, digest)
+		}
+		if testCase.expectedError != "" && err != nil && errors.Unwrap(err) == nil {
+			t.Errorf("ParseImageName(%s) should wrap the underlying cause, but errors.Unwrap returned nil", testCase.Input)
 		}
 	}
 }
@@ -180,10 +184,10 @@ func TestParseCronSchedulePanicRecovery(t *testing.T) {
 				t.Errorf("Expected nil schedule for panic-causing schedule %q, but got: %v", schedule, sched)
 			}
 
-			// Error message should contain "invalid schedule format"
+			// Error message should still start with "invalid schedule format:"
 			errMsg := err.Error()
-			if !strings.Contains(errMsg, "invalid schedule format") {
-				t.Errorf("Expected error message to contain 'invalid schedule format', but got: %s", errMsg)
+			if !strings.HasPrefix(errMsg, "invalid schedule format:") {
+				t.Errorf("Expected error message to start with 'invalid schedule format:', but got: %s", errMsg)
 			}
 		})
 	}
