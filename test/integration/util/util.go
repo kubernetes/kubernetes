@@ -77,7 +77,6 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/ptr"
 )
 
 // ShutdownFunc represents the function handle to be called, typically in a defer handler, to shutdown a running module
@@ -348,13 +347,10 @@ func PodsCleanedUp(ctx context.Context, c clientset.Interface, namespace string)
 func PodGroupDeleted(ctx context.Context, cs clientset.Interface, podNamespace, podName string) wait.ConditionWithContextFunc {
 	return func(context.Context) (bool, error) {
 		_, err := cs.SchedulingV1beta1().PodGroups(podNamespace).Get(ctx, podName, metav1.GetOptions{})
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return true, nil
-			}
-			return false, err
+		if err != nil && apierrors.IsNotFound(err) {
+			return true, nil
 		}
-		return false, nil
+		return false, err
 	}
 }
 
@@ -429,6 +425,7 @@ func CleanupPods(ctx context.Context, cs clientset.Interface, t *testing.T, pods
 	}
 }
 
+// CleanupPodGroups deletes the given pod groups and waits for them to be actually deleted.
 func CleanupPodGroups(ctx context.Context, cs clientset.Interface, t *testing.T, podGroups ...*schedulingapiv1beta1.PodGroup) {
 	for _, pg := range podGroups {
 		// Remove finalizers to avoid getting stuck in deletion if GC is not running.
@@ -788,7 +785,7 @@ func InitTestSchedulerWithNS(t *testing.T, nsPrefix string, opts ...scheduler.Op
 func InitTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 	cfg := configtesting.V1ToInternalWithDefaults(t, kubeschedulerconfigv1.KubeSchedulerConfiguration{
 		Profiles: []kubeschedulerconfigv1.KubeSchedulerProfile{{
-			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			SchedulerName: new(v1.DefaultSchedulerName),
 			Plugins: &kubeschedulerconfigv1.Plugins{
 				MultiPoint: kubeschedulerconfigv1.PluginSet{
 					Disabled: []kubeschedulerconfigv1.Plugin{
@@ -953,7 +950,7 @@ func InitPausePod(conf *PausePodConfig) *v1.Pod {
 		}
 	}
 	if conf.PodGroupName != "" {
-		pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: ptr.To(conf.PodGroupName)}
+		pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: new(conf.PodGroupName)}
 	}
 	return pod
 }
