@@ -263,13 +263,12 @@ export interface RouterInputProps {
    * @default - Generated automatically
    */
   readonly routerInputName?: string;
-  /** Maximum bitrate in bits per second that the Router Input can handle */
+  /** The maximum bitrate for the router input. */
   readonly maximumBitrate: Bitrate;
-  /** Routing scope for the Router Input */
+  /** Indicates whether the router input is configured for Regional or global routing. */
   readonly routingScope: RoutingScope;
   /**
    * Select a tier based on your maximum bitrate requirements.
-   *
    * @default RouterInputTier.INPUT_20
    */
   readonly tier?: RouterInputTier;
@@ -281,12 +280,8 @@ export interface RouterInputProps {
    */
   readonly maintenanceConfiguration?: MaintenanceConfiguration;
   /**
-   * AWS region where the Router Input will be created (i.e. us-east-1).
-   *
-   * Must match the region of the flows, flow outputs, and network interfaces it connects to —
-   * MediaConnect rejects a cross-region connection at deploy.
-   *
-   * @default - Same as the stack's region
+   * The AWS Region where the router input is located.
+   * @default - Defaults to the same region as stack
    */
   readonly regionName?: string;
   /**
@@ -1058,7 +1053,7 @@ class MergeRouterInputConfig extends RouterInputConfiguration {
 }
 
 /**
- * Internal options for {@link MediaConnectFlowRouterInputConfig}. Not exported; jsii never sees this.
+ * Internal options for {@link MediaConnectFlowRouterInputConfig}.
  */
 interface MediaConnectFlowRouterInputOptions {
   readonly flow?: IFlow;
@@ -1095,7 +1090,7 @@ class MediaConnectFlowRouterInputConfig extends RouterInputConfiguration {
 }
 
 /**
- * Internal options for {@link MediaLiveChannelRouterInputConfig}. Not exported; jsii never sees this.
+ * Internal options for {@link MediaLiveChannelRouterInputConfig}.
  */
 interface MediaLiveChannelRouterInputOptions {
   readonly mediaLiveChannelArn?: string;

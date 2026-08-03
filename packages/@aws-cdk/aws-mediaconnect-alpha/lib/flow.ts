@@ -838,9 +838,6 @@ export interface FlowProps {
 
   /**
    * The VPC Interfaces for this flow.
-   *
-   * Use this instead of the FlowVpcInterface construct.
-   *
    * @default No VPC Interface configuration applied
    */
   readonly vpcInterfaces?: VpcInterfaceConfig[];

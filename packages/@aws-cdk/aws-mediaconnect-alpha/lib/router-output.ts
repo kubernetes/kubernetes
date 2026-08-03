@@ -164,13 +164,12 @@ export interface RouterOutputProps {
    * @default - Generated automatically
    */
   readonly routerOutputName?: string;
-  /** Maximum bitrate in bits per second that the Router Output can handle */
+  /** The maximum bitrate for the router output. */
   readonly maximumBitrate: Bitrate;
-  /** Routing scope for the Router Output */
+  /** Indicates whether the router output is configured for Regional or global routing. */
   readonly routingScope: RoutingScope;
   /**
-   * Routing tier that determines the maximum number of outputs.
-   *
+   * Select a tier based on your maximum bitrate requirements.
    * @default RouterOutputTier.OUTPUT_20
    */
   readonly tier?: RouterOutputTier;
@@ -182,7 +181,7 @@ export interface RouterOutputProps {
    */
   readonly maintenanceConfiguration?: MaintenanceConfiguration;
   /**
-   * AWS region where the Router Output will be created
+   * The AWS Region where the router output is located.
    * @default - Defaults to the same region as stack
    */
   readonly regionName?: string;
@@ -697,7 +696,7 @@ class MediaLiveInputRouterOutputConfig extends RouterOutputConfiguration {
 }
 
 /**
- * Internal options for {@link MediaLiveInputRouterOutputConfig}. Not exported; jsii never sees this.
+ * Internal options for {@link MediaLiveInputRouterOutputConfig}.
  */
 interface MediaLiveInputRouterOutputOptions {
   readonly mediaLiveInputArn?: string;
@@ -732,7 +731,7 @@ class MediaConnectFlowRouterOutputConfig extends RouterOutputConfiguration {
 }
 
 /**
- * Internal options for {@link MediaConnectFlowRouterOutputConfig}. Not exported; jsii never sees this.
+ * Internal options for {@link MediaConnectFlowRouterOutputConfig}.
  */
 interface MediaConnectFlowRouterOutputOptions {
   readonly flow?: IFlow;
