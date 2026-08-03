@@ -33,6 +33,7 @@ import (
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 
 	resourcehelper "k8s.io/component-helpers/resource"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -138,6 +139,7 @@ func NewManager(
 		splitContainerImageFs:         nil,
 		thresholdNotifiers:            []ThresholdNotifier{},
 		localStorageCapacityIsolation: localStorageCapacityIsolation,
+		signalToRankFunc:              buildNonDiskSignalToRankFunc(),
 	}
 	return manager, manager
 }
@@ -267,34 +269,36 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 	if m.dedicatedImageFs == nil {
 		hasImageFs, imageFsErr := diskInfoProvider.HasDedicatedImageFs(ctx)
 		if imageFsErr != nil {
-			// TODO: This should be refactored to log an error and retry the HasDedicatedImageFs
-			// If we have a transient error this will never be retried and we will not set eviction signals
 			logger.Error(imageFsErr, "Eviction manager: failed to get HasDedicatedImageFs")
-			return nil, fmt.Errorf("eviction manager: failed to get HasDedicatedImageFs: %w", imageFsErr)
-		}
-		m.dedicatedImageFs = &hasImageFs
-		splitContainerImageFs, splitErr := diskInfoProvider.HasDedicatedContainerFs(ctx)
-		if splitErr != nil {
-			// A common error case is when there is no split filesystem
-			// there is an error finding the split filesystem label and we want to ignore these errors
-			logger.Error(splitErr, "eviction manager: failed to check if we have separate container filesystem. Ignoring.")
-		}
+		} else {
+			m.dedicatedImageFs = &hasImageFs
+			splitContainerImageFs, splitErr := diskInfoProvider.HasDedicatedContainerFs(ctx)
+			if splitErr != nil {
+				// A common error case is when there is no split filesystem
+				// there is an error finding the split filesystem label and we want to ignore these errors
+				logger.Error(splitErr, "eviction manager: failed to check if we have separate container filesystem. Ignoring.")
+			}
 
-		// If we are a split filesystem but the feature is turned off
-		// we should return an error.
-		// This is a bad state.
-		if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletSeparateDiskGC) && splitContainerImageFs {
-			splitDiskError := fmt.Errorf("KubeletSeparateDiskGC is turned off but we still have a split filesystem")
-			return nil, splitDiskError
+			// If we are a split filesystem but the feature is turned off
+			// we should return an error.
+			// This is a bad state.
+			if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletSeparateDiskGC) && splitContainerImageFs {
+				splitDiskError := fmt.Errorf("KubeletSeparateDiskGC is turned off but we still have a split filesystem")
+				return nil, splitDiskError
+			}
+			thresholds, err := UpdateContainerFsThresholds(m.config.Thresholds, hasImageFs, splitContainerImageFs)
+			m.config.Thresholds = thresholds
+			if err != nil {
+				logger.Error(err, "eviction manager: found conflicting containerfs eviction. Ignoring.")
+			}
+			m.splitContainerImageFs = &splitContainerImageFs
+			m.signalToRankFunc = buildSignalToRankFunc(hasImageFs, splitContainerImageFs)
+			m.signalToNodeReclaimFuncs = buildSignalToNodeReclaimFuncs(m.imageGC, m.containerGC, hasImageFs, splitContainerImageFs)
 		}
-		thresholds, err := UpdateContainerFsThresholds(m.config.Thresholds, hasImageFs, splitContainerImageFs)
-		m.config.Thresholds = thresholds
-		if err != nil {
-			logger.Error(err, "eviction manager: found conflicting containerfs eviction. Ignoring.")
-		}
-		m.splitContainerImageFs = &splitContainerImageFs
-		m.signalToRankFunc = buildSignalToRankFunc(hasImageFs, splitContainerImageFs)
-		m.signalToNodeReclaimFuncs = buildSignalToNodeReclaimFuncs(m.imageGC, m.containerGC, hasImageFs, splitContainerImageFs)
+	}
+
+	if m.dedicatedImageFs == nil {
+		thresholds = filterDiskThresholds(thresholds)
 	}
 
 	logger.V(3).Info("FileSystem detection", "DedicatedImageFs", m.dedicatedImageFs, "SplitImageFs", m.splitContainerImageFs)
@@ -369,7 +373,7 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 
 	// evict pods if there is a resource usage violation from local volume temporary storage
 	// If eviction happens in localStorageEviction function, skip the rest of eviction action
-	if m.localStorageCapacityIsolation {
+	if m.localStorageCapacityIsolation && m.dedicatedImageFs != nil {
 		if evictedPods := m.localStorageEviction(logger, activePods, statsFunc); len(evictedPods) > 0 {
 			return evictedPods, nil
 		}
@@ -613,7 +617,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(logger klog.Logger,
 
 	for _, containerStat := range podStats.Containers {
 		containerUsed := diskUsage(containerStat.Logs)
-		if !*m.dedicatedImageFs {
+		if !ptr.Deref(m.dedicatedImageFs, false) {
 			containerUsed.Add(*diskUsage(containerStat.Rootfs))
 		}
 
