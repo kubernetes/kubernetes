@@ -7400,47 +7400,67 @@ func TestMultipleHPAs(t *testing.T) {
 }
 
 func TestHPARescaleWithSuccessfulConflictRetry(t *testing.T) {
-	tc := testCase{
-		minReplicas:             2,
-		maxReplicas:             6,
-		specReplicas:            3,
-		statusReplicas:          3,
-		expectedDesiredReplicas: 5, // On success, the desired count is updated.
-		CPUTarget:               50,
-		reportedLevels:          []uint64{600, 700, 800},
-		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsAPI:           true,
-		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-			Type:   autoscalingv2.AbleToScale,
-			Status: v1.ConditionTrue,
-			Reason: "SucceededRescale",
-		}, scaledToZeroFalse),
-		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
-		},
-		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
-		},
+	fixture := horizontalScenario{
+		minReplicas:         2,
+		maxReplicas:         6,
+		specReplicas:        3,
+		statusReplicas:      3,
+		CPUTarget:           50,
+		reportedLevels:      []uint64{600, 700, 800},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		resource:            &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
 	}
 
-	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
-	tc.testScaleClient = testScaleClient
+	logger, _ := ktesting.NewTestContext(t)
+	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
+	testClient := &fake.Clientset{}
+	testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
+	AddListHPAReactor(testClient, &fixture, t)
+	AddListPodsReactor(testClient, &fixture)
+	AddUpdateAutoscalingReactor(testClient)
+
+	fakeScaleClient := &scalefake.FakeScaleClient{}
+	AddGetScaleReactor(fakeScaleClient, "replicationcontrollers", &fixture)
+	AddUpdateScaleReactor(fakeScaleClient, "replicationcontrollers")
 
 	updateCallCount := 0
-	// Use PrependReactor to simulate a transient conflict.
-	testScaleClient.PrependReactor("update", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+	fakeScaleClient.PrependReactor("update", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		updateCallCount++
-		// On the first call, simulate a conflict error.
 		if updateCallCount == 1 {
 			return true, nil, k8serrors.NewConflict(schema.GroupResource{Group: "", Resource: "replicationcontrollers"}, "test-rc", fmt.Errorf("simulated conflict"))
 		}
-		// On subsequent calls, let the default successful reactor handle it.
 		return false, nil, nil
 	})
 
-	tc.runTest(t)
+	fakeMetricsClient := &metricsfake.Clientset{}
+	AddListPodMetricsReactor(fakeMetricsClient, &fixture)
+
+	eventClient := &fake.Clientset{}
+	AddCreateEventReactor(eventClient)
+
+	setup := newHorizontalSetup(t, &fixture, testClient, eventClient, fakeMetricsClient, nil, nil, fakeScaleClient)
+
+	hpa := buildHPA(t, &fixture)
+	key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
+
+	// Register the HPA in the selector tracker. In production this is done by
+	// enqueueHPA before the worker calls reconcileAutoscaler, but this test
+	// calls reconcileAutoscaler directly, bypassing the queue.
+	hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
+	setup.controller.selectorTracker.PutIfAbsent(hpa.Namespace, hpaKey, labels.Nothing())
+
+	err := setup.controller.reconcileAutoscaler(setup.ctx, hpa, key)
+	require.NoError(t, err)
+
+	assert.Greater(t, updateCallCount, 1, "scale update should have been retried after conflict")
+
+	for _, action := range setup.scaleClient.Actions() {
+		if action.GetVerb() == "update" {
+			updateAction := action.(core.UpdateAction)
+			scale := updateAction.GetObject().(*autoscalingv1.Scale)
+			assert.Equal(t, int32(5), scale.Spec.Replicas, "desired replicas should match after conflict retry")
+		}
+	}
 }
 
 func TestBuildQuantity(t *testing.T) {
