@@ -444,16 +444,28 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			ginkgo.By("Waiting for the pod to start")
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
 
-			ginkgo.By("Validating that Memory PSI metrics reflect pressure")
-			gomega.Eventually(ctx, func(g gomega.Gomega) {
-				summary, err := getNodeSummary(ctx)
-				framework.ExpectNoError(err)
-				g.Expect(summary.Pods).To(gstruct.MatchElements(summaryObjectID, gstruct.IgnoreExtras, gstruct.Elements{
-					fmt.Sprintf("%s::%s", f.Namespace.Name, podName): gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-						"Memory": pressureDetected("full", 0.1),
-					}),
-				}))
-			}, 2*time.Minute, 15*time.Second).Should(gomega.Succeed())
+			// Linux 6.16 and newer reclaim this workload's file cache without
+			// blocking the pod for long, so Full.Avg10 stays at zero and a
+			// check on the average cannot pass there. The total stall time
+			// still grows on every kernel, so check that Full.Total becomes
+			// positive and then keeps growing while the workload runs. An idle
+			// pod adds no stall time, so growth proves the pressure comes from
+			// this pod.
+			ginkgo.By("Validating that Memory PSI metrics report stall time")
+			var baselineTotal uint64
+			gomega.Eventually(ctx, func(ctx context.Context) (uint64, error) {
+				total, err := podMemoryPSIFullTotal(ctx, f.Namespace.Name, podName)
+				if err != nil {
+					return 0, err
+				}
+				baselineTotal = total
+				return total, nil
+			}, 2*time.Minute, 15*time.Second).Should(gomega.BeNumerically(">", uint64(0)))
+
+			ginkgo.By("Validating that Memory PSI total stall time grows under sustained pressure")
+			gomega.Eventually(ctx, func(ctx context.Context) (uint64, error) {
+				return podMemoryPSIFullTotal(ctx, f.Namespace.Name, podName)
+			}, 2*time.Minute, 15*time.Second).Should(gomega.BeNumerically(">", baselineTotal))
 			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
 		})
 
@@ -713,4 +725,23 @@ func pressureDetected(level string, threshold float64) types.GomegaMatcher {
 	return gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 		"PSI": gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, fields)),
 	}))
+}
+
+// podMemoryPSIFullTotal returns the memory PSI full total stall time in
+// microseconds reported for the given pod in /stats/summary.
+func podMemoryPSIFullTotal(ctx context.Context, namespace, podName string) (uint64, error) {
+	summary, err := getNodeSummary(ctx)
+	if err != nil {
+		return 0, err
+	}
+	for _, pod := range summary.Pods {
+		if pod.PodRef.Namespace != namespace || pod.PodRef.Name != podName {
+			continue
+		}
+		if pod.Memory == nil || pod.Memory.PSI == nil {
+			return 0, fmt.Errorf("pod %s/%s has no memory PSI data in summary", namespace, podName)
+		}
+		return pod.Memory.PSI.Full.Total, nil
+	}
+	return 0, fmt.Errorf("pod %s/%s not found in summary", namespace, podName)
 }
