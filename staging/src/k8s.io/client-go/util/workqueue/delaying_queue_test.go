@@ -17,6 +17,7 @@ limitations under the License.
 package workqueue
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -53,7 +54,7 @@ func TestSimpleQueue(t *testing.T) {
 	// step past the next heartbeat
 	fakeClock.Step(10 * time.Second)
 
-	err := wait.Poll(1*time.Millisecond, 30*time.Millisecond, func() (done bool, err error) {
+	err := wait.PollUntilContextTimeout(context.Background(), 1*time.Millisecond, 30*time.Millisecond, false, func(_ context.Context) (done bool, err error) {
 		if q.Len() > 0 {
 			return false, fmt.Errorf("added to queue")
 		}
@@ -230,7 +231,7 @@ func BenchmarkDelayingQueue_AddAfter(b *testing.B) {
 }
 
 func waitForAdded(q DelayingInterface, depth int) error {
-	return wait.Poll(1*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+	return wait.PollUntilContextTimeout(context.Background(), 1*time.Millisecond, 10*time.Second, false, func(_ context.Context) (done bool, err error) {
 		if q.Len() == depth {
 			return true, nil
 		}
@@ -240,7 +241,7 @@ func waitForAdded(q DelayingInterface, depth int) error {
 }
 
 func waitForWaitingQueueToFill(q DelayingInterface) error {
-	return wait.Poll(1*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+	return wait.PollUntilContextTimeout(context.Background(), 1*time.Millisecond, 10*time.Second, false, func(_ context.Context) (done bool, err error) {
 		if len(q.(*delayingType[any]).waitingForAddCh) == 0 {
 			return true, nil
 		}

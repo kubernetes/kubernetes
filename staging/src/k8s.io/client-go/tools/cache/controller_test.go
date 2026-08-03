@@ -243,7 +243,7 @@ func TestHammerController(t *testing.T) {
 	}()
 
 	// Let's wait for the controller to do its initial sync
-	wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, false, func(_ context.Context) (bool, error) {
 		return controller.HasSynced(), nil
 	})
 	if !controller.HasSynced() {

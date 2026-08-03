@@ -18,6 +18,7 @@ package transport
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"reflect"
 	"sync"
@@ -143,10 +144,10 @@ func (c *dynamicClientCert) run(stopCh <-chan struct{}) {
 
 	go wait.Until(c.runWorker, time.Second, stopCh)
 
-	go wait.PollImmediateUntil(CertCallbackRefreshDuration, func() (bool, error) {
+	go wait.PollUntilContextCancel(wait.ContextForChannel(stopCh), CertCallbackRefreshDuration, true, func(_ context.Context) (bool, error) {
 		c.queue.Add(workItemKey)
 		return false, nil
-	}, stopCh)
+	})
 
 	<-stopCh
 }
