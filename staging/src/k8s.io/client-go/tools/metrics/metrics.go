@@ -233,7 +233,7 @@ func Register(opts RegisterOpts) {
 			ExecPluginCalls = opts.ExecPluginCalls
 		}
 		if opts.ExecPluginPolicyCalls != nil {
-			ExecPluginCalls = opts.ExecPluginCalls
+			ExecPluginPolicyCalls = opts.ExecPluginPolicyCalls
 		}
 		if opts.RequestRetry != nil {
 			RequestRetry = opts.RequestRetry
