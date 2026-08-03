@@ -5070,108 +5070,194 @@ func TestConditionSelectorValidation(t *testing.T) {
 func TestConditionFailedGetMetrics(t *testing.T) {
 	targetValue := resource.MustParse("15.0")
 	averageValue := resource.MustParse("15.0")
-	metricsTargets := map[string][]autoscalingv2.MetricSpec{
-		"FailedGetResourceMetric": nil,
-		"FailedGetPodsMetric": {
-			{
-				Type: autoscalingv2.PodsMetricSourceType,
-				Pods: &autoscalingv2.PodsMetricSource{
-					Metric: autoscalingv2.MetricIdentifier{
-						Name: "qps",
-					},
-					Target: autoscalingv2.MetricTarget{
-						Type:         autoscalingv2.AverageValueMetricType,
-						AverageValue: &averageValue,
-					},
-				},
+
+	tests := []struct {
+		name       string
+		fixture    horizontalScenario
+		reason     string
+		metricType autoscalingv2.MetricSourceType
+	}{
+		{
+			name: "failed get resource metric",
+			fixture: horizontalScenario{
+				minReplicas:         1,
+				maxReplicas:         100,
+				specReplicas:        3,
+				statusReplicas:      3,
+				CPUTarget:           10,
+				reportedLevels:      []uint64{100, 200, 300},
+				reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
+				resource:            &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
 			},
+			reason:     "FailedGetResourceMetric",
+			metricType: autoscalingv2.ResourceMetricSourceType,
 		},
-		"FailedGetObjectMetric": {
-			{
-				Type: autoscalingv2.ObjectMetricSourceType,
-				Object: &autoscalingv2.ObjectMetricSource{
-					DescribedObject: autoscalingv2.CrossVersionObjectReference{
-						APIVersion: "apps/v1",
-						Kind:       "Deployment",
-						Name:       "some-deployment",
-					},
-					Metric: autoscalingv2.MetricIdentifier{
-						Name: "qps",
-					},
-					Target: autoscalingv2.MetricTarget{
-						Type:  autoscalingv2.ValueMetricType,
-						Value: &targetValue,
+		{
+			name: "failed get pods metric",
+			fixture: horizontalScenario{
+				minReplicas:         1,
+				maxReplicas:         100,
+				specReplicas:        3,
+				statusReplicas:      3,
+				reportedLevels:      []uint64{100, 200, 300},
+				reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
+				resource:            &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
+				metricsTarget: []autoscalingv2.MetricSpec{
+					{
+						Type: autoscalingv2.PodsMetricSourceType,
+						Pods: &autoscalingv2.PodsMetricSource{
+							Metric: autoscalingv2.MetricIdentifier{
+								Name: "qps",
+							},
+							Target: autoscalingv2.MetricTarget{
+								Type:         autoscalingv2.AverageValueMetricType,
+								AverageValue: &averageValue,
+							},
+						},
 					},
 				},
 			},
+			reason:     "FailedGetPodsMetric",
+			metricType: autoscalingv2.PodsMetricSourceType,
 		},
-		"FailedGetExternalMetric": {
-			{
-				Type: autoscalingv2.ExternalMetricSourceType,
-				External: &autoscalingv2.ExternalMetricSource{
-					Metric: autoscalingv2.MetricIdentifier{
-						Name:     "qps",
-						Selector: &metav1.LabelSelector{},
-					},
-					Target: autoscalingv2.MetricTarget{
-						Type:  autoscalingv2.ValueMetricType,
-						Value: resource.NewMilliQuantity(300, resource.DecimalSI),
+		{
+			name: "failed get object metric",
+			fixture: horizontalScenario{
+				minReplicas:         1,
+				maxReplicas:         100,
+				specReplicas:        3,
+				statusReplicas:      3,
+				reportedLevels:      []uint64{100, 200, 300},
+				reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
+				resource:            &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
+				metricsTarget: []autoscalingv2.MetricSpec{
+					{
+						Type: autoscalingv2.ObjectMetricSourceType,
+						Object: &autoscalingv2.ObjectMetricSource{
+							DescribedObject: autoscalingv2.CrossVersionObjectReference{
+								APIVersion: "apps/v1",
+								Kind:       "Deployment",
+								Name:       "some-deployment",
+							},
+							Metric: autoscalingv2.MetricIdentifier{
+								Name: "qps",
+							},
+							Target: autoscalingv2.MetricTarget{
+								Type:  autoscalingv2.ValueMetricType,
+								Value: &targetValue,
+							},
+						},
 					},
 				},
 			},
+			reason:     "FailedGetObjectMetric",
+			metricType: autoscalingv2.ObjectMetricSourceType,
+		},
+		{
+			name: "failed get external metric",
+			fixture: horizontalScenario{
+				minReplicas:         1,
+				maxReplicas:         100,
+				specReplicas:        3,
+				statusReplicas:      3,
+				reportedLevels:      []uint64{100, 200, 300},
+				reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
+				resource:            &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
+				metricsTarget: []autoscalingv2.MetricSpec{
+					{
+						Type: autoscalingv2.ExternalMetricSourceType,
+						External: &autoscalingv2.ExternalMetricSource{
+							Metric: autoscalingv2.MetricIdentifier{
+								Name:     "qps",
+								Selector: &metav1.LabelSelector{},
+							},
+							Target: autoscalingv2.MetricTarget{
+								Type:  autoscalingv2.ValueMetricType,
+								Value: resource.NewMilliQuantity(300, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+			reason:     "FailedGetExternalMetric",
+			metricType: autoscalingv2.ExternalMetricSourceType,
 		},
 	}
 
-	for reason, specs := range metricsTargets {
-		metricType := autoscalingv2.ResourceMetricSourceType
-		if specs != nil {
-			metricType = specs[0].Type
-		}
-		tc := testCase{
-			minReplicas:             1,
-			maxReplicas:             100,
-			specReplicas:            3,
-			statusReplicas:          3,
-			expectedDesiredReplicas: 3,
-			CPUTarget:               10,
-			reportedLevels:          []uint64{100, 200, 300},
-			reportedCPURequests:     []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
-			useMetricsAPI:           true,
-			expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
-			expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
-			expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-				metricType: monitor.ActionLabelNone,
-			},
-			expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-				metricType: monitor.ErrorLabelInternal,
-			},
-		}
-		_, testMetricsClient, testCMClient, testEMClient, _ := tc.prepareTestClient(t)
-		tc.testMetricsClient = testMetricsClient
-		tc.testCMClient = testCMClient
-		tc.testEMClient = testEMClient
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeWatch := watch.NewFake()
+			testClient := &fake.Clientset{}
+			testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
+			AddListHPAReactor(testClient, &tt.fixture, t)
+			AddListPodsReactor(testClient, &tt.fixture)
+			AddUpdateAutoscalingReactor(testClient)
 
-		testMetricsClient.PrependReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			return true, &metricsapi.PodMetricsList{}, fmt.Errorf("something went wrong")
-		})
-		testCMClient.PrependReactor("get", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			return true, &cmapi.MetricValueList{}, fmt.Errorf("something went wrong")
-		})
-		testEMClient.PrependReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			return true, &emapi.ExternalMetricValueList{}, fmt.Errorf("something went wrong")
-		})
+			fakeScaleClient := &scalefake.FakeScaleClient{}
+			AddGetScaleReactor(fakeScaleClient, "replicationcontrollers", &tt.fixture)
+			AddUpdateScaleReactor(fakeScaleClient, "replicationcontrollers")
 
-		tc.expectedConditions = []autoscalingv2.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: reason},
-		}
-		if specs != nil {
-			tc.CPUTarget = 0
-		} else {
-			tc.CPUTarget = 10
-		}
-		tc.metricsTarget = specs
-		tc.runTest(t)
+			fakeMetricsClient := &metricsfake.Clientset{}
+			// Inject errors for all metric sources so whichever one is used will fail
+			fakeMetricsClient.PrependReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+				return true, &metricsapi.PodMetricsList{}, fmt.Errorf("something went wrong")
+			})
+
+			fakeCMClient := &cmfake.FakeCustomMetricsClient{}
+			// Inject errors for all metric sources so whichever one is used will fail
+			fakeCMClient.PrependReactor("get", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+				return true, &cmapi.MetricValueList{}, fmt.Errorf("something went wrong")
+			})
+
+			fakeEMClient := &emfake.FakeExternalMetricsClient{}
+			// Inject errors for all metric sources so whichever one is used will fail
+			fakeCMClient.PrependReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+				return true, &emapi.ExternalMetricValueList{}, fmt.Errorf("something went wrong")
+			})
+
+			eventClient := &fake.Clientset{}
+
+			setup := newHorizontalSetup(t, &tt.fixture, testClient, eventClient, fakeMetricsClient, fakeCMClient, fakeEMClient, fakeScaleClient)
+
+			hpa := buildHPA(t, &tt.fixture)
+			key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
+
+			_ = setup.controller.reconcileAutoscaler(setup.ctx, hpa, key)
+
+			for _, action := range setup.scaleClient.Actions() {
+				if action.GetVerb() == "update" {
+					t.Fatal("scale should not have been updated when metrics fetch fails")
+				}
+			}
+
+			v, err := metricstestutil.GetCounterMetricValue(
+				monitor.ReconciliationsTotal.WithLabelValues(string(monitor.ActionLabelNone), string(monitor.ErrorLabelInternal)))
+			require.NoError(t, err)
+			assert.GreaterOrEqual(t, v, float64(1), "reconciliation metric should be recorded")
+
+			v, err = metricstestutil.GetCounterMetricValue(
+				monitor.MetricComputationTotal.WithLabelValues(string(monitor.ActionLabelNone), string(monitor.ErrorLabelInternal), string(tt.metricType)))
+			require.NoError(t, err)
+			assert.GreaterOrEqual(t, v, float64(1), "metric computation metric should be recorded for type=%s", tt.metricType)
+
+			expectedConditions := []autoscalingv2.HorizontalPodAutoscalerCondition{
+				{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+				{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: tt.reason},
+			}
+			for _, action := range setup.testClient.Actions() {
+				if action.GetVerb() == "update" && action.GetResource().Resource == "horizontalpodautoscalers" {
+					updatedHPA := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
+					assert.Equal(t, int32(3), updatedHPA.Status.DesiredReplicas, "desired replicas should not change")
+
+					actualConditions := updatedHPA.Status.Conditions
+					for i := range actualConditions {
+						actualConditions[i].Message = ""
+						actualConditions[i].LastTransitionTime = metav1.Time{}
+					}
+					assert.Equal(t, expectedConditions, actualConditions, "status conditions should match")
+				}
+			}
+		})
 	}
 }
 
