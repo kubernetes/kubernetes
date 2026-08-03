@@ -56,7 +56,7 @@ func main() {
 func generate(in io.Reader, out io.Writer, data interface{}) error {
 	var buf bytes.Buffer
 	if _, err := buf.ReadFrom(in); err != nil {
-		return fmt.Errorf("reading input: %v", err)
+		return fmt.Errorf("reading input: %w", err)
 	}
 
 	funcMap := template.FuncMap{
@@ -67,11 +67,11 @@ func generate(in io.Reader, out io.Writer, data interface{}) error {
 
 	tmpl, err := template.New("").Funcs(funcMap).Parse(buf.String())
 	if err != nil {
-		return fmt.Errorf("parsing input as text template: %v", err)
+		return fmt.Errorf("parsing input as text template: %w", err)
 	}
 
 	if err := tmpl.Execute(out, data); err != nil {
-		return fmt.Errorf("generating result: %v", err)
+		return fmt.Errorf("generating result: %w", err)
 	}
 	return nil
 }
@@ -79,7 +79,7 @@ func generate(in io.Reader, out io.Writer, data interface{}) error {
 func include(filename string) (string, error) {
 	content, err := os.ReadFile(filename)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("include %q: %w", filename, err)
 	}
 	return string(content), nil
 }
