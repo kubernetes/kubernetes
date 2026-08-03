@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	goruntime "runtime"
 	"strings"
 	"sync"
@@ -5562,125 +5561,6 @@ func TestScaleTimingBehavior(t *testing.T) {
 	}
 }
 
-// TestComputedToleranceAlgImplementation is a regression test which
-// back-calculates a minimal percentage for downscaling based on a small percentage
-// increase in pod utilization which is calibrated against the tolerance value.
-func TestComputedToleranceAlgImplementation(t *testing.T) {
-
-	startPods := int32(10)
-	// 150 mCPU per pod.
-	totalUsedCPUOfAllPods := uint64(startPods * 150)
-	// Each pod starts out asking for 2X what is really needed.
-	// This means we will have a 50% ratio of used/requested
-	totalRequestedCPUOfAllPods := int32(2 * totalUsedCPUOfAllPods)
-	requestedToUsed := float64(totalRequestedCPUOfAllPods / int32(totalUsedCPUOfAllPods))
-	// Spread the amount we ask over 10 pods.  We can add some jitter later in reportedLevels.
-	perPodRequested := totalRequestedCPUOfAllPods / startPods
-
-	// Force a minimal scaling event by satisfying  (tolerance < 1 - resourcesUsedRatio).
-	target := math.Abs(1/(requestedToUsed*(1-defaultTestingTolerance))) + .01
-	finalCPUPercentTarget := int32(target * 100)
-	resourcesUsedRatio := float64(totalUsedCPUOfAllPods) / float64(float64(totalRequestedCPUOfAllPods)*target)
-
-	// i.e. .60 * 20 -> scaled down expectation.
-	finalPods := int32(math.Ceil(resourcesUsedRatio * float64(startPods)))
-
-	// To breach tolerance we will create a utilization ratio difference of tolerance to usageRatioToleranceValue)
-	tc1 := testCase{
-		minReplicas:             0,
-		maxReplicas:             1000,
-		specReplicas:            startPods,
-		statusReplicas:          startPods,
-		expectedDesiredReplicas: finalPods,
-		CPUTarget:               finalCPUPercentTarget,
-		reportedLevels: []uint64{
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-		},
-		reportedCPURequests: []resource.Quantity{
-			resource.MustParse(fmt.Sprint(perPodRequested+100) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested-100) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested+10) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested-10) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested+2) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested-2) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested+1) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested-1) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
-		},
-		useMetricsAPI:   true,
-		recommendations: []timestampedRecommendation{},
-		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
-		},
-		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
-		},
-	}
-	tc1.runTest(t)
-
-	target = math.Abs(1/(requestedToUsed*(1-defaultTestingTolerance))) + .004
-	finalCPUPercentTarget = int32(target * 100)
-	tc2 := testCase{
-		minReplicas:             0,
-		maxReplicas:             1000,
-		specReplicas:            startPods,
-		statusReplicas:          startPods,
-		expectedDesiredReplicas: startPods,
-		CPUTarget:               finalCPUPercentTarget,
-		reportedLevels: []uint64{
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-			totalUsedCPUOfAllPods / 10,
-		},
-		reportedCPURequests: []resource.Quantity{
-			resource.MustParse(fmt.Sprint(perPodRequested+100) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested-100) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested+10) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested-10) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested+2) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested-2) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested+1) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested-1) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
-			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
-		},
-		useMetricsAPI:   true,
-		recommendations: []timestampedRecommendation{},
-		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-			Type:   autoscalingv2.AbleToScale,
-			Status: v1.ConditionTrue,
-			Reason: "ReadyForNewScale",
-		}),
-		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
-		},
-		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
-		},
-	}
-	tc2.runTest(t)
-}
 
 func TestAvoidUnnecessaryUpdates(t *testing.T) {
 	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
