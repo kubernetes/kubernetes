@@ -624,7 +624,6 @@ type testCase struct {
 	recommendations   []timestampedRecommendation
 	hpaSelectors      map[selectors.Key]labels.Selector
 	initialConditions []autoscalingv2.HorizontalPodAutoscalerCondition
-
 }
 
 // Needs to be called under a lock.
@@ -4064,6 +4063,7 @@ func TestReplicaLimits(t *testing.T) {
 		expectedScaleUpdated    bool
 		expectedActionLabel     monitor.ActionLabel
 		expectedConditions      []autoscalingv2.HorizontalPodAutoscalerCondition
+		skipWindowsTest         bool
 	}{
 		{
 			name: "scale down clamped to min replicas",
@@ -4264,6 +4264,59 @@ func TestReplicaLimits(t *testing.T) {
 			},
 		},
 		{
+			name: "upscale capped by scaling policy",
+			fixture: horizontalScenario{
+				minReplicas:         1,
+				maxReplicas:         100,
+				specReplicas:        3,
+				statusReplicas:      3,
+				scaleUpRules:        generateScalingRules(0, 0, 700, 60, 0),
+				CPUTarget:           10,
+				reportedLevels:      []uint64{100, 200, 300},
+				reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
+				resource: &fakeResource{
+					name:       "test-rc",
+					apiVersion: "v1",
+					kind:       "ReplicationController",
+				},
+			},
+			expectedDesiredReplicas: 24,
+			expectedScaleUpdated:    true,
+			expectedActionLabel:     monitor.ActionLabelScaleUp,
+			expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+				Type:   autoscalingv2.ScalingLimited,
+				Status: v1.ConditionTrue,
+				Reason: "ScaleUpLimit",
+			}, scaledToZeroFalse),
+		},
+		{
+			name: "upscale cap greater than max replicas",
+			fixture: horizontalScenario{
+				minReplicas:         1,
+				maxReplicas:         20,
+				specReplicas:        3,
+				statusReplicas:      3,
+				scaleUpRules:        generateScalingRules(0, 0, 700, 60, 0),
+				CPUTarget:           10,
+				reportedLevels:      []uint64{100, 200, 300},
+				reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
+				resource: &fakeResource{
+					name:       "test-rc",
+					apiVersion: "v1",
+					kind:       "ReplicationController",
+				},
+			},
+			skipWindowsTest:         true,
+			expectedDesiredReplicas: 20,
+			expectedScaleUpdated:    true,
+			expectedActionLabel:     monitor.ActionLabelScaleUp,
+			expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+				Type:   autoscalingv2.ScalingLimited,
+				Status: v1.ConditionTrue,
+				Reason: "TooManyReplicas",
+			}, scaledToZeroFalse),
+		},
+		{
 			name: "scale down to max immediately even with recent scale time",
 			fixture: horizontalScenario{
 				minReplicas:         2,
@@ -4292,6 +4345,10 @@ func TestReplicaLimits(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// TODO: Remove skip once this issue is resolved: https://github.com/kubernetes/kubernetes/issues/124083
+			if tt.skipWindowsTest && goruntime.GOOS == "windows" {
+				t.Skip("Skip flaking test on Windows.")
+			}
 			logger, _ := ktesting.NewTestContext(t)
 			fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 
@@ -4770,71 +4827,6 @@ func TestEventCreation(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestUpscaleCap(t *testing.T) {
-	tc := testCase{
-		minReplicas:             1,
-		maxReplicas:             100,
-		specReplicas:            3,
-		statusReplicas:          3,
-		scaleUpRules:            generateScalingRules(0, 0, 700, 60, 0),
-		initialReplicas:         3,
-		expectedDesiredReplicas: 24,
-		CPUTarget:               10,
-		reportedLevels:          []uint64{100, 200, 300},
-		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
-		useMetricsAPI:           true,
-		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-			Type:   autoscalingv2.ScalingLimited,
-			Status: v1.ConditionTrue,
-			Reason: "ScaleUpLimit",
-		}, scaledToZeroFalse),
-		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
-		},
-		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
-		},
-	}
-	tc.runTest(t)
-}
-
-func TestUpscaleCapGreaterThanMaxReplicas(t *testing.T) {
-	// TODO: Remove skip once this issue is resolved: https://github.com/kubernetes/kubernetes/issues/124083
-	if goruntime.GOOS == "windows" {
-		t.Skip("Skip flaking test on Windows.")
-	}
-	tc := testCase{
-		minReplicas:     1,
-		maxReplicas:     20,
-		specReplicas:    3,
-		statusReplicas:  3,
-		scaleUpRules:    generateScalingRules(0, 0, 700, 60, 0),
-		initialReplicas: 3,
-		// expectedDesiredReplicas would be 24 without maxReplicas
-		expectedDesiredReplicas: 20,
-		CPUTarget:               10,
-		reportedLevels:          []uint64{100, 200, 300},
-		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
-		useMetricsAPI:           true,
-		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-			Type:   autoscalingv2.ScalingLimited,
-			Status: v1.ConditionTrue,
-			Reason: "TooManyReplicas",
-		}, scaledToZeroFalse),
-		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
-		},
-		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
-		},
-	}
-	tc.runTest(t)
 }
 
 func TestConditionSelectorValidation(t *testing.T) {
