@@ -5375,74 +5375,97 @@ func TestInvalidMetricSourceType(t *testing.T) {
 	}
 }
 
-func TestConditionFailedGetScale(t *testing.T) {
-	tc := testCase{
-		minReplicas:             1,
-		maxReplicas:             100,
-		specReplicas:            3,
-		statusReplicas:          3,
-		expectedDesiredReplicas: 3,
-		CPUTarget:               10,
-		reportedLevels:          []uint64{100, 200, 300},
-		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
-		useMetricsAPI:           true,
-		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-			{
-				Type:   autoscalingv2.AbleToScale,
-				Status: v1.ConditionFalse,
-				Reason: "FailedGetScale",
+func TestConditionFailedScale(t *testing.T) {
+	tests := []struct {
+		name               string
+		fixture            horizontalScenario
+		reactorVerb        string
+		expectedConditions []autoscalingv2.HorizontalPodAutoscalerCondition
+	}{
+		{
+			name: "failed get scale",
+			fixture: horizontalScenario{
+				minReplicas:         1,
+				maxReplicas:         100,
+				specReplicas:        3,
+				statusReplicas:      3,
+				CPUTarget:           10,
+				reportedLevels:      []uint64{100, 200, 300},
+				reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
+				resource:            &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
+			},
+			reactorVerb: "get",
+			expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+				{
+					Type:   autoscalingv2.AbleToScale,
+					Status: v1.ConditionFalse,
+					Reason: "FailedGetScale",
+				},
 			},
 		},
-		expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
-		expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelInternal,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
-		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
-	}
-
-	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
-	tc.testScaleClient = testScaleClient
-
-	testScaleClient.PrependReactor("get", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		return true, &autoscalingv1.Scale{}, fmt.Errorf("something went wrong")
-	})
-
-	tc.runTest(t)
-}
-
-func TestConditionFailedUpdateScale(t *testing.T) {
-	tc := testCase{
-		minReplicas:             1,
-		maxReplicas:             5,
-		specReplicas:            3,
-		statusReplicas:          3,
-		expectedDesiredReplicas: 3,
-		CPUTarget:               100,
-		reportedLevels:          []uint64{150, 150, 150},
-		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
-		useMetricsAPI:           true,
-		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-			Type:   autoscalingv2.AbleToScale,
-			Status: v1.ConditionFalse,
-			Reason: "FailedUpdateScale",
-		}),
-		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
-		},
-		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		{
+			name: "failed update scale",
+			fixture: horizontalScenario{
+				minReplicas:         1,
+				maxReplicas:         5,
+				specReplicas:        3,
+				statusReplicas:      3,
+				CPUTarget:           100,
+				reportedLevels:      []uint64{150, 150, 150},
+				reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
+				resource:            &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
+			},
+			reactorVerb: "update",
+			expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+				Type:   autoscalingv2.AbleToScale,
+				Status: v1.ConditionFalse,
+				Reason: "FailedUpdateScale",
+			}),
 		},
 	}
 
-	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
-	tc.testScaleClient = testScaleClient
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
+			testClient := &fake.Clientset{}
+			testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
+			AddListHPAReactor(testClient, &tt.fixture, t)
+			AddListPodsReactor(testClient, &tt.fixture)
+			AddUpdateAutoscalingReactor(testClient)
 
-	testScaleClient.PrependReactor("update", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		return true, &autoscalingv1.Scale{}, fmt.Errorf("something went wrong")
-	})
+			fakeScaleClient := &scalefake.FakeScaleClient{}
+			AddGetScaleReactor(fakeScaleClient, "replicationcontrollers", &tt.fixture)
+			fakeScaleClient.PrependReactor(tt.reactorVerb, "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+				return true, &autoscalingv1.Scale{}, fmt.Errorf("something went wrong")
+			})
 
-	tc.runTest(t)
+			fakeMetricsClient := &metricsfake.Clientset{}
+			AddListPodMetricsReactor(fakeMetricsClient, &tt.fixture)
+
+			eventClient := &fake.Clientset{}
+
+			setup := newHorizontalSetup(t, &tt.fixture, testClient, eventClient, fakeMetricsClient, nil, nil, fakeScaleClient)
+
+			hpa := buildHPA(t, &tt.fixture)
+			key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
+
+			err := setup.controller.reconcileAutoscaler(setup.ctx, hpa, key)
+			require.Error(t, err)
+
+			for _, action := range setup.testClient.Actions() {
+				if action.GetVerb() == "update" && action.GetResource().Resource == "horizontalpodautoscalers" {
+					updatedHPA := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
+					actualConditions := updatedHPA.Status.Conditions
+					for i := range actualConditions {
+						actualConditions[i].Message = ""
+						actualConditions[i].LastTransitionTime = metav1.Time{}
+					}
+					assert.Equal(t, tt.expectedConditions, actualConditions, "status conditions should match")
+				}
+			}
+		})
+	}
 }
 
 func TestNoBackoffUpscaleCM(t *testing.T) {
