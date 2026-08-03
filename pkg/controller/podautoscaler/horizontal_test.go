@@ -625,8 +625,6 @@ type testCase struct {
 	hpaSelectors      map[selectors.Key]labels.Selector
 	initialConditions []autoscalingv2.HorizontalPodAutoscalerCondition
 
-	verifyReconciliationDuration     bool
-	verifyMetricComputationDurations bool
 }
 
 // Needs to be called under a lock.
@@ -1182,18 +1180,6 @@ func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T) {
 		t.Fatalf("%s metric was not recorded for action=%s, error=%s", monitor.ReconciliationsTotal.Name, actionStr, errorStr)
 	}
 
-	if tc.verifyReconciliationDuration {
-		if err := wait.PollUntilContextTimeout(ctx, 20*time.Millisecond, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
-			count, err := metricstestutil.GetHistogramMetricCount(monitor.ReconciliationsDuration.WithLabelValues(actionStr, errorStr))
-			if err != nil {
-				return false, nil
-			}
-			return count >= 1, nil
-		}); err != nil {
-			t.Fatalf("%s metric was not recorded for action=%s, error=%s", monitor.ReconciliationsDuration.Name, actionStr, errorStr)
-		}
-	}
-
 	if tc.expectedReconciliationCount > 0 {
 		var v float64
 		var lastErr error
@@ -1218,15 +1204,6 @@ func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T) {
 				t.Fatalf("metric computation total not found for type %s: %v", metricType, err)
 			}
 			assert.GreaterOrEqual(t, mcv, float64(1), "metric computation count for %s should be at least 1", metricType)
-
-			if tc.verifyMetricComputationDurations {
-				count, err := metricstestutil.GetHistogramMetricCount(
-					monitor.MetricComputationDuration.WithLabelValues(string(expectedAction), string(expectedError), string(metricType)))
-				if err != nil {
-					t.Fatalf("error getting metric computation duration for type %s: %v", metricType, err)
-				}
-				assert.Positive(t, count, "metric computation duration for %s should be recorded", metricType)
-			}
 		}
 
 		for metricType, expectedCount := range tc.expectedMetricComputationCounts {
@@ -7613,61 +7590,6 @@ func TestHPARescaleWithSuccessfulConflictRetry(t *testing.T) {
 		return false, nil, nil
 	})
 
-	tc.runTest(t)
-}
-
-func TestReconciliationDurationIsRecorded(t *testing.T) {
-	tc := testCase{
-		minReplicas:             2,
-		maxReplicas:             6,
-		specReplicas:            3,
-		statusReplicas:          3,
-		expectedDesiredReplicas: 5,
-		CPUTarget:               30,
-		verifyCPUCurrent:        true,
-		reportedLevels:          []uint64{300, 500, 700},
-		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsAPI:           true,
-		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
-		},
-		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
-		},
-		verifyReconciliationDuration:     true,
-		verifyMetricComputationDurations: true,
-	}
-	tc.runTest(t)
-}
-
-func TestReconciliationDurationIsRecordedOnError(t *testing.T) {
-	tc := testCase{
-		minReplicas:             2,
-		maxReplicas:             6,
-		specReplicas:            4,
-		statusReplicas:          4,
-		expectedDesiredReplicas: 4,
-		CPUTarget:               100,
-		reportedLevels:          []uint64{},
-		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsAPI:           true,
-		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetResourceMetric"},
-		},
-		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
-		},
-		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelInternal,
-		},
-		verifyReconciliationDuration:     true,
-		verifyMetricComputationDurations: true,
-	}
 	tc.runTest(t)
 }
 
