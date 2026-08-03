@@ -58,12 +58,12 @@
     "@aws-cdk/service-spec-types" "^0.0.256"
     "@cdklabs/tskb" "^0.0.4"
 
-"@aws-cdk/aws-service-spec@0.1.193":
-  version "0.1.193"
-  resolved "https://registry.npmjs.org/@aws-cdk/aws-service-spec/-/aws-service-spec-0.1.193.tgz#669328ecdacd9f1500ee81bbb34b3a614fc8b280"
-  integrity sha512-xuUb4fre/WYmtdvCEMD3nzbr6iwk6zvl10I9XoS7wr9yRPmbKs+KbAZwoT+Eit+TE8I5dzvh9xDmNfA2PeyV3g==
+"@aws-cdk/aws-service-spec@0.1.199":
+  version "0.1.199"
+  resolved "https://registry.npmjs.org/@aws-cdk/aws-service-spec/-/aws-service-spec-0.1.199.tgz#013aa7ff0a2ae63588bdc244070e3c3cba0713e9"
+  integrity sha512-g6/7x15nVNPrexCe6rOV0h96L+7Wf2kQizZvh4JulmcwTcwiNEjJXi1UVNZFmChmNzJYsB3sMykJzB68+7i31g==
   dependencies:
-    "@aws-cdk/service-spec-types" "^0.0.259"
+    "@aws-cdk/service-spec-types" "^0.0.265"
     "@cdklabs/tskb" "^0.0.4"
 
 "@aws-cdk/cloud-assembly-api@^2.2.6":
@@ -134,13 +134,13 @@
   resolved "https://registry.npmjs.org/@aws-cdk/lambda-layer-kubectl-v36/-/lambda-layer-kubectl-v36-2.0.0.tgz#7c84dc3cedad93003e161c0ef6add78cf04c8700"
   integrity sha512-GAzsW4F7pDVq6L233cA7Qvp5hmXfREKfyVcYi9oq1Yvx2aU9jS8mYDRHT+GEX+B79qeFod76fzVgvchsPYvP1Q==
 
-"@aws-cdk/service-spec-importers@0.0.133":
-  version "0.0.133"
-  resolved "https://registry.npmjs.org/@aws-cdk/service-spec-importers/-/service-spec-importers-0.0.133.tgz#3937c1c44d1a32f47ae79a62f64e603808f53a1d"
-  integrity sha512-eoW1Syw/XIo2xse0R58xpLNRMfoAjviG6Y6LmQf9byFeMVJCM6qyPAS+dhoo1yGdAmteAt3+/XHQ2UMyh59RpA==
+"@aws-cdk/service-spec-importers@0.0.136":
+  version "0.0.136"
+  resolved "https://registry.npmjs.org/@aws-cdk/service-spec-importers/-/service-spec-importers-0.0.136.tgz#519a95eba810a73a4bf459cc9b6278f5efdbd459"
+  integrity sha512-SHz+ghD8VmF/VBBC2iDPjEQFq19qYAWuCLwH9SVwhMu5/u3+aJRFHt4duFZoHi/yp8IcwPZPrczXzTLVJ1slnQ==
   dependencies:
-    "@aws-cdk/service-spec-types" "^0.0.0"
-    "@cdklabs/tskb" "^0.0.0"
+    "@aws-cdk/service-spec-types" "^0.0.264"
+    "@cdklabs/tskb" "^0.0.4"
     ajv "^6"
     canonicalize "^2.1.0"
     chalk "^4"
@@ -150,7 +150,7 @@
     glob "^8"
     sort-json "^2.0.1"
 
-"@aws-cdk/service-spec-types@0.0.259", "@aws-cdk/service-spec-types@0.0.260", "@aws-cdk/service-spec-types@^0.0.0", "@aws-cdk/service-spec-types@^0.0.256", "@aws-cdk/service-spec-types@^0.0.259":
+"@aws-cdk/service-spec-types@0.0.260", "@aws-cdk/service-spec-types@0.0.265", "@aws-cdk/service-spec-types@^0.0.256", "@aws-cdk/service-spec-types@^0.0.264", "@aws-cdk/service-spec-types@^0.0.265":
   version "0.0.260"
   resolved "https://registry.npmjs.org/@aws-cdk/service-spec-types/-/service-spec-types-0.0.260.tgz#bf8d8436d048937fddcc1587a7b3aa1a320aa814"
   integrity sha512-P3EnUAS/AJCEPoW85HkDGFYkeLgEnu4pfGkTQmnHQZ7t4wsoCKqxU7VcZsnM2sKDar/S0BGJQACzya12wp714A==
@@ -2787,11 +2787,6 @@
     "@typescript-eslint/utils" "^8.58.0"
     fs-extra "^11.3.4"
     typescript "^5.9.3"
-
-"@cdklabs/tskb@^0.0.0":
-  version "0.0.0"
-  resolved "https://registry.npmjs.org/@cdklabs/tskb/-/tskb-0.0.0.tgz#2d7e1ae75ab1d65e1cdb3f586819c606128e0d56"
-  integrity sha512-smJy/KlMifb6WzCDU2ONlkSmr2fzp+rvlE8AHAAUQH2uBO5odHUKGzNEnpnlynPfodt6/pvXQv6ly0OtzuFanQ==
 
 "@cdklabs/tskb@^0.0.4":
   version "0.0.4"

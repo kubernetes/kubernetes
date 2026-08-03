@@ -172,7 +172,7 @@ export class UserPoolDomain extends Resource implements IUserPoolDomain {
     this.resource = new CfnUserPoolDomain(this, 'Resource', {
       userPoolId: props.userPool.userPoolRef.userPoolId,
       domain: domainName,
-      customDomainConfig: props.customDomain ? { certificateArn: props.customDomain.certificate.certificateRef.certificateId } : undefined,
+      customDomainConfig: props.customDomain ? { certificateArn: props.customDomain.certificate.certificateRef.certificateArn } : undefined,
       managedLoginVersion: props.managedLoginVersion,
     });
 

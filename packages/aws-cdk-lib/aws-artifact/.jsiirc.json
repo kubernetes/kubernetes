@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.artifact"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.Artifact"
+    },
+    "python": {
+      "module": "aws_cdk.aws_artifact"
+    }
+  }
+}

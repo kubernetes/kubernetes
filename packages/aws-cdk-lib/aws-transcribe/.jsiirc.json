@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.transcribe"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.Transcribe"
+    },
+    "python": {
+      "module": "aws_cdk.aws_transcribe"
+    }
+  }
+}

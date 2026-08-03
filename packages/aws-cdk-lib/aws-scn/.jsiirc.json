@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.scn"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.SCN"
+    },
+    "python": {
+      "module": "aws_cdk.aws_scn"
+    }
+  }
+}

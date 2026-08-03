@@ -248,10 +248,10 @@ export class DomainName extends Resource implements IDomainName {
   @MethodMetadata()
   public addEndpoint(options: EndpointOptions): void {
     const domainNameConfig: CfnDomainName.DomainNameConfigurationProperty = {
-      certificateArn: options.certificate.certificateRef.certificateId,
+      certificateArn: options.certificate.certificateRef.certificateArn,
       certificateName: options.certificateName,
       endpointType: options.endpointType ? options.endpointType?.toString() : 'REGIONAL',
-      ownershipVerificationCertificateArn: options.ownershipCertificate?.certificateRef.certificateId,
+      ownershipVerificationCertificateArn: options.ownershipCertificate?.certificateRef.certificateArn,
       securityPolicy: options.securityPolicy?.toString(),
       ipAddressType: options.ipAddressType,
     };

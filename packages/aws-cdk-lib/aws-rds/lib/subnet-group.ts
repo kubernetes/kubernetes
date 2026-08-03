@@ -2,7 +2,7 @@ import type { Construct } from 'constructs';
 import { CfnDBSubnetGroup } from './rds.generated';
 import * as ec2 from '../../aws-ec2';
 import type { IResource, RemovalPolicy } from '../../core';
-import { Resource, Token } from '../../core';
+import { ArnFormat, Resource, Stack, Token } from '../../core';
 import { addConstructMetadata } from '../../core/lib/metadata-resource';
 import { propertyInjectable } from '../../core/lib/prop-injectable';
 import type { aws_rds } from '../../interfaces';
@@ -73,10 +73,20 @@ export class SubnetGroup extends Resource implements ISubnetGroup {
       public readonly subnetGroupName = subnetGroupName;
       public get dbSubnetGroupRef(): aws_rds.DBSubnetGroupReference {
         return {
+          dbSubnetGroupArn: SubnetGroup.groupArn(this, this.subnetGroupName),
           dbSubnetGroupName: this.subnetGroupName,
         };
       }
     }(scope, id);
+  }
+
+  private static groupArn(scope: Construct, subnetGroupName: string): string {
+    return Stack.of(scope).formatArn({
+      service: 'rds',
+      resource: 'subgrp',
+      resourceName: subnetGroupName,
+      arnFormat: ArnFormat.COLON_RESOURCE_NAME,
+    });
   }
 
   public readonly subnetGroupName: string;
@@ -86,6 +96,7 @@ export class SubnetGroup extends Resource implements ISubnetGroup {
    */
   public get dbSubnetGroupRef(): aws_rds.DBSubnetGroupReference {
     return {
+      dbSubnetGroupArn: SubnetGroup.groupArn(this, this.subnetGroupName),
       dbSubnetGroupName: this.subnetGroupName,
     };
   }

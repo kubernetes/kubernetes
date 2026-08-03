@@ -385,7 +385,7 @@ export class Distribution extends Resource implements IDistribution {
     addConstructMetadata(this, props);
 
     if (props.certificate) {
-      const certificateRegion = Stack.of(this).splitArn(props.certificate.certificateRef.certificateId, ArnFormat.SLASH_RESOURCE_NAME).region;
+      const certificateRegion = Stack.of(this).splitArn(props.certificate.certificateRef.certificateArn, ArnFormat.SLASH_RESOURCE_NAME).region;
       if (!Token.isUnresolved(certificateRegion) && certificateRegion !== 'us-east-1') {
         throw new ValidationError(lit`DistributionCertificateMustBeInUsEast1`, `Distribution certificates must be in the us-east-1 region and the certificate you provided is in ${certificateRegion}.`, this);
       }
@@ -870,7 +870,7 @@ export class Distribution extends Resource implements IDistribution {
     const sslSupportMethod = sslSupportMethodProp ?? SSLMethod.SNI;
 
     return {
-      acmCertificateArn: certificate.certificateRef.certificateId,
+      acmCertificateArn: certificate.certificateRef.certificateArn,
       minimumProtocolVersion: minimumProtocolVersion,
       sslSupportMethod: sslSupportMethod,
     };

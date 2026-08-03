@@ -18,7 +18,7 @@ export class ListenerCertificate implements IListenerCertificate {
    * Use an ACM certificate as a listener certificate
    */
   public static fromCertificateManager(this: void, acmCertificate: ICertificateRef) {
-    return new ListenerCertificate(acmCertificate.certificateRef.certificateId);
+    return new ListenerCertificate(acmCertificate.certificateRef.certificateArn);
   }
 
   /**
