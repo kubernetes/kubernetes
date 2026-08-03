@@ -128,8 +128,14 @@ func statusOkWithOverrides(overrides ...autoscalingv2.HorizontalPodAutoscalerCon
 // AddGetScaleReactor adds a 'get' reactor to a FakeScaleClient returning a specific Scale object.
 func AddGetScaleReactor(client *scalefake.FakeScaleClient, resourceType string, cfg *horizontalScenario) {
 	client.AddReactor("get", resourceType, func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		labelSet := map[string]string{"name": podNamePrefix}
-		selector := labels.SelectorFromSet(labelSet).String()
+		podLabels := map[string]string{"name": podNamePrefix}
+		if cfg.podLabels != nil {
+			podLabels = cfg.podLabels
+		}
+		selector := labels.SelectorFromSet(podLabels).String()
+		if cfg.scaleSelector != nil {
+			selector = *cfg.scaleSelector
+		}
 		obj := &autoscalingv1.Scale{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      cfg.resource.name,
@@ -186,6 +192,11 @@ func AddListPodsReactor(fakeClient *fake.Clientset, cfg *horizontalScenario) {
 			numPodsToCreate = len(cfg.reportedCPURequests)
 		}
 
+		podLabels := map[string]string{"name": podNamePrefix}
+		if cfg.podLabels != nil {
+			podLabels = cfg.podLabels
+		}
+
 		for i := 0; i < numPodsToCreate; i++ {
 			podReadiness := v1.ConditionTrue
 			if cfg.reportedPodReadiness != nil {
@@ -228,9 +239,7 @@ func AddListPodsReactor(fakeClient *fake.Clientset, cfg *horizontalScenario) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
 					Namespace: hpaNamespace,
-					Labels: map[string]string{
-						"name": podNamePrefix,
-					},
+					Labels:    podLabels,
 				},
 
 				Spec: v1.PodSpec{
@@ -455,6 +464,8 @@ type horizontalScenario struct {
 
 	resource      *fakeResource
 	lastScaleTime *metav1.Time
+	podLabels     map[string]string
+	scaleSelector *string
 
 	initialConditions []autoscalingv2.HorizontalPodAutoscalerCondition
 	recommendations   []timestampedRecommendation
@@ -4849,237 +4860,209 @@ func TestUpscaleCapGreaterThanMaxReplicas(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestConditionInvalidSelectorMissing(t *testing.T) {
-	tc := testCase{
-		minReplicas:             1,
-		maxReplicas:             100,
-		specReplicas:            3,
-		statusReplicas:          3,
-		expectedDesiredReplicas: 3,
-		CPUTarget:               10,
-		reportedLevels:          []uint64{100, 200, 300},
-		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
-		useMetricsAPI:           true,
-		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-			{
-				Type:   autoscalingv2.AbleToScale,
-				Status: v1.ConditionTrue,
-				Reason: "SucceededGetScale",
+func TestConditionSelectorValidation(t *testing.T) {
+	tests := []struct {
+		name                    string
+		fixture                 horizontalScenario
+		hpaSelectors            map[selectors.Key]labels.Selector // if non-nil, simulates other HPAs with selectors
+		expectedDesiredReplicas int32
+		expectedScaleUpdated    bool
+		expectedActionLabel     monitor.ActionLabel
+		expectedErrorLabel      monitor.ErrorLabel
+		expectedConditions      []autoscalingv2.HorizontalPodAutoscalerCondition
+	}{
+		{
+			name: "invalid selector missing",
+			fixture: horizontalScenario{
+				minReplicas:         1,
+				maxReplicas:         100,
+				specReplicas:        3,
+				statusReplicas:      3,
+				CPUTarget:           10,
+				reportedLevels:      []uint64{100, 200, 300},
+				reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
+				resource:            &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
+				scaleSelector:       ptr.To(""),
 			},
-			{
-				Type:   autoscalingv2.ScalingActive,
-				Status: v1.ConditionFalse,
-				Reason: "InvalidSelector",
-			},
-		},
-		expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
-		expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelInternal,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
-		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
-	}
-
-	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
-	tc.testScaleClient = testScaleClient
-
-	testScaleClient.PrependReactor("get", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		obj := &autoscalingv1.Scale{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: tc.resource.name,
-			},
-			Spec: autoscalingv1.ScaleSpec{
-				Replicas: tc.specReplicas,
-			},
-			Status: autoscalingv1.ScaleStatus{
-				Replicas: tc.specReplicas,
-			},
-		}
-		return true, obj, nil
-	})
-
-	tc.runTest(t)
-}
-
-func TestConditionInvalidSelectorUnparsable(t *testing.T) {
-	tc := testCase{
-		minReplicas:             1,
-		maxReplicas:             100,
-		specReplicas:            3,
-		statusReplicas:          3,
-		expectedDesiredReplicas: 3,
-		CPUTarget:               10,
-		reportedLevels:          []uint64{100, 200, 300},
-		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
-		useMetricsAPI:           true,
-		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-			{
-				Type:   autoscalingv2.AbleToScale,
-				Status: v1.ConditionTrue,
-				Reason: "SucceededGetScale",
-			},
-			{
-				Type:   autoscalingv2.ScalingActive,
-				Status: v1.ConditionFalse,
-				Reason: "InvalidSelector",
+			expectedDesiredReplicas: 3,
+			expectedScaleUpdated:    false,
+			expectedActionLabel:     monitor.ActionLabelNone,
+			expectedErrorLabel:      monitor.ErrorLabelInternal,
+			expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+				{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+				{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidSelector"},
 			},
 		},
-		expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
-		expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelInternal,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
-		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
+		{
+			name: "invalid selector unparsable",
+			fixture: horizontalScenario{
+				minReplicas:         1,
+				maxReplicas:         100,
+				specReplicas:        3,
+				statusReplicas:      3,
+				CPUTarget:           10,
+				reportedLevels:      []uint64{100, 200, 300},
+				reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
+				resource:            &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
+				scaleSelector:       ptr.To("cheddar cheese"),
+			},
+			expectedDesiredReplicas: 3,
+			expectedScaleUpdated:    false,
+			expectedActionLabel:     monitor.ActionLabelNone,
+			expectedErrorLabel:      monitor.ErrorLabelInternal,
+			expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+				{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+				{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidSelector"},
+			},
+		},
+		{
+			// Another HPA (test-hpa-2) selects {"cheddar":"cheese"} which does not overlap
+			// with the default pod label {"name": podNamePrefix}, so scaling proceeds normally.
+			name: "no ambiguous selector when no overlap between HPAs",
+			fixture: horizontalScenario{
+				minReplicas:         2,
+				maxReplicas:         6,
+				specReplicas:        3,
+				statusReplicas:      3,
+				CPUTarget:           30,
+				reportedLevels:      []uint64{300, 500, 700},
+				reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+				resource:            &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
+			},
+			hpaSelectors: map[selectors.Key]labels.Selector{
+				{Name: "test-hpa-2", Namespace: testNamespace}: labels.SelectorFromSet(labels.Set{"cheddar": "cheese"}),
+			},
+			expectedDesiredReplicas: 5,
+			expectedScaleUpdated:    true,
+			expectedActionLabel:     monitor.ActionLabelScaleUp,
+			expectedErrorLabel:      monitor.ErrorLabelNone,
+		},
+		{
+			// Another HPA (test-hpa-2) selects {"name": podNamePrefix} which fully overlaps
+			// with the original HPA's selector, triggering AmbiguousSelector.
+			name: "ambiguous selector when full overlap between HPAs",
+			fixture: horizontalScenario{
+				minReplicas:         2,
+				maxReplicas:         6,
+				specReplicas:        3,
+				statusReplicas:      3,
+				CPUTarget:           30,
+				reportedLevels:      []uint64{300, 500, 700},
+				reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+				resource:            &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
+			},
+			hpaSelectors: map[selectors.Key]labels.Selector{
+				{Name: "test-hpa-2", Namespace: testNamespace}: labels.SelectorFromSet(labels.Set{"name": podNamePrefix}),
+			},
+			expectedDesiredReplicas: 3,
+			expectedScaleUpdated:    false,
+			expectedActionLabel:     monitor.ActionLabelNone,
+			expectedErrorLabel:      monitor.ErrorLabelInternal,
+			expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+				{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+				{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "AmbiguousSelector"},
+			},
+		},
+		{
+			// Another HPA (test-hpa-2) selects {"cheddar":"cheese"}. Pods have both labels,
+			// so they are selected by both HPAs, triggering AmbiguousSelector.
+			name: "ambiguous selector when partial overlap between HPAs",
+			fixture: horizontalScenario{
+				minReplicas:         2,
+				maxReplicas:         6,
+				specReplicas:        3,
+				statusReplicas:      3,
+				CPUTarget:           30,
+				reportedLevels:      []uint64{300, 500, 700},
+				reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+				resource:            &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
+				podLabels: map[string]string{
+					"name":    podNamePrefix,
+					"cheddar": "cheese",
+				},
+			},
+			hpaSelectors: map[selectors.Key]labels.Selector{
+				{Name: "test-hpa-2", Namespace: testNamespace}: labels.SelectorFromSet(labels.Set{"cheddar": "cheese"}),
+			},
+			expectedDesiredReplicas: 3,
+			expectedScaleUpdated:    false,
+			expectedActionLabel:     monitor.ActionLabelNone,
+			expectedErrorLabel:      monitor.ErrorLabelInternal,
+			expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+				{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+				{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "AmbiguousSelector"},
+			},
+		},
 	}
 
-	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
-	tc.testScaleClient = testScaleClient
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeWatch := watch.NewFake()
+			testClient := &fake.Clientset{}
+			testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
+			AddListHPAReactor(testClient, &tt.fixture, t)
+			AddListPodsReactor(testClient, &tt.fixture)
+			AddUpdateAutoscalingReactor(testClient)
 
-	testScaleClient.PrependReactor("get", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		obj := &autoscalingv1.Scale{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: tc.resource.name,
-			},
-			Spec: autoscalingv1.ScaleSpec{
-				Replicas: tc.specReplicas,
-			},
-			Status: autoscalingv1.ScaleStatus{
-				Replicas: tc.specReplicas,
-				Selector: "cheddar cheese",
-			},
-		}
-		return true, obj, nil
-	})
+			fakeScaleClient := &scalefake.FakeScaleClient{}
+			AddGetScaleReactor(fakeScaleClient, "replicationcontrollers", &tt.fixture)
+			AddUpdateScaleReactor(fakeScaleClient, "replicationcontrollers")
 
-	tc.runTest(t)
-}
+			fakeMetricsClient := &metricsfake.Clientset{}
+			AddListPodMetricsReactor(fakeMetricsClient, &tt.fixture)
 
-func TestConditionNoAmbiguousSelectorWhenNoSelectorOverlapBetweenHPAs(t *testing.T) {
-	for _, fgEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("HPAOptimizedSelectorStore=%v", fgEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAOptimizedSelectorStore, fgEnabled)
-			tc := testCase{
-				minReplicas:             2,
-				maxReplicas:             6,
-				specReplicas:            3,
-				statusReplicas:          3,
-				expectedDesiredReplicas: 5,
-				CPUTarget:               30,
-				reportedLevels:          []uint64{300, 500, 700},
-				reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-				useMetricsAPI:           true,
-				hpaSelectors: map[selectors.Key]labels.Selector{
-					{Name: "test-hpa-2", Namespace: testNamespace}: labels.SelectorFromSet(labels.Set{"cheddar": "cheese"}),
-				},
-				expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
-				expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
-				expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-					autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
-				},
-				expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-					autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
-				},
-			}
-			tc.runTest(t)
-		})
-	}
-}
+			eventClient := &fake.Clientset{}
 
-func TestConditionAmbiguousSelectorWhenFullSelectorOverlapBetweenHPAs(t *testing.T) {
-	for _, fgEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("HPAOptimizedSelectorStore=%v", fgEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAOptimizedSelectorStore, fgEnabled)
-			tc := testCase{
-				minReplicas:             2,
-				maxReplicas:             6,
-				specReplicas:            3,
-				statusReplicas:          3,
-				expectedDesiredReplicas: 3,
-				CPUTarget:               30,
-				reportedLevels:          []uint64{300, 500, 700},
-				reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-				useMetricsAPI:           true,
-				expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{
-						Type:   autoscalingv2.AbleToScale,
-						Status: v1.ConditionTrue,
-						Reason: "SucceededGetScale",
-					},
-					{
-						Type:   autoscalingv2.ScalingActive,
-						Status: v1.ConditionFalse,
-						Reason: "AmbiguousSelector",
-					},
-				},
-				hpaSelectors: map[selectors.Key]labels.Selector{
-					{Name: "test-hpa-2", Namespace: testNamespace}: labels.SelectorFromSet(labels.Set{"name": podNamePrefix}),
-				},
-				expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
-				expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelInternal,
-				expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
-				expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
-			}
-			tc.runTest(t)
-		})
-	}
-}
+			setup := newHorizontalSetup(t, &tt.fixture, testClient, eventClient, fakeMetricsClient, nil, nil, fakeScaleClient)
 
-func TestConditionAmbiguousSelectorWhenPartialSelectorOverlapBetweenHPAs(t *testing.T) {
-	for _, fgEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("HPAOptimizedSelectorStore=%v", fgEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAOptimizedSelectorStore, fgEnabled)
-			tc := testCase{
-				minReplicas:             2,
-				maxReplicas:             6,
-				specReplicas:            3,
-				statusReplicas:          3,
-				expectedDesiredReplicas: 3,
-				CPUTarget:               30,
-				reportedLevels:          []uint64{300, 500, 700},
-				reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-				useMetricsAPI:           true,
-				expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{
-						Type:   autoscalingv2.AbleToScale,
-						Status: v1.ConditionTrue,
-						Reason: "SucceededGetScale",
-					},
-					{
-						Type:   autoscalingv2.ScalingActive,
-						Status: v1.ConditionFalse,
-						Reason: "AmbiguousSelector",
-					},
-				},
-				hpaSelectors: map[selectors.Key]labels.Selector{
-					{Name: "test-hpa-2", Namespace: testNamespace}: labels.SelectorFromSet(labels.Set{"cheddar": "cheese"}),
-				},
-				expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
-				expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelInternal,
-				expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
-				expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
-			}
-
-			testClient, _, _, _, _ := tc.prepareTestClient(t)
-			tc.testClient = testClient
-
-			testClient.PrependReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-				tc.Lock()
-				defer tc.Unlock()
-
-				obj := &v1.PodList{}
-				for i := range tc.reportedCPURequests {
-					pod := v1.Pod{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
-							Namespace: testNamespace,
-							Labels: map[string]string{
-								"name":    podNamePrefix, // selected by the original HPA
-								"cheddar": "cheese",      // selected by test-hpa-2
-							},
-						},
-					}
-					obj.Items = append(obj.Items, pod)
+			// Inject other HPAs' selectors to test overlap detection.
+			// Register the current HPA first (as enqueueHPA would), then add
+			// the competing HPAs so validateAndParseSelector can detect overlap.
+			if tt.hpaSelectors != nil {
+				hpaKey := selectors.Key{Name: "test-hpa", Namespace: testNamespace}
+				setup.controller.selectorTracker.PutIfAbsent(testNamespace, hpaKey, labels.Nothing())
+				for key, sel := range tt.hpaSelectors {
+					setup.controller.selectorTracker.PutIfAbsent(key.Namespace, key, sel)
 				}
-				return true, obj, nil
-			})
+			}
 
-			tc.runTest(t)
+			hpa := buildHPA(t, &tt.fixture)
+			key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
+
+			beforeReconciliationsTotal, err := metricstestutil.GetCounterMetricValue(
+				monitor.ReconciliationsTotal.WithLabelValues(string(tt.expectedActionLabel), string(tt.expectedErrorLabel)))
+			require.NoError(t, err)
+
+			_ = setup.controller.reconcileAutoscaler(setup.ctx, hpa, key)
+
+			scaleUpdated := false
+			for _, action := range setup.scaleClient.Actions() {
+				if action.GetVerb() == "update" {
+					scaleUpdated = true
+					scale := action.(core.UpdateAction).GetObject().(*autoscalingv1.Scale)
+					assert.Equal(t, tt.expectedDesiredReplicas, scale.Spec.Replicas, "desired replicas should match")
+				}
+			}
+			assert.Equal(t, tt.expectedScaleUpdated, scaleUpdated, "scale update expectation mismatch")
+
+			afterReconciliationsTotal, err := metricstestutil.GetCounterMetricValue(
+				monitor.ReconciliationsTotal.WithLabelValues(string(tt.expectedActionLabel), string(tt.expectedErrorLabel)))
+			require.NoError(t, err)
+			assert.Equal(t, 1, int(afterReconciliationsTotal-beforeReconciliationsTotal), "reconciliation metric should be recorded for action=%s error=%s", tt.expectedActionLabel, tt.expectedErrorLabel)
+
+			if tt.expectedConditions != nil {
+				for _, action := range setup.testClient.Actions() {
+					if action.GetVerb() == "update" && action.GetResource().Resource == "horizontalpodautoscalers" {
+						updatedHPA := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
+						actualConditions := updatedHPA.Status.Conditions
+						for i := range actualConditions {
+							actualConditions[i].Message = ""
+							actualConditions[i].LastTransitionTime = metav1.Time{}
+						}
+						assert.Equal(t, tt.expectedConditions, actualConditions, "status conditions should match")
+					}
+				}
+			}
 		})
 	}
 }
