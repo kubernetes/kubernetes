@@ -411,10 +411,14 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			podSpec := getStressTestPod(podName, "memory-stress", []string{})
 			podSpec.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
 			podSpec.Spec.Containers[0].Args = []string{
-				// This command runs an infinite loop that uses `dd` to write 50MB files,
-				// cycling through 5 files to target 250MB of reclaimable file cache usage.
-				// This exceeds the 200MB memory limit, forcing the kernel to reclaim memory and generate pressure stalls.
-				"i=0; while true; do dd if=/dev/zero of=testfile.$i bs=1M count=50 &>/dev/null; i=$(((i+1)%5)); sleep 0.1; done",
+				// Write 50MB files in an infinite loop, cycling through 5 file names, so
+				// the kernel must keep reclaiming file cache inside the 200MB limit.
+				// The first pass writes small 10MB files: without that ramp, the very
+				// first pass fills the whole limit with dirty pages before writeback has
+				// started, and on filesystems that hold dirty data longer (XFS on Fedora
+				// CoreOS) the kernel OOM kills the container instead of reclaiming.
+				"i=0; while [ $i -lt 5 ]; do dd if=/dev/zero of=testfile.$i bs=1M count=10 &>/dev/null; i=$((i+1)); sleep 0.1; done; " +
+					"i=0; while true; do dd if=/dev/zero of=testfile.$i bs=1M count=50 &>/dev/null; i=$(((i+1)%5)); sleep 0.1; done",
 			}
 			podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Limits: v1.ResourceList{
