@@ -38,8 +38,8 @@ import (
 )
 
 type Tester struct {
-	tester   *resttest.Tester
-	storage  *genericregistry.Store
+	tester    *resttest.Tester
+	storage   *genericregistry.Store
 	defaulter runtime.ObjectDefaulter
 }
 type UpdateFunc func(runtime.Object) runtime.Object
