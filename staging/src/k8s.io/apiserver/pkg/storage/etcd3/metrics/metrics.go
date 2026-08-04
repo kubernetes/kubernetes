@@ -84,7 +84,7 @@ var (
 		&compbasemetrics.GaugeOpts{
 			Name:           "apiserver_resource_size_estimate_bytes",
 			Help:           "Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "resource"},
 	)
