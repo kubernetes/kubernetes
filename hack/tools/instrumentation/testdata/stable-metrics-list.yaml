@@ -98,6 +98,31 @@
   stabilityLevel: BETA
   labels:
   - priority_level
+- name: priority_level_seat_utilization
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Observations, at the end of every nanosecond, of utilization of seats for
+    any stage of execution (but only initial stage for WATCHes)
+  type: TimingRatioHistogram
+  stabilityLevel: BETA
+  labels:
+  - priority_level
+  buckets:
+  - 0
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.4
+  - 0.5
+  - 0.6
+  - 0.7
+  - 0.8
+  - 0.9
+  - 0.95
+  - 0.99
+  - 1
+  constLabels:
+    phase: executing
 - name: rejected_requests_total
   subsystem: flowcontrol
   namespace: apiserver
