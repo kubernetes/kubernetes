@@ -126,6 +126,16 @@ func (f *fakeHTTP) Do(req *http.Request) (*http.Response, error) {
 	return f.resp, f.err
 }
 
+type contextBlockingHTTP struct {
+	started chan context.Context
+}
+
+func (f *contextBlockingHTTP) Do(req *http.Request) (*http.Response, error) {
+	f.started <- req.Context()
+	<-req.Context().Done()
+	return nil, req.Context().Err()
+}
+
 func TestRunHandlerHttp(t *testing.T) {
 	_, tCtx := ktesting.NewTestContext(t)
 	fakeHTTPGetter := fakeHTTP{}
@@ -160,6 +170,44 @@ func TestRunHandlerHttp(t *testing.T) {
 	if fakeHTTPGetter.url != "http://foo:8080/bar" {
 		t.Errorf("unexpected url: %s", fakeHTTPGetter.url)
 	}
+}
+
+func TestRunHandlerHTTPCancellation(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+	httpDoer := &contextBlockingHTTP{started: make(chan context.Context, 1)}
+	handlerRunner := NewHandlerRunner(httpDoer, &fakeContainerCommandRunner{}, nil, nil)
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "container"}
+	container := v1.Container{
+		Name: "container",
+		Lifecycle: &v1.Lifecycle{PreStop: &v1.LifecycleHandler{HTTPGet: &v1.HTTPGetAction{
+			Host: "127.0.0.1",
+			Port: intstr.FromInt32(8080),
+		}}},
+	}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "test"}}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := handlerRunner.Run(ctx, containerID, pod, &container, container.Lifecycle.PreStop)
+		done <- err
+	}()
+
+	var requestCtx context.Context
+	select {
+	case requestCtx = <-httpDoer.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("HTTP lifecycle hook did not start")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(5 * time.Second):
+		t.Fatal("HTTP lifecycle hook did not return after its context was cancelled")
+	}
+	require.ErrorIs(t, requestCtx.Err(), context.Canceled)
 }
 
 func TestRunHandlerHttpWithHeaders(t *testing.T) {

@@ -2249,13 +2249,6 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// Ensure the pod is being probed
 	kl.probeManager.AddPod(ctx, pod)
 
-	// TODO(#113606): use cancellation from the incoming context parameter, which comes from the pod worker.
-	// Currently, using cancellation from that context causes test failures. To remove this WithoutCancel,
-	// any wait.Interrupted errors need to be filtered from result and bypass the reasonCache - cancelling
-	// the context for SyncPod is a known and deliberate error, not a generic error.
-	// Use WithoutCancel instead of a new context.TODO() to propagate trace context
-	// Call the container runtime's SyncPod callback
-	sctx := context.WithoutCancel(ctx)
 	restartingAllContainers := false
 	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
 		for _, cond := range apiPodStatus.Conditions {
@@ -2264,7 +2257,15 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			}
 		}
 	}
-	result := kl.containerRuntime.SyncPod(sctx, pod, podStatus, pullSecrets, kl.crashLoopBackOff, restartingAllContainers)
+	// Call the container runtime's SyncPod callback
+	result := kl.containerRuntime.SyncPod(ctx, pod, podStatus, pullSecrets, kl.crashLoopBackOff, restartingAllContainers)
+	// Cancelling the context for SyncPod is a known and deliberate action, for
+	// example when the pod starts terminating or its grace period is shortened.
+	// Such an interruption is not a generic error, so it must neither be cached
+	// in the reasonCache nor reported as a container failure.
+	if syncErr := result.Error(); wait.Interrupted(syncErr) {
+		return false, nil, syncErr
+	}
 	kl.reasonCache.Update(pod.UID, result)
 
 	// If we just performed a RestartAllContainers reset, we want to immediately
@@ -2338,10 +2339,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 // configuration and the kubelet is restarted - SyncTerminatingRuntimePod handles those orphaned
 // pods.
 func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) (err error) {
-	// TODO(#113606): connect this with the incoming context parameter, which comes from the pod worker.
-	// Currently, using that context causes test failures.
 	logger := klog.FromContext(ctx)
-	ctx = klog.NewContext(context.TODO(), logger)
 	logger.V(4).Info("SyncTerminatingPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 
 	ctx, otelSpan := kl.tracer.Start(ctx, "syncTerminatingPod", trace.WithAttributes(
@@ -2375,6 +2373,11 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 
 	p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
 	if err := kl.killPod(ctx, pod, p, gracePeriod); err != nil {
+		// A shortened grace period deliberately cancels this sync so the pod
+		// worker can process the queued update with the new deadline.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
 		// there was an error killing the pod, so we return that error directly
 		return fmt.Errorf("error killing terminating pod: %w", err)
@@ -2475,10 +2478,7 @@ func preserveDataFromBeforeStopping(stoppedPodStatus, podStatus *kubecontainer.P
 // not update the status of the pod because with the source of configuration removed, we have no
 // place to send that status.
 func (kl *Kubelet) SyncTerminatingRuntimePod(ctx context.Context, runningPod *kubecontainer.Pod) error {
-	// TODO(#113606): connect this with the incoming context parameter, which comes from the pod worker.
-	// Currently, using that context causes test failures.
 	logger := klog.FromContext(ctx)
-	ctx = klog.NewContext(context.TODO(), logger)
 	pod := runningPod.ToAPIPod()
 	logger.V(4).Info("SyncTerminatingRuntimePod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer logger.V(4).Info("SyncTerminatingRuntimePod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
@@ -2488,6 +2488,11 @@ func (kl *Kubelet) SyncTerminatingRuntimePod(ctx context.Context, runningPod *ku
 	// TODO: this should probably be zero, to bypass any waiting (needs fixes in container runtime)
 	gracePeriod := int64(1)
 	if err := kl.killPod(ctx, pod, *runningPod, &gracePeriod); err != nil {
+		// Cancellation means a newer pod worker update superseded this attempt;
+		// do not report it as a runtime failure.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
 		// there was an error killing the pod, so we return that error directly
 		utilruntime.HandleError(err)
