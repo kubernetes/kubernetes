@@ -101,16 +101,30 @@ func buildAndRegisterSpecAggregatorForLocalServices(downloader *Downloader, aggr
 	}
 
 	s.openAPIVersionedService = handler.NewOpenAPIServiceLazy(s.buildMergeSpecLocked())
-	s.openAPIVersionedService.RegisterOpenAPIVersionedService("/openapi/v2", instrumentedPathHandler{delegate: pathHandler})
+	// RegisterOpenAPIVersionedService builds the handler internally, so capture it
+	// instead of registering it directly and install the instrumented handler here.
+	var openAPIHandler http.Handler
+	s.openAPIVersionedService.RegisterOpenAPIVersionedService("/openapi/v2", pathHandlerFunc(func(_ string, h http.Handler) {
+		openAPIHandler = h
+	}))
+	pathHandler.Handle("/openapi/v2", metrics.InstrumentHandlerFunc("GET",
+		/* group = */ "",
+		/* version = */ "",
+		/* resource = */ "",
+		/* subresource = */ "openapi/v2",
+		/* scope = */ "",
+		/* component = */ "",
+		/* deprecated */ false,
+		/* removedRelease */ "",
+		openAPIHandler.ServeHTTP))
 	return s
 }
 
-type instrumentedPathHandler struct {
-	delegate common.PathHandler
-}
+// pathHandlerFunc adapts a function to the common.PathHandler interface.
+type pathHandlerFunc func(path string, handler http.Handler)
 
-func (i instrumentedPathHandler) Handle(path string, h http.Handler) {
-	i.delegate.Handle(path, metrics.InstrumentHandlerFunc("GET", "", "", "", "openapi/v2", "", "", false, "", h.ServeHTTP))
+func (f pathHandlerFunc) Handle(path string, handler http.Handler) {
+	f(path, handler)
 }
 
 // BuildAndRegisterAggregator registered OpenAPI aggregator handler. This function is not thread safe as it only being called on startup.
