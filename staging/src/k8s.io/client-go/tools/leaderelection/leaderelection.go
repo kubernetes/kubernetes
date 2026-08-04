@@ -167,7 +167,7 @@ type LeaderElectionConfig struct {
 
 // LeaderCallbacks are callbacks that are triggered during certain
 // lifecycle events of the LeaderElector. These are invoked asynchronously.
-//
+// These must be concurrent safe.
 // possible future callbacks:
 //   - OnChallenge()
 type LeaderCallbacks struct {
