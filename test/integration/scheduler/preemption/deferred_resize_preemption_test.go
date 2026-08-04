@@ -47,7 +47,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			SchedulerName: new(v1.DefaultSchedulerName),
 		}},
 	})
 
@@ -65,9 +65,9 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			nodeCapacityCPU: "300m",
 			nodeCapacityMem: "300",
 			existingPods: []*v1.Pod{
-				initPausePod(&testutils.PausePodConfig{
+				InitPausePod(&testutils.PausePodConfig{
 					Name:     "victim-1",
-					Priority: &lowPriority,
+					Priority: &LowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
 						v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
@@ -76,7 +76,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			},
 			preemptorConfig: &testutils.PausePodConfig{
 				Name:     "preemptor-pod",
-				Priority: &highPriority,
+				Priority: &HighPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
@@ -89,17 +89,17 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			nodeCapacityCPU: "300m",
 			nodeCapacityMem: "300",
 			existingPods: []*v1.Pod{
-				initPausePod(&testutils.PausePodConfig{
+				InitPausePod(&testutils.PausePodConfig{
 					Name:     "victim-1",
-					Priority: &lowPriority,
+					Priority: &LowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
 						v1.ResourceMemory: *resource.NewQuantity(50, resource.DecimalSI)},
 					},
 				}),
-				initPausePod(&testutils.PausePodConfig{
+				InitPausePod(&testutils.PausePodConfig{
 					Name:     "victim-2",
-					Priority: &lowPriority,
+					Priority: &LowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
 						v1.ResourceMemory: *resource.NewQuantity(50, resource.DecimalSI)},
@@ -108,7 +108,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			},
 			preemptorConfig: &testutils.PausePodConfig{
 				Name:     "preemptor-pod",
-				Priority: &highPriority,
+				Priority: &HighPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
@@ -121,9 +121,9 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			nodeCapacityCPU: "300m",
 			nodeCapacityMem: "300",
 			existingPods: []*v1.Pod{
-				initPausePod(&testutils.PausePodConfig{
+				InitPausePod(&testutils.PausePodConfig{
 					Name:     "victim-1",
-					Priority: &lowPriority,
+					Priority: &LowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
 						v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
@@ -132,8 +132,8 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			},
 			preemptorConfig: &testutils.PausePodConfig{
 				Name:             "preemptor-pod",
-				Priority:         &highPriority,
-				PreemptionPolicy: ptr.To(v1.PreemptNever),
+				Priority:         &HighPriority,
+				PreemptionPolicy: new(v1.PreemptNever),
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
@@ -148,7 +148,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			existingPods:    nil, // fits immediately
 			preemptorConfig: &testutils.PausePodConfig{
 				Name:     "preemptor-pod",
-				Priority: &highPriority,
+				Priority: &HighPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
@@ -164,9 +164,9 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 				DisableResizePreemption: []string{"test-operator"},
 			},
 			existingPods: []*v1.Pod{
-				initPausePod(&testutils.PausePodConfig{
+				InitPausePod(&testutils.PausePodConfig{
 					Name:     "victim-1",
-					Priority: &lowPriority,
+					Priority: &LowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
 						v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
@@ -175,7 +175,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			},
 			preemptorConfig: &testutils.PausePodConfig{
 				Name:     "preemptor-pod",
-				Priority: &highPriority,
+				Priority: &HighPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
@@ -223,7 +223,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			for _, p := range tt.existingPods {
 				p.Namespace = testCtx.NS.Name
 				p.Spec.NodeName = nodeName
-				runningPod, err := runPausePod(cs, p)
+				runningPod, err := RunPausePod(cs, p)
 				if err != nil {
 					t.Fatalf("Failed running pause pod %v: %v", p.Name, err)
 				}
@@ -233,7 +233,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			// Create preemptor/resizing pod already scheduled to nodeName
 			tt.preemptorConfig.NodeName = nodeName
 			tt.preemptorConfig.Namespace = testCtx.NS.Name
-			preemptorPod := initPausePod(tt.preemptorConfig)
+			preemptorPod := InitPausePod(tt.preemptorConfig)
 			preemptorPod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, preemptorPod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create preemptor pod: %v", err)
@@ -277,7 +277,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			if len(tt.expectEvictedNames) > 0 {
 				for _, name := range tt.expectEvictedNames {
 					err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
-						podIsGettingEvicted(cs, testCtx.NS.Name, name))
+						PodIsGettingEvicted(cs, testCtx.NS.Name, name))
 					if err != nil {
 						t.Errorf("Expected pod %q to be evicted/deleted, but it was not", name)
 					}
@@ -356,40 +356,40 @@ func setUpPreemptionTestWithContext(t *testing.T, testCtx *testutils.TestContext
 	}
 
 	// Create 'other-pod' utilizing node1
-	other := initPausePod(&testutils.PausePodConfig{
+	other := InitPausePod(&testutils.PausePodConfig{
 		Name:     fmt.Sprintf("other-pod-%d", idx),
 		NodeName: nodeName1,
-		Priority: &highPriority,
+		Priority: &HighPriority,
 		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 			v1.ResourceCPU: resource.MustParse(otherPodCPURequest)},
 		},
 	})
 	other.Namespace = testCtx.NS.Name
-	other, err := runPausePod(cs, other)
+	other, err := RunPausePod(cs, other)
 	if err != nil {
 		t.Fatalf("Failed to run other pod: %v", err)
 	}
 
 	// Create 'irrelevant-pod' utilizing node2
-	irrelevant := initPausePod(&testutils.PausePodConfig{
+	irrelevant := InitPausePod(&testutils.PausePodConfig{
 		Name:     fmt.Sprintf("irrelevant-pod-%d", idx),
 		NodeName: nodeName2,
-		Priority: &highPriority,
+		Priority: &HighPriority,
 		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 			v1.ResourceCPU: *resource.NewMilliQuantity(200, resource.DecimalSI)},
 		},
 	})
 	irrelevant.Namespace = testCtx.NS.Name
-	irrelevant, err = runPausePod(cs, irrelevant)
+	irrelevant, err = RunPausePod(cs, irrelevant)
 	if err != nil {
 		t.Fatalf("Failed to run irrelevant pod: %v", err)
 	}
 
 	// Create deferred pod
-	pod := initPausePod(&testutils.PausePodConfig{
+	pod := InitPausePod(&testutils.PausePodConfig{
 		Name:     fmt.Sprintf("deferred-pod-%d", idx),
 		NodeName: nodeName1,
-		Priority: &lowPriority,
+		Priority: &LowPriority,
 		Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 			v1.ResourceCPU: resource.MustParse(deferredPodCPURequest)},
 		},
@@ -456,7 +456,7 @@ func TestDeferredResizeQueueingHints(t *testing.T) {
 
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			SchedulerName: new(v1.DefaultSchedulerName),
 		}},
 	})
 
@@ -621,7 +621,7 @@ func TestDeferredResizeNodePreemptionPolicy(t *testing.T) {
 
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			SchedulerName: new(v1.DefaultSchedulerName),
 		}},
 	})
 
@@ -748,7 +748,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 
 		cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 			Profiles: []configv1.KubeSchedulerProfile{{
-				SchedulerName: ptr.To(v1.DefaultSchedulerName),
+				SchedulerName: new(v1.DefaultSchedulerName),
 			}},
 		})
 
@@ -767,10 +767,10 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		}
 
 		// Create and status-update pod to be deferred resize
-		pod := initPausePod(&testutils.PausePodConfig{
+		pod := InitPausePod(&testutils.PausePodConfig{
 			Name:     "deferred-pod",
 			NodeName: "node1",
-			Priority: &lowPriority,
+			Priority: &LowPriority,
 			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 				v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)},
 			},
@@ -838,7 +838,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 
 		cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 			Profiles: []configv1.KubeSchedulerProfile{{
-				SchedulerName: ptr.To(v1.DefaultSchedulerName),
+				SchedulerName: new(v1.DefaultSchedulerName),
 			}},
 		})
 
@@ -864,10 +864,10 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		}
 
 		// Create a normal running pod assigned to node1 (no deferred condition)
-		pod := initPausePod(&testutils.PausePodConfig{
+		pod := InitPausePod(&testutils.PausePodConfig{
 			Name:     "deferred-pod",
 			NodeName: "node1",
-			Priority: &lowPriority,
+			Priority: &LowPriority,
 			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 				v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)},
 			},
@@ -945,7 +945,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 
 		cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 			Profiles: []configv1.KubeSchedulerProfile{{
-				SchedulerName: ptr.To(v1.DefaultSchedulerName),
+				SchedulerName: new(v1.DefaultSchedulerName),
 			}},
 		})
 
@@ -968,10 +968,10 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 			t.Fatalf("Failed to create node: %v", err)
 		}
 
-		pod := initPausePod(&testutils.PausePodConfig{
+		pod := InitPausePod(&testutils.PausePodConfig{
 			Name:     "deferred-pod",
 			NodeName: "node1",
-			Priority: &lowPriority,
+			Priority: &LowPriority,
 			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 				v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)},
 			},
@@ -1040,7 +1040,7 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 
 		cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 			Profiles: []configv1.KubeSchedulerProfile{{
-				SchedulerName: ptr.To(v1.DefaultSchedulerName),
+				SchedulerName: new(v1.DefaultSchedulerName),
 			}},
 		})
 
@@ -1066,10 +1066,10 @@ func TestDeferredResizeQueueingHandlers(t *testing.T) {
 		}
 
 		// Create a deferred resize pod assigned to node1
-		pod := initPausePod(&testutils.PausePodConfig{
+		pod := InitPausePod(&testutils.PausePodConfig{
 			Name:     "deferred-pod-del",
 			NodeName: "node1",
-			Priority: &lowPriority,
+			Priority: &LowPriority,
 			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 				v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)},
 			},
