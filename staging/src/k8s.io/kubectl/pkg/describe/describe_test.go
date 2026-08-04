@@ -1512,6 +1512,79 @@ func TestDescribeResources(t *testing.T) {
 	}
 }
 
+func TestFormatResourceQuantity(t *testing.T) {
+	testCases := []struct {
+		name     string
+		resource corev1.ResourceName
+		quantity string
+		expected string
+	}{
+		{
+			name:     "fractional memory",
+			resource: corev1.ResourceMemory,
+			quantity: "0.1Gi",
+			expected: "107374183",
+		},
+		{
+			name:     "millibyte memory",
+			resource: corev1.ResourceMemory,
+			quantity: "107374182400m",
+			expected: "107374183",
+		},
+		{
+			name:     "sub-byte memory",
+			resource: corev1.ResourceMemory,
+			quantity: "1m",
+			expected: "1",
+		},
+		{
+			name:     "whole memory",
+			resource: corev1.ResourceMemory,
+			quantity: "10Gi",
+			expected: "10Gi",
+		},
+		{
+			name:     "zero memory",
+			resource: corev1.ResourceMemory,
+			quantity: "0",
+			expected: "0",
+		},
+		{
+			name:     "fractional ephemeral storage",
+			resource: corev1.ResourceEphemeralStorage,
+			quantity: "0.1Gi",
+			expected: "107374183",
+		},
+		{
+			name:     "fractional hugepages",
+			resource: corev1.ResourceName("hugepages-2Mi"),
+			quantity: "0.1Gi",
+			expected: "107374183",
+		},
+		{
+			name:     "cpu millicores",
+			resource: corev1.ResourceCPU,
+			quantity: "100m",
+			expected: "100m",
+		},
+		{
+			name:     "fractional cpu",
+			resource: corev1.ResourceCPU,
+			quantity: "0.1",
+			expected: "100m",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := formatResourceQuantity(testCase.resource, resource.MustParse(testCase.quantity))
+			if got != testCase.expected {
+				t.Errorf("expected %q, got %q", testCase.expected, got)
+			}
+		})
+	}
+}
+
 func TestDescribeContainerPorts(t *testing.T) {
 	testCases := []struct {
 		name              string
