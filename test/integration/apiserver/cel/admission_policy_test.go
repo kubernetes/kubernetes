@@ -34,7 +34,6 @@ import (
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	admissionregistrationv1apis "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
-	admissionregistrationv1beta1apis "k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -46,7 +45,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 )
 
 const (
@@ -165,123 +163,6 @@ var testSpec admissionregistration.ValidatingAdmissionPolicy = admissionregistra
 			},
 		},
 	},
-}
-
-func createV1beta1ValidatingPolicyAndBinding(ctx ktesting.TContext, client clientset.Interface, convertedRules []admissionregistrationv1beta1.NamedRuleWithOperations) error {
-	denyAction := admissionregistrationv1beta1.DenyAction
-	exact := admissionregistrationv1beta1.Exact
-	equivalent := admissionregistrationv1beta1.Equivalent
-
-	var outSpec admissionregistrationv1beta1.ValidatingAdmissionPolicy
-	if err := admissionregistrationv1beta1apis.Convert_admissionregistration_ValidatingAdmissionPolicy_To_v1beta1_ValidatingAdmissionPolicy(&testSpec, &outSpec, nil); err != nil {
-		return err
-	}
-
-	exactPolicyTemplate := outSpec.DeepCopy()
-	convertedPolicyTemplate := outSpec.DeepCopy()
-
-	exactPolicyTemplate.SetName("test-policy-v1beta1")
-	exactPolicyTemplate.Spec.MatchConstraints = &admissionregistrationv1beta1.MatchResources{
-		ResourceRules: []admissionregistrationv1beta1.NamedRuleWithOperations{
-			{
-				RuleWithOperations: admissionregistrationv1.RuleWithOperations{
-					Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
-					Rule:       admissionregistrationv1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
-				},
-			},
-		},
-		MatchPolicy: &exact,
-	}
-
-	convertedPolicyTemplate.SetName("test-policy-v1beta1-convert")
-	convertedPolicyTemplate.Spec.MatchConstraints = &admissionregistrationv1beta1.MatchResources{
-		ResourceRules: convertedRules,
-		MatchPolicy:   &equivalent,
-	}
-
-	exactPolicy, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(ctx, exactPolicyTemplate, metav1.CreateOptions{})
-	if err != nil {
-		return err
-	}
-
-	convertPolicy, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(ctx, convertedPolicyTemplate, metav1.CreateOptions{})
-	if err != nil {
-		return err
-	}
-
-	// Create a param that holds the options for this
-	configuration, err := client.CoreV1().ConfigMaps("default").Create(ctx, &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-policy-v1beta1-param",
-			Namespace: "default",
-			Annotations: map[string]string{
-				"skipMatch": "yes",
-			},
-		},
-		Data: map[string]string{
-			"version": "v1beta1",
-			"phase":   validation,
-			"convert": "false",
-		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		return err
-	}
-
-	configurationConvert, err := client.CoreV1().ConfigMaps("default").Create(ctx, &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-policy-v1beta1-convert-param",
-			Namespace: "default",
-			Annotations: map[string]string{
-				"skipMatch": "yes",
-			},
-		},
-		Data: map[string]string{
-			"version": "v1beta1",
-			"phase":   validation,
-			"convert": "true",
-		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		return err
-	}
-
-	_, err = client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicyBindings().Create(ctx, &admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-policy-v1beta1-binding",
-		},
-		Spec: admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingSpec{
-			PolicyName:        exactPolicy.GetName(),
-			ValidationActions: []admissionregistrationv1beta1.ValidationAction{admissionregistrationv1beta1.Warn},
-			ParamRef: &admissionregistrationv1beta1.ParamRef{
-				Name:                    configuration.GetName(),
-				Namespace:               configuration.GetNamespace(),
-				ParameterNotFoundAction: &denyAction,
-			},
-		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		return err
-	}
-	_, err = client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicyBindings().Create(ctx, &admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-policy-v1beta1-convert-binding",
-		},
-		Spec: admissionregistrationv1beta1.ValidatingAdmissionPolicyBindingSpec{
-			PolicyName:        convertPolicy.GetName(),
-			ValidationActions: []admissionregistrationv1beta1.ValidationAction{admissionregistrationv1beta1.Warn},
-			ParamRef: &admissionregistrationv1beta1.ParamRef{
-				Name:                    configurationConvert.GetName(),
-				Namespace:               configurationConvert.GetNamespace(),
-				ParameterNotFoundAction: &denyAction,
-			},
-		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func createV1ValidatingPolicyAndBinding(ctx ktesting.TContext, client clientset.Interface, convertedRules []admissionregistrationv1.NamedRuleWithOperations) error {
@@ -511,7 +392,6 @@ func testPolicyAdmission(t *testing.T) {
 	// Note: this only works because there are no overlapping resource names in-process that are not co-located
 	convertedResources := map[string]schema.GroupVersionResource{}
 	// build the webhook rules enumerating the specific group/version/resources we want
-	convertedV1beta1Rules := []admissionregistrationv1beta1.NamedRuleWithOperations{}
 	convertedV1Rules := []admissionregistrationv1.NamedRuleWithOperations{}
 	for _, gvr := range gvrsToTest {
 		metaGVR := metav1.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}
@@ -523,12 +403,6 @@ func testPolicyAdmission(t *testing.T) {
 			convertedGVR = gvr
 			convertedResources[gvr.Resource] = gvr
 			// add an admission rule indicating we can receive this version
-			convertedV1beta1Rules = append(convertedV1beta1Rules, admissionregistrationv1beta1.NamedRuleWithOperations{
-				RuleWithOperations: admissionregistrationv1.RuleWithOperations{
-					Operations: []admissionregistrationv1beta1.OperationType{admissionregistrationv1beta1.OperationAll},
-					Rule:       admissionregistrationv1beta1.Rule{APIGroups: []string{gvr.Group}, APIVersions: []string{gvr.Version}, Resources: []string{gvr.Resource}},
-				},
-			})
 			convertedV1Rules = append(convertedV1Rules, admissionregistrationv1.NamedRuleWithOperations{
 				RuleWithOperations: admissionregistrationv1.RuleWithOperations{
 					Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
