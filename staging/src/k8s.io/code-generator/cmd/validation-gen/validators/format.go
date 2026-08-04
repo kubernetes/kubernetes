@@ -93,8 +93,8 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 	case "k8s-extended-resource-name":
 		return Function(formatTagName, DefaultFlags, extendedResourceNameValidator).
 			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-extended-resource-name", ""}), nil
-	// TODO: uncomment the following when we've done the homework
-	// to be sure it works the current state of IP manual-ratcheting
+	// TODO: uncomment the following (and the docs for it) when we've done the
+	// homework to be sure it works the current state of IP manual-ratcheting
 	/*
 		case "k8s-ip":
 			return Function(formatTagName, DefaultFlags, ipSloppyValidator), nil
@@ -145,9 +145,12 @@ func (ftv formatTagValidator) Docs() TagDoc {
 			Description: "k8s-extended-resource-name",
 			Docs:        "This field holds a Kubernetes extended resource name. This is a domain-prefixed name that must not have a `kubernetes.io` or `requests.` prefix. When `requests.` is prepended, the result must be a valid label key, as used by quota.",
 		}, {
-			Description: "k8s-ip",
-			Docs:        "This field holds an IPv4 or IPv6 address value. IPv4 octets may have leading zeros.",
-		}, {
+			// TODO: uncomment the following (and the code for it) when we've done the
+			// homework to be sure it works the current state of IP manual-ratcheting
+			/*
+				Description: "k8s-ip",
+				Docs:        "This field holds an IPv4 or IPv6 address value. IPv4 octets may have leading zeros.",
+			}, {*/
 			Description: "k8s-label-key",
 			Docs:        "This field holds a Kubernetes label key.",
 		}, {
