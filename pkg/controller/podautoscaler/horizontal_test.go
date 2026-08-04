@@ -564,7 +564,7 @@ func init() {
 	scaleUpLimitFactor = 8
 }
 
-func findCpuUtilization(metricStatus []autoscalingv2.MetricStatus) (utilization *int32) {
+func findCPUUtilization(metricStatus []autoscalingv2.MetricStatus) (utilization *int32) {
 	for _, s := range metricStatus {
 		if s.Type != autoscalingv2.ResourceMetricSourceType {
 			continue
@@ -583,11 +583,11 @@ func findCpuUtilization(metricStatus []autoscalingv2.MetricStatus) (utilization 
 	return nil
 }
 
-func hotCPUCreationTime() metav1.Time {
+func timeNow() metav1.Time {
 	return metav1.Time{Time: time.Now()}
 }
 
-func coolCPUCreationTime() metav1.Time {
+func time3MinsAgo() metav1.Time {
 	return metav1.Time{Time: time.Now().Add(-3 * time.Minute)}
 }
 
@@ -640,7 +640,7 @@ func TestScaleCPU(t *testing.T) {
 				CPUTarget:            30,
 				reportedLevels:       []uint64{300, 500, 700},
 				reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-				reportedPodStartTime: []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime()},
+				reportedPodStartTime: []metav1.Time{timeNow(), time3MinsAgo(), time3MinsAgo()},
 			},
 			expectedDesiredReplicas: 4,
 			expectedScaleUpdated:    true,
@@ -780,7 +780,7 @@ func TestScaleCPU(t *testing.T) {
 				CPUTarget:            50,
 				reportedLevels:       []uint64{100, 300, 500, 250, 250},
 				reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-				reportedPodStartTime: []metav1.Time{coolCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
+				reportedPodStartTime: []metav1.Time{time3MinsAgo(), time3MinsAgo(), time3MinsAgo(), timeNow(), timeNow()},
 				recommendations:      []timestampedRecommendation{},
 			},
 			expectedDesiredReplicas: 2,
@@ -1128,7 +1128,7 @@ func TestScaleUpCM(t *testing.T) {
 				},
 				reportedLevels:       []uint64{50000, 10000, 30000},
 				reportedPodReadiness: []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse},
-				reportedPodStartTime: []metav1.Time{coolCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime()},
+				reportedPodStartTime: []metav1.Time{time3MinsAgo(), time3MinsAgo(), timeNow()},
 				reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 			},
 			expectedDesiredReplicas:  6,
@@ -1162,7 +1162,7 @@ func TestScaleUpCM(t *testing.T) {
 				},
 				reportedLevels:       []uint64{50000, 15000, 30000},
 				reportedPodReadiness: []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionFalse},
-				reportedPodStartTime: []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime()},
+				reportedPodStartTime: []metav1.Time{timeNow(), time3MinsAgo(), timeNow()},
 				reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 			},
 			expectedDesiredReplicas:  6,
@@ -1903,7 +1903,7 @@ func TestScaleWithOneInvalidMetric(t *testing.T) {
 					assert.Equal(t, tt.expectedDesiredReplicas, updatedHPA.Status.DesiredReplicas, "reported desired replicas should match")
 
 					if tt.expectedCPUUtilization != 0 {
-						utilization := findCpuUtilization(updatedHPA.Status.CurrentMetrics)
+						utilization := findCPUUtilization(updatedHPA.Status.CurrentMetrics)
 						if assert.NotNil(t, utilization, "CPU utilization should be reported") {
 							assert.Equal(t, tt.expectedCPUUtilization, *utilization, "CPU utilization should match")
 						}
@@ -3756,13 +3756,23 @@ func TestMetricsEdgeCases(t *testing.T) {
 				monitor.ReconciliationsTotal.WithLabelValues(string(tt.expectedActionLabel), string(tt.expectedErrorLabel)))
 			require.NoError(t, err)
 
+			beforeReconciliationDuration, err := metricstestutil.GetHistogramMetricCount(
+				monitor.ReconciliationsDuration.WithLabelValues(string(tt.expectedActionLabel), string(tt.expectedErrorLabel)))
+			require.NoError(t, err)
+
 			beforeMetricComputation := make(map[autoscalingv2.MetricSourceType]float64)
+			beforeMetricComputationDuration := make(map[autoscalingv2.MetricSourceType]uint64)
 			for metricType, expectedAction := range tt.expectedMetricComputationActionLabels {
 				expectedError := tt.expectedMetricComputationErrorLabels[metricType]
 				v, err := metricstestutil.GetCounterMetricValue(
 					monitor.MetricComputationTotal.WithLabelValues(string(expectedAction), string(expectedError), string(metricType)))
 				require.NoError(t, err)
 				beforeMetricComputation[metricType] = v
+
+				d, err := metricstestutil.GetHistogramMetricCount(
+					monitor.MetricComputationDuration.WithLabelValues(string(expectedAction), string(expectedError), string(metricType)))
+				require.NoError(t, err)
+				beforeMetricComputationDuration[metricType] = d
 			}
 
 			err = setup.controller.reconcileAutoscaler(setup.ctx, hpa, key)
@@ -3788,12 +3798,22 @@ func TestMetricsEdgeCases(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, 1, int(afterReconciliationsTotal-beforeReconciliationsTotal), "reconciliation metric should be recorded for action=%s error=%s", tt.expectedActionLabel, tt.expectedErrorLabel)
 
+			afterReconciliationDuration, err := metricstestutil.GetHistogramMetricCount(
+				monitor.ReconciliationsDuration.WithLabelValues(string(tt.expectedActionLabel), string(tt.expectedErrorLabel)))
+			require.NoError(t, err)
+			assert.Equal(t, uint64(1), afterReconciliationDuration-beforeReconciliationDuration, "reconciliation duration should be recorded for action=%s error=%s", tt.expectedActionLabel, tt.expectedErrorLabel)
+
 			for metricType, expectedAction := range tt.expectedMetricComputationActionLabels {
 				expectedError := tt.expectedMetricComputationErrorLabels[metricType]
 				v, err := metricstestutil.GetCounterMetricValue(
 					monitor.MetricComputationTotal.WithLabelValues(string(expectedAction), string(expectedError), string(metricType)))
 				require.NoError(t, err)
 				assert.Equal(t, 1, int(v-beforeMetricComputation[metricType]), "metric computation metric should be recorded for type=%s action=%s error=%s", metricType, expectedAction, expectedError)
+
+				d, err := metricstestutil.GetHistogramMetricCount(
+					monitor.MetricComputationDuration.WithLabelValues(string(expectedAction), string(expectedError), string(metricType)))
+				require.NoError(t, err)
+				assert.Equal(t, uint64(1), d-beforeMetricComputationDuration[metricType], "metric computation duration should be recorded for type=%s action=%s error=%s", metricType, expectedAction, expectedError)
 			}
 
 			for _, action := range setup.testClient.Actions() {
@@ -3929,6 +3949,7 @@ func TestEventCreation(t *testing.T) {
 }
 
 func TestConditionSelectorValidation(t *testing.T) {
+	unparsableSelector := "cheddar cheese"
 	tests := []struct {
 		name                    string
 		fixture                 horizontalScenario
@@ -3950,7 +3971,7 @@ func TestConditionSelectorValidation(t *testing.T) {
 				reportedLevels:      []uint64{100, 200, 300},
 				reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
 				resource:            &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
-				scaleSelector:       ptr.To(""),
+				scaleSelector:       new(string),
 			},
 			expectedDesiredReplicas: 3,
 			expectedScaleUpdated:    false,
@@ -3972,7 +3993,7 @@ func TestConditionSelectorValidation(t *testing.T) {
 				reportedLevels:      []uint64{100, 200, 300},
 				reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
 				resource:            &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
-				scaleSelector:       ptr.To("cheddar cheese"),
+				scaleSelector:       &unparsableSelector,
 			},
 			expectedDesiredReplicas: 3,
 			expectedScaleUpdated:    false,
@@ -4426,7 +4447,7 @@ func TestInvalidMetricSourceType(t *testing.T) {
 
 			err := setup.controller.reconcileAutoscaler(setup.ctx, hpa, key)
 			if tt.expectedError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 			}
@@ -4867,7 +4888,7 @@ func TestAvoidUnnecessaryUpdates(t *testing.T) {
 		CPUTarget:            80,
 		reportedLevels:       []uint64{400, 500, 700},
 		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		reportedPodStartTime: []metav1.Time{coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
+		reportedPodStartTime: []metav1.Time{time3MinsAgo(), timeNow(), timeNow()},
 		lastScaleTime:        &now,
 		recommendations:      []timestampedRecommendation{},
 		resource:             &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},

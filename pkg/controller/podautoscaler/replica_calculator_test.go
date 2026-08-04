@@ -514,7 +514,7 @@ func TestReplicaCalcResourceScale(t *testing.T) {
 			name: "scale up: hot-CPU container scales less",
 			fixture: calcScenario{
 				currentReplicas: 3,
-				podStartTime:    []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime()},
+				podStartTime:    []metav1.Time{timeNow(), time3MinsAgo(), time3MinsAgo()},
 				container:       "container2",
 				resource: &cpuResource{
 					requests: cpuRequests(3, "1.0"),
@@ -530,7 +530,7 @@ func TestReplicaCalcResourceScale(t *testing.T) {
 			name: "scale up: hot-CPU pod scales less",
 			fixture: calcScenario{
 				currentReplicas: 3,
-				podStartTime:    []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime()},
+				podStartTime:    []metav1.Time{timeNow(), time3MinsAgo(), time3MinsAgo()},
 				resource: &cpuResource{
 					requests: cpuRequests(3, "1.0"),
 					levels:   makePodMetricLevels(300, 500, 700),
@@ -561,7 +561,7 @@ func TestReplicaCalcResourceScale(t *testing.T) {
 			fixture: calcScenario{
 				currentReplicas: 3,
 				podReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
-				podStartTime:    []metav1.Time{coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
+				podStartTime:    []metav1.Time{time3MinsAgo(), timeNow(), timeNow()},
 				resource: &cpuResource{
 					requests: cpuRequests(3, "1.0"),
 					levels:   makePodMetricLevels(400, 500, 700),
@@ -754,7 +754,7 @@ func TestReplicaCalcResourceScale(t *testing.T) {
 			name: "scale down: ignore hot-CPU pods",
 			fixture: calcScenario{
 				currentReplicas: 5,
-				podStartTime:    []metav1.Time{coolCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
+				podStartTime:    []metav1.Time{time3MinsAgo(), time3MinsAgo(), time3MinsAgo(), timeNow(), timeNow()},
 				resource: &cpuResource{
 					requests: cpuRequests(5, "1.0"),
 					levels:   makePodMetricLevels(100, 300, 500, 250, 250),
@@ -769,7 +769,7 @@ func TestReplicaCalcResourceScale(t *testing.T) {
 			name: "scale down: container metric ignores hot-CPU pods",
 			fixture: calcScenario{
 				currentReplicas: 5,
-				podStartTime:    []metav1.Time{coolCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
+				podStartTime:    []metav1.Time{time3MinsAgo(), time3MinsAgo(), time3MinsAgo(), timeNow(), timeNow()},
 				container:       "container2",
 				resource: &cpuResource{
 					requests: cpuRequests(5, "1.0"),
@@ -980,7 +980,7 @@ func TestReplicaCalcPodMetric(t *testing.T) {
 			fixture: calcScenario{
 				currentReplicas: 3,
 				podReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse},
-				podStartTime:    []metav1.Time{coolCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime()},
+				podStartTime:    []metav1.Time{time3MinsAgo(), time3MinsAgo(), timeNow()},
 				metric:          podMetric(50000, 10000, 30000),
 			},
 			targetUsage:      15000,
@@ -992,7 +992,7 @@ func TestReplicaCalcPodMetric(t *testing.T) {
 			fixture: calcScenario{
 				currentReplicas: 3,
 				podReadiness:    []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionFalse},
-				podStartTime:    []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime()},
+				podStartTime:    []metav1.Time{timeNow(), time3MinsAgo(), timeNow()},
 				metric:          podMetric(50000, 15000, 30000),
 			},
 			targetUsage:      15000,
@@ -1512,7 +1512,7 @@ func TestReplicaCalcResourceMissingMetrics(t *testing.T) {
 			name: "no change: hot-CPU pod metric missing",
 			fixture: calcScenario{
 				currentReplicas: 3,
-				podStartTime:    []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime()},
+				podStartTime:    []metav1.Time{timeNow(), time3MinsAgo(), time3MinsAgo()},
 				resource: &cpuResource{
 					requests: cpuRequests(3, "1.0"),
 					levels:   makePodMetricLevels(100, 450),
@@ -1543,7 +1543,7 @@ func TestReplicaCalcResourceMissingMetrics(t *testing.T) {
 			fixture: calcScenario{
 				currentReplicas: 3,
 				podReadiness:    []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue},
-				podStartTime:    []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime()},
+				podStartTime:    []metav1.Time{timeNow(), time3MinsAgo(), time3MinsAgo()},
 				resource: &cpuResource{
 					requests: cpuRequests(3, "1.0"),
 					levels:   makePodMetricLevels(100, 2000),
