@@ -182,31 +182,31 @@ type MetricsProvider interface {
 
 type noopMetricsProvider struct{}
 
-func (_ noopMetricsProvider) NewDepthMetric(name string) GaugeMetric {
+func (noopMetricsProvider) NewDepthMetric(name string) GaugeMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewAddsMetric(name string) CounterMetric {
+func (noopMetricsProvider) NewAddsMetric(name string) CounterMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewLatencyMetric(name string) HistogramMetric {
+func (noopMetricsProvider) NewLatencyMetric(name string) HistogramMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewWorkDurationMetric(name string) HistogramMetric {
+func (noopMetricsProvider) NewWorkDurationMetric(name string) HistogramMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric {
+func (noopMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewLongestRunningProcessorSecondsMetric(name string) SettableGaugeMetric {
+func (noopMetricsProvider) NewLongestRunningProcessorSecondsMetric(name string) SettableGaugeMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
+func (noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
 	return noopMetric{}
 }
 
