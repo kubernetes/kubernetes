@@ -17,12 +17,14 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"regexp"
 	goruntime "runtime"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -37,6 +39,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	v1 "k8s.io/api/core/v1"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/ktesting"
 
@@ -50,6 +53,19 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 )
+
+type blockingLifecycleRunner struct {
+	started chan struct{}
+	release chan struct{}
+	done    chan struct{}
+}
+
+func (r *blockingLifecycleRunner) Run(_ context.Context, _ kubecontainer.ContainerID, _ *v1.Pod, _ *v1.Container, _ *v1.LifecycleHandler) (string, error) {
+	close(r.started)
+	defer close(r.done)
+	<-r.release
+	return "", nil
+}
 
 // TestRemoveContainer tests removing the container and its corresponding container logs.
 func TestRemoveContainer(t *testing.T) {
@@ -208,6 +224,85 @@ func TestKillContainer(t *testing.T) {
 	}
 }
 
+type terminationCancellationRuntime struct {
+	internalapi.RuntimeService
+	mainStarted chan struct{}
+	stops       chan string
+}
+
+func (r *terminationCancellationRuntime) StopContainer(ctx context.Context, containerID string, timeout int64) error {
+	r.stops <- containerID
+	if containerID == "main" && timeout == 100 {
+		close(r.mainStarted)
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	return nil
+}
+
+func TestKillContainersWithSyncResultCancellation(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		tCtx := ktesting.Init(t)
+		_, _, m, err := createTestRuntimeManager(tCtx)
+		require.NoError(t, err)
+		runtime := &terminationCancellationRuntime{
+			RuntimeService: m.runtimeService,
+			mainStarted:    make(chan struct{}),
+			stops:          make(chan string, 4),
+		}
+		m.runtimeService = runtime
+		pod := newSidecarTerminationTestPod()
+		runningPod := kubecontainer.Pod{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace}
+		for _, name := range getContainerNames(pod) {
+			runningPod.Containers = append(runningPod.Containers, &kubecontainer.Container{
+				ID: kubecontainer.ContainerID{Type: "test", ID: name}, Name: name,
+			})
+		}
+		ctx, cancel := context.WithCancel(tCtx)
+		defer cancel()
+		gracePeriod := int64(100)
+		done := make(chan []*kubecontainer.SyncResult, 1)
+		go func() {
+			done <- m.killContainersWithSyncResult(ctx, pod, runningPod, &gracePeriod)
+		}()
+		synctest.Wait()
+		select {
+		case <-runtime.mainStarted:
+		default:
+			t.Fatal("main container stop did not start")
+		}
+		start := time.Now()
+		cancel()
+		synctest.Wait()
+		select {
+		case results := <-done:
+			require.Len(t, results, 3)
+			for _, result := range results {
+				require.ErrorIs(t, result.Error, kubecontainer.ErrKillContainer)
+				require.Equal(t, context.Canceled.Error(), result.Message)
+			}
+		default:
+			t.Fatal("container termination is still blocked after cancellation")
+		}
+		require.Zero(t, time.Since(start), "cancellation must release the termination wait group immediately")
+		require.Len(t, runtime.stops, 1, "sidecar stops must not be issued after the ordering wait is canceled")
+		require.Equal(t, "main", <-runtime.stops)
+
+		// A canceled stop does not prove that main exited. The next attempt must
+		// stop it again before stopping sidecars in reverse order.
+		shorterGracePeriod := int64(10)
+		results := m.killContainersWithSyncResult(tCtx, pod, runningPod, &shorterGracePeriod)
+		require.Len(t, results, 3)
+		for _, result := range results {
+			require.NoError(t, result.Error)
+		}
+		require.Len(t, runtime.stops, 3)
+		require.Equal(t, []string{"main", "sidecar-2", "sidecar-1"}, []string{
+			<-runtime.stops, <-runtime.stops, <-runtime.stops,
+		})
+	})
+}
+
 // TestToKubeContainerStatus tests the converting the CRI container status to
 // the internal type (i.e., toKubeContainerStatus()) for containers in
 // different states.
@@ -284,6 +379,29 @@ func TestToKubeContainerStatus(t *testing.T) {
 				ExitCode:   121,
 				Reason:     "GotKilled",
 				Message:    "The container was killed",
+			},
+		},
+		"container whose start was cancelled": {
+			input: &runtimeapi.ContainerStatus{
+				Id:         cid.ID,
+				Metadata:   meta,
+				Image:      imageSpec,
+				State:      runtimeapi.ContainerState_CONTAINER_EXITED,
+				CreatedAt:  createdAt,
+				FinishedAt: finishedAt,
+				ExitCode:   int32(128),
+				Reason:     "StartError",
+				Message:    "context canceled",
+			},
+			expected: &kubecontainer.Status{
+				ID:         *cid,
+				Image:      imageSpec.Image,
+				State:      kubecontainer.ContainerStateExited,
+				CreatedAt:  time.Unix(0, createdAt),
+				FinishedAt: time.Unix(0, finishedAt),
+				ExitCode:   128,
+				Reason:     "StartError",
+				Message:    "context canceled",
 			},
 		},
 		"unknown container": {
@@ -589,6 +707,59 @@ func TestToKubeContainerStatusWithUser(t *testing.T) {
 			actual := m.toKubeContainerStatus(tCtx, podUID, cStatus, cid.Type)
 			assert.EqualValues(t, test.expected, actual.User, desc)
 		})
+	}
+}
+
+func TestExecutePreStopHookCancellation(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	runner := &blockingLifecycleRunner{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+		done:    make(chan struct{}),
+	}
+	m.runner = runner
+	defer func() {
+		select {
+		case <-runner.done:
+		default:
+			close(runner.release)
+			<-runner.done
+		}
+	}()
+
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod", Name: "pod", Namespace: "test"}}
+	container := &v1.Container{
+		Name:      "container",
+		Lifecycle: &v1.Lifecycle{PreStop: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"block"}}}},
+	}
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "container"}
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+	hookDone := make(chan struct{})
+	go func() {
+		defer close(hookDone)
+		m.executePreStopHook(ctx, pod, containerID, container, 60)
+	}()
+
+	select {
+	case <-runner.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("PreStop hook did not start")
+	}
+	cancel()
+	select {
+	case <-hookDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("executePreStopHook did not return after its context was cancelled")
+	}
+
+	close(runner.release)
+	select {
+	case <-runner.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("blocking lifecycle runner did not exit after release")
 	}
 }
 
