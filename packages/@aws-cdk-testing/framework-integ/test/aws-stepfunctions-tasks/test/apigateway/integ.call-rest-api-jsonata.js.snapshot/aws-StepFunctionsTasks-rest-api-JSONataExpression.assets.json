@@ -1,0 +1,20 @@
+{
+  "version": "53.0.0",
+  "files": {
+    "845e13d735d73e830ea286168dc5091941fd7d3a6bcac8a5590941888dfecd11": {
+      "displayName": "aws-StepFunctionsTasks-rest-api-JSONataExpression Template",
+      "source": {
+        "path": "aws-StepFunctionsTasks-rest-api-JSONataExpression.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-530cc555": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "845e13d735d73e830ea286168dc5091941fd7d3a6bcac8a5590941888dfecd11.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}
