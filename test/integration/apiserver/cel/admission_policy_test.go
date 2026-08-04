@@ -30,10 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	admissionregistrationv1apis "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
@@ -406,33 +403,16 @@ func createV1ValidatingPolicyAndBinding(ctx ktesting.TContext, client clientset.
 
 // This test shows that policy intercepts all requests for all resources,
 // subresources, verbs, and input versions of policy/binding.
-// The test emulates v1.33 as that was the last version before v1beta1 resource was removed.
-// Remove this test once v1.33 cannot be emulated in v1.37.
-//
-// This test tries to mirror very closely the same test for webhook admission
-// test/integration/apiserver/admissionwebhook/admission_test.go testWebhookAdmission
-func TestPolicyAdmissionV1beta1(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(vapV1beta1LastEmulatableVersion))
-	testPolicyAdmission(t, true)
-}
-
-// This test shows that policy intercepts all requests for all resources,
-// subresources, verbs, and input versions of policy/binding.
 //
 // This test tries to mirror very closely the same test for webhook admission
 // test/integration/apiserver/admissionwebhook/admission_test.go testWebhookAdmission
 func TestPolicyAdmission(t *testing.T) {
-	testPolicyAdmission(t, false)
+	testPolicyAdmission(t)
 }
 
-func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
+func testPolicyAdmission(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	supportedVersions := []string{}
-	if supportV1Beta1 {
-		supportedVersions = append(supportedVersions, "v1beta1")
-	} else {
-		supportedVersions = append(supportedVersions, "v1")
-	}
+	supportedVersions := []string{"v1"}
 
 	holder := &policyExpectationHolder{
 		supportedVersions: supportedVersions,
@@ -562,14 +542,8 @@ func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
 		holder.gvrToConvertedGVK[metaGVR] = schema.GroupVersionKind{Group: resourcesByGVR[convertedGVR].Group, Version: resourcesByGVR[convertedGVR].Version, Kind: resourcesByGVR[convertedGVR].Kind}
 	}
 
-	if supportV1Beta1 {
-		if err := createV1beta1ValidatingPolicyAndBinding(tCtx, client, convertedV1beta1Rules); err != nil {
-			t.Fatal(err)
-		}
-	} else {
-		if err := createV1ValidatingPolicyAndBinding(tCtx, client, convertedV1Rules); err != nil {
-			t.Fatal(err)
-		}
+	if err := createV1ValidatingPolicyAndBinding(tCtx, client, convertedV1Rules); err != nil {
+		t.Fatal(err)
 	}
 
 	testConfigmap := corev1.ConfigMap{
@@ -618,15 +592,14 @@ func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
 						holder.reset(t)
 						testFunc := getTestFunc(gvr, verb)
 						testFunc(&testContext{
-							t:                     t,
-							emulateV1beta1Version: supportV1Beta1,
-							admissionHolder:       holder,
-							client:                dynamicClient,
-							clientset:             client,
-							verb:                  verb,
-							gvr:                   gvr,
-							resource:              resource,
-							resources:             resourcesByGVR,
+							t:               t,
+							admissionHolder: holder,
+							client:          dynamicClient,
+							clientset:       client,
+							verb:            verb,
+							gvr:             gvr,
+							resource:        resource,
+							resources:       resourcesByGVR,
 						})
 						holder.verify(t)
 					})
