@@ -49,6 +49,7 @@ message ControllerRevision {
 
   // Data is the serialized representation of the state.
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:immutable
   optional .k8s.io.apimachinery.pkg.runtime.RawExtension data = 2;
 
   // Revision indicates the revision of the state represented by Data.
