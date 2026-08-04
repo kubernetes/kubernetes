@@ -564,7 +564,7 @@ func init() {
 	scaleUpLimitFactor = 8
 }
 
-func findCpuUtilization(metricStatus []autoscalingv2.MetricStatus) (utilization *int32) {
+func findCPUUtilization(metricStatus []autoscalingv2.MetricStatus) (utilization *int32) {
 	for _, s := range metricStatus {
 		if s.Type != autoscalingv2.ResourceMetricSourceType {
 			continue
@@ -1903,7 +1903,7 @@ func TestScaleWithOneInvalidMetric(t *testing.T) {
 					assert.Equal(t, tt.expectedDesiredReplicas, updatedHPA.Status.DesiredReplicas, "reported desired replicas should match")
 
 					if tt.expectedCPUUtilization != 0 {
-						utilization := findCpuUtilization(updatedHPA.Status.CurrentMetrics)
+						utilization := findCPUUtilization(updatedHPA.Status.CurrentMetrics)
 						if assert.NotNil(t, utilization, "CPU utilization should be reported") {
 							assert.Equal(t, tt.expectedCPUUtilization, *utilization, "CPU utilization should match")
 						}
@@ -3929,6 +3929,7 @@ func TestEventCreation(t *testing.T) {
 }
 
 func TestConditionSelectorValidation(t *testing.T) {
+	unparsableSelector := "cheddar cheese"
 	tests := []struct {
 		name                    string
 		fixture                 horizontalScenario
@@ -3950,7 +3951,7 @@ func TestConditionSelectorValidation(t *testing.T) {
 				reportedLevels:      []uint64{100, 200, 300},
 				reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
 				resource:            &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
-				scaleSelector:       ptr.To(""),
+				scaleSelector:       new(string),
 			},
 			expectedDesiredReplicas: 3,
 			expectedScaleUpdated:    false,
@@ -3972,7 +3973,7 @@ func TestConditionSelectorValidation(t *testing.T) {
 				reportedLevels:      []uint64{100, 200, 300},
 				reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
 				resource:            &fakeResource{name: "test-rc", apiVersion: "v1", kind: "ReplicationController"},
-				scaleSelector:       ptr.To("cheddar cheese"),
+				scaleSelector:       &unparsableSelector,
 			},
 			expectedDesiredReplicas: 3,
 			expectedScaleUpdated:    false,
@@ -4426,7 +4427,7 @@ func TestInvalidMetricSourceType(t *testing.T) {
 
 			err := setup.controller.reconcileAutoscaler(setup.ctx, hpa, key)
 			if tt.expectedError {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 			}
