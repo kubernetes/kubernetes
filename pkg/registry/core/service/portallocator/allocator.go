@@ -49,7 +49,7 @@ type ErrNotInRange struct {
 }
 
 func (e *ErrNotInRange) Error() string {
-	return fmt.Sprintf("provided port is not in the valid range. The range of valid ports is %s", e.ValidPorts)
+	return "provided port is not in the valid range"
 }
 
 type PortAllocator struct {

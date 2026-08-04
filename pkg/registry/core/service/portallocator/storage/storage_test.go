@@ -115,17 +115,17 @@ func TestAllocate(t *testing.T) {
 		{
 			name:   "Allocate invalid port: base port minus 1",
 			port:   basePortRange - 1,
-			errMsg: fmt.Sprintf("provided port is not in the valid range. The range of valid ports is %d-%d", basePortRange, basePortRange+sizePortRange-1),
+			errMsg: "provided port is not in the valid range",
 		},
 		{
 			name:   "Allocate invalid port: maximum port from the port range plus 1",
 			port:   basePortRange + sizePortRange,
-			errMsg: fmt.Sprintf("provided port is not in the valid range. The range of valid ports is %d-%d", basePortRange, basePortRange+sizePortRange-1),
+			errMsg: "provided port is not in the valid range",
 		},
 		{
 			name:   "Allocate invalid port",
 			port:   -2,
-			errMsg: fmt.Sprintf("provided port is not in the valid range. The range of valid ports is %d-%d", basePortRange, basePortRange+sizePortRange-1),
+			errMsg: "provided port is not in the valid range",
 		},
 	}
 	for _, tt := range tests {
