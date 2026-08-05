@@ -22,12 +22,10 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/cel/common"
 	"k8s.io/apiserver/pkg/cel/environment"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	openapierrors "k8s.io/kube-openapi/pkg/validation/errors"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
@@ -77,21 +75,6 @@ func WithRatcheting(correlation *common.CorrelatedObject) ValidationOption {
 	}
 }
 
-// basicSchemaValidator wraps a kube-openapi SchemaCreateValidator to
-// support ValidateUpdate. It implements ValidateUpdate by simply validating
-// the new value via kube-openapi, ignoring the old value
-type basicSchemaValidator struct {
-	*validate.SchemaValidator
-}
-
-func (s basicSchemaValidator) Validate(new interface{}, options ...ValidationOption) *validate.Result {
-	return s.SchemaValidator.Validate(new)
-}
-
-func (s basicSchemaValidator) ValidateUpdate(new, old interface{}, options ...ValidationOption) *validate.Result {
-	return s.Validate(new, options...)
-}
-
 // NewSchemaValidator creates an openapi schema validator for the given CRD validation using environment.DefaultCompatibilityVersion().
 func NewSchemaValidator(customResourceValidation *apiextensions.JSONSchemaProps) (SchemaValidator, *spec.Schema, error) {
 	return NewSchemaValidatorForVersion(customResourceValidation, environment.DefaultCompatibilityVersion())
@@ -99,11 +82,7 @@ func NewSchemaValidator(customResourceValidation *apiextensions.JSONSchemaProps)
 
 // NewSchemaValidatorForVersion creates an openapi schema validator for the given CRD validation and compatibilityVersion.
 //
-// If feature `CRDValidationRatcheting` is disabled, this returns a validator which
-// validates all `Update`s and `Create`s as a `Create` - without considering old value.
-//
-// If feature `CRDValidationRatcheting` is enabled - the validator returned
-// will support ratcheting unchanged correlatable fields across an update.
+// The returned validator supports ratcheting unchanged correlatable fields across an update.
 func NewSchemaValidatorForVersion(customResourceValidation *apiextensions.JSONSchemaProps, compatibilityVersion *version.Version) (SchemaValidator, *spec.Schema, error) {
 	// Convert CRD schema to openapi schema
 	openapiSchema := &spec.Schema{}
@@ -118,24 +97,14 @@ func NewSchemaValidatorForVersion(customResourceValidation *apiextensions.JSONSc
 }
 
 func NewSchemaValidatorFromOpenAPI(openapiSchema *spec.Schema) SchemaValidator {
-	if utilfeature.DefaultFeatureGate.Enabled(features.CRDValidationRatcheting) {
-		return NewRatchetingSchemaValidator(openapiSchema, nil, "", strfmt.Default)
-	}
-	return basicSchemaValidator{validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)}
-
+	return NewRatchetingSchemaValidator(openapiSchema, nil, "", strfmt.Default)
 }
 
 // ValidateCustomResourceUpdate validates the transition of Custom Resource from
 // `old` to `new` against the schema in the CustomResourceDefinition.
 // Both customResource and old represent a JSON data structures.
-//
-// If feature `CRDValidationRatcheting` is disabled, this behaves identically to
-// ValidateCustomResource(customResource).
 func ValidateCustomResourceUpdate(fldPath *field.Path, customResource, old interface{}, validator SchemaValidator, options ...ValidationOption) field.ErrorList {
-	// Additional feature gate check for sanity
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CRDValidationRatcheting) {
-		return ValidateCustomResource(nil, customResource, validator)
-	} else if validator == nil {
+	if validator == nil {
 		return nil
 	}
 

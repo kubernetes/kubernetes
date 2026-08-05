@@ -31,7 +31,6 @@ import (
 	structurallisttype "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype"
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +46,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/jsonpath"
 )
 
@@ -281,12 +279,9 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 
 	var options []validation.ValidationOption
 	var celOptions []cel.Option
-	var correlatedObject *common.CorrelatedObject
-	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
-		correlatedObject = common.NewCorrelatedObject(uNew.Object, uOld.Object, &model.Structural{Structural: a.structuralSchema})
-		options = append(options, validation.WithRatcheting(correlatedObject))
-		celOptions = append(celOptions, cel.WithRatcheting(correlatedObject))
-	}
+	correlatedObject := common.NewCorrelatedObject(uNew.Object, uOld.Object, &model.Structural{Structural: a.structuralSchema})
+	options = append(options, validation.WithRatcheting(correlatedObject))
+	celOptions = append(celOptions, cel.WithRatcheting(correlatedObject))
 
 	var errs field.ErrorList
 	errs = append(errs, a.validator.ValidateUpdate(ctx, uNew, uOld, a.scale, options...)...)
@@ -310,9 +305,7 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	}
 
 	// No-op if not attached to context
-	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
-		validation.Metrics.ObserveRatchetingTime(*correlatedObject.Duration)
-	}
+	validation.Metrics.ObserveRatchetingTime(*correlatedObject.Duration)
 	return errs
 }
 

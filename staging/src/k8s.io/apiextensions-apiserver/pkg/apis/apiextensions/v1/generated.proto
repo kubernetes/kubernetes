@@ -772,7 +772,6 @@ message ValidationRule {
   //
   // May not be set unless `oldSelf` is used in `rule`.
   //
-  // +featureGate=CRDValidationRatcheting
   // +optional
   optional bool optionalOldSelf = 6;
 }

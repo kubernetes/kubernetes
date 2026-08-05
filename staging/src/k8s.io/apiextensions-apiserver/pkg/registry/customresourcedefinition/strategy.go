@@ -362,61 +362,9 @@ func CustomResourceDefinitionToSelectableFields(obj *apiextensions.CustomResourc
 // dropDisabledFields drops disabled fields that are not used if their associated feature gates
 // are not enabled.
 func dropDisabledFields(newCRD *apiextensions.CustomResourceDefinition, oldCRD *apiextensions.CustomResourceDefinition) {
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) && (oldCRD == nil || !specHasOptionalOldSelf(&oldCRD.Spec)) {
-		if newCRD.Spec.Validation != nil {
-			dropOptionalOldSelfField(newCRD.Spec.Validation.OpenAPIV3Schema)
-		}
-
-		for _, v := range newCRD.Spec.Versions {
-			if v.Schema != nil {
-				dropOptionalOldSelfField(v.Schema.OpenAPIV3Schema)
-			}
-		}
-	}
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDObservedGenerationTracking) && (oldCRD == nil || !observedGenerationTrackingInUse(&oldCRD.Status)) {
 		dropObservedGeneration(&newCRD.Status)
 	}
-}
-
-// dropOptionalOldSelfField drops field optionalOldSelf from CRD schema
-func dropOptionalOldSelfField(schema *apiextensions.JSONSchemaProps) {
-	if schema == nil {
-		return
-	}
-	for i := range schema.XValidations {
-		schema.XValidations[i].OptionalOldSelf = nil
-	}
-
-	if schema.AdditionalProperties != nil {
-		dropOptionalOldSelfField(schema.AdditionalProperties.Schema)
-	}
-	for def, jsonSchema := range schema.Properties {
-		dropOptionalOldSelfField(&jsonSchema)
-		schema.Properties[def] = jsonSchema
-	}
-	if schema.Items != nil {
-		dropOptionalOldSelfField(schema.Items.Schema)
-		for i, jsonSchema := range schema.Items.JSONSchemas {
-			dropOptionalOldSelfField(&jsonSchema)
-			schema.Items.JSONSchemas[i] = jsonSchema
-		}
-	}
-}
-
-func specHasOptionalOldSelf(spec *apiextensions.CustomResourceDefinitionSpec) bool {
-	return validation.HasSchemaWith(spec, schemaHasOptionalOldSelf)
-}
-
-func schemaHasOptionalOldSelf(s *apiextensions.JSONSchemaProps) bool {
-	return validation.SchemaHas(s, func(s *apiextensions.JSONSchemaProps) bool {
-		for _, v := range s.XValidations {
-			if v.OptionalOldSelf != nil {
-				return true
-			}
-
-		}
-		return false
-	})
 }
 
 func dropObservedGeneration(status *apiextensions.CustomResourceDefinitionStatus) {
