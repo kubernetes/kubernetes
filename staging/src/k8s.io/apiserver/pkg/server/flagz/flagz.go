@@ -14,6 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package flagz implements the /flagz endpoint, which exposes the
+// command-line flag layer of a component: the value each flag was
+// explicitly set to, or the flag's default value when it was not set.
+//
+// /flagz does not reflect the component's resolved (effective) runtime
+// configuration. Settings that come from configuration files or other
+// non-flag sources are not visible here; where implemented, the resolved
+// configuration is exposed by the /configz endpoint instead. The two
+// endpoints are complementary views and neither is a superset of the
+// other. Endpoint availability also differs by component: not every
+// component serves both (for example, kube-apiserver does not expose
+// /configz).
 package flagz
 
 import (

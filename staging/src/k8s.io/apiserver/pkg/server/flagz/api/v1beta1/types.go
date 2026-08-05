@@ -32,6 +32,10 @@ type Flagz struct {
 	// Flags contains the command-line flags and their values.
 	// The keys are the flag names and the values are the flag values,
 	// possibly with confidential values redacted.
+	// Values reflect the flag layer only: the value a flag was explicitly
+	// set to, or its default when unset. They do not necessarily match the
+	// component's resolved runtime configuration, which may come from
+	// configuration files and is exposed by /configz where implemented.
 	// +optional
 	Flags map[string]string `json:"flags,omitempty"`
 }

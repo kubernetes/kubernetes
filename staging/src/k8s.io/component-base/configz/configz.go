@@ -16,6 +16,15 @@ limitations under the License.
 
 // Package configz serves ComponentConfig objects from running components.
 //
+// The /configz endpoint reflects the component's resolved (effective)
+// configuration as registered by the component, typically the merged
+// result of defaults, configuration files, and command-line overrides.
+// This differs from the /flagz endpoint, which reports only the
+// command-line flag layer (explicitly set flag values, or flag defaults
+// when unset). The two endpoints are complementary and neither is a
+// superset of the other. Not every component implements /configz (for
+// example, kube-apiserver does not register one).
+//
 // Each component that wants to serve its ComponentConfig creates a Config
 // object, and the program should call InstallHandler once. e.g.,
 //
