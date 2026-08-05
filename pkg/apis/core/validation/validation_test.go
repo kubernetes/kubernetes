@@ -32959,6 +32959,7 @@ func TestValidateBasicResource(t *testing.T) {
 		{name: "positive", quantity: "1Gi"},
 		{name: "positive, above MaxInt64", quantity: "1000E"},
 		{name: "positive, far above MaxInt64", quantity: "1e30"},
+		{name: "positive, Value() wraps negative", quantity: "9223372036854775808"},
 
 		{name: "negative", quantity: "-1Gi", wantErr: true},
 		{name: "negative, Value() overflows positive", quantity: "-9.5Gi", wantErr: true},
