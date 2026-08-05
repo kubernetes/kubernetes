@@ -45,7 +45,6 @@ func TestNewBuilder(t *testing.T) {
 		wantedItemsSchema string
 
 		v2                bool // produce OpenAPIv2
-		includeSelectable bool // include selectable fields
 		version           string
 	}{
 		{
@@ -53,7 +52,6 @@ func TestNewBuilder(t *testing.T) {
 			"",
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`, `{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
-			false,
 			"v1",
 		},
 		{"with properties",
@@ -61,7 +59,6 @@ func TestNewBuilder(t *testing.T) {
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
-			false,
 			"v1",
 		},
 		{"type only",
@@ -69,7 +66,6 @@ func TestNewBuilder(t *testing.T) {
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
-			false,
 			"v1",
 		},
 		{"preserve unknown at root v2",
@@ -77,7 +73,6 @@ func TestNewBuilder(t *testing.T) {
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
-			false,
 			"v1",
 		},
 		{"with extensions",
@@ -182,7 +177,6 @@ func TestNewBuilder(t *testing.T) {
 }`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
-			false,
 			"v1",
 		},
 		{
@@ -190,7 +184,6 @@ func TestNewBuilder(t *testing.T) {
 			`{"type":"object","properties":{"spec":{"type":"object"},"status":{"type":"object"}}}`,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v2"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v2.Foo"}`,
-			true,
 			true,
 			"v2",
 		},
@@ -232,7 +225,7 @@ func TestNewBuilder(t *testing.T) {
 					},
 					Scope: apiextensionsv1.NamespaceScoped,
 				},
-			}, tt.version, schema, Options{V2: tt.v2, IncludeSelectableFields: tt.includeSelectable})
+			}, tt.version, schema, Options{V2: tt.v2})
 
 			var wantedSchema, wantedItemsSchema spec.Schema
 			if err := json.Unmarshal([]byte(tt.wantedSchema), &wantedSchema); err != nil {
@@ -451,16 +444,9 @@ func TestBuildOpenAPIV2(t *testing.T) {
 			opts:         Options{V2: true},
 		},
 		{
-			name:             "with selectable fields enabled",
+			name:             "with selectable fields",
 			schema:           `{"type":"object","properties":{"foo":{"type":"string"}}}`,
 			wantedSchema:     `{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}], "x-kubernetes-selectable-fields": [{"fieldPath":"foo"}]}`,
-			opts:             Options{V2: true, IncludeSelectableFields: true},
-			selectableFields: []apiextensionsv1.SelectableField{{JSONPath: "foo"}},
-		},
-		{
-			name:             "with selectable fields disabled",
-			schema:           `{"type":"object","properties":{"foo":{"type":"string"}}}`,
-			wantedSchema:     `{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			opts:             Options{V2: true},
 			selectableFields: []apiextensionsv1.SelectableField{{JSONPath: "foo"}},
 		},
@@ -562,16 +548,9 @@ func TestBuildOpenAPIV3(t *testing.T) {
 			wantedSchema: `{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"allOf":[{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}]},"spec":{"type":"object","properties":{"field":{"type":"string","default":"foo"}}},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 		},
 		{
-			name:             "with selectable fields enabled",
+			name:             "with selectable fields",
 			schema:           `{"type":"object","properties":{"spec":{"type":"object","properties":{"field":{"type":"string","default":"foo"}}},"status":{"type":"object"}}}`,
 			wantedSchema:     `{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"allOf":[{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}]},"spec":{"type":"object","properties":{"field":{"type":"string","default":"foo"}}},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}], "x-kubernetes-selectable-fields": [{"fieldPath":"spec.field"}]}`,
-			opts:             Options{IncludeSelectableFields: true},
-			selectableFields: []apiextensionsv1.SelectableField{{JSONPath: "spec.field"}},
-		},
-		{
-			name:             "with selectable fields disabled",
-			schema:           `{"type":"object","properties":{"spec":{"type":"object","properties":{"field":{"type":"string","default":"foo"}}},"status":{"type":"object"}}}`,
-			wantedSchema:     `{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"allOf":[{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}]},"spec":{"type":"object","properties":{"field":{"type":"string","default":"foo"}}},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			selectableFields: []apiextensionsv1.SelectableField{{JSONPath: "spec.field"}},
 		},
 	}
